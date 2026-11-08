@@ -102,16 +102,30 @@ export function personaMemorySlice(
   maxLines: number = PERSONA_MEMORY_MAX_LINES,
   maxTokens: number = PERSONA_MEMORY_MAX_TOKENS,
 ): string | null {
-  const lines = memoryText.split(NL);
+  const lines = withoutBlankEdges(memoryText.split(NL));
+  if (lines.length === 0) {
+    return null;
+  }
+  const picked = newestLessons(lines, maxLines, maxTokens);
+  // The file's own `# Memory` header is not a lesson either.
+  while (picked.length > 0 && picked[0]!.trimStart().startsWith('#')) {
+    picked.shift();
+  }
+  return picked.length === 0 ? null : picked.join(NL);
+}
+
+function withoutBlankEdges(lines: string[]): string[] {
   while (lines.length > 0 && lines[0]!.trim() === '') {
     lines.shift();
   }
   while (lines.length > 0 && lines[lines.length - 1]!.trim() === '') {
     lines.pop();
   }
-  if (lines.length === 0) {
-    return null;
-  }
+  return lines;
+}
+
+/** The newest non-blank lines that fit both budgets, in file order. */
+function newestLessons(lines: readonly string[], maxLines: number, maxTokens: number): string[] {
   const picked: string[] = [];
   let tokens = 0;
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -126,11 +140,7 @@ export function personaMemorySlice(
     picked.unshift(line);
     tokens += lineTokens;
   }
-  // The file's own `# Memory` header is not a lesson either.
-  while (picked.length > 0 && picked[0]!.trimStart().startsWith('#')) {
-    picked.shift();
-  }
-  return picked.length === 0 ? null : picked.join(NL);
+  return picked;
 }
 
 /** The instruction's `## Skills` section for a persona's skills (D-46), or null when it carries none. */

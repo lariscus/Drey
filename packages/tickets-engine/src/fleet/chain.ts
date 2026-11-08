@@ -171,40 +171,53 @@ export function planDispatch(input: PlanDispatchInput): readonly PlannedDispatch
   if (input.master !== 'run') {
     return [];
   }
-  interface Candidate {
-    readonly card: TicketCard;
-    readonly phase: PipelinePhase;
-    readonly columnIndex: number;
-    readonly position: number;
+  return assignSlots(input, sortedCandidates(input));
+}
+
+interface DispatchCandidate {
+  readonly card: TicketCard;
+  readonly phase: PipelinePhase;
+  readonly columnIndex: number;
+  readonly position: number;
+}
+
+/** Whether a column dispatches now: automatic, with a move target, playing, not cooling down. */
+function columnFires(input: PlanDispatchInput, phase: PipelinePhase): boolean {
+  if (!isAutoPhase(phase) || nextPhaseIdOf(input.columns, phase.id) === null) {
+    return false; // a manual step, or the terminal column has nothing to move into
   }
-  const candidates: Candidate[] = [];
-  for (let i = 0; i < input.columns.length; i++) {
-    const column = input.columns[i]!;
-    const phase = column.phase;
-    if (!isAutoPhase(phase) || nextPhaseIdOf(input.columns, phase.id) === null) {
-      continue; // a manual step, or the terminal column has nothing to move into
-    }
-    if ((input.modes[phase.id] ?? 'playing') !== 'playing') {
-      continue;
-    }
-    const cooldown = input.cooldownUntil?.[phase.id];
-    if (cooldown !== undefined && !Number.isNaN(Date.parse(cooldown)) && (input.nowMs ?? Date.now()) < Date.parse(cooldown)) {
-      continue; // a red gate's breather — the column cools down before it fires again
+  if ((input.modes[phase.id] ?? 'playing') !== 'playing') {
+    return false;
+  }
+  const cooldown = input.cooldownUntil?.[phase.id];
+  // a red gate's breather — the column cools down before it fires again
+  return cooldown === undefined || Number.isNaN(Date.parse(cooldown)) || (input.nowMs ?? Date.now()) >= Date.parse(cooldown);
+}
+
+/** Every dispatchable card of a firing column, by priority class, then the rightmost column, then position. */
+function sortedCandidates(input: PlanDispatchInput): DispatchCandidate[] {
+  const candidates: DispatchCandidate[] = [];
+  input.columns.forEach((column, columnIndex) => {
+    if (!columnFires(input, column.phase)) {
+      return;
     }
     column.tickets.forEach((card, position) => {
       if (dispatchable(card, input.busyTickets)) {
-        candidates.push({ card, phase, columnIndex: i, position });
+        candidates.push({ card, phase: column.phase, columnIndex, position });
       }
     });
-  }
-  candidates.sort(
+  });
+  const priorities = input.priorities ?? DEFAULT_PRIORITY_CONFIG;
+  return candidates.sort(
     (a, b) =>
-      priorityClass(a.card.meta.priority, input.priorities ?? DEFAULT_PRIORITY_CONFIG) -
-        priorityClass(b.card.meta.priority, input.priorities ?? DEFAULT_PRIORITY_CONFIG) ||
+      priorityClass(a.card.meta.priority, priorities) - priorityClass(b.card.meta.priority, priorities) ||
       b.columnIndex - a.columnIndex ||
       a.position - b.position,
   );
+}
 
+/** Each candidate takes a slot of its provider's pool while one is free; a running run is never preempted. */
+function assignSlots(input: PlanDispatchInput, candidates: readonly DispatchCandidate[]): PlannedDispatch[] {
   const free: Record<WorkerProviderId, number> = { opencode: 0, 'claude-code': 0, kimi: 0 };
   for (const provider of WORKER_PROVIDERS) {
     free[provider] = (input.poolSize[provider] ?? 0) - (input.liveByPool[provider] ?? 0);

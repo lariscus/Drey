@@ -1,6 +1,7 @@
-import { hostname } from 'node:os';
-
 import { TicketStoreError, type Claim, type TicketStore } from '../ports/ticket-store';
+import { withStage } from './run-lease-text';
+
+export { dricketTrailers, runOwnerId, trailerInstruction, withStage } from './run-lease-text';
 
 /**
  * The run's claim on a dricket ticket (E14-5, ADR-0090 decision 2). One
@@ -23,55 +24,6 @@ const MIN_EXTEND_MS = 30_000;
 /** A failed extension (network, busy store) is retried after this. */
 const RETRY_EXTEND_MS = 60_000;
 
-/** `agent-<run id>@<host>` in dk's owner grammar (`[a-z0-9._@-]`, requirements Q-02): stable per run, so an adopted run re-claims idempotently. */
-export function runOwnerId(runId: string, host: string = hostname()): string {
-  const clean = (text: string): string => text.toLowerCase().replaceAll(/[^a-z0-9._-]/g, '-');
-  return `agent-${clean(runId)}@${clean(host)}`;
-}
-
-/** The commit trailers of protocol.md ("Code repositories"): what `dk validate --trailers` checks. */
-export function dricketTrailers(input: {
-  readonly dricketId: string;
-  readonly epoch: number;
-  readonly actor: string;
-  readonly op: string;
-}): readonly string[] {
-  return [
-    `Dricket-Ticket: ${input.dricketId}`,
-    `Dricket-Epoch: ${input.epoch}`,
-    `Dricket-Op: ${input.op}`,
-    `Dricket-Actor: ${input.actor}`,
-  ];
-}
-
-/** The instruction block that makes a worker's commits carry the trailers. */
-export function trailerInstruction(trailers: readonly string[]): string {
-  return [
-    '## Commit trailers',
-    '',
-    'The ticket store checks every commit of this branch for these trailers. Put them in the',
-    'trailer block (the last paragraph) of every commit message you write, unchanged:',
-    '',
-    ...trailers.map((line) => `    ${line}`),
-  ].join('\n');
-}
-
-/** `stage:` of a ticket document set to `stage` (the first header line only); null when the document has no stage line. */
-export function withStage(text: string, stage: string): string | null {
-  const eol = text.includes(String.fromCharCode(13)) ? String.fromCharCode(13, 10) : String.fromCharCode(10);
-  const lines = text.split(eol);
-  if (lines[0] !== '---') {
-    return null;
-  }
-  const close = lines.indexOf('---', 1);
-  const at = lines.findIndex((line, i) => i > 0 && (close < 0 || i < close) && /^stage:/.test(line));
-  if (at < 0) {
-    return null;
-  }
-  lines[at] = `stage: ${stage}`;
-  return lines.join(eol);
-}
-
 export interface LeaseReleaseOptions {
   /**
    * The stage the ticket should END in when the release itself may not stay put (R-31: dk
@@ -85,6 +37,13 @@ export interface LeaseReleaseOptions {
 export type LeaseRelease =
   | { readonly ok: true; readonly stage: string }
   | { readonly ok: false; readonly lost: boolean; readonly error: string };
+
+const LOST_RELEASE: LeaseRelease = { ok: false, lost: true, error: 'the claim was lost - nothing is written' };
+
+/** One `dk release` to one stage. */
+type ReleaseAttempt =
+  | { readonly kind: 'released'; readonly stage: string }
+  | { readonly kind: 'lost' | 'invalid' | 'failed'; readonly error: string };
 
 export interface RunLeaseOptions {
   readonly store: TicketStore;
@@ -174,45 +133,65 @@ export class RunLease {
    */
   async release(candidates: readonly (string | null)[], note: string | null, options: LeaseReleaseOptions = {}): Promise<LeaseRelease> {
     if (this.fenced) {
-      return { ok: false, lost: true, error: 'the claim was lost - nothing is written' };
+      return LOST_RELEASE;
     }
     this.stopKeepAlive();
     if (note !== null && note !== '') {
       await this.comment(note);
       if (this.fenced) {
-        return { ok: false, lost: true, error: 'the claim was lost - nothing is written' };
+        return LOST_RELEASE;
       }
     }
     const stages = [...new Set(candidates.filter((s): s is string => s !== null && s !== ''))];
+    return this.releaseToFirst(stages, options.restoreTo ?? null);
+  }
+
+  /** Tries each stage in order until dk accepts one; only an `invalid` answer goes on to the next. */
+  private async releaseToFirst(stages: readonly string[], restoreTo: string | null): Promise<LeaseRelease> {
     let last = 'no target stage';
     let restoreRefused = false;
     for (const stage of stages.length > 0 ? stages : [undefined]) {
-      try {
-        const answer = await this.options.store.release(this.options.ticketId, {
-          actor: this.options.actor,
-          ...(stage === undefined ? {} : { stage }),
-        });
-        this.released = true;
-        if (restoreRefused && options.restoreTo !== undefined && options.restoreTo !== null && answer.stage !== options.restoreTo) {
-          const restored = await this.restoreStage(options.restoreTo);
-          return { ok: true, stage: restored ? options.restoreTo : answer.stage };
-        }
-        return { ok: true, stage: answer.stage };
-      } catch (error) {
-        if (error instanceof TicketStoreError && error.kind === 'claim-lost') {
-          this.fence(error.message);
-          return { ok: false, lost: true, error: error.message };
-        }
-        last = errorText(error);
-        if (stage !== undefined && stage === options.restoreTo && error instanceof TicketStoreError && error.kind === 'invalid') {
-          restoreRefused = true;
-        }
-        if (!(error instanceof TicketStoreError && error.kind === 'invalid')) {
-          break; // a network or store failure does not get better with another stage
-        }
+      const attempt = await this.releaseOnce(stage);
+      if (attempt.kind === 'released') {
+        return this.afterRelease(attempt.stage, restoreRefused ? restoreTo : null);
+      }
+      if (attempt.kind === 'lost') {
+        return { ok: false, lost: true, error: attempt.error };
+      }
+      last = attempt.error;
+      restoreRefused ||= attempt.kind === 'invalid' && stage !== undefined && stage === restoreTo;
+      if (attempt.kind !== 'invalid') {
+        break; // a network or store failure does not get better with another stage
       }
     }
     return { ok: false, lost: false, error: last };
+  }
+
+  private async releaseOnce(stage: string | undefined): Promise<ReleaseAttempt> {
+    try {
+      const answer = await this.options.store.release(this.options.ticketId, {
+        actor: this.options.actor,
+        ...(stage === undefined ? {} : { stage }),
+      });
+      this.released = true;
+      return { kind: 'released', stage: answer.stage };
+    } catch (error) {
+      if (error instanceof TicketStoreError && error.kind === 'claim-lost') {
+        this.fence(error.message);
+        return { kind: 'lost', error: error.message };
+      }
+      const invalid = error instanceof TicketStoreError && error.kind === 'invalid';
+      return { kind: invalid ? 'invalid' : 'failed', error: errorText(error) };
+    }
+  }
+
+  /** `restoreTo` is set when the stage to restore was refused and the release had to retreat. */
+  private async afterRelease(stage: string, restoreTo: string | null): Promise<LeaseRelease> {
+    if (restoreTo !== null && stage !== restoreTo) {
+      const restored = await this.restoreStage(restoreTo);
+      return { ok: true, stage: restored ? restoreTo : stage };
+    }
+    return { ok: true, stage };
   }
 
   /**
@@ -361,19 +340,23 @@ export class RunLease {
       }
       this.scheduleExtend();
     } catch (error) {
-      if (error instanceof TicketStoreError && error.kind === 'claim-lost') {
-        this.fence(error.message);
-        return;
-      }
-      if (error instanceof TicketStoreError && (error.kind === 'invalid' || error.kind === 'forbidden')) {
-        // The extension budget is spent: the lease runs out on its own; keep working until dk says no.
-        this.options.log(`run ${this.options.runId}: ${this.options.ticketId} lease not extended - ${error.message}`);
-        this.extendStopped = true;
-        return;
-      }
-      this.options.log(`run ${this.options.runId}: lease extension of ${this.options.ticketId} failed (retrying) - ${errorText(error)}`);
-      this.arm(RETRY_EXTEND_MS);
+      this.extendFailed(error);
     }
+  }
+
+  private extendFailed(error: unknown): void {
+    if (error instanceof TicketStoreError && error.kind === 'claim-lost') {
+      this.fence(error.message);
+      return;
+    }
+    if (error instanceof TicketStoreError && (error.kind === 'invalid' || error.kind === 'forbidden')) {
+      // The extension budget is spent: the lease runs out on its own; keep working until dk says no.
+      this.options.log(`run ${this.options.runId}: ${this.options.ticketId} lease not extended - ${error.message}`);
+      this.extendStopped = true;
+      return;
+    }
+    this.options.log(`run ${this.options.runId}: lease extension of ${this.options.ticketId} failed (retrying) - ${errorText(error)}`);
+    this.arm(RETRY_EXTEND_MS);
   }
 }
 
