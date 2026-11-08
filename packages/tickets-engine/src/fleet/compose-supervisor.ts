@@ -167,7 +167,7 @@ function prepareOf(rt: Runtime, git: TicketsGitSeam): PrepareWorktree {
     const needle = normalizeForMatch(worktreePath);
     return rt.repo.list().some((r) => !isTerminal(r.state) && normalizeForMatch(r.worktreePath) === needle);
   };
-  return (request, worktreePath) => defaultPrepareWorktree(git, request, worktreePath, () => rt.clock.now(), isLive);
+  return (request, worktreePath) => defaultPrepareWorktree({ git, request, worktreePath, now: () => rt.clock.now(), isLive });
 }
 
 function starterOf(rt: Runtime, handover: RunnerHandover, git: TicketsGitSeam): RunStarter {

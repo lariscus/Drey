@@ -576,7 +576,9 @@ extraction, ADR-0088):
   the supervisor's and the chain's parts with the one ticket writer
   `RunBookkeeper`, `harness/` the adapter contract and the Claude Code,
   OpenCode and Kimi adapters, `store/` the ticket store port, `api/` the
-  HTTP routes, `ports/`, and `runner.ts` the composition root; worktrees,
+  HTTP routes and the `GET /events` stream, `ports/` (clock, file
+  system, process table and spawner, event sink — the core imports no
+  Node built-in), and `runner.ts` the composition root; worktrees,
   telemetry beside them · `src/contracts`
   the cross-layer types and pure helpers · `src/services` since E2a the
   host-agnostic board service behind `EngineHost`/`FleetPort` ·

@@ -96,7 +96,7 @@ describe('prepareWorktree (real git)', () => {
   const siblings = async (): Promise<readonly string[]> => await fsp.readdir(path.dirname(worktreePath));
 
   it('creates a fresh worktree from the base ref when nothing exists', async () => {
-    const result = await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    const result = await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     expect(result).toEqual({ outcome: 'created', sessionInvalidated: false, movedTo: null });
     expect(await headOf(worktreePath)).toBe(BRANCH);
     await expect(git(repo, ['rev-parse', '--verify', `refs/heads/${BRANCH}`])).resolves.toBeDefined();
@@ -104,17 +104,17 @@ describe('prepareWorktree (real git)', () => {
 
   it('creates over an existing empty directory', async () => {
     await fsp.mkdir(worktreePath, { recursive: true });
-    const result = await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    const result = await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     expect(result).toEqual({ outcome: 'created', sessionInvalidated: false, movedTo: null });
     expect(await headOf(worktreePath)).toBe(BRANCH);
   });
 
   it('reuses a registered worktree and its dirty state survives (retry keeps the half-finished work)', async () => {
-    await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     await fsp.writeFile(path.join(worktreePath, 'file.txt'), 'edited\n');
     await fsp.writeFile(path.join(worktreePath, 'untracked.txt'), 'new\n');
 
-    const result = await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    const result = await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     expect(result).toEqual({ outcome: 'reused', sessionInvalidated: false, movedTo: null });
     await expect(fsp.readFile(path.join(worktreePath, 'file.txt'), 'utf8')).resolves.toBe('edited\n');
     await expect(fsp.readFile(path.join(worktreePath, 'untracked.txt'), 'utf8')).resolves.toBe('new\n');
@@ -132,10 +132,10 @@ describe('prepareWorktree (real git)', () => {
       await execFileAsync('cmd', ['/c', 'mklink', '/J', aliasBase, baseDir], { windowsHide: true });
       try {
         const aliasPath = path.join(aliasBase, 'fleet-root', 'worktrees', 'repo-T-0091');
-        await prepareWorktree(fleetGit(), req(), aliasPath, frozen);
+        await prepareWorktree({ git: fleetGit(), request: req(), worktreePath: aliasPath, now: frozen });
         await fsp.writeFile(path.join(aliasPath, 'untracked.txt'), 'kept\n');
 
-        const result = await prepareWorktree(fleetGit(), req(), aliasPath, frozen);
+        const result = await prepareWorktree({ git: fleetGit(), request: req(), worktreePath: aliasPath, now: frozen });
         expect(result).toEqual({ outcome: 'reused', sessionInvalidated: false, movedTo: null });
         await expect(fsp.readFile(path.join(aliasPath, 'untracked.txt'), 'utf8')).resolves.toBe(
           'kept\n',
@@ -148,12 +148,12 @@ describe('prepareWorktree (real git)', () => {
   );
 
   it('re-creates a removed worktree with the branch history intact', async () => {
-    await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     await git(worktreePath, ['commit', '--allow-empty', '-m', 'worktree work']);
     const tip = (await git(repo, ['rev-parse', BRANCH])).trim();
     await fsp.rm(worktreePath, { recursive: true, force: true });
 
-    const result = await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    const result = await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     expect(result).toEqual({ outcome: 'created', sessionInvalidated: false, movedTo: null });
     expect((await git(repo, ['rev-parse', BRANCH])).trim()).toBe(tip);
     expect(await headOf(worktreePath)).toBe(BRANCH);
@@ -165,14 +165,14 @@ describe('prepareWorktree (real git)', () => {
    *  ticket's checkout in another base (the legacy fleet root). */
   const legacyConflict = async (): Promise<string> => {
     const legacy = path.join(baseDir, 'legacy-root', 'worktrees', 'repo-T-0091');
-    await prepareWorktree(fleetGit(), req(), legacy, frozen);
+    await prepareWorktree({ git: fleetGit(), request: req(), worktreePath: legacy, now: frozen });
     return legacy;
   };
 
   it('removes a clean conflicting registration when it is not live, then creates', async () => {
     const legacy = await legacyConflict();
 
-    const result = await prepareWorktree(fleetGit(), req(), worktreePath, frozen, () => false);
+    const result = await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen, isLive: () => false });
     expect(result).toEqual({ outcome: 'created', sessionInvalidated: false, movedTo: null });
     expect(await headOf(worktreePath)).toBe(BRANCH);
     // The conflicting registration and its folder are gone (real git
@@ -185,9 +185,8 @@ describe('prepareWorktree (real git)', () => {
   it('refuses descriptively when the conflicting registration is live', async () => {
     const legacy = await legacyConflict();
 
-    const refused = prepareWorktree(fleetGit(), req(), worktreePath, frozen, (p) =>
-      p.replaceAll('\\', '/') === legacy.replaceAll('\\', '/'),
-    );
+    const refused = prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen, isLive: (p) =>
+      p.replaceAll('\\', '/') === legacy.replaceAll('\\', '/') });
     await expect(refused).rejects.toThrow('live run');
     await expect(fsp.stat(legacy)).resolves.toBeDefined();
   });
@@ -196,7 +195,7 @@ describe('prepareWorktree (real git)', () => {
     const legacy = await legacyConflict();
     await fsp.writeFile(path.join(legacy, 'uncommitted.txt'), 'half-finished\n');
 
-    await expect(prepareWorktree(fleetGit(), req(), worktreePath, frozen)).rejects.toThrow(
+    await expect(prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen })).rejects.toThrow(
       'dirty worktree',
     );
     await expect(fsp.readFile(path.join(legacy, 'uncommitted.txt'), 'utf8')).resolves.toBe(
@@ -205,12 +204,12 @@ describe('prepareWorktree (real git)', () => {
   });
 
   it('recreates a stale clean worktree (registration lost, tree still runnable)', async () => {
-    await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     // The verified leftover: the admin gitdir file is gone — the entry
     // vanishes from the list while the directory still answers to git.
     await fsp.rm(path.join(repo, '.git', 'worktrees', adminName, 'gitdir'));
 
-    const result = await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    const result = await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     expect(result).toEqual({ outcome: 'recreated', sessionInvalidated: true, movedTo: null });
     expect(await listing()).toContain(`branch refs/heads/${BRANCH}`);
     expect(await headOf(worktreePath)).toBe(BRANCH);
@@ -226,12 +225,7 @@ describe('prepareWorktree (real git)', () => {
     });
 
     it('links an ignored folder the checkout has, and reports the rest', async () => {
-      const result = await prepareWorktree(
-        fleetGit(),
-        { ...req(), links: ['node_modules', '.tools', 'file.txt'] },
-        worktreePath,
-        frozen,
-      );
+      const result = await prepareWorktree({ git: fleetGit(), request: { ...req(), links: ['node_modules', '.tools', 'file.txt'] }, worktreePath, now: frozen });
       expect(result.links).toEqual({
         linked: ['node_modules'],
         present: ['file.txt'],
@@ -244,19 +238,19 @@ describe('prepareWorktree (real git)', () => {
 
     it('leaves out a folder git would see as a change', async () => {
       await fsp.mkdir(path.join(repo, 'tracked-dir'));
-      const result = await prepareWorktree(fleetGit(), { ...req(), links: ['tracked-dir'] }, worktreePath, frozen);
+      const result = await prepareWorktree({ git: fleetGit(), request: { ...req(), links: ['tracked-dir'] }, worktreePath, now: frozen });
       expect(result.links?.skipped).toEqual([
         { path: 'tracked-dir', reason: 'git does not ignore it — a link would show as a change' },
       ]);
     });
 
     it('a reused worktree keeps its link; a recreate removes it first and never empties the checkout', async () => {
-      await prepareWorktree(fleetGit(), { ...req(), links: ['node_modules'] }, worktreePath, frozen);
-      expect((await prepareWorktree(fleetGit(), { ...req(), links: ['node_modules'] }, worktreePath, frozen)).links?.present).toEqual([
+      await prepareWorktree({ git: fleetGit(), request: { ...req(), links: ['node_modules'] }, worktreePath, now: frozen });
+      expect((await prepareWorktree({ git: fleetGit(), request: { ...req(), links: ['node_modules'] }, worktreePath, now: frozen })).links?.present).toEqual([
         'node_modules',
       ]);
       await fsp.rm(path.join(repo, '.git', 'worktrees', adminName, 'gitdir'));
-      const result = await prepareWorktree(fleetGit(), { ...req(), links: ['node_modules'] }, worktreePath, frozen);
+      const result = await prepareWorktree({ git: fleetGit(), request: { ...req(), links: ['node_modules'] }, worktreePath, now: frozen });
       expect(result.outcome).toBe('recreated');
       expect(result.links?.linked).toEqual(['node_modules']);
       await expect(fsp.readFile(path.join(repo, 'node_modules', 'pkg', 'index.js'), 'utf8')).resolves.toBe('shared\n');

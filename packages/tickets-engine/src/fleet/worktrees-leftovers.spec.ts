@@ -41,11 +41,11 @@ describe('prepareWorktree (real git): leftovers and refusals', () => {
   const siblings = async (): Promise<readonly string[]> => await fsp.readdir(path.dirname(worktreePath));
 
   it('moves a stale dirty worktree aside, keeps it, and checks out fresh', async () => {
-    await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     await fsp.writeFile(path.join(worktreePath, 'uncommitted.txt'), 'half-finished\n');
     await fsp.rm(path.join(repo, '.git', 'worktrees', adminName, 'gitdir'));
 
-    const result = await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    const result = await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     expect(result.outcome).toBe('moved-aside');
     expect(result.sessionInvalidated).toBe(true);
     expect(result.movedTo).toBe(`${worktreePath}.stale-20261019T010203`);
@@ -59,23 +59,23 @@ describe('prepareWorktree (real git): leftovers and refusals', () => {
 
   it('suffixes the stamp when the frozen clock collides', async () => {
     for (const suffix of ['', '-2']) {
-      await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+      await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
       await fsp.writeFile(path.join(worktreePath, 'uncommitted.txt'), `half-finished${suffix}\n`);
       await fsp.rm(path.join(repo, '.git', 'worktrees', adminName, 'gitdir'));
-      const result = await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+      const result = await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
       expect(result.outcome).toBe('moved-aside');
       expect(result.movedTo).toBe(`${worktreePath}.stale-20261019T010203${suffix}`);
     }
   });
 
   it('moves a stale uninspectable directory aside instead of deleting it', async () => {
-    await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     await fsp.writeFile(path.join(worktreePath, 'notes.txt'), 'keep me\n');
     // The verified leftover: `<wt>/.git` is gone — the tree cannot
     // answer to git, so cleanliness cannot be proven.
     await fsp.rm(path.join(worktreePath, '.git'));
 
-    const result = await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    const result = await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     expect(result.outcome).toBe('moved-aside');
     expect(result.sessionInvalidated).toBe(true);
     await expect(fsp.readFile(path.join(result.movedTo!, 'notes.txt'), 'utf8')).resolves.toBe('keep me\n');
@@ -89,7 +89,7 @@ describe('prepareWorktree (real git): leftovers and refusals', () => {
     await fsp.writeFile(path.join(foreign, 'uncommitted.txt'), 'keep\n');
 
     const before = await listing();
-    await expect(prepareWorktree(fleetGit(), req(), foreign, frozen)).rejects.toThrow(
+    await expect(prepareWorktree({ git: fleetGit(), request: req(), worktreePath: foreign, now: frozen })).rejects.toThrow(
       'is on refs/heads/other, expected t/T-0091 — refusing to touch it',
     );
     expect(await listing()).toBe(before);
@@ -106,7 +106,7 @@ describe('prepareWorktree (real git): leftovers and refusals', () => {
     await fsp.writeFile(path.join(stray, 'uncommitted.txt'), 'keep\n');
 
     const before = await listing();
-    await expect(prepareWorktree(fleetGit(), req(), stray, frozen)).rejects.toThrow(
+    await expect(prepareWorktree({ git: fleetGit(), request: req(), worktreePath: stray, now: frozen })).rejects.toThrow(
       'is on main, expected t/T-0091 — refusing to touch it',
     );
     expect(await listing()).toBe(before);
@@ -127,7 +127,7 @@ describe('prepareWorktree (real git): leftovers and refusals', () => {
     await fsp.mkdir(shared);
     await fsp.symlink(shared, path.join(trap, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
 
-    const result = await prepareWorktree(fleetGit(), req(), trap, frozen);
+    const result = await prepareWorktree({ git: fleetGit(), request: req(), worktreePath: trap, now: frozen });
     expect(result.outcome).toBe('moved-aside');
     expect(result.sessionInvalidated).toBe(true);
     expect(await headOf(trap)).toBe(BRANCH);
@@ -138,12 +138,12 @@ describe('prepareWorktree (real git): leftovers and refusals', () => {
   });
 
   it('refuses a locked worktree and modifies nothing', async () => {
-    await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     await fsp.writeFile(path.join(worktreePath, 'uncommitted.txt'), 'dirty\n');
     await git(repo, ['worktree', 'lock', worktreePath]);
 
     const before = await listing();
-    await expect(prepareWorktree(fleetGit(), req(), worktreePath, frozen)).rejects.toThrow('is locked');
+    await expect(prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen })).rejects.toThrow('is locked');
     expect(await listing()).toBe(before);
     expect(await siblings()).toEqual([adminName]);
     await expect(fsp.readFile(path.join(worktreePath, 'uncommitted.txt'), 'utf8')).resolves.toBe('dirty\n');
@@ -161,12 +161,12 @@ describe('prepareWorktree (real git): leftovers and refusals', () => {
   };
 
   it('refuses a worktree with a merge in progress and modifies nothing', async () => {
-    await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     await diverge();
     await expect(git(worktreePath, ['merge', 'main'])).rejects.toBeDefined();
 
     const before = await listing();
-    await expect(prepareWorktree(fleetGit(), req(), worktreePath, frozen)).rejects.toThrow(
+    await expect(prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen })).rejects.toThrow(
       'has a merge in progress',
     );
     expect(await listing()).toBe(before);
@@ -174,13 +174,13 @@ describe('prepareWorktree (real git): leftovers and refusals', () => {
   });
 
   it('refuses a worktree with a rebase in progress (detached) and modifies nothing', async () => {
-    await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
+    await prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen });
     await diverge();
     await expect(git(worktreePath, ['rebase', 'main'])).rejects.toBeDefined();
 
     const before = await listing();
     // A rebase detaches HEAD, so the branch guard fires first.
-    await expect(prepareWorktree(fleetGit(), req(), worktreePath, frozen)).rejects.toThrow(
+    await expect(prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen })).rejects.toThrow(
       'is on a detached HEAD, expected t/T-0091 — refusing to touch it',
     );
     expect(await listing()).toBe(before);
@@ -194,8 +194,8 @@ describe('prepareWorktree (real git): leftovers and refusals', () => {
     // Two independent seams: the module-level lock, not the git queue,
     // must serialize them.
     const [first, second] = await Promise.all([
-      prepareWorktree(fleetGit(), req(), worktreePath, frozen),
-      prepareWorktree(fleetGit(), req(), worktreePath, frozen),
+      prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen }),
+      prepareWorktree({ git: fleetGit(), request: req(), worktreePath, now: frozen }),
     ]);
     expect([first.outcome, second.outcome].sort()).toEqual(['created', 'reused']);
     const mine = parseWorktreePorcelain(await listing()).filter((e) => e.path.endsWith(adminName));
