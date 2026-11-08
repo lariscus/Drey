@@ -580,12 +580,15 @@
   color: var(--set-hint);
 }
 
+/* Board 8c writes its fields 80 and 200 px wide and 32 px high as content boxes: 102 x 34 and 222 x 34 px as drawn. */
 :where(.settings-ui) .set-num {
-  width: 80px;
+  width: 102px;
+  height: 34px;
 }
 
 :where(.settings-ui) .set-wide {
-  width: 200px;
+  width: 222px;
+  height: 34px;
 }
 
 :where(.settings-ui) .set-path {

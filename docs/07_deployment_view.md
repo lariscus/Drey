@@ -226,7 +226,7 @@ What it writes lives outside the install, in `%USERPROFILE%\.drey-engine`:
 `service.lock` (discovery), `service.log`, `service-start.log`,
 `config.json`, `fleet/` (the Crew runner's runs and chain state). An
 uninstall leaves that folder, like the vault. **Start with Windows** is
-opt-in and only with the background service on (Settings → Tickets →
+opt-in and only with the background service on (Settings →
 Background service, or `service-main.js --autostart on`): the per-user
 `HKCU\…\CurrentVersion\Run` value `DreyService` runs
 `wscript.exe ~/.drey-engine/start-service.vbs`, which sets

@@ -796,6 +796,10 @@ Keep it in step whenever a component boundary changes (CLAUDE.md's
   [ADR-0020](09_architecture_decisions/0020-app-wide-appearance-accent-and-ui-scale.md),
   "Assistant tools" (the `tools` slice: group switches, write and
   approval rules, the external MCP servers — ADR-0063),
+  "Background service" (req-165, board 8c — `src/app/settings/service/`: status and controls of Drey Service,
+  the two switches, idle span, taskbar icon, components, Load and Logs; the page reads the service through the
+  tickets plugin's `serviceStatus` / `serviceControl` / `serviceSettings*` IPC methods, and introduces the
+  stacked-item and compact-row shapes of `settings-ui.css`),
   "Daily notes", "Entry format" (what the slash menu's Entry block
   inserts, ADR-0022), "Keyboard shortcuts" (the `keybindings` slice:
   a recorded chord per command and the quick-capture hotkey, with
