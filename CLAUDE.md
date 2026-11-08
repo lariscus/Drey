@@ -575,7 +575,9 @@ extraction, ADR-0088):
   Crew runner (ADR-0096): `run/` the pure run state machine, `orchestrate/`
   the supervisor's and the chain's parts with the one ticket writer
   `RunBookkeeper`, `harness/` the adapter contract and the Claude Code,
-  OpenCode and Kimi adapters, `store/` the ticket store port, `api/` the
+  OpenCode and Kimi adapters, `store/` the ticket store port, `routing/`
+  the slots per account with their quota windows and the profile rule
+  (req-177; configured in the service home's `service.json`), `api/` the
   HTTP routes and the `GET /events` stream, `ports/` (clock, file
   system, process table and spawner, event sink — the core imports no
   Node built-in), and `runner.ts` the composition root; worktrees,

@@ -4663,3 +4663,36 @@ Every Accept goes through `acceptTicket`: a plain move from Ready to try to Done
 and push. A ticket in Done asks nothing of the owner, because the sign-off was on Ready to try. A
 board without a `ready` stage keeps its own checkpoints and the terminal column's Accept into the
 archive.
+
+## 6.101 A run starts on a slot, and the slot learns from the run (req-177, milestone 215)
+
+```mermaid
+sequenceDiagram
+    participant D as Dispatcher / POST /start
+    participant S as RunStarter
+    participant G as SlotGate
+    participant R as SlotRegistry
+    participant W as ProcessSupervisor + adapter
+    participant H as EventHub
+    participant L as SlotRunListener
+    D->>S: start(request with profile)
+    S->>G: bind(request, runId, the resumed session's slot)
+    G->>R: views() — provider, profile, state, busy of total
+    alt a free slot of the profile
+        G-->>S: {id, label} (reserved)
+        S->>W: spawn with the slot's env (CLAUDE_CONFIG_DIR)
+        W-->>H: run record, stream lines (rateLimit, errors)
+        H-->>L: run / line events
+        L->>R: rate-limit windows → measured; a refused login → needs-login
+        H-->>L: the run's terminal record
+        L->>R: release, count the telemetry, refresh the slot's quota
+        R-->>H: slot event (state, windows, q changed)
+    else none free, or none of the profile
+        G-->>S: refused: the reason
+        S-->>D: {ok: false, error} — nothing claimed, nothing spawned
+    end
+```
+
+The registry also reads the remote quotas on its own round (`quota.refreshMinutes`, z.ai and Kimi only for
+configured slots, at most once a minute per slot) and reloads `service.json` each time. A run never goes to a
+slot of the other profile; an expired login is a slot state, never a retry.
