@@ -129,6 +129,7 @@ existing strings do not move in this step.
    `libs/mission-ui/src/shell/`, `libs/mission-ui/src/app-bar/`,
    `libs/mission-ui/src/phone/`,
    `apps/mission-control/src/app/notes/`, `src/app/i18n/`,
+   `src/app/settings/service/` (Settings → Background service, req-165),
    `plugins/tickets/renderer/autopilot/`,
    `plugins/tickets/renderer/decision/`, `plugins/tickets/renderer/cost/`,
    `packages/tickets-engine/src/autopilot/`,

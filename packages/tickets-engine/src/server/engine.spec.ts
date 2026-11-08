@@ -66,6 +66,19 @@ describe('createEngine', () => {
     expect(unauthenticated.status).toBe(401);
   });
 
+  it('closes while a Drey holds its event stream open (Settings → Background service › Stop)', async () => {
+    const controller = new AbortController();
+    const response = await fetch(`${engine.invokeUrl}/api/events`, {
+      headers: { authorization: `Bearer ${engine.token}` },
+      signal: controller.signal,
+    });
+    expect(response.ok).toBe(true);
+    await (response.body as ReadableStream<Uint8Array>).getReader().read();
+    const closed = await Promise.race([engine.close().then(() => true), new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5_000))]);
+    controller.abort();
+    expect(closed).toBe(true);
+  });
+
   it('assembles a snapshot from the vault files', async () => {
     const snapshot = (await engine.invoke('snapshot')) as { vaultName: string | null; pipeline: readonly { id: string }[] };
     expect(snapshot.vaultName).toBe('vault');

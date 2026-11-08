@@ -1,0 +1,241 @@
+<app-settings-pane [title]="'settings.service.title' | t">
+  <div class="set-groups">
+    <section>
+      <h3>{{ 'settings.service.group.service' | t }}</h3>
+
+      <div class="set-item" data-setting-key="service.status">
+        <b class="set-name">{{ 'settings.service.status.name' | t }}</b>
+        <div class="set-controls">
+          <span class="set-value" role="status">
+            @if (statusLine(); as line) {
+              {{
+                'settings.service.status.running'
+                  | t: { time: since(line.since), components: line.components, runs: line.runs }
+              }}
+            } @else {
+              {{ 'settings.service.status.stopped' | t }}
+            }
+          </span>
+          @for (action of statusActions(); track action) {
+            <button
+              type="button"
+              class="ghost"
+              [disabled]="busy() !== null || unavailable()"
+              (click)="serviceAction(action)"
+            >
+              {{ actionKeys[action] | t }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="set-item" data-setting-key="service.enabled">
+        <b class="set-name">{{ 'settings.service.enabled.name' | t }}</b>
+        <label class="switch-row">
+          <input
+            type="checkbox"
+            [attr.aria-label]="'settings.service.enabled.name' | t"
+            [checked]="prefs().enabled"
+            [disabled]="unavailable()"
+            (change)="toggle('enabled', $any($event.target).checked)"
+          />
+          <span class="set-desc">{{ 'settings.service.enabled.desc' | t }}</span>
+        </label>
+      </div>
+
+      <div class="set-item" data-setting-key="service.autostart">
+        <b class="set-name">{{ 'settings.service.autostart.name' | t }}</b>
+        <label class="switch-row">
+          <input
+            type="checkbox"
+            [attr.aria-label]="'settings.service.autostart.name' | t"
+            [checked]="prefs().autostart"
+            [disabled]="unavailable() || !prefs().enabled"
+            (change)="toggle('autostart', $any($event.target).checked)"
+          />
+          <span class="set-desc">{{ 'settings.service.autostart.desc' | t }}</span>
+        </label>
+      </div>
+
+      <div class="set-row" data-setting-key="service.idle">
+        <div class="set-row-text">
+          <b class="set-name">{{ 'settings.service.idle.name' | t }}</b>
+          <span class="set-desc">{{ 'settings.service.idle.desc' | t }}</span>
+        </div>
+        <div class="set-row-value">
+          <input
+            type="text"
+            inputmode="numeric"
+            class="set-num"
+            [class.invalid]="invalid().has('idleMinutes')"
+            [attr.aria-label]="'settings.service.idle.name' | t"
+            [value]="prefs().idleMinutes"
+            [disabled]="unavailable()"
+            (change)="commitNumber('idleMinutes', $any($event.target))"
+          />
+          <span class="set-unit">{{ 'settings.service.idle.unit' | t: { minutes: prefs().idleMinutes } }}</span>
+        </div>
+        <div class="set-row-actions"></div>
+      </div>
+
+      <div class="set-row" data-setting-key="service.tray">
+        <div class="set-row-text">
+          <b class="set-name">{{ 'settings.service.tray.name' | t }}</b>
+        </div>
+        <span class="set-row-value">
+          {{ (prefs().trayIcon ? 'settings.service.tray.shown' : 'settings.service.tray.hidden') | t }}
+        </span>
+        <div class="set-row-actions">
+          <button type="button" class="ghost" [disabled]="unavailable()" (click)="setTray(!prefs().trayIcon)">
+            {{ (prefs().trayIcon ? 'settings.service.tray.hide' : 'settings.service.tray.show') | t }}
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h3>{{ 'settings.service.group.components' | t }}</h3>
+      @for (row of rows(); track row.id) {
+        <div class="set-row" [attr.data-setting-key]="'service.component.' + row.id">
+          <div class="set-row-text">
+            <b class="set-name">{{ row.nameKey | t }}</b>
+            @if (row.descKey) {
+              <span class="set-desc">{{ row.descKey | t }}</span>
+            }
+          </div>
+          <span class="set-row-value">{{ row.state.key | t: row.state.params }}</span>
+          <div class="set-row-actions">
+            @for (action of row.actions; track action) {
+              <button
+                type="button"
+                class="ghost"
+                [disabled]="busy() !== null"
+                (click)="rowAction(row, action)"
+              >
+                {{ actionKeys[action] | t }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </section>
+
+    <section>
+      <h3>{{ 'settings.service.group.load' | t }}</h3>
+
+      <div class="set-item" data-setting-key="service.load.seats">
+        <b class="set-name">{{ 'settings.service.load.seats.name' | t }}</b>
+        <span class="set-desc">{{ 'settings.service.load.seats.desc' | t }}</span>
+        <div class="set-controls">
+          <input
+            type="text"
+            inputmode="numeric"
+            class="set-num"
+            [class.invalid]="invalid().has('heavySeats')"
+            [attr.aria-label]="'settings.service.load.seats.name' | t"
+            [value]="prefs().heavySeats"
+            [disabled]="unavailable()"
+            (change)="commitNumber('heavySeats', $any($event.target))"
+          />
+          <span class="set-unit">{{ 'settings.service.load.seats.unit' | t }}</span>
+        </div>
+      </div>
+
+      <div class="set-item" data-setting-key="service.load.reserve">
+        <b class="set-name">{{ 'settings.service.load.reserve.name' | t }}</b>
+        <div class="set-controls">
+          <input
+            type="text"
+            inputmode="numeric"
+            class="set-num"
+            [class.invalid]="invalid().has('reserve')"
+            [attr.aria-label]="'settings.service.load.reserve.name' | t"
+            [value]="prefs().reserve"
+            [disabled]="unavailable()"
+            (change)="commitNumber('reserve', $any($event.target))"
+          />
+          <span class="set-unit">{{ 'settings.service.load.reserve.unit' | t }}</span>
+        </div>
+      </div>
+
+      <div class="set-item" data-setting-key="service.load.low">
+        <b class="set-name">{{ 'settings.service.load.low.name' | t }}</b>
+        <label class="switch-row">
+          <input
+            type="checkbox"
+            [attr.aria-label]="'settings.service.load.low.name' | t"
+            [checked]="prefs().lowPriority"
+            [disabled]="unavailable()"
+            (change)="toggle('lowPriority', $any($event.target).checked)"
+          />
+          <span class="set-desc">{{ 'settings.service.load.low.desc' | t }}</span>
+        </label>
+      </div>
+
+      <div class="set-item" data-setting-key="service.load.quiet">
+        <b class="set-name">{{ 'settings.service.load.quiet.name' | t }}</b>
+        <span class="set-desc">{{ 'settings.service.load.quiet.desc' | t }}</span>
+        <div class="set-controls">
+          <input
+            type="text"
+            class="set-wide"
+            [class.invalid]="invalid().has('quietHours')"
+            [attr.aria-label]="'settings.service.load.quiet.name' | t"
+            [value]="prefs().quietHours"
+            [disabled]="unavailable()"
+            (change)="commitQuiet($any($event.target))"
+          />
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h3>{{ 'settings.service.group.logs' | t }}</h3>
+
+      <div class="set-item" data-setting-key="service.logs.level">
+        <b class="set-name">{{ 'settings.service.logs.level.name' | t }}</b>
+        <div class="set-controls">
+          <span class="set-value">{{ levelKeys[prefs().logLevel] | t }}</span>
+          <div class="level-pick">
+            <button
+              type="button"
+              class="ghost"
+              aria-haspopup="menu"
+              [attr.aria-expanded]="levelMenu()"
+              [disabled]="unavailable()"
+              (click)="levelMenu.set(!levelMenu())"
+            >
+              {{ 'settings.service.logs.level.change' | t }}
+            </button>
+            @if (levelMenu()) {
+              <div class="level-menu" role="menu">
+                @for (level of levels; track level) {
+                  <button
+                    type="button"
+                    role="menuitemradio"
+                    [attr.aria-checked]="prefs().logLevel === level"
+                    [class.on]="prefs().logLevel === level"
+                    (click)="pickLevel(level)"
+                  >
+                    {{ levelKeys[level] | t }}
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="set-item" data-setting-key="service.logs.folder">
+        <b class="set-name">{{ 'settings.service.logs.folder.name' | t }}</b>
+        <span class="set-desc">{{ 'settings.service.logs.folder.desc' | t }}</span>
+        <div class="set-controls">
+          <span class="set-path">{{ logFolder() }}</span>
+          <button type="button" class="ghost" [disabled]="logFolder() === ''" (click)="openLogFolder()">
+            {{ 'settings.service.logs.folder.open' | t }}
+          </button>
+        </div>
+      </div>
+    </section>
+  </div>
+</app-settings-pane>

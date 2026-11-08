@@ -1,3 +1,4 @@
+import { i18n } from '../../../shared/i18n';
 import type { SettingsScope, SettingsSearchEntry } from './settings-model';
 
 /**
@@ -14,6 +15,18 @@ const RAW_ENTRIES: Readonly<Record<string, readonly SettingsSearchEntry[]>> = {
     e('fontSize', 'Base font size', 'Text size of the interface'),
     e('accent', 'Highlight colour', 'Accent colour of buttons, links and the selected row'),
     e('editorFont', 'Editor font', 'Font family of the editor'),
+  ],
+  service: [
+    e('service.enabled', i18n.t('settings.service.enabled.name'), i18n.t('settings.service.enabled.desc')),
+    e('service.autostart', i18n.t('settings.service.autostart.name'), i18n.t('settings.service.autostart.desc')),
+    e('service.idle', i18n.t('settings.service.idle.name'), i18n.t('settings.service.idle.desc')),
+    e('service.tray', i18n.t('settings.service.tray.name')),
+    e('service.load.seats', i18n.t('settings.service.load.seats.name'), i18n.t('settings.service.load.seats.desc')),
+    e('service.load.reserve', i18n.t('settings.service.load.reserve.name'), i18n.t('settings.service.load.reserve.unit')),
+    e('service.load.low', i18n.t('settings.service.load.low.name'), i18n.t('settings.service.load.low.desc')),
+    e('service.load.quiet', i18n.t('settings.service.load.quiet.name'), i18n.t('settings.service.load.quiet.desc')),
+    e('service.logs.level', i18n.t('settings.service.logs.level.name')),
+    e('service.logs.folder', i18n.t('settings.service.logs.folder.name'), i18n.t('settings.service.logs.folder.desc')),
   ],
   daily: [
     e('daily.open', "Open today's daily note on startup"),
@@ -60,6 +73,7 @@ const PAGE_SCOPE: Readonly<Record<string, SettingsScope>> = {
   shortcuts: 'device',
   spellcheck: 'device',
   updates: 'device',
+  service: 'device',
   widgets: 'device',
   daily: 'vault',
   entry: 'vault',

@@ -1414,8 +1414,8 @@ Each column's dialog prompt is a prompt file like any other: a phase's
 default applies (`plan-interactive-default` — editable in Settings → Tickets,
 re-added by "Add Drey's prompts").
 
-With the **background service** switched on (Settings → *Tickets* →
-*Background service*, off by default), runs survive closing Drey — the runner
+With the **background service** switched on (Settings → *Background service*,
+off by default), runs survive closing Drey — the runner
 then lives in **Drey Service**, the background process that comes with Drey
 (it also holds the tickets board and the phone gateway) — and,
 for OpenCode workers, even a restart of the runner: the new runner takes the
@@ -1976,6 +1976,7 @@ the vault you have open, or shared by every device); click the tab again, or
 | --- | --- |
 | [Appearance](#settings-appearance) | theme, accent, UI scale, editor typeface and scale |
 | [Assistant tools](#settings-assistant-tools) | tool groups, write/approval rules, external MCP servers |
+| [Background service](#settings-background-service) | Drey Service: status, start with Windows, keep running after Drey quits, taskbar icon, components, load, logs |
 | [Daily notes](#settings-daily-notes) | daily folder and template behaviour |
 | [Entry format](#settings-entry-format) | the slash menu's Entry block |
 | [Keyboard shortcuts](#settings-keyboard-shortcuts) | the shortcut of every command, the quick-capture hotkey |
@@ -2007,6 +2008,33 @@ taskbar icon change with it (the desktop shortcut keeps the usual icon).
 ### Settings: Assistant tools {#settings-assistant-tools}
 
 See [Assistant tools and MCP](#11-assistant-tools-and-mcp).
+
+### Settings: Background service {#settings-background-service}
+
+In the category list between *Assistant tools* and *Daily notes*. The two
+switches *Background service* and *Start with Windows* used to sit in Settings →
+*Tickets*; they live here now, and Tickets no longer has a section for them.
+The page holds the controls of **Drey Service**, the background process that comes with Drey
+(chapter 13 says what it holds). Four groups:
+
+- **Service** — *Status* says when the service started, how many components it
+  has and how many runs are live, with **Restart** and **Stop** (a stopped service
+  shows **Start**). Stopping it ends the live runs first. *Background service*
+  switches the optional mode (off by default: everything ends with Drey; on: the
+  service keeps working after Drey quits). *Start with Windows* needs the service
+  on. *Keep running after Drey quits* is how many minutes the service stays up once
+  nothing holds it — no Drey, no live run, no running Autopilot, no paired device;
+  it applies the next time the service starts. *Taskbar icon* is stored, the icon
+  itself comes with the service window.
+- **Components** — the tickets engine (always on while the service runs), the
+  Crew runner, the MCP server and the remote gateway with their state. The runner
+  restarts, stops and starts from here; the gateway's buttons switch Settings →
+  Tickets → Devices' *Serve* setting; the MCP server's switch the *MCP server*
+  category's *Enable* setting (Drey serves it for now).
+- **Load** — heavy seats, reserve, low priority and quiet hours are stored for the
+  resource governor; they take effect once it exists.
+- **Logs** — the log level (stored; the service writes one log file for now) and
+  the log folder, which *Open folder* shows in the file manager.
 
 ### Settings: Daily notes {#settings-daily-notes}
 

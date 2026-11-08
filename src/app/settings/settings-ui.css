@@ -526,6 +526,144 @@
   word-break: break-word;
 }
 
+/* ---- Item shapes of board 8c (Settings -> Background service) ----
+   A stacked item (name, description, control row) and the compact row:
+   name and description left, a state or field in a 230 px column, buttons
+   in a 142 px column. Line heights are the board's: 18 px for names and
+   values, 21 px for descriptions. */
+
+/* The page column of these items: a container, so a narrow tab wraps the rows instead of squeezing their names. */
+:where(.settings-ui) .set-groups {
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+}
+
+:where(.settings-ui) .set-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 0 10px 14px;
+  margin-left: -14px;
+  border-left: 2px solid transparent;
+}
+
+:where(.settings-ui) :is(.set-name, .set-value) {
+  font-size: var(--set-fs-body);
+  line-height: 18px;
+}
+
+:where(.settings-ui) .set-name {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+:where(.settings-ui) .set-value {
+  color: var(--text-primary);
+}
+
+:where(.settings-ui) .set-desc {
+  font-size: var(--set-fs-small);
+  line-height: 21px;
+  color: var(--set-hint);
+}
+
+/* The control line of a stacked item: a value or field, then its unit or buttons. */
+:where(.settings-ui) .set-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+:where(.settings-ui) .set-controls > button:is(.ghost, .primary) {
+  align-self: center;
+}
+
+:where(.settings-ui) .set-unit {
+  font-size: var(--set-fs-tiny);
+  line-height: 18px;
+  color: var(--set-hint);
+}
+
+/* Board 8c writes its fields 80 and 200 px wide and 32 px high as content boxes: 102 x 34 and 222 x 34 px as drawn. */
+:where(.settings-ui) .set-num {
+  width: 102px;
+  height: 34px;
+}
+
+:where(.settings-ui) .set-wide {
+  width: 222px;
+  height: 34px;
+}
+
+:where(.settings-ui) .set-path {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-primary);
+}
+
+:where(.settings-ui) .set-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 0 8px 14px;
+  margin-left: -14px;
+  border-left: 2px solid transparent;
+}
+
+:where(.settings-ui) .set-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+:where(.settings-ui) .set-row-value {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  width: 230px;
+  font-size: var(--set-fs-body);
+  line-height: 18px;
+  color: var(--text-primary);
+}
+
+:where(.settings-ui) .set-row-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 142px;
+}
+
+/* Below 560 px of page width the compact row wraps: the name takes the first line, the state and the buttons follow. */
+@container (max-width: 560px) {
+  :where(.settings-ui) .set-row {
+    flex-wrap: wrap;
+  }
+
+  :where(.settings-ui) .set-row-text {
+    flex-basis: 100%;
+  }
+
+  :where(.settings-ui) .set-row-value {
+    flex: 1;
+    width: auto;
+  }
+
+  :where(.settings-ui) .set-row-actions {
+    width: auto;
+  }
+}
+
 /* ---- Keyboard focus ---- */
 
 :where(.settings-ui) :is(button, a, summary, [tabindex]):focus-visible,

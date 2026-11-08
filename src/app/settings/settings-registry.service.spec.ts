@@ -1,3 +1,4 @@
+import { TestBed } from '@angular/core/testing';
 import { SettingsCategoryRegistry } from './settings-registry.service';
 
 /** Stands in for `PluginSettingsHost`, which the registrar hands in. */
@@ -5,10 +6,11 @@ class FakePageHost {}
 
 describe('SettingsCategoryRegistry category order (req-33)', () => {
   it('lists the core categories alphabetically with About last', () => {
-    const registry = new SettingsCategoryRegistry();
+    const registry = TestBed.inject(SettingsCategoryRegistry);
     expect(registry.categories().map((c) => c.label)).toEqual([
       'Appearance',
       'Assistant tools',
+      'Background service',
       'Daily notes',
       'Entry format',
       'Keyboard shortcuts',
@@ -23,7 +25,7 @@ describe('SettingsCategoryRegistry category order (req-33)', () => {
   });
 
   it('sorts plugin pages by label after the core categories, before About', () => {
-    const registry = new SettingsCategoryRegistry();
+    const registry = TestBed.inject(SettingsCategoryRegistry);
     const mount = () => () => undefined;
     registry.registerPluginPage({ id: 'zeta', label: 'Zeta plugin', hint: '', mount }, FakePageHost);
     registry.registerPluginPage(
@@ -33,6 +35,7 @@ describe('SettingsCategoryRegistry category order (req-33)', () => {
     expect(registry.categories().map((c) => c.label)).toEqual([
       'Appearance',
       'Assistant tools',
+      'Background service',
       'Daily notes',
       'Entry format',
       'Keyboard shortcuts',

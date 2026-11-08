@@ -40,7 +40,16 @@ export function dispatchFrame(
 }
 
 export class EngineClient {
-  constructor(private readonly endpoints: EngineEndpoints) {}
+  constructor(private endpoints: EngineEndpoints) {}
+
+  /**
+   * Points the client at a restarted service (Settings → Background service,
+   * Restart / Start). Every call and the event stream's reconnect read the
+   * endpoints when they run, so nothing else needs to know.
+   */
+  rebind(endpoints: EngineEndpoints): void {
+    this.endpoints = endpoints;
+  }
 
   async health(): Promise<boolean> {
     try {

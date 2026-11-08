@@ -9,7 +9,7 @@
  */
 import { execFile } from 'node:child_process';
 import { promises as fsp } from 'node:fs';
-import { BrowserWindow, dialog } from 'electron';
+import { BrowserWindow, dialog, shell } from 'electron';
 import type { MainPluginContext, MainPluginModule } from '../../../shared/plugin-api';
 import {
   DEFAULT_PRIORITY_CONFIG,
@@ -51,7 +51,9 @@ import { listWorkerModels } from './worker-models';
 import { EngineClient } from './engine-client';
 import { PathAnnouncer } from './path-announcer';
 import { ensureService, syncChatConfig, syncNotesVault, syncStoreConfig } from './service-lifecycle';
-import { SERVICE_AUTOSTART_KEY, SERVICE_ENABLED_KEY, createServiceQuitGuard, quitWordsOf, type QuitChoice } from './service-quit-guard';
+import { createServiceQuitGuard, liveRunsOf, quitWordsOf, type QuitChoice } from './service-quit-guard';
+import { ServiceControl, serviceHomeOf } from './service-control';
+import { ServiceSettingsHandlers } from './service-settings';
 import { TicketDocuments, askToAddCheckout } from './ticket-documents';
 import { isStoreDocumentPath, storeDocumentHeader, storeDocumentHeaderEdit } from './store-document-header';
 import { checkoutOf, readStoreSettings } from '../../../packages/tickets-engine/src/store/store-settings';
@@ -159,25 +161,34 @@ const plugin: MainPluginModule = {
     );
     void fleet.startPolling();
     void board.worktreeBootSweep().catch((error: unknown) => ctx.log(`engine boot sweep: ${messageOf(error)}`, 'warn'));
-    // req-164, the owner's Q3 ruling: the background service is optional. Settings →
-    // Tickets reads and writes the two keys here; each write reaches the engine's config,
-    // where the service re-reads its mode every tick.
-    const serviceSettings = async (): Promise<{ enabled: boolean; autostart: boolean }> => ({
-      enabled: (await ctx.config.get<boolean>(SERVICE_ENABLED_KEY)) === true,
-      autostart: (await ctx.config.get<boolean>(SERVICE_AUTOSTART_KEY)) === true,
+    // req-164 (the owner's Q3 ruling: the background service is optional) and req-165
+    // (board 8c): Settings → Background service, a core category of Drey, reads and
+    // writes the service's preferences and status through these methods; each write
+    // reaches the engine's config, where the service reads its mode every tick.
+    const serviceControl = new ServiceControl({
+      home: serviceHomeOf,
+      liveRuns: async () => liveRunsOf(await fleet.runs()).length,
+      gateway: async () => remoteService.status(),
     });
-    ctx.ipc.handle('serviceSettings', () => serviceSettings());
-    ctx.ipc.handle('serviceSettingsSet', async (payload) => {
-      const p = typeof payload === 'object' && payload !== null ? (payload as Record<string, unknown>) : {};
-      for (const key of [SERVICE_ENABLED_KEY, SERVICE_AUTOSTART_KEY] as const) {
-        const value = p[key === SERVICE_ENABLED_KEY ? 'enabled' : 'autostart'];
-        if (typeof value === 'boolean') {
-          await ctx.config.set(key, value);
-          await client.invoke('configSet', { key, value });
+    const serviceSettings = new ServiceSettingsHandlers({
+      config: ctx.config,
+      engineConfigSet: (key, value) => client.invoke('configSet', { key, value }),
+      control: serviceControl,
+      start: async () => client.rebind(await ensureService(ctx, ctx.log)),
+      openFolder: async (dir) => {
+        const failure = await shell.openPath(dir);
+        if (failure !== '') {
+          throw new Error(failure);
         }
-      }
-      return serviceSettings();
+      },
+      home: serviceHomeOf,
+      log: ctx.log,
     });
+    ctx.ipc.handle('serviceSettings', () => serviceSettings.prefs());
+    ctx.ipc.handle('serviceSettingsSet', (payload) => serviceSettings.setPrefs(payload));
+    ctx.ipc.handle('serviceStatus', () => serviceSettings.status());
+    ctx.ipc.handle('serviceControl', (payload) => serviceSettings.control(payload));
+    ctx.ipc.handle('serviceOpenLogFolder', () => serviceSettings.openLogFolder());
     ctx.app.registerQuitGuard(
       createServiceQuitGuard({
         config: ctx.config,

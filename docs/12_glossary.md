@@ -36,6 +36,7 @@ and [ADR-0002](09_architecture_decisions/0002-quick-capture-opens-daily-note.md)
 | Main process | The Node side of the app (`electron/`). The only part with file and network access. |
 | Renderer | The window (`src/app/`). Sandboxed; reaches the main process through the bridge. |
 | Bridge | `window.dreyApi`, the typed interface the preload script exposes to the renderer. Its shape is `shared/ipc-api.ts`. |
+| Drey Service | The one background process that comes with Drey (ADR-0092): it hosts the tickets engine, the Crew runner, the remote gateway and, later, the MCP server as components. Optional (`service.enabled`, off by default): off, it ends with Drey; on, it outlives Drey until nothing holds it. Controlled in Settings → Background service. |
 | Plugin | A feature loaded at startup from `plugins/<id>/`: a main half, a renderer half, a manifest. Trusted, in-process. |
 | SDK | The versioned interface plugins are written against (`shared/plugin-api/`): `DreyPluginApi` for the renderer half, `MainPluginContext` for the main half. |
 | Seam | One kind of thing a plugin can register: a panel, a tab kind, a command, a save hook, … |
