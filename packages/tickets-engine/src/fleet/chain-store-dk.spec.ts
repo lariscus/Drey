@@ -4,9 +4,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { assertDkVersion, MIN_DK_VERSION } from '../store/dk-process';
-import { Orchestrator, type SupervisorPort } from './orchestrator';
+import { composeOrchestrator } from './compose-orchestrator';
+import { composeShared } from './compose-supervisor';
+import type { SupervisorPort } from './orchestrate/supervisor-directory';
 import { normalizeFleetPools, type ChainStoreConfig, type RunRequest } from './protocol';
-import type { StartOutcome, SupervisorRecord } from './runs';
+import type { StartOutcome, SupervisorRecord } from './run/run-record';
 
 /**
  * E14-5b against a REAL `dk` and a real checkout: the chain reads its board from the store's
@@ -149,10 +151,15 @@ describe.skipIf(!found.ok)('the chain over a real dk store (E14-5b)', { timeout:
     const ciTicket = ticket('Check me', 'plan-review');
 
     const fleet = fakePort();
-    const orch = new Orchestrator({
+    const log = (): void => undefined;
+    const storeFor = (): never => {
+      throw new Error('the chain writes through its store door');
+    };
+    const orch = composeOrchestrator({
       root: fleetRoot,
-      log: () => undefined,
+      log,
       supervisorOf: () => fleet.port,
+      bookkeeper: composeShared(storeFor, log).bookkeeper,
       scanIntervalMs: 50,
       execShell: async () => undefined,
     });

@@ -11,7 +11,7 @@ import {
   type ReleaseResult,
   type TicketDetail,
   type TicketStore,
-} from '../ports/ticket-store';
+} from '../../ports/ticket-store';
 
 /** What the fake store saw, in order: `claim`, `show`, `extend`, `comment`, `release`. */
 export interface StoreCall {
@@ -26,11 +26,11 @@ export interface StoreCall {
 }
 
 /**
- * A scripted dricket store for the lease and the run supervisor specs: records every call,
+ * A scripted dricket store for the lease, the run supervisor and the bookkeeper specs (ADR-0096: the one fake of the runner's `TicketStore`): records every call,
  * answers like dk (epoch rises per claim, exit 14 for stages not in `stages`, exit 13 once
  * `loseClaim()` was called) and lets a spec fail one operation.
  */
-export class FakeStore implements TicketStore {
+export class FakeTicketStore implements TicketStore {
   readonly backend = 'dricket' as const;
   readonly calls: StoreCall[] = [];
   epoch = 1;
@@ -147,29 +147,5 @@ export class FakeStore implements TicketStore {
 
   comments(): Promise<never[]> {
     return Promise.resolve([]);
-  }
-}
-
-/** A manual clock for the lease's keep-alive: `fire()` runs the armed callback. */
-export class FakeTimers {
-  armed: { fn: () => void; ms: number } | null = null;
-  readonly delays: number[] = [];
-  readonly set = (fn: () => void, ms: number): unknown => {
-    this.armed = { fn, ms };
-    this.delays.push(ms);
-    return this.armed;
-  };
-  readonly clear = (handle: unknown): void => {
-    if (this.armed === handle) {
-      this.armed = null;
-    }
-  };
-
-  async fire(): Promise<void> {
-    const armed = this.armed;
-    this.armed = null;
-    armed?.fn();
-    await new Promise((resolve) => setImmediate(resolve));
-    await new Promise((resolve) => setImmediate(resolve));
   }
 }

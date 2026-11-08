@@ -572,7 +572,11 @@ extraction, ADR-0088):
 - `tickets-engine/` — the tickets domain as a pure package
   (`src/core` ticket parse/patch, board assembly, the one transition
   machine, drift, status log, ledger, git plumbing · `src/fleet` the
-  runner, orchestrator, providers, worktrees, telemetry · `src/contracts`
+  Crew runner (ADR-0096): `run/` the pure run state machine, `orchestrate/`
+  the supervisor's and the chain's parts with the one ticket writer
+  `RunBookkeeper`, `store/` the ticket store port, `api/` the HTTP routes,
+  `ports/`, and `runner.ts` the composition root; providers, worktrees,
+  telemetry beside them · `src/contracts`
   the cross-layer types and pure helpers · `src/services` since E2a the
   host-agnostic board service behind `EngineHost`/`FleetPort` ·
   `src/service` **Drey Service**, the one shipped background process

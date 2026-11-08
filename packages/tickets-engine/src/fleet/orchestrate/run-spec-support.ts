@@ -1,6 +1,6 @@
 import { expect, vi } from 'vitest';
-import type { RunState } from './protocol';
-import type { RunSupervisor } from './runs';
+import type { RunState } from '../protocol';
+import type { RunSupervisor } from './run-supervisor';
 
 /**
  * Shared by the RunSupervisor specs (`runs.spec.ts`, `runs-dk.spec.ts`).

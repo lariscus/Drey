@@ -1,41 +1,18 @@
-import { execFile } from 'node:child_process';
 import { promises as fsp } from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
-import { promisify } from 'node:util';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TicketsGit, type GitExecFn } from '../core/tickets-git';
-import { newTicketFileText } from '../core/ticket-files';
-import type { ProviderAdapter, WorkerHandle } from './providers';
-import type { RunInfo, RunRequest } from './protocol';
-import { RunSupervisor, type RunSupervisorDeps } from './runs';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { TicketsGit } from '../core/tickets-git';
+import type { RunRequest } from './protocol';
 import { parseWorktreePorcelain, prepareWorktree } from './worktrees';
+import { BRANCH, execFileAsync, frozen, git, makeRepo, removeRepo, type RepoFixture } from './worktrees-git.fake';
 
 /**
- * The worktree state machine (T-0047) against the installed git — the
- * behaviour *is* git state, so every case constructs the real leftover
- * shapes (removed directory, deleted admin `gitdir` file, deleted
- * `<wt>/.git`, locked, mid-rebase, mid-merge) in temp repos. The
- * supervisor wiring at the bottom mirrors runs.spec.ts's seams (specs
- * never import from other specs).
+ * The worktree state machine (T-0047) against the installed git: parsing
+ * the porcelain listing, creating, reusing and re-creating, and the
+ * `link:` folders. The leftover shapes and refusals are in
+ * `worktrees-leftovers.spec.ts`; the supervisor's wiring is beside
+ * `orchestrate/run-starter.ts`.
  */
-
-const execFileAsync = promisify(execFile);
-
-/** Plain git with a commit identity, outside any seam. */
-async function git(cwd: string, args: readonly string[]): Promise<string> {
-  const { stdout } = await execFileAsync('git', ['-c', 'user.name=spec', '-c', 'user.email=spec@example.com', ...args], {
-    cwd,
-    windowsHide: true,
-    encoding: 'utf8',
-  });
-  return stdout;
-}
-
-const BRANCH = 't/T-0091';
-/** Frozen clock — makes the `.stale-<stamp>` name and its collision
- *  suffixes deterministic. */
-const frozen = (): Date => new Date('2026-10-19T01:02:03Z');
 
 describe('parseWorktreePorcelain', () => {
   it('parses healthy, detached, locked (with reason) and prunable entries', () => {
@@ -91,33 +68,20 @@ describe('parseWorktreePorcelain', () => {
     });
   });
 });
-
 describe('prepareWorktree (real git)', () => {
+  let fixture: RepoFixture;
   let baseDir = '';
   let repo = '';
   let worktreePath = '';
-  /** The worktree's admin dir name inside `<repo>/.git/worktrees/`. */
   let adminName = '';
 
   beforeEach(async () => {
-    // Canonical from the start: the runner's temp dir can be an alias
-    // (the GitHub Windows runner's is the 8.3 `RUNNER~1` form) while git
-    // reports canonical long paths — alias behaviour has its own junction
-    // test below, never the temp dir's accident.
-    baseDir = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-wt-')));
-    repo = path.join(baseDir, 'repo');
-    await fsp.mkdir(repo);
-    await git(repo, ['init', '-b', 'main']);
-    await fsp.writeFile(path.join(repo, 'file.txt'), 'one\n');
-    await git(repo, ['add', '.']);
-    await git(repo, ['commit', '-m', 'initial']);
-    // A nested path on purpose: preparation must create the parent.
-    worktreePath = path.join(baseDir, 'fleet-root', 'worktrees', 'repo-T-0091');
-    adminName = path.basename(worktreePath);
+    fixture = await makeRepo();
+    ({ baseDir, repo, worktreePath, adminName } = fixture);
   });
 
   afterEach(async () => {
-    await fsp.rm(baseDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    await removeRepo(fixture);
   });
 
   const fleetGit = (): TicketsGit => new TicketsGit(() => 'git');
@@ -127,8 +91,7 @@ describe('prepareWorktree (real git)', () => {
     baseRef: 'main',
     ...overrides,
   });
-  const headOf = async (dir: string): Promise<string> =>
-    (await git(dir, ['rev-parse', '--abbrev-ref', 'HEAD'])).trim();
+  const headOf = async (dir: string): Promise<string> => (await git(dir, ['rev-parse', '--abbrev-ref', 'HEAD'])).trim();
   const listing = async (): Promise<string> => await git(repo, ['worktree', 'list', '--porcelain']);
   const siblings = async (): Promise<readonly string[]> => await fsp.readdir(path.dirname(worktreePath));
 
@@ -300,362 +263,4 @@ describe('prepareWorktree (real git)', () => {
     });
   });
 
-  it('moves a stale dirty worktree aside, keeps it, and checks out fresh', async () => {
-    await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
-    await fsp.writeFile(path.join(worktreePath, 'uncommitted.txt'), 'half-finished\n');
-    await fsp.rm(path.join(repo, '.git', 'worktrees', adminName, 'gitdir'));
-
-    const result = await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
-    expect(result.outcome).toBe('moved-aside');
-    expect(result.sessionInvalidated).toBe(true);
-    expect(result.movedTo).toBe(`${worktreePath}.stale-20261019T010203`);
-    await expect(fsp.readFile(path.join(result.movedTo!, 'uncommitted.txt'), 'utf8')).resolves.toBe(
-      'half-finished\n',
-    );
-    // The original path holds a fresh, clean checkout of the branch.
-    expect(await headOf(worktreePath)).toBe(BRANCH);
-    expect((await git(worktreePath, ['status', '--porcelain'])).trim()).toBe('');
-  });
-
-  it('suffixes the stamp when the frozen clock collides', async () => {
-    for (const suffix of ['', '-2']) {
-      await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
-      await fsp.writeFile(path.join(worktreePath, 'uncommitted.txt'), `half-finished${suffix}\n`);
-      await fsp.rm(path.join(repo, '.git', 'worktrees', adminName, 'gitdir'));
-      const result = await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
-      expect(result.outcome).toBe('moved-aside');
-      expect(result.movedTo).toBe(`${worktreePath}.stale-20261019T010203${suffix}`);
-    }
-  });
-
-  it('moves a stale uninspectable directory aside instead of deleting it', async () => {
-    await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
-    await fsp.writeFile(path.join(worktreePath, 'notes.txt'), 'keep me\n');
-    // The verified leftover: `<wt>/.git` is gone — the tree cannot
-    // answer to git, so cleanliness cannot be proven.
-    await fsp.rm(path.join(worktreePath, '.git'));
-
-    const result = await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
-    expect(result.outcome).toBe('moved-aside');
-    expect(result.sessionInvalidated).toBe(true);
-    await expect(fsp.readFile(path.join(result.movedTo!, 'notes.txt'), 'utf8')).resolves.toBe('keep me\n');
-    expect(await headOf(worktreePath)).toBe(BRANCH);
-  });
-
-  it('refuses a registered worktree on the wrong branch and modifies nothing', async () => {
-    await git(repo, ['branch', 'other']);
-    const foreign = path.join(baseDir, 'wt-other');
-    await git(repo, ['worktree', 'add', foreign, 'other']);
-    await fsp.writeFile(path.join(foreign, 'uncommitted.txt'), 'keep\n');
-
-    const before = await listing();
-    await expect(prepareWorktree(fleetGit(), req(), foreign, frozen)).rejects.toThrow(
-      'is on refs/heads/other, expected t/T-0091 — refusing to touch it',
-    );
-    expect(await listing()).toBe(before);
-    await expect(fsp.readFile(path.join(foreign, 'uncommitted.txt'), 'utf8')).resolves.toBe('keep\n');
-  });
-
-  it('still refuses an unregistered folder that is its own repo on the wrong branch', async () => {
-    const stray = path.join(baseDir, 'stray-repo');
-    await fsp.mkdir(stray);
-    await git(stray, ['init', '-b', 'main']);
-    await fsp.writeFile(path.join(stray, 'file.txt'), 'committed elsewhere\n');
-    await git(stray, ['add', '.']);
-    await git(stray, ['commit', '-m', 'initial']);
-    await fsp.writeFile(path.join(stray, 'uncommitted.txt'), 'keep\n');
-
-    const before = await listing();
-    await expect(prepareWorktree(fleetGit(), req(), stray, frozen)).rejects.toThrow(
-      'is on main, expected t/T-0091 — refusing to touch it',
-    );
-    expect(await listing()).toBe(before);
-    await expect(fsp.readFile(path.join(stray, 'uncommitted.txt'), 'utf8')).resolves.toBe('keep\n');
-  });
-
-  it('moves a junction-leftover folder inside a git vault aside instead of refusing (the walk-up trap)', async () => {
-    // The production shape: the worktree base lives inside the tickets
-    // vault — itself a git repo on `main`. A removal leftover (junctions,
-    // no `.git` of its own) made rev-parse answer with the VAULT's
-    // branch, and every dispatch was refused forever.
-    const vault = path.join(baseDir, 'vault-repo');
-    await fsp.mkdir(vault);
-    await git(vault, ['init', '-b', 'main']);
-    const trap = path.join(vault, '_worktrees', 'T-0091');
-    await fsp.mkdir(trap, { recursive: true });
-    const shared = path.join(baseDir, 'shared-tools');
-    await fsp.mkdir(shared);
-    await fsp.symlink(shared, path.join(trap, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
-
-    const result = await prepareWorktree(fleetGit(), req(), trap, frozen);
-    expect(result.outcome).toBe('moved-aside');
-    expect(result.sessionInvalidated).toBe(true);
-    expect(await headOf(trap)).toBe(BRANCH);
-    // The leftover's content survives in the move-aside, junction included.
-    await expect(fsp.stat(path.join(result.movedTo!, 'node_modules'))).resolves.toBeDefined();
-    // The junction's target was never touched.
-    await expect(fsp.stat(path.join(trap, 'file.txt'))).resolves.toBeDefined();
-  });
-
-  it('refuses a locked worktree and modifies nothing', async () => {
-    await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
-    await fsp.writeFile(path.join(worktreePath, 'uncommitted.txt'), 'dirty\n');
-    await git(repo, ['worktree', 'lock', worktreePath]);
-
-    const before = await listing();
-    await expect(prepareWorktree(fleetGit(), req(), worktreePath, frozen)).rejects.toThrow('is locked');
-    expect(await listing()).toBe(before);
-    expect(await siblings()).toEqual([adminName]);
-    await expect(fsp.readFile(path.join(worktreePath, 'uncommitted.txt'), 'utf8')).resolves.toBe('dirty\n');
-  });
-
-  /** Diverge repo main and the worktree's branch so a merge or rebase
-   *  conflicts and stops mid-operation. */
-  const diverge = async (): Promise<void> => {
-    await fsp.writeFile(path.join(repo, 'file.txt'), 'three\n');
-    await git(repo, ['add', '.']);
-    await git(repo, ['commit', '-m', 'main change']);
-    await fsp.writeFile(path.join(worktreePath, 'file.txt'), 'two\n');
-    await git(worktreePath, ['add', '.']);
-    await git(worktreePath, ['commit', '-m', 'worktree change']);
-  };
-
-  it('refuses a worktree with a merge in progress and modifies nothing', async () => {
-    await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
-    await diverge();
-    await expect(git(worktreePath, ['merge', 'main'])).rejects.toBeDefined();
-
-    const before = await listing();
-    await expect(prepareWorktree(fleetGit(), req(), worktreePath, frozen)).rejects.toThrow(
-      'has a merge in progress',
-    );
-    expect(await listing()).toBe(before);
-    expect(await siblings()).toEqual([adminName]);
-  });
-
-  it('refuses a worktree with a rebase in progress (detached) and modifies nothing', async () => {
-    await prepareWorktree(fleetGit(), req(), worktreePath, frozen);
-    await diverge();
-    await expect(git(worktreePath, ['rebase', 'main'])).rejects.toBeDefined();
-
-    const before = await listing();
-    // A rebase detaches HEAD, so the branch guard fires first.
-    await expect(prepareWorktree(fleetGit(), req(), worktreePath, frozen)).rejects.toThrow(
-      'is on a detached HEAD, expected t/T-0091 — refusing to touch it',
-    );
-    expect(await listing()).toBe(before);
-    expect(await siblings()).toEqual([adminName]);
-    // The rebase is still in progress — nothing was touched.
-    const marker = (await git(worktreePath, ['rev-parse', '--git-path', 'rebase-merge'])).trim();
-    await expect(fsp.stat(marker)).resolves.toBeDefined();
-  });
-
-  it('serializes two concurrent prepares on one path (exactly one add)', async () => {
-    // Two independent seams: the module-level lock, not the git queue,
-    // must serialize them.
-    const [first, second] = await Promise.all([
-      prepareWorktree(fleetGit(), req(), worktreePath, frozen),
-      prepareWorktree(fleetGit(), req(), worktreePath, frozen),
-    ]);
-    expect([first.outcome, second.outcome].sort()).toEqual(['created', 'reused']);
-    const mine = parseWorktreePorcelain(await listing()).filter((e) => e.path.endsWith(adminName));
-    expect(mine).toHaveLength(1);
-    expect(mine[0]!.branch).toBe(`refs/heads/${BRANCH}`);
-  });
-});
-
-// -------------------------------------------------------------------------
-
-describe('RunSupervisor worktree wiring', () => {
-  let vaultDir = '';
-  let fleetRoot = '';
-
-  beforeEach(async () => {
-    vaultDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-vault-'));
-    fleetRoot = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-fleet-'));
-  });
-
-  afterEach(async () => {
-    await fsp.rm(vaultDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-    await fsp.rm(fleetRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
-  });
-
-  function fakeAdapter() {
-    const handles: Array<
-      WorkerHandle & { fail: (code: number | null) => void; onEvent: (text: string) => void; result: () => void }
-    > = [];
-    const adapter: ProviderAdapter = {
-      id: 'opencode',
-      label: 'OpenCode',
-      liveInject: true,
-      spawn: (start) => {
-        let exitResolve: ((code: number | null) => void) | null = null;
-        const handle: WorkerHandle & {
-          fail: (code: number | null) => void;
-          onEvent: (text: string) => void;
-          result: () => void;
-        } = {
-          pid: 4242,
-          exited: new Promise<number | null>((resolve) => {
-            exitResolve = resolve;
-          }),
-          steer: vi.fn(async () => 'inject' as const),
-          stop: vi.fn(async () => {
-            exitResolve?.(null);
-          }),
-          fail: (code) => exitResolve?.(code),
-          onEvent: (text) => start.onEvent({ ts: '2026-10-17T12:00:00Z', kind: 'note', text }),
-          result: () => start.onEvent({ ts: '2026-10-17T12:00:00Z', kind: 'result', text: 'done' }),
-        };
-        handles.push(handle);
-        return handle;
-      },
-    };
-    return { adapter, handles };
-  }
-
-  function gitRecorder() {
-    const calls: Array<{ args: readonly string[]; cwd: string }> = [];
-    const exec: GitExecFn = async (_exe, args, cwd) => {
-      calls.push({ args, cwd });
-      if (args[0] === 'rev-parse') {
-        return `${path.sep}root${path.sep}tk\n`;
-      }
-      return '';
-    };
-    const ticketsGit = new TicketsGit(() => 'git', exec);
-    return { ticketsGit, calls };
-  }
-
-  async function writeTicket(): Promise<string> {
-    const rel = 'tickets/plan/T-0001.md';
-    await fsp.mkdir(path.dirname(path.join(vaultDir, rel)), { recursive: true });
-    await fsp.writeFile(
-      path.join(vaultDir, rel),
-      newTicketFileText({
-        id: 'T-0001',
-        title: 'Add the thing',
-        repo: 'kt',
-        priority: 'normal',
-        rank: 5000,
-        firstPhase: 'plan',
-        now: new Date('2026-10-17T10:00:00Z'),
-        actor: 'owner@box',
-        description: 'It should work.',
-      }),
-      'utf8',
-    );
-    return rel;
-  }
-
-  function request(overrides: Partial<RunRequest> = {}): RunRequest {
-    return {
-      origin: 'spec',
-      ticketId: 'T-0001',
-      ticketsVaultPath: vaultDir,
-      ticketRelPath: 'tickets/plan/T-0001.md',
-      phase: 'plan',
-      repoPath: 'W:/kt',
-      worktreePath: path.join(fleetRoot, 'worktrees', 'kt-T-0001'),
-      branch: 't/T-0001',
-      baseRef: null,
-      provider: 'opencode',
-      model: null,
-      permissionMode: 'accept-edits',
-      instruction: 'Do the ticket.',
-      acceptance: ['npm run verify:unit'],
-      git: 'git',
-      nextPhase: 'build',
-      nextPhaseDir: 'build',
-      pushRemote: null,
-      claimIdentity: null,
-      gate: 'commands',
-      ...overrides,
-    };
-  }
-
-  function supervisor(overrides: Partial<RunSupervisorDeps> = {}): {
-    sup: RunSupervisor;
-    adapter: ReturnType<typeof fakeAdapter>;
-  } {
-    const adapter = fakeAdapter();
-    const sup = new RunSupervisor({
-      root: fleetRoot,
-      adapter: adapter.adapter,
-      git: 'git',
-      log: () => undefined,
-      now: () => new Date('2026-10-17T12:00:00Z'),
-      execShell: async () => undefined,
-      ticketsGit: gitRecorder().ticketsGit,
-      ...overrides,
-    });
-    return { sup, adapter };
-  }
-
-  const streamOf = async (sup: RunSupervisor, id: string): Promise<string> =>
-    await fsp.readFile(sup.streamPath(id)!, 'utf8');
-
-  it('threads a stateful outcome into the second run and its stream', async () => {
-    const outcomes = ['created', 'reused'] as const;
-    let calls = 0;
-    const { sup, adapter } = supervisor({
-      prepareWorktree: async () => ({
-        outcome: outcomes[Math.min(calls++, 1)]!,
-        sessionInvalidated: false,
-        movedTo: null,
-      }),
-    });
-    const rel = await writeTicket();
-    const first = await sup.start(request({ ticketRelPath: rel }));
-    expect(first.ok).toBe(true);
-    expect((first as { run: RunInfo }).run.worktree).toBe('created');
-    adapter.handles[0]!.result();
-    adapter.handles[0]!.fail(0);
-    const firstId = (first as { run: RunInfo }).run.id;
-    await vi.waitFor(() => expect(sup.get(firstId)?.state).toBe('done'));
-
-    // Next phase, same ticket: the worktree already exists.
-    const second = await sup.start(
-      request({ ticketRelPath: 'tickets/build/T-0001.md', phase: 'build', nextPhase: null }),
-    );
-    expect(second.ok).toBe(true);
-    const info = (second as { run: RunInfo }).run;
-    expect(info.worktree).toBe('reused');
-    expect(await streamOf(sup, info.id)).toContain('— worktree reused');
-  });
-
-  it('reports a moved-aside worktree in the stream with its parking path', async () => {
-    const { sup } = supervisor({
-      prepareWorktree: async () => ({
-        outcome: 'moved-aside' as const,
-        sessionInvalidated: true,
-        movedTo: 'W:/fleet/worktrees/kt-T-0001.stale-20261019T010203',
-      }),
-    });
-    await writeTicket();
-    const started = await sup.start(request());
-    expect(started.ok).toBe(true);
-    const info = (started as { run: RunInfo }).run;
-    expect(info.worktree).toBe('moved-aside');
-    const stream = await streamOf(sup, info.id);
-    expect(stream).toContain('— worktree moved-aside');
-    expect(stream).toContain(
-      'stale dirty worktree moved aside to W:/fleet/worktrees/kt-T-0001.stale-20261019T010203 — kept, not deleted; earlier session context is invalid',
-    );
-  });
-
-  it('wraps a rejecting preparation as a failed start, mutating nothing', async () => {
-    const { sup, adapter } = supervisor({
-      prepareWorktree: async () => {
-        throw new Error('worktree W:/x is locked');
-      },
-    });
-    await writeTicket();
-    const started = await sup.start(request());
-    expect(started.ok).toBe(false);
-    expect((started as { error: string }).error).toContain('worktree failed:');
-    expect((started as { error: string }).error).toContain('is locked');
-    expect(sup.list()).toHaveLength(0);
-    expect(adapter.handles).toHaveLength(0);
-  });
 });

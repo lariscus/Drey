@@ -1,0 +1,155 @@
+import type { TicketCard } from '../../contracts/tickets';
+import { renderStatusComment, slugStatusKey } from '../../core/status-comment';
+import type { Clock } from '../ports/clock';
+import type { RunRequest } from '../protocol';
+import type { TerminalRunState } from '../run/run-state';
+import { usageSummary } from '../run/run-summary';
+import type { ChainCardPatch } from '../store-chain-board';
+import type { ClaimRelease, WriteResult } from './claim-release';
+import type { LiveRun } from './live-run';
+import type { PersonaMemory } from './persona-memory';
+import type { RunStreams } from './run-streams';
+import type { TicketCopy } from './ticket-copy';
+import type { WaitClaim } from './wait-claim';
+
+/** The chain's door to a store ticket that no run holds (the orchestrator's writes). */
+export interface ChainCardDoor {
+  patch(card: TicketCard, patch: ChainCardPatch, actor: string): Promise<boolean>;
+  comment(id: string, text: string, actor: string): Promise<void>;
+}
+
+export interface RunBookkeeperParts {
+  readonly streams: RunStreams;
+  readonly release: ClaimRelease;
+  readonly wait: WaitClaim;
+  readonly copy: TicketCopy;
+  readonly memory: PersonaMemory;
+  readonly clock: Clock;
+  /** The machine's identity on the chain's own writes (`agent@<host>`). */
+  readonly actor: string;
+  readonly log: (message: string) => void;
+}
+
+/**
+ * The one ticket writer of the Crew runner (ADR-0096): every write to a
+ * ticket, its status comments, the Verlauf line and the persona memory —
+ * the supervisor's and the orchestrator's alike — goes through here, over
+ * the `TicketStore` port (a run's claim) or the chain's store door (a free
+ * ticket). The legacy file writer is gone (req-176): a run record from
+ * before the cut-over has no store target and writes no ticket (D-42).
+ */
+export class RunBookkeeper {
+  constructor(private readonly parts: RunBookkeeperParts) {}
+
+  /** The runner's own line in the run's transcript (`detail: 'runner'`: drawn as a system note, never a tool call). */
+  async note(run: LiveRun, what: string): Promise<void> {
+    await this.parts.streams.say(run, what, 'runner');
+  }
+
+  /** The settle's one ticket write: the claim goes, with the release note and the Verlauf line inside it. */
+  async releaseAtEnd(run: LiveRun, note: string | null): Promise<void> {
+    if (run.request.dk !== undefined) {
+      await this.parts.release.atEnd(run, note ?? `run ${run.info.state}${usageSummary(run.info)}`);
+    }
+  }
+
+  /** The success transition: the release into the next stage. */
+  async moveOnSuccess(run: LiveRun, nextPhase: string): Promise<WriteResult> {
+    if (run.request.dk === undefined) {
+      return this.predatesStore(run, 'moved');
+    }
+    return this.parts.release.move(run, nextPhase);
+  }
+
+  /** E10-6: a manual step follows the green gate — the ticket waits where it is, parked for the human persona. */
+  async parkOnSuccess(run: LiveRun, personaId: string): Promise<WriteResult> {
+    if (run.request.dk === undefined) {
+      return this.predatesStore(run, 'parked');
+    }
+    const comment = renderStatusComment({
+      verb: 'done',
+      text: `handed over on ${run.currentPhase} - a manual step waits for ${personaId}`,
+      detail: `run ${run.info.id} is done - gate green; parked for ${personaId} (manual step)`,
+    });
+    return this.parts.release.park(run, comment ?? personaId);
+  }
+
+  /** A blocked end (ADR-0077): the claim goes, the worker's words as the comment, the ticket stays put. */
+  async parkBlocked(run: LiveRun, blocked: string): Promise<void> {
+    if (run.request.dk === undefined) {
+      return;
+    }
+    const first = (blocked.split('\n')[0] ?? '').slice(0, 200);
+    const comment = renderStatusComment({
+      verb: 'blocked',
+      key: slugStatusKey(`run ${run.info.id}`),
+      text: first,
+      detail: `run ${run.info.id} is blocked:\n\n${blocked}`,
+    });
+    await this.parts.release.park(run, comment ?? blocked);
+  }
+
+  releaseForWait(run: LiveRun, text: string): Promise<void> {
+    return this.parts.wait.release(run, text);
+  }
+
+  reclaimAfterWait(run: LiveRun, answer: string | null): Promise<WriteResult> {
+    return this.parts.wait.reclaim(run, answer);
+  }
+
+  writeCopy(request: RunRequest, dir: string): Promise<void> {
+    return this.parts.copy.write(request, dir);
+  }
+
+  /** The ticket as the store holds it, the worker's changes merged in first (gate, scout report). */
+  syncedText(run: LiveRun): Promise<string | null> {
+    return this.parts.copy.syncedText(run);
+  }
+
+  /** The run's end: its copy goes and its lesson lands in the persona's memory. */
+  async closeRun(run: LiveRun, state: TerminalRunState): Promise<void> {
+    await this.parts.copy.drop(run);
+    await this.parts.memory.append(run, state);
+  }
+
+  verlaufLine(run: LiveRun, state: TerminalRunState): string | null {
+    return this.parts.release.verlaufLine(run, state);
+  }
+
+  // --- the chain's writes to tickets no run holds ------------------------------------
+
+  /** A Log line on the ticket (one `put`). */
+  async logCard(door: ChainCardDoor, card: TicketCard, what: string): Promise<void> {
+    await door.patch(card, { now: this.parts.clock.now(), actor: this.parts.actor, action: what }, this.parts.actor);
+  }
+
+  /** A machine move (the ci handover): stage + Log line, one `put`. */
+  moveCard(door: ChainCardDoor, card: TicketCard, toStage: string, action: string): Promise<boolean> {
+    return door.patch(card, { toStage, now: this.parts.clock.now(), actor: this.parts.actor, action }, this.parts.actor);
+  }
+
+  /** The circuit breaker's park in inbox, with a `paused:` comment. */
+  async parkCard(door: ChainCardDoor, card: TicketCard, column: string, reason: string): Promise<boolean> {
+    const actor = this.parts.actor;
+    const parked = await door.patch(card, { toStage: 'inbox', now: this.parts.clock.now(), actor, action: `parked by the circuit breaker (${column}) - ${reason}`, park: reason }, actor);
+    if (parked) {
+      await door.comment(card.id, renderStatusComment({ verb: 'paused', text: `parked by the circuit breaker (${column})`, detail: reason }) ?? reason, actor);
+    }
+    return parked;
+  }
+
+  /** E10-6: `awaiting:` where the ticket sits, with a `paused:` comment. */
+  async parkInPlace(door: ChainCardDoor, card: TicketCard, personaId: string, what: string): Promise<boolean> {
+    const actor = this.parts.actor;
+    const parked = await door.patch(card, { now: this.parts.clock.now(), actor, action: what, setAwaiting: personaId }, actor);
+    if (parked) {
+      await door.comment(card.id, renderStatusComment({ verb: 'paused', text: what }) ?? what, actor);
+    }
+    return parked;
+  }
+
+  private predatesStore(run: LiveRun, what: string): WriteResult {
+    this.parts.log(`run ${run.info.id}: ${run.request.ticketId} predates the store - nothing is ${what}`);
+    return { ok: true };
+  }
+}
