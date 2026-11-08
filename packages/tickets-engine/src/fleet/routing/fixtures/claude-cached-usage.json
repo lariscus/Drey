@@ -1,0 +1,11 @@
+{"cachedUsageUtilization":{
+  "fetchedAtMs":1789851480936,
+  "accountUuid":"<redacted>",
+  "utilization":{
+    "five_hour":{"utilization":9,"resets_at":"2026-09-20T00:10:00.471087+00:00","limit_dollars":null,"used_dollars":null,"remaining_dollars":null,"locked_reason":null},
+    "seven_day":{"utilization":8,"resets_at":"2026-09-22T04:59:59.471109+00:00","limit_dollars":null,"used_dollars":null,"remaining_dollars":null,"locked_reason":null},
+    "seven_day_oauth_apps":null,"seven_day_opus":null,"seven_day_sonnet":null,"seven_day_cowork":null,
+    "extra_usage":{"is_enabled":false,"monthly_limit":10000,"used_credits":9181,"utilization":91.81,"currency":"USD","decimal_places":2,"disabled_reason":"out_of_credits","user_disabled":false,"spend_limit_reached":false,"credits_ever_enabled":true,"daily":null,"weekly":null},
+    "limits":[{"kind":"session","group":"session"}]
+  }},
+ "oauthAccount":{"organizationRateLimitTier":"default_claude_max_5x"}}

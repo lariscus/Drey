@@ -2,6 +2,7 @@ import type { HandoverDecision } from '../handover';
 import type { RunInfo, RunRequest } from '../protocol';
 import type { NormalizedEvent } from '../harness/contract';
 import type { LinkReport, PreparedWorktree } from '../worktrees';
+import type { SlotBinding } from './slot-binder';
 
 /** The stream's setup line for the repo's `link:` folders (req-56). */
 export function linkNote(report: LinkReport): string {
@@ -22,6 +23,8 @@ export interface RunOpening {
   readonly resumeRef: string | null;
   readonly persona: string | null;
   readonly stamp: string;
+  /** req-177: the slot (account) the run starts on; absent without slots. */
+  readonly slot?: SlotBinding | null;
 }
 
 /** The first lines of a run's stream: what runs where, a moved-aside worktree, the links, the handover. */
@@ -34,6 +37,7 @@ export function openingNotes(opening: RunOpening): readonly NormalizedEvent[] {
     prepared?.outcome === 'moved-aside' ? `stale dirty worktree moved aside to ${prepared.movedTo} — kept, not deleted; earlier session context is invalid` : null,
     prepared?.links !== undefined ? linkNote(prepared.links) : null,
     decision !== null ? `handover: ${decision.mode} — ${decision.why}` : null,
+    opening.slot !== undefined && opening.slot !== null ? `slot: ${opening.slot.label}` : null,
   ];
   return lines.filter((text): text is string => text !== null).map((text) => ({ ts: stamp, kind: 'note', text }));
 }
@@ -69,6 +73,7 @@ export function newRunInfo(opening: RunOpening, initial: RunInfo['state']): RunI
     phase: request.phase,
     ...(request.form === 'scout' ? { form: 'scout' as const } : {}), // E8: the board's lanes and the settle hooks read it
     usage: { input: null, cacheRead: null, cacheCreation: null, output: null },
+    ...(opening.slot !== undefined && opening.slot !== null ? { slot: { id: opening.slot.id, label: opening.slot.label } } : {}),
     lastTurnContext: null,
     turns: 0,
     readCalls: 0,

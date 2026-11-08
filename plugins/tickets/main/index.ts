@@ -461,6 +461,8 @@ const plugin: MainPluginModule = {
           launch: str('launch'),
           instructions: str('instructions'),
           ...(Array.isArray(r['link']) && r['link'].every((l): l is string => typeof l === 'string') && r['link'].length > 0 ? { link: r['link'] as string[] } : {}),
+          // req-177: the slot profile rides through the save; dropping it would run a work repository on a private slot.
+          ...(r['profile'] === 'private' || r['profile'] === 'work' ? { profile: r['profile'] } : {}),
         });
       }
       return board.saveRepos(repos);

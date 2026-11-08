@@ -71,6 +71,12 @@ and [ADR-0002](09_architecture_decisions/0002-quick-capture-opens-daily-note.md)
 | MCP | Model Context Protocol. Drey is both a server (other programs use the vault) and a client (the assistant uses external servers). |
 | Confirmation dialog | The one dialog that shows a proposed change as a diff ([ADR-0011](09_architecture_decisions/0011-unified-confirmation-flow.md)). |
 | Own-write ledger | The record of files Drey itself just wrote, so the watcher does not report them as outside changes. |
+| Slot | One account a fleet worker runs on — `Claude A`, `Claude B`, `z.ai`, `Kimi` — with a profile, a billing kind, a session cap and quota windows. Configured in the service home's `service.json`; a slot names the account's login, never its key (req-177, [ADR-0095](09_architecture_decisions/0095-model-table-and-capacity-pool.md)). |
+| Profile | `private` or `work`. A repository has one (`profile:` in `_meta/repos.md`, default `private`) and its runs go only to slots of the same profile. |
+| Quota window | A span over which a provider limits an account's use — the rolling five hours, the week, the month — with the share left and its reset time. |
+| Reliability | How far a window's numbers can be trusted: `measured` (read from the provider), `estimated` (counted by the runner, or a cache), `unknown`. |
+| Surplus (q) | A window's remaining share divided by its remaining share of time; a slot's q is the minimum over its windows. Above 1 the account has more left than an even pace would use. |
+| Slot state | `ready`, `busy` (runs of the cap), `exhausted` (a window spent), `needs login` (the account's login was refused; no run starts until it is signed in again) or `unknown` (nothing read or counted yet). |
 
 ## The Crew (tickets and agents)
 
@@ -96,9 +102,6 @@ and [ADR-0002](09_architecture_decisions/0002-quick-capture-opens-daily-note.md)
 | Worktree (`t/<id>`) | The worker's own checkout of the work repository on the ticket's branch, under `<tickets repo>/_worktrees/<id>/` ([ADR-0080](09_architecture_decisions/0080-fleet-worktrees-home-and-cleanup.md)). |
 | Handover (session) | How a run's context reaches its worker: fresh, resume, resume-compact (T-0049). Not the pipeline's `handover:` key, which is a column's mode. |
 | Needs-you card | A decision raised to the owner in Mission Control: a question from a worker, a proof to accept, a stopped run, a checkpoint report. |
-| Slot | An account a worker runs on (Claude A, Claude B, z.ai, Kimi, Copilot) with a profile (`private | work`), a billing kind and quota windows; a repository is bound to one profile ([ADR-0095](09_architecture_decisions/0095-model-table-and-capacity-pool.md) later change; req-177). |
-| Quota window / reliability | A provider's limit over a span (5 h, 7 d, month) with its remaining share and reset time, read from the provider (`measured`), counted from own runs (`estimated`) or `unknown`. |
-| Surplus q | Remaining share over remaining time share of a window, minimum over the windows: above about 1.3 a bigger model of the slot is attractive; never a smaller class (req-178). |
 | Capability class | A / B / C, strongest first; a session requests a class and gets exactly it or waits ([ADR-0095](09_architecture_decisions/0095-model-table-and-capacity-pool.md)). |
 | Tranche / checkpoint report | Planned (req-179): the Autopilot's release unit (N runs, a budget share or a time span); at its end the runner pauses and the Lead reports gate rate, change size, cost per run and repeated tickets. |
 | Resource governor | Planned (req-180): seats of a class (`light` model runs, `heavy` tests, builds, dev servers), a CPU/RAM reserve, quiet hours. |

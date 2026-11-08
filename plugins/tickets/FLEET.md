@@ -106,9 +106,13 @@ Invoke-RestMethod "http://127.0.0.1:$($d.port)/health" -Headers $h
 | `GET /status` | all runs (newest info per run) |
 | `GET /status/<runId>` | one run: `{run, streamPath}` |
 | `GET /stream/<runId>` | the run's stream.jsonl tail (last ~200 KB, ndjson) |
-| `GET /events` | the runner's events as server-sent events (req-176): `event: run` with a run's record each time it is persisted, `event: line` with `{runId, event}` for each line of a run's stream; a `: ping` comment every 15 s, `retry: 3000` at the start. A read: it never keeps the runner awake, and it ends when the runner goes to sleep — reconnect then. `curl.exe -N -H "Authorization: Bearer …" http://127.0.0.1:<port>/events` |
+| `GET /events` | the runner's events as server-sent events (req-176): `event: run` with a run's record each time it is persisted, `event: line` with `{runId, event}` for each line of a run's stream, `event: slot` with a slot's view when its state, windows or busy count changed (req-177); a `: ping` comment every 15 s, `retry: 3000` at the start. A read: it never keeps the runner awake, and it ends when the runner goes to sleep — reconnect then. `curl.exe -N -H "Authorization: Bearer …" http://127.0.0.1:<port>/events` |
 | `GET /log?tail=N` | daemon log tail, plain text (default 300 lines, max 2000; daemon builds) |
-| `GET /chain` | chain state + config (daemon builds) |
+| `GET /chain` | chain state + config (daemon builds); `slots` carries the 7e summary per slot (req-177) |
+| `GET /slots` | every slot (req-177): `{ok, slots: [{id, label, provider, profile, billing, quota, state, busy, total, windows: [{name, spanMs, remaining, resetsAt, reliability, fetchedAt, used?, limit?, unit?, rejected?}], q, reason, lastFetch, lastFetchError, implied}], configPath}` — see "Slots" below |
+| `POST /slots/refresh` `{id?}` | read the quotas now (one slot, or all), the config reloaded first |
+| `POST /slots/login-done` `{id}` | the owner signed the slot's account in again: `needs-login` clears, its quota is read |
+| `POST /slots/config` `{slots: [...]}` | write the `slots` of `service.json` (every other key kept) and reload; a broken entry refuses the whole list (422), a file that does not parse refuses the write (409) |
 | `GET /report` | token telemetry grouped by ticket, phase and model, sorted by total desc: `{ok, groups: [{ticket, phase, model, runs, total, input, cacheRead, cacheCreation, output, beforeFirstWrite, beforeFirstWriteShare}]}` — a counter the provider never reports counts 0 into the sums; pre-T-0048 records fall back to their cumulative `tokensIn`+`tokensOut` (T-0048) |
 | `POST /stop` `{runId, reason}` | stop one run |
 | `POST /send` `{runId, text}` | steer a live run (rung: inject/resume/refused); while the run waits on a question it is the answer, not a takeover. To an ended run (done/stopped/failed) with a session it reopens that session under a new held run, the text as its first prompt — the reply carries the new `runId` |
@@ -425,10 +429,104 @@ within five minutes keeps the Autopilot as it stood — any other boot
 ends as Off, also a Paused whose resume time has not passed).
 
 `GET /chain` reports the same plus `quotaPausedUntil` (per provider,
-the ISO instant its quota pause ends — not persisted). The Work panel
+the ISO instant its quota pause ends — not persisted) and `slots` (per
+slot: busy/total, the longest window's remaining share, its reliability,
+`q` and reset — req-177). The Work panel
 draws both as alerts with a Resume button (chain alerts fix); a runner
 that predates them omits the fields and the panel reads a hold with a
 full red streak as a trip.
+
+## Slots — accounts and their quota windows (req-177)
+
+A **slot** is an account a worker runs on (ADR-0095 later change):
+`Claude A` and `Claude B` as two Claude Code logins, `z.ai`, `Kimi`, at
+work `Copilot`. Every run is bound to one slot when it starts; the
+binding is on the run record (`slot: {id, label}`) and in the stream's
+opening lines (`slot: Claude A`). Code: `packages/tickets-engine/src/fleet/routing/`,
+wired in `fleet/compose-routing.ts`.
+
+### `service.json` — where the slots are configured
+
+`~/.drey-engine/service.json` (the service home; a standalone runner
+takes `--home`, else the parent of a `<home>/fleet` root). Machine
+scope (ADR-0092 R13): the file is created as `{ "slots": [] }` when the
+runner first wakes, read again on every refresh round (an edit applies
+without a restart), and a write through `POST /slots/config` replaces
+only `slots` — every other key (req-173's model table, cap, providers)
+is kept. A file that does not parse is never overwritten; the runner
+then works with the implied slots and logs why.
+
+```json
+{
+  "slots": [
+    { "id": "claude-a", "label": "Claude A", "provider": "claude-code", "profile": "private", "sessions": 2,
+      "billing": { "kind": "subscription", "pricePerMonth": 90, "currency": "EUR" },
+      "login": { "claudeConfigDir": "C:/Users/me/.claude-a" } },
+    { "id": "claude-b", "label": "Claude B", "provider": "claude-code",
+      "login": { "claudeConfigDir": "C:/Users/me/.claude-b" } },
+    { "id": "zai", "label": "z.ai", "provider": "opencode",
+      "billing": { "kind": "subscription", "pricePerMonth": 30 },
+      "login": { "opencodeAuthEntry": "zai-coding-plan" } },
+    { "id": "kimi", "label": "Kimi", "provider": "kimi" },
+    { "id": "copilot", "label": "Copilot", "provider": "opencode", "profile": "work",
+      "billing": { "kind": "credits", "pricePerCredit": 0.04 },
+      "limits": [{ "window": "month", "budget": 1000, "unit": "runs" }] }
+  ],
+  "quota": { "refreshMinutes": 10 }
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `id` | letters, digits, `.`, `_`, `-`; unique |
+| `label` | what the boards show; default the id |
+| `provider` | `claude-code`, `opencode` or `kimi` — the harness the slot's runs use |
+| `profile` | `private` (default) or `work`: a repository runs only on slots of its own `profile:` (`_meta/repos.md`) |
+| `sessions` | concurrent runs the account serves; absent = no cap of its own (the provider's pool decides) |
+| `billing` | `{kind: "subscription", pricePerMonth}` or `{kind: "credits", pricePerCredit}`, optional `currency` — display data |
+| `login` | the harness login, **never a key**: `claudeConfigDir` (spawned as `CLAUDE_CONFIG_DIR`; absent = the default login), `opencodeAuthEntry` / `opencodeAuthFile` (the entry of opencode's `auth.json` the z.ai quota is read with), `kimiCredentials` / `kimiHome` (the Kimi CLI's credentials file; `kimiHome` is spawned as `KIMI_HOME`) |
+| `quota` | where the windows come from — `claude-code`, `zai`, `kimi` or `counting`; absent = by provider (`opencode` with a `zai…` auth entry → `zai`, other `opencode` → `counting`) |
+| `limits` | budgets the counting measures against: `{window: "5h" \| "7d" \| "month", budget, unit: "tokens" \| "runs"}` |
+| `quota.refreshMinutes` | the refresh round (default 10); a remote quota is read at most once a minute per slot, whatever asks |
+
+A provider no slot names runs on an **implied** `private` slot on its
+default login (ids `claude-code`, `opencode`, `kimi`; `implied: true`) —
+a machine without slots runs as before. An implied slot makes no network
+call: Claude Code's windows come from its runs and cache, Kimi and
+OpenCode are counted. The z.ai and Kimi endpoints are read only for a
+slot `service.json` names.
+
+### Where the windows come from
+
+| Source | Windows | Reliability |
+|---|---|---|
+| Claude Code | the `rate_limit_event` after every assistant turn of a run on the slot (5 h, 7 d; `rejected` spends the window); between runs `cachedUsageUtilization` in the account's `.claude.json` | `measured`; the cache `estimated` |
+| z.ai | `GET https://api.z.ai/api/monitor/usage/quota/limit` with the key of the opencode auth entry (5 h, weekly; the tool-call `TIME_LIMIT` is left out) | `measured` |
+| Kimi | `GET https://api.kimi.ai/coding/v1/usages` with the CLI login's access token (5 h, the two monthly ratios); an expired token is skipped — the CLI refreshes it on its next run | `measured` |
+| counting | every finished run on the slot (input without cache reads, plus output; or one per run) against `limits:`; behind every other source as the fallback | `estimated` after the first run, `unknown` before or without a budget |
+
+`q = R / T` per window — the remaining share over the remaining time
+share — and the slot's `q` is the minimum over its windows: above 1 the
+account has more left than an even pace would use. A display value; no
+run is routed by it yet (req-178).
+
+### Slot states
+
+| State | When | A start on it |
+|---|---|---|
+| `ready` | a readout or a counted run, nothing holds it | takes the run |
+| `busy` | runs hold it (`busy` of `total`) | takes the run while `busy < total` |
+| `exhausted` | a window at 0 left, or the provider's `rejected`; a window past its reset counts as full again (`estimated`) | refused with the window and its reset |
+| `needs-login` | a run ended on `authentication_failed` / 401 / "Please run /login", or a quota read got 401 | refused, **never retried** — sign the account in (`claude` with that `CLAUDE_CONFIG_DIR`, `/login`), then `POST /slots/login-done`; a remote read that succeeds clears it too |
+| `unknown` | no readout and no counted run | takes the run |
+
+A start binds a free slot of the request's provider and profile — the
+slot the resumed session lives on first, else the first in
+`service.json`'s order — or is refused with each candidate's reason
+(`no work slot serves claude-code: the repository is work and never runs
+on a private slot — …`). A failed start frees its slot; a restarted
+runner re-reserves the slots of the runs it adopts. The run's own
+`failed` card is the Needs-you card of an expired login.
 
 ## The tickets remote is not the runner
 

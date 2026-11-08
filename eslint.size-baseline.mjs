@@ -8,7 +8,6 @@
 export const SIZE_BASELINE = [
   'packages/tickets-engine/src/contracts/changes.ts',
   'packages/tickets-engine/src/contracts/question-shape.ts',
-  'packages/tickets-engine/src/contracts/tickets.ts',
   'packages/tickets-engine/src/core/blocked.ts',
   'packages/tickets-engine/src/core/chain-delta.ts',
   'packages/tickets-engine/src/core/chat-intents.ts',
@@ -65,7 +64,6 @@ export const SIZE_BASELINE = [
   'packages/tickets-engine/src/services/chat-model.ts',
   'packages/tickets-engine/src/services/chat-service.spec.ts',
   'packages/tickets-engine/src/services/chat-service.ts',
-  'packages/tickets-engine/src/services/fleet-client.ts',
   'packages/tickets-engine/src/services/notes-service.ts',
   'packages/tickets-engine/src/services/plan-shadow.ts',
   'packages/tickets-engine/src/services/verify-service.spec.ts',

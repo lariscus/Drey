@@ -101,6 +101,8 @@ export interface ProviderStart {
   /** Deliver NO first prompt — a quiet start (req-75); claude-code ignores it. */
   readonly holdAtSpawn?: boolean;
   readonly ticketId: string;
+  /** req-177: the worker's extra environment — its slot's login folder (`CLAUDE_CONFIG_DIR`, `KIMI_HOME`). */
+  readonly env?: Readonly<Record<string, string>>;
   /** Events land here; the run's stream file keeps them. */
   readonly onEvent: (event: NormalizedEvent) => void;
   /** The session to steer/resume with, as soon as the provider reports it. */

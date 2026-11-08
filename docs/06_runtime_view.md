@@ -4735,3 +4735,63 @@ Where the parts live and which may import which (`run/` and `ports/` import
 nothing from Node or their siblings; `orchestrate/` sees the harness contract
 alone; only `runner.ts` wires a concrete adapter) is §5.0's "Crew runner
 structure" row; the rule is enforced by ESLint and `fleet/architecture.spec.ts`.
+
+## 6.101 A run starts on a slot, and the slot learns from the run (req-177, milestone 215)
+
+```mermaid
+sequenceDiagram
+    participant D as Dispatcher / POST /start
+    participant S as RunStarter
+    participant G as SlotGate
+    participant R as SlotRegistry
+    participant W as ProcessSupervisor + adapter
+    participant H as EventHub
+    participant L as SlotRunListener
+    D->>S: start(request with profile)
+    S->>G: bind(request, runId, the resumed session's slot)
+    G->>R: views() — provider, profile, state, busy of total
+    alt a free slot of the profile
+        G-->>S: {id, label} (reserved)
+        S->>W: spawn with the slot's env (CLAUDE_CONFIG_DIR)
+        W-->>H: run record, stream lines (rateLimit, errors)
+        H-->>L: run / line events
+        L->>R: rate-limit windows → measured; a refused login → needs-login
+        H-->>L: the run's terminal record
+        L->>R: release, count the telemetry, refresh the slot's quota
+        R-->>H: slot event (state, windows, q changed)
+    else none free, or none of the profile
+        G-->>S: refused: the reason
+        S-->>D: {ok: false, error} — nothing claimed, nothing spawned
+    end
+```
+
+The registry also reads the remote quotas on its own round (`quota.refreshMinutes`, z.ai and Kimi only for
+configured slots, at most once a minute per slot) and reloads `service.json` each time. A run never goes to a
+slot of the other profile; an expired login is a slot state, never a retry.
+
+How a quota readout reaches the slot and the boards — from a run's own stream, or from the registry's round:
+
+```mermaid
+sequenceDiagram
+    participant A as Claude Code adapter
+    participant H as EventHub
+    participant L as SlotRunListener
+    participant C as ClaudeCodeQuotaSource
+    participant Q as Zai / Kimi QuotaSource
+    participant R as SlotRegistry
+    participant API as GET /chain, GET /slots
+    participant UI as 7e band, 7l page
+    A->>H: line: usage with rateLimit (five hours, seven days)
+    H->>L: line event (the run's slot is known from its reservation)
+    L->>C: observe(slot, windows) — measured
+    L->>R: refresh(slot)
+    R->>C: read(slot)
+    loop every quota.refreshMinutes (at most once a minute per slot)
+        R->>Q: read(slot) — fetch with the login's key, never kept
+        Q-->>R: windows (measured), a refused login, or unavailable (the counting stands in)
+    end
+    R->>R: state, q = R / T, compare with the last view
+    R-->>H: slot event (only when the view changed)
+    H-->>UI: SSE event: slot
+    UI->>API: GET /chain (slots summary), GET /slots (windows, q, state)
+```

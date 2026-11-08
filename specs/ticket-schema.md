@@ -1180,6 +1180,7 @@ repos:
     url: https://dev.azure.com/org/project/_git/lariscus
     branch: main
     policy: Azure DevOps branch policies protect main
+    profile: work
 ---
 Prose for humans.
 ```
@@ -1214,8 +1215,16 @@ fleet worktree (a junction on Windows, a directory symlink elsewhere)
 instead of the worker rebuilding them: the toolchain (`.tools`,
 `node_modules`). A folder is linked only when the checkout has it, the
 worktree does not, and git ignores it there; the brief then tells the
-worker not to install anything. Names are unique; a ticket's `repo:`
-must name one of them once it is in a work phase.
+worker not to install anything. `profile` (req-177, ADR-0095 later
+change) is `private` or `work`: the slot profile the repository runs
+under. A fleet run on the repository is served only by a slot of that
+profile (the slots live in the service home's `service.json`,
+`plugins/tickets/FLEET.md`) and is refused, with the reason, when no
+slot of it is free — never served by the other profile, not even as a
+fallback. Unset is `private`; any other value is a parse error of the
+file, never a guess. The run request carries it (`profile`). Names are
+unique; a ticket's `repo:` must name one of them once it is in a work
+phase.
 
 The registry is edited in Settings → Tickets, Repositories (req-72):
 the entries as editable rows, one commit per save, the prose under the

@@ -20,6 +20,7 @@
  */
 import * as crypto from 'node:crypto';
 import { promises as fsp } from 'node:fs';
+import { homedir } from 'node:os';
 import * as path from 'node:path';
 import { ChainRoutes } from './api/chain-routes';
 import { EventHub } from './api/event-hub';
@@ -28,8 +29,10 @@ import { LifecycleRoutes } from './api/lifecycle-routes';
 import { RunReadRoutes } from './api/run-read-routes';
 import { RunWriteRoutes } from './api/run-write-routes';
 import { RunnerHttpApi } from './api/runner-http-api';
+import { SlotRoutes } from './api/slot-routes';
 import { fleetBuildStamp } from './build-stamp';
 import { composeOrchestrator } from './compose-orchestrator';
+import { composeRouting, type Routing } from './compose-routing';
 import { composeRunSupervisor, composeShared } from './compose-supervisor';
 import { dkTargetFor, retreatStages } from './dk-target';
 import { FleetEventWriter } from './event-writer';
@@ -45,6 +48,9 @@ import { opencodeAdapter } from './harness/opencode';
 import { peerAlive, readDescriptor, removeDescriptor, writeDescriptor } from './runner-descriptor';
 import { RunnerExit } from './runner-exit';
 import { IdleWatch } from './runner-lifecycle';
+import { NodeFileSystem } from './node-file-system';
+import { SYSTEM_CLOCK } from './ports/clock';
+import type { QuotaHttp } from './routing/quota-source';
 import { RunnerLog } from './runner-log';
 import { DkTicketStores } from './store/dk-ticket-store';
 
@@ -53,6 +59,8 @@ const VERSION = 1;
 export interface Args {
   readonly root: string;
   readonly idleMs: number;
+  /** The service home (`service.json`, req-177); absent = the root's parent when the root is `<home>/fleet`, else the root. */
+  readonly home?: string;
   /**
    * The board lives in a dricket store (D-42). Still passed by the service's
    * launch; since req-176 the runner writes tickets only through a store
@@ -71,6 +79,10 @@ export interface RunnerDeps {
   readonly descriptor?: 'file' | 'none';
   /** Whether the runner installs its own SIGINT/SIGTERM/exit handlers; the service handles signals itself. */
   readonly signals?: boolean;
+  /** req-177: the user's home (Claude's default login, opencode's and Kimi's folders); `os.homedir()` by default. */
+  readonly userHome?: string;
+  /** req-177: the remote quota reads; the global `fetch` by default. */
+  readonly quotaHttp?: QuotaHttp;
 }
 
 /** What `startRunner` hands back: the spec reads the descriptor and ends the runner through it. */
@@ -95,7 +107,8 @@ function parseArgs(argv: readonly string[]): Args {
     console.error('fleet runner: --root is required');
     process.exit(2);
   }
-  return { root, idleMs: Number.isFinite(idleMs) && idleMs > 0 ? idleMs : 15 * 60_000, storeBacked: argv.includes('--store-backed') };
+  const home = value('--home');
+  return { root, idleMs: Number.isFinite(idleMs) && idleMs > 0 ? idleMs : 15 * 60_000, storeBacked: argv.includes('--store-backed'), ...(home !== undefined ? { home } : {}) };
 }
 
 /** The fleet ledger (E7): the vault arrives only with the chain config, so the writer is built on the first event. */
@@ -117,8 +130,31 @@ function ledgerOf(log: (message: string) => void): { events: FleetEvents; setVau
   };
 }
 
+/** What the fleet is composed over. */
+interface FleetContext {
+  readonly root: string;
+  readonly log: (message: string) => void;
+  readonly events: FleetEvents;
+  readonly hub: EventHub;
+  readonly routing: Routing;
+}
+
+/** The service home: `--home`, else the parent of a `<home>/fleet` root, else the root itself (a spec's temp root). */
+function serviceHome(args: Args): string {
+  return args.home ?? (path.basename(args.root) === 'fleet' ? path.dirname(args.root) : args.root);
+}
+
+/** The slots (req-177): their changes go out as `slot` events, the runs' events come back in. */
+function routingFor(args: Args, deps: RunnerDeps, log: (message: string) => void, hub: EventHub): Routing {
+  const http = deps.quotaHttp !== undefined ? { http: deps.quotaHttp } : {};
+  const routing = composeRouting({ home: serviceHome(args), userHome: deps.userHome ?? homedir(), env: process.env, fs: new NodeFileSystem(), clock: SYSTEM_CLOCK, log, publish: (slot) => hub.publish({ kind: 'slot', slot }), ...http });
+  hub.subscribe((event) => routing.listener.publish(event));
+  return routing;
+}
+
 /** The supervisors, one per provider, and the chain over them; the settle hook closes the loop back to the chain. */
-function composeFleet(root: string, log: (message: string) => void, events: FleetEvents, hub: EventHub): { supervisors: SupervisorSet; orchestrator: Orchestrator } {
+function composeFleet(ctx: FleetContext): { supervisors: SupervisorSet; orchestrator: Orchestrator } {
+  const { root, log, events, hub, routing } = ctx;
   const stores = new DkTicketStores();
   const shared = composeShared(stores.storeFor, log, undefined, { sink: hub });
   const adapters = [opencodeAdapter(nodeSpawnFn()), claudeCodeAdapter(nodeSpawnFn()), kimiAdapter(nodeSpawnFn(), nodeKimiUsageReader())];
@@ -134,6 +170,7 @@ function composeFleet(root: string, log: (message: string) => void, events: Flee
         shared,
         onRunSettled: (info) => void orchestrator.onRunSettled(info),
         secondOpinion: (request) => orchestrator.secondOpinion(request),
+        slots: routing.gate,
       }),
     ]),
   );
@@ -143,6 +180,7 @@ function composeFleet(root: string, log: (message: string) => void, events: Flee
     log,
     events,
     bookkeeper: shared.bookkeeper,
+    slots: routing.registry,
     supervisorOf: (provider) => supervisors.forProvider(provider),
     // E14-5b: a killed runner's claims on a dricket store are released before the chain's first dispatch there.
     releaseLeftovers: async (store, pipeline) => {
@@ -173,6 +211,19 @@ function installSignals(exit: RunnerExit, descriptorPath: string | null): void {
   process.once('exit', () => descriptorPath !== null && removeDescriptor(descriptorPath));
 }
 
+/** The runner's log and build stamp, with the start lines written. */
+async function openLog(args: Args, deps: RunnerDeps): Promise<{ log: RunnerLog; build: string }> {
+  const log = new RunnerLog(path.join(args.root, 'runner.log'), deps.stdout ?? ((line: string): void => console.log(line)));
+  // The build stamp (req-51): a rebuild that changed the fleet code makes the client retire this daemon with a handover.
+  const build = await fleetBuildStamp(__filename);
+  log.line(`daemon pid ${process.pid} starting in ${args.root} (v${VERSION})`);
+  const scrubbed = scrubInheritedEnv(process.env);
+  if (scrubbed.length > 0) {
+    log.line(`workers start without ${scrubbed.length} inherited variable(s): ${scrubbed.join(', ')}`);
+  }
+  return { log, build };
+}
+
 export async function startRunner(args: Args, deps: RunnerDeps = {}): Promise<RunnerHandle | null> {
   const exitProcess = deps.exit ?? ((code: number): void => process.exit(code));
   await fsp.mkdir(path.join(args.root, 'runs'), { recursive: true });
@@ -182,26 +233,26 @@ export async function startRunner(args: Args, deps: RunnerDeps = {}): Promise<Ru
     exitProcess(0); // a healthy peer keeps this process out; a stale descriptor is taken over
     return null;
   }
-  const log = new RunnerLog(path.join(args.root, 'runner.log'), deps.stdout ?? ((line: string): void => console.log(line)));
-  // The build stamp (req-51): a rebuild that changed the fleet code makes the client retire this daemon with a handover.
-  const build = await fleetBuildStamp(__filename);
-  log.line(`daemon pid ${process.pid} starting in ${args.root} (v${VERSION})`);
-  const scrubbed = scrubInheritedEnv(process.env);
-  if (scrubbed.length > 0) {
-    log.line(`workers start without ${scrubbed.length} inherited variable(s): ${scrubbed.join(', ')}`);
-  }
+  const { log, build } = await openLog(args, deps);
   const ledger = ledgerOf(log.line);
   const hub = new EventHub();
   const stream = new EventStream(hub);
-  const { supervisors, orchestrator } = composeFleet(args.root, log.line, ledger.events, hub);
+  const routing = routingFor(args, deps, log.line, hub);
+  const { supervisors, orchestrator } = composeFleet({ root: args.root, log: log.line, events: ledger.events, hub, routing });
   await supervisors.adoptAll();
+  routing.listener.seed(supervisors.records().map((record) => record.info));
+  await routing.start();
   await orchestrator.load();
   const descriptor: RunnerDescriptor = { port: await freePort(), token: crypto.randomBytes(24).toString('hex'), pid: process.pid, startedAt: new Date().toISOString(), version: VERSION, build };
   const idle = new IdleWatch(args.idleMs);
-  const exit = new RunnerExit({ exit: exitProcess, log, orchestrator, supervisors, idle, idleMs: args.idleMs, descriptorPath: writesDescriptor ? descriptorPath : null, closeStreams: () => stream.closeAll() });
+  const closeStreams = (): void => {
+    stream.closeAll();
+    routing.stop();
+  };
+  const exit = new RunnerExit({ exit: exitProcess, log, orchestrator, supervisors, idle, idleMs: args.idleMs, descriptorPath: writesDescriptor ? descriptorPath : null, closeStreams });
   const api = new RunnerHttpApi(
     descriptor.token,
-    [new LifecycleRoutes(exit, supervisors, log, { version: VERSION, build }), new ChainRoutes(orchestrator, supervisors, exit, ledger.setVault), new RunReadRoutes(supervisors), new RunWriteRoutes(supervisors), stream],
+    [new LifecycleRoutes(exit, supervisors, log, { version: VERSION, build }), new ChainRoutes(orchestrator, supervisors, exit, ledger.setVault), new RunReadRoutes(supervisors), new RunWriteRoutes(supervisors), new SlotRoutes(routing.registry, routing.config, routing.check), stream],
     { exit, idle },
   );
   const server = api.server();

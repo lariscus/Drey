@@ -42,6 +42,8 @@ export interface ProcessSupervisorDeps {
   readonly settings: HandoverSettings;
   readonly table: ProcessTable;
   readonly log: (message: string) => void;
+  /** req-177: the worker environment of the run's slot (its login folder). */
+  readonly slotEnv?: (slotId: string) => Readonly<Record<string, string>> | undefined;
   /** The worker the run owns exited: the completion decides. */
   readonly onExit: (run: LiveRun, code: number | null) => Promise<void>;
 }
@@ -65,6 +67,7 @@ export class ProcessSupervisor {
 
   spawn(run: LiveRun, plan: SpawnPlan): WorkerHandle {
     const request = run.request;
+    const env = run.info.slot === undefined ? undefined : this.deps.slotEnv?.(run.info.slot.id);
     const handle = this.deps.adapter.spawn({
       cwd: run.info.worktreePath,
       instruction: plan.instruction,
@@ -76,6 +79,7 @@ export class ProcessSupervisor {
       ...(plan.holdAtSpawn === true ? { holdAtSpawn: true } : {}),
       ...(plan.usageBase !== undefined ? { usageBase: plan.usageBase } : {}),
       ticketId: request.ticketId,
+      ...(env !== undefined ? { env } : {}),
       onEvent: (event) => this.deps.events.onEvent(run, event),
       onSessionRef: (ref) => this.keepSession(run, ref),
       ...(plan.recordAttach === true ? { onAttachInfo: (info: ServerInfo) => this.deps.background.track(this.recordAttach(run, info)) } : {}),

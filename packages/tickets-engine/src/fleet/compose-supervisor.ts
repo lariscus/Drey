@@ -48,6 +48,7 @@ import { RunSupervisor } from './orchestrate/run-supervisor';
 import { RunTakeover } from './orchestrate/run-takeover';
 import { RunnerHandover } from './orchestrate/runner-handover';
 import { SessionHandover } from './orchestrate/session-handover';
+import type { SlotBinder } from './orchestrate/slot-binder';
 import { SteerService } from './orchestrate/steer-service';
 import { StoreClaims } from './orchestrate/store-claims';
 import { TicketCopy } from './orchestrate/ticket-copy';
@@ -118,6 +119,8 @@ export interface RunSupervisorDeps {
   readonly secondOpinion?: (request: RunRequest) => Promise<string | null>;
   /** Per-run ceilings (0 = unlimited); a run that passes one is failed, never retried at once. */
   readonly limits?: Partial<RunLimits>;
+  /** req-177: the slot (account) each run starts on; absent = no slots. */
+  readonly slots?: SlotBinder;
 }
 
 /** The parts that touch the worker, the ticket and the record, with the loops between them closed. */
@@ -136,6 +139,11 @@ interface Runtime extends RunnerShared {
   readonly completion: RunCompletion;
 }
 
+/** The worker environment of a run's slot, when slots are wired. */
+function slotEnvOf(slots: SlotBinder | undefined): { slotEnv?: (slotId: string) => Readonly<Record<string, string>> | undefined } {
+  return slots === undefined ? {} : { slotEnv: (slotId) => slots.envOf(slotId) };
+}
+
 function runtimeOf(deps: RunSupervisorDeps): Runtime {
   const shared = deps.shared ?? composeShared(deps.storeFor, deps.log, deps.now);
   const { clock, streams, bookkeeper } = shared;
@@ -150,7 +158,7 @@ function runtimeOf(deps: RunSupervisorDeps): Runtime {
   const settler = new RunSettler({ machine, repo, bookkeeper, clock, log, ...(deps.onRunSettled !== undefined ? { onRunSettled: deps.onRunSettled } : {}) });
   const takeover = new RunTakeover(repo, bookkeeper);
   const events: EventFold = new EventFold({ repo, streams, bookkeeper, background, log, interrupt: (run) => takeover.interrupt(run.info.id), claimLost: (run, why): Promise<void> => stopper.claimLost(run, why) });
-  const processes: ProcessSupervisor = new ProcessSupervisor({ adapter: deps.adapter, repo, events, background, settings, table, log, onExit: (run, code): Promise<void> => completion.onWorkerExit(run, code) });
+  const processes: ProcessSupervisor = new ProcessSupervisor({ adapter: deps.adapter, repo, events, background, settings, table, log, ...slotEnvOf(deps.slots), onExit: (run, code): Promise<void> => completion.onWorkerExit(run, code) });
   const stopper: RunStopper = new RunStopper(machine, repo, processes, { settler, bookkeeper, log });
   const gate = new GateRunner(bookkeeper, deps.execShell ?? execShell, deps.validateTrailers ?? validateTrailers);
   const opinion = deps.secondOpinion !== undefined ? { secondOpinion: deps.secondOpinion } : {};
@@ -175,7 +183,7 @@ function starterOf(rt: Runtime, handover: RunnerHandover, git: TicketsGitSeam): 
   const log = rt.deps.log;
   const launcher = new WorkerLauncher({ machine, repo, processes, claims, background, streams, log });
   const sessions = new SessionHandover(repo, rt.settings, rt.deps.adapter.id, clock);
-  return new RunStarter({ machine, repo, streams, stores, claims, bookkeeper, sessions, launcher, prepareWorktree: prepareOf(rt, git), clock, log, retiring: () => handover.retiring });
+  return new RunStarter({ machine, repo, streams, stores, claims, bookkeeper, sessions, launcher, prepareWorktree: prepareOf(rt, git), clock, log, retiring: () => handover.retiring, ...(rt.deps.slots !== undefined ? { slots: rt.deps.slots } : {}) });
 }
 
 /** One provider's supervisor, every part wired. */

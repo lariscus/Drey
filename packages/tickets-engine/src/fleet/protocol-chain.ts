@@ -1,5 +1,6 @@
 import type { FleetCaps, FleetHandoverConfig, FleetPools } from './protocol-fleet-config';
 import type { PermissionMode } from './protocol';
+import type { SlotSummary } from './protocol-slots';
 
 // ---------------------------------------------------------------------------
 // The chain (M85, ADR-0077): the orchestrator's configuration and control
@@ -131,6 +132,8 @@ export interface ChainStatus {
    * older runners.
    */
   readonly poolSize?: Readonly<Record<string, number>>;
+  /** req-177: per slot (account) the busy count, the remaining share, its reliability, q and the reset — the 7e Capacity band's Slots row. Absent on older runners. */
+  readonly slots?: readonly SlotSummary[];
 }
 
 /** One circuit-breaker trip (the chain alerts fix). */

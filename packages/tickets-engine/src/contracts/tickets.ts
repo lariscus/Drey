@@ -11,6 +11,8 @@
  * reachable; the plugin renderer bundle may not import packages).
  */
 import type { ChainEntry } from './chain';
+import type { RepoRef } from './repo-ref';
+import type { PriorityConfig, TicketPriority } from './ticket-priority';
 
 /** `T-` + at least four digits (`T-0042`). Grammar of ids AND file stems. */
 export const TICKET_ID_PATTERN = /^T-\d{4,}$/;
@@ -79,13 +81,6 @@ export function ticketOfBranch(branch: string): string | null {
 }
 
 /**
- * A priority id from the vault's configured vocabulary — `urgent` in the
- * default list, or whatever pipeline.md's `priorities:` names (`p0`,
- * `critical`, …). The order of the list IS the weight: first is highest.
- */
-export type TicketPriority = string;
-
-/**
  * The ticket's track (req-75 W1b, ADR-0087 decision 2): `auto` runs on
  * its own, `shape` goes through the plan-mode dialog with the owner.
  */
@@ -99,83 +94,6 @@ export type TicketTrack = 'auto' | 'shape';
  * "Needs you" and the owner promotes the ticket to ship from there.
  */
 export type TicketForm = 'ship' | 'scout';
-
-/** The default vocabulary — what a vault without `priorities:` gets. */
-export const TICKET_PRIORITIES: readonly TicketPriority[] = [
-  'urgent',
-  'high',
-  'normal',
-  'low',
-];
-
-/** The vault's priority vocabulary: the order IS the weight (first = highest). */
-export interface PriorityConfig {
-  readonly order: readonly TicketPriority[];
-  /** What a ticket whose file omits (or misspells) `priority:` reads as. */
-  readonly default: TicketPriority;
-}
-
-export const DEFAULT_PRIORITY_CONFIG: PriorityConfig = { order: TICKET_PRIORITIES, default: 'normal' };
-
-/**
- * pipeline.md's `priorities:` — a list of ids in weight order. The
- * vocabulary splits at its middle (`floor(len/2)`): the entries before
- * it are the dispatch's jump class (req-63), the entry at it is the
- * default (`normal` in the default list of four), the rest is the calm
- * half. Forgiving: anything unreadable is a noise issue and the default
- * vocabulary applies.
- */
-export function parsePriorityConfig(raw: unknown): { config: PriorityConfig; issues: TicketIssue[] } {
-  if (raw === undefined || raw === null) {
-    return { config: DEFAULT_PRIORITY_CONFIG, issues: [] };
-  }
-  if (!Array.isArray(raw)) {
-    return {
-      config: DEFAULT_PRIORITY_CONFIG,
-      issues: [{ level: 'noise', message: 'priorities must be a list of ids — the default vocabulary applies' }],
-    };
-  }
-  const issues: TicketIssue[] = [];
-  const order: TicketPriority[] = [];
-  for (const entry of raw) {
-    if (typeof entry !== 'string' || !PRIORITY_ID.test(entry)) {
-      issues.push({
-        level: 'noise',
-        message: `priorities: "${String(entry)}" is not a readable id — dropped`,
-      });
-      continue;
-    }
-    if (order.includes(entry)) {
-      issues.push({ level: 'noise', message: `priorities: "${entry}" appears twice — first wins` });
-      continue;
-    }
-    order.push(entry);
-  }
-  if (order.length === 0) {
-    issues.push({ level: 'noise', message: 'priorities is empty — the default vocabulary applies' });
-    return { config: DEFAULT_PRIORITY_CONFIG, issues };
-  }
-  return { config: { order, default: order[Math.floor(order.length / 2)]! }, issues };
-}
-
-/** A priority id in the configured vocabulary (`p0`, `critical`). */
-const PRIORITY_ID = /^[a-z][a-z0-9-]*$/;
-
-/** Sort weight inside derived column order — the configured index; smaller sorts first, an unknown id sorts last. */
-export function priorityWeight(priority: TicketPriority, config: PriorityConfig = DEFAULT_PRIORITY_CONFIG): number {
-  const at = config.order.indexOf(priority);
-  return at === -1 ? config.order.length : at;
-}
-
-/**
- * The dispatch class (req-63): the entries before the vocabulary's
- * middle jump the queue, the rest waits — `urgent` and `high` in the
- * default list. An unknown id waits.
- */
-export function priorityClass(priority: TicketPriority, config: PriorityConfig = DEFAULT_PRIORITY_CONFIG): 0 | 1 {
-  const at = config.order.indexOf(priority);
-  return at >= 0 && at < Math.floor(config.order.length / 2) ? 0 : 1;
-}
 
 /** Default `rank` when a file omits it (the reader's normalization). */
 export const DEFAULT_RANK = 5000;
@@ -435,39 +353,9 @@ export function resolveCardWorker(
   return defaultWorker;
 }
 
-/** One work repo from `tickets/_meta/repos.md`. */
-export interface RepoRef {
-  readonly name: string;
-  readonly url: string;
-  readonly branch: string | null;
-  readonly policy: string | null;
-  /** Local checkout / worktree to open for testing (T-0004); the clone
-   *  URL stays `url`. Null when not configured. */
-  readonly path: string | null;
-  /** The repo's default fleet worker (`worker: opencode`), or null. */
-  readonly worker: string | null;
-  /**
-   * The repo's worktree base override (`worktrees:`, T-0044): where the
-   * fleet's checkouts for this repo live — `<base>/<ticket-id>`.
-   * Absolute, or relative to the tickets repo root. Null = the default
-   * `<ticketsRepo>/_worktrees` (ADR-0080).
-   */
-  readonly worktrees: string | null;
-  /**
-   * The command that starts the repository's program in a worktree, run
-   * there in a new console — req-75 W3 / T-0057; null = `dev.ps1 -Built
-   * -Multi` when the worktree has a `dev.ps1`, else no launch.
-   */
-  readonly launch: string | null;
-  /**
-   * The file inlined as a fleet run's agent instructions (`instructions:`,
-   * req-79), relative to the checkout at `path`; null = `CLAUDE.md`, else
-   * `AGENTS.md` (the context pack, T-0048).
-   */
-  readonly instructions: string | null;
-  /** Git-ignored folders a fleet worktree links from the checkout (`link:`, req-56); absent = none. */
-  readonly link?: readonly string[];
-}
+export type { RepoProfile, RepoRef } from './repo-ref';
+export { DEFAULT_PRIORITY_CONFIG, TICKET_PRIORITIES, parsePriorityConfig, priorityClass, priorityWeight } from './ticket-priority';
+export type { PriorityConfig, TicketPriority } from './ticket-priority';
 
 export interface BoardColumn {
   readonly phase: PipelinePhase;

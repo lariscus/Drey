@@ -84,13 +84,16 @@ function graph(): readonly ImportEdge[] {
 const inFolder = (file: string, folder: string): boolean => file.startsWith(`${folder}/`);
 
 /** The parts that reach the machine only through `fleet/ports` (req-176 step 4). */
-const NODE_FREE: readonly string[] = ['run', 'ports', 'orchestrate'];
+const NODE_FREE: readonly string[] = ['run', 'ports', 'orchestrate', 'routing'];
 
 /** Single files of other parts that stay Node-free: the adapter contract. */
 const NODE_FREE_FILES: readonly string[] = ['harness/contract.ts'];
 
 /** A module that wires a concrete adapter: only the composition root may import it at runtime. */
 const CONCRETE = [/^harness\/claude-code$/, /^harness\/opencode$/, /^harness\/kimi(-.*)?$/, /^store\/dk-ticket-store$/];
+
+/** What `fleet/routing` may import (req-177): the wire types, the ports, the adapter contract and the run core. */
+const ROUTING_TARGETS = [/^routing\//, /^protocol(-[a-z-]+)?$/, /^ports\//, /^harness\/contract$/, /^run\//];
 
 /** The violations of the rules over a set of edges; empty = the layering holds. */
 function violations(edges: readonly ImportEdge[]): readonly string[] {
@@ -109,6 +112,9 @@ function violations(edges: readonly ImportEdge[]): readonly string[] {
     }
     if (inFolder(edge.from, 'harness') && edge.target !== null && /^(orchestrate|api|store)\/|^runner$/.test(edge.target)) {
       found.push(`${where}: an adapter never imports the orchestration`);
+    }
+    if (inFolder(edge.from, 'routing') && edge.target !== null && !ROUTING_TARGETS.some((re) => re.test(edge.target!))) {
+      found.push(`${where}: fleet/routing takes the protocol, the ports, the adapter contract and the run core only`);
     }
     const concrete = edge.target !== null && !edge.typeOnly && CONCRETE.some((re) => re.test(edge.target!));
     const sameFolder = edge.target !== null && path.posix.dirname(edge.target) === path.posix.dirname(edge.from);
@@ -147,6 +153,20 @@ describe('the Crew runner import graph (ADR-0096)', () => {
   it('reports an adapter that imports the orchestration', () => {
     expect(violations(importsOf('harness/opencode.ts', "import type { LiveRun } from '../orchestrate/live-run';"))).toHaveLength(1);
     expect(violations(importsOf('harness/opencode.ts', "import { x } from './contract';"))).toEqual([]);
+  });
+
+  it('keeps routing on the protocol, the ports, the contract and the run core (req-177)', () => {
+    expect(violations(importsOf('routing/x.ts', "import type { RunSupervisor } from '../orchestrate/run-supervisor';"))).toHaveLength(1);
+    expect(violations(importsOf('routing/x.ts', "import { EventHub } from '../api/event-hub';"))).toHaveLength(1);
+    expect(violations(importsOf('routing/x.ts', "import { promises } from 'node:fs';"))).toHaveLength(1);
+    const allowed = [
+      "import type { Clock } from '../ports/clock';",
+      "import { isTerminal } from '../run/run-state';",
+      "import type { SlotView } from '../protocol';",
+      "import type { RateLimitReading } from '../harness/contract';",
+      "import { y } from './y';",
+    ];
+    expect(violations(importsOf('routing/x.ts', allowed.join('\n')))).toEqual([]);
   });
 
   it('reports a concrete adapter wired outside the composition root', () => {

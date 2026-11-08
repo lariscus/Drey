@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { hostname } from 'node:os';
-import type { PipelinePhase } from '../contracts/tickets';
+import type { PipelinePhase, RepoRef } from '../contracts/tickets';
 import type { ComposedInstruction } from './instruction-parts';
 import type { RunRequest } from './protocol';
 import type { RunPlan } from './request-plan';
@@ -26,7 +26,7 @@ type WorkParts = Pick<
   'provider' | 'model' | 'permissionMode' | 'instruction' | 'continuationInstruction' | 'briefDigest' | 'acceptance' | 'gate' | 'git'
 >;
 type MoveParts = Pick<RunRequest, 'nextPhase' | 'nextPhaseDir' | 'pushRemote' | 'claimIdentity'>;
-type OptionalParts = Pick<RunRequest, 'limits' | 'recordWorker' | 'column' | 'handover' | 'interactive' | 'dk' | 'parkFor'>;
+type OptionalParts = Pick<RunRequest, 'limits' | 'recordWorker' | 'column' | 'handover' | 'interactive' | 'dk' | 'parkFor' | 'profile'>;
 
 /** The wire request, its keys in the order the runner's log and record have always shown them. */
 export function assembleRunRequest(plan: RunPlan, worker: RunWorkerPin, instruction: ComposedInstruction): RunRequest {
@@ -93,7 +93,13 @@ function optionalParts(plan: RunPlan): OptionalParts {
     ...(input.interactive !== undefined ? { interactive: input.interactive } : {}),
     ...(input.dk !== undefined ? { dk: input.dk } : {}),
     ...(moves && input.parkFor ? { parkFor: input.parkFor } : {}),
+    ...profileParts(input.repo),
   };
+}
+
+/** req-177: the repository's slot profile, when `repos.md` sets one (absent reads as `private`). */
+function profileParts(repo: RepoRef | null): Pick<RunRequest, 'profile'> {
+  return repo !== null && repo.profile !== undefined ? { profile: repo.profile } : {};
 }
 
 /** The column's own ceilings as the request carries them, or null when it sets none. */

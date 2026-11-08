@@ -6,7 +6,7 @@
  * paths, the specs feed it fixtures. Everything here is deterministic:
  * the same files always produce the same board (no stored state).
  */
-import { isCollection, isMap, parseDocument, stringify, type Document, type YAMLMap, type YAMLSeq } from 'yaml';
+import { isCollection, isMap, parseDocument, type Document, type YAMLMap, type YAMLSeq } from 'yaml';
 import { splitFrontmatter } from '../../../../shared/frontmatter';
 import {
   DEFAULT_PRIORITY_CONFIG,
@@ -21,7 +21,6 @@ import {
   type PipelinePhase,
   type PriorityConfig,
   type RecentDone,
-  type RepoRef,
   type TicketCard,
   type TicketIssue,
   type TicketPriority,
@@ -31,6 +30,7 @@ import { checkpointPhaseIds } from '../fleet/chain';
 import { withTerminalTickets } from './normalize';
 import { READY_STATE } from './pipeline-states';
 import { runDependencyPass } from './blocked';
+import { parseRepos } from './repos-file';
 import { parseTicketFile, ticketPathParts } from './ticket-files';
 
 const PHASE_ID = /^[a-z][a-z0-9-]*$/;
@@ -475,187 +475,9 @@ export function removePipelinePhase(text: string, phaseId: string): string {
   return closePipelineDoc(doc, body);
 }
 
-// --- repos.md --------------------------------------------------------------
+// --- repos.md: core/repos-file.ts (req-177) ----------------------------------
 
-export interface ReposParse {
-  readonly repos: readonly RepoRef[];
-  readonly error: string | null;
-  /** Tolerated entries (a non-string `launch:`), one message each. */
-  readonly warnings: readonly string[];
-}
-
-export function parseRepos(text: string | null): ReposParse {
-  if (text === null) {
-    return { repos: [], error: null, warnings: [] };
-  }
-  const { yamlText, hadFence } = splitFrontmatter(text);
-  if (!hadFence || yamlText === null) {
-    return { repos: [], error: 'repos.md has no frontmatter fence', warnings: [] };
-  }
-  const doc = parseDocument(yamlText);
-  if (doc.errors.length > 0) {
-    return { repos: [], error: `repos.md does not parse: ${doc.errors[0]!.message}`, warnings: [] };
-  }
-  const parsed = doc.toJS() as unknown;
-  const root = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-    ? (parsed as Record<string, unknown>)
-    : {};
-  const rawRepos = root['repos'];
-  if (rawRepos === undefined || rawRepos === null) {
-    return { repos: [], error: 'repos.md needs a repos mapping', warnings: [] };
-  }
-  if (typeof rawRepos !== 'object' || Array.isArray(rawRepos)) {
-    return { repos: [], error: 'repos.md: repos must be a mapping of name -> {url, branch, policy}', warnings: [] };
-  }
-  const repos: RepoRef[] = [];
-  const warnings: string[] = [];
-  for (const [name, entry] of Object.entries(rawRepos as Record<string, unknown>)) {
-    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
-      return { repos: [], error: `repos.md: repo "${name}" must be a mapping`, warnings };
-    }
-    const map = entry as Record<string, unknown>;
-    const url = typeof map['url'] === 'string' ? map['url'].trim() : '';
-    if (url === '') {
-      return { repos: [], error: `repos.md: repo "${name}" needs a url`, warnings };
-    }
-    let launch: string | null = null;
-    if (map['launch'] !== undefined && map['launch'] !== null) {
-      if (typeof map['launch'] === 'string' && map['launch'].trim() !== '') {
-        launch = map['launch'].trim();
-      } else {
-        warnings.push(`repos.md: repo "${name}" launch must be a command string`);
-      }
-    }
-    let instructions: string | null = null;
-    if (map['instructions'] !== undefined && map['instructions'] !== null) {
-      const rel = typeof map['instructions'] === 'string' ? repoRelativePath(map['instructions']) : null;
-      if (rel !== null && rel !== '') {
-        instructions = rel;
-      } else {
-        warnings.push(`repos.md: repo "${name}" instructions must be a file path inside the repo`);
-      }
-    }
-    repos.push({
-      name,
-      url,
-      branch: typeof map['branch'] === 'string' && map['branch'].trim() !== '' ? map['branch'] : null,
-      policy: typeof map['policy'] === 'string' && map['policy'].trim() !== '' ? map['policy'] : null,
-      path: typeof map['path'] === 'string' && map['path'].trim() !== '' ? map['path'].trim() : null,
-      worker: typeof map['worker'] === 'string' && map['worker'].trim() !== '' ? map['worker'].trim() : null,
-      worktrees: typeof map['worktrees'] === 'string' && map['worktrees'].trim() !== '' ? map['worktrees'].trim() : null,
-      launch,
-      instructions,
-    });
-    const links = parseRepoLinks(map['link']);
-    if (typeof links === 'string') {
-      return { repos: [], error: `repos.md: repo "${name}" ${links}`, warnings };
-    }
-    if (links.length > 0) {
-      repos[repos.length - 1] = { ...repos[repos.length - 1]!, link: links };
-    }
-  }
-  return { repos, error: null, warnings };
-}
-
-/**
- * The prose under `repos.md`'s frontmatter — the notes the owner keeps
- * there. A file without a fence reads as the shipped default prose.
- */
-export function reposProse(text: string | null): string {
-  if (text === null) {
-    return DEFAULT_REPOS_PROSE;
-  }
-  const { body, hadFence } = splitFrontmatter(text);
-  return hadFence && body.trim() !== '' ? body : DEFAULT_REPOS_PROSE;
-}
-
-const DEFAULT_REPOS_PROSE = `Work repositories a ticket's \`repos:\` field may name. The fleet never
-calls a host API — only plain git (ADR-0075); protection on \`main\` is
-the host's branch-policy feature, recorded here when configured.
-\`path\` is the local checkout the board's "Open work folder in
-terminal" opens.`;
-
-/**
- * Writes `repos.md` from its entries (req-72, the settings page's save):
- * the frontmatter regenerated from the list, the owner's prose kept.
- * Optional keys are omitted when unset, so the file stays hand-readable.
- */
-export function reposFileText(repos: readonly RepoRef[], prose: string): string {
-  const mapping: Record<string, Record<string, unknown>> = {};
-  for (const repo of repos) {
-    const entry: Record<string, unknown> = { url: repo.url };
-    if (repo.branch !== null) {
-      entry['branch'] = repo.branch;
-    }
-    if (repo.policy !== null) {
-      entry['policy'] = repo.policy;
-    }
-    if (repo.path !== null) {
-      entry['path'] = repo.path.replaceAll('\\', '/');
-    }
-    if (repo.worker !== null) {
-      entry['worker'] = repo.worker;
-    }
-    if (repo.worktrees !== null) {
-      entry['worktrees'] = repo.worktrees;
-    }
-    if (repo.launch !== null) {
-      entry['launch'] = repo.launch;
-    }
-    if (repo.instructions !== null) {
-      entry['instructions'] = repo.instructions;
-    }
-    if (repo.link !== undefined && repo.link.length > 0) {
-      entry['link'] = [...repo.link];
-    }
-    mapping[repo.name] = entry;
-  }
-  const front = stringify({ repos: mapping }, { lineWidth: 0 }).trimEnd();
-  return `---\n${front}\n---\n${prose.trimEnd()}\n`;
-}
-
-/**
- * `link:` (req-56) — the checkout's git-ignored folders a fleet worktree
- * borrows instead of rebuilding (`.tools`, `node_modules`): one name or a
- * list, each relative to the repo root, never leaving it. A string is
- * the reason it is refused.
- */
-function parseRepoLinks(raw: unknown): readonly string[] | string {
-  if (raw === undefined || raw === null) {
-    return [];
-  }
-  const items = typeof raw === 'string' ? [raw] : Array.isArray(raw) ? raw : null;
-  if (items === null || items.some((item) => typeof item !== 'string')) {
-    return 'link: must be a folder name or a list of them';
-  }
-  const links: string[] = [];
-  for (const item of items as string[]) {
-    const rel = repoRelativePath(item);
-    if (rel === null) {
-      return `link: "${item}" must be a path inside the repo (no absolute path, no ..)`;
-    }
-    if (rel !== '') {
-      links.push(rel);
-    }
-  }
-  return links;
-}
-
-/**
- * A repo-relative path from `repos.md`, forward slashes, no trailing
- * slash; '' for a blank value, null when it is absolute or leaves the
- * repo (`..`, `.`).
- */
-function repoRelativePath(raw: string): string | null {
-  const rel = raw.trim().replaceAll('\\', '/').replace(/\/+$/, '');
-  if (rel === '') {
-    return '';
-  }
-  if (rel.startsWith('/') || /^[a-zA-Z]:/.test(rel) || rel.split('/').some((part) => part === '..' || part === '.')) {
-    return null;
-  }
-  return rel;
-}
+export { parseRepos, reposFileText, reposProse, type ReposParse } from './repos-file';
 
 // --- ordering ----------------------------------------------------------------
 
