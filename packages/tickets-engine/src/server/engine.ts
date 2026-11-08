@@ -516,6 +516,8 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
       await board.idle();
       await git.idle();
       server.close();
+      // A Drey's event stream never ends by itself: without this the service's Stop waits for it for ever.
+      server.closeAllConnections();
       await once(server, 'close').catch(() => undefined);
     },
   };

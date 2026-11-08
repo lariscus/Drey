@@ -532,6 +532,13 @@
    in a 142 px column. Line heights are the board's: 18 px for names and
    values, 21 px for descriptions. */
 
+/* The page column of these items: a container, so a narrow tab wraps the rows instead of squeezing their names. */
+:where(.settings-ui) .set-groups {
+  display: flex;
+  flex-direction: column;
+  container-type: inline-size;
+}
+
 :where(.settings-ui) .set-item {
   display: flex;
   flex-direction: column;
@@ -565,6 +572,7 @@
 /* The control line of a stacked item: a value or field, then its unit or buttons. */
 :where(.settings-ui) .set-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -634,6 +642,26 @@
   justify-content: flex-end;
   gap: 8px;
   width: 142px;
+}
+
+/* Below 560 px of page width the compact row wraps: the name takes the first line, the state and the buttons follow. */
+@container (max-width: 560px) {
+  :where(.settings-ui) .set-row {
+    flex-wrap: wrap;
+  }
+
+  :where(.settings-ui) .set-row-text {
+    flex-basis: 100%;
+  }
+
+  :where(.settings-ui) .set-row-value {
+    flex: 1;
+    width: auto;
+  }
+
+  :where(.settings-ui) .set-row-actions {
+    width: auto;
+  }
 }
 
 /* ---- Keyboard focus ---- */

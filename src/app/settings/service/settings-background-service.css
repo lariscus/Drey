@@ -1,9 +1,3 @@
-/* The page's four groups sit in one column without a gap: the group heading's own margin (22 px) is the board's spacing. */
-.groups {
-  display: flex;
-  flex-direction: column;
-}
-
 .level-pick {
   position: relative;
   display: flex;
