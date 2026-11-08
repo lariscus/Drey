@@ -1,0 +1,48 @@
+/* The page's four groups sit in one column without a gap: the group heading's own margin (22 px) is the board's spacing. */
+.groups {
+  display: flex;
+  flex-direction: column;
+}
+
+.level-pick {
+  position: relative;
+  display: flex;
+}
+
+/* The log level's choices: a popover under Change…, rows of 32 px. */
+.level-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+  padding: 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius);
+}
+
+.level-menu button {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 8px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-chip);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--set-fs-small);
+  text-align: left;
+  cursor: pointer;
+}
+
+.level-menu button:hover {
+  background: var(--hover-bg-strong);
+}
+
+.level-menu button.on {
+  font-weight: 600;
+}

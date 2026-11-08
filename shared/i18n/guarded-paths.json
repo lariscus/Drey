@@ -12,6 +12,7 @@
     "libs/mission-ui/src/phone",
     "apps/mission-control/src/app/notes",
     "src/app/i18n",
+    "src/app/settings/service",
     "plugins/tickets/renderer/autopilot",
     "plugins/tickets/renderer/decision",
     "plugins/tickets/renderer/cost",

@@ -13,6 +13,7 @@ import {
   type ServiceLock,
 } from '../../../packages/tickets-engine/src/service/service-lock';
 import { STORE_SETTING_KEYS } from '../../../packages/tickets-engine/src/store/store-settings';
+import { SERVICE_PREF_KEYS } from '../../../shared/service-settings';
 import { EngineClient, type EngineEndpoints } from './engine-client';
 
 /**
@@ -126,8 +127,7 @@ const SYNCED_KEYS = (providers: readonly string[]): readonly string[] => [
   'remote.allowBypass',
   'remote.devices',
   // req-164: the background service is optional; it reads its mode from the engine's config.
-  'service.enabled',
-  'service.autostart',
+  ...Object.values(SERVICE_PREF_KEYS),
 ];
 
 /** The assistant LLM slice the chat bridge needs, out of the base app config. */

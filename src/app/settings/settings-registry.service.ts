@@ -1,7 +1,9 @@
-import { Injectable, Signal, Type, computed, signal } from '@angular/core';
+import { Injectable, Signal, Type, computed, inject, signal } from '@angular/core';
 import type { PluginSettingsPageContrib, Unsubscribe } from '../../../shared/plugin-api/renderer';
 import { SettingsAbout } from './about/settings-about';
+import { I18nService } from '../i18n';
 import { SettingsAppearance } from './appearance/settings-appearance';
+import { SettingsBackgroundService } from './service/settings-background-service';
 import { SettingsDaily } from './daily/settings-daily';
 import { SettingsDockWidgets } from './dock-widgets/settings-dock-widgets';
 import { SettingsEntry } from './entry/settings-entry';
@@ -34,11 +36,12 @@ import type { SettingsSearchSource } from './settings-model';
  */
 @Injectable({ providedIn: 'root' })
 export class SettingsCategoryRegistry {
+  private readonly core = coreCategories(inject(I18nService));
   private readonly pluginPages = signal<readonly SettingsCategory[]>([]);
   private readonly pageContribs = new Map<string, PluginSettingsPageContrib>();
 
   readonly categories: Signal<readonly SettingsCategory[]> = computed(() => [
-    ...CORE_CATEGORIES,
+    ...this.core,
     ...[...this.pluginPages()].sort((a, b) => a.label.localeCompare(b.label)),
     ABOUT_CATEGORY,
   ]);
@@ -76,7 +79,7 @@ export class SettingsCategoryRegistry {
 
   registerPluginPage(page: PluginSettingsPageContrib, component: Type<unknown>): Unsubscribe {
     const existing = this.contribFor(page.id);
-    if (existing !== undefined || CORE_CATEGORIES.some((c) => c.id === page.id)) {
+    if (existing !== undefined || this.core.some((c) => c.id === page.id)) {
       throw new Error(`settings page id "${page.id}" is already registered`);
     }
     this.pageContribs.set(page.id, page);
@@ -103,49 +106,57 @@ export class SettingsCategoryRegistry {
 }
 
 /** Core categories, kept in alphabetical label order (req-33). */
-const CORE_CATEGORIES: readonly SettingsCategory[] = [
-  {
-    id: 'appearance',
-    label: 'Appearance',
-    hint: 'Type size, colour & font',
-    component: SettingsAppearance,
-  },
-  {
-    id: 'tools',
-    label: 'Assistant tools',
-    hint: 'Vault, web & MCP servers',
-    component: SettingsTools,
-  },
-  { id: 'daily', label: 'Daily notes', hint: 'Startup & storage folder', component: SettingsDaily },
-  { id: 'entry', label: 'Entry format', hint: 'The / menu Entry block', component: SettingsEntry },
-  {
-    id: 'shortcuts',
-    label: 'Keyboard shortcuts',
-    hint: 'Commands & quick capture',
-    component: SettingsShortcuts,
-  },
-  { id: 'llm', label: 'LLM', hint: 'Local model connection', component: SettingsLlm },
-  { id: 'mcp', label: 'MCP server', hint: 'Vault server for other apps', component: SettingsMcp },
-  {
-    id: 'widgets',
-    label: 'Panels and plugins',
-    hint: 'Toggle panels & plugins',
-    component: SettingsDockWidgets,
-  },
-  {
-    id: 'spellcheck',
-    label: 'Spelling',
-    hint: 'Dictionaries & language',
-    component: SettingsSpellcheck,
-  },
-  {
-    id: 'updates',
-    label: 'Updates',
-    hint: 'Check & install app updates',
-    component: SettingsUpdates,
-  },
-  { id: 'vault', label: 'Vault', hint: 'External change detection', component: SettingsVault },
-];
+function coreCategories(i18n: I18nService): readonly SettingsCategory[] {
+  return [
+    {
+      id: 'appearance',
+      label: 'Appearance',
+      hint: 'Type size, colour & font',
+      component: SettingsAppearance,
+    },
+    {
+      id: 'tools',
+      label: 'Assistant tools',
+      hint: 'Vault, web & MCP servers',
+      component: SettingsTools,
+    },
+    {
+      id: 'service',
+      label: i18n.t('settings.service.title'),
+      hint: i18n.t('settings.service.hint'),
+      component: SettingsBackgroundService,
+    },
+    { id: 'daily', label: 'Daily notes', hint: 'Startup & storage folder', component: SettingsDaily },
+    { id: 'entry', label: 'Entry format', hint: 'The / menu Entry block', component: SettingsEntry },
+    {
+      id: 'shortcuts',
+      label: 'Keyboard shortcuts',
+      hint: 'Commands & quick capture',
+      component: SettingsShortcuts,
+    },
+    { id: 'llm', label: 'LLM', hint: 'Local model connection', component: SettingsLlm },
+    { id: 'mcp', label: 'MCP server', hint: 'Vault server for other apps', component: SettingsMcp },
+    {
+      id: 'widgets',
+      label: 'Panels and plugins',
+      hint: 'Toggle panels & plugins',
+      component: SettingsDockWidgets,
+    },
+    {
+      id: 'spellcheck',
+      label: 'Spelling',
+      hint: 'Dictionaries & language',
+      component: SettingsSpellcheck,
+    },
+    {
+      id: 'updates',
+      label: 'Updates',
+      hint: 'Check & install app updates',
+      component: SettingsUpdates,
+    },
+    { id: 'vault', label: 'Vault', hint: 'External change detection', component: SettingsVault },
+  ];
+}
 
 /** Always last — app metadata, not a feature category. */
 const ABOUT_CATEGORY: SettingsCategory = {
