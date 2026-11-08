@@ -11,6 +11,7 @@ import { TicketsGit } from '../core/tickets-git';
 import { NodeFileSystem } from './node-file-system';
 import { NodeProcessTable } from './node-process-table';
 import { clockOf, type Clock } from './ports/clock';
+import { NULL_SINK, type EventSink } from './ports/event-sink';
 import type { FileSystem } from './ports/file-system';
 import type { ProcessTable } from './ports/process-table';
 import type { ExecFn } from './procs';
@@ -62,11 +63,20 @@ export interface RunnerShared {
   readonly stores: StoreClaims;
   readonly bookkeeper: RunBookkeeper;
   readonly fs: FileSystem;
+  readonly sink: EventSink;
 }
 
-export function composeShared(storeFor: StoreForTarget, log: (message: string) => void, now?: () => Date, fs: FileSystem = new NodeFileSystem()): RunnerShared {
+/** The machine the shared part runs on: Node's files and no listener, unless the runner or a spec says otherwise. */
+export interface SharedPorts {
+  readonly fs?: FileSystem;
+  readonly sink?: EventSink;
+}
+
+export function composeShared(storeFor: StoreForTarget, log: (message: string) => void, now?: () => Date, ports: SharedPorts = {}): RunnerShared {
   const clock = clockOf(now);
-  const streams = new RunStreams(clock, fs);
+  const fs = ports.fs ?? new NodeFileSystem();
+  const sink = ports.sink ?? NULL_SINK;
+  const streams = new RunStreams(clock, fs, sink);
   const stores = new StoreClaims(storeFor, clock, log);
   const copy = new TicketCopy(stores, fs, log);
   const bookkeeper = new RunBookkeeper({
@@ -79,7 +89,7 @@ export function composeShared(storeFor: StoreForTarget, log: (message: string) =
     actor: `agent@${hostname().toLowerCase()}`,
     log,
   });
-  return { clock, streams, stores, bookkeeper, fs };
+  return { clock, streams, stores, bookkeeper, fs, sink };
 }
 
 export interface RunSupervisorDeps {
@@ -132,7 +142,7 @@ function runtimeOf(deps: RunSupervisorDeps): Runtime {
   const log = deps.log;
   const machine = new RunStateMachine();
   const background = new BackgroundWork();
-  const repo = new RunRepository(deps.root, shared.fs);
+  const repo = new RunRepository(deps.root, shared.fs, shared.sink);
   const settings = new HandoverSettings(deps.adapter.id);
   const table = new NodeProcessTable(deps.exec ?? probeExec(deps.root));
   const timers = deps.leaseTimers !== undefined ? { leaseTimers: deps.leaseTimers } : {};

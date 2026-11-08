@@ -14,6 +14,8 @@ export interface RunnerExitDeps {
   readonly idleMs: number;
   /** The standalone runner's descriptor file; null inside Drey Service (no file). */
   readonly descriptorPath: string | null;
+  /** Ends the open `/events` streams: a server close waits for every open response. */
+  readonly closeStreams: () => void;
 }
 
 /**
@@ -112,6 +114,7 @@ export class RunnerExit {
     }
     this.timers.forEach((t) => clearInterval(t));
     this.deps.orchestrator.dispose(); // in-process (the service's component) the scan timer must stop with the runner
+    this.deps.closeStreams();
     const once = (): void => {
       if (!this.exited) {
         this.exited = true;

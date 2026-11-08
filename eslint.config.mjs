@@ -85,6 +85,18 @@ const RUN_CORE_ONLY = [
     message: 'fleet/run takes only types from ../protocol (ADR-0096).',
   },
 ];
+/** Ports take types from the wire protocol and the adapter contract, nothing else. */
+const PORTS_ONLY = [
+  {
+    group: ['../**', '!../protocol', '!../harness/contract'],
+    message: 'fleet/ports holds interfaces only (ADR-0096): types from ../protocol and ../harness/contract, nothing else.',
+  },
+  {
+    group: ['../protocol', '../harness/contract'],
+    allowTypeImports: true,
+    message: 'fleet/ports takes only types (ADR-0096).',
+  },
+];
 const HARNESS_NOT_ORCHESTRATE = {
   group: ['../orchestrate', '../orchestrate/**', '../api', '../api/**', '../store', '../store/**', '../runner', '../../**/orchestrate/**'],
   message: 'An adapter never imports the orchestration (ADR-0096): it reports normalized events, the orchestrator decides.',
@@ -305,10 +317,17 @@ export default tseslint.config(
     },
   },
   {
-    files: [`${FLEET}/run/**/*.ts`, `${FLEET}/ports/**/*.ts`],
+    files: [`${FLEET}/run/**/*.ts`],
     ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`],
     rules: {
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, NODE_BUILTINS, ...RUN_CORE_ONLY] }],
+    },
+  },
+  {
+    files: [`${FLEET}/ports/**/*.ts`],
+    ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, NODE_BUILTINS, ...PORTS_ONLY] }],
     },
   },
   {

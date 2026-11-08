@@ -1,3 +1,4 @@
+import type { EventSink } from '../ports/event-sink';
 import type { FileSystem } from '../ports/file-system';
 import type { RunInfo } from '../protocol';
 import type { StoredRun, SupervisorRecord } from '../run/run-record';
@@ -28,6 +29,7 @@ export class RunRepository {
   constructor(
     private readonly root: string,
     private readonly fs: FileSystem,
+    private readonly sink: EventSink,
   ) {}
 
   add(run: LiveRun): void {
@@ -93,6 +95,7 @@ export class RunRepository {
     const write = run.writeQueue.then(() => this.fs.writeText(this.fs.join(run.dir, 'run.json'), JSON.stringify(stored, null, 2)));
     run.writeQueue = write.catch(() => undefined); // the queue survives a failed write
     await write;
+    this.sink.publish({ kind: 'run', info: stored.info });
   }
 
   /** The run's folder. */

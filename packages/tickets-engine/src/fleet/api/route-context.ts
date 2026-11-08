@@ -14,6 +14,16 @@ export interface RouteContext {
   respond(status: number, body: unknown): void;
   /** A non-JSON answer (the log's text, a stream's tail). */
   raw(status: number, contentType: string, text: string): void;
+  /** Opens a server-sent event stream: 200, `text/event-stream`, kept open. */
+  stream(): EventChannel;
+}
+
+/** An open response the route keeps writing to (server-sent events). */
+export interface EventChannel {
+  write(text: string): void;
+  end(): void;
+  /** The client went away, or the channel was ended. */
+  onClose(cb: () => void): void;
 }
 
 /** One group of the runner's routes; true when it answered the request. */
@@ -35,6 +45,21 @@ async function readBody(req: http.IncomingMessage, limit: number): Promise<unkno
   return text === '' ? {} : (JSON.parse(text) as unknown);
 }
 
+function channelOf(res: http.ServerResponse): EventChannel {
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
+  return {
+    write: (text) => {
+      if (!res.writableEnded) {
+        res.write(text);
+      }
+    },
+    end: () => res.end(),
+    onClose: (cb) => {
+      res.on('close', cb);
+    },
+  };
+}
+
 export function routeContext(req: http.IncomingMessage, res: http.ServerResponse): RouteContext {
   const url = new URL(req.url ?? '/', 'http://127.0.0.1');
   return {
@@ -51,5 +76,6 @@ export function routeContext(req: http.IncomingMessage, res: http.ServerResponse
       res.writeHead(status, { 'content-type': contentType });
       res.end(text);
     },
+    stream: () => channelOf(res),
   };
 }

@@ -22,6 +22,8 @@ import * as crypto from 'node:crypto';
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import { ChainRoutes } from './api/chain-routes';
+import { EventHub } from './api/event-hub';
+import { EventStream } from './api/event-stream';
 import { LifecycleRoutes } from './api/lifecycle-routes';
 import { RunReadRoutes } from './api/run-read-routes';
 import { RunWriteRoutes } from './api/run-write-routes';
@@ -116,9 +118,9 @@ function ledgerOf(log: (message: string) => void): { events: FleetEvents; setVau
 }
 
 /** The supervisors, one per provider, and the chain over them; the settle hook closes the loop back to the chain. */
-function composeFleet(root: string, log: (message: string) => void, events: FleetEvents): { supervisors: SupervisorSet; orchestrator: Orchestrator } {
+function composeFleet(root: string, log: (message: string) => void, events: FleetEvents, hub: EventHub): { supervisors: SupervisorSet; orchestrator: Orchestrator } {
   const stores = new DkTicketStores();
-  const shared = composeShared(stores.storeFor, log);
+  const shared = composeShared(stores.storeFor, log, undefined, { sink: hub });
   const adapters = [opencodeAdapter(nodeSpawnFn()), claudeCodeAdapter(nodeSpawnFn()), kimiAdapter(nodeSpawnFn(), nodeKimiUsageReader())];
   const byProvider = new Map<WorkerProviderId, RunSupervisor>(
     adapters.map((adapter) => [
@@ -157,13 +159,26 @@ function composeFleet(root: string, log: (message: string) => void, events: Flee
   return { supervisors, orchestrator };
 }
 
+/** A runner already serves from this descriptor (a stale one — a crashed runner — is taken over). */
+async function healthyPeer(descriptorPath: string): Promise<boolean> {
+  const existing = await readDescriptor(descriptorPath);
+  return existing !== null && (await peerAlive(existing));
+}
+
+/** The standalone process's own signals: live runs stopped (bounded), then out; the descriptor goes with the process. */
+function installSignals(exit: RunnerExit, descriptorPath: string | null): void {
+  const onSignal = (): void => void exit.stopLiveRuns().finally(() => exit.shutdown(0));
+  process.once('SIGINT', onSignal);
+  process.once('SIGTERM', onSignal);
+  process.once('exit', () => descriptorPath !== null && removeDescriptor(descriptorPath));
+}
+
 export async function startRunner(args: Args, deps: RunnerDeps = {}): Promise<RunnerHandle | null> {
   const exitProcess = deps.exit ?? ((code: number): void => process.exit(code));
   await fsp.mkdir(path.join(args.root, 'runs'), { recursive: true });
   const descriptorPath = path.join(args.root, 'runner.json');
   const writesDescriptor = (deps.descriptor ?? 'file') === 'file';
-  const existing = writesDescriptor ? await readDescriptor(descriptorPath) : null;
-  if (existing !== null && (await peerAlive(existing))) {
+  if (writesDescriptor && (await healthyPeer(descriptorPath))) {
     exitProcess(0); // a healthy peer keeps this process out; a stale descriptor is taken over
     return null;
   }
@@ -176,15 +191,17 @@ export async function startRunner(args: Args, deps: RunnerDeps = {}): Promise<Ru
     log.line(`workers start without ${scrubbed.length} inherited variable(s): ${scrubbed.join(', ')}`);
   }
   const ledger = ledgerOf(log.line);
-  const { supervisors, orchestrator } = composeFleet(args.root, log.line, ledger.events);
+  const hub = new EventHub();
+  const stream = new EventStream(hub);
+  const { supervisors, orchestrator } = composeFleet(args.root, log.line, ledger.events, hub);
   await supervisors.adoptAll();
   await orchestrator.load();
   const descriptor: RunnerDescriptor = { port: await freePort(), token: crypto.randomBytes(24).toString('hex'), pid: process.pid, startedAt: new Date().toISOString(), version: VERSION, build };
   const idle = new IdleWatch(args.idleMs);
-  const exit = new RunnerExit({ exit: exitProcess, log, orchestrator, supervisors, idle, idleMs: args.idleMs, descriptorPath: writesDescriptor ? descriptorPath : null });
+  const exit = new RunnerExit({ exit: exitProcess, log, orchestrator, supervisors, idle, idleMs: args.idleMs, descriptorPath: writesDescriptor ? descriptorPath : null, closeStreams: () => stream.closeAll() });
   const api = new RunnerHttpApi(
     descriptor.token,
-    [new LifecycleRoutes(exit, supervisors, log, { version: VERSION, build }), new ChainRoutes(orchestrator, supervisors, exit, ledger.setVault), new RunReadRoutes(supervisors), new RunWriteRoutes(supervisors)],
+    [new LifecycleRoutes(exit, supervisors, log, { version: VERSION, build }), new ChainRoutes(orchestrator, supervisors, exit, ledger.setVault), new RunReadRoutes(supervisors), new RunWriteRoutes(supervisors), stream],
     { exit, idle },
   );
   const server = api.server();
@@ -199,10 +216,7 @@ export async function startRunner(args: Args, deps: RunnerDeps = {}): Promise<Ru
   });
   exit.start(server);
   if (deps.signals ?? true) {
-    const onSignal = (): void => void exit.stopLiveRuns().finally(() => exit.shutdown(0));
-    process.once('SIGINT', onSignal);
-    process.once('SIGTERM', onSignal);
-    process.once('exit', () => writesDescriptor && removeDescriptor(descriptorPath));
+    installSignals(exit, writesDescriptor ? descriptorPath : null);
   }
   return {
     port: descriptor.port,

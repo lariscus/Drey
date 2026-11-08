@@ -106,6 +106,7 @@ Invoke-RestMethod "http://127.0.0.1:$($d.port)/health" -Headers $h
 | `GET /status` | all runs (newest info per run) |
 | `GET /status/<runId>` | one run: `{run, streamPath}` |
 | `GET /stream/<runId>` | the run's stream.jsonl tail (last ~200 KB, ndjson) |
+| `GET /events` | the runner's events as server-sent events (req-176): `event: run` with a run's record each time it is persisted, `event: line` with `{runId, event}` for each line of a run's stream; a `: ping` comment every 15 s, `retry: 3000` at the start. A read: it never keeps the runner awake, and it ends when the runner goes to sleep — reconnect then. `curl.exe -N -H "Authorization: Bearer …" http://127.0.0.1:<port>/events` |
 | `GET /log?tail=N` | daemon log tail, plain text (default 300 lines, max 2000; daemon builds) |
 | `GET /chain` | chain state + config (daemon builds) |
 | `GET /report` | token telemetry grouped by ticket, phase and model, sorted by total desc: `{ok, groups: [{ticket, phase, model, runs, total, input, cacheRead, cacheCreation, output, beforeFirstWrite, beforeFirstWriteShare}]}` — a counter the provider never reports counts 0 into the sums; pre-T-0048 records fall back to their cumulative `tokensIn`+`tokensOut` (T-0048) |

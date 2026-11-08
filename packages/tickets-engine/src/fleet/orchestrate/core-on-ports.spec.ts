@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RunInfo, RunRequest } from '../protocol';
+import { NULL_SINK } from '../ports/event-sink';
 import { MemoryFileSystem } from '../ports/memory-file-system.fake';
 import { ChainState } from './chain-state';
 import { ChainStateStore } from './chain-state-store';
@@ -20,21 +21,21 @@ const request = { ticketId: 'T-0001', phase: 'build' } as RunRequest;
 describe('the run record and stream on the FileSystem port', () => {
   it('persists the record, appends the stream and finds the run again', async () => {
     const fs = new MemoryFileSystem();
-    const repo = new RunRepository('/fleet', fs);
-    const streams = new RunStreams(clock, fs);
+    const repo = new RunRepository('/fleet', fs, NULL_SINK);
+    const streams = new RunStreams(clock, fs, NULL_SINK);
     const run = newLiveRun({ info, request, dir: repo.dirFor('R-1') });
     repo.add(run);
     await repo.persist(run);
     await streams.open(run, [{ ts: 'x', kind: 'note', text: 'opened' }]);
     await streams.say(run, 'gate: npm test', 'runner');
     expect(await fs.readText('/fleet/runs/R-1/stream.jsonl')).toContain('"detail":"runner","text":"gate: npm test"');
-    const found = await new RunRepository('/fleet', fs).found();
+    const found = await new RunRepository('/fleet', fs, NULL_SINK).found();
     expect(found.map((f) => [f.dir, f.stored.info.id])).toEqual([['/fleet/runs/R-1', 'R-1']]);
   });
 
   it('keeps the take-back credential in a file of its own and drops it with the run', async () => {
     const fs = new MemoryFileSystem();
-    const repo = new RunRepository('/fleet', fs);
+    const repo = new RunRepository('/fleet', fs, NULL_SINK);
     const run = newLiveRun({ info, request, dir: repo.dirFor('R-1') });
     await repo.writeAttach(run, { address: 'http://127.0.0.1:1', password: 'p', pid: 7, pidStartedMs: 1 });
     expect(await repo.hasAttach(run)).toBe(true);
