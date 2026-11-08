@@ -4696,3 +4696,30 @@ sequenceDiagram
 The registry also reads the remote quotas on its own round (`quota.refreshMinutes`, z.ai and Kimi only for
 configured slots, at most once a minute per slot) and reloads `service.json` each time. A run never goes to a
 slot of the other profile; an expired login is a slot state, never a retry.
+
+How a quota readout reaches the slot and the boards — from a run's own stream, or from the registry's round:
+
+```mermaid
+sequenceDiagram
+    participant A as Claude Code adapter
+    participant H as EventHub
+    participant L as SlotRunListener
+    participant C as ClaudeCodeQuotaSource
+    participant Q as Zai / Kimi QuotaSource
+    participant R as SlotRegistry
+    participant API as GET /chain, GET /slots
+    participant UI as 7e band, 7l page
+    A->>H: line: usage with rateLimit (five hours, seven days)
+    H->>L: line event (the run's slot is known from its reservation)
+    L->>C: observe(slot, windows) — measured
+    L->>R: refresh(slot)
+    R->>C: read(slot)
+    loop every quota.refreshMinutes (at most once a minute per slot)
+        R->>Q: read(slot) — fetch with the login's key, never kept
+        Q-->>R: windows (measured), a refused login, or unavailable (the counting stands in)
+    end
+    R->>R: state, q = R / T, compare with the last view
+    R-->>H: slot event (only when the view changed)
+    H-->>UI: SSE event: slot
+    UI->>API: GET /chain (slots summary), GET /slots (windows, q, state)
+```

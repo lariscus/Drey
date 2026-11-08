@@ -1243,6 +1243,16 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   the Board tab is active. As the only panel of the bottom dock it has no
   icon strip above it; the chevron in its header folds it to the header.
 
+**Accounts and their quota.** Each worker runs on one of your accounts —
+for example two Claude Code logins, z.ai and Kimi. Every repository is
+either *private* or *work*, and its tickets run only on accounts of the
+same kind, never on the other, even when those are free. A run that
+finds no free account of its kind does not start, and the reason says
+which accounts are busy, out of quota or signed out. When an account's
+login expires, the run that hit it ends and its card in **Needs you**
+names the refused login; no further run starts on that account until you
+sign in to it again. Nothing is retried on its own.
+
 **Pause and stuck workers.** **Pause** (on the thread and on a Crew
 run) waits for the current action — a command or an edit — to finish and
 then pauses; it never cuts one off half-way. A worker silent for ten

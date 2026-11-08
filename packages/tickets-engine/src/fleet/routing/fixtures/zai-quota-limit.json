@@ -1,12 +1,4 @@
-{
-  "code": 200,
-  "msg": "Operation successful",
-  "success": true,
-  "data": {
-    "limits": [
-      { "type": "TOKENS_LIMIT", "unit": 3, "number": 5, "usage": 800000000, "currentValue": 360000000, "remaining": 440000000, "percentage": 45, "nextResetTime": 1794621600000 },
-      { "type": "TOKENS_LIMIT", "unit": 6, "number": 1, "usage": 4000000000, "currentValue": 1200000000, "remaining": 2800000000, "percentage": 30, "nextResetTime": 1794960000000 },
-      { "type": "TIME_LIMIT", "unit": 5, "number": 1, "usage": 1000, "currentValue": 12, "remaining": 988, "percentage": 1, "nextResetTime": 1796083200000 }
-    ]
-  }
-}
+{"code":200,"msg":"Operation successful","data":{"limits":[
+  {"type":"CREDIT_LIMIT","unit":3,"number":5,"usage":12000,"currentValue":181,"remaining":11818,"percentage":1,"nextResetTime":1794153648269},
+  {"type":"CREDIT_LIMIT","unit":6,"number":1,"usage":60000,"currentValue":252,"remaining":59747,"percentage":1,"nextResetTime":1794670380996}
+],"level":"pro"},"success":true}

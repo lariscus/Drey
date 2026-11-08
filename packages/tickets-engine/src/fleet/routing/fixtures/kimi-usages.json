@@ -1,8 +1,4 @@
-{
-  "usages": {
-    "limit_5h": { "used_ratio": 0.25, "reset_time": "2026-11-09T03:00:00Z" },
-    "limit_month_total": { "used_ratio": 0.4, "reset_time": "2026-12-01T00:00:00Z" },
-    "limit_month_code": { "used_ratio": 0.1, "reset_time": "2026-12-01T00:00:00Z" },
-    "request_rate": { "limit": 60, "window_seconds": 60 }
-  }
-}
+{"limits":[{"window":{"duration":300,"timeUnit":"TIME_UNIT_MINUTE"},"detail":{"limit":"100","remaining":"100","resetTime":"2026-11-08T17:10:14.829731Z"}}],
+ "usages":{"limit_5h":{"used_ratio":0.0024,"reset_time":"2026-11-08T17:10:14Z"},
+           "limit_month_total":{"used_ratio":0.7764,"reset_time":"2026-12-01T10:13:07Z"},
+           "limit_month_code":{"used_ratio":0.4528,"reset_time":"2026-12-01T10:13:07Z"}}}

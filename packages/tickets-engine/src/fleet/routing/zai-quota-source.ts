@@ -8,10 +8,11 @@ export const ZAI_QUOTA_URL = 'https://api.z.ai/api/monitor/usage/quota/limit';
 export const ZAI_DEFAULT_AUTH_ENTRY = 'zai-coding-plan';
 
 /**
- * z.ai's numeric window units (reconstructed, not recorded by Spike 4):
- * 3 hours, 4 days, 5 months, 6 weeks. A unit outside the table falls back
- * to the reset distance (at most five hours away: the 5 h window, else the
- * week).
+ * z.ai's numeric window units. Recorded by Spike 4: 3 = hours (`number` 5,
+ * the five-hour window) and 6 = weeks (`number` 1). The enumeration is not
+ * documented; 4 (days) and 5 (months) are guesses, and any other unit falls
+ * back to the reset distance (at most five hours away: the 5 h window, else
+ * the week).
  */
 const NUMERIC_UNITS: Readonly<Record<number, number>> = { 3: HOUR_MS, 4: 24 * HOUR_MS, 5: MONTH_MS, 6: WEEK_MS };
 
@@ -110,7 +111,7 @@ export class ZaiQuotaSource implements QuotaSource {
     if (key === null) {
       return { kind: 'unavailable', detail: `no key under "${entry}" in opencode's auth.json` };
     }
-    // The header form is not recorded: the bearer form first, the bare key once more before a login counts as refused.
+    // Spike 4 used the bearer form; the bare key is tried once more before a login counts as refused.
     let reply = await this.deps.http.getJson(ZAI_QUOTA_URL, { Authorization: `Bearer ${key}` });
     if (refused(reply.status, reply.body)) {
       reply = await this.deps.http.getJson(ZAI_QUOTA_URL, { Authorization: key });

@@ -15,31 +15,33 @@ function measured(name: string, spanMs: number, raw: RateLimitWindow | null, at:
   return { name, spanMs, remaining, resetsAt: raw.resetsAt, reliability: 'measured', fetchedAt: at, ...(rejected ? { rejected: true } : {}) };
 }
 
-/** A utilization the cache may write as 0–1 or as a percentage. */
-function utilizationOf(value: unknown): number | null {
-  return typeof value === 'number' && value > 1 ? shareOf(value / 100) : shareOf(value);
-}
-
-/** One window of `cachedUsageUtilization`, read leniently (snake or camel case); `estimated`, the cache is not live. */
-function cached(name: string, spanMs: number, raw: unknown): QuotaWindow | null {
+/** One window of `cachedUsageUtilization.utilization` (whole percent, unlike the event's ratios); `estimated`, the cache is not live. */
+function cached(name: string, spanMs: number, raw: unknown, fetchedAt: string | null): QuotaWindow | null {
   if (raw === null || typeof raw !== 'object') {
     return null;
   }
   const entry = raw as Record<string, unknown>;
-  const used = utilizationOf(entry['utilization']);
-  const resetsAt = instantOf(entry['resetsAt'] ?? entry['resets_at']);
-  return used === null && resetsAt === null ? null : { name, spanMs, remaining: used === null ? null : 1 - used, resetsAt, reliability: 'estimated', fetchedAt: null };
+  const percent = entry['utilization'];
+  const used = typeof percent === 'number' ? shareOf(percent / 100) : null;
+  const resetsAt = instantOf(entry['resets_at']);
+  return used === null && resetsAt === null ? null : { name, spanMs, remaining: used === null ? null : 1 - used, resetsAt, reliability: 'estimated', fetchedAt };
 }
 
-/** The `.claude.json` cache's windows; the shape was not recorded by Spike 4, so both spellings are read. */
+/**
+ * The `.claude.json` cache's windows (Spike 4's recorded shape:
+ * `cachedUsageUtilization.{fetchedAtMs, utilization.{five_hour, seven_day}}`,
+ * each `{utilization: <whole percent>, resets_at: ISO}`). The interactive
+ * session writes it, headless runs do not; it is absent right after a login.
+ */
 export function parseClaudeCache(text: string | null): QuotaWindow[] {
   try {
-    const root = (JSON.parse(text ?? 'null') as { cachedUsageUtilization?: Record<string, unknown> } | null)?.cachedUsageUtilization;
-    if (root === undefined || root === null || typeof root !== 'object') {
+    const root = (JSON.parse(text ?? 'null') as { cachedUsageUtilization?: { fetchedAtMs?: unknown; utilization?: Record<string, unknown> } } | null)?.cachedUsageUtilization;
+    const windows = root?.utilization;
+    if (windows === undefined || windows === null || typeof windows !== 'object') {
       return [];
     }
-    const windows = [cached('5h', FIVE_HOURS_MS, root['five_hour'] ?? root['fiveHour']), cached('7d', WEEK_MS, root['seven_day'] ?? root['sevenDay'])];
-    return windows.filter((w): w is QuotaWindow => w !== null);
+    const fetchedAt = instantOf(root?.fetchedAtMs);
+    return [cached('5h', FIVE_HOURS_MS, windows['five_hour'], fetchedAt), cached('7d', WEEK_MS, windows['seven_day'], fetchedAt)].filter((w): w is QuotaWindow => w !== null);
   } catch {
     return [];
   }

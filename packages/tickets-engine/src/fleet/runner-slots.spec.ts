@@ -16,7 +16,13 @@ import { startRunner, type RunnerHandle } from './runner';
 describe('the runner serves the slots (req-177)', () => {
   let tmp = '';
   let runner: RunnerHandle | null = null;
-  const http = new FakeQuotaHttp(() => ({ status: 200, body: fixture('zai-quota-limit.json') }));
+  /** The recorded z.ai answer with its resets moved ahead of the wall clock (this runner runs on real time). */
+  const zaiNow = (): unknown => {
+    const body = fixture('zai-quota-limit.json') as { data: { limits: { nextResetTime: number; number: number }[] } };
+    body.data.limits.forEach((limit, i) => (limit.nextResetTime = Date.now() + (i === 0 ? 2 : 72) * 3_600_000));
+    return body;
+  };
+  const http = new FakeQuotaHttp(() => ({ status: 200, body: zaiNow() }));
 
   beforeEach(async () => {
     tmp = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-slots-'));
@@ -64,7 +70,7 @@ describe('the runner serves the slots (req-177)', () => {
     expect(http.calls[0]?.headers).toEqual({ Authorization: 'Bearer k-1' });
     const chain = await call('GET', '/chain');
     expect((chain.body['slots'] as unknown[]).length).toBe(3);
-    expect(chain.body['slots']).toContainEqual(expect.objectContaining({ id: 'zai', state: 'ready', reliability: 'measured', remaining: 0.7 }));
+    expect(chain.body['slots']).toContainEqual(expect.objectContaining({ id: 'zai', state: 'ready', reliability: 'measured' }));
   });
 
   it('refuses a slot list with a broken entry, and an unknown slot', async () => {

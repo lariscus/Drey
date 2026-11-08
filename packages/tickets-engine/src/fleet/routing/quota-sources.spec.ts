@@ -17,7 +17,7 @@ import { parseZaiLimits, ZAI_QUOTA_URL, ZaiQuotaSource } from './zai-quota-sourc
 const AUTH = '/home/u/.local/share/opencode/auth.json';
 
 describe('ZaiQuotaSource — the coding plan quota endpoint', () => {
-  const now = new FakeClock(new Date('2026-11-13T23:00:00Z'));
+  const now = new FakeClock(new Date('2026-11-08T11:00:48Z'));
   const zai = slot({ id: 'zai', provider: 'opencode', quota: 'zai', login: { opencodeAuthEntry: 'zai-coding-plan' } });
 
   function source(answer: ConstructorParameters<typeof FakeQuotaHttp>[0]): { http: FakeQuotaHttp; source: ZaiQuotaSource } {
@@ -27,15 +27,22 @@ describe('ZaiQuotaSource — the coding plan quota endpoint', () => {
     return { http, source: new ZaiQuotaSource({ http, fs, authFile: AUTH, clock: now }) };
   }
 
-  it('reads the 5 h and the weekly window, measured; the tool-call TIME_LIMIT is left out', () => {
-    expect(parseZaiLimits(fixture('zai-quota-limit.json'), now.now())).toEqual([
-      { name: '5h', spanMs: FIVE_HOURS_MS, remaining: 0.55, resetsAt: '2026-11-14T02:00:00.000Z', reliability: 'measured', fetchedAt: '2026-11-13T23:00:00.000Z' },
-      { name: '7d', spanMs: WEEK_MS, remaining: 0.7, resetsAt: '2026-11-18T00:00:00.000Z', reliability: 'measured', fetchedAt: '2026-11-13T23:00:00.000Z' },
+  it('reads the recorded 5 h and weekly windows (unit 3 × 5, unit 6 × 1), measured, remaining over the budget', () => {
+    const windows = parseZaiLimits(fixture('zai-quota-limit.json'), now.now());
+    expect(windows?.map((w) => [w.name, w.spanMs, w.resetsAt, w.reliability, w.fetchedAt])).toEqual([
+      ['5h', FIVE_HOURS_MS, '2026-11-08T16:00:48.269Z', 'measured', '2026-11-08T11:00:48.000Z'],
+      ['7d', WEEK_MS, '2026-11-14T15:33:00.996Z', 'measured', '2026-11-08T11:00:48.000Z'],
     ]);
+    expect(windows?.[0]?.remaining).toBeCloseTo(11818 / 12000);
+    expect(windows?.[1]?.remaining).toBeCloseTo(59747 / 60000);
+  });
+
+  it('leaves out a TIME_LIMIT entry (tool calls, not model use)', () => {
+    expect(parseZaiLimits({ data: { limits: [{ type: 'TIME_LIMIT', unit: 5, number: 1, percentage: 1 }] } }, now.now())).toEqual([]);
   });
 
   it('falls back to the percentage, and to the reset distance for an unknown unit', () => {
-    const body = { data: { limits: [{ unit: 99, percentage: 20, nextResetTime: Date.parse('2026-11-14T01:00:00Z') }, { unit: 'hours', number: 5, percentage: 50 }] } };
+    const body = { data: { limits: [{ unit: 99, percentage: 20, nextResetTime: Date.parse('2026-11-08T14:00:00Z') }, { unit: 'hours', number: 5, percentage: 50 }] } };
     const windows = parseZaiLimits(body, now.now());
     expect(windows?.map((w) => [w.name, w.remaining])).toEqual([
       ['5h', 0.8],
@@ -81,9 +88,9 @@ describe('KimiQuotaSource — the usages endpoint with the CLI login', () => {
 
   it('reads the 5 h window and the two monthly ratios, measured', () => {
     expect(parseKimiUsages(fixture('kimi-usages.json'), now.now())).toEqual([
-      { name: '5h', spanMs: FIVE_HOURS_MS, remaining: 0.75, resetsAt: '2026-11-09T03:00:00.000Z', reliability: 'measured', fetchedAt: '2026-11-09T00:00:00.000Z' },
-      { name: 'month', spanMs: MONTH_MS, remaining: 0.6, resetsAt: '2026-12-01T00:00:00.000Z', reliability: 'measured', fetchedAt: '2026-11-09T00:00:00.000Z' },
-      { name: 'month-code', spanMs: MONTH_MS, remaining: 0.9, resetsAt: '2026-12-01T00:00:00.000Z', reliability: 'measured', fetchedAt: '2026-11-09T00:00:00.000Z' },
+      { name: '5h', spanMs: FIVE_HOURS_MS, remaining: 1 - 0.0024, resetsAt: '2026-11-08T17:10:14.000Z', reliability: 'measured', fetchedAt: '2026-11-09T00:00:00.000Z' },
+      { name: 'month', spanMs: MONTH_MS, remaining: 1 - 0.7764, resetsAt: '2026-12-01T10:13:07.000Z', reliability: 'measured', fetchedAt: '2026-11-09T00:00:00.000Z' },
+      { name: 'month-code', spanMs: MONTH_MS, remaining: 1 - 0.4528, resetsAt: '2026-12-01T10:13:07.000Z', reliability: 'measured', fetchedAt: '2026-11-09T00:00:00.000Z' },
     ]);
   });
 
@@ -101,7 +108,7 @@ describe('KimiQuotaSource — the usages endpoint with the CLI login', () => {
   });
 
   it('a 401 with a valid token is a refused login', async () => {
-    const { source: kimiSource } = source(Date.parse('2026-11-09T06:00:00Z') / 1000, () => ({ status: 401, body: null }));
+    const { source: kimiSource } = source(Date.parse('2026-11-09T06:00:00Z') / 1000, () => ({ status: 401, body: fixture('kimi-401.json') }));
     expect(await kimiSource.read(kimi)).toEqual({ kind: 'login', detail: 'Kimi refused the CLI login (401)' });
   });
 });
@@ -112,20 +119,20 @@ describe('ClaudeCodeQuotaSource — the rate-limit events of its runs, the cache
 
   it("turns the adapter's reading into measured windows; rejected spends the window", async () => {
     const source = new ClaudeCodeQuotaSource(new MemoryFileSystem(), '/home/u');
-    expect(source.observe('claude-a', event!.rateLimit!, new Date('2026-11-13T23:00:00Z'))).toBe(true);
+    expect(source.observe('claude-a', event!.rateLimit!, new Date('2026-11-08T12:00:00Z'))).toBe(true);
     const reading = await source.read(claudeA);
     expect(reading).toEqual({
       kind: 'windows',
       windows: [
-        { name: '5h', spanMs: FIVE_HOURS_MS, remaining: 0.78, resetsAt: '2026-11-14T02:00:00.000Z', reliability: 'measured', fetchedAt: '2026-11-13T23:00:00.000Z' },
-        { name: '7d', spanMs: WEEK_MS, remaining: 0.62, resetsAt: '2026-11-18T00:00:00.000Z', reliability: 'measured', fetchedAt: '2026-11-13T23:00:00.000Z' },
+        { name: '5h', spanMs: FIVE_HOURS_MS, remaining: 1 - 0.41, resetsAt: '2026-11-08T17:40:00.000Z', reliability: 'measured', fetchedAt: '2026-11-08T12:00:00.000Z' },
+        { name: '7d', spanMs: WEEK_MS, remaining: 1 - 0.95, resetsAt: '2026-11-08T22:00:00.000Z', reliability: 'measured', fetchedAt: '2026-11-08T12:00:00.000Z' },
       ],
     });
     source.observe('claude-a', { fiveHour: { utilization: 1, resetsAt: null, status: 'rejected' }, sevenDay: null }, new Date());
     const after = await source.read(claudeA);
     expect(after.kind === 'windows' && after.windows.map((w) => [w.name, w.remaining, w.rejected ?? false])).toEqual([
       ['5h', 0, true],
-      ['7d', 0.62, false],
+      ['7d', 1 - 0.95, false],
     ]);
   });
 
@@ -135,16 +142,17 @@ describe('ClaudeCodeQuotaSource — the rate-limit events of its runs, the cache
     const source = new ClaudeCodeQuotaSource(fs, '/home/u');
     source.observe('claude-b', event!.rateLimit!, new Date());
     const reading = await source.read(claudeA);
-    expect(reading.kind === 'windows' && reading.windows.map((w) => [w.name, w.remaining, w.reliability])).toEqual([
-      ['5h', 0.36, 'estimated'],
-      ['7d', 0.5, 'estimated'],
+    expect(reading.kind === 'windows' && reading.windows).toEqual([
+      { name: '5h', spanMs: FIVE_HOURS_MS, remaining: 0.91, resetsAt: '2026-09-20T00:10:00.471Z', reliability: 'estimated', fetchedAt: '2026-09-19T20:58:00.936Z' },
+      { name: '7d', spanMs: WEEK_MS, remaining: 0.92, resetsAt: '2026-09-22T04:59:59.471Z', reliability: 'estimated', fetchedAt: '2026-09-19T20:58:00.936Z' },
     ]);
     expect((await source.read(slot({ id: 'default', quota: 'claude-code' }))).kind).toBe('unavailable');
   });
 
-  it('reads the cache leniently and an unknown file as nothing', () => {
+  it('reads the cache as whole percent (1 is 1 %), and a missing key, a missing file or a broken one as nothing', () => {
+    expect(parseClaudeCache(JSON.stringify({ cachedUsageUtilization: { utilization: { five_hour: { utilization: 1 } } } }))[0]?.remaining).toBeCloseTo(0.99);
+    expect(parseClaudeCache(JSON.stringify({ oauthAccount: {} }))).toEqual([]);
     expect(parseClaudeCache(null)).toEqual([]);
     expect(parseClaudeCache('{broken')).toEqual([]);
-    expect(parseClaudeCache(JSON.stringify({ cachedUsageUtilization: { fiveHour: { utilization: 0.1 } } }))[0]?.remaining).toBeCloseTo(0.9);
   });
 });

@@ -71,3 +71,9 @@ and [ADR-0002](09_architecture_decisions/0002-quick-capture-opens-daily-note.md)
 | MCP | Model Context Protocol. Drey is both a server (other programs use the vault) and a client (the assistant uses external servers). |
 | Confirmation dialog | The one dialog that shows a proposed change as a diff ([ADR-0011](09_architecture_decisions/0011-unified-confirmation-flow.md)). |
 | Own-write ledger | The record of files Drey itself just wrote, so the watcher does not report them as outside changes. |
+| Slot | One account a fleet worker runs on — `Claude A`, `Claude B`, `z.ai`, `Kimi` — with a profile, a billing kind, a session cap and quota windows. Configured in the service home's `service.json`; a slot names the account's login, never its key (req-177, [ADR-0095](09_architecture_decisions/0095-model-table-and-capacity-pool.md)). |
+| Profile | `private` or `work`. A repository has one (`profile:` in `_meta/repos.md`, default `private`) and its runs go only to slots of the same profile. |
+| Quota window | A span over which a provider limits an account's use — the rolling five hours, the week, the month — with the share left and its reset time. |
+| Reliability | How far a window's numbers can be trusted: `measured` (read from the provider), `estimated` (counted by the runner, or a cache), `unknown`. |
+| Surplus (q) | A window's remaining share divided by its remaining share of time; a slot's q is the minimum over its windows. Above 1 the account has more left than an even pace would use. |
+| Slot state | `ready`, `busy` (runs of the cap), `exhausted` (a window spent), `needs login` (the account's login was refused; no run starts until it is signed in again) or `unknown` (nothing read or counted yet). |
