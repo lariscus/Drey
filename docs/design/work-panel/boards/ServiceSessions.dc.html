@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Drey Service: Sessions</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{cursor:default}
+.wc{width:40px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;background:transparent;border:0;color:#b3b7bc}
+.ib{width:24px;height:24px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;background:transparent;border:0;border-radius:4px;color:#b3b7bc}
+.ib:hover{background:#3b3d42;color:#f4f5f6}
+.tb{height:26px;padding:0 12px;display:flex;align-items:center;background:transparent;border:0;border-radius:4px;color:#b3b7bc;font:inherit;font-size:13px}
+.tb[aria-selected="true"]{background:#2c2d31;color:#f4f5f6;font-weight:600}
+.bt{height:30px;padding:0 12px;display:flex;align-items:center;gap:6px;background:transparent;border:1px solid #747980;border-radius:4px;color:#f4f5f6;font:inherit;font-size:13px;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sx{height:56px;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:0 8px 0 16px}
+.fl{display:flex;gap:8px}
+.fl .k{width:104px;flex-shrink:0;color:#b3b7bc}
+.ll{display:flex;gap:10px}
+.ll .t{width:56px;flex-shrink:0;color:#b3b7bc}
+.ll .k{width:64px;flex-shrink:0;color:#b3b7bc}
+.ll .x{min-width:0;color:#f4f5f6;overflow-wrap:anywhere}
+</style>
+</helmet>
+<div style="position: relative; width: 1100px; height: 720px; display: flex; flex-direction: column; background: #18191b; color: #f4f5f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif; font-size: 13px; line-height: 18px; overflow: hidden">
+
+<header style="height: 36px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 0 0 8px; background: #222326; border-bottom: 1px solid #3b3d42"><span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 4px; background: #8ecbef; color: #101113; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px">D</span><span style="font-size: 13px; color: #f4f5f6">Drey Service</span><span style="flex-grow: 1"></span><button type="button" class="wc" aria-label="Minimize"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><button type="button" class="wc" aria-label="Maximize"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1"></rect></svg></button><button type="button" class="wc" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></header>
+
+<div role="tablist" aria-label="Service sections" style="height: 32px; flex-shrink: 0; display: flex; align-items: center; gap: 2px; padding: 0 16px; border-bottom: 1px solid #3b3d42"><button type="button" role="tab" class="tb" aria-selected="false">Components</button><button type="button" role="tab" class="tb" aria-selected="true">Sessions</button><button type="button" role="tab" class="tb" aria-selected="false">Logs</button></div>
+
+<div style="flex: 1; min-height: 0; display: flex">
+
+<div style="width: 320px; flex-shrink: 0; display: flex; flex-direction: column; border-right: 1px solid #3b3d42">
+<div style="height: 28px; flex-shrink: 0; display: flex; align-items: center; padding: 0 16px; margin-top: 4px; color: #b3b7bc">3 sessions · 2 runs · 1 held</div>
+<div class="sx"><span class="dot" style="background: #93c47f"></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 600">T-0126 · test · Tessa</span><span style="color: #b3b7bc">opencode · qwen3-coder · turn 6 · 9 min quiet</span></span><button type="button" class="ib" aria-label="Stop T-0126 test" title="Stop"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"></rect></svg></button></div>
+<div class="sx" style="background: #2c2d31"><span class="dot" style="background: #93c47f"></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 600">T-0121 · build · Ben</span><span style="color: #b3b7bc">claude-code · sonnet · turn 3 · writing</span></span><button type="button" class="ib" aria-label="Stop T-0121 build" title="Stop"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"></rect></svg></button></div>
+<div class="sx"><span class="dot" style="background: #e0bb6e"></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 600">1:1 · Ben</span><span style="color: #b3b7bc">claude-code · sonnet · held · releases in 11 min</span></span><button type="button" class="ib" aria-label="Release 1:1 with Ben now" title="Release now"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 18h14"></path><path d="M12 5l7 9H5z"></path></svg></button></div>
+<div style="height: 28px; flex-shrink: 0; display: flex; align-items: center; padding: 0 16px; margin-top: 8px; color: #b3b7bc; border-top: 1px solid #3b3d42"><span>Ended today · 7</span><span style="margin: 0 6px">·</span><button type="button" style="padding: 0; background: transparent; border: 0; font: inherit; color: #8ecbef">Show</button></div>
+</div>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+
+<div style="flex-shrink: 0; display: flex; align-items: flex-start; gap: 12px; padding: 16px 16px 12px 16px">
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><div style="display: flex; align-items: center; gap: 8px"><span class="dot" style="background: #93c47f"></span><span style="font-size: 15px; line-height: 22px; font-weight: 700">T-0121 · build · Ben</span></div><span style="font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 18px; color: #b3b7bc">R-20261107T0833-c02e · pid 19877 · origin chain · fresh</span></div>
+<button type="button" class="bt">Open worktree</button><button type="button" class="bt">Copy attach command</button><button type="button" class="bt">Stop</button>
+</div>
+
+<div style="flex-shrink: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; padding: 0 16px 14px 16px">
+<div class="fl"><span class="k">Harness · model</span><span>claude-code 2.1 · sonnet · permission auto</span></div>
+<div class="fl"><span class="k">Session ref</span><span><span style="font-family: ui-monospace, Consolas, monospace; font-size: 12px">e4b9…71c0</span> · resumable</span></div>
+<div class="fl"><span class="k">Tokens</span><span>112k in (98k cached) · 4.1k out · $0.61</span></div>
+<div class="fl"><span class="k">MCP</span><span>vault read · tickets · 14 calls, 1 refused</span></div>
+<div class="fl"><span class="k">Slot</span><span>Claude A · class B · q 1.4</span></div>
+<div class="fl"><span class="k">Seats</span><span>light</span></div>
+</div>
+
+<div style="height: 36px; flex-shrink: 0; display: flex; align-items: center; gap: 2px; padding: 0 16px; border-top: 1px solid #3b3d42; border-bottom: 1px solid #3b3d42; background: #222326"><div role="tablist" aria-label="Session view" style="display: flex; gap: 2px"><button type="button" role="tab" class="tb" aria-selected="true">Stream</button><button type="button" role="tab" class="tb" aria-selected="false">Instruction</button><button type="button" role="tab" class="tb" aria-selected="false">Tool calls</button><button type="button" role="tab" class="tb" aria-selected="false">Process</button><button type="button" role="tab" class="tb" aria-selected="false">Raw JSON</button></div><span style="flex-grow: 1"></span><label style="display: flex; align-items: center; gap: 8px; color: #b3b7bc"><span>Follow</span><span aria-hidden="true" style="width: 32px; height: 18px; border-radius: 9px; background: #8ecbef; position: relative; display: block"><span style="position: absolute; top: 2px; left: 16px; width: 14px; height: 14px; border-radius: 50%; background: #101113"></span></span></label></div>
+
+<div style="flex: 1; min-height: 0; overflow: hidden; padding: 8px 16px; background: #18191b; font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 18px; display: flex; flex-direction: column">
+<div class="ll"><span class="t">08:33:09</span><span class="k">system</span><span class="x">init · cwd E:\projects\drey-tickets\_worktrees\T-0121 · tools: Read, Edit, Bash, mcp__drey__vault_read, mcp__drey__vault_search, mcp__drey__tickets_read …</span></div>
+<div class="ll"><span class="t">08:33:10</span><span class="k">user</span><span class="x">[instruction, 9.8k tokens — open under Instruction]</span></div>
+<div class="ll"><span class="t">08:33:31</span><span class="k">assistant</span><span class="x">I will start with the failing test for the order reducer …</span></div>
+<div class="ll"><span class="t">08:33:32</span><span class="k">tool</span><span class="x">Read plugins/tickets/renderer/board/order.ts → 212 lines</span></div>
+<div class="ll"><span class="t">08:33:40</span><span class="k">tool</span><span class="x">mcp__drey__vault_search {"query":"order reducer","vault":"notes"} → 3 hits</span></div>
+<div class="ll"><span class="t">08:33:41</span><span class="k">tool</span><span class="x" style="color: #ee8f89">mcp__drey__vault_write → Error: ben may not write vault "notes" (allowed: read)</span></div>
+<div class="ll"><span class="t">08:34:02</span><span class="k">tool</span><span class="x">Edit plugins/tickets/renderer/board/order.spec.ts (+18 −0)</span></div>
+<div class="ll"><span class="t">08:34:55</span><span class="k">tool</span><span class="x">Bash npm run test:plugin -- tickets -t "order" → exit 1 (1 failed)</span></div>
+<div class="ll"><span class="t">08:35:10</span><span class="k">assistant</span><span class="x">The test fails as intended; now the reducer.</span></div>
+<div class="ll"><span class="t">08:35:11</span><span class="k">usage</span><span class="x">turn 3 · input 41k (38k cached) · output 1.4k</span></div>
+</div>
+
+<div style="flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid #3b3d42; background: #222326"><input type="text" aria-label="Send to the session" style="flex: 1; min-width: 0; height: 32px; box-sizing: border-box; padding: 0 10px; background: #18191b; border: 1px solid #747980; border-radius: 8px; color: #f4f5f6; font: inherit; font-size: 13px"><button type="button" class="bt" style="background: #8ecbef; border-color: #8ecbef; color: #101113; font-weight: 600">Send</button><button type="button" class="bt">Interrupt turn</button><button type="button" class="bt">Resume after stop<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button></div>
+
+<div style="flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-top: 1px solid #3b3d42; background: #222326"><span style="flex: 1; min-width: 0; color: #b3b7bc">Drey's Thread shows this session cleaned up; here it is the harness as it speaks. Everything you send is logged to the ticket.</span><button type="button" class="bt">Open in Drey</button></div>
+
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1100,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

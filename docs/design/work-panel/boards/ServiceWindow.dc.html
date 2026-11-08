@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Drey Service: Components</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{cursor:default}
+.wc{width:40px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;background:transparent;border:0;color:#b3b7bc}
+.ib{width:24px;height:24px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;background:transparent;border:0;border-radius:4px;color:#b3b7bc}
+.ib:hover{background:#3b3d42;color:#f4f5f6}
+.tb{height:26px;padding:0 12px;display:flex;align-items:center;background:transparent;border:0;border-radius:4px;color:#b3b7bc;font:inherit;font-size:13px}
+.tb[aria-selected="true"]{background:#2c2d31;color:#f4f5f6;font-weight:600}
+.seg{display:flex;flex-shrink:0;gap:2px;padding:2px;background:#18191b;border:1px solid #3b3d42;border-radius:8px}
+.sg{height:26px;padding:0 10px;display:flex;align-items:center;border:0;border-radius:4px;background:transparent;color:#b3b7bc;font:inherit;font-size:13px}
+.sg[aria-selected="true"]{background:#2c2d31;color:#f4f5f6;font-weight:600}
+.bt{height:30px;padding:0 12px;background:transparent;border:1px solid #747980;border-radius:4px;color:#f4f5f6;font:inherit;font-size:13px}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cr{height:44px;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:0 8px 0 12px;border-radius:4px}
+.sh{height:28px;flex-shrink:0;display:flex;align-items:center;padding:0 12px;font-size:13px;font-weight:600;color:#f4f5f6;border-bottom:1px solid #3b3d42}
+.sr{height:28px;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:0 12px}
+.chip{height:22px;padding:0 8px;display:flex;align-items:center;border:1px solid #3b3d42;border-radius:4px;font-size:13px;color:#b3b7bc;margin-left:auto}
+.bar{width:48px;height:4px;border-radius:2px;background:#3b3d42;flex-shrink:0;overflow:hidden}
+.bd{width:8px;height:8px;border-radius:50%;box-sizing:border-box;border:1px solid #747980}
+.bd.on{background:#8ecbef;border-color:#8ecbef}
+.gr{height:28px;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:0 12px}
+.gl{width:96px;flex-shrink:0;color:#b3b7bc}
+.ll{height:18px;display:flex;gap:10px;white-space:nowrap}
+.ll .t{width:56px;flex-shrink:0;color:#b3b7bc}
+.ll .x{min-width:0;overflow:hidden;text-overflow:ellipsis;color:#f4f5f6}
+.mi{height:32px;flex-shrink:0;padding:0 6px;display:flex;align-items:center;gap:8px;color:#f4f5f6;font-size:13px;line-height:20px;white-space:nowrap;border-radius:4px}
+</style>
+</helmet>
+<div style="position: relative; width: 1100px; height: 720px; display: flex; flex-direction: column; background: #18191b; color: #f4f5f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif; font-size: 13px; line-height: 18px; overflow: hidden">
+
+<header style="height: 36px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 0 0 8px; background: #222326; border-bottom: 1px solid #3b3d42"><span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 4px; background: #8ecbef; color: #101113; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px">D</span><span style="font-size: 13px; color: #f4f5f6">Drey Service</span><span style="flex-grow: 1"></span><button type="button" class="wc" aria-label="Minimize"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><button type="button" class="wc" aria-label="Maximize"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="1"></rect></svg></button><button type="button" class="wc" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></header>
+
+<div role="tablist" aria-label="Service sections" style="height: 32px; flex-shrink: 0; display: flex; align-items: center; gap: 2px; padding: 0 16px; border-bottom: 1px solid #3b3d42"><button type="button" role="tab" class="tb" aria-selected="true">Components</button><button type="button" role="tab" class="tb" aria-selected="false">Sessions</button><button type="button" role="tab" class="tb" aria-selected="false">Logs</button></div>
+
+<div style="height: 28px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 16px; color: #b3b7bc"><span class="dot" style="background: #93c47f"></span><span>Running since 08:12 · pid 18240 · 4 components · 2 runs live · $4.10 of $15 today</span></div>
+
+<div style="flex: 1; min-height: 0; display: flex; gap: 16px; padding: 4px 16px 16px 16px">
+
+<div style="width: 560px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px">
+
+<div style="display: flex; flex-direction: column; flex-shrink: 0">
+<div class="cr"><span class="dot" style="background: #93c47f"></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 600">Tickets engine</span><span style="color: #b3b7bc">127.0.0.1:52114 · vault drey-tickets</span></span></div>
+<div class="cr" style="background: #2c2d31"><span class="dot" style="background: #93c47f"></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 600">Crew runner</span><span style="color: #b3b7bc">2 runs live · 1:1 with Ben idle 4 min</span></span><button type="button" class="ib" aria-label="Restart Crew runner" title="Restart"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"></path><path d="M21 3v5h-5"></path></svg></button><button type="button" class="ib" aria-label="Stop Crew runner" title="Stop"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"></rect></svg></button></div>
+<div class="cr"><span class="dot" style="background: #93c47f"></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 600">MCP server</span><span style="color: #b3b7bc">127.0.0.1:4319 · 3 clients (2 runs, Claude Desktop)</span></span></div>
+<div class="cr"><span class="dot" style="background: #747980"></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 600">Remote gateway</span><span style="color: #b3b7bc">off · phones and iPad</span></span></div>
+<div class="cr"><span class="dot" style="background: #ee8f89"></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 600">Local model (LM Studio)</span><span style="color: #b3b7bc">not reachable · last seen 07:40</span></span></div>
+</div>
+
+<div style="display: flex; flex-direction: column; flex-shrink: 0">
+<div class="sh">Slots</div>
+<div class="sr"><span style="width: 64px; flex-shrink: 0">Claude A</span><span style="width: 40px; flex-shrink: 0; display: flex; gap: 4px" aria-label="1 of 2 busy"><span class="bd on"></span><span class="bd"></span></span><span class="bar"><span style="display: block; width: 62%; height: 4px; background: #8ecbef"></span></span><span style="color: #b3b7bc; white-space: nowrap">62 % · q 1.4 · resets Mon 09:00</span><span class="chip">measured</span></div>
+<div class="sr"><span style="width: 64px; flex-shrink: 0">Claude B</span><span style="width: 40px; flex-shrink: 0; display: flex; gap: 4px" aria-label="0 of 1 busy"><span class="bd"></span></span><span class="bar"><span style="display: block; width: 31%; height: 4px; background: #8ecbef"></span></span><span style="color: #b3b7bc; white-space: nowrap">31 % · q 0.8 · resets Tue 14:00</span><span class="chip">measured</span></div>
+<div class="sr"><span style="width: 64px; flex-shrink: 0">z.ai</span><span style="width: 40px; flex-shrink: 0; display: flex; gap: 4px" aria-label="1 of 3 busy"><span class="bd on"></span><span class="bd"></span><span class="bd"></span></span><span class="bar"><span style="display: block; width: 70%; height: 4px; background: #e0bb6e"></span></span><span style="color: #b3b7bc; white-space: nowrap">70 % · q 1.2 · resets Wed 00:00</span><span class="chip" style="color: #e0bb6e">estimated</span></div>
+<div class="sr"><span style="width: 64px; flex-shrink: 0">Kimi</span><span style="width: 40px; flex-shrink: 0; display: flex; gap: 4px" aria-label="0 of 2 busy"><span class="bd"></span><span class="bd"></span></span><span class="bar"></span><span style="color: #b3b7bc; white-space: nowrap">no quota readout</span><span class="chip">unknown</span></div>
+</div>
+
+<div style="display: flex; flex-direction: column; flex-shrink: 0">
+<div class="sh">Governor</div>
+<div class="gr"><span class="gl">Heavy seats</span><span>1 of 2 busy · tests for T-0126</span></div>
+<div class="gr"><span class="gl">Light seats</span><span>2 of 6 busy</span></div>
+<div class="gr"><span class="gl">Reserve</span><span>25 % CPU and RAM kept free · load 41 %</span></div>
+<div class="gr"><span class="gl">Waiting</span><span>1 heavy task (build T-0121) · starts when a seat frees</span></div>
+<div class="gr"><span class="gl">Dev servers</span><span>1 · port 4302 (T-0126)</span></div>
+</div>
+
+</div>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; border: 1px solid #3b3d42; border-radius: 8px; overflow: hidden">
+<div style="height: 36px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; background: #222326; border-bottom: 1px solid #3b3d42"><span style="font-size: 13px; font-weight: 600">Log</span><span style="flex-grow: 1"></span><div role="tablist" aria-label="Log filter" class="seg"><button type="button" role="tab" class="sg" aria-selected="true">All</button><button type="button" role="tab" class="sg" aria-selected="false">Warnings</button><button type="button" role="tab" class="sg" aria-selected="false">Errors</button></div><span style="width: 4px"></span><label style="display: flex; align-items: center; gap: 8px; color: #b3b7bc"><span>Follow</span><span aria-hidden="true" style="width: 32px; height: 18px; border-radius: 9px; background: #8ecbef; position: relative; display: block"><span style="position: absolute; top: 2px; left: 16px; width: 14px; height: 14px; border-radius: 50%; background: #101113"></span></span></label></div>
+<div style="flex: 1; min-height: 0; padding: 6px 12px; background: #18191b; font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 18px; display: flex; flex-direction: column">
+<div class="ll"><span class="t">08:12:03</span><span class="x">runner up, home C:\Users\puls\.drey-engine\fleet</span></div>
+<div class="ll"><span class="t">08:12:04</span><span class="x">chain config from engine: vault drey-tickets, autopilot off</span></div>
+<div class="ll"><span class="t">08:14:11</span><span class="x">run R-…7f1a start T-0126 test · tessa · opencode/qwen3-coder · origin drey:run-dialog</span></div>
+<div class="ll"><span class="t">08:14:11</span><span class="x">route T-0126 → z.ai/glm-5.3: class B, q 1.2, est $0.22 · filtered: kimi (no image input)</span></div>
+<div class="ll"><span class="t">08:14:12</span><span class="x">mcp: run token minted, vault read-only (all), tickets tools</span></div>
+<div class="ll"><span class="t">08:21:40</span><span class="x">run R-…7f1a turn 6 · 38k in (34k cached) · 1.2k out</span></div>
+<div class="ll"><span class="t">08:26:02</span><span class="x" style="color: #e0bb6e">run R-…7f1a no output for 9 min</span></div>
+<div class="ll"><span class="t">08:27:15</span><span class="x">session S-ben-1on1 open · claude-code/sonnet · origin drey:crew-1on1</span></div>
+<div class="ll"><span class="t">08:31:50</span><span class="x">session S-ben-1on1 idle, release in 11 min</span></div>
+<div class="ll"><span class="t">08:33:09</span><span class="x">run R-…c02e start T-0121 build · ben · origin chain</span></div>
+<div class="ll"><span class="t">08:33:09</span><span class="x">route T-0121 → claude-a/sonnet: class B, q 1.4, est $0.40</span></div>
+<div class="ll"><span class="t">08:33:10</span><span class="x" style="color: #ee8f89">mcp: vault_write refused — ben may not write vault "notes" (allowed: read)</span></div>
+<div class="ll"><span class="t">08:35:02</span><span class="x">governor: heavy seat granted to T-0126 tests · 1 of 2</span></div>
+<div class="ll"><span class="t">08:36:40</span><span class="x">tranche 4 of 10 runs · checkpoint in 6 runs</span></div>
+</div>
+</div>
+
+</div>
+
+<footer style="height: 36px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 16px; background: #222326; border-top: 1px solid #3b3d42"><span style="flex: 1; color: #b3b7bc">Service runs in the background. Closing this window keeps it running.</span><button type="button" class="bt" style="height: 28px">Open Drey</button><button type="button" class="bt" style="height: 28px; color: #ee8f89">Quit service</button></footer>
+
+<div style="position: absolute; right: 16px; bottom: 56px; width: 220px; display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 12px; line-height: 16px; letter-spacing: 0.04em; text-transform: uppercase; color: #b3b7bc">Tray menu</span>
+<div role="menu" aria-label="Tray menu" style="display: flex; flex-direction: column; padding: 4px; background: #222326; border: 1px solid #3b3d42; border-radius: 8px">
+<div class="mi" style="color: #b3b7bc"><span class="dot" style="background: #93c47f"></span>Drey Service · running</div>
+<button type="button" role="menuitem" class="mi" style="background: transparent; border: 0; font-family: inherit">Open Drey Service…</button>
+<button type="button" role="menuitem" class="mi" style="background: transparent; border: 0; font-family: inherit">Open Drey</button>
+<button type="button" role="menuitem" class="mi" style="background: transparent; border: 0; font-family: inherit"><span style="flex: 1; min-width: 0; text-align: left">Autopilot: Paused at checkpoint</span><svg width="14" height="14" style="flex-shrink: 0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></button>
+<button type="button" role="menuitem" class="mi" style="background: transparent; border: 0; font-family: inherit; color: #ee8f89">Stop all running steps…</button>
+<div role="separator" style="height: 1px; background: #3b3d42; margin: 4px 0; flex-shrink: 0"></div>
+<button type="button" role="menuitem" class="mi" style="background: transparent; border: 0; font-family: inherit"><span style="flex: 1; text-align: left">Start with Windows</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"></path></svg></button>
+<button type="button" role="menuitem" class="mi" style="background: transparent; border: 0; font-family: inherit">Quit service</button>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1100,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

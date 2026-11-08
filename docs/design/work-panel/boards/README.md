@@ -5,7 +5,10 @@ redesign" (artifact `a401ec8a-b3e4-459f-b9df-ff8893105b9f`, version
 `1793992275-ade0`; the 9c, 9d and 9e boards `DeskFind`, `DeskFindParts`,
 `FindDirections`, `FindSimple`, `DeskSourceControl`, `DeskSourceControlParts`,
 `DeskOutline`, `DeskOutlineParts` and `canvas.json` from version
-`1794096178-a5ad`, 2026-11-08).
+`1794096178-a5ad`, 2026-11-08; the Crew-concept boards `DeskModels`, `DeskServiceSettings`,
+`ServiceWindow`, `ServiceSessions`, `MCCards`, the revised `DeskBoard` and `Autopilot` and
+`canvas.json` from version `1794147040-05e9`, 2026-11-08, accepted by the owner the same
+day; measure sheets and handoff in [../crew-concept-boards.md](../crew-concept-boards.md)).
 **This folder is what "it looks like the design" means.**
 A session that builds or changes a screen reads the board's HTML for the exact
 measures, colours, spacing and strings, opens the PNG to see it, and compares
@@ -51,7 +54,7 @@ above.
 | 7b · Shape: the plan is the ticket, Paul works in it through the Assistant | `DeskShape` | 1440×900 | desktop |
 | 7c · Plan to accept: the Parts block inside the ticket | `DeskPlan` | 1440×900 | desktop |
 | 7d · Review tab: proof, files, line comments like a pull request | `DeskReview` | 1440×900 | desktop |
-| 7e · Board tab with the Capacity band in the bottom dock | `DeskBoard` | 1440×900 | desktop |
+| 7e · Board tab with the Capacity band in the bottom dock — **revised 2026-11-08**: slots row, tranche and queue row in the band | `DeskBoard` | 1440×900 | desktop |
 | 7f · Crew tab: personas, stuck worker, setup and cost | `DeskTeam` | 1440×900 | desktop |
 | 7g · Settings like VS Code: search, collapsible sections, scope tabs | `DeskSettings` | 1440×900 | desktop |
 | 7h · Views: Notes · Work · Crew, Layout menu with save, reset, rename, delete | `DeskViews` | 1440×900 | desktop |
@@ -87,7 +90,12 @@ above.
 | 10q · Ready to try, three panes: tickets, ticket with cost by phase, Mission Control | `MPadReady` | 1194×834 | iPad |
 | 10r · editing a note: files, Markdown editor, Assistant | `MPadNotesEdit` | 1194×834 | iPad |
 | 10s · iPad portrait — list and ticket, right sidebar closed | `MPadPortrait` | 834×1194 | iPad |
-| 10t · Autopilot switch: on, paused, off — desktop status bar, iPad header, phone app bar | `Autopilot` | 1440×900 | all |
+| 10t · Autopilot switch: on, paused, off — desktop status bar, iPad header, phone app bar  — **revised 2026-11-08**: tranche chips and bar, checkpoint pause, Release next tranche | `Autopilot` | 1440×900 | all |
+| 7l · Settings → Models: model table, capacity cap, slots and quota windows, routing, ledgers (concept 2026-11-08, ADR-0095, req-170) | `DeskModels` | 1440×900 | desktop |
+| 8a · Drey Service window: components, slots, governor, log; the tray menu (req-165) | `ServiceWindow` | 1100×720 | desktop |
+| 8b · Drey Service window, Sessions: every harness session raw — stream, instruction, tool calls, process (req-166) | `ServiceSessions` | 1100×720 | desktop |
+| 8c · Settings → Background service: status, start with Windows, keep running, components, load, logs (req-165) | `DeskServiceSettings` | 1440×900 | desktop |
+| 10u · Mission Control cards of the Lead: checkpoint report, merge conflict, budget and quota stop, queued, early stop — desktop and phone | `MCCards` | 1480×1160 | parts |
 
 The older boards one folder up (`Home`, `Ticket`, `Workers`, `Ready`,
 `Shaping`, `Orchestrator`, `Phone*` of 2026-10-31) are superseded by the

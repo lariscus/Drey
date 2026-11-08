@@ -4,7 +4,7 @@
   "boards": {
     "DeskBoard.dc.html": {
       "h": 900,
-      "title": "7e · Drey — Board tab with the Capacity band in the bottom dock",
+      "title": "7e · Drey — Board tab with the Capacity band in the bottom dock — revised 2026-11-08: slots, tranche and queue rows in the band",
       "w": 1440,
       "x": 1520,
       "y": 11720
@@ -284,7 +284,7 @@
     },
     "Autopilot.dc.html": {
       "h": 900,
-      "title": "10t · Autopilot switch: on, paused, off — desktop status bar, iPad header, phone app bar",
+      "title": "10t · Autopilot switch: on, paused, off — desktop status bar, iPad header, phone app bar — revised 2026-11-08: tranche, checkpoint, release next tranche",
       "w": 1440,
       "x": 0,
       "y": 23000
@@ -344,6 +344,41 @@
       "w": 1120,
       "h": 620,
       "title": "9e · Outline, the parts at 1:1: three levels, all collapsed, folded, empty"
+    },
+    "DeskModels.dc.html": {
+      "x": 0,
+      "y": 24020,
+      "w": 1440,
+      "h": 900,
+      "title": "7l · Drey · Settings → Models: model table, capacity cap, slots and quota windows, routing, ledgers (concept 2026-11-08, ADR-0095)"
+    },
+    "DeskServiceSettings.dc.html": {
+      "x": 1520,
+      "y": 24020,
+      "w": 1440,
+      "h": 900,
+      "title": "8c · Drey · Settings → Background service: status, start with Windows, keep running, components, load, logs (req-165)"
+    },
+    "ServiceWindow.dc.html": {
+      "x": 3040,
+      "y": 24020,
+      "w": 1100,
+      "h": 720,
+      "title": "8a · Drey Service window: components, slots, governor, log; the tray menu (req-165)"
+    },
+    "ServiceSessions.dc.html": {
+      "x": 4220,
+      "y": 24020,
+      "w": 1100,
+      "h": 720,
+      "title": "8b · Drey Service window, Sessions: every harness session raw — stream, instruction, tool calls, process (req-166)"
+    },
+    "MCCards.dc.html": {
+      "x": 5400,
+      "y": 24020,
+      "w": 1480,
+      "h": 1160,
+      "title": "10u · Mission Control cards of the Lead: checkpoint report, merge conflict, budget and quota stop, queued, early stop — desktop and phone"
     }
   },
   "createdOnFiles": {
@@ -378,7 +413,9 @@
     "panelsNote",
     "findNote",
     "scNote",
-    "outlineNote"
+    "outlineNote",
+    "rowCrew",
+    "crewNote"
   ],
   "notes": {
     "alignMC": {
@@ -497,6 +534,20 @@
       "w": 520,
       "fill": "blue",
       "text": "9e: Outline (req-162; the look of 9b, measured; every level folds — owner, 2026-11-08)\n\nHeader 28 px: \"Outline\" + the heading count; one control, chevrons-down-up \"Collapse all levels\" (pressed: \"Expand all levels\"), shown on hover, focus or while active.\nRow 28 px, margin 0 4, radius 4, 14 px --text-primary, ellipsis; indent 4 + 16 per level. A heading with children has its own fold chevron (20 px button, icon 14 --text-4: chevron-down open, chevron-right folded); a leaf has a 20 px spacer.\nThe heading at the caret (or its nearest visible parent when folded): --active-bg. Hover: --hover-bg. No accent tint, no h1/h2 weights.\nEmpty: \"Open a note to see its outline.\" / \"No headings in this document.\" (14/20 --text-4, padding 12)."
+    },
+    "rowCrew": {
+      "kind": "title1",
+      "x": 0,
+      "y": 23720,
+      "maxW": 6880,
+      "text": "Crew concept, 2026-11-08 — Models, Drey Service, the Lead's cards (7e and 10t revised in place)"
+    },
+    "crewNote": {
+      "x": 7000,
+      "y": 24020,
+      "w": 420,
+      "fill": "blue",
+      "text": "Crew concept boards (2026-11-08). Source: the owner's Grobkonzept \"Drey crew\" as adapted; ADR-0092/0093/0095; docs/design/work-panel/crew-concept-boards.md has the measure sheets and the implementation handoff.\n\n1. Slots are accounts (Claude A, Claude B, z.ai, Kimi, Copilot at work) with profile, billing and quota windows; q = remaining share / remaining time; upgrade above q 1.3; never a smaller class (R10).\n2. The Autopilot's On releases one tranche; at its end it pauses with a checkpoint report; anomalies stop early.\n3. The governor seats heavy tasks (tests, builds, dev servers) separately from model runs; a CPU/RAM reserve stays free.\n4. The Lead is Pia with a fixed command set; decisions are cards in Mission Control (10u).\n5. Drey Service is optional (service.enabled off by default); its window and Settings page are 8a/8b/8c.\n6. The runner is refactored in TypeScript, not rewritten; ACP is the target adapter protocol."
     }
   },
   "order": [
@@ -547,7 +598,12 @@
     "DeskSourceControl.dc.html",
     "DeskSourceControlParts.dc.html",
     "DeskOutline.dc.html",
-    "DeskOutlineParts.dc.html"
+    "DeskOutlineParts.dc.html",
+    "DeskModels.dc.html",
+    "DeskServiceSettings.dc.html",
+    "ServiceWindow.dc.html",
+    "ServiceSessions.dc.html",
+    "MCCards.dc.html"
   ],
   "pages": [],
   "title": "Drey Tickets — Workflow redesign"

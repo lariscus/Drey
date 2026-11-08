@@ -183,3 +183,7 @@ What req-164 built, and where it differs from the decision above:
   gone. `config.json` keys stay where they are (req-173 moves them).
 - **Command line.** `service-main.js --version | --status | --stop |
   --autostart on|off|status`; operations in `plugins/tickets/SERVICE.md`.
+
+## Later change (2026-11-08, proposed — req-180, req-165/166 boards): the resource governor and the accepted window design
+
+The service gains a **resource governor** (ADR-0096's `ResourceGovernor` port): tasks take seats of a class — `light` for model runs, `heavy` for tests, builds, dev servers and browsers — with one or two heavy seats at once, heavy processes at low priority (Windows Job Object / priority class, Linux `nice`; a native helper behind the port where Node cannot), a CPU/RAM reserve, quiet hours, one dev-server port per worktree, and every refusal or wait logged with its reason. Settings → Background service shows it as the **Load** group (board 8c). The window of this ADR is drawn: board 8a (Components, the Slots and Governor blocks, the filtered log, the tray menu) and 8b (Sessions raw: list, facts, Stream / Instruction / Tool calls / Process / Raw JSON, send, interrupt turn, resume after stop) — accepted by the owner 2026-11-08, measures in `docs/design/work-panel/crew-concept-boards.md`. The window remains the workshop; Drey's Thread the clean view.

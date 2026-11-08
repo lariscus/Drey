@@ -1,6 +1,7 @@
 // @ts-check
 import { readdirSync } from 'node:fs';
 import tseslint from 'typescript-eslint';
+import { SIZE_BASELINE } from './eslint.size-baseline.mjs';
 
 /**
  * This config is intentionally narrow. It is not a style pass over the
@@ -236,8 +237,43 @@ export default tseslint.config(
         'error',
         { patterns: [NO_RENDERER, NO_MAIN, NO_PLUGINS, NO_APPS] },
       ],
+      // The backend OOP rule (CLAUDE.md "Coding & Style Conventions",
+      // ADR-0096, owner 2026-11-08): short files, short functions, no god
+      // objects. Counted without blank lines and comments. Today's
+      // offenders are the baseline below, which may only shrink.
+      'max-lines': ['error', { max: 300, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': ['error', { max: 60, skipBlankLines: true, skipComments: true }],
+      'max-params': ['error', 4],
+      complexity: ['error', 12],
+      'max-classes-per-file': ['error', 1],
     },
   },
+  {
+    // Specs: a describe block is one long function by nature; only the
+    // file limit applies, at 400.
+    files: ['packages/**/*.spec.ts', 'packages/**/*.fake.ts'],
+    rules: {
+      'max-lines': ['error', { max: 400, skipBlankLines: true, skipComments: true }],
+      'max-lines-per-function': 'off',
+      'max-params': 'off',
+      complexity: 'off',
+      'max-classes-per-file': 'off',
+    },
+  },
+  ...(SIZE_BASELINE.length > 0
+    ? [
+        {
+          files: SIZE_BASELINE,
+          rules: {
+            'max-lines': 'off',
+            'max-lines-per-function': 'off',
+            'max-params': 'off',
+            complexity: 'off',
+            'max-classes-per-file': 'off',
+          },
+        },
+      ]
+    : []),
   {
     files: ['src/**/*.ts'],
     rules: {

@@ -160,3 +160,7 @@ state. The engine speaks codes only; the words are the clients' catalog (req-95b
   failed opinion parks the ticket exactly like a red gate.
 - The SDK gains its first program-facing tool seam; plugin tools are full MCP citizens and carry the same trust
   model as the vault tools (the tickets repo's commands were always owner-authored).
+
+## Later change (2026-11-08, proposed — req-179): the tranche as the Autopilot's release unit
+
+The owner's Grobkonzept "Drey crew" adds **checkpoints in tranches** to the chain. The Autopilot's On always releases one tranche: up to N runs, a budget share or a time span, whichever comes first. At the tranche's end the runner pauses (the Autopilot reads Paused with the reason checkpoint) and the Lead raises a **checkpoint report** card in Mission Control — gate rate, change size, cost per run, repeated tickets; deterministic numbers, no prompt — with *Release next tranche* and *Adjust…*; anomalies stop a tranche early (a falling gate rate, the same ticket repeatedly, unusually growing changes, cost per run far above the median). The boot rule stands (every start is Off). `chain.json` keeps the tranche counters; tranche size and the thresholds are config. Boards: 7e (the band's tranche row), 10t (the popovers), 10u (the cards) — `docs/design/work-panel/crew-concept-boards.md`. The `TranchePolicy` class of ADR-0096 holds the rule; the circuit breaker of this ADR stays the per-column safety net beneath it.

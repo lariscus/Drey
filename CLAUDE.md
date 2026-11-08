@@ -714,6 +714,24 @@ introduced silently.
   (`Note`, `Task`, `TagEntry`, `VaultConfig`, `ClassifierResult`, ...) —
   define once in a shared types module, used by both main and renderer.
 - ESLint + Prettier, default configs unless a concrete conflict comes up.
+- **Backend OOP rule** (owner, 2026-11-08;
+  [ADR-0096](docs/09_architecture_decisions/0096-crew-runner-refactor-state-machine-ports-and-file-size-rule.md)).
+  `packages/` (the tickets engine and the Crew runner) is built
+  object-oriented as far as TypeScript carries it: one class per file, one
+  responsibility per class; interfaces small and defined at the consumer;
+  dependencies by constructor, wired only in the composition root (no DI
+  container, no service locator); composition over inheritance (an abstract
+  class only as a pure template); states and events as discriminated
+  unions; `readonly` by default; no static mutable state; the core imports
+  ports, never `node:fs`, `child_process` or `http` (adapters do). No god
+  objects: the class that supervises processes does not also write tickets.
+  **File sizes:** target 200 lines, hard limit 300 (specs 400); a function
+  at most 60 lines; at most 4 parameters (else an options object);
+  cyclomatic complexity at most 12. Enforced by ESLint on `packages/**`
+  with a baseline of today's offenders in `eslint.size-baseline.mjs` that
+  may only shrink (a touched file leaves the list or is split), and by the
+  import boundaries between the runner's sub-packages (ADR-0096). The rest
+  of the repo adopts the limits for new files.
 - No business logic inside components — components call services, services
   hold the logic.
 - Background: strong C++/C# experience — prefer explicit typing and clear
