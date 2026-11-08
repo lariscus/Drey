@@ -4663,3 +4663,75 @@ Every Accept goes through `acceptTicket`: a plain move from Ready to try to Done
 and push. A ticket in Done asks nothing of the owner, because the sign-off was on Ready to try. A
 board without a `ready` stage keeps its own checkpoints and the terminal column's Accept into the
 archive.
+
+## 6.99 A run through the state machine, the one ticket writer and the event stream (milestone 214, req-176, [ADR-0096](09_architecture_decisions/0096-crew-runner-refactor-state-machine-ports-and-file-size-rule.md))
+
+Since the refactor every change of a run's state is one transition of
+`RunStateMachine` (`packages/tickets-engine/src/fleet/run/run-state-machine.ts`):
+the supervisor's parts report an event, the machine answers the next state
+or refuses it (`IllegalRunTransition`). Every write to a ticket — the
+supervisor's and the chain's — goes through the one `RunBookkeeper` over the
+`TicketStore` port (the dricket store; the legacy file writer is gone, a start
+without a store is refused), and every persisted record and stream line is
+published into the `EventHub`, which `GET /events` serves as server-sent
+events. The transition table is the whole contract:
+
+```mermaid
+stateDiagram-v2
+    [*] --> starting: start accepted
+    starting --> running: spawned · adopted
+    starting --> starting: respawning (a resume fell back fresh)
+    running --> running: spawned (a held worker prompted) · adopted
+    running --> starting: respawning
+    starting --> detached: orphaned (the runner restarted, the worker lives on)
+    running --> detached: orphaned
+    stopping --> detached: orphaned
+    detached --> running: adopted (re-attached)
+    starting --> stopping: stop-requested · claim-lost
+    running --> stopping: stop-requested · claim-lost
+    detached --> stopping: stop-requested · claim-lost
+    state "settled(outcome) from starting, running, stopping or detached" as settled
+    settled --> done
+    settled --> stopped
+    settled --> failed
+    done --> [*]
+    stopped --> [*]
+    failed --> [*]
+```
+
+`settled` carries its outcome (`done`, `stopped`, `failed`) and is taken from
+every state that is not over; `detached` runs settle through the reaper once
+the worker is provably gone. Everything else a run carries (pid, end stamp,
+gate verdict, telemetry) the caller sets beside the state.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant H as Harness adapter (claude-code · opencode · kimi)
+    participant F as EventFold
+    participant M as RunStateMachine
+    participant R as RunRepository
+    participant E as EventHub → GET /events
+    participant C as RunCompletion
+    participant G as GateRunner
+    participant B as RunBookkeeper
+    participant S as TicketStore (dk)
+    H->>F: NormalizedEvent (text, usage, tool, question, result, error)
+    F->>R: fold into the record, append the stream line
+    R->>E: publish event run / event line
+    H-->>C: worker exited (exit verdict)
+    C->>G: run the ticket's acceptance commands
+    G-->>C: green or red (the failure's tail)
+    C->>M: transition(record, settled(outcome))
+    M-->>C: the record in done · stopped · failed
+    C->>B: settle: release stage and comment, Verlauf line, persona memory
+    B->>S: dk put / release inside the run's claim
+    C->>R: persist run.json
+    R->>E: event run (settled)
+    Note over E: Drey, the phones and a terminal read the same stream; a read never keeps the runner awake
+```
+
+Where the parts live and which may import which (`run/` and `ports/` import
+nothing from Node or their siblings; `orchestrate/` sees the harness contract
+alone; only `runner.ts` wires a concrete adapter) is §5.0's "Crew runner
+structure" row; the rule is enforced by ESLint and `fleet/architecture.spec.ts`.

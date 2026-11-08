@@ -1157,8 +1157,7 @@ the switch says why (*The runner could not be started: …*).
 
 ### Running agents on tickets (the fleet)
 
-A ticket can be worked by an **external agent CLI** — OpenCode or
-Claude Code — while you watch from the Work panel. Open the menu of a row
+A ticket can be worked by an **external agent CLI** — OpenCode, Claude Code or Kimi Code — while you watch from the Work panel. Running agents needs the board on a ticket store (the dricket checkout the Work panel's foot names); on a plain folder board, *Run agent* is refused and says so. Open the menu of a row
 in an agent column (Inbox, Shaping and Prioritized are yours: move the ticket
 to Building first) and choose **Run agent**: the dialog lets you pick the worker (the menu
 shows the one your pins resolve to: the ticket's `worker:` field wins,
@@ -1307,14 +1306,9 @@ live on OpenCode workers: a tool step appears as the worker calls it
 and reply text grows while it is written. The view follows new output
 while you are at the bottom; scrolled up, it stays put and a
 **↓ New output** button brings you back. Only OpenCode workers can be
-taken over for now. When a run ends, the ticket's Log line records the
-tokens it used — how much of the input came from the provider's cache,
-and the cost, when the provider reports one (flat coding plans report
-none). A run that continues an earlier session counts only its own
-tokens. When the worker finishes, the runner executes the ticket's
+taken over for now. When a run ends, its step line in the thread and the Crew card record the tokens it used — how much of the input came from the provider's cache — and the cost, when the provider reports one (flat coding plans report none); on the ticket store the run's release comment carries the outcome. The runner writes no lines into the ticket's own Log any more. A run that continues an earlier session counts only its own tokens. When the worker finishes, the runner executes the ticket's
 **acceptance criteria** (the backticked commands under Plan): all green
-means the ticket moves to the next phase on its own; a failure parks
-the reason in the Log and leaves the ticket where it is — the next run
+means the ticket moves to the next phase on its own; a failure keeps the reason on the run (the thread's step line shows it) and leaves the ticket where it is — the next run
 of that ticket carries the failed gate's output (its tail) so the
 worker fixes it first and continues the branch instead of starting
 over.
@@ -1326,8 +1320,7 @@ run, and the controls act on a run or on everything at once — **Nudge**,
 all** (click twice); see *Board, Crew and Capacity* above. A busy worker
 without progress — no edit for eight minutes, the same file read again
 and again, or the runner itself flagging it — is flagged **Looks
-stuck**; the ticket thread's header shows the same word. The fleet
-daemon's log is on disk as `runner.log` under the app's data folder.
+stuck**; the ticket thread's header shows the same word. The fleet daemon's log is on disk as `runner.log` in the fleet folder of the service home (`~/.drey-engine/fleet`).
 
 Every run's instruction is a **context pack**, assembled in a fixed
 order: the repo's own agent instructions (the file its **Agent

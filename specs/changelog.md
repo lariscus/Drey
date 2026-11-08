@@ -22,6 +22,8 @@
 - **Docs:** ADR-0096 (the design), docs/05 §5.0 ("Crew runner structure"), `plugins/tickets/FLEET.md` (the store-only runner, `GET /events`), the CLAUDE.md ownership map (the sub-packages).
 - **Left open:** a follow-up on the roadmap — retire `--store-backed` and the `storeBacked` argument.
 
+- **Docs follow-up (2026-11-09, the integrator, on the owner's instruction that documentation is part of done):** docs/06 §6.99 (the run through the state machine, the one ticket writer and the event stream, a state and a sequence diagram), docs/12 a glossary section "The Crew (tickets and agents)" (the tickets and agent vocabulary from ticket to size baseline, planned terms marked), the manual's §13 corrected for milestone 214 (Kimi Code named, the ticket-store requirement for Run agent, no runner-written Log lines, the gate failure on the run, `runner.log` in the service home) and re-synced to `public/manual`.
+
 ### Milestone 213 — the Crew concept review: adapted concept, seven boards, ADR-0096, the backend OOP rule with its size baseline (req-176 step 0)
 
 **Not yet manually verified by the owner** (the boards and the six decisions were accepted in the session of 2026-11-08; what awaits a look is the lint ratchet in a full `test:all` run). Owner request, outside the list (2026-11-08): the owner's Grobkonzept "Drey crew" (Claude doc) was reviewed against the code, against ADR-0092/0093/0095 and against the market, then adapted, and the canvas followed it.
