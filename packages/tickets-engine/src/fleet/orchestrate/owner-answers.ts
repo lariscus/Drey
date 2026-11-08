@@ -1,5 +1,5 @@
 import type { PermissionDecision, QuestionAnswers, SteerRung } from '../protocol';
-import { answersText } from '../providers';
+import { answersText } from '../harness/question-forms';
 import type { StopOutcome, TakeoverOutcome } from '../run/run-record';
 import type { RunBookkeeper } from './run-bookkeeper';
 import type { RunRepository } from './run-repository';

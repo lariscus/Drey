@@ -11,7 +11,7 @@
  * through every sum (0 is a measurement, absence is not).
  */
 import type { RunUsage } from './protocol';
-import type { NormalizedEvent } from './providers';
+import type { NormalizedEvent } from './harness/contract';
 
 /** Tool names that read (claude-code spells `Read`, opencode `read`) — compared lowercase. */
 export const READ_TOOLS: ReadonlySet<string> = new Set(['read', 'grep', 'glob']);

@@ -8,7 +8,17 @@
 import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import type { KimiUsageReader, KimiUsageRecord } from './kimi';
+/** One model call of the session, as Kimi's wire log records it. */
+export interface KimiUsageRecord {
+  readonly model: string | null;
+  readonly inputOther: number;
+  readonly output: number;
+  readonly cacheRead: number;
+  readonly cacheCreation: number;
+}
+
+/** Reads the session's usage records in order; empty when the log is unreadable. */
+export type KimiUsageReader = (sessionRef: string) => Promise<readonly KimiUsageRecord[]>;
 
 /** The records of a wire log's text, in order; lines of other shapes are skipped. */
 export function parseKimiWire(raw: string): KimiUsageRecord[] {

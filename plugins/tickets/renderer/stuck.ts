@@ -6,7 +6,7 @@
  * owner picks Nudge, Hand over or Stop.
  */
 import type { RunInfo } from '../../../packages/tickets-engine/src/fleet/protocol';
-import type { NormalizedEvent } from '../../../packages/tickets-engine/src/fleet/providers';
+import type { NormalizedEvent } from '../../../packages/tickets-engine/src/fleet/harness/contract';
 import { READ_TOOLS, WRITE_TOOLS } from '../../../packages/tickets-engine/src/fleet/telemetry';
 import { RESULT_PREFIX, THINK_PREFIX, YOU_PREFIX } from './watch-format';
 

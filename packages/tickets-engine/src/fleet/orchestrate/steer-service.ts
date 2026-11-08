@@ -1,5 +1,5 @@
 import type { SteerRung } from '../protocol';
-import { answersFromText } from '../providers';
+import { answersFromText } from '../harness/question-forms';
 import type { StopOutcome, TakeoverOutcome } from '../run/run-record';
 import { isTerminal } from '../run/run-state';
 import type { LiveRun } from './live-run';

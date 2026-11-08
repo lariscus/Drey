@@ -1,4 +1,4 @@
-import type { WorkerHandle } from '../providers';
+import type { WorkerHandle } from '../harness/contract';
 import type { RunStateMachine } from '../run/run-state-machine';
 import type { BackgroundWork } from './background-work';
 import type { LiveRun } from './live-run';

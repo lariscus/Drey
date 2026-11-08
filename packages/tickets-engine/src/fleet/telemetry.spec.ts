@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { NormalizedEvent } from './providers';
+import type { NormalizedEvent } from './harness/contract';
 import { READ_TOOLS, TelemetryFold, telemetryFromEvents, WRITE_TOOLS } from './telemetry';
 
 /**

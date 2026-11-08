@@ -1,7 +1,7 @@
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import type { Clock } from '../ports/clock';
-import type { NormalizedEvent } from '../providers';
+import type { NormalizedEvent } from '../harness/contract';
 
 /** What a stream line is written for: a run's folder. */
 interface StreamOwner {

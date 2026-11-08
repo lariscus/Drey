@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { OPENCODE_API, opencodeAdapter, type FetchFn, type NormalizedEvent, type ProviderStart } from './providers';
-import type { RunnerProcess, SpawnFn } from './procs';
+import type { SpawnFn } from '../procs';
+import { OPENCODE_API } from './opencode-api';
+import { opencodeAdapter } from './opencode';
+import type { FetchFn, NormalizedEvent, ProviderStart } from './contract';
+import { fakeProcess, spawnOf } from './worker-process.fake';
 
 /**
  * T-0052: the model's context window comes from the opencode server's
@@ -8,37 +11,6 @@ import type { RunnerProcess, SpawnFn } from './procs';
  * resolved once per worker from the run's model pin, reported as a
  * `contextWindow` event. A miss is a note, the number is never guessed.
  */
-
-/** A scripted process: the spec pushes the stdout credential line. */
-function fakeProcess(): RunnerProcess & { stdout: (line: string) => void; killTree: ReturnType<typeof vi.fn>; exit: (code: number | null) => void } {
-  const listeners = {
-    stdout: (_line: string): void => undefined,
-    exit: (_code: number | null): void => undefined,
-  };
-  const killTree = vi.fn(async () => undefined);
-  const proc: RunnerProcess & {
-    stdout: (line: string) => void;
-    killTree: typeof killTree;
-    exit: (code: number | null) => void;
-  } = {
-    pid: 4242,
-    write: () => undefined,
-    endInput: () => undefined,
-    onStdout: (cb) => {
-      listeners.stdout = cb;
-    },
-    onStderr: () => undefined,
-    onExit: (cb) => {
-      listeners.exit = cb;
-    },
-    stdout: (line) => listeners.stdout(`${line}\n`),
-    killTree,
-    exit: (code) => listeners.exit(code),
-  };
-  return proc;
-}
-
-const spawnOf = (proc: ReturnType<typeof fakeProcess>): SpawnFn => () => proc;
 
 /**
  * A scripted server: everything the boot round needs answers empty; the

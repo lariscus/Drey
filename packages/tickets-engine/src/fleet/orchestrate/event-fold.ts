@@ -1,5 +1,5 @@
 import type { RunInfo } from '../protocol';
-import type { NormalizedEvent } from '../providers';
+import type { NormalizedEvent } from '../harness/contract';
 import { foldExecSpan } from '../run/exec-span';
 import type { RunTelemetry } from '../telemetry';
 import type { BackgroundWork } from './background-work';

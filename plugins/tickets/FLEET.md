@@ -574,7 +574,7 @@ by themselves** (On), only finish what runs (Paused), or wait for the owner
   (`runner.ts` — the composition root, `runner-lifecycle.ts` — when the runner may sleep, req-110;
   `run/` — the run state machine; `orchestrate/` — the supervisor's and the chain's parts, the one
   ticket writer `RunBookkeeper`; `api/` — the HTTP routes; `store/` — the ticket store port;
-  `orchestrator.ts`, `chain.ts`, `providers.ts`, `protocol.ts`; ADR-0096), client side
+  `harness/` — the adapter contract and the Claude Code, OpenCode and Kimi adapters; `orchestrator.ts`, `chain.ts`, `protocol.ts`; ADR-0096), client side
   `packages/tickets-engine/src/services/fleet-client.ts`; the Drey-gone
   signal `packages/tickets-engine/src/server/drey-presence.ts`
 - Specs: `specs/ticket-schema.md` (tickets, gates, agent lane rules),
@@ -594,4 +594,4 @@ prompt changes in substance.
 
 ## Kimi Code (E10-8)
 
-`kimi` is the third adapter (`packages/tickets-engine/src/fleet/kimi.ts`): `kimi acp` over stdio, approvals and questions held for the owner, `/compact` native, resume by `session/load`. Tokens come from Kimi's wire log, cost from the price table. See `docs/design/kimi-worker.md`.
+`kimi` is the third adapter (`packages/tickets-engine/src/fleet/harness/kimi.ts`): `kimi acp` over stdio, approvals and questions held for the owner, `/compact` native, resume by `session/load`. Tokens come from Kimi's wire log, cost from the price table. See `docs/design/kimi-worker.md`.

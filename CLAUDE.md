@@ -574,8 +574,9 @@ extraction, ADR-0088):
   machine, drift, status log, ledger, git plumbing · `src/fleet` the
   Crew runner (ADR-0096): `run/` the pure run state machine, `orchestrate/`
   the supervisor's and the chain's parts with the one ticket writer
-  `RunBookkeeper`, `store/` the ticket store port, `api/` the HTTP routes,
-  `ports/`, and `runner.ts` the composition root; providers, worktrees,
+  `RunBookkeeper`, `harness/` the adapter contract and the Claude Code,
+  OpenCode and Kimi adapters, `store/` the ticket store port, `api/` the
+  HTTP routes, `ports/`, and `runner.ts` the composition root; worktrees,
   telemetry beside them · `src/contracts`
   the cross-layer types and pure helpers · `src/services` since E2a the
   host-agnostic board service behind `EngineHost`/`FleetPort` ·

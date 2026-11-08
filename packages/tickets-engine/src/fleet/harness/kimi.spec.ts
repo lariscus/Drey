@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { kimiAdapter, type KimiUsageRecord } from './kimi';
-import { parseKimiWire } from './kimi-usage';
-import type { NormalizedEvent, ProviderStart } from './providers';
-import type { RunnerProcess } from './procs';
+import type { RunnerProcess } from '../procs';
+import type { NormalizedEvent, ProviderStart } from './contract';
+import { kimiAdapter } from './kimi';
+import type { KimiUsageRecord } from './kimi-usage';
 
 /**
  * The Kimi adapter against a scripted `kimi acp`: the JSON shapes below are
@@ -347,21 +347,5 @@ describe('kimiAdapter', () => {
     await handle.stop();
     expect(rpc.killTree).toHaveBeenCalled();
     expect(await handle.steer('late')).toBe('refused');
-  });
-});
-
-describe('parseKimiWire', () => {
-  it('reads the usage.record lines in order and skips the rest', () => {
-    const wire = [
-      '{"type":"metadata","protocol_version":"1.5"}',
-      '{"type":"usage.record","agentId":"main","model":"zai-coding-plan/glm-5.3-flash","usage":{"inputOther":16734,"output":668,"inputCacheRead":0,"inputCacheCreation":0},"usageScope":"turn"}',
-      '{"type":"context.append_loop_event","event":{"type":"step.end","usage":{"inputOther":1}}}',
-      '{"type":"usage.record","model":"x","usage":{"inputOther":745,"output":165,"inputCacheRead":16704,"inputCacheCreation":2}}',
-      '{"type":"usage.record","model":"x","usa',
-    ].join('\n');
-    expect(parseKimiWire(wire)).toEqual([
-      { model: 'zai-coding-plan/glm-5.3-flash', inputOther: 16734, output: 668, cacheRead: 0, cacheCreation: 0 },
-      { model: 'x', inputOther: 745, output: 165, cacheRead: 16704, cacheCreation: 2 },
-    ]);
   });
 });

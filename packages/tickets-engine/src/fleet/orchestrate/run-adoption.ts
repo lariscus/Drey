@@ -1,6 +1,6 @@
 import type { Clock } from '../ports/clock';
 import { processAlive, type ExecFn } from '../procs';
-import { ZERO_USAGE, type WorkerHandle } from '../providers';
+import { ZERO_USAGE, type WorkerHandle } from '../harness/contract';
 import { closeExecSpan } from '../run/exec-span';
 import type { RunHandover, StoredRun } from '../run/run-record';
 import { isTerminal } from '../run/run-state';

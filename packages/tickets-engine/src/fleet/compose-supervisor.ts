@@ -10,7 +10,7 @@ import { hostname } from 'node:os';
 import { TicketsGit } from '../core/tickets-git';
 import { clockOf, type Clock } from './ports/clock';
 import type { ExecFn } from './procs';
-import type { ProviderAdapter } from './providers';
+import type { ProviderAdapter } from './harness/contract';
 import type { RunInfo, RunRequest } from './protocol';
 import type { RunLimits } from './run/run-limits';
 import { isTerminal } from './run/run-state';

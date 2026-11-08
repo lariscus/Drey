@@ -1,5 +1,5 @@
 import type { RunInfo, RunRequest } from '../protocol';
-import type { WorkerHandle } from '../providers';
+import type { WorkerHandle } from '../harness/contract';
 import type { RunLease } from '../run-lease';
 import type { RunHandover, StoredRun, UsageBase } from '../run/run-record';
 import { TelemetryFold, type RunTelemetry } from '../telemetry';

@@ -1,5 +1,5 @@
 import { killTreeGuarded, listenerPid, processStartMs, type ExecFn } from '../procs';
-import type { ProviderAdapter, UsageTotals, WorkerHandle } from '../providers';
+import type { ProviderAdapter, UsageTotals, WorkerHandle } from '../harness/contract';
 import type { BackgroundWork } from './background-work';
 import type { EventFold } from './event-fold';
 import type { HandoverSettings } from './handover-settings';

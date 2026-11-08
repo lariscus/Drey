@@ -1,6 +1,6 @@
 import type { HandoverDecision } from '../handover';
 import type { RunInfo, RunRequest } from '../protocol';
-import type { NormalizedEvent } from '../providers';
+import type { NormalizedEvent } from '../harness/contract';
 import type { LinkReport, PreparedWorktree } from '../worktrees';
 
 /** The stream's setup line for the repo's `link:` folders (req-56). */

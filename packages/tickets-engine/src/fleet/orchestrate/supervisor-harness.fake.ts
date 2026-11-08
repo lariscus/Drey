@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, expect, vi } from 'vitest';
 import { composeRunSupervisor, type RunSupervisorDeps } from '../compose-supervisor';
 import type { RunDkTarget, RunInfo, RunRequest } from '../protocol';
-import type { AttachInfo, NormalizedEvent, ProviderAdapter, ProviderStart, WorkerHandle } from '../providers';
+import type { AttachInfo, NormalizedEvent, ProviderAdapter, ProviderStart, WorkerHandle } from '../harness/contract';
 import { FakeTimers } from '../run-lease-timers.fake';
 import type { StoredRun } from '../run/run-record';
 import { FakeTicketStore } from '../store/ticket-store.fake';
