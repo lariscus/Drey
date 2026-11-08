@@ -29,7 +29,7 @@ at once):
 | **gateway** | the remote gateway for phone and iPad (ADR-0086), inside the engine | `running` (address, paired devices), `stopped` (remote access off) or `failed` (why it does not listen) |
 | **mcp** | Drey's MCP server for other programs | `external` — still served by the Drey process until req-167 moves it |
 
-Settings → Background service (milestone 215) shows the components and drives
+Settings → Background service (milestone 216) shows the components and drives
 the runner, the gateway and Drey's MCP server; the tray icon and the service
 window are req-165, the Sessions area req-166. Until then the service is also
 seen through `--status`, its control port and `service.log`.

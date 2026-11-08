@@ -4,7 +4,7 @@
 
 **Accepted — as built (milestone 209, req-164)** for the process, its
 components, discovery and lifecycle; the deviations are listed under "As
-built" below; Settings → Background service is built too (milestone 215,
+built" below; Settings → Background service is built too (milestone 216,
 "Settings → Background service as built"). The tray icon and the window
 (req-165), the Sessions area (req-166), the MCP server's move (req-167) and
 `service.json` / the three configuration layers (req-173) remain proposed
@@ -155,7 +155,7 @@ What req-164 built, and where it differs from the decision above:
   starts one. A boot claim keeps two Dreys from starting two.
 - **Optional, as the owner ruled (Q3).** `service.enabled` (default off) and
   `service.autostart` are switched in Settings → Background service
-  (milestone 215); Drey writes them into the engine's config and the service
+  (milestone 216); Drey writes them into the engine's config and the service
   re-reads its mode every tick. **With Drey** (off): once no Drey has held the
   event stream for 10 s (2 min for a Drey that never came) the service stops
   its live runs and leaves — a paired phone does not keep it; closing Drey
@@ -184,7 +184,7 @@ What req-164 built, and where it differs from the decision above:
 - **Command line.** `service-main.js --version | --status | --stop |
   --autostart on|off|status`; operations in `plugins/tickets/SERVICE.md`.
 
-## Settings → Background service as built (milestone 215, req-165 settings part, board 8c)
+## Settings → Background service as built (milestone 216, req-165 settings part, board 8c)
 
 A core Settings category (`src/app/settings/service/`), alphabetically between *Assistant tools* and *Daily notes*; the two switches left Settings → Tickets. The page is a client of the tickets plugin (`serviceStatus`, `serviceControl`, `serviceSettings`, `serviceSettingsSet`, `serviceOpenLogFolder` over `plugin:invoke`): the plugin owns adopting, starting and calling the service, so a core page needs no second path to it. **Controls that exist are wired, the rest are drawn and stored:** Restart / Stop of the service are `POST /shutdown` and, for Restart / Start, `ensureService` plus `EngineClient.rebind`; the Crew runner has `/components/runner/start|stop`; the gateway and Drey's MCP server follow `remote.enabled` and `mcp.enabled`; the engine has no buttons. `service.idleMinutes` is the idle span (read when the service starts); `service.trayIcon`, `service.logLevel` and `service.load.*` are stored for the tray, the log work and the governor (req-180). Open: **Open Drey Service…** (the window), the tray, per-component log files, a live idle span, an atomic service restart.
 
