@@ -751,19 +751,30 @@ A vault can be a Git repository (its root or a folder inside one). The
 **git plugin** runs your installed `git` — no bundled reimplementation.
 The panel shows the repository of the focused document's vault:
 
-- **Branch button** â†’ switch, track a remote branch, create.
-- **Commit** box — `Ctrl+Enter`, or *Commit and push*
-  (`Ctrl+Shift+Enter`). Drey asks before committing with unsaved tabs,
-  and refuses checkout/pull while the vault has unsaved tabs.
-- **Merge conflicts / Staged changes / Changes** lists — row click
-  compares through the diff view; stage, unstage, discard, open from
-  each row.
-- **History** (collapsible) — commits not on the upstream carry a
-  "â†‘ not pushed" marker.
-- Header icons: Fetch · Pull · Push · More (merge a branch, stash,
-  stashes, amend — never of a pushed commit — file history) · Refresh.
+- **Header** — the number of changes, then (while you hover the header or
+  work in the panel) *Pull*, *Push* — their tooltips say how many commits
+  wait — and **More Git actions**: Fetch from the remote · Commit and push
+  (`Ctrl+Shift+Enter`) · Merge a branch… · Stash changes · Stashes… ·
+  Amend the last commit (never of a pushed commit) · Git history of this
+  file… · Refresh the status.
+- **Branch line** — the repository (only when there are several; a click
+  switches), the **branch button** → switch, track a remote branch,
+  create; at the right end `↑2 ↓1` (commits not pushed / to pull) or
+  *Not published* for a branch without upstream. While a command runs, a
+  line under it says what runs, with *Cancel* where it can stop.
+- **Commit field** — one line that grows with your message; the check
+  button or `Ctrl+Enter` commits the staged changes. Drey asks before
+  committing with unsaved tabs, and refuses checkout/pull while the vault
+  has unsaved tabs.
+- **Merge conflicts / Staged changes / Changes** — each group folds by its
+  head, whose bulk action (*Stage all changes*, *Unstage all*) shows on
+  hover. A file's name is in its status colour; a row click compares
+  through the diff view; open, discard, stage or unstage from the row.
+- **History** (folds like the groups) — commits not on the upstream carry
+  "↑ not pushed".
 - A merge shows a banner with an abort button; the conflict surface is
-  keep mine / keep theirs / mark resolved.
+  keep mine / keep theirs / mark resolved. Amend mode shows a banner with
+  *Stop amending*.
 - A **plugin-managed** repository (the tickets vault) is **read-only
   here**: a "Managed by Tickets" banner sits above the commit box and
   staging, discarding, committing (and amending), pulling and pushing
@@ -786,8 +797,8 @@ is no commit box, and stage/discard, fetch/pull/push, merge, stash and
 amend are all disabled or refused — clicking a row still compares, and
 history and file history still work. When a focused document lies
 inside one of several found repositories, the panel shows exactly that
-one; the selector at the top switches between them (its tooltip shows
-each repository's absolute path).
+one; the repository button on the branch line switches between them
+(its tooltip shows the repository's absolute path).
 
 **Register as vault** (the button in the hint row) turns a found
 repository into a vault of its own with one click — after that you can
@@ -798,7 +809,7 @@ belong to another registered vault are never listed twice.
 ![Git decorations in the Files panel](img/git-files-badges.png)
 
 Changed files carry status badges (`M` modified, `U` untracked) and
-tones in the Files panel. The `git.path` is configurable in Settings â†’
+tones in the Files panel. The `git.path` is configurable in Settings →
 *Git*.
 
 ![The diff dialog](img/dialog-diff.png)
@@ -1410,8 +1421,8 @@ Each column's dialog prompt is a prompt file like any other: a phase's
 default applies (`plan-interactive-default` — editable in Settings → Tickets,
 re-added by "Add Drey's prompts").
 
-With the **background service** switched on (Settings → *Tickets* →
-*Background service*, off by default), runs survive closing Drey — the runner
+With the **background service** switched on (Settings → *Background service*,
+off by default), runs survive closing Drey — the runner
 then lives in **Drey Service**, the background process that comes with Drey
 (it also holds the tickets board and the phone gateway) — and,
 for OpenCode workers, even a restart of the runner: the new runner takes the
@@ -1875,8 +1886,11 @@ automatically.
 
 ![The Open windows panel](img/panel-windows.png)
 
-Other panels: **Outline** shows the open note's heading tree (click to
-jump, fold levels) …
+Other panels: **Outline** shows the open note's heading tree — click a
+heading to jump to it; every heading with headings below it has its own
+fold chevron, and the header's *Collapse all levels* folds the whole tree
+(pressed again: *Expand all levels*). The heading the caret is in is
+marked grey (inside a folded section: its nearest visible parent) …
 
 ![The Outline panel](img/panel-outline.png)
 
@@ -1969,6 +1983,7 @@ the vault you have open, or shared by every device); click the tab again, or
 | --- | --- |
 | [Appearance](#settings-appearance) | theme, accent, UI scale, editor typeface and scale |
 | [Assistant tools](#settings-assistant-tools) | tool groups, write/approval rules, external MCP servers |
+| [Background service](#settings-background-service) | Drey Service: status, start with Windows, keep running after Drey quits, taskbar icon, components, load, logs |
 | [Daily notes](#settings-daily-notes) | daily folder and template behaviour |
 | [Entry format](#settings-entry-format) | the slash menu's Entry block |
 | [Keyboard shortcuts](#settings-keyboard-shortcuts) | the shortcut of every command, the quick-capture hotkey |
@@ -2000,6 +2015,33 @@ taskbar icon change with it (the desktop shortcut keeps the usual icon).
 ### Settings: Assistant tools {#settings-assistant-tools}
 
 See [Assistant tools and MCP](#11-assistant-tools-and-mcp).
+
+### Settings: Background service {#settings-background-service}
+
+In the category list between *Assistant tools* and *Daily notes*. The two
+switches *Background service* and *Start with Windows* used to sit in Settings →
+*Tickets*; they live here now, and Tickets no longer has a section for them.
+The page holds the controls of **Drey Service**, the background process that comes with Drey
+(chapter 13 says what it holds). Four groups:
+
+- **Service** — *Status* says when the service started, how many components it
+  has and how many runs are live, with **Restart** and **Stop** (a stopped service
+  shows **Start**). Stopping it ends the live runs first. *Background service*
+  switches the optional mode (off by default: everything ends with Drey; on: the
+  service keeps working after Drey quits). *Start with Windows* needs the service
+  on. *Keep running after Drey quits* is how many minutes the service stays up once
+  nothing holds it — no Drey, no live run, no running Autopilot, no paired device;
+  it applies the next time the service starts. *Taskbar icon* is stored, the icon
+  itself comes with the service window.
+- **Components** — the tickets engine (always on while the service runs), the
+  Crew runner, the MCP server and the remote gateway with their state. The runner
+  restarts, stops and starts from here; the gateway's buttons switch Settings →
+  Tickets → Devices' *Serve* setting; the MCP server's switch the *MCP server*
+  category's *Enable* setting (Drey serves it for now).
+- **Load** — heavy seats, reserve, low priority and quiet hours are stored for the
+  resource governor; they take effect once it exists.
+- **Logs** — the log level (stored; the service writes one log file for now) and
+  the log folder, which *Open folder* shows in the file manager.
 
 ### Settings: Daily notes {#settings-daily-notes}
 

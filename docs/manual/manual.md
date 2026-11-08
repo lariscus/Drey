@@ -2018,7 +2018,10 @@ See [Assistant tools and MCP](#11-assistant-tools-and-mcp).
 
 ### Settings: Background service {#settings-background-service}
 
-The controls of **Drey Service**, the background process that comes with Drey
+In the category list between *Assistant tools* and *Daily notes*. The two
+switches *Background service* and *Start with Windows* used to sit in Settings →
+*Tickets*; they live here now, and Tickets no longer has a section for them.
+The page holds the controls of **Drey Service**, the background process that comes with Drey
 (chapter 13 says what it holds). Four groups:
 
 - **Service** — *Status* says when the service started, how many components it
