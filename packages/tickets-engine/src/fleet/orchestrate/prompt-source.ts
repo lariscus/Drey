@@ -1,9 +1,8 @@
-import { promises as fsp } from 'node:fs';
-import * as path from 'node:path';
 import type { PipelinePhase, TicketCard } from '../../contracts/tickets';
 import { promptVersion, stripPromptVersion } from '../../core/default-prompts';
 import { PERSONAS_DIR } from '../../core/persona';
 import { columnPromptRef } from '../chain';
+import type { FileSystem } from '../ports/file-system';
 import type { ChainConfig } from '../protocol';
 import type { Note, TicketPersona } from './board-personas';
 
@@ -28,6 +27,7 @@ export class PromptSource {
 
   constructor(
     private readonly note: Note,
+    private readonly fs: FileSystem,
     private readonly log: (message: string) => void,
     private readonly shippedPrompt?: (ref: string) => Promise<string | null>,
   ) {}
@@ -44,7 +44,7 @@ export class PromptSource {
     if (entry !== null && entry.persona !== null && entry.resolution.persona !== null) {
       this.note(card.id, `dispatch: ${card.id}'s persona "${entry.persona.id}" has no prompt.md — the phase prompt stands`);
     }
-    const text = await fsp.readFile(path.join(config.ticketsVaultPath, 'tickets', '_meta', 'prompts', `${ref}.md`), 'utf8').catch(() => null);
+    const text = await this.fs.readTextOrNull(this.fs.join(config.ticketsVaultPath, 'tickets', '_meta', 'prompts', `${ref}.md`));
     if (text === null) {
       this.note(card.id, `dispatch skips ${card.id}: prompt "${ref}" is missing (tickets/_meta/prompts/${ref}.md)`);
       return null;

@@ -1,5 +1,5 @@
 import type { PermissionDecision, QuestionAnswers, SteerRung } from '../protocol';
-import type { RunnerProcess } from '../procs';
+import type { RunnerProcess } from '../ports/process-spawner';
 import type { NormalizedEvent, WorkerHandle } from './contract';
 import type { KimiRequests } from './kimi-requests';
 import { kimiEmit, kimiText, type KimiContext } from './kimi-state';

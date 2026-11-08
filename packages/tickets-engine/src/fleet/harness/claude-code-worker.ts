@@ -1,5 +1,5 @@
 import type { SteerRung } from '../protocol';
-import type { RunnerProcess } from '../procs';
+import type { RunnerProcess } from '../ports/process-spawner';
 import { assistantEvents, rateLimitEvent, toolResultEvents, turnEnd } from './claude-code-events';
 import type { NormalizedEvent, NowFn, ProviderStart, WorkerHandle } from './contract';
 import { stderrLines } from './line-buffer';

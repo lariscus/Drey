@@ -1,6 +1,5 @@
-import { promises as fsp } from 'node:fs';
-import * as path from 'node:path';
 import { mergeWorkerChapters } from '../../core/ticket-chapters';
+import type { FileSystem } from '../ports/file-system';
 import type { RunRequest } from '../protocol';
 import { ticketCopyPathFor } from '../worktree-home';
 import { messageOf, type LiveRun } from './live-run';
@@ -19,6 +18,7 @@ const TICKET_GIVEN_FILE = 'ticket-given.md';
 export class TicketCopy {
   constructor(
     private readonly claims: StoreClaims,
+    private readonly fs: FileSystem,
     private readonly log: (message: string) => void,
   ) {}
 
@@ -27,9 +27,9 @@ export class TicketCopy {
     try {
       const { text } = await this.claims.storeOf(request.dk!).show(request.ticketId);
       const copy = ticketCopyPathFor(request.ticketsVaultPath, request.ticketId);
-      await fsp.mkdir(path.dirname(copy), { recursive: true });
-      await fsp.writeFile(copy, text, 'utf8');
-      await fsp.writeFile(path.join(dir, TICKET_GIVEN_FILE), text, 'utf8');
+      await this.fs.mkdirp(this.fs.dirname(copy));
+      await this.fs.writeText(copy, text);
+      await this.fs.writeText(this.fs.join(dir, TICKET_GIVEN_FILE), text);
     } catch (error) {
       this.log(`${request.ticketId}: the worker's copy of the ticket could not be written - ${messageOf(error)}`);
     }
@@ -40,14 +40,14 @@ export class TicketCopy {
     if (run.request.dk === undefined || run.lease === undefined) {
       return;
     }
-    const givenPath = path.join(run.dir, TICKET_GIVEN_FILE);
-    const given = await fsp.readFile(givenPath, 'utf8').catch(() => null);
-    const worker = await fsp.readFile(ticketCopyPathFor(run.request.ticketsVaultPath, run.request.ticketId), 'utf8').catch(() => null);
+    const givenPath = this.fs.join(run.dir, TICKET_GIVEN_FILE);
+    const given = await this.fs.readTextOrNull(givenPath);
+    const worker = await this.fs.readTextOrNull(ticketCopyPathFor(run.request.ticketsVaultPath, run.request.ticketId));
     if (given === null || worker === null || given === worker) {
       return;
     }
     if (await run.lease.patchInClaim((current) => mergeWorkerChapters(given, worker, current))) {
-      await fsp.writeFile(givenPath, worker, 'utf8').catch(() => undefined);
+      await this.fs.writeText(givenPath, worker).catch(() => undefined);
     }
   }
 
@@ -67,7 +67,7 @@ export class TicketCopy {
   /** The copy goes with the run's end. */
   async drop(run: LiveRun): Promise<void> {
     if (run.request.dk !== undefined) {
-      await fsp.rm(ticketCopyPathFor(run.request.ticketsVaultPath, run.request.ticketId), { force: true }).catch(() => undefined);
+      await this.fs.remove(ticketCopyPathFor(run.request.ticketsVaultPath, run.request.ticketId));
     }
   }
 }

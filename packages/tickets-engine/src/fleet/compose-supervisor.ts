@@ -8,7 +8,11 @@
  */
 import { hostname } from 'node:os';
 import { TicketsGit } from '../core/tickets-git';
+import { NodeFileSystem } from './node-file-system';
+import { NodeProcessTable } from './node-process-table';
 import { clockOf, type Clock } from './ports/clock';
+import type { FileSystem } from './ports/file-system';
+import type { ProcessTable } from './ports/process-table';
 import type { ExecFn } from './procs';
 import type { ProviderAdapter } from './harness/contract';
 import type { RunInfo, RunRequest } from './protocol';
@@ -57,24 +61,25 @@ export interface RunnerShared {
   readonly streams: RunStreams;
   readonly stores: StoreClaims;
   readonly bookkeeper: RunBookkeeper;
+  readonly fs: FileSystem;
 }
 
-export function composeShared(storeFor: StoreForTarget, log: (message: string) => void, now?: () => Date): RunnerShared {
+export function composeShared(storeFor: StoreForTarget, log: (message: string) => void, now?: () => Date, fs: FileSystem = new NodeFileSystem()): RunnerShared {
   const clock = clockOf(now);
-  const streams = new RunStreams(clock);
+  const streams = new RunStreams(clock, fs);
   const stores = new StoreClaims(storeFor, clock, log);
-  const copy = new TicketCopy(stores, log);
+  const copy = new TicketCopy(stores, fs, log);
   const bookkeeper = new RunBookkeeper({
     streams,
     release: new ClaimRelease(stores, copy, clock, log),
     wait: new WaitClaim(stores, copy, log),
     copy,
-    memory: new PersonaMemory(clock, log),
+    memory: new PersonaMemory(clock, fs, log),
     clock,
     actor: `agent@${hostname().toLowerCase()}`,
     log,
   });
-  return { clock, streams, stores, bookkeeper };
+  return { clock, streams, stores, bookkeeper, fs };
 }
 
 export interface RunSupervisorDeps {
@@ -108,7 +113,7 @@ export interface RunSupervisorDeps {
 /** The parts that touch the worker, the ticket and the record, with the loops between them closed. */
 interface Runtime extends RunnerShared {
   readonly deps: RunSupervisorDeps;
-  readonly exec: ExecFn;
+  readonly table: ProcessTable;
   readonly machine: RunStateMachine;
   readonly background: BackgroundWork;
   readonly repo: RunRepository;
@@ -127,20 +132,20 @@ function runtimeOf(deps: RunSupervisorDeps): Runtime {
   const log = deps.log;
   const machine = new RunStateMachine();
   const background = new BackgroundWork();
-  const repo = new RunRepository(deps.root);
+  const repo = new RunRepository(deps.root, shared.fs);
   const settings = new HandoverSettings(deps.adapter.id);
-  const exec = deps.exec ?? probeExec(deps.root);
+  const table = new NodeProcessTable(deps.exec ?? probeExec(deps.root));
   const timers = deps.leaseTimers !== undefined ? { leaseTimers: deps.leaseTimers } : {};
   const claims = new RunClaims({ stores: shared.stores, log, clock, background, ...timers, onLost: (run, why): Promise<void> => stopper.claimLost(run, why) });
   const settler = new RunSettler({ machine, repo, bookkeeper, clock, log, ...(deps.onRunSettled !== undefined ? { onRunSettled: deps.onRunSettled } : {}) });
   const takeover = new RunTakeover(repo, bookkeeper);
   const events: EventFold = new EventFold({ repo, streams, bookkeeper, background, log, interrupt: (run) => takeover.interrupt(run.info.id), claimLost: (run, why): Promise<void> => stopper.claimLost(run, why) });
-  const processes: ProcessSupervisor = new ProcessSupervisor({ adapter: deps.adapter, repo, events, background, settings, exec, log, onExit: (run, code): Promise<void> => completion.onWorkerExit(run, code) });
+  const processes: ProcessSupervisor = new ProcessSupervisor({ adapter: deps.adapter, repo, events, background, settings, table, log, onExit: (run, code): Promise<void> => completion.onWorkerExit(run, code) });
   const stopper: RunStopper = new RunStopper(machine, repo, processes, { settler, bookkeeper, log });
   const gate = new GateRunner(bookkeeper, deps.execShell ?? execShell, deps.validateTrailers ?? validateTrailers);
   const opinion = deps.secondOpinion !== undefined ? { secondOpinion: deps.secondOpinion } : {};
   const completion: RunCompletion = new RunCompletion({ machine, repo, gate, bookkeeper, settler, processes, ...opinion });
-  return { ...shared, deps, exec, machine, background, repo, settings, claims, settler, processes, stopper, takeover, completion };
+  return { ...shared, deps, table, machine, background, repo, settings, claims, settler, processes, stopper, takeover, completion };
 }
 
 function prepareOf(rt: Runtime, git: TicketsGitSeam): PrepareWorktree {
@@ -166,10 +171,10 @@ function starterOf(rt: Runtime, handover: RunnerHandover, git: TicketsGitSeam): 
 /** One provider's supervisor, every part wired. */
 export function composeRunSupervisor(deps: RunSupervisorDeps): RunSupervisor {
   const rt = runtimeOf(deps);
-  const { clock, machine, repo, streams, claims, bookkeeper, settler, processes, exec, background, settings } = rt;
+  const { clock, machine, repo, streams, claims, bookkeeper, settler, processes, table, background, settings } = rt;
   const log = deps.log;
   const git = deps.ticketsGit ?? new TicketsGit(() => deps.git);
-  const handover = new RunnerHandover(repo, processes, exec, { clock, line: log });
+  const handover = new RunnerHandover(repo, processes, table, { clock, line: log });
   const starter = starterOf(rt, handover, git);
   const reopener = new RunReopener(repo, starter, settler, { processes, provider: deps.adapter.id });
   const answers = new OwnerAnswers(repo, bookkeeper, streams);
@@ -178,16 +183,16 @@ export function composeRunSupervisor(deps: RunSupervisorDeps): RunSupervisor {
     repo,
     background,
     settings,
-    adoption: new RunAdoption({ machine, repo, streams, processes, claims, bookkeeper, exec, clock, log }),
+    adoption: new RunAdoption({ machine, repo, streams, processes, claims, bookkeeper, table, clock, log }),
     handover,
     starter,
     stopper: rt.stopper,
     steer: new SteerService(repo, bookkeeper, { answers, reopener, hold: (run, why) => rt.takeover.hold(run, why) }, streams),
     takeover: rt.takeover,
     answers,
-    attachments: new AttachmentStore(repo, git, clock),
+    attachments: new AttachmentStore(repo, git, rt.fs, clock),
     reopener,
-    reaper: new RunReaper({ repo, settler, bookkeeper, settings, background, clock, exec, log, ...limits, replayExit: (run) => rt.completion.onWorkerExit(run, null) }),
+    reaper: new RunReaper({ repo, settler, bookkeeper, settings, background, clock, table, log, ...limits, replayExit: (run) => rt.completion.onWorkerExit(run, null) }),
     leftovers: new LeftoverClaims(deps.storeFor, log),
   });
 }

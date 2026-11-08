@@ -4,7 +4,7 @@
  * message in; resume is `--resume <sessionRef>`. Its node seam (spawn)
  * comes through the constructor; the specs run it against a fake process.
  */
-import type { SpawnFn } from '../procs';
+import type { SpawnFn } from '../ports/process-spawner';
 import { ClaudeCodeWorker } from './claude-code-worker';
 import type { NowFn, ProviderAdapter, ProviderStart, WorkerHandle } from './contract';
 

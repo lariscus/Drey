@@ -1,5 +1,5 @@
 import type { Clock } from '../ports/clock';
-import { processStartMs, type ExecFn } from '../procs';
+import type { ProcessTable } from '../ports/process-table';
 import { isTerminal } from '../run/run-state';
 import { currentPid, type LiveRun } from './live-run';
 import type { ProcessSupervisor } from './process-supervisor';
@@ -16,7 +16,7 @@ export class RunnerHandover {
   constructor(
     private readonly repo: RunRepository,
     private readonly processes: ProcessSupervisor,
-    private readonly exec: ExecFn,
+    private readonly table: ProcessTable,
     private readonly log: { readonly clock: Clock; readonly line: (message: string) => void },
   ) {}
 
@@ -65,7 +65,7 @@ export class RunnerHandover {
   private async handOverOne(run: LiveRun): Promise<void> {
     const attachable = this.processes.canAttach && (await this.repo.hasAttach(run));
     const pid = currentPid(run);
-    const pidStartedMs = pid === null ? null : await processStartMs(pid, this.exec).catch(() => null);
+    const pidStartedMs = pid === null ? null : await this.table.startMs(pid).catch(() => null);
     const mode = attachable ? 'reattach' : 'resume';
     run.handover = { mode, at: this.log.clock.now().toISOString(), pidStartedMs, turnIdle: run.info.turn === 'idle' };
     run.info = { ...run.info, pid };

@@ -1,4 +1,4 @@
-import type { RunnerProcess, SpawnFn } from '../procs';
+import type { RunnerProcess, SpawnFn } from '../ports/process-spawner';
 
 /**
  * A scripted worker process for the contract suite: what the adapter

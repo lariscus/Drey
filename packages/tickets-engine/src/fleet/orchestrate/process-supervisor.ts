@@ -1,4 +1,4 @@
-import { killTreeGuarded, listenerPid, processStartMs, type ExecFn } from '../procs';
+import type { ProcessTable } from '../ports/process-table';
 import type { ProviderAdapter, UsageTotals, WorkerHandle } from '../harness/contract';
 import type { BackgroundWork } from './background-work';
 import type { EventFold } from './event-fold';
@@ -40,7 +40,7 @@ export interface ProcessSupervisorDeps {
   readonly events: EventFold;
   readonly background: BackgroundWork;
   readonly settings: HandoverSettings;
-  readonly exec: ExecFn;
+  readonly table: ProcessTable;
   readonly log: (message: string) => void;
   /** The worker the run owns exited: the completion decides. */
   readonly onExit: (run: LiveRun, code: number | null) => Promise<void>;
@@ -113,7 +113,7 @@ export class ProcessSupervisor {
         seenBeforeMs: Date.parse(info.lastActivity) || 0,
         pid: server.pid,
         kill: async () => {
-          await killTreeGuarded(server.pid, this.deps.exec, server.pidStartedMs);
+          await this.deps.table.killGuarded(server.pid, server.pidStartedMs);
         },
       },
     );
@@ -129,8 +129,8 @@ export class ProcessSupervisor {
    */
   async recordAttach(run: LiveRun, info: ServerInfo): Promise<void> {
     try {
-      const serverPid = (await listenerPid(Number(new URL(info.address).port), this.deps.exec)) ?? info.pid;
-      const pidStartedMs = serverPid === null ? null : await processStartMs(serverPid, this.deps.exec);
+      const serverPid = (await this.deps.table.listener(Number(new URL(info.address).port))) ?? info.pid;
+      const pidStartedMs = serverPid === null ? null : await this.deps.table.startMs(serverPid);
       await this.deps.repo.writeAttach(run, { address: info.address, password: info.password, pid: serverPid, pidStartedMs });
     } catch (error) {
       this.deps.log(`run ${run.info.id}: could not record the attach info — ${messageOf(error)}`);
@@ -141,13 +141,13 @@ export class ProcessSupervisor {
   async killRecordedServer(dir: string): Promise<void> {
     const attach = await this.deps.repo.readAttach(dir);
     if (attach !== null && typeof attach.pid === 'number' && typeof attach.pidStartedMs === 'number') {
-      await killTreeGuarded(attach.pid, this.deps.exec, attach.pidStartedMs).catch(() => undefined);
+      await this.deps.table.killGuarded(attach.pid, attach.pidStartedMs).catch(() => undefined);
     }
   }
 
   /** The guarded kill of a recorded process (pid-reuse guard: its creation time). */
   async kill(pid: number, startedMs: number | null | undefined): Promise<void> {
-    await killTreeGuarded(pid, this.deps.exec, startedMs ?? undefined);
+    await this.deps.table.killGuarded(pid, startedMs ?? undefined);
   }
 
   private own(run: LiveRun, handle: WorkerHandle): void {

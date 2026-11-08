@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { SpawnFn } from '../procs';
+import type { SpawnFn } from '../ports/process-spawner';
 import { opencodeAdapter } from './opencode';
 import type { FetchFn } from './contract';
 import { assistant, scriptedFetch } from './opencode-server.fake';

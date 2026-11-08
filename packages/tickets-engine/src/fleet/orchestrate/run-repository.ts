@@ -1,5 +1,4 @@
-import { promises as fsp } from 'node:fs';
-import * as path from 'node:path';
+import type { FileSystem } from '../ports/file-system';
 import type { RunInfo } from '../protocol';
 import type { StoredRun, SupervisorRecord } from '../run/run-record';
 import { storedOf, type LiveRun } from './live-run';
@@ -26,7 +25,10 @@ export interface FoundRun {
 export class RunRepository {
   private readonly runs = new Map<string, LiveRun>();
 
-  constructor(private readonly root: string) {}
+  constructor(
+    private readonly root: string,
+    private readonly fs: FileSystem,
+  ) {}
 
   add(run: LiveRun): void {
     this.runs.set(run.info.id, run);
@@ -55,25 +57,25 @@ export class RunRepository {
   }
 
   dirFor(runId: string): string {
-    return path.join(this.root, 'runs', runId);
+    return this.fs.join(this.root, 'runs', runId);
   }
 
   /** The stream file's absolute path — Drey's watch view tails it. */
   streamPath(runId: string): string | null {
     const run = this.runs.get(runId);
-    return run === undefined ? null : path.join(run.dir, 'stream.jsonl');
+    return run === undefined ? null : this.fs.join(run.dir, 'stream.jsonl');
   }
 
   /** Every run folder with a readable record; a torn `run.json` is skipped. */
   async found(): Promise<readonly FoundRun[]> {
-    const runsDir = path.join(this.root, 'runs');
-    const entries = await fsp.readdir(runsDir).catch(() => [] as string[]);
+    const runsDir = this.fs.join(this.root, 'runs');
+    const entries = await this.fs.list(runsDir);
     const out: FoundRun[] = [];
     for (const id of entries) {
-      const raw = await fsp.readFile(path.join(runsDir, id, 'run.json'), 'utf8').catch(() => null);
+      const raw = await this.fs.readTextOrNull(this.fs.join(runsDir, id, 'run.json'));
       try {
         if (raw !== null) {
-          out.push({ dir: path.join(runsDir, id), stored: JSON.parse(raw) as StoredRun });
+          out.push({ dir: this.fs.join(runsDir, id), stored: JSON.parse(raw) as StoredRun });
         }
       } catch {
         // a torn run.json is noise; skip the run
@@ -88,23 +90,23 @@ export class RunRepository {
    */
   async persist(run: LiveRun): Promise<void> {
     const stored = storedOf(run);
-    const write = run.writeQueue.then(() => fsp.writeFile(path.join(run.dir, 'run.json'), JSON.stringify(stored, null, 2), 'utf8'));
+    const write = run.writeQueue.then(() => this.fs.writeText(this.fs.join(run.dir, 'run.json'), JSON.stringify(stored, null, 2)));
     run.writeQueue = write.catch(() => undefined); // the queue survives a failed write
     await write;
   }
 
   /** The run's folder. */
   async ensureDir(dir: string): Promise<void> {
-    await fsp.mkdir(dir, { recursive: true });
+    await this.fs.mkdirp(dir);
   }
 
   async writeAttach(run: LiveRun, record: AttachRecord): Promise<void> {
-    await fsp.writeFile(path.join(run.dir, 'attach.json'), JSON.stringify(record), { encoding: 'utf8', mode: 0o600 });
+    await this.fs.writeText(this.fs.join(run.dir, 'attach.json'), JSON.stringify(record), { mode: 0o600 });
   }
 
   /** The attach record of a run folder, or null when absent or unreadable. */
   async readAttach(dir: string): Promise<Partial<Record<keyof AttachRecord, unknown>> | null> {
-    const raw = await fsp.readFile(path.join(dir, 'attach.json'), 'utf8').catch(() => null);
+    const raw = await this.fs.readTextOrNull(this.fs.join(dir, 'attach.json'));
     if (raw === null) {
       return null;
     }
@@ -116,14 +118,11 @@ export class RunRepository {
   }
 
   async hasAttach(run: LiveRun): Promise<boolean> {
-    return fsp.stat(path.join(run.dir, 'attach.json')).then(
-      () => true,
-      () => false,
-    );
+    return this.fs.exists(this.fs.join(run.dir, 'attach.json'));
   }
 
   /** The attach credential has no use once the run is over. */
   async removeAttach(run: LiveRun): Promise<void> {
-    await fsp.rm(path.join(run.dir, 'attach.json'), { force: true }).catch(() => undefined);
+    await this.fs.remove(this.fs.join(run.dir, 'attach.json'));
   }
 }

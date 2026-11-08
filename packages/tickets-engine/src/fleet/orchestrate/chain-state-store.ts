@@ -1,7 +1,6 @@
-import { promises as fsp } from 'node:fs';
-import * as path from 'node:path';
 import { autopilotAtBoot, autopilotOfMaster, restoreAutopilot } from '../autopilot';
 import type { Clock } from '../ports/clock';
+import type { FileSystem } from '../ports/file-system';
 import type { ChainTrip, ColumnMode } from '../protocol';
 import type { ChainFile, ChainState, OwnerHold, TicketFailure } from './chain-state';
 
@@ -53,13 +52,14 @@ function restoreMaps(state: ChainState, parsed: ChainFile): void {
 export class ChainStateStore {
   constructor(
     private readonly root: string,
+    private readonly fs: FileSystem,
     private readonly clock: Clock,
     private readonly log: (message: string) => void,
   ) {}
 
   /** Restores the state; true when the file held a moving Autopilot that the boot rule switched Off (write it back). */
   async load(state: ChainState): Promise<boolean> {
-    const raw = await fsp.readFile(path.join(this.root, CHAIN_FILE), 'utf8').catch(() => null);
+    const raw = await this.fs.readTextOrNull(this.fs.join(this.root, CHAIN_FILE));
     if (raw === null) {
       return false;
     }
@@ -79,12 +79,9 @@ export class ChainStateStore {
 
   /** Temp file + rename: a torn chain.json would lose all control state. */
   async persist(state: ChainState, handoverAt?: string): Promise<void> {
-    const target = path.join(this.root, CHAIN_FILE);
-    const temp = `${target}.${process.pid}.tmp`;
-    await fsp
-      .writeFile(temp, `${JSON.stringify(state.file(handoverAt), null, 2)}\n`, 'utf8')
-      .then(() => fsp.rename(temp, target))
-      .catch((error) => this.log(`chain.json write failed: ${String(error)}`));
+    await this.fs
+      .writeAtomic(this.fs.join(this.root, CHAIN_FILE), `${JSON.stringify(state.file(handoverAt), null, 2)}\n`)
+      .catch((error: unknown) => this.log(`chain.json write failed: ${String(error)}`));
   }
 
   private restoreAutopilot(state: ChainState, parsed: ChainFile): boolean {

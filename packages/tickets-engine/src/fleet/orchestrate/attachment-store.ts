@@ -1,7 +1,6 @@
-import { promises as fsp } from 'node:fs';
-import * as path from 'node:path';
 import type { TicketsGit } from '../../core/tickets-git';
 import type { Clock } from '../ports/clock';
+import type { FileSystem } from '../ports/file-system';
 import { messageOf } from './live-run';
 import type { RunRepository } from './run-repository';
 
@@ -22,6 +21,7 @@ export class AttachmentStore {
   constructor(
     private readonly repo: RunRepository,
     private readonly git: Pick<TicketsGit, 'run'>,
+    private readonly fs: FileSystem,
     private readonly clock: Clock,
   ) {}
 
@@ -36,12 +36,12 @@ export class AttachmentStore {
     }
     const scout = run.request.form === 'scout';
     const worktree = scout ? run.dir : run.info.worktreePath;
-    const dir = path.join(worktree, ATTACHMENT_DIR);
+    const dir = this.fs.join(worktree, ATTACHMENT_DIR);
     const safe = name.replace(/[^\w.\- ]/g, '_').slice(-80) || 'file';
-    const target = path.join(dir, `${this.clock.now().getTime()}-${safe}`);
+    const target = this.fs.join(dir, `${this.clock.now().getTime()}-${safe}`);
     try {
-      await fsp.mkdir(dir, { recursive: true });
-      await fsp.writeFile(target, bytes);
+      await this.fs.mkdirp(dir);
+      await this.fs.writeBytes(target, bytes);
       if (!scout) {
         await this.exclude(worktree);
       }
@@ -54,12 +54,12 @@ export class AttachmentStore {
   /** The attachment folder in the checkout's exclude file, once. */
   private async exclude(worktree: string): Promise<void> {
     const excludeRel = (await this.git.run(worktree, ['rev-parse', '--git-path', 'info/exclude'])).trim();
-    const exclude = path.resolve(worktree, excludeRel);
-    const current = await fsp.readFile(exclude, 'utf8').catch(() => '');
+    const exclude = this.fs.resolve(worktree, excludeRel);
+    const current = (await this.fs.readTextOrNull(exclude)) ?? '';
     if (!current.split('\n').some((line) => line.trim() === `${ATTACHMENT_DIR}/`)) {
-      await fsp.mkdir(path.dirname(exclude), { recursive: true });
+      await this.fs.mkdirp(this.fs.dirname(exclude));
       const lead = current === '' || current.endsWith('\n') ? '' : '\n';
-      await fsp.writeFile(exclude, `${current}${lead}${ATTACHMENT_DIR}/\n`, 'utf8');
+      await this.fs.writeText(exclude, `${current}${lead}${ATTACHMENT_DIR}/\n`);
     }
   }
 }

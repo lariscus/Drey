@@ -1,5 +1,5 @@
 import type { Clock } from '../ports/clock';
-import { processAlive, type ExecFn } from '../procs';
+import type { ProcessTable } from '../ports/process-table';
 import { ZERO_USAGE, type WorkerHandle } from '../harness/contract';
 import { closeExecSpan } from '../run/exec-span';
 import type { RunHandover, StoredRun } from '../run/run-record';
@@ -24,7 +24,7 @@ export interface RunAdoptionDeps {
   readonly processes: ProcessSupervisor;
   readonly claims: RunClaims;
   readonly bookkeeper: RunBookkeeper;
-  readonly exec: ExecFn;
+  readonly table: ProcessTable;
   readonly clock: Clock;
   readonly log: (message: string) => void;
 }
@@ -93,7 +93,7 @@ export class RunAdoption {
     if (attach === null || typeof attach.address !== 'string' || typeof attach.password !== 'string' || pid === null) {
       return false;
     }
-    if (!(await processAlive(pid, this.deps.exec))) {
+    if (!(await this.deps.table.alive(pid))) {
       return false;
     }
     // req-67: unwatched while the runner was down — the open span closes at its last stamp.

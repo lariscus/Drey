@@ -1,4 +1,4 @@
-import type { RunnerProcess, SpawnFn } from '../procs';
+import type { RunnerProcess, SpawnFn } from '../ports/process-spawner';
 import { LineBuffer } from './line-buffer';
 import { OPENCODE_API, opencodeCapConfig } from './opencode-api';
 import { emitOf, type OpencodeContext } from './opencode-state';

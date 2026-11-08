@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { RunnerProcess } from '../procs';
+import type { RunnerProcess } from '../ports/process-spawner';
 import type { NormalizedEvent, ProviderStart } from './contract';
 import { kimiAdapter } from './kimi';
 import type { KimiUsageRecord } from './kimi-usage';

@@ -1,8 +1,7 @@
-import { promises as fsp } from 'node:fs';
-import * as path from 'node:path';
 import type { BoardSnapshot, TicketCard } from '../../contracts/tickets';
 import { manualStepAfter } from '../../core/manual-gate';
 import { HUMAN_PERSONA_ID, PERSONAS_DIR, isHumanPersona, loadPersonaSkills, parsePersonaFile, resolvePersona, type Persona, type PersonaResolution, type PersonaSkill } from '../../core/persona';
+import type { FileSystem } from '../ports/file-system';
 import type { ChainConfig } from '../protocol';
 
 /**
@@ -32,14 +31,17 @@ export type Note = (key: string, line: string) => void;
  * ring — the pass never fails on one bad persona.
  */
 export class BoardPersonas {
-  constructor(private readonly note: Note) {}
+  constructor(
+    private readonly note: Note,
+    private readonly fs: FileSystem,
+  ) {}
 
   async resolve(config: ChainConfig, snap: BoardSnapshot): Promise<Map<string, TicketPersona>> {
     const cache = new Map<string, Promise<string | null>>();
     const fileOf = (rel: string): Promise<string | null> => {
       let hit = cache.get(rel);
       if (hit === undefined) {
-        hit = fsp.readFile(path.join(config.ticketsVaultPath, rel), 'utf8').catch(() => null);
+        hit = this.fs.readTextOrNull(this.fs.join(config.ticketsVaultPath, rel));
         cache.set(rel, hit);
       }
       return hit;
@@ -56,7 +58,7 @@ export class BoardPersonas {
 
   /** The persona file of an id, or null when absent / unreadable. */
   async read(config: ChainConfig, id: string): Promise<Persona | null> {
-    const text = await fsp.readFile(path.join(config.ticketsVaultPath, PERSONAS_DIR, id, 'persona.md'), 'utf8').catch(() => null);
+    const text = await this.fs.readTextOrNull(this.fs.join(config.ticketsVaultPath, PERSONAS_DIR, id, 'persona.md'));
     return text === null ? null : parsed(id, text);
   }
 

@@ -4,7 +4,9 @@
  * runner's one `RunBookkeeper`; a spec without the shared part gets its own.
  */
 import type { PipelinePhase } from '../contracts/tickets';
+import { NodeFileSystem } from './node-file-system';
 import { Orchestrator } from './orchestrator';
+import type { FileSystem } from './ports/file-system';
 import { clockOf } from './ports/clock';
 import type { ChainStoreConfig, WorkerProviderId } from './protocol';
 import { execShell } from './shell-exec';
@@ -49,13 +51,16 @@ export interface OrchestratorDeps {
   readonly storeChainFor?: (store: ChainStoreConfig) => StoreChainBoard;
   /** E14-5b: gives up the claims no live run holds, once per runner life and store, before its first dispatch. */
   readonly releaseLeftovers?: (store: ChainStoreConfig, pipeline: readonly PipelinePhase[]) => Promise<void>;
+  /** The files of the chain's state and the meta vault's personas and prompts; Node's by default. */
+  readonly fs?: FileSystem;
 }
 
 export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
   const { log, bookkeeper } = deps;
   const clock = clockOf(deps.now);
   const state = new ChainState();
-  const store = new ChainStateStore(deps.root, clock, log);
+  const fs = deps.fs ?? new NodeFileSystem();
+  const store = new ChainStateStore(deps.root, fs, clock, log);
   const persist = (): Promise<void> => store.persist(state);
   const pipelineRead = (): Promise<void> => orchestrator.pipelineRead();
   const board = new ChainBoard({
@@ -67,10 +72,10 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
   const pools = new PoolCapacity(deps.probeSlots ?? fetchTotalSlots, clock, log);
   const notes = new WaitNotes(log);
   const note = (key: string, line: string): void => notes.skip(key, line);
-  const personas = new BoardPersonas(note);
+  const personas = new BoardPersonas(note, fs);
   const events = deps.events !== undefined ? { events: deps.events } : {};
   const breaker = new Breaker(state, board, bookkeeper, { clock, log, persist });
-  const dispatch = new TicketDispatch({ board, directory, personas, prompts: new PromptSource(note, log, deps.shippedPrompt), notes, log, ...events });
+  const dispatch = new TicketDispatch({ board, directory, personas, prompts: new PromptSource(note, fs, log, deps.shippedPrompt), notes, log, ...events });
   const humanGates = new HumanGates(board, personas, bookkeeper, log);
   const orchestrator: Orchestrator = new Orchestrator({
     state,

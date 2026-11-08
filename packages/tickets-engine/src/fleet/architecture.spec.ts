@@ -83,8 +83,11 @@ function graph(): readonly ImportEdge[] {
 
 const inFolder = (file: string, folder: string): boolean => file.startsWith(`${folder}/`);
 
-/** The parts that reach the machine only through `fleet/ports` (step 4 adds `orchestrate` and `harness/contract`). */
-const NODE_FREE: readonly string[] = ['run', 'ports'];
+/** The parts that reach the machine only through `fleet/ports` (req-176 step 4). */
+const NODE_FREE: readonly string[] = ['run', 'ports', 'orchestrate'];
+
+/** Single files of other parts that stay Node-free: the adapter contract. */
+const NODE_FREE_FILES: readonly string[] = ['harness/contract.ts'];
 
 /** A module that wires a concrete adapter: only the composition root may import it at runtime. */
 const CONCRETE = [/^harness\/claude-code$/, /^harness\/opencode$/, /^harness\/kimi(-.*)?$/, /^store\/dk-ticket-store$/];
@@ -97,7 +100,7 @@ function violations(edges: readonly ImportEdge[]): readonly string[] {
       continue;
     }
     const where = `${edge.from} imports ${edge.specifier}`;
-    const folder = NODE_FREE.find((f) => inFolder(edge.from, f));
+    const folder = NODE_FREE.find((f) => inFolder(edge.from, f)) ?? NODE_FREE_FILES.find((f) => edge.from === f);
     if (folder !== undefined && isNodeModule(edge.specifier)) {
       found.push(`${where}: fleet/${folder} reaches the machine only through fleet/ports`);
     }
@@ -130,6 +133,9 @@ describe('the Crew runner import graph (ADR-0096)', () => {
   it('reports a Node module in the pure core', () => {
     expect(violations(importsOf('run/x.ts', "import { promises } from 'node:fs';"))).toHaveLength(1);
     expect(violations(importsOf('ports/clock.ts', "import * as os from 'os';"))).toHaveLength(1);
+    expect(violations(importsOf('orchestrate/run-repository.ts', "import { promises } from 'node:fs';"))).toHaveLength(1);
+    expect(violations(importsOf('harness/contract.ts', "import { spawn } from 'node:child_process';"))).toHaveLength(1);
+    expect(violations(importsOf('harness/opencode.ts', "import { spawn } from 'node:child_process';"))).toEqual([]);
   });
 
   it('reports a runtime import out of run/, but not a type from protocol', () => {

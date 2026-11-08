@@ -7,7 +7,7 @@
  * `session/cancel` (the interrupt and the steer's cancel), `session/load`
  * (resume) and `/compact`; tokens and cost come from the session's wire log.
  */
-import type { SpawnFn } from '../procs';
+import type { SpawnFn } from '../ports/process-spawner';
 import { AcpClient } from './acp-client';
 import type { NowFn, ProviderAdapter, ProviderStart, WorkerHandle } from './contract';
 import { KimiRequests } from './kimi-requests';

@@ -312,10 +312,24 @@ export default tseslint.config(
     },
   },
   {
+    // req-176 step 4: the orchestration reaches the machine only through fleet/ports.
+    files: [`${FLEET}/orchestrate/**/*.ts`],
+    ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`, `${FLEET}/**/*spec-support.ts`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS, NODE_BUILTINS] }],
+    },
+  },
+  {
     files: [`${FLEET}/harness/**/*.ts`],
     ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`],
     rules: {
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, HARNESS_NOT_ORCHESTRATE] }],
+    },
+  },
+  {
+    files: [`${FLEET}/harness/contract.ts`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, HARNESS_NOT_ORCHESTRATE, NODE_BUILTINS] }],
     },
   },
   ...(SIZE_BASELINE.length > 0

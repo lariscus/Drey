@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { SpawnFn } from '../procs';
+import type { SpawnFn } from '../ports/process-spawner';
 import { modelBody, opencodeCapConfig } from './opencode-api';
 import { opencodeAdapter } from './opencode';
 import { collect, fakeProcess } from './worker-process.fake';

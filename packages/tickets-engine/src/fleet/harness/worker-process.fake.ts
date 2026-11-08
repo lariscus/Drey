@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import type { RunnerProcess, SpawnFn } from '../procs';
+import type { RunnerProcess, SpawnFn } from '../ports/process-spawner';
 import type { NormalizedEvent, ProviderStart } from './contract';
 
 /**

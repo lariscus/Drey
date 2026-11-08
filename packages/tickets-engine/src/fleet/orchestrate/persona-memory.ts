@@ -1,7 +1,6 @@
-import { promises as fsp } from 'node:fs';
-import * as path from 'node:path';
 import { PERSONAS_DIR } from '../../core/persona';
 import type { Clock } from '../ports/clock';
+import type { FileSystem } from '../ports/file-system';
 import type { TerminalRunState } from '../run/run-state';
 import { messageOf, type LiveRun } from './live-run';
 
@@ -22,6 +21,7 @@ export const PERSONA_MEMORY_LINE_CAP = 200;
 export class PersonaMemory {
   constructor(
     private readonly clock: Clock,
+    private readonly fs: FileSystem,
     private readonly log: (message: string) => void,
   ) {}
 
@@ -33,10 +33,10 @@ export class PersonaMemory {
     const outcome = state === 'done' ? 'handed-over' : state;
     const entry = `- ${this.clock.now().toISOString().slice(0, 10)} · ${run.info.ticketId} · ${outcome} · ${run.info.tokensIn + run.info.tokensOut} tokens`;
     try {
-      const abs = path.join(run.request.ticketsVaultPath, PERSONAS_DIR, persona, 'memory.md');
-      const existing = await fsp.readFile(abs, 'utf8').catch(() => null);
-      await fsp.mkdir(path.dirname(abs), { recursive: true });
-      await fsp.writeFile(abs, withEntry(existing, entry), 'utf8');
+      const abs = this.fs.join(run.request.ticketsVaultPath, PERSONAS_DIR, persona, 'memory.md');
+      const existing = await this.fs.readTextOrNull(abs);
+      await this.fs.mkdirp(this.fs.dirname(abs));
+      await this.fs.writeText(abs, withEntry(existing, entry));
     } catch (error) {
       this.log(`run ${run.info.id}: persona memory append failed — ${messageOf(error)}`);
     }

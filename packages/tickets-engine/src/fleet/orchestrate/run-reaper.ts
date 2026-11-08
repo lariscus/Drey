@@ -1,6 +1,6 @@
 import { COMPACT_CAPABILITY } from '../handover';
 import type { Clock } from '../ports/clock';
-import { processAlive, recordedWorkerPids, workerGone, type ExecFn } from '../procs';
+import type { ProcessTable } from '../ports/process-table';
 import { DEFAULT_RUN_LIMITS, limitExceeded, type RunLimits } from '../run/run-limits';
 import { isTerminal } from '../run/run-state';
 import type { BackgroundWork } from './background-work';
@@ -24,7 +24,7 @@ export interface RunReaperDeps {
   readonly settings: HandoverSettings;
   readonly background: BackgroundWork;
   readonly clock: Clock;
-  readonly exec: ExecFn;
+  readonly table: ProcessTable;
   readonly log: (message: string) => void;
   /** Per-run ceilings (0 = unlimited) over the defaults; the request's own beat them. */
   readonly limits?: Partial<RunLimits>;
@@ -140,7 +140,7 @@ export class RunReaper {
       }
       return;
     }
-    if (await processAlive(pid, this.deps.exec)) {
+    if (await this.deps.table.alive(pid)) {
       return;
     }
     if (run.agentDone) {
@@ -153,8 +153,8 @@ export class RunReaper {
 
   /** D-34: a detached worker provably gone ends the run — the claim (if any) goes, the ticket is free. */
   private async settleIfWorkerGone(run: LiveRun): Promise<void> {
-    const pids = await recordedWorkerPids(run.dir, run.info.pid);
-    if (!(await workerGone(pids, Date.parse(run.info.lastActivity), this.deps.exec))) {
+    const pids = await this.deps.table.recordedPids(run.dir, run.info.pid);
+    if (!(await this.deps.table.gone(pids, Date.parse(run.info.lastActivity)))) {
       return;
     }
     run.stopNote = `the worker of run ${run.info.id} is gone - the run is over`;

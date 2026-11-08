@@ -1,4 +1,4 @@
-import type { RunnerProcess } from '../procs';
+import type { RunnerProcess } from '../ports/process-spawner';
 import { LineBuffer, stderrLines } from './line-buffer';
 
 /** One JSON-RPC 2.0 message as an ACP agent sends it. */
