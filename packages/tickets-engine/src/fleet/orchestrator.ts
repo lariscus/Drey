@@ -60,6 +60,7 @@ import type {
   WorkerProviderId,
 } from './protocol';
 import { DEFAULT_FLEET_CAPS, isWorkerProvider, normalizeFleetPools, WORKER_PROVIDERS } from './protocol';
+import { BLOCKING_RUN_STATES, LIVE_RUN_STATES } from './run/run-state';
 
 const CHAIN_FILE = 'chain.json';
 
@@ -193,9 +194,6 @@ export function failureBackoffMs(count: number): number {
 
 /** How fresh a retiring runner's handover stamp must be for its successor to keep the master. */
 export const HANDOVER_MASTER_MS = 5 * 60_000;
-
-const LIVE: readonly string[] = ['starting', 'running', 'stopping'];
-const BLOCKING: readonly string[] = ['starting', 'running', 'stopping', 'detached'];
 
 /** Consecutive red gates a column tolerates without its own `max-red:`. */
 export const DEFAULT_MAX_RED = 3;
@@ -570,7 +568,7 @@ export class Orchestrator {
   async abortAll(): Promise<ChainStatus> {
     this.autopilot = AUTOPILOT_OFF;
     await this.persist();
-    await this.stopRuns((record) => LIVE.includes(record.info.state), 'chain emergency stop (Notaus)');
+    await this.stopRuns((record) => LIVE_RUN_STATES.includes(record.info.state), 'chain emergency stop (Notaus)');
     return this.status();
   }
 
@@ -579,7 +577,7 @@ export class Orchestrator {
     this.columns[phaseId] = 'held';
     await this.persist();
     await this.stopRuns(
-      (record) => LIVE.includes(record.info.state) && (record.request.column ?? null) === phaseId,
+      (record) => LIVE_RUN_STATES.includes(record.info.state) && (record.request.column ?? null) === phaseId,
       `column ${phaseId} stopped`,
     );
     return this.status();
@@ -1325,10 +1323,10 @@ export class Orchestrator {
         // A worker waiting on the owner (a question, an approval) takes no pool
         // slot: with a pool of one, one unanswered question used to block the
         // whole provider. Its ticket stays busy — only the slot is free.
-        if (LIVE.includes(record.info.state) && record.info.waiting == null) {
+        if (LIVE_RUN_STATES.includes(record.info.state) && record.info.waiting == null) {
           liveByPool[record.info.provider] += 1;
         }
-        if (BLOCKING.includes(record.info.state)) {
+        if (BLOCKING_RUN_STATES.includes(record.info.state)) {
           busyTickets.add(record.info.ticketId);
         }
       }

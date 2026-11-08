@@ -56,6 +56,11 @@ import { TicketStoreError, type TicketStore } from '../ports/ticket-store';
 import { DkProcess } from '../store/dk-process';
 import { toDricketId } from '../store/ids';
 import { DricketTicketStore } from '../store/dricket-ticket-store';
+import { DEFAULT_RUN_LIMITS, limitExceeded, type RunLimits } from './run/run-limits';
+import { INITIAL_RUN_STATE, isTerminal, type TerminalRunState } from './run/run-state';
+import { RunStateMachine } from './run/run-state-machine';
+
+export { DEFAULT_RUN_LIMITS, limitExceeded, type RunLimits };
 
 const execFileAsync = promisify(nodeExecFile);
 
@@ -242,35 +247,6 @@ async function defaultValidateTrailers(target: RunDkTarget, worktree: string, ra
   }
 }
 
-/** What one run may spend before the reaper stops it. */
-export interface RunLimits {
-  /** Model turns (the telemetry's count — an upper estimate). */
-  readonly maxTurns: number;
-  /** Working time in ms: busy spans only, a wait for the owner does not tick. */
-  readonly maxWorkMs: number;
-}
-
-/**
- * Observed on the live fleet: ordinary runs end within 20 turns / 20 minutes,
- * the heavy legitimate ones within ~170 turns / 76 minutes; the runaways
- * (400 turns, 128 min, 87 M tokens in) are what these stop.
- */
-export const DEFAULT_RUN_LIMITS: RunLimits = { maxTurns: 250, maxWorkMs: 90 * 60_000 };
-
-/** The reason a run passed its ceiling, or null while it stays inside. */
-export function limitExceeded(info: RunInfo, limits: RunLimits, nowMs: number): string | null {
-  const turns = info.turns ?? 0;
-  if (limits.maxTurns > 0 && turns > limits.maxTurns) {
-    return `${turns} turns, over the limit of ${limits.maxTurns}`;
-  }
-  const open = info.execSince !== undefined && info.execSince !== null ? nowMs - (Date.parse(info.execSince) || nowMs) : 0;
-  const worked = (info.execMs ?? 0) + Math.max(0, open);
-  if (limits.maxWorkMs > 0 && worked > limits.maxWorkMs) {
-    return `${Math.round(worked / 60_000)} min of work, over the limit of ${Math.round(limits.maxWorkMs / 60_000)} min`;
-  }
-  return null;
-}
-
 interface LiveRun {
   info: RunInfo;
   readonly request: RunRequest;
@@ -404,8 +380,6 @@ function closeExecSpan(info: RunInfo, at: string): RunInfo {
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const ATTACHMENT_DIR = '.drey-attachments';
 
-const TERMINAL: readonly RunState[] = ['done', 'stopped', 'failed'];
-
 /**
  * The persona memory file never grows past this many lines, the
  * `# Memory` header included — the same cap `persona-store` applies on
@@ -467,6 +441,8 @@ export class RunSupervisor {
   private readonly prepareWorktree: (request: RunRequest, worktreePath: string) => Promise<PreparedWorktree>;
   /** One dk-backed store per `bin|store|dataDir` (E14-5). */
   private readonly stores = new Map<string, TicketStore>();
+  /** The one place a run's state changes (ADR-0096). */
+  private readonly machine = new RunStateMachine();
 
   constructor(private readonly deps: RunSupervisorDeps) {
     this.git = deps.ticketsGit ?? new TicketsGit(() => deps.git);
@@ -511,7 +487,7 @@ export class RunSupervisor {
         // A worker that outlived the runner is taken back when its server
         // still answers (OpenCode); a run handed over by a retiring runner
         // is otherwise resumed in place (req-51); else it is detached below.
-        if (!TERMINAL.includes(stored.info.state) && stored.info.state !== 'stopping') {
+        if (!isTerminal(stored.info.state) && stored.info.state !== 'stopping') {
           if (await this.reattach(stored, dir)) {
             continue;
           }
@@ -521,7 +497,7 @@ export class RunSupervisor {
         }
         // A run that is already detached stays as it is: re-detaching it on
         // every boot rewrote its record and re-stamped its ticket each time.
-        if (TERMINAL.includes(stored.info.state) || stored.info.state === 'detached') {
+        if (isTerminal(stored.info.state) || stored.info.state === 'detached') {
           this.runs.set(stored.info.id, {
             info: stored.info,
             request: stored.request,
@@ -539,13 +515,15 @@ export class RunSupervisor {
           });
           continue;
         }
-        const detached: RunInfo = {
-          // req-67: freeze the clock at the last stamp the dead runner left.
-          ...closeExecSpan(stored.info, stored.info.lastActivity),
-          state: 'detached',
-          endedAt: this.stamp(),
-          gateFailure: 'the runner restarted while the worker lived on; watch or resume it manually',
-        };
+        const detached: RunInfo = this.machine.transition(
+          {
+            // req-67: freeze the clock at the last stamp the dead runner left.
+            ...closeExecSpan(stored.info, stored.info.lastActivity),
+            endedAt: this.stamp(),
+            gateFailure: 'the runner restarted while the worker lived on; watch or resume it manually',
+          },
+          { kind: 'orphaned' },
+        );
         const live: LiveRun = {
           info: detached,
           request: stored.request,
@@ -631,13 +609,10 @@ export class RunSupervisor {
     const wasDetached = stored.info.state === 'detached';
     // req-67: the worker was unwatched while the runner was down — the open
     // span closes at its last stamp; the next busy report opens a new one.
-    const info: RunInfo = {
-      ...closeExecSpan(stored.info, stored.info.lastActivity),
-      state: 'running',
-      pid,
-      endedAt: null,
-      gateFailure: null,
-    };
+    const info: RunInfo = this.machine.transition(
+      { ...closeExecSpan(stored.info, stored.info.lastActivity), pid, endedAt: null, gateFailure: null },
+      { kind: 'adopted' },
+    );
     const run: LiveRun = {
       info,
       request: stored.request,
@@ -745,7 +720,10 @@ export class RunSupervisor {
     const held = stored.info.held === true;
     // req-67: the unwatched gap does not tick — see reattach.
     const run: LiveRun = {
-      info: { ...closeExecSpan(stored.info, stored.info.lastActivity), state: 'running', pid: null, endedAt: null, gateFailure: null },
+      info: this.machine.transition(
+        { ...closeExecSpan(stored.info, stored.info.lastActivity), pid: null, endedAt: null, gateFailure: null },
+        { kind: 'adopted' },
+      ),
       request: stored.request,
       currentRelPath: stored.request.ticketRelPath,
       currentPhase: stored.request.phase,
@@ -828,7 +806,7 @@ export class RunSupervisor {
    */
   handoverBlocker(): string | null {
     for (const run of this.runs.values()) {
-      if (TERMINAL.includes(run.info.state) || run.info.state === 'detached') {
+      if (isTerminal(run.info.state) || run.info.state === 'detached') {
         continue;
       }
       if (run.gating) {
@@ -905,7 +883,7 @@ export class RunSupervisor {
       return { ok: false, error: 'the runner is handing over to a newer build — try again in a moment' };
     }
     const live = this.list().find(
-      (r) => r.ticketId === request.ticketId && !TERMINAL.includes(r.state) && r.state !== 'detached',
+      (r) => r.ticketId === request.ticketId && !isTerminal(r.state) && r.state !== 'detached',
     );
     if (live !== undefined) {
       return { ok: false, error: `${request.ticketId} already has a live run (${live.id}) — stop it first` };
@@ -1003,7 +981,7 @@ export class RunSupervisor {
       persona: options.persona ?? null,
       ...(request.origin !== undefined ? { origin: request.origin } : {}),
       provider: request.provider,
-      state: 'starting',
+      state: INITIAL_RUN_STATE,
       pid: null,
       startedAt: this.stamp(),
       endedAt: null,
@@ -1100,7 +1078,7 @@ export class RunSupervisor {
         ? { onResumeFailed: (reason: string) => this.track(this.freshFallback(run, reason)) }
         : {}),
     });
-    run.info = { ...run.info, state: 'running', pid: handle.pid };
+    run.info = this.machine.transition({ ...run.info, pid: handle.pid }, { kind: 'spawned' });
     // req-65: an interactive dialog is the owner's from turn one — held
     // at spawn (the worker stands, quiet, until the owner opens the
     // dialog), and at its end neither the gate nor a move runs: the owner
@@ -1256,7 +1234,7 @@ export class RunSupervisor {
       return false;
     }
     return [...this.runs.values()].some(
-      (r) => !TERMINAL.includes(r.info.state) && r.info.sessionRef === sessionRef,
+      (r) => !isTerminal(r.info.state) && r.info.sessionRef === sessionRef,
     );
   }
 
@@ -1268,21 +1246,18 @@ export class RunSupervisor {
    * here (the adapters report only before their first prompt).
    */
   private async freshFallback(run: LiveRun, reason: string): Promise<void> {
-    if (run.fallbackActive === true || TERMINAL.includes(run.info.state) || run.handle === null) {
+    // A run being stopped is never revived: the stop would be undone by the fresh worker.
+    if (run.fallbackActive === true || !this.machine.can(run.info.state, { kind: 'respawning' }) || run.handle === null) {
       return;
     }
     run.fallbackActive = true;
     this.deps.log(`run ${run.info.id}: the resume failed — ${reason}; starting fresh under the same run id`);
     await run.handle.stop().catch(() => undefined);
     run.handle = null;
-    run.info = {
-      ...run.info,
-      state: 'starting',
-      pid: null,
-      handoverMode: 'fresh',
-      resumedFrom: null,
-      sessionRef: null,
-    };
+    run.info = this.machine.transition(
+      { ...run.info, pid: null, handoverMode: 'fresh', resumedFrom: null, sessionRef: null },
+      { kind: 'respawning' },
+    );
     const handle = this.spawnWorker(run, { resumeRef: null });
     // A held run (an interactive dialog, a quiet start) stays held on its
     // replacement worker: its quiet stand must not end before the owner's
@@ -1291,7 +1266,7 @@ export class RunSupervisor {
       handle.setHold?.(true);
     }
     run.fallbackActive = false;
-    run.info = { ...run.info, state: 'running', pid: handle.pid };
+    run.info = this.machine.transition({ ...run.info, pid: handle.pid }, { kind: 'spawned' });
     await this.appendStream(run, {
       ts: this.stamp(),
       kind: 'note',
@@ -1305,7 +1280,7 @@ export class RunSupervisor {
     if (run === undefined) {
       return { ok: false, error: `unknown run "${runId}"` };
     }
-    if (TERMINAL.includes(run.info.state)) {
+    if (isTerminal(run.info.state)) {
       return { ok: false, error: `run ${runId} already ended (${run.info.state})` };
     }
     if (run.handover !== undefined) {
@@ -1315,7 +1290,7 @@ export class RunSupervisor {
     // A detached run has no attached worker: stopping it kills the recorded
     // process if it still lives and ends the record — the only way to free
     // the ticket it blocks.
-    run.info = { ...run.info, state: 'stopping' };
+    run.info = this.machine.transition(run.info, { kind: 'stop-requested' });
     // The worker dies FIRST and the Log line follows with the run's end: the
     // line used to be written before the kill (a ticket write plus a git
     // commit), and a runner shutdown that gave up waiting on it exited with
@@ -1340,7 +1315,7 @@ export class RunSupervisor {
     if (run === undefined) {
       return { ok: false, error: `unknown run "${runId}"` };
     }
-    if (TERMINAL.includes(run.info.state)) {
+    if (isTerminal(run.info.state)) {
       // Every run takes a prompt: an ended one reopens its session under a
       // new run the owner holds, the prompt as its first message.
       if (text.trim() === '') {
@@ -1450,7 +1425,7 @@ export class RunSupervisor {
     if (old === undefined) {
       return { ok: false, error: `unknown run "${runId}"` };
     }
-    if (TERMINAL.includes(old.info.state)) {
+    if (isTerminal(old.info.state)) {
       return this.reopen(old);
     }
     if (old.info.state !== 'detached') {
@@ -1652,7 +1627,7 @@ export class RunSupervisor {
 
   /** True while at least one run is starting/running — the idle shutdown waits on this. */
   hasLive(): boolean {
-    return this.list().some((r) => !TERMINAL.includes(r.state) && r.state !== 'detached');
+    return this.list().some((r) => !isTerminal(r.state) && r.state !== 'detached');
   }
 
   /**
@@ -1681,7 +1656,7 @@ export class RunSupervisor {
   private isWorktreeLive(worktreePath: string): boolean {
     const needle = normalizeForMatch(worktreePath);
     return this.list().some(
-      (r) => !TERMINAL.includes(r.state) && normalizeForMatch(r.worktreePath) === needle,
+      (r) => !isTerminal(r.state) && normalizeForMatch(r.worktreePath) === needle,
     );
   }
 
@@ -1913,7 +1888,7 @@ export class RunSupervisor {
         await this.settleIfWorkerGone(run);
         continue;
       }
-      if (TERMINAL.includes(state) || state === 'stopping' || run.gating || run.handover !== undefined) {
+      if (isTerminal(state) || state === 'stopping' || run.gating || run.handover !== undefined) {
         continue;
       }
       if (run.info.held !== true && run.request.interactive === undefined && !run.agentDone) {
@@ -2107,7 +2082,7 @@ export class RunSupervisor {
   }
 
   private async onWorkerExit(run: LiveRun, code: number | null): Promise<void> {
-    if (TERMINAL.includes(run.info.state)) {
+    if (isTerminal(run.info.state)) {
       return; // the lease reaper got here first
     }
     if (run.claimLost !== undefined) {
@@ -2244,7 +2219,7 @@ export class RunSupervisor {
         });
         run.handle = handle;
         run.gating = false;
-        run.info = { ...run.info, state: 'running', pid: handle.pid };
+        run.info = this.machine.transition({ ...run.info, pid: handle.pid }, { kind: 'spawned' });
         await this.logLine(run, 'second opinion — a fresh worker reviews the step before it moves');
         await this.persist(run);
         void handle.exited.then((code) => this.track(this.onWorkerExit(run, code)));
@@ -2413,12 +2388,12 @@ export class RunSupervisor {
    * `onRunSettled` twice. A second caller waits for the first settle
    * instead and returns when it is done.
    */
-  private finish(run: LiveRun, state: RunState): Promise<void> {
+  private finish(run: LiveRun, state: TerminalRunState): Promise<void> {
     run.settling ??= this.settle(run, state);
     return run.settling;
   }
 
-  private async settle(run: LiveRun, state: RunState): Promise<void> {
+  private async settle(run: LiveRun, state: TerminalRunState): Promise<void> {
     // A "looks stuck" write still in flight would race the settle's ticket write.
     await run.stuckLog;
     const stamp = this.stamp();
@@ -2426,27 +2401,27 @@ export class RunSupervisor {
     // never reported counts from the run's start, an open span from its stamp.
     const last = run.info;
     const open = isExecuting(last) && last.execSince === undefined ? { ...last, execSince: last.startedAt } : last;
-    run.info = {
-      ...closeExecSpan(open, stamp),
-      state,
-      endedAt: stamp,
-      pid: null,
-      // Costtracking (concept §4.3): the provider's own cost wins; one that
-      // reports none gets the price-table estimate HERE, at the settle —
-      // every downstream reader (the Log line, the run_settled ledger
-      // line, the reports, the Verlauf) then sees one effective number.
-      // An unknown model stays null: no cost is never a 0 fake.
-      ...(last.costUsd === null ? { costUsd: costOf(last.model ?? null, last.tokensIn, last.tokensOut) } : {}),
-    };
-    if (TERMINAL.includes(state)) {
-      run.handle = null;
-      // The attach credential has no use once the run is over.
-      await fsp.rm(path.join(run.dir, 'attach.json'), { force: true }).catch(() => undefined);
-    }
+    run.info = this.machine.transition(
+      {
+        ...closeExecSpan(open, stamp),
+        endedAt: stamp,
+        pid: null,
+        // Costtracking (concept §4.3): the provider's own cost wins; one that
+        // reports none gets the price-table estimate HERE, at the settle —
+        // every downstream reader (the Log line, the run_settled ledger
+        // line, the reports, the Verlauf) then sees one effective number.
+        // An unknown model stays null: no cost is never a 0 fake.
+        ...(last.costUsd === null ? { costUsd: costOf(last.model ?? null, last.tokensIn, last.tokensOut) } : {}),
+      },
+      { kind: 'settled', outcome: state },
+    );
+    run.handle = null;
+    // The attach credential has no use once the run is over.
+    await fsp.rm(path.join(run.dir, 'attach.json'), { force: true }).catch(() => undefined);
     this.deps.log(`run ${run.info.id} → ${state}`);
     await this.persist(run);
     await this.clearRunStamp(run, run.stopNote === undefined ? null : `${run.stopNote}${usageSummary(run.info)}`, this.verlaufLineFor(run, state));
-    if (run.request.dk !== undefined && TERMINAL.includes(state)) {
+    if (run.request.dk !== undefined) {
       await fsp.rm(ticketCopyPathFor(run.request.ticketsVaultPath, run.request.ticketId), { force: true }).catch(() => undefined);
     }
     // E3: the run's one-line lesson lands in its persona's memory — the
@@ -2722,12 +2697,12 @@ export class RunSupervisor {
 
   /** Exit 13 (or an epoch that moved): another actor owns the ticket - stop the worker, write nothing. */
   private async onClaimLost(run: LiveRun, why: string): Promise<void> {
-    if (run.claimLost !== undefined || TERMINAL.includes(run.info.state)) {
+    if (run.claimLost !== undefined || isTerminal(run.info.state)) {
       return;
     }
     run.claimLost = why;
     this.deps.log(`run ${run.info.id}: claim on ${run.request.ticketId} lost - ${why}`);
-    run.info = { ...run.info, state: 'stopping', gateFailure: `claim lost - ${why}` };
+    run.info = this.machine.transition({ ...run.info, gateFailure: `claim lost - ${why}` }, { kind: 'claim-lost' });
     run.stopNote = `claim lost - ${why}`;
     await this.appendStream(run, { ts: this.stamp(), kind: 'note', detail: 'runner', text: `claim lost - ${why} - the worker is stopped and the ticket is not written` });
     if (run.handle !== null) {
