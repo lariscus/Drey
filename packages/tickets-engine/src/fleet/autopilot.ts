@@ -45,14 +45,17 @@ export function parseAutopilotSet(
   if (resumeAt === undefined || resumeAt === null) {
     return { ok: true, value: { state } };
   }
-  if (state !== 'paused' || typeof resumeAt !== 'string' || !ZONED_INSTANT.test(resumeAt)) {
-    return refuse('bad_resume_at');
+  const at = state === 'paused' ? futureInstant(resumeAt, now) : null;
+  return at === null ? refuse('bad_resume_at') : { ok: true, value: { state, resumeAt: new Date(at).toISOString() } };
+}
+
+/** A resume time's epoch ms: a zoned ISO instant after `now`; null otherwise. */
+function futureInstant(value: unknown, now: Date): number | null {
+  if (typeof value !== 'string' || !ZONED_INSTANT.test(value)) {
+    return null;
   }
-  const at = Date.parse(resumeAt);
-  if (Number.isNaN(at) || at <= now.getTime()) {
-    return refuse('bad_resume_at');
-  }
-  return { ok: true, value: { state, resumeAt: new Date(at).toISOString() } };
+  const at = Date.parse(value);
+  return Number.isNaN(at) || at <= now.getTime() ? null : at;
 }
 
 /** The record as `chain.json` holds it; null when the file has none (an older runner wrote it). */

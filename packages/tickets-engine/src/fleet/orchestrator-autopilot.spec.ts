@@ -1,16 +1,15 @@
 import { promises as fsp } from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Orchestrator, type OrchestratorDeps, type SupervisorPort } from './orchestrator';
-import type { StartOutcome, StopOutcome, SupervisorRecord } from './runs';
-import { normalizeFleetPools, type RunInfo, type RunRequest } from './protocol';
-import { newTicketFileText } from '../core/ticket-files';
+import type { OrchestratorDeps } from './compose-orchestrator';
+import { ChainHarness, type Built } from './orchestrate/chain-harness.fake';
+import { normalizeFleetPools, type ChainConfig } from './protocol';
 
 /**
- * The Autopilot over the chain master (req-95) against a real tickets
- * vault and a fake supervisor: what each state dispatches, the boot rule
- * over `chain.json`, and the resume time firing on the scan tick.
+ * The Autopilot over the chain master (req-95) through the real composition
+ * over a fake dricket store and a fake supervisor: what each state
+ * dispatches, the boot rule over `chain.json`, and the resume time firing
+ * on the scan tick.
  */
 
 const PIPELINE = [
@@ -22,103 +21,34 @@ const PIPELINE = [
   '---',
   '',
 ].join('\n');
-const REPOS = ['---', 'repos:', '  drey:', '    url: https://example.test/drey.git', '    branch: main', '    path: W:/drey', '---', ''].join('\n');
 
 const NOON = new Date('2026-11-06T12:00:00Z');
 const AT_SIX = '2026-11-06T18:00:00.000Z';
 
-let vaultDir = '';
-let fleetRoot = '';
+let h: ChainHarness;
 
-function config(): Parameters<Orchestrator['configure']>[0] {
-  return {
-    ticketsVaultPath: vaultDir,
-    git: 'git',
-    defaultWorker: 'opencode',
-    permissionMode: 'accept-edits',
-    pools: normalizeFleetPools({ opencode: { size: 1 } }),
-  };
-}
-
-async function writeTicket(id: string): Promise<void> {
-  const file = path.join(vaultDir, 'tickets', 'plan', `${id}.md`);
-  await fsp.mkdir(path.dirname(file), { recursive: true });
-  await fsp.writeFile(
-    file,
-    newTicketFileText({ id, title: id, repo: 'drey', priority: 'normal', rank: 5000, firstPhase: 'plan', now: NOON, actor: 'owner@box', description: 'x' }),
-    'utf8',
-  );
-}
-
-function fakePort(): { port: SupervisorPort; records: SupervisorRecord[] } {
-  const records: SupervisorRecord[] = [];
-  const port: SupervisorPort = {
-    start: vi.fn(async (request: RunRequest): Promise<StartOutcome> => {
-      const info = {
-        id: `R-${records.length + 1}`,
-        ticketId: request.ticketId,
-        provider: request.provider,
-        state: 'running',
-        startedAt: NOON.toISOString(),
-        endedAt: null,
-        tokensIn: 0,
-        tokensOut: 0,
-        costUsd: null,
-        gateFailure: null,
-      } as unknown as RunInfo;
-      records.push({ info, request });
-      return { ok: true, run: info };
-    }),
-    stop: vi.fn(async (runId: string): Promise<StopOutcome> => {
-      const index = records.findIndex((r) => r.info.id === runId);
-      records[index] = { ...records[index]!, info: { ...records[index]!.info, state: 'stopped' } };
-      return { ok: true };
-    }),
-    records: () => [...records],
-    reap: vi.fn(async (): Promise<void> => undefined),
-  };
-  return { port, records };
+function config(): ChainConfig {
+  return h.config({ pools: normalizeFleetPools({ opencode: { size: 1 } }) });
 }
 
 /** An orchestrator whose clock the spec moves. */
-function build(over: Partial<OrchestratorDeps> = {}): {
-  orch: Orchestrator;
-  fleet: ReturnType<typeof fakePort>;
-  clock: { now: Date };
-  logs: string[];
-} {
-  const fleet = fakePort();
+function build(over: Partial<OrchestratorDeps> = {}): Built & { clock: { now: Date } } {
   const clock = { now: NOON };
-  const logs: string[] = [];
-  const orch = new Orchestrator({
-    root: fleetRoot,
-    log: (message) => logs.push(message),
-    supervisorOf: () => fleet.port,
-    scanIntervalMs: 60_000,
-    now: () => clock.now,
-    ...over,
-  });
-  return { orch, fleet, clock, logs };
+  return { ...h.build({ now: () => clock.now, ...over }), clock };
 }
 
-const chainFile = async (): Promise<{ master: string; autopilot?: unknown }> =>
-  JSON.parse(await fsp.readFile(path.join(fleetRoot, 'chain.json'), 'utf8')) as { master: string; autopilot?: unknown };
+const chainFile = (): Promise<Record<string, unknown>> => h.chainFile();
 
 describe('the Autopilot', () => {
   beforeEach(async () => {
-    vaultDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-autopilot-vault-'));
-    fleetRoot = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-autopilot-fleet-'));
-    await fsp.mkdir(path.join(vaultDir, 'tickets', '_meta', 'prompts'), { recursive: true });
-    await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'pipeline.md'), PIPELINE, 'utf8');
-    await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'repos.md'), REPOS, 'utf8');
-    await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'prompts', 'plan-default.md'), 'Plan it.', 'utf8');
-    await writeTicket('T-0001');
-    await writeTicket('T-0002');
+    h = new ChainHarness();
+    await h.setUp(PIPELINE);
+    h.io.seed('T-0001', 'plan');
+    h.io.seed('T-0002', 'plan');
   });
 
   afterEach(async () => {
-    await fsp.rm(vaultDir, { recursive: true, force: true });
-    await fsp.rm(fleetRoot, { recursive: true, force: true });
+    await h.tearDown();
   });
 
   describe('transitions', () => {
@@ -128,7 +58,6 @@ describe('the Autopilot', () => {
       expect(status.autopilot).toEqual({ state: 'off' });
       expect(status.master).toBe('halted');
       expect(fleet.records).toEqual([]);
-      orch.dispose();
     });
 
     it('On derives run and dispatches at once', async () => {
@@ -138,7 +67,6 @@ describe('the Autopilot', () => {
       expect(status.master).toBe('run');
       expect(status.autopilot).toEqual({ state: 'on' });
       expect(fleet.records).toHaveLength(1);
-      orch.dispose();
     });
 
     it('Paused lets the running step finish and starts nothing new', async () => {
@@ -148,14 +76,12 @@ describe('the Autopilot', () => {
       const status = await orch.setAutopilot({ state: 'paused', resumeAt: AT_SIX });
       expect(status.master).toBe('halted');
       expect(status.autopilot).toEqual({ state: 'paused', resumeAt: AT_SIX });
-      expect(fleet.port.stop).not.toHaveBeenCalled();
+      expect(fleet.stop).not.toHaveBeenCalled();
       expect(fleet.records[0]!.info.state).toBe('running');
 
-      fleet.records[0] = { ...fleet.records[0]!, info: { ...fleet.records[0]!.info, state: 'done' } };
-      await orch.onRunSettled(fleet.records[0]!.info);
+      await orch.onRunSettled(fleet.end(fleet.records[0]!, { state: 'done' }));
       await orch.configure(config());
       expect(fleet.records).toHaveLength(1);
-      orch.dispose();
     });
 
     it('Off halts the same way and leaves a running step alone', async () => {
@@ -164,8 +90,7 @@ describe('the Autopilot', () => {
       await orch.setAutopilot({ state: 'on' });
       const status = await orch.setAutopilot({ state: 'off' });
       expect(status.master).toBe('halted');
-      expect(fleet.port.stop).not.toHaveBeenCalled();
-      orch.dispose();
+      expect(fleet.stop).not.toHaveBeenCalled();
     });
 
     it('On after Paused cancels the resume time and dispatches', async () => {
@@ -179,7 +104,6 @@ describe('the Autopilot', () => {
       clock.now = new Date(AT_SIX);
       await orch.resumeIfDue();
       expect(orch.status().autopilot).toEqual({ state: 'off' });
-      orch.dispose();
     });
 
     it('the master API keeps working: run is On, halted is Off and ends a pending resume', async () => {
@@ -191,7 +115,6 @@ describe('the Autopilot', () => {
       clock.now = new Date(AT_SIX);
       await orch.resumeIfDue();
       expect(orch.status().master).toBe('halted');
-      orch.dispose();
     });
 
     it('stop-now aborts every live run and ends as Off, from any state', async () => {
@@ -200,13 +123,12 @@ describe('the Autopilot', () => {
       await orch.setAutopilot({ state: 'on' });
       await orch.setAutopilot({ state: 'paused', resumeAt: AT_SIX });
       const status = await orch.abortAll();
-      expect(fleet.port.stop).toHaveBeenCalledTimes(1);
+      expect(fleet.stop).toHaveBeenCalledTimes(1);
       expect(status.autopilot).toEqual({ state: 'off' });
       expect(await chainFile()).toMatchObject({ master: 'halted', autopilot: { state: 'off' } });
       clock.now = new Date(AT_SIX);
       await orch.resumeIfDue();
       expect(fleet.records).toHaveLength(1);
-      orch.dispose();
     });
 
     it('persists the record beside the derived master', async () => {
@@ -216,7 +138,6 @@ describe('the Autopilot', () => {
       expect(await chainFile()).toMatchObject({ master: 'halted', autopilot: { state: 'paused', resumeAt: AT_SIX } });
       await orch.setAutopilot({ state: 'on' });
       expect(await chainFile()).toMatchObject({ master: 'run', autopilot: { state: 'on' } });
-      orch.dispose();
     });
 
     it('On and Paused keep the runner from its idle shutdown, Off does not', async () => {
@@ -230,7 +151,6 @@ describe('the Autopilot', () => {
       expect(orch.active).toBe(false);
       await orch.setAutopilot({ state: 'off' });
       expect(orch.keepsRunnerAlive).toBe(false);
-      orch.dispose();
     });
   });
 
@@ -253,7 +173,6 @@ describe('the Autopilot', () => {
       expect(await chainFile()).toMatchObject({ master: 'run', autopilot: { state: 'on' } });
       expect(logs).toContain(`autopilot: paused until ${AT_SIX}`);
       expect(logs).toContain('autopilot: on');
-      orch.dispose();
     });
 
     it('a Paused without a time waits for the owner', async () => {
@@ -263,7 +182,6 @@ describe('the Autopilot', () => {
       clock.now = new Date('2030-01-01T00:00:00Z');
       await orch.resumeIfDue();
       expect(orch.status().autopilot).toEqual({ state: 'paused' });
-      orch.dispose();
     });
 
     it('fires on the scan tick by itself', async () => {
@@ -271,7 +189,7 @@ describe('the Autopilot', () => {
       await orch.setAutopilot({ state: 'paused', resumeAt: AT_SIX });
       await orch.configure(config());
       clock.now = new Date(AT_SIX);
-      await vi.waitFor(() => expect(fleet.records).toHaveLength(1));
+      await vi.waitFor(() => expect(fleet.records).toHaveLength(1), { timeout: 5_000 });
       expect(orch.status().autopilot).toEqual({ state: 'on' });
       await orch.setAutopilot({ state: 'off' });
       orch.dispose();
@@ -281,7 +199,7 @@ describe('the Autopilot', () => {
   describe('the boot rule', () => {
     async function persisted(autopilot: unknown, master: string, handoverAt?: string): Promise<void> {
       await fsp.writeFile(
-        path.join(fleetRoot, 'chain.json'),
+        path.join(h.fleetRoot, 'chain.json'),
         JSON.stringify({ version: 1, config: config(), master, autopilot, columns: {}, redStreak: {}, cooldownUntil: {}, tokensDay: {}, tokensUsed: {}, ciBackoff: {}, handoverAt }),
         'utf8',
       );
@@ -295,7 +213,6 @@ describe('the Autopilot', () => {
       expect(orch.status().master).toBe('halted');
       expect(fleet.records).toEqual([]);
       expect(await chainFile()).toMatchObject({ master: 'halted', autopilot: { state: 'off' } });
-      orch.dispose();
     });
 
     it('a Paused whose time has not passed comes back as Off, and the time never fires', async () => {
@@ -309,7 +226,6 @@ describe('the Autopilot', () => {
       await orch.resumeIfDue();
       expect(orch.status().autopilot).toEqual({ state: 'off' });
       expect(fleet.records).toEqual([]);
-      orch.dispose();
     });
 
     it('a Paused whose time passed while the runner was down comes back as Off too, never On', async () => {
@@ -317,7 +233,6 @@ describe('the Autopilot', () => {
       const { orch } = build();
       await orch.load();
       expect(orch.status().autopilot).toEqual({ state: 'off' });
-      orch.dispose();
     });
 
     it('an older file without the record reads through its master', async () => {
@@ -331,7 +246,6 @@ describe('the Autopilot', () => {
       const second = build();
       await second.orch.load();
       expect(second.orch.status().autopilot).toEqual({ state: 'on' });
-      second.orch.dispose();
     });
   });
 
@@ -356,7 +270,6 @@ describe('the Autopilot', () => {
       const third = build();
       await third.orch.load();
       expect(third.orch.status().autopilot).toEqual({ state: 'off' });
-      third.orch.dispose();
     });
   });
 });

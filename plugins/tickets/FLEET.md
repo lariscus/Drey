@@ -106,6 +106,7 @@ Invoke-RestMethod "http://127.0.0.1:$($d.port)/health" -Headers $h
 | `GET /status` | all runs (newest info per run) |
 | `GET /status/<runId>` | one run: `{run, streamPath}` |
 | `GET /stream/<runId>` | the run's stream.jsonl tail (last ~200 KB, ndjson) |
+| `GET /events` | the runner's events as server-sent events (req-176): `event: run` with a run's record each time it is persisted, `event: line` with `{runId, event}` for each line of a run's stream; a `: ping` comment every 15 s, `retry: 3000` at the start. A read: it never keeps the runner awake, and it ends when the runner goes to sleep — reconnect then. `curl.exe -N -H "Authorization: Bearer …" http://127.0.0.1:<port>/events` |
 | `GET /log?tail=N` | daemon log tail, plain text (default 300 lines, max 2000; daemon builds) |
 | `GET /chain` | chain state + config (daemon builds) |
 | `GET /report` | token telemetry grouped by ticket, phase and model, sorted by total desc: `{ok, groups: [{ticket, phase, model, runs, total, input, cacheRead, cacheCreation, output, beforeFirstWrite, beforeFirstWriteShare}]}` — a counter the provider never reports counts 0 into the sums; pre-T-0048 records fall back to their cumulative `tokensIn`+`tokensOut` (T-0048) |
@@ -196,9 +197,11 @@ replaces the ticket's own, new Log lines are appended, frontmatter and `## Verla
 the owner edited meanwhile stands unless the worker changed the same one. The copy goes when the run ends.
 A failed `put` is a log line and the next take-back tries again.
 
-The legacy tree of a board on a store is frozen: the engine tells the runner at its start
-(`--store-backed`), and a run record from before the cut-over, which has no `dk`, writes no stamp, Log, move or
-park there (D-42).
+The store is the runner's one ticket backend (req-176, ADR-0096): every ticket write — a run's and the chain's —
+goes through the one `RunBookkeeper` over the claim (release, comments, the in-claim `put`); a start whose
+request names no `dk` is refused, and the chain drives no board without a store (one line in the log says so).
+A run record from before the cut-over, which has no `dk`, is read and never writes a stamp, Log, move or park
+(D-42); the `--store-backed` flag is still accepted and changes nothing.
 
 ### Interactive dialog runs (req-65)
 
@@ -216,10 +219,9 @@ spawn — its dialogs keep today's first posted turn. At the run's end
 exits — the owner moves the ticket on the board themselves (the takeover
 tab's end moves are owner moves). The brief's completion discipline is
 replaced by a dialog discipline; the asking protocol (`QUESTION:`) is
-the interview loop. The ticket still carries the `run:` stamp while the
-run lives, and the start lays `interactive: true`, which keeps the
-dispatcher off the ticket between dialogs; a board move drops the
-field. Reopening such a run's session ("Resume session") works as for
+the interview loop. While the run lives its claim marks the ticket (on a store the
+claim is the stamp); a ticket marked `interactive: true` keeps the
+dispatcher off between dialogs, and a board move drops the field. Reopening such a run's session ("Resume session") works as for
 any run — the reopened session is held and belongs to the owner.
 
 ### Scout runs (E8, concept §5.6)
@@ -228,8 +230,8 @@ A ticket with `form: scout` dispatches a **scout run**, not a build:
 the `scout-default` prompt, and none of the build machinery — no
 worktree is prepared, no branch is cut, no gate runs and nothing
 moves. The run is a read-only exploration (repo, history, data)
-whose one write is its own ticket file's `## Report` section; the
-runner commits the ticket file, as on every run. The
+whose one write is its own ticket's `## Report` section, in the
+worker's copy; the runner `put`s it back inside the claim, as on every run. The
 acceptance-criteria hold (the most common dispatch skip) is a
 ship-form requirement — a scout run has no gate to feed, and a
 scout ticket carries no plan.
@@ -251,11 +253,10 @@ its own.
 derives paths), `branch`, `phase`/`column`, `instruction`, `acceptance`
 (the gate commands), `model`, `permissionMode`; the info is the same
 object `/status` reports.
-Since T-0041 the request also carries `nextPhaseDir` (the resolved
-numbered directory the success move targets — `50-build`, the owner's
-`35-qa`, whatever exists) and `pushRemote` (pipeline.md `push:`; the
-runner pushes each transition commit `git push <remote> HEAD` when it is
-set — a failed push is a log line here, never a failed move). Ticket
+Since T-0041 the request also carries `nextPhaseDir` and `pushRemote`
+(pipeline.md `push:`); since req-176 the runner moves a ticket by its
+release into the next stage, so neither a phase folder nor a push of its
+own applies — the fields stay for older records. Ticket
 paths may be numbered (`tickets/30-plan/…`) or unprefixed — the stripped
 id is the identity everywhere. `stream.jsonl` lines are
 `{ts, kind, text, ...}` with kinds `note`
@@ -550,8 +551,8 @@ by themselves** (On), only finish what runs (Paused), or wait for the owner
   linked or left out and why. Before removing a worktree by hand, remove
   its junctions (`cmd /c rmdir <worktree>\node_modules` removes the link,
   not the target) — never a recursive delete through them. The runner's
-  own recreate does that itself. The runner commits
-  ticket bookkeeping ("fleet run bookkeeping") in the tickets repo itself.
+  own recreate does that itself. The runner writes no
+  ticket file: its bookkeeping is the claim's release, comments and the in-claim `put` (req-176).
 - **`worktree add` says the branch is "already checked out"** (a settled
   ticket's leftover checkout somewhere — the re-run trap) → the runner
   heals this itself when the conflicting tree is clean and not live; if
@@ -561,9 +562,9 @@ by themselves** (On), only finish what runs (Paused), or wait for the owner
   `npm_*`, `INIT_CWD` and `ELECTRON_RUN_AS_NODE` variables it inherits
   at boot (req-56; `runner.log` names them); a runner started before that
   build still hands them on.
-- **A transition did not reach the remote** → check pipeline.md's `push:`
-  key first (absent = pushing is the owner's business), then
-  `GET /log?tail=50` for `push of the transition to "<remote>" failed`.
+- **A transition did not reach the remote** → a run's move is a `dk`
+  release (req-176): the store's own sync carries it; pipeline.md's `push:`
+  applies to the board's file-backend moves only.
   Archived tickets (`tickets/archive/`, T-0041) never dispatch and never
   count toward the board — the owner archives and deletes them by hand.
 
@@ -571,8 +572,10 @@ by themselves** (On), only finish what runs (Paused), or wait for the owner
 
 - Code: `packages/tickets-engine/src/service/runner-component.ts` (the runner
   as a service component, req-164), `packages/tickets-engine/src/fleet/`
-  (`runner.ts`, `runner-lifecycle.ts` — when the runner may sleep, req-110; `runs.ts`, `chain.ts`,
-  `orchestrator.ts`, `providers.ts`, `protocol.ts`), client side
+  (`runner.ts` — the composition root, `runner-lifecycle.ts` — when the runner may sleep, req-110;
+  `run/` — the run state machine; `orchestrate/` — the supervisor's and the chain's parts, the one
+  ticket writer `RunBookkeeper`; `api/` — the HTTP routes; `store/` — the ticket store port;
+  `harness/` — the adapter contract and the Claude Code, OpenCode and Kimi adapters; `orchestrator.ts`, `chain.ts`, `protocol.ts`; ADR-0096), client side
   `packages/tickets-engine/src/services/fleet-client.ts`; the Drey-gone
   signal `packages/tickets-engine/src/server/drey-presence.ts`
 - Specs: `specs/ticket-schema.md` (tickets, gates, agent lane rules),
@@ -592,4 +595,4 @@ prompt changes in substance.
 
 ## Kimi Code (E10-8)
 
-`kimi` is the third adapter (`packages/tickets-engine/src/fleet/kimi.ts`): `kimi acp` over stdio, approvals and questions held for the owner, `/compact` native, resume by `session/load`. Tokens come from Kimi's wire log, cost from the price table. See `docs/design/kimi-worker.md`.
+`kimi` is the third adapter (`packages/tickets-engine/src/fleet/harness/kimi.ts`): `kimi acp` over stdio, approvals and questions held for the owner, `/compact` native, resume by `session/load`. Tokens come from Kimi's wire log, cost from the price table. See `docs/design/kimi-worker.md`.

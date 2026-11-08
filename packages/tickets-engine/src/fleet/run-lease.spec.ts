@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { TicketStoreError } from '../ports/ticket-store';
 import { dricketTrailers, RunLease, runOwnerId, trailerInstruction } from './run-lease';
-import { FakeStore, FakeTimers } from './run-lease.fake';
+import { FakeTicketStore as FakeStore } from './store/ticket-store.fake';
+import { FakeTimers } from './run-lease-timers.fake';
 
 const NOW = new Date('2026-10-17T12:00:00Z');
 

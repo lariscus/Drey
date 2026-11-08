@@ -56,6 +56,52 @@ const NO_APPS = layer(
   '`apps/` is the served client surface -- nothing imports it; it consumes the engine API, never the other way round.',
 );
 
+/**
+ * The Crew runner's sub-packages (ADR-0096, req-176): `fleet/run` is the
+ * pure core (state machine, records, limits), `fleet/harness/*` are the
+ * coding-agent adapters, `fleet/orchestrate` drives runs over ports, and
+ * `fleet/runner.ts` is the composition root — the only module that wires a
+ * concrete adapter. The architecture spec (`fleet/architecture.spec.ts`)
+ * asserts the same graph in the test gate.
+ */
+const ENGINE_LAYERS = [NO_RENDERER, NO_MAIN, NO_PLUGINS, NO_APPS];
+const FLEET = 'packages/tickets-engine/src/fleet';
+const NODE_BUILTINS = {
+  group: ['node:*', 'fs', 'fs/*', 'path', 'os', 'child_process', 'http', 'https', 'net', 'util', 'crypto', 'stream'],
+  message: 'This part of the Crew runner reaches the machine through a port in fleet/ports (ADR-0096), never a Node module.',
+};
+const CONCRETE_ADAPTERS = {
+  group: ['**/harness/claude-code', '**/harness/opencode', '**/harness/kimi', '**/harness/kimi-*', '**/store/dk-ticket-store'],
+  message: 'Only fleet/runner.ts (the composition root) imports a concrete adapter (ADR-0096); depend on the port it satisfies instead.',
+};
+const RUN_CORE_ONLY = [
+  {
+    group: ['../**', '!../protocol'],
+    message: 'fleet/run is the pure core (ADR-0096): it imports nothing outside its folder but types from ../protocol.',
+  },
+  {
+    group: ['../protocol'],
+    allowTypeImports: true,
+    message: 'fleet/run takes only types from ../protocol (ADR-0096).',
+  },
+];
+/** Ports take types from the wire protocol and the adapter contract, nothing else. */
+const PORTS_ONLY = [
+  {
+    group: ['../**', '!../protocol', '!../harness/contract'],
+    message: 'fleet/ports holds interfaces only (ADR-0096): types from ../protocol and ../harness/contract, nothing else.',
+  },
+  {
+    group: ['../protocol', '../harness/contract'],
+    allowTypeImports: true,
+    message: 'fleet/ports takes only types (ADR-0096).',
+  },
+];
+const HARNESS_NOT_ORCHESTRATE = {
+  group: ['../orchestrate', '../orchestrate/**', '../api', '../api/**', '../store', '../store/**', '../runner', '../../**/orchestrate/**'],
+  message: 'An adapter never imports the orchestration (ADR-0096): it reports normalized events, the orchestrator decides.',
+};
+
 const PLUGIN_IDS = readdirSync(new URL('./plugins', import.meta.url), { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name);
@@ -258,6 +304,51 @@ export default tseslint.config(
       'max-params': 'off',
       complexity: 'off',
       'max-classes-per-file': 'off',
+    },
+  },
+  {
+    // The Crew runner's import boundaries (ADR-0096). One block per part,
+    // each with the engine's layer rules restated: a later block replaces
+    // the rule's options for its files, it does not add to them.
+    files: [`${FLEET}/**/*.ts`],
+    ignores: [`${FLEET}/runner.ts`, `${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`, `${FLEET}/harness/**`, `${FLEET}/store/**`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS] }],
+    },
+  },
+  {
+    files: [`${FLEET}/run/**/*.ts`],
+    ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, NODE_BUILTINS, ...RUN_CORE_ONLY] }],
+    },
+  },
+  {
+    files: [`${FLEET}/ports/**/*.ts`],
+    ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, NODE_BUILTINS, ...PORTS_ONLY] }],
+    },
+  },
+  {
+    // req-176 step 4: the orchestration reaches the machine only through fleet/ports.
+    files: [`${FLEET}/orchestrate/**/*.ts`],
+    ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`, `${FLEET}/**/*spec-support.ts`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS, NODE_BUILTINS] }],
+    },
+  },
+  {
+    files: [`${FLEET}/harness/**/*.ts`],
+    ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, HARNESS_NOT_ORCHESTRATE] }],
+    },
+  },
+  {
+    files: [`${FLEET}/harness/contract.ts`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, HARNESS_NOT_ORCHESTRATE, NODE_BUILTINS] }],
     },
   },
   ...(SIZE_BASELINE.length > 0

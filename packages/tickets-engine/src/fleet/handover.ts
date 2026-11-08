@@ -134,110 +134,163 @@ function mostSpecific(
  *   never auto-compact a transcript nobody measured.
  */
 export function resolveHandover(input: HandoverInput): HandoverDecision {
-  const fresh = (why: string): HandoverDecision => ({ mode: 'fresh', resumeRef: null, compactFirst: false, why });
-  const resume = (sessionRef: string, why: string): HandoverDecision => ({
-    mode: 'resume',
-    resumeRef: sessionRef,
-    compactFirst: false,
-    why,
-  });
+  const verdict = structuralVerdict(input);
+  if (verdict.kind === 'refused') {
+    return fresh(verdict.why);
+  }
+  // From here a resume is structurally legal; an explicit ask is honoured.
+  if (input.requested === 'resume') {
+    return resume(verdict.sessionRef, 'explicit resume of the last session');
+  }
+  if (input.requested === 'resume-compact') {
+    return explicitResumeCompact(input, verdict.sessionRef);
+  }
+  return autoHandover(input, verdict);
+}
 
+/** A candidate whose session may be resumed — every structural rule passed. */
+interface ResumableSession {
+  readonly kind: 'legal';
+  readonly candidate: HandoverCandidate;
+  readonly sessionRef: string;
+}
+
+/** The structural rules' outcome: a fresh start with its reason, or the resumable session. */
+type StructuralVerdict = { readonly kind: 'refused'; readonly why: string } | ResumableSession;
+
+function fresh(why: string): HandoverDecision {
+  return { mode: 'fresh', resumeRef: null, compactFirst: false, why };
+}
+
+function resume(sessionRef: string, why: string): HandoverDecision {
+  return { mode: 'resume', resumeRef: sessionRef, compactFirst: false, why };
+}
+
+function resumeCompact(sessionRef: string, why: string): HandoverDecision {
+  return { mode: 'resume-compact', resumeRef: sessionRef, compactFirst: true, why };
+}
+
+function refused(why: string): StructuralVerdict {
+  return { kind: 'refused', why };
+}
+
+/** The rules that hold on every path, explicit or auto: review, an explicit fresh, no candidate. */
+function structuralVerdict(input: HandoverInput): StructuralVerdict {
   if (input.phase === 'review') {
-    return fresh('the review phase always starts fresh — an independent worker judges the step');
+    return refused('the review phase always starts fresh — an independent worker judges the step');
   }
   if (input.requested === 'fresh') {
-    return fresh('explicit fresh start');
+    return refused('explicit fresh start');
   }
-  const candidate = input.candidate;
-  if (candidate === null) {
-    return fresh('no earlier run of this ticket to resume');
+  if (input.candidate === null) {
+    return refused('no earlier run of this ticket to resume');
   }
+  return candidateVerdict(input, input.candidate);
+}
+
+/** Whether the candidate's session fits this run: settled, reported, same worker and phase, not stale or held. */
+function candidateVerdict(input: HandoverInput, candidate: HandoverCandidate): StructuralVerdict {
   if (!HANDOVER_CANDIDATE_STATES.includes(candidate.state)) {
-    return fresh(`the last run is ${candidate.state} — only a settled run leaves a resumable session`);
+    return refused(`the last run is ${candidate.state} — only a settled run leaves a resumable session`);
   }
   if (candidate.sessionRef === null) {
-    return fresh('the last run reported no session');
+    return refused('the last run reported no session');
   }
   if (candidate.provider !== input.provider || candidate.model !== input.model) {
-    return fresh(
-      `the last session ran ${candidate.provider}${candidate.model !== null ? `/${candidate.model}` : ''}` +
-        ` — this run is ${input.provider}${input.model !== null ? `/${input.model}` : ''}`,
+    return refused(
+      `the last session ran ${workerLabel(candidate.provider, candidate.model)}` +
+        ` — this run is ${workerLabel(input.provider, input.model)}`,
     );
   }
   if (candidate.phase !== input.phase) {
-    return fresh(`the last session worked the ${candidate.phase} phase — this run starts ${input.phase} fresh`);
+    return refused(`the last session worked the ${candidate.phase} phase — this run starts ${input.phase} fresh`);
   }
   if (input.sessionInvalidated) {
-    return fresh('the worktree was recreated or moved aside — the session\'s file state is stale');
+    return refused('the worktree was recreated or moved aside — the session\'s file state is stale');
   }
   if (input.sessionInUse) {
-    return fresh('another run holds that session — resuming it twice is refused');
+    return refused('another run holds that session — resuming it twice is refused');
   }
+  return { kind: 'legal', candidate, sessionRef: candidate.sessionRef };
+}
 
-  // From here a resume is structurally legal; an explicit ask is honoured.
-  if (input.requested === 'resume') {
-    return resume(candidate.sessionRef, 'explicit resume of the last session');
-  }
-  if (input.requested === 'resume-compact') {
-    if (input.capability !== 'native') {
-      return fresh(`the ${input.provider} worker cannot compact natively`);
-    }
-    return {
-      mode: 'resume-compact',
-      resumeRef: candidate.sessionRef,
-      compactFirst: true,
-      why: 'explicit resume with a native compact first',
-    };
-  }
+/** `<provider>` or `<provider>/<model>`. */
+function workerLabel(provider: string, model: string | null): string {
+  return `${provider}${model !== null ? `/${model}` : ''}`;
+}
 
-  // The auto path — the measured rules.
-  const pauseMs =
-    candidate.endedAt !== null && Number.isFinite(Date.parse(candidate.endedAt))
-      ? input.nowMs - Date.parse(candidate.endedAt)
-      : Number.POSITIVE_INFINITY;
+function explicitResumeCompact(input: HandoverInput, sessionRef: string): HandoverDecision {
+  if (input.capability !== 'native') {
+    return fresh(`the ${input.provider} worker cannot compact natively`);
+  }
+  return resumeCompact(sessionRef, 'explicit resume with a native compact first');
+}
+
+/** The auto path — the measured rules, split by whether the pause is still warm. */
+function autoHandover(input: HandoverInput, session: ResumableSession): HandoverDecision {
+  const pauseMs = pauseSince(session.candidate.endedAt, input.nowMs);
   const warmMs = input.config.resumePauseTtlMin * 60_000;
-  const context = candidate.lastTurnContext;
-  const threshold = compactThreshold(input.config, input.provider, input.model);
-  const cap = contextCap(input.config, input.provider, input.model);
-  if (pauseMs < warmMs && cap > 0 && context !== null && context >= cap) {
-    // A warm pause used to resume at any size (a retry came back at 148 k
-    // against a 120 k cap and grew to 184 k): an over-cap transcript is
-    // compacted when the worker can, else the step starts fresh.
-    if (input.capability === 'native') {
-      return {
-        mode: 'resume-compact',
-        resumeRef: candidate.sessionRef,
-        compactFirst: true,
-        why: `warm pause, but the ${context}-token context is over the ${cap} cap — resumed and natively compacted first`,
-      };
-    }
-    return fresh(`warm pause, but the ${context}-token context is over the ${cap} cap and the worker cannot compact — fresh is cheaper`);
-  }
   if (pauseMs < warmMs) {
-    return resume(
-      candidate.sessionRef,
-      context !== null
-        ? `pause ${Math.max(0, Math.round(pauseMs / 60_000))} min is within the cache TTL — the transcript re-pays cached (ctx ${context})`
-        : `pause ${Math.max(0, Math.round(pauseMs / 60_000))} min is within the cache TTL — the transcript re-pays cached`,
+    return warmHandover(input, session, pauseMs);
+  }
+  return coldHandover(input, session);
+}
+
+/** Milliseconds since the candidate ended; an unknown or unparsable end counts as an endless (cold) pause. */
+function pauseSince(endedAt: string | null, nowMs: number): number {
+  return endedAt !== null && Number.isFinite(Date.parse(endedAt))
+    ? nowMs - Date.parse(endedAt)
+    : Number.POSITIVE_INFINITY;
+}
+
+function warmHandover(input: HandoverInput, session: ResumableSession, pauseMs: number): HandoverDecision {
+  const context = session.candidate.lastTurnContext;
+  const cap = contextCap(input.config, input.provider, input.model);
+  if (cap > 0 && context !== null && context >= cap) {
+    return overCapHandover(input, session.sessionRef, context, cap);
+  }
+  const minutes = Math.max(0, Math.round(pauseMs / 60_000));
+  return resume(
+    session.sessionRef,
+    context !== null
+      ? `pause ${minutes} min is within the cache TTL — the transcript re-pays cached (ctx ${context})`
+      : `pause ${minutes} min is within the cache TTL — the transcript re-pays cached`,
+  );
+}
+
+/**
+ * A warm pause used to resume at any size (a retry came back at 148 k
+ * against a 120 k cap and grew to 184 k): an over-cap transcript is
+ * compacted when the worker can, else the step starts fresh.
+ */
+function overCapHandover(input: HandoverInput, sessionRef: string, context: number, cap: number): HandoverDecision {
+  if (input.capability === 'native') {
+    return resumeCompact(
+      sessionRef,
+      `warm pause, but the ${context}-token context is over the ${cap} cap — resumed and natively compacted first`,
     );
   }
-  if (context !== null && context < threshold) {
+  return fresh(`warm pause, but the ${context}-token context is over the ${cap} cap and the worker cannot compact — fresh is cheaper`);
+}
+
+function coldHandover(input: HandoverInput, session: ResumableSession): HandoverDecision {
+  const context = session.candidate.lastTurnContext;
+  if (context === null) {
+    return fresh('cold pause and the last context is unknown — never auto-compact an unmeasured transcript');
+  }
+  const threshold = compactThreshold(input.config, input.provider, input.model);
+  if (context < threshold) {
     return resume(
-      candidate.sessionRef,
+      session.sessionRef,
       `cold pause, but the context (${context}) is below the compact threshold — resumed as it is`,
     );
   }
-  if (context !== null && context >= threshold && input.capability === 'native') {
-    return {
-      mode: 'resume-compact',
-      resumeRef: candidate.sessionRef,
-      compactFirst: true,
-      why: `cold pause with a ${context}-token context — resumed and natively compacted first`,
-    };
+  // Both comparisons stay explicit: a NaN threshold fails both and falls through to fresh.
+  if (context >= threshold && input.capability === 'native') {
+    return resumeCompact(
+      session.sessionRef,
+      `cold pause with a ${context}-token context — resumed and natively compacted first`,
+    );
   }
-  return fresh(
-    context === null
-      ? 'cold pause and the last context is unknown — never auto-compact an unmeasured transcript'
-      : `cold pause with a ${context}-token context and no native compact — fresh is cheaper`,
-  );
+  return fresh(`cold pause with a ${context}-token context and no native compact — fresh is cheaper`);
 }

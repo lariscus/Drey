@@ -115,72 +115,90 @@ export async function cleanWorktrees(git: GitSeam, input: CleanWorktreesInput): 
       protectedSet.add(form);
     }
   }
-  const removed: string[] = [];
-  const keptDirty: string[] = [];
-  const failed: { path: string; error: string }[] = [];
-  const prunedRepos: string[] = [];
-  const registered = new Set<string>();
-  const sweepBases = new Set<string>([legacyWorktreeBase(input.fleetRoot)]);
-  const links = new Set<string>();
+  const state: CleanupState = { protectedSet, removed: [], keptDirty: [], failed: [], prunedRepos: [], registered: new Set<string>(), sweepBases: new Set<string>([legacyWorktreeBase(input.fleetRoot)]), links: new Set<string>() };
   for (const repo of input.repos) {
-    if (repo.path === null) {
-      continue;
-    }
-    const bases =
-      input.legacyOnly === true ? [legacyWorktreeBase(input.fleetRoot)] : [
-        worktreeBaseFor(input.vaultPath, repo),
-        legacyWorktreeBase(input.fleetRoot),
-      ];
-    bases.forEach((base) => sweepBases.add(base));
-    (repo.link ?? []).forEach((link) => links.add(link));
-    const baseForms = (await Promise.all(bases.map(matchForms))).flat();
-    const repoForms = await matchForms(repo.path);
-    repoForms.forEach((form) => registered.add(form));
-    let listing: string;
-    try {
-      listing = await git.run(repo.path, ['worktree', 'list', '--porcelain']);
-    } catch (error) {
-      failed.push({ path: repo.path, error: `worktree list failed: ${messageOf(error)}` });
-      continue;
-    }
-    for (const entry of parseWorktreePorcelain(listing)) {
-      // Prunable entries (vanished trees) are the prune's job; the
-      // repo's own checkout is never a fleet worktree.
-      if (entry.prunable) {
-        continue;
-      }
-      const entryForms = await matchForms(entry.path);
-      const keep = (): void => entryForms.forEach((form) => registered.add(form));
-      const isRepoCheckout = entryForms.some((form) => repoForms.includes(form));
-      if (isRepoCheckout || !entryForms.some((form) => isUnderAnyBase(form, baseForms))) {
-        keep();
-        continue;
-      }
-      if (entryForms.some((form) => protectedSet.has(form))) {
-        keep();
-        continue;
-      }
-      const outcome = await removeWorktree(git, repo.path, entry.path, { links: repo.link });
-      if (outcome.ok) {
-        removed.push(entry.path);
-      } else if (outcome.dirty === true) {
-        keep();
-        keptDirty.push(entry.path);
-      } else {
-        keep();
-        failed.push({ path: entry.path, error: outcome.error });
-      }
-    }
-    try {
-      await git.run(repo.path, ['worktree', 'prune']);
-      prunedRepos.push(repo.path);
-    } catch (error) {
-      failed.push({ path: repo.path, error: `prune failed: ${messageOf(error)}` });
+    await cleanRepo(git, input, repo, state);
+  }
+  const leftovers = await sweepLeftovers([...state.sweepBases], state.registered, protectedSet, [...state.links]);
+  await fsp.rmdir(legacyWorktreeBase(input.fleetRoot)).catch(() => undefined);
+  return { removed: state.removed, keptDirty: state.keptDirty, failed: state.failed, prunedRepos: state.prunedRepos, leftovers };
+}
+
+/** What one cleanup collects across its repos. */
+interface CleanupState {
+  readonly protectedSet: ReadonlySet<string>;
+  readonly removed: string[];
+  readonly keptDirty: string[];
+  readonly failed: { path: string; error: string }[];
+  readonly prunedRepos: string[];
+  /** Every match form of a checkout that stays registered (the sweep leaves it alone). */
+  readonly registered: Set<string>;
+  readonly sweepBases: Set<string>;
+  readonly links: Set<string>;
+}
+
+/** One repo's registered worktrees, as the cleanup sees them. */
+interface RepoScope {
+  readonly repoPath: string;
+  readonly link: readonly string[] | undefined;
+  readonly baseForms: readonly string[];
+  readonly repoForms: readonly string[];
+}
+
+async function cleanRepo(git: GitSeam, input: CleanWorktreesInput, repo: RepoRef, state: CleanupState): Promise<void> {
+  if (repo.path === null) {
+    return;
+  }
+  const legacy = legacyWorktreeBase(input.fleetRoot);
+  const bases = input.legacyOnly === true ? [legacy] : [worktreeBaseFor(input.vaultPath, repo), legacy];
+  bases.forEach((base) => state.sweepBases.add(base));
+  (repo.link ?? []).forEach((link) => state.links.add(link));
+  const baseForms = (await Promise.all(bases.map(matchForms))).flat();
+  const repoForms = await matchForms(repo.path);
+  repoForms.forEach((form) => state.registered.add(form));
+  let listing: string;
+  try {
+    listing = await git.run(repo.path, ['worktree', 'list', '--porcelain']);
+  } catch (error) {
+    state.failed.push({ path: repo.path, error: `worktree list failed: ${messageOf(error)}` });
+    return;
+  }
+  const scope: RepoScope = { repoPath: repo.path, link: repo.link, baseForms, repoForms };
+  for (const entry of parseWorktreePorcelain(listing)) {
+    // Prunable entries (vanished trees) are the prune's job.
+    if (!entry.prunable) {
+      await cleanEntry(git, scope, entry.path, state);
     }
   }
-  const leftovers = await sweepLeftovers([...sweepBases], registered, protectedSet, [...links]);
-  await fsp.rmdir(legacyWorktreeBase(input.fleetRoot)).catch(() => undefined);
-  return { removed, keptDirty, failed, prunedRepos, leftovers };
+  try {
+    await git.run(repo.path, ['worktree', 'prune']);
+    state.prunedRepos.push(repo.path);
+  } catch (error) {
+    state.failed.push({ path: repo.path, error: `prune failed: ${messageOf(error)}` });
+  }
+}
+
+/** One registered worktree: kept (the repo's own checkout, outside the bases, protected, dirty, failed) or removed. */
+async function cleanEntry(git: GitSeam, scope: RepoScope, entryPath: string, state: CleanupState): Promise<void> {
+  const entryForms = await matchForms(entryPath);
+  const keep = (): void => entryForms.forEach((form) => state.registered.add(form));
+  // The repo's own checkout is never a fleet worktree.
+  const isRepoCheckout = entryForms.some((form) => scope.repoForms.includes(form));
+  if (isRepoCheckout || !entryForms.some((form) => isUnderAnyBase(form, scope.baseForms)) || entryForms.some((form) => state.protectedSet.has(form))) {
+    keep();
+    return;
+  }
+  const outcome = await removeWorktree(git, scope.repoPath, entryPath, { links: scope.link });
+  if (outcome.ok) {
+    state.removed.push(entryPath);
+    return;
+  }
+  keep();
+  if (outcome.dirty === true) {
+    state.keptDirty.push(entryPath);
+  } else {
+    state.failed.push({ path: entryPath, error: outcome.error });
+  }
 }
 
 /**

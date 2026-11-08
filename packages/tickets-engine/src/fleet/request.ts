@@ -7,21 +7,18 @@
  * exploration, not a build) — cannot drift. Pure: file reads (the
  * prompt text, the ticket text) stay with the caller.
  */
-import { createHash } from 'node:crypto';
-import { hostname } from 'node:os';
-import path from 'node:path';
-import {
-  branchForTicket,
-  type PipelinePhase,
-  type RepoRef,
-  type TicketCard,
-} from '../contracts/tickets';
-import { acceptanceCommands, acceptanceFinding, ticketSections } from '../core/ticket-files';
-import { composeInstruction, composeScoutInstruction, parseWorkerValue, resolveAssignment, type Truncation } from './assignment';
-import { isAutoPhase } from './chain';
-import { personaMemorySection, personaSkillsSection } from './context-pack';
-import { DEFAULT_FLEET_CAPS, type FleetCaps, type HandoverMode, type InteractiveMode, type PermissionMode, type RunDkTarget, type RunRequest, type WorkerProviderId } from './protocol';
-import { ticketCopyPathFor, worktreePathFor } from './worktree-home';
+import type { PipelinePhase, RepoRef, TicketCard } from '../contracts/tickets';
+import { acceptanceCommands } from '../core/ticket-files';
+import type { Truncation } from './assignment';
+import type { FleetCaps, HandoverMode, InteractiveMode, PermissionMode, RunDkTarget, RunRequest } from './protocol';
+import { assembleRunRequest } from './request-assemble';
+import { composeRunInstruction } from './request-instruction';
+import { planRun } from './request-plan';
+import { acceptanceRefusal, ownerColumnRefusal, repoRefusal } from './request-refusals';
+import { resolveExtraRepos } from './request-repos';
+import { resolveRunWorker } from './request-worker';
+
+export { agentIdentity } from './request-assemble';
 
 export interface ComposeRunInput {
   /** Who asks for this run (D-41); it rides the request to the runner's log and record. */
@@ -144,217 +141,36 @@ export type ComposeRunResult =
   | { readonly ok: false; readonly error: string };
 
 export function composeRunRequest(input: ComposeRunInput): ComposeRunResult {
-  // D-29: every start passes here, so this is where the owner's columns are closed. A manual column is
-  // the owner's: nothing is run out of it, whoever asks. Only the owner's own dialog and Accept's commit step work there.
-  const phaseOfRun = input.workingPhase;
-  if (phaseOfRun !== null && !isAutoPhase(phaseOfRun) && input.interactive === undefined && input.commitStep !== true) {
-    return {
-      ok: false,
-      error: `${input.card.id} sits in ${phaseOfRun.title}, the owner's column: the fleet takes nothing from it. Move it into an agent column to run it.`,
-    };
-  }
   // A scout ticket (form: scout, E8, concept §5.6) runs an exploration,
   // not a build: no worktree is prepared — the named repo's checkout
   // (else the tickets vault itself) is the run's read ground, the gate
-  // is 'none' and nothing moves. A NAMED repo still needs a local path
-  // (a ticket pointing at an unreadable checkout is a refusal, never a
-  // guess); only a ticket naming no repo at all falls back to the vault.
+  // is 'none' and nothing moves.
   const scout = (input.card.meta.form ?? 'ship') === 'scout';
-  const repo = input.repo;
-  if (repo === null && !scout) {
-    return {
-      ok: false,
-      error: `${input.card.id} names no repository — set repo: to a _meta/repos.md entry`,
-    };
+  const refusal = ownerColumnRefusal(input) ?? repoRefusal(input, scout);
+  if (refusal !== null) {
+    return refused(refusal);
   }
-  if (repo !== null && repo.path === null) {
-    return {
-      ok: false,
-      error: `"${repo.name}" has no local path: in _meta/repos.md — the worker needs a checkout`,
-    };
-  }
-  // req-72: every extra repo needs a checkout too — the fleet prepares
-  // one worktree per repo before a ship run starts. A scout run reads
-  // them in place instead: named read grounds, never a prepared tree.
-  const extraRepos: {
-    name: string;
-    repoPath: string;
-    worktreePath: string;
-    baseRef: string | null;
-    links?: readonly string[];
-  }[] = [];
-  const extraReadGrounds: { name: string; path: string }[] = [];
-  for (const extra of input.extraRepos ?? []) {
-    if (repo !== null && extra.name === repo.name) {
-      continue; // the primary twice would prepare one worktree twice
-    }
-    if (extra.path === null) {
-      return {
-        ok: false,
-        error: `"${extra.name}" has no local path: in _meta/repos.md — the ticket names it beside ${repo?.name ?? 'no primary repo'}`,
-      };
-    }
-    if (scout) {
-      extraReadGrounds.push({ name: extra.name, path: extra.path });
-    } else {
-      extraRepos.push({
-        name: extra.name,
-        repoPath: extra.path,
-        worktreePath: worktreePathFor(input.vaultPath, extra, input.card.id),
-        baseRef: extra.branch,
-        ...(extra.link !== undefined && extra.link.length > 0 ? { links: [...extra.link] } : {}),
-      });
-    }
+  const extras = resolveExtraRepos(input, scout);
+  if (!extras.ok) {
+    return refused(extras.error);
   }
   // A scout run has no machine gate (concept §5.6) — no acceptance
   // commands are demanded, carried or run.
   const acceptance = scout ? [] : acceptanceCommands(input.ticketText);
-  if (acceptance.length === 0 && !scout && input.structuralGateAllowed !== true && input.interactive === undefined) {
-    return {
-      ok: false,
-      error: `${input.card.id} has no runnable acceptance criteria: ${acceptanceFinding(input.ticketText)}`,
-    };
+  const gateRefusal = acceptanceRefusal(input, acceptance, scout);
+  if (gateRefusal !== null) {
+    return refused(gateRefusal);
   }
-  const handover = input.workingPhase?.handover ?? null;
-  const assignment = resolveAssignment({
-    ticketWorker: input.workerChoice ?? input.card.meta.worker,
-    columnWorker: input.workingPhase?.worker ?? null,
-    columnModel: input.workingPhase?.model ?? null,
-    handover,
-    repoWorker: repo?.worker ?? null,
-    configuredDefault: input.defaultWorker,
-  });
-  // E3: a loaded persona beats the legacy ring for provider and model —
-  // a harness the fleet cannot run (an 'api' persona) leaves the ring's
-  // choice in place, as does every ring refusal when no persona resolved.
-  // An owner-picked worker in the start dialog still wins over the
-  // persona (the concept's override order: the owner is the final
-  // authority); the persona's prompt and memory apply regardless.
-  const persona = input.persona ?? null;
-  const personaWorker = persona !== null ? parseWorkerValue(persona.worker) : null;
-  const ownerPicked = (input.workerChoice ?? null) !== null;
-  let provider: WorkerProviderId;
-  let model: string | null;
-  if (persona !== null && personaWorker !== null && !ownerPicked) {
-    provider = personaWorker.provider;
-    model = persona.model;
-  } else if (assignment.ok) {
-    provider = assignment.provider;
-    model = assignment.model;
-  } else {
-    return { ok: false, error: assignment.error };
+  const worker = resolveRunWorker(input);
+  if (!worker.ok) {
+    return refused(worker.error);
   }
-  const personaPrompt = persona !== null && persona.prompt !== null && persona.prompt.trim() !== '' ? persona.prompt : null;
-  const promptText = personaPrompt ?? input.promptText;
-  const branch = input.card.meta.branch ?? branchForTicket(input.card.id);
-  const sections = ticketSections(input.ticketText);
-  // D-30: a store card's path is virtual, no such file exists: the worker gets a copy the runner takes back.
-  const ticketFile = input.dk !== undefined ? ticketCopyPathFor(input.vaultPath, input.card.id) : path.join(input.vaultPath, input.card.path);
-  // The scout run's directory is its read ground — the named repo's
-  // checkout, else the tickets vault — computed here and carried on the
-  // request like the worktree home (ADR-0080): the runner never derives
-  // paths, and the brief names the absolute location so the worker never
-  // has to find it. No worktree is ever prepared there.
-  const readGround = repo?.path ?? input.vaultPath;
-  const worktreePath = scout ? readGround : worktreePathFor(input.vaultPath, repo!, input.card.id);
-  const instruction = scout
-    ? composeScoutInstruction({
-        ticketId: input.card.id,
-        title: input.card.meta.title ?? input.card.id,
-        readGround,
-        repoName: repo?.name ?? null,
-        ticketFile,
-        phase: input.card.phase,
-        description: sections.description,
-        plan: sections.plan,
-        prompt: promptText,
-        repoInstructions: input.repoInstructions,
-        ...(extraReadGrounds.length > 0 ? { extraRepos: extraReadGrounds } : {}),
-        ...(input.interactive !== undefined ? { interactive: input.interactive } : {}),
-        ...(persona !== null
-          ? { skillsSection: personaSkillsSection(persona.skills), memorySection: personaMemorySection(persona.memory), personaId: persona.id, personaRole: persona.role ?? null }
-          : {}),
-      })
-    : composeInstruction({
-        ticketId: input.card.id,
-        title: input.card.meta.title ?? input.card.id,
-        repo: repo!.name,
-        branch,
-        worktreePath,
-        phase: input.card.phase,
-        description: sections.description,
-        plan: sections.plan,
-        handover: sections.handover,
-        prompt: promptText,
-        acceptance,
-        ticketFile,
-        ...(input.dk !== undefined ? { ticketFileIsCopy: true } : {}),
-        ...(repo!.link !== undefined && repo!.link.length > 0 ? { links: repo!.link } : {}),
-        ...(extraRepos.length > 0
-          ? { extraRepos: extraRepos.map((r) => ({ name: r.name, worktreePath: r.worktreePath, base: r.baseRef })) }
-          : {}),
-        repoInstructions: input.repoInstructions,
-        diffStat: input.diffStat,
-        gateFailure: input.gateFailure,
-        caps: input.caps ?? DEFAULT_FLEET_CAPS,
-        ...(input.interactive !== undefined ? { interactive: input.interactive } : {}),
-        ...(persona !== null
-          ? { skillsSection: personaSkillsSection(persona.skills), memorySection: personaMemorySection(persona.memory), personaId: persona.id, personaRole: persona.role ?? null }
-          : {}),
-      });
-  // A scout run never gates and never moves (concept §5.6) — the same
-  // move-target rule as an interactive dialog: the ticket stays where it
-  // sits until the owner promotes it from the report card.
-  const moves = !scout && input.interactive === undefined;
-  const request: RunRequest = {
-    origin: input.origin,
-    ticketId: input.card.id,
-    ...(scout ? { form: 'scout' as const } : {}),
-    ticketsVaultPath: input.vaultPath,
-    ticketRelPath: input.card.path,
-    phase: input.card.phase,
-    repoPath: readGround,
-    worktreePath,
-    branch,
-    baseRef: scout ? null : repo!.branch,
-    ...(repo !== null && !scout && repo.link !== undefined && repo.link.length > 0 ? { links: repo.link } : {}),
-    ...(extraRepos.length > 0 ? { extraRepos } : {}),
-    provider,
-    model,
-    permissionMode: input.permissionMode,
-    instruction: instruction.text,
-    continuationInstruction: instruction.continuation,
-    briefDigest: createHash('sha256').update(instruction.stable).digest('hex'),
-    acceptance,
-    gate: scout ? 'none' : acceptance.length > 0 ? 'commands' : 'structural',
-    git: input.gitPath.trim() === '' ? 'git' : input.gitPath.trim(),
-    nextPhase: moves ? input.nextPhaseId : null,
-    nextPhaseDir: !moves || input.nextPhaseId === null ? null : input.nextPhaseDir,
-    pushRemote: input.pushRemote,
-    claimIdentity: moves && input.nextPhaseClaims && input.nextPhaseId !== null ? agentIdentity() : null,
-    ...(limitsOf(input.workingPhase) !== null ? { limits: limitsOf(input.workingPhase)! } : {}),
-    ...(input.workerChoice !== null ? { recordWorker: input.workerChoice } : {}),
-    ...(input.dispatchedBy !== undefined ? { column: input.dispatchedBy } : {}),
-    ...(input.handover !== undefined ? { handover: input.handover } : {}),
-    ...(input.interactive !== undefined ? { interactive: input.interactive } : {}),
-    ...(input.dk !== undefined ? { dk: input.dk } : {}),
-    ...(moves && input.parkFor ? { parkFor: input.parkFor } : {}),
-  };
-  return { ok: true, request, truncations: instruction.truncations, persona: persona?.id ?? null };
+  const plan = planRun({ input, scout, acceptance, extras });
+  const instruction = composeRunInstruction(plan);
+  const request = assembleRunRequest(plan, worker, instruction);
+  return { ok: true, request, truncations: instruction.truncations, persona: input.persona?.id ?? null };
 }
 
-/** The column's own ceilings as the request carries them, or null when it sets none. */
-function limitsOf(phase: PipelinePhase | null): { maxTurns?: number; maxWorkMs?: number } | null {
-  if (phase === null || (phase.maxTurns === null && phase.maxWorkMin === null)) {
-    return null;
-  }
-  return {
-    ...(phase.maxTurns !== null ? { maxTurns: phase.maxTurns } : {}),
-    ...(phase.maxWorkMin !== null ? { maxWorkMs: phase.maxWorkMin * 60_000 } : {}),
-  };
-}
-
-/** The fleet's actor identity for stamps (`agent@<host>`). */
-export function agentIdentity(): string {
-  return `agent@${hostname().toLowerCase()}`;
+function refused(error: string): ComposeRunResult {
+  return { ok: false, error };
 }

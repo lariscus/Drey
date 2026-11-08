@@ -56,68 +56,68 @@ function runTotal(run: ReportRun): number {
   return run.tokensIn + run.tokensOut;
 }
 
-export function tokenReport(runs: readonly ReportRun[]): readonly ReportGroup[] {
-  const byKey = new Map<
-    string,
-    {
-      ticket: string;
-      phase: string;
-      model: string | null;
-      runs: number;
-      total: number;
-      input: number;
-      cacheRead: number;
-      cacheCreation: number;
-      output: number;
-      inputSide: number;
-      beforeFirstWrite: number | null;
-    }
-  >();
+/** The counters both reports sum per group. */
+interface UsageCounters {
+  runs: number;
+  total: number;
+  input: number;
+  cacheRead: number;
+  cacheCreation: number;
+  output: number;
+}
+
+/** Adds one run to a group's counters; an absent usage counter counts 0. */
+function addUsage(group: UsageCounters, run: ReportRun): void {
+  group.runs++;
+  group.total += runTotal(run);
+  group.input += run.usage?.input ?? 0;
+  group.cacheRead += run.usage?.cacheRead ?? 0;
+  group.cacheCreation += run.usage?.cacheCreation ?? 0;
+  group.output += run.usage?.output ?? 0;
+}
+
+interface TokenGroup extends UsageCounters {
+  ticket: string;
+  phase: string;
+  model: string | null;
+  inputSide: number;
+  beforeFirstWrite: number | null;
+}
+
+function tokenGroups(runs: readonly ReportRun[]): TokenGroup[] {
+  const byKey = new Map<string, TokenGroup>();
   for (const run of runs) {
     const key = `${run.ticketId}\u0000${run.phase}\u0000${run.model ?? ''}`;
-    const existing = byKey.get(key) ?? {
-      ticket: run.ticketId,
-      phase: run.phase,
-      model: run.model,
-      runs: 0,
-      total: 0,
-      input: 0,
-      cacheRead: 0,
-      cacheCreation: 0,
-      output: 0,
-      inputSide: 0,
-      beforeFirstWrite: null,
-    };
-    const input = run.usage?.input ?? 0;
-    const cacheRead = run.usage?.cacheRead ?? 0;
-    const cacheCreation = run.usage?.cacheCreation ?? 0;
-    existing.runs++;
-    existing.total += runTotal(run);
-    existing.input += input;
-    existing.cacheRead += cacheRead;
-    existing.cacheCreation += cacheCreation;
-    existing.output += run.usage?.output ?? 0;
-    existing.inputSide += input + cacheRead + cacheCreation;
+    const group = byKey.get(key) ?? { ticket: run.ticketId, phase: run.phase, model: run.model, runs: 0, total: 0, input: 0, cacheRead: 0, cacheCreation: 0, output: 0, inputSide: 0, beforeFirstWrite: null };
+    addUsage(group, run);
+    group.inputSide += (run.usage?.input ?? 0) + (run.usage?.cacheRead ?? 0) + (run.usage?.cacheCreation ?? 0);
     if (run.tokensBeforeFirstWrite !== null) {
-      existing.beforeFirstWrite = (existing.beforeFirstWrite ?? 0) + run.tokensBeforeFirstWrite;
+      group.beforeFirstWrite = (group.beforeFirstWrite ?? 0) + run.tokensBeforeFirstWrite;
     }
-    byKey.set(key, existing);
+    byKey.set(key, group);
   }
-  return [...byKey.values()]
-    .map((g) => ({
-      ticket: g.ticket,
-      phase: g.phase,
-      model: g.model,
-      runs: g.runs,
-      total: g.total,
-      input: g.input,
-      cacheRead: g.cacheRead,
-      cacheCreation: g.cacheCreation,
-      output: g.output,
-      beforeFirstWrite: g.beforeFirstWrite,
-      beforeFirstWriteShare:
-        g.beforeFirstWrite !== null && g.inputSide > 0 ? g.beforeFirstWrite / g.inputSide : null,
-    }))
+  return [...byKey.values()];
+}
+
+function reportGroupOf(g: TokenGroup): ReportGroup {
+  return {
+    ticket: g.ticket,
+    phase: g.phase,
+    model: g.model,
+    runs: g.runs,
+    total: g.total,
+    input: g.input,
+    cacheRead: g.cacheRead,
+    cacheCreation: g.cacheCreation,
+    output: g.output,
+    beforeFirstWrite: g.beforeFirstWrite,
+    beforeFirstWriteShare: g.beforeFirstWrite !== null && g.inputSide > 0 ? g.beforeFirstWrite / g.inputSide : null,
+  };
+}
+
+export function tokenReport(runs: readonly ReportRun[]): readonly ReportGroup[] {
+  return tokenGroups(runs)
+    .map(reportGroupOf)
     .sort(
       (a, b) =>
         b.total - a.total ||
@@ -156,41 +156,15 @@ export interface PersonaCost {
  * and `costUsd` stays null until a run of the group reports one.
  */
 export function personaCostReport(runs: readonly ReportRun[]): readonly PersonaCost[] {
-  const byPersona = new Map<
-    string,
-    {
-      persona: string;
-      runs: number;
-      total: number;
-      input: number;
-      cacheRead: number;
-      cacheCreation: number;
-      output: number;
-      costUsd: number | null;
-    }
-  >();
+  const byPersona = new Map<string, UsageCounters & { persona: string; costUsd: number | null }>();
   for (const run of runs) {
     const key = run.persona ?? UNASSIGNED_PERSONA;
-    const existing = byPersona.get(key) ?? {
-      persona: key,
-      runs: 0,
-      total: 0,
-      input: 0,
-      cacheRead: 0,
-      cacheCreation: 0,
-      output: 0,
-      costUsd: null,
-    };
-    existing.runs++;
-    existing.total += runTotal(run);
-    existing.input += run.usage?.input ?? 0;
-    existing.cacheRead += run.usage?.cacheRead ?? 0;
-    existing.cacheCreation += run.usage?.cacheCreation ?? 0;
-    existing.output += run.usage?.output ?? 0;
+    const group = byPersona.get(key) ?? { persona: key, runs: 0, total: 0, input: 0, cacheRead: 0, cacheCreation: 0, output: 0, costUsd: null };
+    addUsage(group, run);
     if (run.costUsd !== null && run.costUsd !== undefined) {
-      existing.costUsd = (existing.costUsd ?? 0) + run.costUsd;
+      group.costUsd = (group.costUsd ?? 0) + run.costUsd;
     }
-    byPersona.set(key, existing);
+    byPersona.set(key, group);
   }
   return [...byPersona.values()].sort((a, b) => b.total - a.total || a.persona.localeCompare(b.persona));
 }

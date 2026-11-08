@@ -1,0 +1,208 @@
+/**
+ * The wiring of the Crew runner's parts (ADR-0096): every part built once
+ * and handed its collaborators by constructor. This is the composition
+ * root's helper — `runner.ts` builds the shared part once and one
+ * supervisor per provider with the concrete adapter and store; a spec
+ * calls it with fakes. A late-bound arrow (`(run) => stopper.claimLost(run)`)
+ * closes the few loops between parts (a lost claim stops its own run).
+ */
+import { hostname } from 'node:os';
+import { TicketsGit } from '../core/tickets-git';
+import { NodeFileSystem } from './node-file-system';
+import { NodeProcessTable } from './node-process-table';
+import { clockOf, type Clock } from './ports/clock';
+import { NULL_SINK, type EventSink } from './ports/event-sink';
+import type { FileSystem } from './ports/file-system';
+import type { ProcessTable } from './ports/process-table';
+import type { ExecFn } from './procs';
+import type { ProviderAdapter } from './harness/contract';
+import type { RunInfo, RunRequest } from './protocol';
+import type { RunLimits } from './run/run-limits';
+import { isTerminal } from './run/run-state';
+import { RunStateMachine } from './run/run-state-machine';
+import { execShell, probeExec, validateTrailers } from './shell-exec';
+import type { StoreForTarget } from './store/ticket-store';
+import { normalizeForMatch, prepareWorktree as defaultPrepareWorktree } from './worktrees';
+import { AttachmentStore } from './orchestrate/attachment-store';
+import { BackgroundWork } from './orchestrate/background-work';
+import { ClaimRelease } from './orchestrate/claim-release';
+import { EventFold } from './orchestrate/event-fold';
+import { GateRunner, type GateShell, type TrailerCheck } from './orchestrate/gate-runner';
+import { HandoverSettings } from './orchestrate/handover-settings';
+import { LeftoverClaims } from './orchestrate/leftover-claims';
+import { OwnerAnswers } from './orchestrate/owner-answers';
+import { PersonaMemory } from './orchestrate/persona-memory';
+import { ProcessSupervisor } from './orchestrate/process-supervisor';
+import { RunAdoption } from './orchestrate/run-adoption';
+import { RunBookkeeper } from './orchestrate/run-bookkeeper';
+import { RunClaims, type LeaseTimers } from './orchestrate/run-claims';
+import { RunCompletion } from './orchestrate/run-completion';
+import { RunReaper } from './orchestrate/run-reaper';
+import { RunReopener } from './orchestrate/run-reopener';
+import { RunRepository } from './orchestrate/run-repository';
+import { RunSettler } from './orchestrate/run-settler';
+import { RunStarter, type PrepareWorktree } from './orchestrate/run-starter';
+import { RunStopper } from './orchestrate/run-stopper';
+import { RunStreams } from './orchestrate/run-streams';
+import { RunSupervisor } from './orchestrate/run-supervisor';
+import { RunTakeover } from './orchestrate/run-takeover';
+import { RunnerHandover } from './orchestrate/runner-handover';
+import { SessionHandover } from './orchestrate/session-handover';
+import { SteerService } from './orchestrate/steer-service';
+import { StoreClaims } from './orchestrate/store-claims';
+import { TicketCopy } from './orchestrate/ticket-copy';
+import { WaitClaim } from './orchestrate/wait-claim';
+import { WorkerLauncher } from './orchestrate/worker-launcher';
+
+type TicketsGitSeam = Pick<TicketsGit, 'run' | 'locate' | 'commitPaths' | 'push'>;
+
+/** What the whole runner shares: one clock, one stream writer, one store side, the one ticket writer. */
+export interface RunnerShared {
+  readonly clock: Clock;
+  readonly streams: RunStreams;
+  readonly stores: StoreClaims;
+  readonly bookkeeper: RunBookkeeper;
+  readonly fs: FileSystem;
+  readonly sink: EventSink;
+}
+
+/** The machine the shared part runs on: Node's files and no listener, unless the runner or a spec says otherwise. */
+export interface SharedPorts {
+  readonly fs?: FileSystem;
+  readonly sink?: EventSink;
+}
+
+export function composeShared(storeFor: StoreForTarget, log: (message: string) => void, now?: () => Date, ports: SharedPorts = {}): RunnerShared {
+  const clock = clockOf(now);
+  const fs = ports.fs ?? new NodeFileSystem();
+  const sink = ports.sink ?? NULL_SINK;
+  const streams = new RunStreams(clock, fs, sink);
+  const stores = new StoreClaims(storeFor, clock, log);
+  const copy = new TicketCopy(stores, fs, log);
+  const bookkeeper = new RunBookkeeper({
+    streams,
+    release: new ClaimRelease(stores, copy, clock, log),
+    wait: new WaitClaim(stores, copy, log),
+    copy,
+    memory: new PersonaMemory(clock, fs, log),
+    clock,
+    actor: `agent@${hostname().toLowerCase()}`,
+    log,
+  });
+  return { clock, streams, stores, bookkeeper, fs, sink };
+}
+
+export interface RunSupervisorDeps {
+  readonly root: string;
+  readonly adapter: ProviderAdapter;
+  /** git executable for the worktree ops and the attachments' exclude file. */
+  readonly git: string;
+  readonly log: (message: string) => void;
+  /** The store of a run's dricket target — the one ticket backend (req-176). */
+  readonly storeFor: StoreForTarget;
+  /** The runner's shared part; a spec without one gets its own. */
+  readonly shared?: RunnerShared;
+  readonly now?: () => Date;
+  /** The process probes (liveness, start time). */
+  readonly exec?: ExecFn;
+  /** The gate's shell commands (cwd = the worktree). */
+  readonly execShell?: GateShell;
+  readonly prepareWorktree?: PrepareWorktree;
+  readonly ticketsGit?: TicketsGitSeam;
+  /** `dk validate --trailers` (the gate's trailer check): null = passes. */
+  readonly validateTrailers?: TrailerCheck;
+  readonly leaseTimers?: LeaseTimers;
+  /** Run settled (terminal): the orchestrator's slot-freed trigger (M85). */
+  readonly onRunSettled?: (info: RunInfo) => void;
+  /** The quality rungs (M85, flagged off): a second worker's brief on a green gate, or null. */
+  readonly secondOpinion?: (request: RunRequest) => Promise<string | null>;
+  /** Per-run ceilings (0 = unlimited); a run that passes one is failed, never retried at once. */
+  readonly limits?: Partial<RunLimits>;
+}
+
+/** The parts that touch the worker, the ticket and the record, with the loops between them closed. */
+interface Runtime extends RunnerShared {
+  readonly deps: RunSupervisorDeps;
+  readonly table: ProcessTable;
+  readonly machine: RunStateMachine;
+  readonly background: BackgroundWork;
+  readonly repo: RunRepository;
+  readonly settings: HandoverSettings;
+  readonly claims: RunClaims;
+  readonly settler: RunSettler;
+  readonly processes: ProcessSupervisor;
+  readonly stopper: RunStopper;
+  readonly takeover: RunTakeover;
+  readonly completion: RunCompletion;
+}
+
+function runtimeOf(deps: RunSupervisorDeps): Runtime {
+  const shared = deps.shared ?? composeShared(deps.storeFor, deps.log, deps.now);
+  const { clock, streams, bookkeeper } = shared;
+  const log = deps.log;
+  const machine = new RunStateMachine();
+  const background = new BackgroundWork();
+  const repo = new RunRepository(deps.root, shared.fs, shared.sink);
+  const settings = new HandoverSettings(deps.adapter.id);
+  const table = new NodeProcessTable(deps.exec ?? probeExec(deps.root));
+  const timers = deps.leaseTimers !== undefined ? { leaseTimers: deps.leaseTimers } : {};
+  const claims = new RunClaims({ stores: shared.stores, log, clock, background, ...timers, onLost: (run, why): Promise<void> => stopper.claimLost(run, why) });
+  const settler = new RunSettler({ machine, repo, bookkeeper, clock, log, ...(deps.onRunSettled !== undefined ? { onRunSettled: deps.onRunSettled } : {}) });
+  const takeover = new RunTakeover(repo, bookkeeper);
+  const events: EventFold = new EventFold({ repo, streams, bookkeeper, background, log, interrupt: (run) => takeover.interrupt(run.info.id), claimLost: (run, why): Promise<void> => stopper.claimLost(run, why) });
+  const processes: ProcessSupervisor = new ProcessSupervisor({ adapter: deps.adapter, repo, events, background, settings, table, log, onExit: (run, code): Promise<void> => completion.onWorkerExit(run, code) });
+  const stopper: RunStopper = new RunStopper(machine, repo, processes, { settler, bookkeeper, log });
+  const gate = new GateRunner(bookkeeper, deps.execShell ?? execShell, deps.validateTrailers ?? validateTrailers);
+  const opinion = deps.secondOpinion !== undefined ? { secondOpinion: deps.secondOpinion } : {};
+  const completion: RunCompletion = new RunCompletion({ machine, repo, gate, bookkeeper, settler, processes, ...opinion });
+  return { ...shared, deps, table, machine, background, repo, settings, claims, settler, processes, stopper, takeover, completion };
+}
+
+function prepareOf(rt: Runtime, git: TicketsGitSeam): PrepareWorktree {
+  if (rt.deps.prepareWorktree !== undefined) {
+    return rt.deps.prepareWorktree;
+  }
+  // Prepare-time healing (T-0044) never removes a tree a live (or detached) run holds.
+  const isLive = (worktreePath: string): boolean => {
+    const needle = normalizeForMatch(worktreePath);
+    return rt.repo.list().some((r) => !isTerminal(r.state) && normalizeForMatch(r.worktreePath) === needle);
+  };
+  return (request, worktreePath) => defaultPrepareWorktree({ git, request, worktreePath, now: () => rt.clock.now(), isLive });
+}
+
+function starterOf(rt: Runtime, handover: RunnerHandover, git: TicketsGitSeam): RunStarter {
+  const { machine, repo, streams, stores, claims, bookkeeper, processes, background, clock } = rt;
+  const log = rt.deps.log;
+  const launcher = new WorkerLauncher({ machine, repo, processes, claims, background, streams, log });
+  const sessions = new SessionHandover(repo, rt.settings, rt.deps.adapter.id, clock);
+  return new RunStarter({ machine, repo, streams, stores, claims, bookkeeper, sessions, launcher, prepareWorktree: prepareOf(rt, git), clock, log, retiring: () => handover.retiring });
+}
+
+/** One provider's supervisor, every part wired. */
+export function composeRunSupervisor(deps: RunSupervisorDeps): RunSupervisor {
+  const rt = runtimeOf(deps);
+  const { clock, machine, repo, streams, claims, bookkeeper, settler, processes, table, background, settings } = rt;
+  const log = deps.log;
+  const git = deps.ticketsGit ?? new TicketsGit(() => deps.git);
+  const handover = new RunnerHandover(repo, processes, table, { clock, line: log });
+  const starter = starterOf(rt, handover, git);
+  const reopener = new RunReopener(repo, starter, settler, { processes, provider: deps.adapter.id });
+  const answers = new OwnerAnswers(repo, bookkeeper, streams);
+  const limits = deps.limits !== undefined ? { limits: deps.limits } : {};
+  return new RunSupervisor({
+    repo,
+    background,
+    settings,
+    adoption: new RunAdoption({ machine, repo, streams, processes, claims, bookkeeper, table, clock, log }),
+    handover,
+    starter,
+    stopper: rt.stopper,
+    steer: new SteerService(repo, bookkeeper, { answers, reopener, hold: (run, why) => rt.takeover.hold(run, why) }, streams),
+    takeover: rt.takeover,
+    answers,
+    attachments: new AttachmentStore(repo, git, rt.fs, clock),
+    reopener,
+    reaper: new RunReaper({ repo, settler, bookkeeper, settings, background, clock, table, log, ...limits, replayExit: (run) => rt.completion.onWorkerExit(run, null) }),
+    leftovers: new LeftoverClaims(deps.storeFor, log),
+  });
+}
