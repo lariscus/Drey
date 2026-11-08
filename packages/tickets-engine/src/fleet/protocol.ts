@@ -12,6 +12,7 @@
  * worker process, its pipes, the worktree and the machine gate.
  */
 import type { HandoverMode } from './protocol-fleet-config';
+import type { SlotProfile } from './protocol-slots';
 import type { ShapedQuestion } from '../contracts/question-shape';
 import type { TicketForm } from '../contracts/tickets';
 
@@ -19,6 +20,8 @@ import type { TicketForm } from '../contracts/tickets';
 export { DEFAULT_FLEET_CAPS, DEFAULT_FLEET_HANDOVER, DEFAULT_FLEET_POOL, normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from './protocol-fleet-config';
 export type { FleetCaps, FleetHandoverConfig, FleetPool, FleetPools, HandoverMode } from './protocol-fleet-config';
 export { normalizeChainStore } from './protocol-chain';
+export { SLOT_PROFILES } from './protocol-slots';
+export type { QuotaKind, QuotaReliability, QuotaWindow, SlotBilling, SlotProfile, SlotStateName, SlotSummary, SlotView } from './protocol-slots';
 export type { AutopilotRecord, AutopilotRefusal, AutopilotState, ChainConfig, ChainMaster, ChainStatus, ChainStoreConfig, ChainTrip, ColumnMode } from './protocol-chain';
 
 /** The workers of milestone 84, in fleet order (the assignment default). */
@@ -212,6 +215,8 @@ export interface RunRequest {
    * every older sender.
    */
   readonly dk?: RunDkTarget;
+  /** req-177: the repository's profile (`profile:` in `_meta/repos.md`); absent = `private`. A run is served only by a slot of this profile. */
+  readonly profile?: SlotProfile;
 }
 
 /** How the run's worktree was obtained — `prepareWorktree` (T-0047) is
@@ -413,6 +418,8 @@ export interface RunInfo {
   readonly worktree?: WorktreeOutcome;
   /** The machine gate's verdict, once it ran (T-0048); absent when it never did. */
   readonly gateResult?: 'green' | 'red' | null;
+  /** req-177: the slot (account) the run is bound to; absent on runs before slots or without one. */
+  readonly slot?: { readonly id: string; readonly label: string };
   /**
    * Why the worker declared the step incomplete (`BLOCKED:` in its final
    * message): no gate ran, nothing moved — the ticket waits for the

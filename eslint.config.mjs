@@ -97,6 +97,23 @@ const PORTS_ONLY = [
     message: 'fleet/ports takes only types (ADR-0096).',
   },
 ];
+/**
+ * `fleet/routing` (req-177): the slots and their quota windows. It takes the
+ * wire types, the ports, the adapter contract's types and the run core; the
+ * orchestration, the API, the store and the concrete adapters stay out —
+ * the orchestration asks it through the consumer's `SlotBinder`.
+ */
+const ROUTING_ONLY = [
+  {
+    group: ['../**', '!../protocol', '!../ports', '!../ports/*', '!../harness', '!../harness/contract', '!../run', '!../run/*'],
+    message: 'fleet/routing takes ../protocol, ../ports, ../harness/contract and ../run only (ADR-0096, req-177).',
+  },
+  {
+    group: ['../ports/*', '../harness/contract'],
+    allowTypeImports: true,
+    message: 'fleet/routing takes only types from ../ports and ../harness/contract (ADR-0096).',
+  },
+];
 const HARNESS_NOT_ORCHESTRATE = {
   group: ['../orchestrate', '../orchestrate/**', '../api', '../api/**', '../store', '../store/**', '../runner', '../../**/orchestrate/**'],
   message: 'An adapter never imports the orchestration (ADR-0096): it reports normalized events, the orchestrator decides.',
@@ -336,6 +353,13 @@ export default tseslint.config(
     ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`, `${FLEET}/**/*spec-support.ts`],
     rules: {
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS, NODE_BUILTINS] }],
+    },
+  },
+  {
+    files: [`${FLEET}/routing/**/*.ts`],
+    ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, NODE_BUILTINS, ...ROUTING_ONLY] }],
     },
   },
   {

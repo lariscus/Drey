@@ -5,7 +5,7 @@
  */
 import type { PipelinePhase } from '../contracts/tickets';
 import { NodeFileSystem } from './node-file-system';
-import { Orchestrator } from './orchestrator';
+import { Orchestrator, type SlotSummarySource } from './orchestrator';
 import type { FileSystem } from './ports/file-system';
 import { clockOf } from './ports/clock';
 import type { ChainStoreConfig, WorkerProviderId } from './protocol';
@@ -53,6 +53,8 @@ export interface OrchestratorDeps {
   readonly releaseLeftovers?: (store: ChainStoreConfig, pipeline: readonly PipelinePhase[]) => Promise<void>;
   /** The files of the chain's state and the meta vault's personas and prompts; Node's by default. */
   readonly fs?: FileSystem;
+  /** req-177: the slots' summary the chain status carries (the 7e band). */
+  readonly slots?: SlotSummarySource;
 }
 
 export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
@@ -88,6 +90,7 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
     clock,
     log,
     scanIntervalMs: deps.scanIntervalMs ?? 15_000,
+    ...(deps.slots !== undefined ? { slots: deps.slots } : {}),
   });
   return orchestrator;
 }

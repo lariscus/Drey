@@ -4,9 +4,13 @@
  * written. The core publishes; the runner's `/events` route streams it.
  */
 import type { NormalizedEvent } from '../harness/contract';
-import type { RunInfo } from '../protocol';
+import type { RunInfo, SlotView } from '../protocol';
 
-export type RunnerEvent = { readonly kind: 'run'; readonly info: RunInfo } | { readonly kind: 'line'; readonly runId: string; readonly event: NormalizedEvent };
+export type RunnerEvent =
+  | { readonly kind: 'run'; readonly info: RunInfo }
+  | { readonly kind: 'line'; readonly runId: string; readonly event: NormalizedEvent }
+  /** req-177: a slot's state, windows or busy count changed. */
+  | { readonly kind: 'slot'; readonly slot: SlotView };
 
 export interface EventSink {
   publish(event: RunnerEvent): void;

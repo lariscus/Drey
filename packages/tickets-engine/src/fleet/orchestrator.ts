@@ -13,7 +13,7 @@
  */
 import { AUTOPILOT_OFF, autopilotOfMaster, resumeDue } from './autopilot';
 import type { Clock } from './ports/clock';
-import type { AutopilotRecord, ChainConfig, ChainMaster, ChainStatus, ColumnMode, RunInfo, RunRequest } from './protocol';
+import type { AutopilotRecord, ChainConfig, ChainMaster, ChainStatus, ColumnMode, RunInfo, RunRequest, SlotSummary } from './protocol';
 import { LIVE_RUN_STATES } from './run/run-state';
 import type { ChainState } from './orchestrate/chain-state';
 import type { ChainStateStore } from './orchestrate/chain-state-store';
@@ -50,6 +50,13 @@ export interface OrchestratorParts {
   readonly log: (message: string) => void;
   /** The safety-net rescan interval. */
   readonly scanIntervalMs: number;
+  /** req-177: the slots' summary for the 7e band; absent = the status carries none. */
+  readonly slots?: SlotSummarySource;
+}
+
+/** Where the chain status reads the slots from (`fleet/routing`'s registry satisfies it). */
+export interface SlotSummarySource {
+  summary(): readonly SlotSummary[];
 }
 
 export class Orchestrator {
@@ -66,7 +73,8 @@ export class Orchestrator {
   }
 
   status(): ChainStatus {
-    return this.parts.state.status({ quotaPausedUntil: this.parts.pools.quotaPausedUntil(), poolSize: this.parts.pools.sizes(this.parts.state.config) });
+    const status = this.parts.state.status({ quotaPausedUntil: this.parts.pools.quotaPausedUntil(), poolSize: this.parts.pools.sizes(this.parts.state.config) });
+    return this.parts.slots === undefined ? status : { ...status, slots: this.parts.slots.summary() };
   }
 
   /** Points the chain at a board (idempotent) and scans. */

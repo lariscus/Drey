@@ -30,7 +30,8 @@ export class KimiAcpAdapter implements ProviderAdapter {
 
   /** One worker's parts, wired; the client's handlers and the finish reach them through late-bound arrows. */
   spawn(start: ProviderStart): WorkerHandle {
-    const proc = this.spawnFn('kimi', ['acp'], { cwd: start.cwd });
+    // req-177: a second Kimi account is its own KIMI_HOME, handed in through the environment.
+    const proc = this.spawnFn('kimi', ['acp'], start.env !== undefined ? { cwd: start.cwd, env: start.env } : { cwd: start.cwd });
     const state = newKimiState();
     const emit = kimiEmit({ start, now: this.now });
     const fold = new KimiUpdateFold({ start, now: this.now });

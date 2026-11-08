@@ -35,7 +35,9 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
   ) {}
 
   spawn(start: ProviderStart): WorkerHandle {
-    return new ClaudeCodeWorker(this.spawnFn('claude', claudeCodeArgs(start), { cwd: start.cwd }), start, this.now);
+    // req-177: a slot's account is its CLAUDE_CONFIG_DIR, handed in through the environment.
+    const opts = start.env !== undefined ? { cwd: start.cwd, env: start.env } : { cwd: start.cwd };
+    return new ClaudeCodeWorker(this.spawnFn('claude', claudeCodeArgs(start), opts), start, this.now);
   }
 }
 

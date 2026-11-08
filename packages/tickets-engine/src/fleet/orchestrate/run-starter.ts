@@ -1,6 +1,6 @@
 import type { HandoverDecision } from '../handover';
 import type { Clock } from '../ports/clock';
-import type { RunRequest } from '../protocol';
+import type { RunInfo, RunRequest } from '../protocol';
 import type { RunLease } from '../run-lease';
 import type { StartOutcome } from '../run/run-record';
 import { INITIAL_RUN_STATE, isTerminal } from '../run/run-state';
@@ -15,6 +15,7 @@ import type { RunRepository } from './run-repository';
 import type { RunStreams } from './run-streams';
 import type { StoreClaims } from './store-claims';
 import type { SessionHandover } from './session-handover';
+import type { SlotBinder, SlotBinding } from './slot-binder';
 import type { WorkerLauncher } from './worker-launcher';
 
 /** Prepares a worktree for a request at a path (T-0044's healing included). */
@@ -34,6 +35,8 @@ export interface RunStarterDeps {
   readonly log: (message: string) => void;
   /** The runner is handing over to a newer build: it starts nothing new (req-51). */
   readonly retiring: () => boolean;
+  /** req-177: the slot (account) a run starts on; absent = no slots, every older wiring. */
+  readonly slots?: SlotBinder;
 }
 
 /** How a start was asked for beyond its request. */
@@ -64,6 +67,20 @@ export class RunStarter {
     const stamp = this.deps.clock.now().toISOString();
     const id = `R-${stamp.replaceAll(/[-:.]/g, '').slice(0, 14)}-${Math.random().toString(36).slice(2, 6)}`;
     this.deps.log(`run ${id} (${request.ticketId}): asked by ${request.origin ?? 'a reopened session'}`);
+    const slot = this.bindSlot(request, id, ask);
+    if (typeof slot === 'string') {
+      return { ok: false, error: slot };
+    }
+    const outcome = await this.startBound({ id, request, ask, slot, stamp });
+    if (!outcome.ok) {
+      this.deps.slots?.release(id);
+    }
+    return outcome;
+  }
+
+  /** The claim, the worktrees, the session and the record of a start whose slot is bound. */
+  private async startBound(start: { id: string; request: RunRequest; ask: StartAsk; slot: SlotBinding | null; stamp: string }): Promise<StartOutcome> {
+    const { id, request, ask, slot, stamp } = start;
     const claimed = await this.claim(request, id);
     if (typeof claimed === 'string') {
       return { ok: false, error: claimed };
@@ -73,8 +90,32 @@ export class RunStarter {
       return { ok: false, error: prepared };
     }
     const session = this.session(id, request, ask, prepared);
-    const opening: RunOpening = { id, request, prepared, ...session, persona: ask.persona ?? null, stamp };
-    return this.open(opening, reopened, claimed);
+    const opening: RunOpening = { id, request, prepared, ...session, persona: ask.persona ?? null, stamp, slot };
+    return this.open(opening, ask.reopened === true, claimed);
+  }
+
+  /** req-177: the slot the run starts on, the refusal when none serves, null without slots. */
+  private bindSlot(request: RunRequest, id: string, ask: StartAsk): SlotBinding | null | string {
+    const slots = this.deps.slots;
+    if (slots === undefined) {
+      return null;
+    }
+    const bound = slots.bind(request, id, this.preferredSlot(request, ask));
+    if ('refused' in bound) {
+      this.deps.log(`run ${id} (${request.ticketId}): refused — ${bound.refused}`);
+      return bound.refused;
+    }
+    return bound;
+  }
+
+  /** The slot the resumed session lives on: the explicit session's run, else the ticket's latest run with a slot. */
+  private preferredSlot(request: RunRequest, ask: StartAsk): string | null {
+    const records = this.deps.repo.list();
+    if (ask.resumeRef !== undefined && ask.resumeRef !== null) {
+      return records.find((r) => r.sessionRef === ask.resumeRef)?.slot?.id ?? null;
+    }
+    const ofTicket = records.filter((r) => r.ticketId === request.ticketId && r.slot !== undefined);
+    return ofTicket.reduce<RunInfo | null>((latest, r) => (latest === null || r.startedAt > latest.startedAt ? r : latest), null)?.slot?.id ?? null;
   }
 
   /**

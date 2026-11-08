@@ -7,14 +7,15 @@ export const HEARTBEAT_MS = 15_000;
 
 /** One event as a server-sent event: its kind names it, the data is the event as JSON. */
 export function sseFrame(event: RunnerEvent): string {
-  const data = event.kind === 'run' ? event.info : { runId: event.runId, event: event.event };
+  const data = event.kind === 'run' ? event.info : event.kind === 'slot' ? event.slot : { runId: event.runId, event: event.event };
   return `event: ${event.kind}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
 /**
  * `GET /events` (req-176 step 5): the runner's events as server-sent
  * events — `run` with a run's record each time it is persisted, `line` with
- * each line of a run's stream — instead of polling `/status` and tailing
+ * each line of a run's stream, `slot` with a slot's view when it changed
+ * (req-177) — instead of polling `/status` and tailing
  * stream files. Bearer-authenticated like every route; a read, so it never
  * keeps the runner awake. Every stream closes when the runner goes.
  */

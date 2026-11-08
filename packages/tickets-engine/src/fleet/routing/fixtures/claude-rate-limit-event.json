@@ -1,0 +1,10 @@
+{
+  "type": "rate_limit_event",
+  "rate_limit_info": {
+    "unifiedWindows": {
+      "five_hour": { "utilization": 0.22, "resetsAt": 1794621600, "status": "allowed" },
+      "seven_day": { "utilization": 0.38, "resetsAt": 1794960000, "status": "allowed" }
+    },
+    "isUsingOverage": false
+  }
+}

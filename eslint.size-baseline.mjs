@@ -8,7 +8,6 @@
 export const SIZE_BASELINE = [
   'packages/tickets-engine/src/contracts/changes.ts',
   'packages/tickets-engine/src/contracts/question-shape.ts',
-  'packages/tickets-engine/src/contracts/tickets.ts',
   'packages/tickets-engine/src/core/blocked.ts',
   'packages/tickets-engine/src/core/chain-delta.ts',
   'packages/tickets-engine/src/core/chat-intents.ts',
