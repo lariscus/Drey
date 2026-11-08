@@ -245,6 +245,11 @@ the other slot cards, Routing and Ledgers are below the fold.
   read-only checkout, `_worktrees/<id>.ticket.md` → `_workcopy/`. They belong in
   `specs/roadmap.md` under the Crew internals block, after req-173, once the owner accepts
   these boards.
-- Settings → Models (7l) shows measured windows for Claude and z.ai; until Spike 4 is done
-  the real page can only show `estimated` / `unknown`.
+- Settings → Models (7l) shows measured windows for Claude and z.ai. Spike 4 (2026-11-08)
+  settled what the real page can show: z.ai `measured` (quota endpoint with two windows),
+  Kimi `measured` while the CLI login holds (usage endpoint, access token), Claude
+  `estimated` (headless Claude Code emits no quota; the interactive session's cache in
+  `.claude.json` per `CLAUDE_CONFIG_DIR` is the anchor while fresh). The build shows the
+  Claude cards with the `estimated` chip and the z.ai card as drawn. An expired login is a
+  slot state `needs login` (a card of 10u's kind), never a retry.
 - 7k v2 (req-171) as a canvas board, with the sub-agent policy row.
