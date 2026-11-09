@@ -1,4 +1,4 @@
-import { parsePersonaFile, resolvePersona, personaModelFor, type Persona, type PersonaModelContext, type PersonaResolution } from '../core/persona';
+import { parsePersonaFile, resolvePersona, splitPoolEntry, type Persona, type PersonaResolution } from '../core/persona';
 
 /**
  * The persona loader (ADR-0088, E3): the services read personas from the
@@ -60,12 +60,11 @@ export async function resolvePersonaForTicket(
 }
 
 /**
- * What a dispatch derives from a persona: the worker harness and the
- * model (pool+router applied against the fleet context, D-62; the default
- * without one). The result feeds the existing `composeRunRequest` — the
- * persona is configuration, not identity.
+ * What a run started outside the chain derives from a persona: its harness
+ * and its default model (an estimate, the dialog's start). The chain's
+ * dispatch asks the capacity pool instead (req-170) — the class decides.
  */
-export function deriveWorkerModel(persona: Persona, context: PersonaModelContext | null): { workerChoice: string; model: string | null } {
-  const { model, provider } = personaModelFor(persona, context);
+export function deriveWorkerModel(persona: Persona): { workerChoice: string; model: string | null } {
+  const { provider, model } = splitPoolEntry(persona.models.default);
   return { workerChoice: provider ?? persona.worker, model };
 }

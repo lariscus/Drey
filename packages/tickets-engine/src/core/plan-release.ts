@@ -134,7 +134,7 @@ export interface PartTicketInput {
 
 /**
  * A part's ticket file: the canonical creation text, then the keys only
- * a part carries (`parent`, `persona`, `blocked-by`, `chain`) set through
+ * a part carries (`parent`, `persona`, `size`, `blocked-by`, `chain`) set through
  * the header patcher, so the file keeps every convention of a ticket
  * the owner typed.
  */
@@ -156,7 +156,8 @@ export function partTicketText(input: PartTicketInput): string {
     ...(input.blockedBy !== null ? { blockedBy: [input.blockedBy] } : {}),
     ...(input.part.chain.length > 0 ? { chain: input.part.chain } : {}),
   }, input.priorities);
-  const extra = [`parent: ${input.parentId}`, ...(input.part.persona !== null ? [`persona: ${input.part.persona}`] : [])];
+  const size = input.part.size ?? null;
+  const extra = [`parent: ${input.parentId}`, ...(input.part.persona !== null ? [`persona: ${input.part.persona}`] : []), ...(size !== null ? [`size: ${size}`] : [])];
   block = block.replace(/\n---$/, `\n${extra.join('\n')}\n---`);
   const created = `${block}\n${body}`;
   return input.phase === input.firstPhase

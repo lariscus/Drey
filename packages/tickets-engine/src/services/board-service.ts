@@ -57,6 +57,7 @@ import { isMap, isScalar, parseDocument } from 'yaml';
 import { splitFrontmatter } from '../../../../shared/frontmatter';
 import { composeRunRequest, type PersonaDispatch } from '../fleet/request';
 import { deriveWorkerModel, personaLoader, resolvePersonaForTicket } from './persona-loader';
+import { personaPatchError } from './persona-patch';
 import { columnPromptRef, isAutoPhase, nextPhaseIdOf } from '../fleet/chain';
 import { readRepoInstructions, worktreeDiffStat } from '../fleet/context-pack';
 import { cleanWorktrees, listOrphans, removeWorktree, type CleanupReport } from '../fleet/worktree-clean';
@@ -68,7 +69,7 @@ import { type ChainConfig, type ChainStoreConfig, FleetCaps, FleetHandoverConfig
 import { type EngineHost, type EngineVaultChangeEvent, EngineVault, FleetPort } from './host';
 import { handoverFromConfig, handoverOverrideKeys } from './handover-config';
 import { appendMemory, memoryPathFor, parseMemoryEntries, toggleMemoryPin } from './persona-store';
-import { HUMAN_PERSONA_ID, humanPersona, inPipelineOrder, isHumanPersona, loadPersonaSkills, personaFileText, personaMigrationFor, parsePersonaFile, personaRef, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaMigration, type PersonaRouter, type PersonaSkill } from '../core/persona';
+import { HUMAN_PERSONA_ID, humanPersona, inPipelineOrder, isHumanPersona, loadPersonaSkills, personaFileText, personaMigrationFor, parsePersonaFile, personaRef, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaMigration, type PersonaSkill } from '../core/persona';
 import { appendThreadOwner, newThreadText, parseThread, threadPathFor } from '../core/persona-thread';
 import { scanRepoFolder } from './repos-scan';
 
@@ -145,48 +146,6 @@ interface FlowFrame {
 
 function personaMissing(id: string): string {
   return `persona "${id}" does not exist — create tickets/_meta/personas/${id}/persona.md first`;
-}
-
-/** The PATCH body's validation (U4): only the listed rules reject; null = the patch is writable. */
-function personaPatchError(input: {
-  title?: string;
-  role?: string;
-  worker?: string;
-  model?: string;
-  pool?: readonly string[];
-  router?: string;
-  color?: string;
-  skills?: readonly string[];
-  prompt?: string;
-}): string | null {
-  if (input.title !== undefined && input.title.trim() === '') {
-    return 'the title is not empty';
-  }
-  if (input.role !== undefined && !(PERSONA_ROLES as readonly string[]).includes(input.role)) {
-    return `the role is one of ${PERSONA_ROLES.join(', ')}`;
-  }
-  if (input.worker !== undefined && input.worker.trim() === '') {
-    return 'the worker is not empty ("opencode", "claude-code", "kimi" or "api")';
-  }
-  if (input.model !== undefined && input.model.trim() === '') {
-    return 'the default model is not empty';
-  }
-  if (input.pool !== undefined && (input.pool.length === 0 || input.pool.some((m) => typeof m !== 'string' || m.trim() === ''))) {
-    return 'the model pool is a non-empty list of model names';
-  }
-  if (input.router !== undefined && !(['off', 'budget', 'escalate-on-fail'] as const).includes(input.router as PersonaRouter)) {
-    return 'the router is "off", "budget" or "escalate-on-fail"';
-  }
-  if (input.color !== undefined && !/^#[0-9a-f]{6}$/i.test(input.color.trim())) {
-    return 'the color is a #rrggbb hex value';
-  }
-  if (input.skills !== undefined && input.skills.some((s) => typeof s !== 'string')) {
-    return 'the skills are a list of skill names';
-  }
-  if (input.prompt !== undefined && typeof input.prompt !== 'string') {
-    return 'the prompt is markdown text';
-  }
-  return null;
 }
 
 /**
@@ -1324,7 +1283,7 @@ export class EngineBoardService {
         title: p.title,
         role: isHumanPersona(p) ? '' : p.role,
         color: p.color,
-        model: isHumanPersona(p) ? '' : (deriveWorkerModel(p, null).model ?? ''),
+        model: isHumanPersona(p) ? '' : (deriveWorkerModel(p).model ?? ''),
       })),
       warnings: parsed.warnings,
     };
@@ -1468,7 +1427,7 @@ export class EngineBoardService {
     const buildId = this.buildPhaseOf(frame.snap)?.id ?? null;
     const modelOf = (personaId: string | null): string | null => {
       const persona = personas.find((p) => p.id === personaId);
-      return persona === undefined || isHumanPersona(persona) ? null : (deriveWorkerModel(persona, null).model ?? null);
+      return persona === undefined || isHumanPersona(persona) ? null : (deriveWorkerModel(persona).model ?? null);
     };
     const steps: FlowStepView[] = mergeChain(frame.phases, frame.currentId, entries)
       .map((step, index): FlowStepView | null => {
@@ -1515,7 +1474,7 @@ export class EngineBoardService {
         kind: p.kind,
         title: p.title,
         color: p.color,
-        model: isHumanPersona(p) ? '' : (deriveWorkerModel(p, null).model ?? ''),
+        model: isHumanPersona(p) ? '' : (deriveWorkerModel(p).model ?? ''),
       })),
       readOnly: frame.readOnly,
     };
@@ -3088,7 +3047,7 @@ export class EngineBoardService {
     );
     let personaDispatch: PersonaDispatch | null = null;
     if (personaResolution.persona !== null) {
-      const derived = deriveWorkerModel(personaResolution.persona, null);
+      const derived = deriveWorkerModel(personaResolution.persona);
       personaDispatch = {
         id: personaResolution.persona.id,
         role: personaResolution.persona.role,
@@ -4013,7 +3972,6 @@ export class EngineBoardService {
     worker?: string;
     model?: string;
     pool?: readonly string[];
-    router?: string;
     color?: string;
     skills?: readonly string[];
     prompt?: string;
@@ -4037,8 +3995,8 @@ export class EngineBoardService {
         return { ok: false, error: refusal };
       }
       const sent = (key: string): boolean =>
-        input[key as 'title' | 'role' | 'worker' | 'model' | 'pool' | 'router' | 'color' | 'skills' | 'prompt'] !== undefined;
-      if (!['title', 'role', 'worker', 'model', 'pool', 'router', 'color', 'skills', 'prompt'].some(sent)) {
+        input[key as 'title' | 'role' | 'worker' | 'model' | 'pool' | 'color' | 'skills' | 'prompt'] !== undefined;
+      if (!['title', 'role', 'worker', 'model', 'pool', 'color', 'skills', 'prompt'].some(sent)) {
         return { ok: true }; // nothing to change
       }
       const personaPath = `${PERSONAS_DIR}/${id}/persona.md`;
@@ -4050,12 +4008,11 @@ export class EngineBoardService {
         ...(input.title !== undefined ? { title: input.title.trim() } : {}),
         ...(input.role !== undefined ? { role: input.role as Persona['role'] } : {}),
         ...(input.worker !== undefined ? { worker: input.worker.trim() } : {}),
-        ...(input.model !== undefined || input.pool !== undefined || input.router !== undefined
+        ...(input.model !== undefined || input.pool !== undefined
           ? {
               models: {
                 default: input.model !== undefined ? input.model.trim() : persona.models.default,
                 pool: input.pool !== undefined ? input.pool.map((m) => m.trim()) : persona.models.pool,
-                router: input.router !== undefined ? (input.router as PersonaRouter) : persona.models.router,
               },
             }
           : {}),
@@ -4186,10 +4143,11 @@ export class EngineBoardService {
             title: migration.title,
             role: 'custom',
             worker: migration.worker,
-            models: { default: migration.model ?? 'opus', pool: [migration.model ?? 'opus'], router: 'off' },
+            models: { default: migration.model ?? 'opus', pool: [migration.model ?? 'opus'] },
             color: '#a78bfa',
             skills: [],
             budget: null,
+            allowed: { spendAboveAllowance: false },
           };
           const personaPath = `${PERSONAS_DIR}/${migration.id}/persona.md`;
           await this.host.write(vault.id, personaPath, personaFileText(persona));

@@ -32,6 +32,7 @@ import { READY_STATE } from './pipeline-states';
 import { runDependencyPass } from './blocked';
 import { parseRepos } from './repos-file';
 import { parseTicketFile, ticketPathParts } from './ticket-files';
+import { phaseMinClassOf } from './phase-min-class';
 
 const PHASE_ID = /^[a-z][a-z0-9-]*$/;
 /** `color:` in pipeline.md — a `#rrggbb` hex value (T-0084). */
@@ -137,6 +138,7 @@ export function parsePipeline(text: string): PipelineParse {
         ? auditRaw
         : null;
     const semantic = map['semantic'] === true;
+    const minClass = phaseMinClassOf(map['min-class'], id, issues);
     const colorRaw = map['color'];
     let color: string | null = null;
     if (typeof colorRaw === 'string' && colorRaw.trim() !== '') {
@@ -167,6 +169,7 @@ export function parsePipeline(text: string): PipelineParse {
       audit,
       semantic,
       color,
+      ...(minClass !== null ? { minClass } : {}),
     });
   }
   return { phases, pushRemote, priorities, error: null, issues };

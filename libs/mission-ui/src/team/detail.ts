@@ -14,7 +14,6 @@ import type {
   PersonaImprovementsView,
   PersonaMemoryView,
   PersonaPatch,
-  PersonaRouterView,
   PersonaThreadView,
 } from '../api/dto';
 import {
@@ -129,14 +128,6 @@ export function timeWordsOf(at: string): string {
 
 // --- the setup tab's pure moves ---------------------------------------------------
 
-/** The router cycle the setup row walks through, one PATCH per tap. */
-export const ROUTER_CYCLE: readonly PersonaRouterView[] = ['off', 'budget', 'escalate-on-fail'];
-
-export function nextRouterOf(current: PersonaRouterView): PersonaRouterView {
-  const at = ROUTER_CYCLE.indexOf(current);
-  return ROUTER_CYCLE[(at + 1) % ROUTER_CYCLE.length] ?? 'off';
-}
-
 /** The workers the setup sheet offers (the desk's harnesses). */
 export const WORKER_OPTIONS: readonly string[] = ['claude-code', 'opencode', 'kimi'];
 
@@ -161,7 +152,7 @@ export interface DetailActionReply {
 /**
  * The persona's facts the tabs render. Beyond the directory slice the
  * setup tab consumes an optional tolerant slice (model, pool, skills,
- * router, worker) — an adapter that carries only the base facts keeps
+ * worker) — an adapter that carries only the base facts keeps
  * every tab whole (the setup rows then show their dash).
  */
 export interface PersonaFacts {
@@ -178,8 +169,6 @@ export interface PersonaFacts {
   readonly pool?: readonly string[];
   /** The carried skill files; absent when the adapter omits them. */
   readonly skills?: readonly string[];
-  /** The routing policy; absent reads as `off` (the cycle's start). */
-  readonly router?: PersonaRouterView;
 }
 
 /** The persona detail's tabs — the conversation (`chat`, labelled 1:1) carries the improvement drafts, the thread and the composer in one place (D8). */
@@ -275,7 +264,7 @@ export const MC_TEAM_DETAIL = new InjectionToken<TeamDetailVm>('mc-team-detail',
  * coaching thread with the client-side prompt/memory/ticket intents and
  * their confirm cards), 1:1 (the friction proposals as cards with the
  * armed two-step Apply), Memory (the curated entries with pin toggles
- * and the manual add) and Setup (the mirror: model, pool, router,
+ * and the manual add) and Setup (the mirror: model, pool,
  * worker, the prompt editor and the skill switches — every change one
  * PATCH, one commit). Read-only paired devices watch: their mutations
  * hide entirely.
@@ -401,7 +390,6 @@ export class PersonaDetail {
         this.memError.set(null);
         this.pinBusy.set(null);
         this.pinError.set(null);
-        this.routerLocal.set(null);
         this.skillsLocal.set(null);
         this.promptDraft.set('');
         this.promptError.set(null);
@@ -745,13 +733,6 @@ export class PersonaDetail {
 
   // --- the setup tab -------------------------------------------------------------------
 
-  /** The local router mirror — the cycle keeps walking even when the desk never reports the policy back. */
-  protected readonly routerLocal = signal<PersonaRouterView | null>(null);
-
-  protected readonly routerValue = computed<PersonaRouterView>(
-    () => this.routerLocal() ?? this.persona()?.router ?? 'off',
-  );
-
   /** The local skills mirror — a toggle applies at once, the PATCH follows. */
   protected readonly skillsLocal = signal<readonly string[] | null>(null);
 
@@ -763,7 +744,7 @@ export class PersonaDetail {
 
   protected readonly promptError = signal<string | null>(null);
 
-  /** What a setup change is in flight for ('router' | 'model' | …); null = idle. */
+  /** What a setup change is in flight for ('model' | 'skills' | …); null = idle. */
   protected readonly setupBusy = signal<string | null>(null);
 
   protected readonly setupError = signal<string | null>(null);
@@ -819,16 +800,6 @@ export class PersonaDetail {
     }
     this.sheet.set(null);
     await this.runSetup(kind, kind === 'model' ? { model: value } : { worker: value }, value);
-  }
-
-  /** The router row's tap: walk the cycle, PATCH the next policy. */
-  protected async cycleRouter(): Promise<void> {
-    if (this.readOnly() || this.setupBusy() !== null) {
-      return;
-    }
-    const next = nextRouterOf(this.routerValue());
-    this.routerLocal.set(next);
-    await this.runSetup('router', { router: next }, next);
   }
 
   /** A skill switch: the local list flips at once, the new list PATCHes in one commit. */
@@ -892,9 +863,7 @@ export class PersonaDetail {
 
   /** Folds a refused change's local mirror back onto the persona facts. */
   private revertSetup(what: string): void {
-    if (what === 'router') {
-      this.routerLocal.set(null);
-    } else if (what === 'skills') {
+    if (what === 'skills') {
       this.skillsLocal.set(null);
     }
   }

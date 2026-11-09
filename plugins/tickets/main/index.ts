@@ -37,7 +37,6 @@ import {
 } from '../../../packages/tickets-engine/src/core/commands';
 import { parseTicketFile, patchHeaderFields, type HeaderPatch } from '../../../packages/tickets-engine/src/core/ticket-files';
 import { parseReviewComments, sendBackNoteOf } from '../../../packages/tickets-engine/src/core/review-feedback';
-import { personaModelFor } from '../../../packages/tickets-engine/src/core/persona';
 import { planWorktreeRemoval } from '../../../packages/tickets-engine/src/core/worktree-removal';
 import { captureTidyMessages, parseCaptureTidy } from '../shared/capture-tidy';
 import type { AttachmentReply, RefineReply, TicketReply } from '../shared/remote-protocol';
@@ -598,7 +597,7 @@ const plugin: MainPluginModule = {
       if (persona === undefined) {
         return { estimate: null };
       }
-      const model = personaModelFor(persona, null).model;
+      const model = persona.models.default;
       return { estimate: await board.estimateOf({ gate: p['gate'], persona: persona.id, model }) };
     });
 

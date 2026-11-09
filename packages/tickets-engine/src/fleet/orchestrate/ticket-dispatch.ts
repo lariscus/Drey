@@ -1,11 +1,10 @@
 import type { BoardSnapshot, PipelinePhase, RepoRef, TicketCard } from '../../contracts/tickets';
-import type { PersonaModelChoice } from '../../core/persona';
-import { personaModelFor } from '../../core/persona';
+import { splitPoolEntry } from '../../core/persona';
 import { TicketsGit } from '../../core/tickets-git';
 import { isAutoPhase, nextPhaseIdOf } from '../chain';
 import { readRepoInstructions, worktreeDiffStat } from '../context-pack';
 import { dkTargetFor } from '../dk-target';
-import { DEFAULT_FLEET_CAPS, type ChainConfig, type RunRequest } from '../protocol';
+import { DEFAULT_FLEET_CAPS, type ChainConfig, type ClassRequest, type PoolGrantDecision, type RunRequest } from '../protocol';
 import { composeRunRequest } from '../request';
 import { worktreePathFor } from '../worktree-home';
 import type { BoardPersonas, TicketPersona } from './board-personas';
@@ -17,12 +16,19 @@ import type { WaitNotes } from './wait-notes';
 
 export type DispatchOutcome = 'dispatched' | 'refused' | 'skipped';
 
+/** The capacity pool's grant for a dispatch (req-170): what was asked and what it granted. */
+export interface PoolGrantFor {
+  readonly request: ClassRequest;
+  readonly decision: PoolGrantDecision;
+}
+
 /** One planned dispatch: the card, the column it works in, and what the pass resolved for it. */
 export interface PlannedDispatch {
   readonly card: TicketCard;
   readonly workingPhaseId: string;
   readonly persona: TicketPersona | null;
-  readonly modelChoice: PersonaModelChoice | null;
+  /** req-170: the pool's grant; null without a pool (or on a ring dispatch). */
+  readonly grant: PoolGrantFor | null;
 }
 
 export interface TicketDispatchDeps {
@@ -33,6 +39,25 @@ export interface TicketDispatchDeps {
   readonly notes: WaitNotes;
   readonly log: (message: string) => void;
   readonly events?: FleetLedger;
+}
+
+/** The harness and model a persona runs: the pool's grant (req-170), else the persona's default. */
+function harnessOf(persona: { readonly worker: string; readonly models: { readonly default: string } }, grant: PoolGrantFor | null): { worker: string; model: string } {
+  const fallback = splitPoolEntry(persona.models.default);
+  const granted = grant?.decision ?? null;
+  if (granted === null) {
+    return { worker: fallback.provider ?? persona.worker, model: fallback.model };
+  }
+  return { worker: granted.provider, model: granted.model ?? fallback.model };
+}
+
+/** The request's pool fields: the class asked for, why, and what the ledgers need. */
+function poolParts(grant: PoolGrantFor | null): Pick<RunRequest, 'poolClass' | 'poolWhy' | 'ledger'> {
+  if (grant === null) {
+    return {};
+  }
+  const { request } = grant;
+  return { ...(request.class !== null ? { poolClass: request.class } : {}), poolWhy: request.why, ledger: request.ledger };
 }
 
 /** What the repo side of a dispatch resolved to. */
@@ -66,7 +91,7 @@ export class TicketDispatch {
     for (const truncation of composed.truncations) {
       this.deps.log(`instruction: ${card.id} ${truncation.section} truncated: true, originalSize ${truncation.originalSize}`);
     }
-    return this.start(planned, composed.request, composed.persona);
+    return this.start(planned, { ...composed.request, ...poolParts(planned.grant) }, composed.persona);
   }
 
   /** The target, the instruction base and the ticket's text; null (said once) when one of them is missing. */
@@ -86,13 +111,13 @@ export class TicketDispatch {
   }
 
   private async start(planned: PlannedDispatch, request: RunRequest, persona: string | null): Promise<DispatchOutcome> {
-    const { card, workingPhaseId, modelChoice } = planned;
+    const { card, workingPhaseId, grant } = planned;
     const outcome = await this.deps.directory.start(request, { persona });
     if (!outcome.ok) {
       this.deps.notes.skip(card.id, `dispatch refused ${card.id}: ${outcome.error}`);
       return 'refused';
     }
-    const choice = modelChoice !== null && (planned.persona?.persona ?? null) !== null ? ` — model ${modelChoice.model}: ${modelChoice.reason}` : '';
+    const choice = grant !== null ? ` — ${grant.decision.reason}` : '';
     const model = request.model !== null ? `/${request.model}` : '';
     const who = `${persona !== null ? `, persona ${persona}` : ''}${request.form === 'scout' ? ', scout' : ''}`;
     this.deps.log(`dispatched ${card.id} (${workingPhaseId} pool, ${request.provider}${model}${who}) as ${outcome.run.id}${choice}`);
@@ -184,13 +209,11 @@ export class TicketDispatch {
     if (persona === null) {
       return {};
     }
-    const choice = planned.modelChoice;
     return {
       persona: {
         id: persona.id,
         role: persona.role,
-        worker: choice?.provider ?? persona.worker, // D-62: a pool entry may name its own provider
-        model: (choice ?? personaModelFor(persona, null)).model,
+        ...harnessOf(persona, planned.grant),
         prompt: prompt.personaPrompt,
         memory: entry?.memory ?? '',
         skills: entry?.skills ?? [],

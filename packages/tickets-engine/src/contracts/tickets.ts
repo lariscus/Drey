@@ -11,6 +11,7 @@
  * reachable; the plugin renderer bundle may not import packages).
  */
 import type { ChainEntry } from './chain';
+import type { TicketPoolMeta } from './ticket-pool-meta';
 import type { RepoRef } from './repo-ref';
 import type { PriorityConfig, TicketPriority } from './ticket-priority';
 
@@ -127,7 +128,7 @@ export interface TicketRun {
 }
 
 /** Parsed, normalized ticket frontmatter (all optionals reflect absence). */
-export interface TicketMeta {
+export interface TicketMeta extends TicketPoolMeta {
   readonly id: string | null;
   readonly title: string | null;
   /**
@@ -307,6 +308,8 @@ export interface PipelinePhase {
    * null = the curated default palette colours by board position.
    */
   readonly color: string | null;
+  /** The phase's class floor (`min-class:`, req-170): no run of it asks the pool for a lighter class; absent = none. */
+  readonly minClass?: 'A' | 'B' | 'C' | null;
 }
 
 /** The default for a phase entry that omits the M85 pool keys —

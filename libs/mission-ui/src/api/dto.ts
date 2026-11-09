@@ -204,9 +204,6 @@ export interface PersonaRun {
   readonly state: RunStateView;
 }
 
-/** The persona's routing policy inside its pool (the engine's PersonaRouter). */
-export type PersonaRouterView = 'off' | 'budget' | 'escalate-on-fail';
-
 /** One live run of a persona, as the Team card's run rows render it (E12-4). */
 export interface LiveRunView {
   readonly runId: string;
@@ -279,11 +276,6 @@ export interface PersonaView {
    * when the desk omits them — the setup tab's skills group hides then.
    */
   readonly skills?: readonly string[];
-  /**
-   * The routing policy inside the pool; absent when the desk omits it —
-   * the setup tab reads that as the `off` its cycle starts from.
-   */
-  readonly router?: PersonaRouterView;
 }
 
 export interface TeamView {
@@ -380,7 +372,6 @@ export interface PersonaPatch {
   readonly worker?: string;
   readonly model?: string;
   readonly pool?: readonly string[];
-  readonly router?: PersonaRouterView;
   readonly color?: string;
   readonly skills?: readonly string[];
   readonly prompt?: string;
@@ -1071,7 +1062,6 @@ function personaOf(raw: unknown): PersonaView | null {
   const dailyCost = moneyOf(persona['dailyCost']);
   const phases = strArray(persona['phases']);
   const skills = strArray(persona['skills']);
-  const router = routerOf(persona['router']);
   const paused = personasPausedOf(persona['paused']);
   return {
     id,
@@ -1089,18 +1079,12 @@ function personaOf(raw: unknown): PersonaView | null {
     ...(phases.length > 0 ? { phases } : {}),
     ...(paused !== undefined ? { paused } : {}),
     ...(skills.length > 0 ? { skills } : {}),
-    ...(router !== null ? { router } : {}),
   };
 }
 
 /** The persona's `paused` flag; undefined when the desk omits it or junks it. */
 function personasPausedOf(value: unknown): boolean | undefined {
   return value === true ? true : value === false ? false : undefined;
-}
-
-/** The routing policy off the wire; anything unknown reads as omitted. */
-function routerOf(value: unknown): PersonaRouterView | null {
-  return value === 'budget' || value === 'escalate-on-fail' || value === 'off' ? value : null;
 }
 
 /**

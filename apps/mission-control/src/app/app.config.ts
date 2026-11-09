@@ -253,7 +253,6 @@ export const appConfig: ApplicationConfig = {
               model?: string;
               pool?: readonly string[];
               skills?: readonly string[];
-              router?: PersonaFacts['router'];
             }[]
           ).find((p) => p.id === open.id);
           return found ?? { id: open.id, title: open.id, role: '', color: '' };

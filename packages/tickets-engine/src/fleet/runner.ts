@@ -26,6 +26,7 @@ import { ChainRoutes } from './api/chain-routes';
 import { EventHub } from './api/event-hub';
 import { EventStream } from './api/event-stream';
 import { LifecycleRoutes } from './api/lifecycle-routes';
+import { ModelRoutes } from './api/model-routes';
 import { RunReadRoutes } from './api/run-read-routes';
 import { RunWriteRoutes } from './api/run-write-routes';
 import { RunnerHttpApi } from './api/runner-http-api';
@@ -42,7 +43,7 @@ import type { Orchestrator, FleetEvents } from './orchestrator';
 import type { RunSupervisor } from './orchestrate/run-supervisor';
 import { SupervisorSet } from './orchestrate/supervisor-set';
 import { freePort, nodeSpawnFn, scrubInheritedEnv } from './procs';
-import type { RunnerDescriptor, WorkerProviderId } from './protocol';
+import type { PoolLoad, RunnerDescriptor, SlotView, WorkerProviderId } from './protocol';
 import { claudeCodeAdapter } from './harness/claude-code';
 import { opencodeAdapter } from './harness/opencode';
 import { peerAlive, readDescriptor, removeDescriptor, writeDescriptor } from './runner-descriptor';
@@ -52,6 +53,9 @@ import { NodeFileSystem } from './node-file-system';
 import { SYSTEM_CLOCK } from './ports/clock';
 import type { QuotaHttp } from './routing/quota-source';
 import { RunnerLog } from './runner-log';
+import { PoolCapacity } from './orchestrate/pool-capacity';
+import { fetchTotalSlots } from './orchestrate/pool-sizes';
+import type { DispatchPool } from './orchestrate/dispatch-pool';
 import { DkTicketStores } from './store/dk-ticket-store';
 
 const VERSION = 1;
@@ -137,6 +141,8 @@ interface FleetContext {
   readonly events: FleetEvents;
   readonly hub: EventHub;
   readonly routing: Routing;
+  /** The provider pools' throttle (req-63), shared by the pool and the chain. */
+  readonly capacity: PoolCapacity;
 }
 
 /** The service home: `--home`, else the parent of a `<home>/fleet` root, else the root itself (a spec's temp root). */
@@ -145,16 +151,34 @@ function serviceHome(args: Args): string {
 }
 
 /** The slots (req-177): their changes go out as `slot` events, the runs' events come back in. */
-function routingFor(args: Args, deps: RunnerDeps, log: (message: string) => void, hub: EventHub): Routing {
+function routingFor(args: Args, deps: RunnerDeps, ctx: { log: (message: string) => void; hub: EventHub; capacity: PoolCapacity }): Routing {
+  const { log, hub, capacity } = ctx;
   const http = deps.quotaHttp !== undefined ? { http: deps.quotaHttp } : {};
-  const routing = composeRouting({ home: serviceHome(args), userHome: deps.userHome ?? homedir(), env: process.env, fs: new NodeFileSystem(), clock: SYSTEM_CLOCK, log, publish: (slot) => hub.publish({ kind: 'slot', slot }), ...http });
-  hub.subscribe((event) => routing.listener.publish(event));
+  const publish = { publish: (slot: SlotView) => hub.publish({ kind: 'slot', slot }), publishPool: (pool: PoolLoad) => hub.publish({ kind: 'pool', pool }) };
+  const routing = composeRouting({ home: serviceHome(args), userHome: deps.userHome ?? homedir(), env: process.env, fs: new NodeFileSystem(), clock: SYSTEM_CLOCK, log, throttle: capacity, ...publish, ...http });
+  hub.subscribe((event) => {
+    routing.listener.publish(event);
+    routing.pool.book.publish(event);
+  });
   return routing;
+}
+
+/** The records a restart found: the slots re-reserve the live ones, the ledgers count them all. */
+function seedRouting(routing: Routing, supervisors: SupervisorSet): void {
+  const found = supervisors.records().map((record) => record.info);
+  routing.listener.seed(found);
+  routing.pool.book.seed(found);
+}
+
+/** The capacity pool as the chain's dispatch asks it (req-170). */
+function dispatchPoolOf(routing: Routing): DispatchPool {
+  const { pool } = routing;
+  return { classes: pool.grant, queue: pool.queue, load: () => pool.load(), sessionsOf: (provider) => pool.sessionsOf(provider) };
 }
 
 /** The supervisors, one per provider, and the chain over them; the settle hook closes the loop back to the chain. */
 function composeFleet(ctx: FleetContext): { supervisors: SupervisorSet; orchestrator: Orchestrator } {
-  const { root, log, events, hub, routing } = ctx;
+  const { root, log, events, hub, routing, capacity } = ctx;
   const stores = new DkTicketStores();
   const shared = composeShared(stores.storeFor, log, undefined, { sink: hub });
   const adapters = [opencodeAdapter(nodeSpawnFn()), claudeCodeAdapter(nodeSpawnFn()), kimiAdapter(nodeSpawnFn(), nodeKimiUsageReader())];
@@ -181,6 +205,9 @@ function composeFleet(ctx: FleetContext): { supervisors: SupervisorSet; orchestr
     events,
     bookkeeper: shared.bookkeeper,
     slots: routing.registry,
+    pool: dispatchPoolOf(routing),
+    capacity,
+    migratePools: (config) => routing.pool.migrate(config.pools),
     supervisorOf: (provider) => supervisors.forProvider(provider),
     // E14-5b: a killed runner's claims on a dricket store are released before the chain's first dispatch there.
     releaseLeftovers: async (store, pipeline) => {
@@ -237,10 +264,11 @@ export async function startRunner(args: Args, deps: RunnerDeps = {}): Promise<Ru
   const ledger = ledgerOf(log.line);
   const hub = new EventHub();
   const stream = new EventStream(hub);
-  const routing = routingFor(args, deps, log.line, hub);
-  const { supervisors, orchestrator } = composeFleet({ root: args.root, log: log.line, events: ledger.events, hub, routing });
+  const capacity = new PoolCapacity(fetchTotalSlots, SYSTEM_CLOCK, log.line);
+  const routing = routingFor(args, deps, { log: log.line, hub, capacity });
+  const { supervisors, orchestrator } = composeFleet({ root: args.root, log: log.line, events: ledger.events, hub, routing, capacity });
   await supervisors.adoptAll();
-  routing.listener.seed(supervisors.records().map((record) => record.info));
+  seedRouting(routing, supervisors);
   await routing.start();
   await orchestrator.load();
   const descriptor: RunnerDescriptor = { port: await freePort(), token: crypto.randomBytes(24).toString('hex'), pid: process.pid, startedAt: new Date().toISOString(), version: VERSION, build };
@@ -252,7 +280,7 @@ export async function startRunner(args: Args, deps: RunnerDeps = {}): Promise<Ru
   const exit = new RunnerExit({ exit: exitProcess, log, orchestrator, supervisors, idle, idleMs: args.idleMs, descriptorPath: writesDescriptor ? descriptorPath : null, closeStreams });
   const api = new RunnerHttpApi(
     descriptor.token,
-    [new LifecycleRoutes(exit, supervisors, log, { version: VERSION, build }), new ChainRoutes(orchestrator, supervisors, exit, ledger.setVault), new RunReadRoutes(supervisors), new RunWriteRoutes(supervisors), new SlotRoutes(routing.registry, routing.config, routing.check), stream],
+    [new LifecycleRoutes(exit, supervisors, log, { version: VERSION, build }), new ChainRoutes(orchestrator, supervisors, exit, ledger.setVault), new RunReadRoutes(supervisors), new RunWriteRoutes(supervisors), new SlotRoutes(routing.registry, routing.config, routing.check), new ModelRoutes(routing.poolDesk, routing.config), stream],
     { exit, idle },
   );
   const server = api.server();

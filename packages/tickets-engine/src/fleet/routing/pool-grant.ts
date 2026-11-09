@@ -1,4 +1,4 @@
-import type { ClassRequest, FullLedger, ModelRow, PoolDecision, PoolEntry, PoolGrantDecision, PoolWaitDecision, QueueReason, SlotView, WorkerProviderId } from '../protocol';
+import type { CapabilityClass, ClassRequest, FullLedger, ModelRow, PoolDecision, PoolEntry, PoolGrantDecision, PoolWaitDecision, QueueReason, SlotView, WorkerProviderId } from '../protocol';
 import type { CapacityCap } from './capacity-cap';
 import type { Ledgers } from './ledgers';
 import { UNTABLED_COST } from './model-table';
@@ -74,6 +74,11 @@ export class PoolGrant {
       }
     }
     return this.waitOf(request, refusals);
+  }
+
+  /** The class the model table gives a pool entry (its first row); null when the table does not hold it. */
+  classOf(entry: PoolEntry): CapabilityClass | null {
+    return entry.model === null ? null : (this.deps.settings.table().rowsOf(entry.model, entry.provider)[0]?.class ?? null);
   }
 
   /** The rows of the pool's entries that match the class, strongest entry first. */

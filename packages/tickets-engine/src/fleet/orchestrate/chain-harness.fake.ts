@@ -120,7 +120,6 @@ export interface PersonaSeed {
   readonly worker?: string;
   readonly model?: string;
   readonly pool?: readonly string[];
-  readonly router?: string;
   readonly role?: string;
   readonly prompt?: string | null;
   readonly memory?: string;
@@ -201,7 +200,7 @@ export class ChainHarness {
   async writePersona(id: string, over: PersonaSeed = {}): Promise<void> {
     const model = over.model ?? 'opus';
     const head = ['---', `title: ${id}`, `role: ${over.role ?? 'builder'}`, `worker: ${over.worker ?? 'opencode'}`, 'models:', `  default: ${model}`];
-    const tail = [`  pool: [${(over.pool ?? [model]).join(', ')}]`, `  router: ${over.router ?? 'off'}`, "color: '#a78bfa'", `skills: [${(over.skills ?? []).join(', ')}]`, '---', ''];
+    const tail = [`  pool: [${(over.pool ?? [model]).join(', ')}]`, "color: '#a78bfa'", `skills: [${(over.skills ?? []).join(', ')}]`, '---', ''];
     await this.write(`tickets/_meta/personas/${id}/persona.md`, [...head, ...tail].join('\n'));
     if (over.prompt != null) {
       await this.write(`tickets/_meta/personas/${id}/prompt.md`, over.prompt);

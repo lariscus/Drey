@@ -15,7 +15,7 @@ import {
   signal,
   type Signal,
 } from '@angular/core';
-import type { CapacityView, LiveRunView, PersonaRouterView } from '../api/dto';
+import type { CapacityView, LiveRunView } from '../api/dto';
 
 /**
  * The wire DTO of `GET /api/personas` — duplicated from the engine's
@@ -50,8 +50,6 @@ export interface McPersonaView {
   readonly paused?: boolean;
   /** The skill files the persona carries; absent when the desk omits them. */
   readonly skills?: readonly string[];
-  /** The routing policy inside the pool; absent when the desk omits it. */
-  readonly router?: PersonaRouterView;
 }
 
 /** The fleet run states (packages/tickets-engine/src/fleet/protocol.ts), duplicated locally. */

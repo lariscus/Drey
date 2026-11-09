@@ -1,17 +1,20 @@
 import type { BoardColumn, BoardSnapshot, PipelinePhase } from '../../contracts/tickets';
-import { planDispatch } from '../chain';
+import { planDispatch, type PlannedDispatch as PlanItem } from '../chain';
 import type { Clock } from '../ports/clock';
-import { normalizeFleetPools, type ChainConfig, type ColumnMode, type WorkerProviderId } from '../protocol';
+import { normalizeFleetPools, type ChainConfig, type ClassRequest, type ColumnMode, type PoolWaitDecision, type WorkerProviderId } from '../protocol';
 import { BLOCKING_RUN_STATES, LIVE_RUN_STATES } from '../run/run-state';
 import type { BoardPersonas, TicketPersona } from './board-personas';
 import type { ChainBoard } from './chain-board';
 import type { ChainState } from './chain-state';
+import { ClassRequestBuilder } from './class-request-builder';
+import type { DispatchPool } from './dispatch-pool';
 import type { HumanGates } from './human-gates';
+import type { LedgerCards } from './ledger-cards';
 import { messageOf } from './live-run';
 import { PassPools } from './pass-pools';
 import type { PoolCapacity } from './pool-capacity';
 import type { SupervisorDirectory } from './supervisor-directory';
-import type { TicketDispatch } from './ticket-dispatch';
+import type { DispatchOutcome, PoolGrantFor, TicketDispatch } from './ticket-dispatch';
 import type { WaitContext } from './wait-lines';
 import type { WaitNotes } from './wait-notes';
 
@@ -29,6 +32,10 @@ export interface DispatcherDeps {
   /** The pass read the pipeline: drop stale phase state and write `chain.json`. */
   readonly pipelineRead: () => Promise<void>;
   readonly persist: () => Promise<void>;
+  /** req-170: the capacity pool every persona dispatch asks for its class; absent = no class requests. */
+  readonly pool?: DispatchPool;
+  /** req-170: the Needs-you card of a full ledger. */
+  readonly ledgerCards?: LedgerCards;
 }
 
 /** What a pass found occupied: the live runs per pool and the tickets the plan must leave alone. */
@@ -37,15 +44,33 @@ interface Occupancy {
   readonly busy: Set<string>;
 }
 
+/** What one pass dispatches over. */
+interface Pass {
+  readonly plan: readonly PlanItem[];
+  readonly personas: ReadonlyMap<string, TicketPersona>;
+  readonly pools: PassPools;
+}
+
+/** A plan item's class request and the pool's answer. */
+interface Asked {
+  readonly request: ClassRequest;
+  readonly grant: PoolGrantFor | null;
+  readonly wait: PoolWaitDecision | null;
+}
+
 /**
  * One dispatch round (M85, ADR-0077): read the board, count the pools,
  * resolve the personas, park the human's gates, plan with the pure rules of
- * `chain.ts`, start what is due, and say why the rest waits.
+ * `chain.ts`, ask the capacity pool for each persona's class (req-170),
+ * start what it grants, and say why the rest waits.
  */
 export class Dispatcher {
   private passing = false;
+  private readonly classes: ClassRequestBuilder | null;
 
-  constructor(private readonly deps: DispatcherDeps) {}
+  constructor(private readonly deps: DispatcherDeps) {
+    this.classes = deps.pool === undefined ? null : new ClassRequestBuilder(deps.pool.classes);
+  }
 
   async pass(): Promise<void> {
     const config = this.deps.state.config;
@@ -79,12 +104,12 @@ export class Dispatcher {
     if (running) {
       await this.deps.humanGates.park(config, { snap, resolved: personas, busy: occupied.busy, modes });
     }
-    const pools = new PassPools(config, snap, personas, this.deps.directory);
+    const pools = new PassPools(config, snap, personas, this.deps.pool !== undefined);
     const plan = planDispatch({
       master: state.master,
       columns: snap.columns,
       modes,
-      poolSize: this.deps.pools.sizes(config),
+      poolSize: this.deps.pools.sizes(config, this.sessionsOf()),
       liveByPool: occupied.liveByPool,
       poolOf: pools.poolOf,
       busyTickets: occupied.busy,
@@ -98,15 +123,66 @@ export class Dispatcher {
     for (const [cardId, entry] of paused) {
       this.deps.notes.skip(cardId, `dispatch holds ${cardId}: persona "${entry.resolution.persona}" is paused — play the persona again to release its tickets`);
     }
+    const refusedByColumn = await this.dispatchPlan(config, snap, { plan, personas, pools });
+    this.noteWaits(snap, pools, { busy: occupied.busy, dispatched: new Set(plan.map((item) => item.card.id)), refusedByColumn });
+    this.deps.notes.endPass();
+  }
+
+  /** The plan's bound per provider: its slots' sessions with the pool, the plugin's pool sizes without. */
+  private sessionsOf(): ((provider: WorkerProviderId) => number | null) | undefined {
+    const pool = this.deps.pool;
+    return pool === undefined ? undefined : (provider) => pool.sessionsOf(provider);
+  }
+
+  /** Starts what the plan holds, in its order; a persona's class request waits when the pool has no room (no process). */
+  private async dispatchPlan(config: ChainConfig, snap: BoardSnapshot, pass: Pass): Promise<Map<string, string>> {
     const refusedByColumn = new Map<string, string>();
-    for (const item of plan) {
-      const outcome = await this.deps.dispatch.dispatch(config, snap, { card: item.card, workingPhaseId: item.workingPhase, persona: personas.get(item.card.id) ?? null, modelChoice: pools.choiceOf(item.card.id) });
+    this.deps.pool?.queue.begin();
+    for (const item of pass.plan) {
+      const outcome = await this.dispatchOne(config, snap, item, pass);
       if (outcome === 'refused' && !refusedByColumn.has(item.workingPhase)) {
         refusedByColumn.set(item.workingPhase, item.card.id);
       }
     }
-    this.noteWaits(snap, pools, { busy: occupied.busy, dispatched: new Set(plan.map((item) => item.card.id)), refusedByColumn });
-    this.deps.notes.endPass();
+    this.deps.pool?.queue.end();
+    return refusedByColumn;
+  }
+
+  /** One plan item: the class request first (a wait queues it), then the start; a granted ticket's ledger cards resolve. */
+  private async dispatchOne(config: ChainConfig, snap: BoardSnapshot, item: PlanItem, pass: Pass): Promise<DispatchOutcome | 'queued'> {
+    const persona = pass.personas.get(item.card.id) ?? null;
+    const asked = pass.pools.asksPool(item.card) ? this.ask(snap, item, persona) : null;
+    if (asked !== null && asked.wait !== null) {
+      await this.queued(config, item, asked.request, asked.wait);
+      return 'queued';
+    }
+    const outcome = await this.deps.dispatch.dispatch(config, snap, { card: item.card, workingPhaseId: item.workingPhase, persona, grant: asked?.grant ?? null });
+    if (outcome === 'dispatched' && asked !== null) {
+      await this.deps.ledgerCards?.resolve(config, item.card.id);
+    }
+    return outcome;
+  }
+
+  /** The class request of a persona's dispatch and the pool's answer; null when it cannot be built. */
+  private ask(snap: BoardSnapshot, item: PlanItem, entry: TicketPersona | null): Asked | null {
+    const phase = snap.pipeline.find((p) => p.id === item.workingPhase) ?? null;
+    const persona = entry?.persona ?? null;
+    if (this.classes === null || this.deps.pool === undefined || phase === null || persona === null) {
+      return null;
+    }
+    const repo = item.card.meta.repo === null ? null : (snap.repos.find((r) => r.name === item.card.meta.repo) ?? null);
+    const request = this.classes.build({ card: item.card, phase, persona, repo });
+    const decision = this.deps.pool.classes.choose(request);
+    return decision.kind === 'grant' ? { request, grant: { request, decision }, wait: null } : { request, grant: null, wait: decision };
+  }
+
+  /** No room for the class: the task queues — the card's line, the log once, a ledger's Needs-you card. */
+  private async queued(config: ChainConfig, item: PlanItem, request: ClassRequest, wait: PoolWaitDecision): Promise<void> {
+    this.deps.pool?.queue.wait({ ticket: item.card.id, persona: request.persona, class: request.class, reason: wait.reason, line: wait.line, detail: wait.detail });
+    this.deps.notes.skip(item.card.id, `dispatch waits ${item.card.id}: queued · ${wait.line} — ${wait.detail} (asked ${request.class ?? 'a pinned model'}: ${request.why})`);
+    if (wait.ledger !== undefined) {
+      await this.deps.ledgerCards?.raise(config, item.card.id, wait.ledger);
+    }
   }
 
   /** A worker waiting on the owner takes no pool slot (a pool of one used to block on one question); its ticket stays busy. */
@@ -126,6 +202,7 @@ export class Dispatcher {
 
   private noteWaits(snap: BoardSnapshot, pools: PassPools, pass: Pick<WaitContext, 'busy' | 'dispatched' | 'refusedByColumn'>): void {
     if (this.deps.state.master !== 'run') {
+      this.deps.pool?.queue.clear();
       return; // the chain is off — silence is the honest state
     }
     const detached = new Set(this.deps.directory.all().filter((r) => r.info.state === 'detached').map((r) => r.info.ticketId));

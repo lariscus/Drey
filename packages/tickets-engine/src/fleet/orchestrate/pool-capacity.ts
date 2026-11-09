@@ -2,6 +2,18 @@ import type { Clock } from '../ports/clock';
 import { normalizeFleetPools, WORKER_PROVIDERS, type ChainConfig, type FleetPools, type RunInfo, type WorkerProviderId } from '../protocol';
 import { effectivePoolSizes, isQuotaError, isRateLimitError, POOL_PROBE_INTERVAL_MS, QUOTA_PAUSE_MS, RATE_LIMIT_SHRINK_MS, type PoolShrink } from './pool-sizes';
 
+/** No limit of its own: a provider whose slots serve unbounded sessions. */
+const UNBOUNDED = Number.MAX_SAFE_INTEGER;
+
+/** The pools with each provider's size taken from its slots' sessions. */
+function bySessions(pools: FleetPools, sessionsOf: (provider: WorkerProviderId) => number | null): FleetPools {
+  const out = { ...pools } as Record<WorkerProviderId, FleetPools[WorkerProviderId]>;
+  for (const provider of WORKER_PROVIDERS) {
+    out[provider] = { ...pools[provider], size: sessionsOf(provider) ?? UNBOUNDED };
+  }
+  return out;
+}
+
 /** Asks a pool's server for its parallel slots; null when it gives no count. */
 export type SlotProbe = (baseUrl: string) => Promise<number | null>;
 
@@ -21,13 +33,41 @@ export class PoolCapacity {
     private readonly log: (message: string) => void,
   ) {}
 
-  /** The sizes the next dispatch pass plans with. */
-  sizes(config: ChainConfig | null): Record<WorkerProviderId, number> {
+  /**
+   * The sizes the next dispatch pass plans with. With the capacity pool
+   * (req-170) a provider's size is the sessions its slots serve
+   * (`sessionsOf`, unbounded = no limit of its own); without it the
+   * plugin's `fleet.pool.<provider>.size` stands (every older wiring).
+   */
+  sizes(config: ChainConfig | null, sessionsOf?: (provider: WorkerProviderId) => number | null): Record<WorkerProviderId, number> {
     const probed: Partial<Record<WorkerProviderId, number | null>> = {};
     for (const provider of WORKER_PROVIDERS) {
       probed[provider] = this.probed[provider]?.slots ?? null;
     }
-    return effectivePoolSizes({ pools: config?.pools ?? normalizeFleetPools(undefined), probed, shrink: this.shrink, nowMs: this.clock.now().getTime(), pausedUntil: this.quotaPause });
+    const configured = config?.pools ?? normalizeFleetPools(undefined);
+    const pools = sessionsOf === undefined ? configured : bySessions(configured, sessionsOf);
+    return effectivePoolSizes({ pools, probed, shrink: this.shrink, nowMs: this.clock.now().getTime(), pausedUntil: this.quotaPause });
+  }
+
+  /**
+   * req-170's throttle for the pool: a provider paused for its quota takes
+   * nothing; a rate limit's shrink or a local server's slot count lowers its
+   * ceiling below the sessions its slots serve (`base`, null = unbounded).
+   */
+  refusal(provider: WorkerProviderId, live: number, base: number | null): string | null {
+    const pausedUntil = this.quotaPause[provider];
+    if (pausedUntil !== undefined && this.clock.now().getTime() < pausedUntil) {
+      return `${provider} is out of quota until ${new Date(pausedUntil).toISOString()}`;
+    }
+    const probe = this.probed[provider]?.slots ?? null;
+    const shrink = this.shrink[provider];
+    const shrunk = shrink !== undefined && this.clock.now().getTime() < shrink.untilMs ? shrink.count : 0;
+    const bound = probe === null ? base : base === null ? probe : Math.min(base, probe);
+    if (bound === null) {
+      return null;
+    }
+    const ceiling = Math.max(1, bound - shrunk);
+    return live >= ceiling ? `${provider} runs ${live} of ${ceiling} sessions${shrunk > 0 ? ' (a rate limit shrank it)' : ''}` : null;
   }
 
   /** The quota pauses still running, as ISO instants. */

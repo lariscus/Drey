@@ -21,12 +21,10 @@ import {
   EVIDENCE_PREVIEW_CAP,
   MC_TEAM_DETAIL,
   PersonaDetail,
-  ROUTER_CYCLE,
   WORKER_OPTIONS,
   chatIntentOf,
   contentPreviewOf,
   evidencePreviewOf,
-  nextRouterOf,
   poolWordsOf,
   proposalsSplitOf,
   skillsToggled,
@@ -253,8 +251,6 @@ interface DetailSurface {
   onMemDraftInput(event: Event): void;
   addMemory(): Promise<void>;
   togglePin(index: number, pinned: boolean): Promise<void>;
-  routerLocal: WritableSignal<string | null>;
-  routerValue: Signal<string>;
   skillsLocal: WritableSignal<readonly string[] | null>;
   skillsValue: Signal<readonly string[]>;
   promptDraft: WritableSignal<string>;
@@ -270,7 +266,6 @@ interface DetailSurface {
   openSheet(which: 'model' | 'worker'): void;
   closeSheet(): void;
   pick(kind: 'model' | 'worker', value: string): Promise<void>;
-  cycleRouter(): Promise<void>;
   toggleSkill(name: string): Promise<void>;
   savePrompt(): Promise<void>;
   poolTap(): void;
@@ -649,13 +644,6 @@ describe('snippetOf and timeWordsOf', () => {
 });
 
 describe('the setup tab’s pure moves', () => {
-  it('the router cycle walks off → budget → escalate-on-fail → off', () => {
-    expect(ROUTER_CYCLE).toEqual(['off', 'budget', 'escalate-on-fail']);
-    expect(nextRouterOf('off')).toBe('budget');
-    expect(nextRouterOf('budget')).toBe('escalate-on-fail');
-    expect(nextRouterOf('escalate-on-fail')).toBe('off');
-  });
-
   it('the skill toggle drops a carried name and adds a missing one', () => {
     expect(skillsToggled(['a', 'b'], 'a')).toEqual(['b']);
     expect(skillsToggled(['b'], 'a')).toEqual(['b', 'a']);
@@ -907,38 +895,6 @@ describe('the memory tab', () => {
 describe('the setup tab', () => {
   const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
-  it('the router row cycles off → budget → escalate-on-fail → off with one PATCH per tap', async () => {
-    const fake = makeVm();
-    const vm = surface(setup(fake));
-    expect(vm.routerValue()).toBe('off');
-
-    await vm.cycleRouter();
-    expect(vm.routerValue()).toBe('budget');
-    await vm.cycleRouter();
-    expect(vm.routerValue()).toBe('escalate-on-fail');
-    await vm.cycleRouter();
-    expect(vm.routerValue()).toBe('off');
-    expect(fake.patched).toEqual([
-      { router: 'budget' },
-      { router: 'escalate-on-fail' },
-      { router: 'off' },
-    ]);
-    await flush();
-  });
-
-  it('the router commit toasts the commit words; a refusal reverts the local mirror', async () => {
-    const fake = makeVm();
-    const vm = surface(setup(fake));
-    await vm.cycleRouter();
-    expect(fake.toasts[0]?.message).toBe('personas: pia router → budget (commit)');
-
-    const refused = makeVm({ patchReplies: [{ ok: false, error: 'the desk refused' }] });
-    const vm2 = surface(setup(refused));
-    await vm2.cycleRouter();
-    expect(vm2.routerValue()).toBe('off');
-    expect(vm2.setupError()).toBe('the desk refused');
-  });
-
   it('the model sheet offers the pool (the current model as the fallback) and picks with a PATCH', async () => {
     const fake = makeVm();
     const vm = surface(setup(fake));
@@ -1024,13 +980,11 @@ describe('the setup tab', () => {
     const fake = makeVm({ readonly: true });
     const vm = surface(setup(fake));
     vm.openSheet('model');
-    await vm.cycleRouter();
     await vm.toggleSkill('diff-review.md');
     vm.promptDraft.set('New text');
     await vm.savePrompt();
     expect(fake.patched).toEqual([]);
     expect(vm.sheet()).toBeNull();
-    expect(vm.routerValue()).toBe('off');
   });
 });
 

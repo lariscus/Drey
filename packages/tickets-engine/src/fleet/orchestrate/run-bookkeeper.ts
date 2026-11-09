@@ -148,6 +148,14 @@ export class RunBookkeeper {
     return parked;
   }
 
+  /** req-170: a full ledger's Needs-you card (a keyed `blocked:` comment), or its `resolved:` once the pool grants again. */
+  async ledgerCard(door: ChainCardDoor, ticketId: string, card: { readonly key: string; readonly text: string | null }): Promise<void> {
+    const comment = card.text === null ? renderStatusComment({ verb: 'resolved', key: card.key }) : renderStatusComment({ verb: 'blocked', key: card.key, text: card.text });
+    if (comment !== null) {
+      await door.comment(ticketId, comment, this.parts.actor);
+    }
+  }
+
   private predatesStore(run: LiveRun, what: string): WriteResult {
     this.parts.log(`run ${run.info.id}: ${run.request.ticketId} predates the store - nothing is ${what}`);
     return { ok: true };

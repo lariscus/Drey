@@ -1545,7 +1545,7 @@ describe('parseTeam: the chain slice (prototype convergence)', () => {
     ]);
   });
 
-  it('carries the persona phases, paused, skills and router tolerantly', () => {
+  it('carries the persona phases, paused, skills tolerantly', () => {
     const team = parseTeam(
       [
         {
@@ -1554,9 +1554,8 @@ describe('parseTeam: the chain slice (prototype convergence)', () => {
           phases: ['plan', 'shape'],
           paused: true,
           skills: ['repo-recherche.md', 'fragen-formulieren.md'],
-          router: 'budget',
         },
-        { id: 'ben', phases: [], skills: [], router: 'sideways', paused: 'yes' },
+        { id: 'ben', phases: [], skills: [], paused: 'yes' },
       ],
       null,
     );
@@ -1564,7 +1563,6 @@ describe('parseTeam: the chain slice (prototype convergence)', () => {
       phases: ['plan', 'shape'],
       paused: true,
       skills: ['repo-recherche.md', 'fragen-formulieren.md'],
-      router: 'budget',
     });
     // Absent or junk on the wire reads as omitted — the slots hide, never a guess.
     expect(team.personas[1]).toEqual({

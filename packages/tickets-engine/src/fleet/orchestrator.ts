@@ -13,7 +13,8 @@
  */
 import { AUTOPILOT_OFF, autopilotOfMaster, resumeDue } from './autopilot';
 import type { Clock } from './ports/clock';
-import type { AutopilotRecord, ChainConfig, ChainMaster, ChainStatus, ColumnMode, RunInfo, RunRequest, SlotSummary } from './protocol';
+import { WORKER_PROVIDERS, type AutopilotRecord, type ChainConfig, type ChainMaster, type ChainStatus, type ColumnMode, type RunInfo, type RunRequest, type SlotSummary } from './protocol';
+import type { DispatchPool } from './orchestrate/dispatch-pool';
 import { LIVE_RUN_STATES } from './run/run-state';
 import type { ChainState } from './orchestrate/chain-state';
 import type { ChainStateStore } from './orchestrate/chain-state-store';
@@ -52,6 +53,10 @@ export interface OrchestratorParts {
   readonly scanIntervalMs: number;
   /** req-177: the slots' summary for the 7e band; absent = the status carries none. */
   readonly slots?: SlotSummarySource;
+  /** req-170: the capacity pool — its live load and queue ride the chain status. */
+  readonly pool?: DispatchPool;
+  /** req-170: the one-time move of the old pool sizes into `service.json`. */
+  readonly migratePools?: (config: ChainConfig) => Promise<void>;
 }
 
 /** Where the chain status reads the slots from (`fleet/routing`'s registry satisfies it). */
@@ -73,8 +78,17 @@ export class Orchestrator {
   }
 
   status(): ChainStatus {
-    const status = this.parts.state.status({ quotaPausedUntil: this.parts.pools.quotaPausedUntil(), poolSize: this.parts.pools.sizes(this.parts.state.config) });
-    return this.parts.slots === undefined ? status : { ...status, slots: this.parts.slots.summary() };
+    const status = this.parts.state.status({ quotaPausedUntil: this.parts.pools.quotaPausedUntil(), poolSize: this.poolSizes() });
+    const pool = this.parts.pool;
+    const withSlots = this.parts.slots === undefined ? status : { ...status, slots: this.parts.slots.summary() };
+    return pool === undefined ? withSlots : { ...withSlots, pool: pool.load(), queue: pool.queue.list() };
+  }
+
+  /** The effective parallel runs per provider; a provider without a bound of its own is left out. */
+  private poolSizes(): Record<string, number> {
+    const pool = this.parts.pool;
+    const sizes = this.parts.pools.sizes(this.parts.state.config, pool === undefined ? undefined : (provider) => pool.sessionsOf(provider));
+    return Object.fromEntries(WORKER_PROVIDERS.filter((provider) => sizes[provider] < Number.MAX_SAFE_INTEGER).map((provider) => [provider, sizes[provider]]));
   }
 
   /** Points the chain at a board (idempotent) and scans. */
@@ -89,6 +103,7 @@ export class Orchestrator {
     if (!same) {
       await this.persist();
     }
+    await this.parts.migratePools?.(config);
     this.startTimer();
     await this.parts.dispatcher.pass();
     return this.status();

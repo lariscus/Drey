@@ -1,45 +1,36 @@
 import type { BoardSnapshot, PipelinePhase, TicketCard } from '../../contracts/tickets';
-import { personaModelFor, type PersonaModelChoice } from '../../core/persona';
 import { parseWorkerValue, resolveAssignment } from '../assignment';
-import { isWorkerProvider, type ChainConfig, type WorkerProviderId } from '../protocol';
+import type { ChainConfig, WorkerProviderId } from '../protocol';
 import type { TicketPersona } from './board-personas';
-import type { SupervisorDirectory } from './supervisor-directory';
-
-type FreeSlots = Readonly<Partial<Record<WorkerProviderId, number>>>;
 
 /**
- * Which provider pool a card's run takes, for one pass (E3, D-62): a
- * resolved persona's pool and router pick the model — and with it the
- * provider — against the planner's free slots at that point of the pass;
- * without a persona the assignment ring decides. The dispatch reads the
- * same model choice back.
+ * Which provider pool a card's run counts against in the dispatch plan, for
+ * one pass (req-63, E3): with the capacity pool wired (req-170) a persona's
+ * card counts against none — the pool grants its class on whichever
+ * provider holds it; without it the persona's harness; without a persona
+ * the assignment ring decides.
  */
 export class PassPools {
-  private readonly choices = new Map<string, PersonaModelChoice>();
-
   constructor(
     private readonly config: ChainConfig,
     private readonly snap: BoardSnapshot,
     private readonly personas: ReadonlyMap<string, TicketPersona>,
-    private readonly directory: SupervisorDirectory,
+    private readonly classPool: boolean,
   ) {}
 
-  readonly poolOf = (card: TicketCard, phase: PipelinePhase, free: FreeSlots = {}): WorkerProviderId | null => this.personaPool(card, phase, free) ?? this.ringPool(card, phase);
-
-  choiceOf(cardId: string): PersonaModelChoice | null {
-    return this.choices.get(cardId) ?? null;
-  }
-
-  /** The persona's choice: the chosen pool entry's provider, else the persona's harness; null without a persona. */
-  private personaPool(card: TicketCard, phase: PipelinePhase, free: FreeSlots): WorkerProviderId | null {
+  readonly poolOf = (card: TicketCard, phase: PipelinePhase): WorkerProviderId | null => {
     const persona = this.personas.get(card.id)?.persona ?? null;
     const parsed = persona === null ? null : parseWorkerValue(persona.worker);
-    if (persona === null || parsed === null) {
-      return null;
+    if (parsed !== null) {
+      return this.classPool ? null : parsed.provider;
     }
-    const choice = personaModelFor(persona, { phase: phase.id, provider: parsed.provider, freeSlots: free, failedRuns: this.directory.failedRunsInColumn(card.id, phase.id) });
-    this.choices.set(card.id, choice);
-    return choice.provider !== null && isWorkerProvider(choice.provider) ? choice.provider : parsed.provider;
+    return this.ringPool(card, phase);
+  };
+
+  /** True when the card's run asks the capacity pool for its class. */
+  asksPool(card: TicketCard): boolean {
+    const persona = this.personas.get(card.id)?.persona ?? null;
+    return this.classPool && persona !== null && parseWorkerValue(persona.worker) !== null;
   }
 
   /** The assignment ring: ticket, column, repo, the configured default. */

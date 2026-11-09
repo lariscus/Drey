@@ -509,7 +509,7 @@ describe('route', () => {
         path: '/api/personas/pia',
         origin,
         authorization: auth,
-        body: { model: 'sonnet', pool: ['sonnet', 'haiku'], router: 'budget', color: '#ff8800', prompt: 'You are Pia.\n' },
+        body: { model: 'sonnet', pool: ['sonnet', 'haiku'], router: 'budget', color: '#ff8800', prompt: 'You are Pia.\n' }, // req-170: a stray router is no writable key
       }),
       deps,
     );
@@ -518,7 +518,6 @@ describe('route', () => {
       persona: 'pia',
       model: 'sonnet',
       pool: ['sonnet', 'haiku'],
-      router: 'budget',
       color: '#ff8800',
       prompt: 'You are Pia.\n',
     });
