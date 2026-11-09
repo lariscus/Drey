@@ -148,6 +148,12 @@ export interface ChatServiceDeps {
   readonly shadows?: PlanShadowStore;
   /** E10-3: the model a shape turn runs on (the chat model), shown in the context line. */
   readonly modelName?: () => Promise<string | undefined>;
+  /** req-173: the free sessions Pia's startSession card starts once confirmed; absent = the card refuses. */
+  readonly sessions?: {
+    start(ask: { persona: string; directory: string; poolClass?: 'A' | 'B' | 'C' | null; firstLine?: string }, origin: string): Promise<{ ok: true; runId: string } | { ok: false; error: string }>;
+    /** The personas and folders Pia may name, as a block below the board digest; null = none. */
+    promptContext(): Promise<string | null>;
+  };
 }
 
 /** The card's human sentence — what the proposal line and the UI show. */
@@ -169,6 +175,8 @@ function summaryOf(command: ChatCommand): string {
       return command.blockedBy.length === 0
         ? `Clear ${command.id} blockers`
         : `Block ${command.id} by ${command.blockedBy.join(', ')}`;
+    case 'startSession':
+      return `Start a session of ${command.persona} in ${command.directory}${command.poolClass === null ? '' : ` (class ${command.poolClass})`}`;
   }
 }
 
@@ -383,7 +391,7 @@ export class ChatService implements ChatServicePort {
       const reply = await this.deps.bridge.runTurn({
         text,
         history,
-        board: boardDigest(snap),
+        board: await this.withSessions(boardDigest(snap)),
         priorities: snap.priorities,
         ...(named === null ? {} : { named }),
         ...(delta === null ? {} : { planDelta: planDeltaForModel(delta) }),
@@ -767,7 +775,21 @@ export class ChatService implements ChatServicePort {
         const result = await this.deps.board.setBlockedBy({ id: command.id, blockedBy: command.blockedBy, actor });
         return result.ok ? { ok: true, outcome: 'ok' } : { ok: false, error: result.error };
       }
+      case 'startSession': {
+        if (this.deps.sessions === undefined) {
+          return { ok: false, error: 'free sessions are not available here' };
+        }
+        const ask = { persona: command.persona, directory: command.directory, poolClass: command.poolClass, firstLine: command.brief };
+        const result = await this.deps.sessions.start(ask, "chat (Pia's card)");
+        return result.ok ? { ok: true, outcome: result.runId } : { ok: false, error: result.error };
+      }
     }
+  }
+
+  /** req-173: the digest plus the personas and folders a startSession card may name. */
+  private async withSessions(digest: string): Promise<string> {
+    const block = (await this.deps.sessions?.promptContext().catch(() => null)) ?? null;
+    return block === null ? digest : `${digest}\n\n${block}`;
   }
 
   // --- the host plumbing ----------------------------------------------------

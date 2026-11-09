@@ -71,7 +71,7 @@ below, the runner's and the engine's.
 
 The service home is `~/.drey-engine` (`%USERPROFILE%\.drey-engine`) — the
 engine's home before, unchanged so `config.json`, the fleet root and the
-e2e isolation stay where they were (req-173 may move it).
+e2e isolation stay where they were (req-173 kept it there).
 
 ```
 ~/.drey-engine/
@@ -81,9 +81,35 @@ e2e isolation stay where they were (req-173 may move it).
 ├── service-window/     the tray / window process's own userData (its single-instance lock)
 ├── service-start.log   stdout/stderr of the last start (a start that dies says why here)
 ├── start-service.vbs   the Windows sign-in launcher (only while start with Windows is on)
-├── config.json         the engine's config (keys unchanged; added: `service.enabled`, `service.autostart`, `service.vaultPath`, `service.idleMinutes`; Drey writes every Settings → Background service key here too — `service.trayIcon`, `service.logLevel`, `service.load.*` — and the service applies them each tick; the Load group goes to the in-process runner's resource governor live, req-180)
-└── fleet/              the Crew runner's root (FLEET.md): runs/, chain.json, runner.log
+├── service.json        the machine layer (req-173): slots, quota, the model table, the cap, ledgers, routing, governor — schema below
+├── config.json         the engine's config (since req-173 no vault key is read from it — those live in the tickets repository's `tickets/_meta/crew.md`; the marker `crew.migrated` records the one-time move; added: `service.enabled`, `service.autostart`, `service.vaultPath`, `service.idleMinutes`; Drey writes every Settings → Background service key here too — `service.trayIcon`, `service.logLevel`, `service.load.*` — and the service applies them each tick; the Load group goes to the in-process runner's resource governor live, req-180)
+└── fleet/              the Crew runner's root (FLEET.md): runs/, chains/<vault key>/chain.json (one per tickets vault, req-173), chain-vault.json, runner.log
 ```
+
+### `service.json` — the machine layer (req-173, R13)
+
+What this computer is, read and written only through `ServiceConfigFile`
+(`fleet/routing/service-config-file.ts`; a write keeps the keys it does not
+know, a file that does not parse is never overwritten). Its root keys,
+each parsed by its owner (`fleet/routing/service-config-schema.ts`):
+
+| Key | Owner | Holds |
+|---|---|---|
+| `slots` | req-177, `routing/slot-config.ts` | the accounts per provider: id, label, provider, profile, login folder, sessions |
+| `quota` | req-177 | the quota sources (Claude Code, Kimi, z.ai) and their refresh |
+| `models` | req-170, `routing/pool-config.ts` | the model table: model, provider, category, class, cost factor, capabilities |
+| `capacity` | req-170 | the capacity cap, global and per provider |
+| `ledgers` | req-170 | the default ticket allowance, persona day, provider day |
+| `routing` | req-178 / req-181 | surplus and step-up thresholds, the reserve, the burn rate |
+| `governor` | req-180 | the dev-port range (`devPorts`) |
+| `migrations` | req-170 | the one-time moves done on this machine |
+
+The three layers (machine `service.json` · vault `tickets/_meta/crew.md` ·
+the session record) and their precedence — session > vault > built-in
+default, a machine key never overridden — are in FLEET.md ("The three
+configuration layers"). Drey's mirrored device settings (`service.*`,
+`remote.*`, `chat.*`, `gitPath`, `dk.*`) still sit in `config.json`;
+folding them into `service.json` is req-231.
 
 ### `service.lock`
 
@@ -181,8 +207,21 @@ is asked for the handover. Both lock files are removed. A runner that
 refuses (a run in its gate) keeps its runs; the Crew runner component stays
 blocked (row `failed`, the reason named) and the service asks again every
 tick until the old runner has gone. Handed-over runs wake the runner at
-boot so they are taken back at once. Nothing else changes shape: `config.json`,
-`fleet/runs/` and `chain.json` are read where they are.
+boot so they are taken back at once. Nothing else changes shape: `config.json`
+and `fleet/runs/` are read where they are.
+
+**The vault keys move into the tickets repository (req-173, once).** The
+first board read of a tickets vault moves the vault keys of `config.json`
+(`defaultWorker`, `autoPermissionMode`, `personas.default`, `fleet.cap.*`,
+`fleet.compactAboveTokens*`, `fleet.resumePauseTtlMin`,
+`fleet.contextCapTokens*`, `autopilot.tranche.*`, `autopilot.earlyStop.*`)
+and of the old `chain.json`'s `config` into `tickets/_meta/crew.md` — only
+keys the file lacks, only values that differ from the defaults, one commit,
+one log line per key — and sets `crew.migrated` in `config.json`. The old
+keys are left in place and read by nothing. The runner's first boot moves
+the machine-wide `fleet/chain.json` into its vault's
+`fleet/chains/<vault key>/chain.json` and keeps the original as
+`fleet/chain.legacy.json`.
 
 **With Drey (the service off).** The service follows Drey: when no Drey has
 held the event stream for 10 s it stops its live runs (the runner's graceful

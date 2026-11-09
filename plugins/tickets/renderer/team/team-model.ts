@@ -214,8 +214,8 @@ export function personaCardOf(
   titleOf: (ticketId: string) => string | null,
   nowMs: number,
 ): PersonaCardModel {
-  // req-168: a held 1:1 is a session, not work on a ticket — the persona's card does not read "running" for it.
-  const live = runs.filter((run) => isLiveRun(run) && run.persona === persona.id && run.kind !== '1:1');
+  // req-168/173: a 1:1 or a free session is a session, not work on a ticket — the persona's card does not read "running" for it.
+  const live = runs.filter((run) => isLiveRun(run) && run.persona === persona.id && (run.kind ?? 'run') === 'run');
   const rows = live.map((run) => runRowOf(run, titleOf, nowMs));
   const paused = persona.paused === true || pausedIds.includes(persona.id);
   const state: PersonaState = paused

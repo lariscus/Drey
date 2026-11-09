@@ -15,10 +15,31 @@ export interface OwnerHold {
   readonly at: string;
 }
 
-/** `<root>/chain.json` (ADR-0077): the chain's control state; the tickets repo never sees it (ADR-0076). */
+/**
+ * Which tickets vault a chain file belongs to, and how this device reaches
+ * it (req-173): the path is the file's key, the store and the git
+ * executable are this machine's. Not configuration — the vault's keys live
+ * in its `_meta/crew.md`.
+ */
+export type ChainVaultLocator = Pick<ChainConfig, 'ticketsVaultPath' | 'store' | 'git'>;
+
+/** The locator of a chain config. */
+export function locatorOf(config: ChainVaultLocator): ChainVaultLocator {
+  return { ticketsVaultPath: config.ticketsVaultPath, ...(config.store !== undefined ? { store: config.store } : {}), git: config.git };
+}
+
+/**
+ * `<root>/chains/<vault key>/chain.json` (ADR-0077, req-173): the chain's
+ * runtime state for one tickets vault; the tickets repo never sees it
+ * (ADR-0076). Runtime only: the Autopilot, the column states, the breaker,
+ * the streaks — never configuration.
+ */
 export interface ChainFile {
   readonly version: 1;
-  readonly config: ChainConfig | null;
+  /** The vault this state belongs to (req-173); absent in files from before it. */
+  readonly vault?: ChainVaultLocator;
+  /** Written by runners before req-173 only: read by the key migration, never restored, never written. */
+  readonly config?: ChainConfig | null;
   /** Derived from `autopilot`, still written for tools that read the file (FLEET.md). */
   readonly master: ChainMaster;
   /** The owner's switch (req-95); absent in older files, then `master` stands in. */
@@ -52,7 +73,10 @@ export interface ChainFile {
  * chain's parts share; `ChainStateStore` writes it to `chain.json`.
  */
 export class ChainState {
+  /** The resolved config the board last sent (req-173: held in memory, never persisted). */
   config: ChainConfig | null = null;
+  /** The vault whose file this state is (req-173); null before the first config or a boot from a file. */
+  vault: ChainVaultLocator | null = null;
   autopilot: AutopilotRecord = AUTOPILOT_OFF;
   readonly columns: Record<string, ColumnMode> = {};
   readonly redStreak: Record<string, number> = {};
@@ -111,10 +135,25 @@ export class ChainState {
     };
   }
 
+  /** Empties the state before another vault's file is loaded into it (req-173): nothing carries over. */
+  reset(): void {
+    this.config = null;
+    this.vault = null;
+    this.autopilot = AUTOPILOT_OFF;
+    const maps = [this.columns, this.redStreak, this.cooldownUntil, this.tokensDay, this.tokensUsed, this.tripped, this.ticketFailures, this.ownerHold, this.ciBackoff, this.ledgerCards];
+    for (const map of maps as Record<string, unknown>[]) {
+      for (const key of Object.keys(map)) {
+        delete map[key];
+      }
+    }
+    this.pausedPersonas.clear();
+    this.tranche = null;
+  }
+
   file(handoverAt?: string): ChainFile {
     return {
       version: 1,
-      config: this.config,
+      ...(this.vault !== null ? { vault: this.vault } : {}),
       master: this.master,
       autopilot: this.autopilot,
       columns: { ...this.columns },

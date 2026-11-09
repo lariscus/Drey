@@ -29,6 +29,8 @@ import type { FleetEvents } from '../fleet/orchestrator';
 import { ChangeHub, DreyTicketsPort, type PathsChange } from './drey-port';
 import { DreyPresence } from './drey-presence';
 import { FileConfigStore } from './file-config';
+import { composeCrewConfig, composeFreeSessions } from '../services/compose-crew-sessions';
+import { parseCrewOverrides, parseCrewPatches, parseFreeSessionAsk } from './session-payloads';
 import { RemoteService, type RemoteStatus } from './service';
 import { parseSettingsPatch } from './settings';
 import { FsEngineHost } from './standalone-host';
@@ -166,6 +168,9 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
   // ledger phase/merged/archived lines, the verify service proof_ready
   // lines; the append-only files ride the next regular commit.
   const events = new FleetEventWriter({ vaultPath: opts.vaultPath, log });
+  // req-173 (R13): the vault layer of the configuration, `_meta/crew.md` — the board resolves its crew
+  // keys from it; the first read of a vault moves the old keys of config.json and chain.json in once.
+  const crew = composeCrewConfig({ host, git, config, fleetRoot, log });
   const board = new EngineBoardService(
     host,
     git,
@@ -178,8 +183,10 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
     normalizeFleetPools({}),
     normalizeFleetHandover({}),
     `engine@${hostname().toLowerCase()}`,
-    { events },
+    { events, crew },
   );
+  // req-173 (R12): the free sessions the owner opens (service window, Crew tab) or accepts from Pia's card.
+  const freeSessions = composeFreeSessions({ board, fleet, crew, host, log });
   board.onChanged(() => hub.emit('board'));
 
   // E4: the machine verification step — the harness runs the ticket
@@ -213,6 +220,7 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
     host,
     git,
     bridge: opts.chatBridge ?? createChatBridge({ config }),
+    sessions: freeSessions, // req-173: Pia's startSession card
     shadows: new FilePlanShadowStore(path.join(opts.home, 'plan-shadow.json')),
     modelName: () => config.get<string>('chat.model'),
     actor: `chat@${hostname().toLowerCase()}`,
@@ -358,6 +366,14 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
   table.set('settingsPatch', (payload) => {
     const patch = parseSettingsPatch(payload);
     return patch.ok ? remoteService.settings().patch(patch.value, 'drey') : Promise.resolve(patch);
+  });
+  // req-173: the vault layer (Settings -> Tickets) and the free sessions.
+  table.set('crewConfig', async () => crew.reply(await board.detect()));
+  table.set('crewConfigSet', async (payload) => crew.set(await board.detect(), parseCrewPatches(payload), parseCrewOverrides(payload)));
+  table.set('sessionOptions', () => freeSessions.options());
+  table.set('sessionStart', (payload) => {
+    const ask = parseFreeSessionAsk(payload);
+    return ask.ok ? freeSessions.start(ask.value, ask.origin) : Promise.resolve({ ok: false, error: ask.error });
   });
   table.set('chatSessions', () => chat.sessions());
   table.set('chatOpen', (payload) => {

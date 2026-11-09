@@ -1215,6 +1215,38 @@ repository's `_meta/pipeline.md` (all five by default, `none` for none).
 The findings a worker used to write into a separate friction file moved
 into the journal.
 
+### Free sessions {#free-sessions}
+
+A free session is a persona at work on something of yours that is not a
+ticket: look into a folder, try something out, answer a question about a
+repository. Open one with **New session…** — on the Sessions tab of Drey
+Service's window, or on the Crew tab — and choose:
+
+- **Persona** — who works (its worker and instructions come with it).
+- **Folder** — where it works. The tickets repository is offered first and
+  is allowed like any other folder; your repositories follow, or type any
+  folder on this computer. A network share, a `.git` folder or the folder
+  of a step that is running right now is refused.
+- **Class** — *Auto* lets the persona's model decide; a class asks the crew
+  for a model of exactly that class (it never falls back to a smaller one).
+- **Permission** — the crew's setting (*Accept edits* unless you chose
+  otherwise), or *Read-only*, or *Bypass*. A free session is not limited to
+  reading the way a 1:1 is.
+- **First line** — what you want done first (optional; without it the
+  session waits for you).
+
+The session takes one of the crew's places like a run and counts on the
+persona's and the account's daily budgets — never on a ticket's. You talk
+to it on the Sessions tab (**Send**, **Interrupt turn**). It stays while you
+keep talking and is let go after 15 minutes without a line; it is not
+reopened — start a new one. When the crew has no free place for the class,
+the session does not start and the form says why.
+
+**From Mission Control:** ask Pia ("let Ben look into the build in the drey
+repository") and she answers with a card — *Start a session of ben in …*.
+Nothing starts until you **Confirm**; Pia never chooses the permission (the
+crew's setting applies).
+
 ### Tranches and the checkpoint report
 
 **On** never lets the crew run open-ended: it releases one **tranche** — up to
@@ -1972,6 +2004,18 @@ videos already there) and *Largest video* in MB. Under **Mission Control on
 other devices** you pair a phone or tablet and revoke it again (below). Fleet and
 workers follow *Budget and runners*; *Store and Git* and *Pipeline and
 prompts* close the page.
+
+**Where a setting lives.** The scope tabs at the top of Settings say it:
+*This vault* settings are stored in the tickets repository —
+`tickets/_meta/crew.md`, beside the pipeline and the personas — so every
+computer that works the same tickets uses the same values: the default
+worker, the permission of runs the crew starts by itself, the resume pause,
+the context cap and the compact thresholds (the *Fleet* group is marked
+*This vault*). Each change is one commit there. *This device* settings
+belong to this computer — the models, the capacity cap and the accounts
+(*Models*), the Git executable, the background service. After the update,
+the values you had set move into `crew.md` once, by themselves; nothing
+for you to do.
 
 ### The board from a phone or tablet
 

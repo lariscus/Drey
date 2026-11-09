@@ -254,3 +254,7 @@ words or the engine's 422 text — shows under the group. The look is board 7l's
 **Deviations and gaps:** the Capacity band's upgrade mark (board 7e) still reads the fixed 1.3 (the chain status carries
 no routing); a slot without a weekly window has no weekly samples, so its estimate stays the 5 % default per run (a
 monthly window could be scaled instead); the day is UTC.
+
+## Later change (2026-11-09, as built — milestone 230, req-173, R12/R13): free sessions on the pool; `service.json` is the machine layer
+
+A **free session** (ADR-0092 later change) asks the pool like a 1:1: the class the owner picked on the form (or Pia's card), else the model table's class of the persona's model (the session record's model pin over the persona's), the persona's and the provider's ledgers, **no ticket allowance** (`ledger.noTicket`); a free session in a repository's checkout is served only by a slot of that repository's `profile`. A session the pool cannot serve now is **refused with the pool's reason**, not queued (req-230). `service.json` is named the **machine layer** of the three (R13): its root keys and their owners are documented once in `fleet/routing/service-config-schema.ts`; no vault key (`tickets/_meta/crew.md`) or session record overrides the model table, the cap, the slots or the ledgers' defaults — the session's class request is still granted only within the machine's cap.

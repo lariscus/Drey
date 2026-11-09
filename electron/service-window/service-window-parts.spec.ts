@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { dreyCommand } from './drey-launcher';
 import { windowEventOf } from './event-relay';
 import { localModelTarget } from './local-model-probe';
+import { newSessionAskOf } from './new-session-ask';
 import { endpointsOfLock } from './service-endpoints';
 import { parseWindowArgs } from './service-window-args';
 import { SseParser } from './sse-parser';
@@ -17,6 +18,20 @@ describe('parseWindowArgs', () => {
       open: false,
     });
     expect(parseWindowArgs(['Drey.exe', '--open'])).toEqual({ home: null, servicePid: null, tray: false, open: true });
+  });
+});
+
+describe('newSessionAskOf', () => {
+  const ask = { persona: 'ben', directory: ' E:/notes ', poolClass: null, permissionMode: 'read-only', firstLine: '  ' };
+
+  it('trims the folder, drops a blank first line, and passes the rest', () => {
+    expect(newSessionAskOf(ask)).toEqual({ persona: 'ben', directory: 'E:/notes', poolClass: null, permissionMode: 'read-only' });
+    expect(newSessionAskOf({ ...ask, poolClass: 'B', firstLine: 'go' })).toMatchObject({ poolClass: 'B', firstLine: 'go' });
+  });
+  it('refuses a missing persona, a blank folder, an unknown class or permission', () => {
+    for (const bad of [{ ...ask, persona: '' }, { ...ask, directory: ' ' }, { ...ask, poolClass: 'Z' }, { ...ask, permissionMode: 'root' }, null, 'x']) {
+      expect(newSessionAskOf(bad)).toBeNull();
+    }
   });
 });
 

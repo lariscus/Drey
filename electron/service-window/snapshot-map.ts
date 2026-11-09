@@ -3,7 +3,7 @@
  * contract shapes them (req-165/166). Pure: tolerant of absent fields, so an
  * older service still draws.
  */
-import { ONE_ON_ONE_IDLE_MS } from '../../shared/session-lifecycle';
+import { HELD_SESSION_IDLE_MS, HELD_SESSION_KINDS, sessionStateOf } from '../../shared/session-lifecycle';
 import type {
   ComponentState,
   GovernorFacts,
@@ -121,13 +121,18 @@ export function isLive(run: Json): boolean {
 
 const KINDS: readonly SessionRun['kind'][] = ['run', '1:1', 'shape', 'free'];
 
-/** req-168 (R12): the kind, the explicit directory, and a live 1:1's release time. */
-function sessionFieldsOf(info: Json): Pick<SessionRun, 'kind' | 'workingDirectory' | 'releaseAt'> {
+/** req-168/173 (R12): the kind, the state, the explicit directory, and a live held session's release time. */
+function sessionFieldsOf(info: Json): Pick<SessionRun, 'kind' | 'sessionState' | 'workingDirectory' | 'releaseAt'> {
   const kind = KINDS.find((k) => k === info['kind']) ?? 'run';
   const workingDirectory = str(info['workingDirectory']) ?? String(info['worktreePath'] ?? '');
   const last = Math.max(Date.parse(String(info['startedAt'] ?? '')) || 0, Date.parse(String(info['lastActivity'] ?? '')) || 0);
-  const releaseAt = kind === '1:1' && isLive(info) && last > 0 ? new Date(last + ONE_ON_ONE_IDLE_MS).toISOString() : null;
-  return { kind, workingDirectory, releaseAt };
+  const releaseAt = HELD_SESSION_KINDS.includes(kind) && isLive(info) && last > 0 ? new Date(last + HELD_SESSION_IDLE_MS).toISOString() : null;
+  const sessionState = sessionStateOf({
+    state: (str(info['state']) ?? 'failed') as SessionRun['state'],
+    held: info['held'] === true,
+    turn: info['turn'] === 'busy' || info['turn'] === 'idle' ? info['turn'] : null,
+  });
+  return { kind, sessionState, workingDirectory, releaseAt };
 }
 
 /** A runner `RunInfo` as the Sessions tab needs it. */

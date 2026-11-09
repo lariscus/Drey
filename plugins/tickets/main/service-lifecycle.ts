@@ -106,20 +106,12 @@ async function locateTicketsVault(ctx: {
  */
 const SYNCED_KEYS = (providers: readonly string[]): readonly string[] => [
   'gitPath',
-  'defaultWorker',
+  // req-173 (R13): the vault keys (default worker, permission mode, fleet caps, handover thresholds)
+  // live in tickets/_meta/crew.md; Settings writes them there and they no longer travel here.
   'personas.humanName',
-  'autoPermissionMode',
   'vaultId',
   ...STORE_SETTING_KEYS,
-  ...['gateFailureLines', 'gateFailureBytes', 'diffStatLines', 'diffStatBytes'].map((k) => `fleet.cap.${k}`),
   ...providers.flatMap((p) => [`fleet.pool.${p}.size`, `fleet.pool.${p}.probe`]),
-  'fleet.compactAboveTokens',
-  'fleet.resumePauseTtlMin',
-  'fleet.contextCapTokens',
-  ...providers.flatMap((p) => [
-    `fleet.compactAboveTokens.${p}`,
-    `fleet.contextCapTokens.${p}`,
-  ]),
   'remote.enabled',
   'remote.mode',
   'remote.lanAddress',

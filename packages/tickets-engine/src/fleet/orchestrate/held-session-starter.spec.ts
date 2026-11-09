@@ -2,7 +2,7 @@ import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { RunRequest } from '../protocol';
-import { ONE_ON_ONE_IDLE_MS, ONE_ON_ONE_TICKET } from '../protocol-session';
+import { FREE_SESSION_TICKET, ONE_ON_ONE_IDLE_MS, ONE_ON_ONE_TICKET } from '../protocol-session';
 import { settled, waitFor } from './run-spec-support';
 import type { SlotBinder } from './slot-binder';
 import { aliveProbe, harness, runnerNotes, runRequest, startRun, useTempDirs } from './supervisor-harness.fake';
@@ -54,7 +54,7 @@ function movableClock(start: string): { now: () => Date; advance: (ms: number) =
   return { now: () => new Date(at), advance: (ms) => (at += ms) };
 }
 
-describe('OneOnOneStarter — a 1:1 is a quiet, held session of the persona (req-168)', () => {
+describe('HeldSessionStarter — a 1:1 is a quiet, held session of the persona (req-168)', () => {
   const dirs = useTempDirs();
 
   it('starts the worker quiet and held in the tickets repository, read-only, with no claim and no worktree', async () => {
@@ -138,5 +138,60 @@ describe('OneOnOneStarter — a 1:1 is a quiet, held session of the persona (req
     // An ended 1:1 never reopens in place: no ticket, no worktree — the next line starts a fresh session.
     expect(await h.sup.send(id, 'still there?')).toMatchObject({ ok: false, error: expect.stringContaining('does not reopen') });
     expect(h.adapter.starts).toHaveLength(1);
+  });
+});
+
+/** A free session request as the engine's builder composes it (req-173). */
+function freeSession(vault: string, directory: string, over: Partial<RunRequest> = {}): RunRequest {
+  return oneOnOne(vault, {
+    origin: 'service-window',
+    ticketId: FREE_SESSION_TICKET,
+    worktreePath: directory,
+    repoPath: directory,
+    permissionMode: 'accept-edits',
+    instruction: 'You are Ben. The free session brief.',
+    session: { kind: 'free', persona: 'ben', workingDirectory: directory },
+    ...over,
+  });
+}
+
+describe('HeldSessionStarter — a free session (req-173)', () => {
+  const dirs = useTempDirs();
+
+  it('starts quiet and held in the named directory with the permission the request carries, no claim, no worktree', async () => {
+    let prepared = 0;
+    const h = harness(dirs.fleet, { prepareWorktree: async () => ((prepared += 1), { outcome: 'created', sessionInvalidated: false, movedTo: null }) });
+    const id = await startRun(h.sup, freeSession(dirs.vault, dirs.fleet));
+    const start = h.adapter.starts[0]!;
+    expect(start.cwd).toBe(dirs.fleet);
+    expect(start.permissionMode).toBe('accept-edits');
+    expect(start.holdAtSpawn).toBe(true);
+    expect(prepared).toBe(0);
+    expect(h.store.calls).toEqual([]);
+    expect(h.sup.get(id)).toMatchObject({ kind: 'free', persona: 'ben', workingDirectory: dirs.fleet, held: true, quietStart: true, ticketId: FREE_SESSION_TICKET });
+    expect(await runnerNotes(dirs.fleet, id)).toEqual([expect.stringContaining('free session of ben')]);
+  });
+
+  it('the tickets vault itself is a working directory; two free sessions of one persona may stand at once', async () => {
+    const h = harness(dirs.fleet);
+    await startRun(h.sup, freeSession(dirs.vault, dirs.vault));
+    await startRun(h.sup, freeSession(dirs.vault, dirs.fleet));
+    expect(h.adapter.starts.map((s) => s.cwd)).toEqual([dirs.vault, dirs.fleet]);
+    const empty = await h.sup.start(freeSession(dirs.vault, dirs.vault, { instruction: ' ' }));
+    expect(empty).toMatchObject({ ok: false, error: 'the free session brief is empty' });
+  });
+
+  it('takes a slot of the pool and frees it on the idle release', async () => {
+    const clock = movableClock('2026-11-09T10:00:00Z');
+    const slots = recordingSlots();
+    const h = harness(dirs.fleet, { slots, now: clock.now, exec: aliveProbe, onRunSettled: (info) => slots.release(info.id) });
+    const id = await startRun(h.sup, freeSession(dirs.vault, dirs.vault));
+    expect(slots.held.has(id)).toBe(true);
+    clock.advance(ONE_ON_ONE_IDLE_MS + 1_000);
+    await h.sup.reap();
+    await settled(h.sup, id, 'done');
+    await waitFor(() => expect(slots.held.has(id)).toBe(false));
+    expect(await runnerNotes(dirs.fleet, id)).toContainEqual(expect.stringContaining('released after 15 min idle'));
+    expect(await h.sup.send(id, 'more?')).toMatchObject({ ok: false, error: expect.stringContaining('free session — it does not reopen') });
   });
 });

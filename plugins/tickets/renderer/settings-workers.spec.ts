@@ -3,6 +3,7 @@ import { WORKER_PROVIDERS } from '../../../packages/tickets-engine/src/fleet/pro
 import { RUNNER_FIELDS, RUNNER_LABEL } from './settings-workers';
 
 const keysOf = (provider: keyof typeof RUNNER_FIELDS): string[] => RUNNER_FIELDS[provider].map((f) => f.key);
+const fieldOf = (provider: keyof typeof RUNNER_FIELDS, kind: string) => RUNNER_FIELDS[provider].find((f) => f.kind === kind);
 
 describe('RUNNER_FIELDS (req-71)', () => {
   it('has a section and a label for every worker provider', () => {
@@ -10,29 +11,28 @@ describe('RUNNER_FIELDS (req-71)', () => {
     expect(Object.keys(RUNNER_LABEL).sort()).toEqual([...WORKER_PROVIDERS].sort());
   });
 
-  it('writes the compact-override key the main side reads per provider, and no pool size (the slots hold it, req-186)', () => {
+  it('writes the compact override of the vault layer per provider (req-173), and no pool size (the slots hold it, req-186)', () => {
     for (const provider of WORKER_PROVIDERS) {
       expect(keysOf(provider).some((key) => key.endsWith('.size'))).toBe(false);
-      expect(keysOf(provider)).toContain(`fleet.compactAboveTokens.${provider}`);
+      expect(fieldOf(provider, 'compact')?.key).toBe(provider);
     }
   });
 
-  it('offers the pool probe only for OpenCode', () => {
-    expect(keysOf('opencode')).toContain('fleet.pool.opencode.probe');
+  it('offers the pool probe only for OpenCode — a machine key of the plugin config', () => {
+    expect(fieldOf('opencode', 'text')?.key).toBe('fleet.pool.opencode.probe');
     expect(keysOf('claude-code').some((k) => k.endsWith('.probe'))).toBe(false);
   });
 
-  it('offers the dispatched-run permissions only for Claude Code, on the existing key', () => {
-    expect(keysOf('claude-code')).toContain('autoPermissionMode');
-    expect(keysOf('opencode')).not.toContain('autoPermissionMode');
-    const field = RUNNER_FIELDS['claude-code'].find((f) => f.key === 'autoPermissionMode');
+  it("offers the dispatched-run permissions only for Claude Code, on the vault layer's permission-mode (req-173)", () => {
+    const field = fieldOf('claude-code', 'permission');
+    expect(field?.key).toBe('permissionMode');
+    expect(fieldOf('opencode', 'permission')).toBeUndefined();
     expect(field?.choices?.map(([value]) => value)).toEqual(['accept-edits', 'bypass']);
-    expect(field?.fallback).toBe('accept-edits');
   });
 
   it('gives Kimi Code a compact override, and no probe or permission flag of its own', () => {
     expect(RUNNER_LABEL.kimi).toBe('Kimi Code');
-    expect(keysOf('kimi')).toEqual(['fleet.compactAboveTokens.kimi']);
+    expect(RUNNER_FIELDS.kimi.map((f) => f.kind)).toEqual(['compact']);
   });
 
   it('keeps control ids unique across all runners', () => {

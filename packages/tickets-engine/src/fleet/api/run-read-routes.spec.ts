@@ -51,6 +51,16 @@ describe('GET /instruction/<run> and /attach/<run>', () => {
   });
 });
 
+describe('GET /sessions (req-173, R12)', () => {
+  it('answers every record as a session record: kind, directory, state, permission', async () => {
+    const free = { id: 'R-2', ticketId: 'free', kind: 'free', persona: 'ben', provider: 'kimi', state: 'running', held: true, turn: 'idle', workingDirectory: 'E:\\drey-tickets', worktreePath: 'E:\\drey-tickets', startedAt: 's', endedAt: null };
+    const set = { records: () => [{ info: free, request: { permissionMode: 'accept-edits' } }] } as unknown as SupervisorSet;
+    const r = request('/sessions');
+    expect(await new RunReadRoutes(set).handle(r.ctx)).toBe(true);
+    expect(r.answer.body).toMatchObject({ sessions: [{ id: 'R-2', kind: 'free', workingDirectory: 'E:\\drey-tickets', state: 'held', ticketId: null, permission: 'accept-edits' }] });
+  });
+});
+
 describe('attachCommandOf', () => {
   it('one resume per harness; none without a session or for an unknown harness', () => {
     expect(attachCommandOf('opencode', 'ses_1', '')).toBe('opencode --session ses_1');

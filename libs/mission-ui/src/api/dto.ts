@@ -225,6 +225,19 @@ export interface LiveRunView {
   readonly contextPct: number | null;
 }
 
+/**
+ * One live session that is not a ticket run (req-168, req-173, R12): a
+ * persona's 1:1, a free session, a shape session. Shown with its kind and
+ * the folder it works in; never counted as work on a ticket.
+ */
+export interface LiveSessionView {
+  readonly runId: string;
+  readonly kind: '1:1' | 'free' | 'shape';
+  /** Where the worker works: the explicit directory, else the worktree; '' when the desk omits both. */
+  readonly directory: string;
+  readonly state: RunStateView;
+}
+
 /** One provider pool's load: running runs against the pool's effective size. */
 export interface CapacityView {
   readonly provider: string;
@@ -250,6 +263,8 @@ export interface PersonaView {
   readonly currentRun: PersonaRun | null;
   /** Every live run of this persona (a builder may carry several); absent = none known. */
   readonly liveRuns?: readonly LiveRunView[];
+  /** Every live session of this persona that is not a ticket run (req-173); absent = none. */
+  readonly liveSessions?: readonly LiveSessionView[];
   /**
    * The persona's daily budget in dollars (frontmatter `budget:`,
    * concept §4.3 — the team card shows the day's costs against it);
@@ -1243,8 +1258,8 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
     if (persona === null) {
       continue;
     }
-    // req-168: a persona's held 1:1 is a session, not work on a ticket — the card does not read "running" for it.
-    const ticketRuns = runs.filter((run) => rec(run)?.['kind'] !== '1:1');
+    const ticketRuns = ticketRunsOf(runs);
+    const liveSessions = sessionsOfPersona(runs, persona.id);
     const liveRun = ticketRuns
       .map((run) => rec(run))
       .find(
@@ -1263,6 +1278,7 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
     personas.push({
       ...persona,
       ...(liveRuns.length > 0 ? { liveRuns } : {}),
+      ...(liveSessions.length > 0 ? { liveSessions } : {}),
       currentRun:
         liveRun === null || liveRun === undefined || state === null
           ? null
@@ -1271,7 +1287,7 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
   }
   return {
     personas,
-    runs: runs
+    runs: ticketRunsOf(runs)
       .map((run) => rec(run))
       .map((run) => ({
         state: run !== null && typeof run['state'] === 'string' ? run['state'] : null,
@@ -1284,6 +1300,27 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
     ...(pausedPersonas.length > 0 ? { pausedPersonas } : {}),
     ...(capacity.length > 0 ? { capacity } : {}),
   };
+}
+
+/** The session kinds that are not a ticket run (R12). */
+const SESSION_KINDS: readonly LiveSessionView['kind'][] = ['1:1', 'free', 'shape'];
+
+/** req-168/173: a 1:1 or a free session is a session, not work on a ticket — no card reads "running" for it, no live count includes it. */
+function ticketRunsOf(runs: readonly unknown[]): readonly unknown[] {
+  return runs.filter((run) => !SESSION_KINDS.includes(rec(run)?.['kind'] as LiveSessionView['kind']));
+}
+
+/** A persona's live sessions, each with its kind and directory. */
+function sessionsOfPersona(runs: readonly unknown[], persona: string): LiveSessionView[] {
+  return runs.flatMap((run): LiveSessionView[] => {
+    const r = rec(run);
+    const kind = SESSION_KINDS.find((k) => k === r?.['kind']);
+    const state = r === null ? null : runStateOf(r['state']);
+    if (r === null || kind === undefined || state === null || str(r['persona']) !== persona) {
+      return [];
+    }
+    return [{ runId: str(r['id']), kind, directory: str(r['workingDirectory']) !== '' ? str(r['workingDirectory']) : str(r['worktreePath']), state }];
+  });
 }
 
 const PROVIDER_LABEL: Readonly<Record<string, string>> = { opencode: 'Local', 'claude-code': 'Claude Code', kimi: 'Kimi Code', copilot: 'Copilot CLI' };

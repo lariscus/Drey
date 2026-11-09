@@ -2,6 +2,7 @@ import { personaLessonLine } from '../../core/memory-line';
 import { PERSONAS_DIR } from '../../core/persona';
 import type { Clock } from '../ports/clock';
 import type { FileSystem } from '../ports/file-system';
+import { isTicketRun } from '../protocol-session';
 import { messageOf, type LiveRun } from './live-run';
 
 /**
@@ -30,7 +31,7 @@ export class PersonaMemory {
   /** The lesson as written; null when nothing was written. */
   async appendLesson(run: LiveRun, lesson: string): Promise<string | null> {
     const persona = run.info.persona ?? null;
-    if (persona === null || persona.trim() === '' || lesson.trim() === '') {
+    if (persona === null || persona.trim() === '' || lesson.trim() === '' || !isTicketRun(run.request)) {
       return null;
     }
     const entry = personaLessonLine({

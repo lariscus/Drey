@@ -3,8 +3,8 @@
  * that turns a configured pipeline into running workers. The board comes
  * from the dricket store the chain config names; the next dispatches are
  * planned by the pure rules of `chain.ts` and started through the
- * per-provider supervisors. The control state persists in
- * `<root>/chain.json`; the tickets repo never sees it (ADR-0076).
+ * per-provider supervisors. The control state persists per tickets vault in
+ * `<root>/chains/<vault key>/chain.json` (req-173); the tickets repo never sees it (ADR-0076).
  *
  * The loop is event-driven with a slow safety net: a pass runs when the
  * config or a control state changes, when a run settles, and every scan
@@ -16,7 +16,7 @@ import type { Clock } from './ports/clock';
 import { WORKER_PROVIDERS, type AutopilotRecord, type ChainConfig, type ChainMaster, type ChainStatus, type ColumnMode, type RunInfo, type RunRequest, type SlotSummary, type TrancheStatus } from './protocol';
 import type { DispatchPool } from './orchestrate/dispatch-pool';
 import { LIVE_RUN_STATES } from './run/run-state';
-import type { ChainState } from './orchestrate/chain-state';
+import type { ChainState, ChainVaultLocator } from './orchestrate/chain-state';
 import type { ChainStateStore } from './orchestrate/chain-state-store';
 import type { CiSweep } from './orchestrate/ci-sweep';
 import type { Dispatcher } from './orchestrate/dispatcher';
@@ -58,6 +58,8 @@ export interface OrchestratorParts {
   readonly pool?: DispatchPool;
   /** req-170: the one-time move of the old pool sizes into `service.json`. */
   readonly migratePools?: (config: ChainConfig) => Promise<void>;
+  /** req-173: the config of a vault resolved from its `_meta/crew.md` at boot, before the board sends one. */
+  readonly restoreConfig?: (vault: ChainVaultLocator) => Promise<ChainConfig | null>;
   /** req-179: the tranche — its status, the owner's release, the settled runs' facts. */
   readonly tranches?: TrancheSource;
   /** The write of `chain.json` with what follows it (the tranche's event); absent = the store's write alone. */
@@ -78,24 +80,22 @@ export interface SlotSummarySource {
   summary(): readonly SlotSummary[];
 }
 
-/** Whether a config changes nothing `chain.json` keeps. */
-function sameChainConfig(was: ChainConfig | null, config: ChainConfig): boolean {
-  const json = (value: unknown): string => JSON.stringify(value ?? null);
-  return (
-    was !== null &&
-    (['ticketsVaultPath', 'git', 'defaultWorker', 'permissionMode'] as const).every((key) => was[key] === config[key]) &&
-    (['store', 'pools', 'tranche'] as const).every((key) => json(was[key]) === json(config[key]))
-  );
-}
-
 export class Orchestrator {
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(private readonly parts: OrchestratorParts) {}
 
-  /** Loads `chain.json`; the Autopilot boots Off (written back), except across a fresh handover. */
+  /**
+   * Loads the last vault's `chain.json`; the Autopilot boots Off (written back), except across a fresh
+   * handover. req-173: the config is resolved again from that vault's `_meta/crew.md`, never read from the file.
+   */
   async load(): Promise<void> {
-    if (await this.parts.store.load(this.parts.state)) {
+    const moving = await this.parts.store.load(this.parts.state);
+    const vault = this.parts.state.vault;
+    if (vault !== null && this.parts.state.config === null && this.parts.restoreConfig !== undefined) {
+      this.parts.state.config = await this.parts.restoreConfig(vault).catch(() => null);
+    }
+    if (moving) {
       await this.persist();
     }
     this.startTimer();
@@ -120,9 +120,9 @@ export class Orchestrator {
 
   /** Points the chain at a board (idempotent) and scans. */
   async configure(config: ChainConfig): Promise<ChainStatus> {
-    const same = sameChainConfig(this.parts.state.config, config);
+    const switched = await this.parts.store.switchTo(this.parts.state, config); // req-173: one chain.json per vault
     this.parts.state.config = config;
-    if (!same) {
+    if (switched) {
       await this.persist();
     }
     await this.parts.migratePools?.(config);

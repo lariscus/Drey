@@ -11,6 +11,7 @@ import { StoreChainBoard } from '../store-chain-board';
 import { FakeChainIo } from './chain-io.fake';
 import type { StartOptions } from './run-supervisor';
 import type { SupervisorPort } from './supervisor-directory';
+import { ChainStatePaths } from './chain-state-paths';
 
 /**
  * The chain orchestrator's spec harness (req-176): the real
@@ -171,9 +172,9 @@ export class ChainHarness {
     return { ticketsVaultPath: this.vaultDir, store: STORE, git: 'git', defaultWorker: 'opencode', permissionMode: 'accept-edits', pools: TWO, ...over };
   }
 
-  /** `chain.json` as the orchestrator last wrote it. */
+  /** The vault's `chain.json` as the orchestrator last wrote it (req-173: one per vault). */
   async chainFile(): Promise<Record<string, unknown>> {
-    return JSON.parse(await fsp.readFile(path.join(this.fleetRoot, 'chain.json'), 'utf8')) as Record<string, unknown>;
+    return JSON.parse(await fsp.readFile(path.join(this.fleetRoot, 'chains', ChainStatePaths.keyOf(this.vaultDir), 'chain.json'), 'utf8')) as Record<string, unknown>;
   }
 
   /** The real composition over the fake store and a fake (or the given) supervisor port; logs land in `logs`. */

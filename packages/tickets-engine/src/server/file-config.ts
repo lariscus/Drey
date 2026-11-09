@@ -30,6 +30,11 @@ export class FileConfigStore {
     return data[key] as T | undefined;
   }
 
+  /** Every key, a copy (req-173's migration reads the flat keys it moves). */
+  async all(): Promise<Readonly<Record<string, unknown>>> {
+    return { ...(await this.load()) };
+  }
+
   async set<T>(key: string, value: T): Promise<void> {
     const data = await this.load();
     data[key] = value;

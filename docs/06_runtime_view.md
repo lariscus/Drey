@@ -5407,3 +5407,64 @@ sequenceDiagram
 The round's events land in the run's stream (the service window's Sessions area shows them) but its exit decides
 nothing; a 1:1, a dialog, a blocked, scout or no-result run never reaches it. The runner's writes into the persona
 folder are plain file writes (req-225); the owner's removals and the migration are the engine's, one commit each.
+
+## 6.114 A free session — "New session…" or Pia's card → pool → record → directory → idle release; the layers at a run's start (req-173, milestone 230, ADR-0092 / ADR-0077 later changes)
+
+A free session starts from the service window's or the Crew tab's *New session…* form, or from Pia's `startSession` card once the owner confirms it; all three reach the engine's one door.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner
+    participant UI as Service window / Crew tab / Pia's card
+    participant Eng as Engine (FreeSessionService)
+    participant Crew as CrewConfigService (_meta/crew.md)
+    participant Rule as SessionDirectoryRule
+    participant Run as Crew runner (HeldSessionStarter)
+    participant Pool as Pool (SlotBinder, ADR-0095)
+    participant W as Worker (persona's harness)
+    Owner->>UI: New session… persona, folder, class, first line (or Confirm on the card)
+    UI->>Eng: sessionStart {persona, directory, poolClass?, permissionMode?, firstLine, origin}
+    Eng->>Crew: effective(vault) — runs the one-time migration first
+    Crew-->>Eng: permission-mode, default persona … (vault over defaults)
+    Eng->>Rule: check(directory, facts) — the tickets vault allowed
+    Rule-->>Eng: ok / refused (.git, share, live worktree, missing)
+    Eng->>Eng: FreeSessionRequestBuilder — session > persona > vault; class from the table; brief
+    Eng->>Run: POST /start (session.kind free, ticket "free", noTicket)
+    Run->>Pool: bind(request, class) — persona + provider ledgers, no ticket allowance
+    alt no capacity
+        Pool-->>Run: refused (reason)
+        Run-->>Eng: ok false — the form or card shows why
+    else granted
+        Pool-->>Run: slot
+        Run->>W: spawn quiet + held in the folder (permission of the session)
+        Run-->>Eng: record kind free, state held
+        Eng->>Run: POST /send firstLine (wraps the brief once)
+        Run->>W: brief + first line
+        W-->>Run: turn … result (state running → held)
+        Note over Run: IdleRelease on the reaper's round: 15 min without a turn
+        Run->>W: stop
+        Run->>Pool: release slot (state released)
+    end
+```
+
+At a ticket run's start the three layers meet in the board's chain config and the request:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Board as Board service (engine)
+    participant Crew as CrewConfigService
+    participant Res as LayeredConfigResolver
+    participant Run as Crew runner (Orchestrator)
+    participant Mach as service.json (machine)
+    Board->>Crew: effective(vault) on every snapshot
+    Crew->>Res: crew(_meta/crew.md)
+    Res-->>Board: default worker, permission mode, caps, handover, tranche, default persona (vault > default)
+    Board->>Run: configureChain(resolved config) — held in memory
+    Run->>Run: switchTo(vault): chains/<vault key>/chain.json (runtime only)
+    Run->>Mach: the pool's grant reads the model table, the cap, the slots (machine only)
+    Note over Run: a request's own pin, class and permission win over the vault (session layer)
+```
+
+A runner that boots with a vault in `chain-vault.json` resolves that vault's `crew.md` itself (`ChainConfigRestorer`) so a handover keeps the chain running before the board's next config; a switch to another vault writes the current state away and loads the other vault's file under the boot rule.

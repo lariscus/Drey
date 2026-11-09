@@ -25,6 +25,7 @@ import {
   type TeamModel,
 } from './team-model';
 import { mountMemoryPane } from './memory-pane';
+import { mountNewSessionForm, type NewSessionFormHandle } from './new-session-form';
 import { mountOneOnOnePane } from './one-on-one-pane';
 import { personaPictureNode } from './persona-picture';
 import type { TeamStore } from './team-store';
@@ -73,6 +74,7 @@ const GLYPH_BELL = ['M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4
 const GLYPH_TERMINAL = ['M4 17l6-5-6-5M12 19h8'];
 const GLYPH_PAUSE = ['M8 5v14M16 5v14'];
 const GLYPH_PLAY = ['M7 5l12 7-12 7z'];
+const GLYPH_PLUS = ['M12 5v14M5 12h14'];
 
 function iconButton(label: string, title: string, icon: SVGElement, extra: string, onClick: () => void): HTMLButtonElement {
   const button = h('button', `desk-btn desk-btn-icon ${extra}`);
@@ -339,6 +341,7 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
   let frame = 0;
   let detailKey = '';
   let detail: HTMLElement | null = null;
+  let newSession: NewSessionFormHandle | null = null;
 
   const render = (): void => {
     frame = 0;
@@ -358,6 +361,7 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
     if (autopilot !== null) {
       head.append(autopilot);
     }
+    const newSessionLabel = deps.api.i18n.t('tickets.team.new_session.title');
     head.append(
       iconButton(
         model.halted ? 'Resume all' : 'Pause all after this step',
@@ -390,6 +394,24 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
           void deps.chainAction('chainAbort', {});
         },
       ),
+      iconButton(newSessionLabel, newSessionLabel, glyph(GLYPH_PLUS), '', () => {
+        newSession =
+          newSession === null
+            ? mountNewSessionForm(
+                deps,
+                () => {
+                  newSession = null;
+                  void store.refresh();
+                  schedule();
+                },
+                () => {
+                  newSession = null;
+                  schedule();
+                },
+              )
+            : null;
+        schedule();
+      }),
     );
 
     const grid = h('div', 'desk-persona-grid');
@@ -434,7 +456,7 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
               schedule();
             });
     }
-    root.replaceChildren(head, grid, ...(detail === null ? [] : [detail]));
+    root.replaceChildren(head, ...(newSession === null ? [] : [newSession.node]), grid, ...(detail === null ? [] : [detail]));
   };
 
   const schedule = (): void => {

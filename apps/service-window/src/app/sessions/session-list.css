@@ -6,13 +6,16 @@
   border-right: 1px solid var(--line);
   overflow-y: auto;
 }
-.summary {
+.head {
   height: 28px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  justify-content: space-between;
+  padding: 0 8px 0 16px;
   margin-top: 4px;
+}
+.summary {
   color: var(--text-2);
 }
 .sx {

@@ -16,6 +16,7 @@ import type {
 } from '../api/dto';
 import { ACCEPT_ARM_WINDOW_MS, type AcceptArmState } from '../ticket/ticket.model';
 import {
+  sessionRowsOf,
   oneOnOneLineOf,
   CARD_SNIPPET_CAP,
   CONTENT_PREVIEW_LINES,
@@ -1035,6 +1036,24 @@ describe('the 1:1 as a persona session (req-168)', () => {
     expect(oneOnOneLineOf({ messages: [], session: 'none' }, 'Pia', time)).toBeNull();
     expect(oneOnOneLineOf({ messages: [], session: 'bridge' }, 'Pia', time)).toBeNull();
     expect(oneOnOneLineOf(null, 'Pia', time)).toBeNull();
+  });
+
+  it('draws one line per live session: its kind and the folder it works in (req-173)', () => {
+    const words: Record<string, string> = { 'mission.session.kind.one_on_one': '1:1', 'mission.session.kind.free': 'free' };
+    const t = (key: string, params?: Record<string, string>): string => (key === 'mission.session.line' ? `${params?.['kind']} · ${params?.['directory']}` : (words[key] ?? key));
+    expect(
+      sessionRowsOf(
+        [
+          { runId: 'S-1', kind: '1:1', directory: 'E:/tickets', state: 'running' },
+          { runId: 'S-2', kind: 'free', directory: 'E:/notes', state: 'running' },
+        ],
+        t,
+      ),
+    ).toEqual([
+      { id: 'S-1', text: '1:1 · E:/tickets' },
+      { id: 'S-2', text: 'free · E:/notes' },
+    ]);
+    expect(sessionRowsOf([], t)).toEqual([]);
   });
 
   it("carries the persona's cards and its failure, and a card's decision goes to the desk", async () => {

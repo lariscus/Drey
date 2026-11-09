@@ -51,10 +51,11 @@ describe("the chain's state on the FileSystem port", () => {
     const logs: string[] = [];
     const store = new ChainStateStore('/fleet', fs, clock, (m) => logs.push(m));
     const state = new ChainState();
+    state.vault = { ticketsVaultPath: 'T:/tickets', git: 'git' };
     state.autopilot = { state: 'on' };
     state.columns['build'] = 'held';
     await store.persist(state);
-    expect(fs.atomicWrites).toEqual(['/fleet/chain.json']);
+    expect(fs.atomicWrites).toEqual([store.fileFor('T:/tickets'), '/fleet/chain-vault.json']);
     const restored = new ChainState();
     expect(await store.load(restored)).toBe(true);
     expect(restored.autopilot.state).toBe('off');

@@ -523,6 +523,26 @@ describe('parseTeam — live runs and capacity (E12-4)', () => {
     expect(team.personas.find((p) => p.id === 'ralf')?.liveRuns).toBeUndefined();
   });
 
+  it('keeps a free session and a 1:1 out of the ticket runs and lists them as sessions with their folder (req-173)', () => {
+    const sessions = {
+      runs: [
+        { id: 'r1', ticketId: 'T-1', persona: 'ben', provider: 'opencode', state: 'running' },
+        { id: 's1', ticketId: '1:1', persona: 'ben', provider: 'claude-code', state: 'running', kind: '1:1', workingDirectory: 'E:/tickets', worktreePath: 'E:/tickets' },
+        { id: 's2', ticketId: 'free', persona: 'ben', provider: 'claude-code', state: 'running', kind: 'free', workingDirectory: 'E:/notes', worktreePath: '' },
+        { id: 's3', ticketId: 'free', persona: 'ben', provider: 'claude-code', state: 'done', kind: 'free', workingDirectory: 'E:/old' },
+      ],
+    };
+    const team = parseTeam(personas, sessions);
+    const ben = team.personas.find((p) => p.id === 'ben');
+    expect(team.runs.map((r) => r.ticketId)).toEqual(['T-1']);
+    expect(ben?.liveRuns?.map((r) => r.runId)).toEqual(['r1']);
+    expect(ben?.liveSessions).toEqual([
+      { runId: 's1', kind: '1:1', directory: 'E:/tickets', state: 'running' },
+      { runId: 's2', kind: 'free', directory: 'E:/notes', state: 'running' },
+    ]);
+    expect(team.personas.find((p) => p.id === 'ralf')?.liveSessions).toBeUndefined();
+  });
+
   it('reads the pool sizes as capacity chips against the live runs per provider', () => {
     expect(parseTeam(personas, fleet).capacity).toEqual([
       { provider: 'opencode', label: 'Local', running: 1, size: 2 },

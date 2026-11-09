@@ -255,8 +255,8 @@ create as a `raw capture:` Log line (ticket-schema).
   his reason. The desk validates it like any edit and shows it as a draft;
   nothing is written.
 - **`MISSION_SYSTEM_PROMPT` and its context** (`chat-llm.ts` + `chat-service.ts`,
-  E5a; D-7a / milestone 165) — the six intents (steer, create, promote, chain,
-  blocked, report) and the strict `{say, thought, commands}` envelope. The system
+  E5a; D-7a / milestone 165; req-173) — the seven intents (steer, create, promote, chain,
+  blocked, session, report) and the strict `{say, thought, commands}` envelope. The system
   message is the prompt, then `## Board digest` (priority vocabulary, the columns
   with counts, one line per **open** ticket, capped near 2 KB — the terminal column
   is never listed, and the digest says so in one line), then — D-7a — `## Tickets
@@ -270,6 +270,24 @@ create as a `raw capture:` Log line (ticket-schema).
   of it), a named ticket's block is authoritative, "I cannot find it" only when
   that block says so; ticket ids may come from the digest or the named block.
   Nothing of the named block is written to the session file.
+  **req-173 — the `session` intent:** the intent line *"session — the owner
+  wants a persona to work on something outside the board (look into a folder,
+  try something, answer a question in a repository): answer with a
+  startSession command naming the persona, the folder and the first line;
+  only personas and folders from the "Sessions you may propose" block"*, the
+  propose-only list gains `startSession`, and one rule explains it: *"startSession
+  opens a free session: the persona works in the folder (an absolute path from
+  the block — the tickets repository is one), with no ticket, until the owner
+  stops talking to it. "poolClass" is "A", "B", "C" or null (null = the
+  persona's model decides); "brief" is the first line the persona gets, in the
+  owner's words."* with the example
+  `{"kind":"startSession","persona":"ben","directory":"E:/projects/drey","poolClass":null,"brief":"Find out why the build is slow and tell me."}`.
+  Below the digest (same system message) rides `## Sessions you may propose`:
+  `personas: <id> (<harness>), …` (agents with a harness; an `api` persona is
+  left out) and `folders: <tickets vault> (the tickets repository); <path>
+  (<repo>); …` (`repos.md` `path:`) — `FreeSessionService.promptContext`. The
+  card (`Start a session of ben in E:/projects/drey`) starts nothing until the
+  owner confirms; Pia never sets a permission mode (the vault's applies).
 - **The Mission Control bridge's provider call** (`packages/tickets-engine/src/services/chat-model.ts`,
   `chat-llm.ts`, D-1 / milestone 131) — every Mission Control prompt above
   (mission, shape, flow, aggregator) goes out as ONE streamed request in the
@@ -512,6 +530,40 @@ Answer with exactly one JSON object and nothing outside it — no prose, no mark
   you send the step back. Nothing to report: no line."* The runner reads
   the last line-start `FRICTION:` line (`harness/event-text.ts`
   `frictionOf`, 300 characters).
+
+## The free session brief (req-173, R12)
+
+`packages/tickets-engine/src/fleet/free-session-brief.ts`
+`composeFreeSessionBrief`, composed by `services/free-session-service.ts`:
+what a free session is told once, with the owner's first line. Sections in
+this order, an empty one left out:
+
+```markdown
+# Free session with <Title>
+
+You are <Title>, the <role> of this crew. The owner opened this session for work of their own: there is no ticket, no gate and nothing moves on the board. Do what the owner asks, in their words; say when you are done and wait for the next line.
+
+You work in <folder>. <what the mode allows>
+
+This folder is the tickets repository: its ticket files and `_meta/` are the board — change them only when the owner asks you to.   ← only in the tickets vault
+
+## Your instructions
+<prompt.md>
+
+## Skills
+### <name>
+<text>
+```
+
+*What the mode allows*: `read-only` — *"Read-only: read what you need,
+never edit a file, never run a command that changes anything."*;
+`accept-edits` — *"You may edit files here; ask before anything that
+reaches beyond this folder."*; `bypass` — *"You run without permission
+prompts; stay inside this folder and do only what the owner asked."* No
+board, no memory, no runs, no tools section: the owner directs the session
+line by line.
+
+---
 
 ## The assistant's system prompt (milestones 76–78, ADR-0071)
 

@@ -206,7 +206,23 @@ export function validateChatCommand(
     }
     return { kind: 'setBlockedBy', id, blockedBy };
   }
+  if (kind === 'startSession') {
+    return startSessionOf(obj);
+  }
   return null;
+}
+
+/** req-173: Pia's free session card — a persona id, an absolute folder, an optional class, the first line. */
+function startSessionOf(obj: Record<string, unknown>): ChatCommand | null {
+  const persona = textOf(obj['persona']);
+  const directory = textOf(obj['directory']);
+  const brief = textOf(obj['brief']);
+  const raw = obj['poolClass'] ?? null;
+  const poolClass = raw === 'A' || raw === 'B' || raw === 'C' ? raw : null;
+  if (persona === null || directory === null || brief === null || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(persona) || (raw !== null && poolClass === null)) {
+    return null;
+  }
+  return { kind: 'startSession', persona, directory, poolClass, brief };
 }
 
 /** The setChain payload's shape check: a list of non-empty strings (the

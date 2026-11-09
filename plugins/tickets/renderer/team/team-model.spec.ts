@@ -124,6 +124,13 @@ describe('persona cards', () => {
     expect(personaCardOf(persona(), [run({ persona: 'ralf' })], [], titles, NOW).state).toBe('idle');
   });
 
+  it('reads no session as work: a 1:1 and a free session keep the card idle (req-168, req-173)', () => {
+    const sessions = [run({ id: 's1', kind: '1:1' }), run({ id: 's2', kind: 'free', ticketId: 'free' }), run({ id: 's3', kind: 'shape' })];
+    expect(personaCardOf(persona(), sessions, [], titles, NOW).state).toBe('idle');
+    const card = personaCardOf(persona(), [...sessions, run({ kind: 'run' }), run({ id: 'r9' })], [], titles, NOW);
+    expect(card.runs.map((row) => row.runId)).toEqual(['r1', 'r9']);
+  });
+
   it('weighs stuck over waiting over running, and paused over all', () => {
     const waiting = run({ waiting: { kind: 'question', since: minutesAgo(1), text: '' } } as unknown as Partial<RunInfo>);
     const stuck = run({ id: 'r3', stuck: true, lastActivity: minutesAgo(9) });

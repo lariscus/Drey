@@ -77,9 +77,11 @@ describe('syncConfig (E5a chat keys)', () => {
     const calls: RecordedCall[] = [];
     await syncConfig(
       recordingClient(calls),
-      ctxWith({ defaultWorker: 'claude-code' }, { baseUrl: 'http://127.0.0.1:1234/v1', apiKey: null, model: 'glm-5' }),
+      ctxWith({ gitPath: 'C:/git/git.exe', defaultWorker: 'claude-code' }, { baseUrl: 'http://127.0.0.1:1234/v1', apiKey: null, model: 'glm-5' }),
     );
-    expect(calls).toContainEqual({ method: 'configSet', payload: { key: 'defaultWorker', value: 'claude-code' } });
+    expect(calls).toContainEqual({ method: 'configSet', payload: { key: 'gitPath', value: 'C:/git/git.exe' } });
+    // req-173: a vault key lives in _meta/crew.md and no longer travels into the engine's config.
+    expect(calls.some((call) => (call.payload as { key?: unknown }).key === 'defaultWorker')).toBe(false);
     expect(calls).toContainEqual({ method: 'configSet', payload: { key: 'chat.model', value: 'glm-5' } });
   });
 

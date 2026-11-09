@@ -99,3 +99,7 @@ every re-run with git's "already checked out".
   removed through git; the Files panel's *Remove worktree* does not match
   it (the run's end removes it), and *Clean up worktrees* unlocks a
   leftover before `git worktree remove` (ADR-0075 later change).
+
+## Later change — the session's working directory is explicit (req-173, milestone 230, 2026-11-09)
+
+The working directory is a field of the session record (R12): a ticket run still works in its worktree under this ADR's home (`repos.md` `path:` + `<base>/<ticket-id>`), a review in its read-only checkout, a 1:1 in the tickets repository, and a **free session in the folder the owner named** — the tickets repository itself is allowed. A free session never prepares or removes a worktree, and its directory may not be the worktree of a live ticket run (`fleet/session/session-directory-rule.ts`); the cleanup surfaces of this ADR never touch a free session's folder.

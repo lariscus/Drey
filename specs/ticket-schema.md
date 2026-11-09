@@ -59,6 +59,7 @@ Top-level rules, once, up front:
       pipeline.md     # the phases + handover config (config, never data)
       order.md        # ignored since req-75 W1 (the former order pins), may be absent
       repos.md        # work-repo name -> clone URL/path mapping
+      crew.md         # the crew's defaults and limits — the vault layer (req-173), see below
       prompts/        # the handover prompts (`agent <prompt-ref>` names one file)
       personas/       # the agent personas (E3, the improvement loop E6):
                       #   <id>/persona.md + prompt.md + memory.md + reviews.md +
@@ -1327,6 +1328,116 @@ current branch, absolute `path`). The file stays the single source of
 truth; the scan is a seeding step, not a live reference. A ticket may
 name several of these repos in its `repos:` list (see the frontmatter
 fields) — the fleet prepares one worktree per name.
+
+## `_meta/crew.md` — the crew's defaults and limits (the vault layer, req-173)
+
+The vault layer of the configuration (R13, ADR-0092 later change): what
+every device working this tickets repository shares, versioned with it.
+
+```markdown
+---
+default-persona: ben          # the persona ladder's floor (was config personas.default)
+default-worker: claude-code   # the assignment ring's floor (was defaultWorker)
+permission-mode: accept-edits # dispatched runs: accept-edits | bypass (was autoPermissionMode)
+caps:                          # the instruction output caps (was fleet.cap.*)
+  gate-failure-lines: 40
+  gate-failure-bytes: 4096
+  diff-stat-lines: 50
+  diff-stat-bytes: 4096
+handover:                      # the handover thresholds (was fleet.compactAboveTokens …)
+  compact-above-tokens: 120000
+  resume-pause-ttl-min: 30
+  context-cap-tokens: 0
+  compact-above-tokens-by:     # per worker / worker/model (was fleet.compactAboveTokens.<key>)
+    claude-code: 90000
+  context-cap-tokens-by:
+    opencode: 64000
+tranche:                       # the Autopilot's release unit (was autopilot.tranche.*)
+  runs: 10                     # a number, or off
+  budget-share: 0.33
+  minutes: 240
+  early-stop:                  # (was autopilot.earlyStop.*)
+    red-gates: 3
+    gate-window: 6
+    same-ticket-red: 2
+    change-factor: 3
+    cost-factor: 3
+    min-runs: 3
+---
+Prose for humans.
+```
+
+Every key is optional; an absent key is the built-in default
+(`fleet/config/layered-config-resolver.ts` `CREW_DEFAULTS`). A value of the
+wrong kind warns and reads as the default; a file whose YAML does not parse
+reads as empty with the error (the engine logs it once) and is never
+written over — Settings refuses to save into it. `permission-mode` is a
+crew default only: `read-only` is a session's mode (a review, a 1:1, a
+free session the owner opens read-only), never the crew's. Keys of other
+features may sit beside these and are kept by every write (req-169's
+closing-round signals belong here).
+
+**Precedence** (written down once, enforced by `LayeredConfigResolver`):
+**session record > vault (`_meta/crew.md`) > built-in default**. The
+machine layer (`service.json` in the service home: the model table, the
+capacity cap, the slots, providers and keys, paths, autostart) stands
+beside it: a machine key is set only there, and no vault or session key
+overrides it. A vault key never reads a device's settings, so two devices
+on the same `_meta/` resolve the same crew.
+
+**Written** by Settings → Tickets (the Fleet group — default worker,
+resume pause TTL, context cap — and the Workers group's permission mode and
+compact thresholds): one key per change, one commit
+(`tickets: crew settings (<keys>)`), the change round announced. The
+engine reads it on every board snapshot and resolves the chain config the
+runner gets from it.
+
+**Migrated** once per vault and device (`services/crew-config-migrator.ts`,
+on the first read): every key the file lacks takes the value the engine's
+`~/.drey-engine/config.json` held (the owner's settings as Drey mirrored
+them), else the old machine-wide `chain.json`'s `config`
+(`fleet/chain.legacy.json` once the runner moved it aside). A key the file
+already holds is never touched; a value equal to the built-in default is
+not written. One commit (`tickets: crew settings move into _meta/crew.md
+(req-173)`), one log line per moved key, and the marker `crew.migrated`
+(vault path → ISO stamp) in `config.json` keeps it from running again.
+The old keys stay where they were and are read by nothing.
+
+## The session record (req-173, R12)
+
+Every unit of work Drey Service carries is a **session** with a record:
+a ticket `run`, a persona `1:1`, a `free` session (and `shape`, typed only —
+req-229). The record is a view over the run record
+(`<fleet root>/runs/<id>/run.json`, `fleet/session/session-record.ts`,
+`GET /sessions`), not a second file:
+
+| Field | From the run record |
+|---|---|
+| `id`, `kind` | `kind` (absent = `run`) |
+| `persona`, `harness`, `model`, `class` | `persona`, `provider`, the pool grant's model and class |
+| `workingDirectory` | explicit: a run's worktree (`repos.md` `path:` + `_worktrees/<id>`), a review's checkout, a 1:1's tickets repository (read-only), a free session's folder the owner named |
+| `state` | `queued` (no worker yet) · `held` (standing between the owner's lines) · `running` · `released` (done, stopped, failed, or out of reach) — `shared/session-lifecycle.ts` |
+| `ticketId` | a run's ticket; null for every other kind (the request carries the marker `1:1` / `free`) |
+| `token` | the run id the worker's vault-MCP token is keyed by in the service (req-167), when one was minted (`vaultMcp`); the token itself is never written |
+| `ledgers` | ticket (runs only), persona, provider |
+| `stream` | `runs/<id>/stream.jsonl` |
+
+A **free session** is created by the owner — the service window's
+Sessions tab or the Crew tab, *New session…* (persona, folder, class,
+permission, first line) — or proposed by Pia as a card (Mission Control's
+`startSession` command) and started on the owner's confirm. It runs
+through the same pool (the class asked, or the model table's class of the
+persona's model), on the persona's and the provider's ledgers with no
+ticket allowance, in the directory the owner named with the persona's
+harness, and is released after 15 idle minutes like a 1:1. **The tickets
+vault itself is an allowed directory**; refused are a relative path, a
+network share, a folder inside `.git` and the worktree of a live ticket
+run. Its permission mode is the vault's `permission-mode` unless the owner
+chose another on the session (`read-only`, `accept-edits`, `bypass`); the
+read-only rule of a 1:1 does not apply. A free session in a repository's
+checkout (`repos.md` `path:`) is served by a slot of that repository's
+`profile`. Its conversation is the worker's stream (the service window's
+Sessions tab, the takeover); it has no chat file and writes no memory line.
 
 ## `_meta/chat/` — the Mission Control sessions
 

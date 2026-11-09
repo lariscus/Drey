@@ -33,6 +33,14 @@ export class Confirmations {
     return this.ask(i18n.t('service_tray.quit.message', { count: liveRuns }), i18n.t('service_tray.quit.detail'), i18n.t('service_tray.quit'));
   }
 
+  /** The native folder picker (the New session form's Browse); null when cancelled. */
+  async pickFolder(): Promise<string | null> {
+    const options = { title: i18n.t('service_window.new_session.pick_folder'), properties: ['openDirectory' as const] };
+    const parent = this.parent();
+    const reply = parent === null ? await dialog.showOpenDialog(options) : await dialog.showOpenDialog(parent, options);
+    return reply.canceled ? null : (reply.filePaths[0] ?? null);
+  }
+
   stopAll(liveRuns: number): Promise<boolean> {
     return this.ask(i18n.t('service_tray.stop_all.message', { count: liveRuns }), undefined, i18n.t('service_tray.stop_all.confirm'));
   }

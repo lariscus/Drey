@@ -1,7 +1,7 @@
 import type { Clock } from '../ports/clock';
 import { ONE_ON_ONE_IDLE_MS } from '../protocol-session';
 import type { LiveRun } from './live-run';
-import { isLiveOneOnOne } from './one-on-one-starter';
+import { isLiveHeldSession } from './held-session-starter';
 import type { RunBookkeeper } from './run-bookkeeper';
 import type { RunSettler } from './run-settler';
 
@@ -15,7 +15,7 @@ export interface IdleReleaseDeps {
 }
 
 /**
- * The idle release of a held session (req-157's lifecycle as req-168
+ * The idle release of a held session — a 1:1 or a free session (req-157's lifecycle as req-168
  * builds it, ADR-0093): a 1:1 stands held while the owner keeps talking —
  * its provider session and cache kept — and is let go once it has stood
  * this long without a turn: the worker stops, the session settles `done`,
@@ -33,7 +33,7 @@ export class IdleRelease {
 
   /** Whether this run is a held 1:1 that has stood idle past the span. */
   due(run: LiveRun): boolean {
-    if (!isLiveOneOnOne(run) || run.info.state !== 'running' || run.info.turn === 'busy') {
+    if (!isLiveHeldSession(run) || run.info.state !== 'running' || run.info.turn === 'busy') {
       return false;
     }
     if (run.info.waiting !== undefined && run.info.waiting !== null) {

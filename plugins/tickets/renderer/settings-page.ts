@@ -12,6 +12,7 @@ import { createDeskSettings, type DeskSettingsHooks } from './settings/desk-sett
 import { ticketsEntries, ticketsSections, type TicketsSectionId } from './settings-sections';
 import { createModelsSection } from './settings/models-section';
 import { createWorkersSection } from './settings-workers';
+import { CrewSettings } from './settings-crew';
 
 /** Marks the first element of a part of the page (`data-settings-section`). */
 function anchored<T extends HTMLElement>(element: T, id: TicketsSectionId): T {
@@ -48,6 +49,8 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
 
       let disposed = false;
       let seededPrompts = false;
+      // req-173: the vault layer (tickets/_meta/crew.md) behind the default worker, the permissions and the thresholds.
+      const crew = new CrewSettings(api);
       let timer: ReturnType<typeof setTimeout> | null = null;
       const load = async (): Promise<void> => {
         const [snap, folders, firstListing, reposListing, configured] = await Promise.all([
@@ -55,7 +58,7 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
           api.backend.invoke('folders') as Promise<FolderStatus>,
           api.backend.invoke('prompts') as Promise<PromptListing>,
           api.backend.invoke('reposListing') as Promise<ReposListing>,
-          api.settings.get<string>('defaultWorker'),
+          crew.resolved('defaultWorker').then((value) => (typeof value === 'string' ? value : undefined)),
         ]);
         if (disposed) {
           return;
@@ -97,7 +100,7 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
       const prompts = createPromptsSection(api, reload);
       const repos = createReposSection(api, reload);
       // Opens on the default worker's runner once the first load knows it.
-      const workers = createWorkersSection(api, 'opencode');
+      const workers = createWorkersSection(api, 'opencode', crew);
       let workersOpened = false;
       const remote = createRemoteSection(api);
       const models = createModelsSection(api);
@@ -114,7 +117,7 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
       anchored(remote.root, 'devices');
       body.append(
         desk.root,
-        fleetSection(api),
+        fleetSection(api, crew),
         workers.root,
         desk.videos,
         remote.root,
@@ -158,24 +161,25 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
 
 // --- the fleet's own settings (plugin config; applied on restart) ----------
 
-function fleetSection(api: DreyPluginApi): HTMLElement {
+function fleetSection(api: DreyPluginApi, crew: CrewSettings): HTMLElement {
   const section = el('section', 'tset-section');
   section.setAttribute('aria-labelledby', 'tset-fleet-head');
   const head = el('div', 'tset-section-head');
   const title = el('h3', undefined, 'Fleet');
   title.id = 'tset-fleet-head';
-  head.append(title, el('span', 'tset-chip tset-chip-manual', 'Applies on restart'));
+  // req-173 (R13): the section's keys live in the vault (tickets/_meta/crew.md) and apply on the next board round.
+  head.append(title, el('span', 'tset-chip', api.i18n.t('settings.scope.vault')));
   const rows = el('div', 'tset-kv');
   rows.append(
     ...kv(
       'tset-default-worker',
       'Default worker',
-      selectConfig(api, 'defaultWorker', [
+      crew.select('defaultWorker', [
         ['opencode', 'OpenCode'],
         ['claude-code', 'Claude Code'],
         ['kimi', 'Kimi Code'],
         ['copilot', 'Copilot CLI'],
-      ], 'opencode'),
+      ]),
       'For a run no ticket, column or repository assigns a worker to.',
     ),
   );
@@ -188,13 +192,13 @@ function fleetSection(api: DreyPluginApi): HTMLElement {
     ...kv(
       'tset-handover-ttl',
       'Resume pause TTL — minutes',
-      numberConfig(api, 'fleet.resumePauseTtlMin'),
+      crew.number('handover.resumePauseTtlMin'),
       'A pause within this window counts as warm: the previous session resumes and re-pays its transcript as cache reads.',
     ),
     ...kv(
       'tset-context-cap',
       'Context cap — tokens',
-      numberConfig(api, 'fleet.contextCapTokens'),
+      crew.number('handover.contextCapTokens'),
       'OpenCode compacts a running worker\'s context once it reaches this size instead of the model\'s full window. 0 = the model\'s own window.',
     ),
   );
