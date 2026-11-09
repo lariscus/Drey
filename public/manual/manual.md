@@ -1236,11 +1236,30 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   the prompt they started with. **Discard** goes back to what is saved. If
   the instructions cannot be read, the editor and Save stay off, so nothing
   can overwrite them unread.
-- **Capacity** (a panel for the bottom dock) — one line: how many of the
-  worker slots are busy, the pool chips, what each persona is doing right
-  now, today's cost, **Pause all** and **Open Crew ›**. It shows only while
-  the Board tab is active. As the only panel of the bottom dock it has no
+- **Capacity** (a panel for the bottom dock) — its header reads `2 of 5
+  sessions · 1 queued`: the live sessions over what the pools carry, and the
+  tickets waiting to be pulled. Below it: what each persona is doing right now,
+  today's cost, **Open Crew ›**, a chip per account (see *Accounts and their
+  quota*), and a last line with the ticket next in the queue. **Pause all**
+  sits in the header. It shows only while the Board tab is active. As the only panel of the bottom dock it has no
   icon strip above it; the chevron in its header folds it to the header.
+
+**Accounts and their quota.** Each worker runs on one of your accounts —
+for example two Claude Code logins, z.ai and Kimi. Every repository is
+either *private* or *work*, and its tickets run only on accounts of the
+same kind, never on the other, even when those are free. A run that
+finds no free account of its kind does not start, and the reason says
+which accounts are busy, out of quota or signed out. When an account's
+login expires, the run that hit it ends and its card in **Needs you**
+names the refused login; no further run starts on that account until you
+sign in to it again. Nothing is retried on its own.
+
+In the Capacity band each account is a chip: its sessions as dots (filled
+while busy), the share of its quota left as a bar — blue when the provider
+reports it, amber when Drey only estimates it, no bar and `unknown` when
+neither — and when the quota resets. `q` compares the quota left with the
+time left in its window; above 1.3 the account has more than the week will
+use, and an up-chevron marks it.
 
 **Pause and stuck workers.** **Pause** (on the thread and on a Crew
 run) waits for the current action — a command or an edit — to finish and
@@ -2234,7 +2253,7 @@ history store is deliberately outside it).
 ---
 
 *Manual for Drey 0.8.1; manual content last changed
-2026-11-08. Screenshots were captured automatically from
+2026-11-09. Screenshots were captured automatically from
 the built app (Anthrazit theme, 1600Ã—1000) by
 `e2e/manual-screenshots.spec.ts` — run
 `$env:DREY_MANUAL_SHOTS='1'; npm run e2e:run -- manual-screenshots`
