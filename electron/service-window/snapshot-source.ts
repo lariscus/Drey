@@ -2,7 +2,7 @@
 import type { ServiceSnapshot } from '../../shared/service-window/contract';
 import type { LocalModelProbe } from './local-model-probe';
 import type { ServiceCalls } from './service-calls';
-import { DEFAULT_LOAD, componentsOf, isLive, loadOf, slotFactsOf, spendOf } from './snapshot-map';
+import { DEFAULT_LOAD, componentsOf, governorFactsOf, isLive, loadOf, slotFactsOf, spendOf } from './snapshot-map';
 
 const obj = (value: unknown): Record<string, unknown> => (typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {});
 
@@ -13,12 +13,13 @@ export class SnapshotSource {
   ) {}
 
   async snapshot(): Promise<ServiceSnapshot> {
-    const [status, runs, slots, models, model] = await Promise.all([
+    const [status, runs, slots, models, model, governor] = await Promise.all([
       this.calls.status(),
       this.calls.runs(),
       this.calls.slots(),
       this.calls.models(),
       this.model.facts(),
+      this.calls.governor(),
     ]);
     const settings = obj(status?.['settings']);
     const live = runs.filter(isLive).length;
@@ -30,6 +31,7 @@ export class SnapshotSource {
       spend: spendOf(models),
       slots: slots === null ? null : slots.map(obj).map(slotFactsOf),
       load: status === null ? DEFAULT_LOAD : loadOf(settings),
+      governor: governor === null ? null : governorFactsOf(governor),
       autostart: settings['enabled'] === true && settings['autostart'] === true,
     };
   }

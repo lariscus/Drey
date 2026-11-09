@@ -5,6 +5,8 @@
  */
 import type {
   ComponentState,
+  GovernorFacts,
+  GovernorWaitCause,
   LoadFacts,
   LogLevel,
   LogLine,
@@ -33,6 +35,29 @@ export function loadOf(settings: Json): LoadFacts {
     reserve: num(settings['reserve']) ?? DEFAULT_LOAD.reserve,
     lowPriority: typeof settings['lowPriority'] === 'boolean' ? settings['lowPriority'] : DEFAULT_LOAD.lowPriority,
     quietHours: str(settings['quietHours']) ?? '',
+  };
+}
+
+const CAUSES: ReadonlySet<string> = new Set(['seats', 'quiet', 'load']);
+const list = (value: unknown): readonly Json[] => (Array.isArray(value) ? value.map(obj) : []);
+
+/** The runner's `GET /governor` as the Governor block needs it (req-180). */
+export function governorFactsOf(status: Json): GovernorFacts {
+  const heavy = obj(status['heavy']);
+  const light = obj(status['light']);
+  const load = obj(status['load']);
+  const cpu = num(load['cpu']);
+  const memory = num(load['memory']);
+  return {
+    heavy: { busy: num(heavy['busy']) ?? 0, total: num(heavy['total']) ?? 0, holders: list(heavy['holders']).map((h) => ({ ticket: String(h['ticket'] ?? ''), task: String(h['task'] ?? '') })) },
+    light: { busy: num(light['busy']) ?? 0, total: num(light['total']) },
+    load: cpu === null && memory === null ? null : Math.max(cpu ?? 0, memory ?? 0),
+    reserve: num(load['reserve']) ?? DEFAULT_LOAD.reserve,
+    quietUntil: str(status['quietUntil']),
+    waiting: list(status['waiting']).map((w) => ({ ticket: String(w['ticket'] ?? ''), task: String(w['task'] ?? ''), cause: (CAUSES.has(String(w['cause'])) ? w['cause'] : 'seats') as GovernorWaitCause })),
+    devServers: list(status['devServers'])
+      .filter((d) => d['listening'] === true)
+      .map((d) => ({ port: num(d['port']) ?? 0, ticket: String(d['ticket'] ?? '') })),
   };
 }
 

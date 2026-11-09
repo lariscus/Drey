@@ -17,6 +17,19 @@ export interface LaunchResume {
   readonly fallbackOnFailure?: boolean;
 }
 
+/** A held light seat as the launcher sees it (req-180). */
+export interface WorkerSeat {
+  readonly env: Readonly<Record<string, string>>;
+  readonly devPort: number | null;
+  adopt(pid: number): void;
+  release(): void;
+}
+
+/** The resource governor as the launcher asks it: a light seat per worker (req-180). */
+export interface WorkerSeats {
+  light(ask: { readonly runId: string; readonly ticket: string; readonly worktree: string }): WorkerSeat;
+}
+
 export interface WorkerLauncherDeps {
   readonly machine: RunStateMachine;
   readonly repo: RunRepository;
@@ -25,6 +38,8 @@ export interface WorkerLauncherDeps {
   readonly background: BackgroundWork;
   readonly streams: RunStreams;
   readonly log: (message: string) => void;
+  /** req-180: the governor's light seat; absent = no governor (a spec). */
+  readonly seats?: WorkerSeats;
 }
 
 /**
@@ -39,7 +54,8 @@ export class WorkerLauncher {
   launch(run: LiveRun, resume: LaunchResume): WorkerHandle {
     const trailers = this.deps.claims.trailerBlock(run);
     const base = resume.instruction ?? run.request.instruction;
-    return this.deps.processes.spawn(run, {
+    const seat = this.seatFor(run);
+    const handle = this.deps.processes.spawn(run, {
       instruction: trailers === null ? base : `${base}\n\n${trailers}`,
       resumeRef: resume.resumeRef,
       ...(resume.compactFirst === true ? { compactFirst: true } : {}),
@@ -48,7 +64,31 @@ export class WorkerLauncher {
       recordAttach: true,
       trackUsageBase: true,
       ...(resume.fallbackOnFailure === true ? { onResumeFailed: (reason: string) => this.deps.background.track(this.fallback(run, reason)) } : {}),
+      ...(seat !== null ? { env: seat.env } : {}),
     });
+    if (seat !== null) {
+      if (handle.pid !== null) {
+        seat.adopt(handle.pid);
+      }
+      void handle.exited.then(
+        () => seat.release(),
+        () => seat.release(),
+      );
+    }
+    return handle;
+  }
+
+  /** The worker's light seat: the worktree's dev-server port goes on the record (req-180). */
+  private seatFor(run: LiveRun): WorkerSeat | null {
+    const seats = this.deps.seats;
+    if (seats === undefined) {
+      return null;
+    }
+    const seat = seats.light({ runId: run.info.id, ticket: run.request.ticketId, worktree: run.info.worktreePath });
+    if (seat.devPort !== null) {
+      run.info = { ...run.info, devPort: seat.devPort };
+    }
+    return seat;
   }
 
   /**

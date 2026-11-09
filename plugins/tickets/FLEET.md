@@ -776,6 +776,70 @@ tranche 1 released again after the early stop — the rules look past it
 `GET /events` sends `event: tranche` with the status (or `null`) after every
 change.
 
+## The resource governor (req-180)
+
+Every task the runner spawns takes a **seat of a class** first and gives it
+back when it ends (ADR-0092 later change 2026-11-09, `fleet/governor/`):
+`light` for a worker (a model run; never waits — the slots and the pool bound
+those), `heavy` for each acceptance command of the gate, each ci check, and a
+dev server listening on a leased port.
+
+**Settings** — Settings → Background service → *Load* (board 8c), stored by
+Drey into the engine's config and read live by the service every 5 s:
+
+| Key | Default | What |
+|---|---|---|
+| `service.load.heavySeats` | 2 | heavy tasks at once (1–16) |
+| `service.load.reserve` | 25 | percent of CPU *and* memory a heavy start leaves free (CPU over the last 5 s sample) |
+| `service.load.lowPriority` | true | heavy processes at Windows' *below normal* priority class / `nice` 10 |
+| `service.load.quietHours` | '' | `22:00 – 07:00` (local time, may cross midnight): no new heavy task starts |
+
+`service.json` (the service home): `"governor": {"devPorts": {"from": 4300,
+"to": 4399}}` — the dev-server port range.
+
+**Rules, in order:** quiet hours → the seat count → the reserve; first come,
+first served. After ten minutes above the reserve with no heavy seat busy the
+task starts anyway (`· after 10 min above the reserve`).
+
+**Environment** of a heavy command (and of a worker): the parallelism
+`workers = max(1, ⌊cpus × (100 − reserve) % / heavySeats⌋)` as
+`VITEST_MAX_WORKERS`, `VITEST_MAX_THREADS`, `VITEST_MAX_FORKS`,
+`MAKEFLAGS=-jN`, `CARGO_BUILD_JOBS`, `GOMAXPROCS`, `DOTNET_PROCESSOR_COUNT`,
+`UV_THREADPOOL_SIZE` (2–4) and `DREY_TEST_WORKERS` (read it in a Jest or
+Playwright config: neither tool has a variable of its own). A worker also gets
+`DREY_DEV_PORT` — its worktree's dev-server port, the same for the worktree's
+next run, on the run record as `devPort`, returned when the run settles.
+
+**Log lines** (runner log, the service window's log):
+
+```
+governor: heavy seat granted to T-0126 tests · 1 of 2
+governor: T-0121 build waits · 2 of 2 heavy seats busy
+governor: T-0121 build refused · quiet hours until 07:00
+governor: T-0126 tests refused · load 91 % above the reserve
+governor: heavy seat released by T-0126 tests · 1 of 2
+governor: stale heavy seat of T-0126 tests released · pid 1234 gone
+governor: dev server of T-0126 on port 4302 holds a heavy seat · 1 of 2
+governor: T-0121 tests no longer waits · the run stopped
+```
+
+A waiting gate also writes ``gate: `npm test` waits — 2 of 2 heavy seats
+busy`` into the run's stream and sets the run's `activity` to `waits for a
+heavy seat · …` (the Work row's and the board card's second line).
+
+**Status:** `GET /governor` → `{ok, governor: GovernorStatus}`:
+`heavy {busy, total, holders [{runId, ticket, task, since, pid}]}`,
+`light {busy, total}` (total = the slots' `sessions` summed, null when one has
+no cap), `load {cpu, memory, reserve}`, `lowPriority`, `quietHours`,
+`quietUntil`, `waiting [{runId, ticket, task, cause: seats|quiet|load, reason,
+since}]`, `devServers [{port, ticket, runId, listening}]`. The same object
+rides the `governor` event on `GET /events` whenever it changed.
+
+**Release:** on the process's exit; the 30 s sweep frees a seat whose pid is
+gone; a runner restart starts empty and re-seats the adopted live runs (light
+seats, recorded ports). The listener probe for dev servers answers on Windows
+only.
+
 ## What the Autopilot governs (req-154)
 
 The Autopilot decides one thing: whether tickets are **moved on or started

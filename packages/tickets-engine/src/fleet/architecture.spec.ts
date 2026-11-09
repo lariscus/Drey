@@ -84,7 +84,7 @@ function graph(): readonly ImportEdge[] {
 const inFolder = (file: string, folder: string): boolean => file.startsWith(`${folder}/`);
 
 /** The parts that reach the machine only through `fleet/ports` (req-176 step 4). */
-const NODE_FREE: readonly string[] = ['run', 'ports', 'orchestrate', 'routing'];
+const NODE_FREE: readonly string[] = ['run', 'ports', 'orchestrate', 'routing', 'governor'];
 
 /** Single files of other parts that stay Node-free: the adapter contract. */
 const NODE_FREE_FILES: readonly string[] = ['harness/contract.ts'];
@@ -102,6 +102,9 @@ const ROUTING_TARGETS = [/^routing\//, /^protocol(-[a-z-]+)?$/, /^ports\//, /^ha
  */
 const ROUTING_DECISION = /^routing\/(pool-grant|slot-fit|capability-filter|surplus-choice|step-up|reserve-guard|route-recorder|cost-estimate)\.ts$/;
 const IMPURE_FOR_DECISION = /^(ports\/|routing\/(quota-source|[a-z-]+-quota-source|slot-registry|service-config-file|models-dev-import|run-share-tracker)$)/;
+
+/** What `fleet/governor` may import (req-180): its own wire types and the ports' types. */
+const GOVERNOR_TARGETS = [/^governor\//, /^protocol-governor$/, /^ports\//];
 
 /** The violations of the rules over a set of edges; empty = the layering holds. */
 function violations(edges: readonly ImportEdge[]): readonly string[] {
@@ -123,6 +126,12 @@ function violations(edges: readonly ImportEdge[]): readonly string[] {
     }
     if ((inFolder(edge.from, 'orchestrate') || inFolder(edge.from, 'api')) && edge.target !== null && inFolder(edge.target, 'routing')) {
       found.push(`${where}: the orchestration and the API ask the slots and the pool through their own interfaces (slot-binder, dispatch-pool, model-routes), never fleet/routing`);
+    }
+    if ((inFolder(edge.from, 'orchestrate') || inFolder(edge.from, 'api')) && edge.target !== null && inFolder(edge.target, 'governor')) {
+      found.push(`${where}: the orchestration and the API ask the governor through their own interfaces (WorkerSeats, GateSeats, GovernorDesk), never fleet/governor`);
+    }
+    if (inFolder(edge.from, 'governor') && edge.target !== null && (!GOVERNOR_TARGETS.some((re) => re.test(edge.target!)) || (inFolder(edge.target, 'ports') && !edge.typeOnly))) {
+      found.push(`${where}: fleet/governor takes ../protocol-governor and the types of ../ports only`);
     }
     if (ROUTING_DECISION.test(edge.from) && edge.target !== null && !edge.typeOnly && IMPURE_FOR_DECISION.test(edge.target)) {
       found.push(`${where}: the routing's decision is pure — no port, quota source, registry or network at runtime (req-178)`);
@@ -197,6 +206,17 @@ describe('the Crew runner import graph (ADR-0096)', () => {
     expect(violations(importsOf('orchestrate/pool.fake.ts', "import { PoolGrant } from '../routing/pool-grant';"))).toEqual([]);
     expect(violations(importsOf('compose-routing.ts', "import { PoolGrant } from './routing/pool-grant';"))).toEqual([]);
     expect(violations(importsOf('orchestrate/dispatcher.ts', "import type { ClassRequest } from '../protocol';"))).toEqual([]);
+  });
+
+  it('keeps the governor on its wire types and the ports, and the orchestration off the governor (req-180)', () => {
+    expect(violations(importsOf('governor/x.ts', "import { cpus } from 'node:os';"))).toHaveLength(1);
+    expect(violations(importsOf('governor/x.ts', "import type { LiveRun } from '../orchestrate/live-run';"))).toHaveLength(1);
+    expect(violations(importsOf('governor/x.ts', "import { SYSTEM_CLOCK } from '../ports/clock';"))).toHaveLength(1);
+    expect(violations(importsOf('orchestrate/gate-runner.ts', "import type { SeatLease } from '../governor/resource-governor';"))).toHaveLength(1);
+    expect(violations(importsOf('api/governor-routes.ts', "import { SeatGovernor } from '../governor/seat-governor';"))).toHaveLength(1);
+    const allowed = ["import type { Clock } from '../ports/clock';", "import { DEFAULT_DEV_PORTS } from '../protocol-governor';", "import { SeatTable } from './seat-table';"];
+    expect(violations(importsOf('governor/x.ts', allowed.join('\n')))).toEqual([]);
+    expect(violations(importsOf('compose-governor.ts', "import { SeatGovernor } from './governor/seat-governor';"))).toEqual([]);
   });
 
   it('reports a concrete adapter wired outside the composition root', () => {

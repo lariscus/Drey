@@ -5024,3 +5024,48 @@ sequenceDiagram
 *Interrupt turn* is `POST /interrupt` (the turn stops, the run reads Paused), *Resume after stop* `POST /resume` (a
 detached or ended run's session is resumed under a new run); *Copy attach command* reads `GET /attach/<run>` and puts
 `cd "<worktree>" && claude --resume <ref>` (OpenCode / Kimi: `--session`) on the clipboard.
+
+## 6.107 A gate command asks for a heavy seat → waits → runs at low priority → releases (req-180, milestone 223, [ADR-0092](09_architecture_decisions/0092-drey-service-the-shipped-background-process.md) later change)
+
+The worker's turn ended green; the gate runs the ticket's acceptance commands. Each takes a heavy seat of the resource
+governor first. Here the only seat (`service.load.heavySeats` = 1) is held by another ticket's build; the wait is
+logged once, published, and stands on the run until the seat frees.
+
+```mermaid
+sequenceDiagram
+    participant RC as RunCompletion
+    participant G as GateRunner
+    participant GS as GateSeats (compose-governor)
+    participant SG as SeatGovernor
+    participant A as Admission
+    participant P as GovernorPublisher
+    participant R as RunRepository
+    participant Sh as execShell
+    participant PP as ProcessPriority
+    RC->>G: run(run) — worker exited, turn done
+    G->>GS: heavy({run, ticket, worktree, command: "npm test"})
+    GS->>SG: heavy({…, task: "tests"})
+    SG->>A: judge(since)
+    A-->>SG: waits · "1 of 1 heavy seats busy"
+    SG->>P: line("T-0121 tests waits · 1 of 1 heavy seats busy") · status → governor event
+    SG-->>G: onWait(reason)
+    G->>R: activity = "waits for a heavy seat · 1 of 1 heavy seats busy" · persist (run event)
+    Note over SG: the other build's shell exits → its lease is released
+    SG->>P: line("heavy seat released by T-0126 build · 0 of 1")
+    SG->>A: judge(since) (pump)
+    A-->>SG: grant
+    SG->>P: line("heavy seat granted to T-0121 tests · 1 of 1")
+    SG-->>G: SeatLease {env: VITEST_MAX_WORKERS…, adopt, release}
+    G->>Sh: execShell("npm test", worktree, {env, onSpawn})
+    Sh-->>G: onSpawn(pid)
+    G->>SG: adopt(pid)
+    SG->>PP: lower(pid) — below normal (lowPriority on)
+    Sh-->>G: exit 0
+    G->>SG: release()
+    SG->>P: line("heavy seat released by T-0121 tests · 0 of 1") · status → governor event
+```
+
+The 5 s tick samples the load and re-checks the queue (a settings change or a dropped load lets a waiter in); the 30 s
+sweep frees a seat whose pid the process table calls gone and seats a dev server listening on a leased port. In the
+quiet hours `Admission` answers `refused · quiet hours until 07:00` before it counts seats; above the reserve
+`refused · load 91 % above the reserve` — after ten minutes with no heavy seat busy it grants anyway.

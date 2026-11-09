@@ -5,7 +5,8 @@ import { demoLog, demoRuns, demoSnapshot } from '../api/demo-data';
 import { componentRows } from './component-rows';
 import { clock, compact, joinParts, money, shortRef } from './format';
 import { appendLog, logRows, LOG_LIMIT } from './log-rows';
-import { governorRows, slotRows } from './slot-rows';
+import { governorRows } from './governor-rows';
+import { slotRows } from './slot-rows';
 import { statusLine } from './status-line';
 
 const i18n = createI18n({ locale: DEFAULT_LOCALE, catalog: loadCatalog(DEFAULT_LOCALE) });
@@ -124,11 +125,28 @@ describe('slotRows and governorRows', () => {
   it('draws no rows while the runner sleeps', () => {
     expect(slotRows(i18n, null)).toEqual([]);
   });
-  it('labels the governor and leaves the values unmeasured', () => {
-    const rows = governorRows(i18n, demoSnapshot().load);
+  it('draws the governor as board 8a writes it (req-180)', () => {
+    const snapshot = demoSnapshot();
+    const rows = governorRows(i18n, snapshot.load, snapshot.governor);
     expect(rows.map((row) => row.label)).toEqual(['Heavy seats', 'Light seats', 'Reserve', 'Waiting', 'Dev servers']);
-    expect(rows[0]?.value).toBe('— of 2 busy');
-    expect(rows[2]?.value).toBe('25 % CPU and RAM kept free · load —');
+    expect(rows.map((row) => row.value)).toEqual([
+      '1 of 2 busy · tests for T-0126',
+      '2 of 6 busy',
+      '25 % CPU and RAM kept free · load 41 %',
+      '1 heavy task (build T-0121) · starts when a seat frees',
+      '1 · port 4302 (T-0126)',
+    ]);
+  });
+  it('says when a wait ends: the quiet span, the load; several tasks counted', () => {
+    const base = demoSnapshot().governor!;
+    const quiet = { ...base, quietUntil: '07:00', waiting: [{ ticket: 'T-1', task: 'build', cause: 'quiet' as const }, { ticket: 'T-2', task: 'tests', cause: 'quiet' as const }] };
+    expect(governorRows(i18n, demoSnapshot().load, quiet)[3]?.value).toBe('2 heavy tasks (build T-1, tests T-2) · starts at 07:00');
+    const load = { ...base, waiting: [{ ticket: 'T-3', task: 'command', cause: 'load' as const }] };
+    expect(governorRows(i18n, demoSnapshot().load, load)[3]?.value).toBe('1 heavy task (command T-3) · starts when the load drops');
+  });
+  it('draws an idle governor while the runner sleeps: nothing busy, nothing waits, the load unmeasured', () => {
+    const rows = governorRows(i18n, demoSnapshot().load, null);
+    expect(rows.map((row) => row.value)).toEqual(['0 of 2 busy', '0 busy', '25 % CPU and RAM kept free', 'none', 'none']);
   });
 });
 

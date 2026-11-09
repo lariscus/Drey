@@ -21,6 +21,8 @@ export interface SpawnPlan {
   readonly recordAttach?: boolean;
   /** Keep the session's spend base on the record when the adapter reads it. */
   readonly trackUsageBase?: boolean;
+  /** req-180: the light seat's environment (`DREY_DEV_PORT`, the parallelism variables), under the slot's. */
+  readonly env?: Readonly<Record<string, string>>;
 }
 
 /** What a booted server reports for a later take-back. */
@@ -67,7 +69,8 @@ export class ProcessSupervisor {
 
   spawn(run: LiveRun, plan: SpawnPlan): WorkerHandle {
     const request = run.request;
-    const env = run.info.slot === undefined ? undefined : this.deps.slotEnv?.(run.info.slot.id);
+    const slotEnv = run.info.slot === undefined ? undefined : this.deps.slotEnv?.(run.info.slot.id);
+    const env = plan.env === undefined && slotEnv === undefined ? undefined : { ...plan.env, ...slotEnv };
     const handle = this.deps.adapter.spawn({
       cwd: run.info.worktreePath,
       instruction: plan.instruction,

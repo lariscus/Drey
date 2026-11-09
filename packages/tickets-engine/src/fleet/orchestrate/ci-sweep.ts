@@ -5,7 +5,7 @@ import type { Clock } from '../ports/clock';
 import type { ChainConfig } from '../protocol';
 import type { ChainBoard } from './chain-board';
 import type { ChainState } from './chain-state';
-import type { GateShell } from './gate-runner';
+import type { GateSeat, GateSeats, GateShell } from './gate-runner';
 import { messageOf } from './live-run';
 import type { RunBookkeeper } from './run-bookkeeper';
 
@@ -22,6 +22,8 @@ export interface CiSweepDeps {
   /** The pass read the pipeline: drop stale phase state and write `chain.json`. */
   readonly pipelineRead: () => Promise<void>;
   readonly persist: () => Promise<void>;
+  /** req-180: a ci check is a heavy task — it takes a governor seat first; absent = no governor. */
+  readonly seats?: GateSeats;
 }
 
 /**
@@ -75,6 +77,17 @@ export class CiSweep {
     }
   }
 
+  /** The check on a heavy seat (req-180); the wait is the governor's log line, the sweep holds until the seat comes. */
+  private async seated(ticket: string, command: string, cwd: string): Promise<void> {
+    const seat: GateSeat | null =
+      this.deps.seats === undefined ? null : await this.deps.seats.heavy({ runId: `ci:${ticket}`, ticket, worktree: cwd, command, onWait: () => undefined, cancelled: () => false });
+    try {
+      await (seat === null ? this.deps.shell(command, cwd) : this.deps.shell(command, cwd, { env: seat.env, onSpawn: (pid) => seat.adopt(pid) }));
+    } finally {
+      seat?.release();
+    }
+  }
+
   /** Free, unblocked (T-0050) and past its back-off. */
   private due(card: TicketCard): boolean {
     const backoff = this.deps.state.ciBackoff[card.id];
@@ -91,7 +104,7 @@ export class CiSweep {
     }
     this.deps.log(`ci ${phase.id}: ${card.id} — ${phase.ci}`);
     try {
-      await this.deps.shell(phase.ci, repo.path);
+      await this.seated(card.id, phase.ci, repo.path);
     } catch (error) {
       const detail = messageOf(error).split('\n')[0] ?? 'failed';
       this.deps.state.ciBackoff[card.id] = new Date(this.deps.clock.now().getTime() + CI_BACKOFF_MS).toISOString();

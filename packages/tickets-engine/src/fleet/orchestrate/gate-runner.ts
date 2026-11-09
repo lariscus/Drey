@@ -1,11 +1,47 @@
 import { acceptanceCommands } from '../../core/ticket-files';
 import { capTail, SANITY_CAP } from '../capping';
 import type { RunDkTarget } from '../protocol';
+import { isTerminal } from '../run/run-state';
 import { messageOf, type LiveRun } from './live-run';
 import type { RunBookkeeper } from './run-bookkeeper';
+import type { RunRepository } from './run-repository';
+
+/** What the governor's seat adds to a gate command (req-180): its environment, and the pid once it runs. */
+export interface GateShellOptions {
+  readonly env?: Readonly<Record<string, string>>;
+  readonly onSpawn?: (pid: number) => void;
+}
 
 /** The gate's shell: the owner's command in the worktree; rejects with the output on a failure. */
-export type GateShell = (command: string, cwd: string) => Promise<void>;
+export type GateShell = (command: string, cwd: string, opts?: GateShellOptions) => Promise<void>;
+
+/** A held heavy seat as the gate sees it (req-180). */
+export interface GateSeat {
+  readonly env: Readonly<Record<string, string>>;
+  adopt(pid: number): void;
+  release(): void;
+}
+
+/** The resource governor as the gate asks it: a heavy seat per acceptance command (req-180). */
+export interface GateSeats {
+  heavy(ask: {
+    readonly runId: string;
+    readonly ticket: string;
+    readonly worktree: string;
+    readonly command: string;
+    readonly onWait: (reason: string | null) => void;
+    readonly cancelled: () => boolean;
+  }): Promise<GateSeat>;
+}
+
+export interface GateRunnerDeps {
+  readonly bookkeeper: RunBookkeeper;
+  readonly shell: GateShell;
+  readonly trailers: TrailerCheck;
+  /** req-180: the governor's heavy seats and the record the wait shows on; absent = no governor (a spec). */
+  readonly seats?: GateSeats;
+  readonly repo?: Pick<RunRepository, 'persist'>;
+}
 
 /** `dk validate --trailers <range>` inside the worktree: null = passes, else the output. */
 export type TrailerCheck = (target: RunDkTarget, worktree: string, range: string) => Promise<string | null>;
@@ -22,14 +58,12 @@ function combinedOutput(error: unknown): string {
  * in the worktree, then — on a store with commit trailers — `dk validate
  * --trailers` over the branch. A structural run (the plan phase) instead
  * reads what the run produced: writing the executable criteria IS the
- * plan's deliverable, so the gate checks they came into existence.
+ * plan's deliverable, so the gate checks they came into existence. Each
+ * command takes a heavy seat of the governor first (req-180) and may wait
+ * for it; the wait's reason stands on the run as its activity.
  */
 export class GateRunner {
-  constructor(
-    private readonly bookkeeper: RunBookkeeper,
-    private readonly shell: GateShell,
-    private readonly trailers: TrailerCheck,
-  ) {}
+  constructor(private readonly deps: GateRunnerDeps) {}
 
   /** Null when green, else the failure (multi-line, bounded by SANITY_CAP so run.json stays sane). */
   async run(run: LiveRun): Promise<string | null> {
@@ -37,9 +71,9 @@ export class GateRunner {
       return this.structural(run);
     }
     for (const command of run.request.acceptance) {
-      await this.bookkeeper.note(run, `gate: ${command}`);
+      await this.deps.bookkeeper.note(run, `gate: ${command}`);
       try {
-        await this.shell(command, run.info.worktreePath);
+        await this.seated(run, command);
       } catch (error) {
         return `\`${command}\` failed\n\n${capTail(combinedOutput(error), SANITY_CAP).text}`;
       }
@@ -47,8 +81,47 @@ export class GateRunner {
     return this.trailerGate(run);
   }
 
+  /** The command on its heavy seat: the seat's environment, the pid handed back, the seat given back at the end. */
+  private async seated(run: LiveRun, command: string): Promise<void> {
+    const seat = await this.seat(run, command);
+    try {
+      const cwd = run.info.worktreePath;
+      await (seat === null ? this.deps.shell(command, cwd) : this.deps.shell(command, cwd, { env: seat.env, onSpawn: (pid) => seat.adopt(pid) }));
+    } finally {
+      seat?.release();
+    }
+  }
+
+  private async seat(run: LiveRun, command: string): Promise<GateSeat | null> {
+    if (this.deps.seats === undefined) {
+      return null;
+    }
+    let shown: Promise<void> = Promise.resolve();
+    const seat = await this.deps.seats.heavy({
+      runId: run.info.id,
+      ticket: run.request.ticketId,
+      worktree: run.info.worktreePath,
+      command,
+      onWait: (reason) => {
+        shown = shown.then(() => this.showWait(run, command, reason));
+      },
+      cancelled: () => run.info.state === 'stopping' || isTerminal(run.info.state),
+    });
+    await shown;
+    return seat;
+  }
+
+  /** The wait's reason on the run (its activity line) and in its stream; null = the seat came. */
+  private async showWait(run: LiveRun, command: string, reason: string | null): Promise<void> {
+    run.info = { ...run.info, activity: reason === null ? `gate: ${command}` : `waits for a heavy seat · ${reason}` };
+    if (reason !== null) {
+      await this.deps.bookkeeper.note(run, `gate: \`${command}\` waits — ${reason}`);
+    }
+    await this.deps.repo?.persist(run).catch(() => undefined);
+  }
+
   private async structural(run: LiveRun): Promise<string | null> {
-    const text = await this.bookkeeper.syncedText(run);
+    const text = await this.deps.bookkeeper.syncedText(run);
     if (text === null) {
       return 'the ticket file disappeared — nothing to gate';
     }
@@ -64,8 +137,8 @@ export class GateRunner {
     if (target === undefined || !target.trailers || run.request.baseRef === null) {
       return null;
     }
-    await this.bookkeeper.note(run, 'gate: dk validate --trailers');
-    const failure = await this.trailers(target, run.info.worktreePath, `${run.request.baseRef}..HEAD`);
+    await this.deps.bookkeeper.note(run, 'gate: dk validate --trailers');
+    const failure = await this.deps.trailers(target, run.info.worktreePath, `${run.request.baseRef}..HEAD`);
     return failure === null ? null : `dk validate --trailers failed\n\n${failure}`;
   }
 }

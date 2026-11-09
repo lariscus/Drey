@@ -6,6 +6,7 @@
 import { execFile as nodeExecFile, spawn as nodeSpawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { capTail, SANITY_CAP } from './capping';
+import type { GateShellOptions } from './orchestrate/gate-runner';
 import type { ExecFn } from './procs';
 import type { RunDkTarget } from './protocol';
 
@@ -42,10 +43,16 @@ function killTree(pid: number | undefined, kill: () => void): void {
  * minutes each; the orchestrator's `ci` check uses the same. A spawn keeps
  * just the output's tail (`exec` capped its buffer at 1 MB and a chatty
  * passing command failed the gate) and kills the whole tree on the timeout.
+ * The governor's seat (req-180) adds its environment and learns the pid at
+ * once, so the shell drops to low priority before it starts its children.
  */
-export const execShell = (command: string, cwd: string): Promise<void> =>
+export const execShell = (command: string, cwd: string, opts: GateShellOptions = {}): Promise<void> =>
   new Promise<void>((resolve, reject) => {
-    const child = nodeSpawn(command, { cwd, shell: true, windowsHide: true });
+    const env = opts.env === undefined ? undefined : { ...process.env, ...opts.env };
+    const child = nodeSpawn(command, { cwd, shell: true, windowsHide: true, ...(env !== undefined ? { env } : {}) });
+    if (child.pid !== undefined) {
+      opts.onSpawn?.(child.pid);
+    }
     let output = '';
     const keep = (chunk: Buffer): void => {
       output += chunk.toString('utf8');

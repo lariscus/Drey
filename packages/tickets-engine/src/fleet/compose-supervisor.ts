@@ -27,7 +27,7 @@ import { AttachmentStore } from './orchestrate/attachment-store';
 import { BackgroundWork } from './orchestrate/background-work';
 import { ClaimRelease } from './orchestrate/claim-release';
 import { EventFold } from './orchestrate/event-fold';
-import { GateRunner, type GateShell, type TrailerCheck } from './orchestrate/gate-runner';
+import { GateRunner, type GateSeats, type GateShell, type TrailerCheck } from './orchestrate/gate-runner';
 import { HandoverSettings } from './orchestrate/handover-settings';
 import { LeftoverClaims } from './orchestrate/leftover-claims';
 import { OwnerAnswers } from './orchestrate/owner-answers';
@@ -53,7 +53,7 @@ import { SteerService } from './orchestrate/steer-service';
 import { StoreClaims } from './orchestrate/store-claims';
 import { TicketCopy } from './orchestrate/ticket-copy';
 import { WaitClaim } from './orchestrate/wait-claim';
-import { WorkerLauncher } from './orchestrate/worker-launcher';
+import { WorkerLauncher, type WorkerSeats } from './orchestrate/worker-launcher';
 
 type TicketsGitSeam = Pick<TicketsGit, 'run' | 'locate' | 'commitPaths' | 'push'>;
 
@@ -121,6 +121,8 @@ export interface RunSupervisorDeps {
   readonly limits?: Partial<RunLimits>;
   /** req-177: the slot (account) each run starts on; absent = no slots. */
   readonly slots?: SlotBinder;
+  /** req-180: the resource governor's seats — light for the worker, heavy per gate command; absent = none. */
+  readonly seats?: WorkerSeats & GateSeats;
 }
 
 /** The parts that touch the worker, the ticket and the record, with the loops between them closed. */
@@ -160,7 +162,7 @@ function runtimeOf(deps: RunSupervisorDeps): Runtime {
   const events: EventFold = new EventFold({ repo, streams, bookkeeper, background, log, interrupt: (run) => takeover.interrupt(run.info.id), claimLost: (run, why): Promise<void> => stopper.claimLost(run, why) });
   const processes: ProcessSupervisor = new ProcessSupervisor({ adapter: deps.adapter, repo, events, background, settings, table, log, ...slotEnvOf(deps.slots), onExit: (run, code): Promise<void> => completion.onWorkerExit(run, code) });
   const stopper: RunStopper = new RunStopper(machine, repo, processes, { settler, bookkeeper, log });
-  const gate = new GateRunner(bookkeeper, deps.execShell ?? execShell, deps.validateTrailers ?? validateTrailers);
+  const gate = new GateRunner({ bookkeeper, shell: deps.execShell ?? execShell, trailers: deps.validateTrailers ?? validateTrailers, repo, ...(deps.seats !== undefined ? { seats: deps.seats } : {}) });
   const opinion = deps.secondOpinion !== undefined ? { secondOpinion: deps.secondOpinion } : {};
   const completion: RunCompletion = new RunCompletion({ machine, repo, gate, bookkeeper, settler, processes, ...opinion });
   return { ...shared, deps, table, machine, background, repo, settings, claims, settler, processes, stopper, takeover, completion };
@@ -181,7 +183,7 @@ function prepareOf(rt: Runtime, git: TicketsGitSeam): PrepareWorktree {
 function starterOf(rt: Runtime, handover: RunnerHandover, git: TicketsGitSeam): RunStarter {
   const { machine, repo, streams, stores, claims, bookkeeper, processes, background, clock } = rt;
   const log = rt.deps.log;
-  const launcher = new WorkerLauncher({ machine, repo, processes, claims, background, streams, log });
+  const launcher = new WorkerLauncher({ machine, repo, processes, claims, background, streams, log, ...(rt.deps.seats !== undefined ? { seats: rt.deps.seats } : {}) });
   const sessions = new SessionHandover(repo, rt.settings, rt.deps.adapter.id, clock);
   return new RunStarter({ machine, repo, streams, stores, claims, bookkeeper, sessions, launcher, prepareWorktree: prepareOf(rt, git), clock, log, retiring: () => handover.retiring, ...(rt.deps.slots !== undefined ? { slots: rt.deps.slots } : {}) });
 }
