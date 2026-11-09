@@ -129,6 +129,11 @@ export class AcpWorker implements WorkerHandle {
     if (start.compactFirst === true && start.resumeRef !== null) {
       await this.parts.turns.run('/compact');
     }
+    if (start.holdAtSpawn === true || start.instruction === '') {
+      // A quiet start (req-75): no prompt — the session stands for the owner, who sends the first word.
+      this.emit({ kind: 'usage', turn: 'idle' });
+      return;
+    }
     await this.parts.turns.settle(await this.parts.turns.run(start.instruction));
   }
 }

@@ -98,6 +98,17 @@ describe('opencode over ACP (req-182)', () => {
     expect(r.events.find((e) => e.kind === 'error')?.text).toContain('answered the prompt with nothing');
   });
 
+  it('a quiet start (req-75) sends no prompt; the owner’s first word is the first turn', async () => {
+    const r = run({ holdAtSpawn: true, resumeRef: 'ses_old' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(r.sent('session/resume')).toHaveLength(1);
+    expect(r.sent('session/prompt')).toEqual([]);
+    expect(r.events.at(-1)).toMatchObject({ kind: 'usage', turn: 'idle' });
+    expect(await r.handle.steer('go on')).toBe('inject');
+    await ticks();
+    expect(r.sent('session/prompt')).toEqual([{ sessionId: 'ses_old', prompt: [{ type: 'text', text: 'go on' }] }]);
+  });
+
   it('a permission names the tool and what it runs', async () => {
     const r = run();
     await ticks();
