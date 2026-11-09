@@ -812,6 +812,15 @@ const plugin: MainPluginModule = {
         ? { ok: false, error: 'bad persona message payload' }
         : client.invoke('personaThreadAppend', { persona, text });
     });
+    // req-168: a 1:1 proposal card's decision.
+    ctx.ipc.handle('personaProposalDecide', (payload) => {
+      const persona = str(payload, 'persona');
+      const id = str(payload, 'id');
+      const decision = str(payload, 'decision');
+      return persona === null || id === null || (decision !== 'confirm' && decision !== 'dismiss')
+        ? { ok: false, error: 'bad proposal decision payload' }
+        : client.invoke('personaProposalDecide', { persona, id, decision });
+    });
     registerChatIpc(ctx, (method, payload) => client.invoke(method, payload));
     // The Flow tab (E13-11) and the Settings page's engine half (E13-12):
     // the engine's own flow calls and `videos.*` settings, one channel each.

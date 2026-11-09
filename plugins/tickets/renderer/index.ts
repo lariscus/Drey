@@ -3161,6 +3161,12 @@ const plugin: { activate(api: DreyPluginApi): void } = {
         invoke: (method, payload) => api.backend.invoke(method, payload),
         personas: () => teamStore(api).personas(),
         subscribePersonas: (listener) => teamStore(api).subscribe(listener),
+        // req-168: the 1:1's words, and the changes its answer arrives by (the file written, a turn's end).
+        words: { t: (key, params) => api.i18n.t(key as never, params as never), formatTime: (date) => api.i18n.formatTime(date) },
+        subscribeChanges: (listener) => {
+          const offs = [api.backend.on('board-changed', () => listener('board')), api.backend.on('fleet-changed', () => listener('fleet'))];
+          return () => offs.forEach((off) => off());
+        },
         tranche: {
           view: () => trancheViewOf(chain),
           format: () => ({

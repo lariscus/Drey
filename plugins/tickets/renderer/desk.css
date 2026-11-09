@@ -1232,6 +1232,33 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   color: var(--text-4);
 }
 
+/* req-168: the 1:1 — the owner's lines apart from the persona's answers, the proposal cards under an answer. */
+.desk-msg-me {
+  align-self: flex-end;
+  max-width: 85%;
+}
+
+.desk-msg-text {
+  white-space: pre-wrap;
+}
+
+.desk-card {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.desk-card-title {
+  font-weight: 600;
+}
+
+.desk-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
 .desk-memory-row {
   display: flex;
   align-items: center;

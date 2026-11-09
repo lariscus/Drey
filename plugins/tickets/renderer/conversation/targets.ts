@@ -29,9 +29,9 @@ import {
   trancheMessageOf,
   withTrancheMessage,
   historyOfSessions,
-  threadOfPersona,
   threadOfSession,
 } from './map';
+import { ACCEPT, DISMISS, followsFleet, threadOfPersona, type PersonaWords } from './persona-map';
 
 /** The id a view preset names as its `assistantTarget` (the Work view: Mission Control). */
 export const MISSION_CONTROL_TARGET = 'tickets.mission-control';
@@ -54,7 +54,14 @@ export interface ConversationDeps {
   tranche?: TrancheBinding;
   /** The burn rate's hold (req-181); absent = Mission Control carries no burn-rate card. */
   hold?: HoldBinding;
+  /** req-168: the 1:1's words (catalog, clock); absent = the keys themselves (a spec). */
+  words?: PersonaWords;
+  /** req-168: fires on every board and fleet change; returns the unsubscribe. Absent = the 1:1 is read on calls only. */
+  subscribeChanges?(listener: (what: 'board' | 'fleet') => void): () => void;
 }
+
+/** The words of a spec without a catalog: the key itself, the time as HH:MM. */
+const KEY_WORDS: PersonaWords = { t: (key) => key, formatTime: (date) => date.toISOString().slice(11, 16) };
 
 /** What Mission Control needs of the burn rate's hold: the chain's block, the words, and the lift its card can do. */
 export interface HoldBinding {
@@ -383,35 +390,49 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
   };
 }
 
-/** A 1:1 with one persona: the owner's messages in that persona's thread. */
+/**
+ * A 1:1 with one persona (req-168, ADR-0093): the conversation in the
+ * persona's chat session file. A line is written and answered in the
+ * background by the persona's held session (or the chat bridge); the
+ * answer arrives through `onThreadChange` — a board change (the file was
+ * written) or, while a session starts or a turn runs, a fleet change.
+ */
 export function createPersonaTarget(deps: ConversationDeps, persona: PersonaView): ConversationTarget {
-  const read = async (): Promise<ConversationThread> => {
+  const words = deps.words ?? KEY_WORDS;
+  let last: unknown = null;
+  const call = async (method: string, payload: unknown): Promise<ConversationThread> => {
     try {
-      return threadOfPersona(persona.id, persona.title, await deps.invoke('personaThread', { persona: persona.id }));
+      last = await deps.invoke(method, payload);
     } catch (error) {
-      return threadOfPersona(persona.id, persona.title, { ok: false, error: messageOf(error) });
+      last = { ok: false, error: messageOf(error) };
     }
+    return threadOfPersona(persona.id, persona.title, last, words);
   };
+  const read = (): Promise<ConversationThread> => call('personaThread', { persona: persona.id });
+  const subscribe = deps.subscribeChanges;
   return {
     id: personaTargetId(persona.id),
     label: persona.title,
     group: PERSONA_GROUP,
     icon: 'users',
-    description: `Talk to ${persona.title} 1:1`,
+    description: words.t('one_on_one.talk_to', { name: persona.title }),
     thread: read,
-    send: async (text) => {
-      try {
-        return threadOfPersona(
-          persona.id,
-          persona.title,
-          await deps.invoke('personaThreadAppend', { persona: persona.id, text }),
-        );
-      } catch (error) {
-        return threadOfPersona(persona.id, persona.title, { ok: false, error: messageOf(error) });
-      }
-    },
-    act: read,
+    send: (text) => call('personaThreadAppend', { persona: persona.id, text }),
+    act: (cardId, actionId) =>
+      actionId === ACCEPT || actionId === DISMISS
+        ? call('personaProposalDecide', { persona: persona.id, id: cardId, decision: actionId === ACCEPT ? 'confirm' : 'dismiss' })
+        : read(),
     newThread: read,
+    ...(subscribe === undefined
+      ? {}
+      : {
+          onThreadChange: (listener: () => void) =>
+            subscribe((what) => {
+              if (what === 'board' || followsFleet(last)) {
+                listener();
+              }
+            }),
+        }),
   };
 }
 
