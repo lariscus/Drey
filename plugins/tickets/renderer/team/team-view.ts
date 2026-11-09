@@ -12,7 +12,6 @@
  */
 import { autopilotSwitchViewOf, autopilotToneOf } from '../../../../shared/autopilot';
 import type { PersonaView } from '../../shared/remote-protocol';
-import type { PersonaMemoryReply } from '../../shared/remote-protocol';
 import { h, textButton, type DeskDeps } from '../desk-deps';
 import { NUDGE_TEXT } from '../workers-view';
 import {
@@ -25,6 +24,7 @@ import {
   type RunRowModel,
   type TeamModel,
 } from './team-model';
+import { mountMemoryPane } from './memory-pane';
 import { mountOneOnOnePane } from './one-on-one-pane';
 import { personaPictureNode } from './persona-picture';
 import type { TeamStore } from './team-store';
@@ -199,55 +199,6 @@ function messageNode(text: string, kind: 'empty' | 'error' = 'empty'): HTMLEleme
   return h('div', kind === 'error' ? 'desk-note desk-note-error' : 'desk-note', text);
 }
 
-function memoryPane(deps: DeskDeps, persona: PersonaView, body: HTMLElement): void {
-  const list = h('div', 'desk-memory');
-  const input = h('input', 'desk-input desk-input-line');
-  input.type = 'text';
-  input.setAttribute('aria-label', `Teach ${persona.title}`);
-  const paint = (reply: PersonaMemoryReply): void => {
-    list.replaceChildren();
-    if (!reply.ok) {
-      list.append(messageNode(reply.error, 'error'));
-      return;
-    }
-    if (reply.entries.length === 0) {
-      list.append(messageNode('No memory yet.'));
-    }
-    reply.entries.forEach((entry, index) => {
-      const row = h('div', `desk-memory-row${entry.pinned ? ' desk-memory-pinned' : ''}`);
-      const pin = textButton(entry.pinned ? 'Pinned' : 'Pin', 'desk-btn desk-btn-small', entry.pinned ? 'Unpin this entry' : 'Pin this entry - it always rides along', () =>
-        void act('personaMemoryPin', { persona: persona.id, index, pinned: !entry.pinned }),
-      );
-      row.append(h('span', 'desk-memory-text', entry.text), pin);
-      list.append(row);
-    });
-  };
-  const act = async (method: string, payload: unknown): Promise<void> => {
-    try {
-      paint((await deps.invoke(method, payload)) as PersonaMemoryReply);
-    } catch (error) {
-      list.append(messageNode(error instanceof Error ? error.message : String(error), 'error'));
-    }
-  };
-  const add = textButton('Add', 'desk-btn desk-btn-primary', 'Teach the persona this', () => {
-    const text = input.value.trim();
-    if (text !== '') {
-      input.value = '';
-      void act('personaMemoryAppend', { persona: persona.id, text });
-    }
-  });
-  input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      add.click();
-    }
-  });
-  const composer = h('div', 'desk-composer desk-composer-line');
-  composer.append(input, add);
-  body.append(list, composer);
-  void act('personaMemory', { persona: persona.id });
-}
-
 /** Setup (board 7f): the model pool in order, and what the persona cost today. */
 function setupPane(deps: DeskDeps, store: TeamStore, persona: PersonaView, card: PersonaCardModel, body: HTMLElement): void {
   body.append(h('b', 'desk-pane-title', 'Setup'));
@@ -324,7 +275,7 @@ function detailNode(deps: DeskDeps, store: TeamStore, card: PersonaCardModel, pe
   if (tab === '1:1') {
     mountOneOnOnePane(deps, persona, body);
   } else if (tab === 'Memory') {
-    memoryPane(deps, persona, body);
+    mountMemoryPane(deps, persona, body);
   } else {
     setupPane(deps, store, persona, card, body);
   }

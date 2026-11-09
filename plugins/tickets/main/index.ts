@@ -842,6 +842,27 @@ const plugin: MainPluginModule = {
         ? { ok: false, error: 'bad memory payload' }
         : client.invoke('personaMemoryAppend', { persona, text });
     });
+    // req-169: the Memory tab's per-line removals and the journal (reviews.md).
+    ctx.ipc.handle('personaMemoryRemove', (payload) => {
+      const persona = str(payload, 'persona');
+      const text = str(payload, 'text');
+      const index = (payload ?? {}) as { index?: unknown };
+      return persona === null || text === null || typeof index.index !== 'number'
+        ? { ok: false, error: 'bad memory removal payload' }
+        : client.invoke('personaMemoryRemove', { persona, index: index.index, text });
+    });
+    ctx.ipc.handle('personaJournal', (payload) => {
+      const persona = str(payload, 'persona');
+      return persona === null ? { ok: false, error: 'bad persona payload' } : client.invoke('personaJournal', persona);
+    });
+    ctx.ipc.handle('personaJournalRemove', (payload) => {
+      const persona = str(payload, 'persona');
+      const at = str(payload, 'at');
+      const index = (payload ?? {}) as { index?: unknown };
+      return persona === null || at === null || typeof index.index !== 'number'
+        ? { ok: false, error: 'bad journal removal payload' }
+        : client.invoke('personaJournalRemove', { persona, index: index.index, at });
+    });
     ctx.ipc.handle('personaMemoryPin', (payload) => {
       const persona = str(payload, 'persona');
       const p = (payload ?? {}) as { index?: unknown; pinned?: unknown };
