@@ -51,7 +51,10 @@ import type { StorePathChange } from '../store/store-path-report';
 import { storeFooterLine } from '../store/store-footer';
 import { loadShippedPrompts } from '../core/default-prompts';
 import { type AttachmentCommand, RefineCommand } from '../core/commands';
-import { nextImprovementId, parseFriction, parseImprovements, renderImprovements, type FrictionLine, type ImprovementDraft, type ImprovementProposal } from '../core/improvements';
+import { nextImprovementId, parseImprovements, renderImprovements, type FrictionLine, type ImprovementDraft, type ImprovementProposal } from '../core/improvements';
+import { ownerLessonLine } from '../core/memory-line';
+import { JOURNAL_FILE } from '../core/persona-journal';
+import { journalFrictions } from '../core/persona-journal-file';
 import type { ImprovementDecision, PersonaImprovementsReply, PersonaMemoryReply } from '../contracts/remote-protocol';
 import { isMap, isScalar, parseDocument } from 'yaml';
 import { splitFrontmatter } from '../../../../shared/frontmatter';
@@ -70,7 +73,7 @@ import { trancheConfigOf } from './tranche-config';
 import { isWorkerProvider, WORKER_PROVIDERS, type ChainConfig, type ChainStoreConfig, FleetCaps, FleetHandoverConfig, HandoverMode, InteractiveMode, PermissionMode, RunDkTarget, RunInfo, FleetPools } from '../fleet/protocol';
 import { type EngineHost, type EngineVaultChangeEvent, EngineVault, FleetPort } from './host';
 import { handoverFromConfig, handoverOverrideKeys } from './handover-config';
-import { appendMemory, memoryPathFor, parseMemoryEntries, toggleMemoryPin } from './persona-store';
+import { appendMemory, describeMemoryEntries, memoryPathFor, toggleMemoryPin } from './persona-store';
 import { HUMAN_PERSONA_ID, humanPersona, inPipelineOrder, isHumanPersona, loadPersonaSkills, personaFileText, personaMigrationFor, parsePersonaFile, personaRef, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaMigration, type PersonaSkill } from '../core/persona';
 import { scanRepoFolder } from './repos-scan';
 
@@ -118,8 +121,14 @@ function improvementsPathFor(id: string): string {
   return `${PERSONAS_DIR}/${id}/improvements.md`;
 }
 
-function frictionPathFor(id: string): string {
-  return `${PERSONAS_DIR}/${id}/friction.md`;
+/** req-169: the journal the aggregation reads (friction.md is retired and migrated into it). */
+function journalPathFor(id: string): string {
+  return `${PERSONAS_DIR}/${id}/${JOURNAL_FILE}`;
+}
+
+/** Today's date as the owner's memory line names it. */
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 /** One memory entry is always one line, bounded (the personaLearn shape). */
@@ -147,22 +156,6 @@ interface FlowFrame {
 
 function personaMissing(id: string): string {
   return `persona "${id}" does not exist — create tickets/_meta/personas/${id}/persona.md first`;
-}
-
-/**
- * The aggregation's truncation of friction.md: the findings moved into
- * the proposals' evidence, so only the heading stays. A file without a
- * `#` heading truncates to empty (the worker's file is heading-led).
- */
-function frictionHeadingOnly(text: string): string {
-  const head: string[] = [];
-  for (const line of text.split('\n')) {
-    head.push(line);
-    if (line.startsWith('#')) {
-      break;
-    }
-  }
-  return `${head.join('\n').replace(/\n+$/, '')}\n`;
 }
 
 /**
@@ -3785,8 +3778,8 @@ export class EngineBoardService {
       if ((await loader.load(id)) === null) {
         return { ok: false, error: `persona "${id}" does not exist — create tickets/_meta/personas/${id}/persona.md first` };
       }
-      // One line, always: flatten what the dialog sent, bounded.
-      const entry = oneMemoryLine(input.entry);
+      // One line, always: flatten what the dialog sent, bounded — the owner's line form (req-169).
+      const entry = oneMemoryLine(input.entry) === '' ? '' : ownerLessonLine(today(), oneMemoryLine(input.entry));
       if (entry === '') {
         return { ok: false, error: 'a memory entry is one non-empty line' };
       }
@@ -3836,7 +3829,7 @@ export class EngineBoardService {
       return { ok: false, error: personaMissing(id) };
     }
     const text = await this.readOptional(vault.id, memoryPathFor(id));
-    return { ok: true, entries: parseMemoryEntries(text ?? '') };
+    return { ok: true, entries: describeMemoryEntries(text ?? '') };
   }
 
   /**
@@ -3859,7 +3852,7 @@ export class EngineBoardService {
       if ((await this.personaLoaderFor(vault).load(id)) === null) {
         return { ok: false, error: personaMissing(id) };
       }
-      const entry = oneMemoryLine(input.text);
+      const entry = oneMemoryLine(input.text) === '' ? '' : ownerLessonLine(today(), oneMemoryLine(input.text));
       if (entry === '') {
         return { ok: false, error: 'a memory entry is one non-empty line' };
       }
@@ -3878,7 +3871,7 @@ export class EngineBoardService {
       this.host.announceChanges(vault.id, [path]);
       this.announceChanged();
       const text = await this.readOptional(vault.id, path);
-      return { ok: true, entries: parseMemoryEntries(text ?? ''), ...(warning === null ? {} : { warning }) };
+      return { ok: true, entries: describeMemoryEntries(text ?? ''), ...(warning === null ? {} : { warning }) };
     });
   }
 
@@ -3924,7 +3917,7 @@ export class EngineBoardService {
       const warning = await this.commit(vault, [path], `personas: ${id} memory ${input.pinned ? 'pinned' : 'unpinned'}`);
       this.host.announceChanges(vault.id, [path]);
       this.announceChanged();
-      return { ok: true, entries: parseMemoryEntries(updated), ...(warning === null ? {} : { warning }) };
+      return { ok: true, entries: describeMemoryEntries(updated), ...(warning === null ? {} : { warning }) };
     });
   }
 
@@ -4170,17 +4163,18 @@ export class EngineBoardService {
     if (persona === null) {
       return { ok: false, error: `persona "${id}" does not exist — create tickets/_meta/personas/${id}/persona.md first` };
     }
-    const [improvementsText, frictionText] = await Promise.all([
+    const [improvementsText, journalText] = await Promise.all([
       this.readOptional(vault.id, improvementsPathFor(id)),
-      this.readOptional(vault.id, frictionPathFor(id)),
+      this.readOptional(vault.id, journalPathFor(id)),
     ]);
-    const proposals = parseImprovements(improvementsText ?? '').proposals;
+    const improvements = parseImprovements(improvementsText ?? '');
+    const proposals = improvements.proposals;
     return {
       ok: true,
       persona,
       proposals,
       openCount: proposals.filter((p) => p.state === 'open').length,
-      frictionCount: parseFriction(frictionText ?? '').length,
+      frictionCount: journalFrictions(journalText ?? '', improvements.lastAggregation).length,
     };
   }
 
@@ -4202,9 +4196,9 @@ export class EngineBoardService {
     if (vault === null) {
       return { friction: [], lastAggregation: null, settledRuns: 0 };
     }
-    const [improvementsText, frictionText, runs] = await Promise.all([
+    const [improvementsText, journalText, runs] = await Promise.all([
       this.readOptional(vault.id, improvementsPathFor(id)),
-      this.readOptional(vault.id, frictionPathFor(id)),
+      this.readOptional(vault.id, journalPathFor(id)),
       this.fleetRecords().catch(() => [] as readonly RunInfo[]),
     ]);
     const lastAggregation = parseImprovements(improvementsText ?? '').lastAggregation;
@@ -4212,15 +4206,14 @@ export class EngineBoardService {
       lastAggregation === null
         ? 0
         : runs.filter((run) => (run.persona ?? null) === id && run.startedAt > lastAggregation).length;
-    return { friction: parseFriction(frictionText ?? ''), lastAggregation, settledRuns };
+    return { friction: journalFrictions(journalText ?? '', lastAggregation), lastAggregation, settledRuns };
   }
 
   /**
    * The aggregation's write (E6): the validated drafts become open
    * proposals — ids minted from the file (`imp-<n>`, never reused), one
-   * strict re-render, lastAggregation stamped — and friction.md
-   * truncates to its heading, the findings having moved into the
-   * evidence. Exactly one commit `personas: <id> improvements +<n>`,
+   * strict re-render, lastAggregation stamped (req-169: the journal is
+   * never truncated; the stamp is where the next input starts). Exactly one commit `personas: <id> improvements +<n>`,
    * then the announcement.
    */
   applyAggregation(input: { id: string; drafts: readonly ImprovementDraft[]; now?: string }): Promise<BoardMutationResult> {
@@ -4259,15 +4252,10 @@ export class EngineBoardService {
         at,
         decidedAt: null,
       }));
-      const frictionPath = frictionPathFor(id);
-      const frictionText = await this.readOptional(vault.id, frictionPath);
+      // req-169: the journal stays whole — the new aggregation stamp is the cut the next input reads from.
       const touched = [improvementsPath];
       try {
         await this.host.write(vault.id, improvementsPath, renderImprovements(id, { lastAggregation: at, proposals: [...file.proposals, ...added] }));
-        if (frictionText !== null) {
-          await this.host.write(vault.id, frictionPath, frictionHeadingOnly(frictionText));
-          touched.push(frictionPath);
-        }
       } catch (error) {
         return { ok: false, error: `write failed: ${messageOf(error)}` };
       }
@@ -4314,13 +4302,12 @@ export class EngineBoardService {
       const touched = new Set<string>([improvementsPath]);
       const appendLesson = async (line: string): Promise<string | null> => {
         try {
-          const flattened = oneMemoryLine(line);
-          // The memory file is a bullet list — the line carries its own marker.
+          // The owner decided it: the owner's line form (req-169).
           await appendMemory(
             (rel) => this.host.read(vault.id, rel),
             (rel, text) => this.host.write(vault.id, rel, text),
             id,
-            flattened.startsWith('- ') ? flattened : `- ${flattened}`,
+            ownerLessonLine(at.slice(0, 10), oneMemoryLine(line)),
           );
           touched.add(memoryPathFor(id));
           return null;

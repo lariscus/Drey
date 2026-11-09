@@ -39,6 +39,9 @@ import type {
   ImprovementDecision,
   NeedItem,
   PersonaImprovementsReply,
+  PersonaJournalRemove,
+  PersonaJournalReply,
+  PersonaMemoryRemove,
   PersonaMemoryReply,
   PersonaProposalDecision,
   PersonaThreadReply,
@@ -218,6 +221,13 @@ const HANDOFF_POLL_MS = 500;
 
 export const BYPASS_REFUSAL = 'bypass runs are not allowed from a remote device';
 
+/** req-169: the Memory tab's journal and removals (`services/persona-records.ts`). */
+export interface PersonaRecordsPort {
+  journal(personaId: string): Promise<PersonaJournalReply>;
+  journalRemove(cmd: PersonaJournalRemove): Promise<PersonaJournalReply>;
+  memoryRemove(cmd: PersonaMemoryRemove): Promise<PersonaMemoryReply>;
+}
+
 export class DreyTicketsPort implements TicketsRemotePort {
   constructor(
     private readonly boardService: RemoteBoard,
@@ -226,7 +236,16 @@ export class DreyTicketsPort implements TicketsRemotePort {
     private readonly options: DreyPortOptions,
     private readonly chatService: ChatServicePort | null = null,
     private readonly personaSessions: PersonaSessionPort | null = null,
+    private readonly records: PersonaRecordsPort | null = null,
   ) {}
+
+  /** req-169: the journal and the per-line removals throw a clear line when the engine did not wire them. */
+  private personaRecords(): PersonaRecordsPort {
+    if (this.records === null) {
+      throw new Error('the persona records service is not wired on this port');
+    }
+    return this.records;
+  }
 
   /** req-168: the 1:1 delegations throw a clear line when the engine did not wire the service. */
   private oneOnOne(): PersonaSessionPort {
@@ -538,6 +557,18 @@ export class DreyTicketsPort implements TicketsRemotePort {
 
   personaMemoryPin(cmd: { readonly persona: string; readonly index: number; readonly pinned: boolean }): Promise<PersonaMemoryReply> {
     return this.boardService.personaMemoryPin({ id: cmd.persona, index: cmd.index, pinned: cmd.pinned });
+  }
+
+  personaMemoryRemove(cmd: PersonaMemoryRemove): Promise<PersonaMemoryReply> {
+    return this.personaRecords().memoryRemove(cmd);
+  }
+
+  personaJournal(personaId: string): Promise<PersonaJournalReply> {
+    return this.personaRecords().journal(personaId);
+  }
+
+  personaJournalRemove(cmd: PersonaJournalRemove): Promise<PersonaJournalReply> {
+    return this.personaRecords().journalRemove(cmd);
   }
 
   personaPatch(cmd: Parameters<TicketsRemotePort['personaPatch']>[0]): Promise<MutationResult> {

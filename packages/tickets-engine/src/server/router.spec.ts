@@ -67,6 +67,9 @@ function port(): TicketsRemotePort {
     personaMemory: vi.fn(async () => ({ ok: true, entries: [{ text: 'lesson', pinned: false }] })),
     personaMemoryAppend: vi.fn(async () => ({ ok: true, entries: [{ text: 'lesson', pinned: false }] })),
     personaMemoryPin: vi.fn(async () => ({ ok: true, entries: [{ text: 'lesson', pinned: true }] })),
+    personaMemoryRemove: vi.fn(async () => ({ ok: true, entries: [] })),
+    personaJournal: vi.fn(async () => ({ ok: true, entries: [] })),
+    personaJournalRemove: vi.fn(async () => ({ ok: true, entries: [] })),
     personaPatch: vi.fn(ok),
     chainPersonaPause: vi.fn(async (cmd: { persona: string; paused: boolean }) => ({ ok: true, persona: cmd.persona, paused: cmd.paused })),
     chatSessions: vi.fn(async () => []),
@@ -488,6 +491,15 @@ describe('route', () => {
     expect(remote.personaMemoryAppend).toHaveBeenCalledWith({ persona: 'pia', text: 'a lesson' });
     await route(req({ method: 'POST', path: '/api/personas/pia/memory/pin', origin, authorization: auth, body: { index: 1, pinned: true } }), deps);
     expect(remote.personaMemoryPin).toHaveBeenCalledWith({ persona: 'pia', index: 1, pinned: true });
+    // req-169: the journal's read, and one line or entry removed by index and what the client saw
+    expect(await route(req({ path: '/api/personas/pia/journal', authorization: auth }), deps)).toEqual({ status: 200, body: { ok: true, entries: [] } });
+    expect(remote.personaJournal).toHaveBeenCalledWith('pia');
+    await route(req({ method: 'POST', path: '/api/personas/pia/memory/remove', origin, authorization: auth, body: { index: 0, text: '2026-11-09 · you · x' } }), deps);
+    expect(remote.personaMemoryRemove).toHaveBeenCalledWith({ persona: 'pia', index: 0, text: '2026-11-09 · you · x' });
+    await route(req({ method: 'POST', path: '/api/personas/pia/journal/remove', origin, authorization: auth, body: { index: 2, at: '2026-11-09T10:00:00Z' } }), deps);
+    expect(remote.personaJournalRemove).toHaveBeenCalledWith({ persona: 'pia', index: 2, at: '2026-11-09T10:00:00Z' });
+    await route(req({ method: 'POST', path: '/api/personas/pia/journal/remove', origin, authorization: auth, body: { index: 2 } }), deps);
+    expect(remote.personaJournalRemove).toHaveBeenCalledTimes(1);
 
     // a blank message, a bad pin index, a non-boolean pinned flag and an
     // unknown persona grammar are refused before the port sees them

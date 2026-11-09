@@ -66,10 +66,10 @@ export function personaLessonLine(input: { readonly date: string; readonly ticke
   return `- ${input.date} · ${input.ticket ?? '—'} · ${input.persona}/${input.model.replace(/\s+/g, '-')} · ${flat(input.lesson)}`;
 }
 
-/** The owner's lesson as its stored line; a text that already names its author keeps it. */
+/** The owner's lesson as its stored line; a text that already carries its own date and evidence keeps it. */
 export function ownerLessonLine(date: string, lesson: string): string {
   const text = flat(lesson.startsWith('- ') ? lesson.slice(2) : lesson);
-  return parseMemoryLine(text).author.kind !== 'unknown' ? `- ${text}` : `- ${date} · you · ${text}`;
+  return parseMemoryLine(text).date !== null ? `- ${text}` : `- ${date} · you · ${text}`;
 }
 
 /** One memory entry: the line's text without bullet and pin marker, and whether it is pinned. */

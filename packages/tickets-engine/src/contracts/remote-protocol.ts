@@ -102,12 +102,13 @@ export type { PersonaMessage, PersonaProposal, PersonaProposalCommand, PersonaPr
 
 /**
  * The persona memory's read (U4, concept §4.4): the curated entries in
- * file order (oldest first), each with its pin state. The pin toggle's
- * `index` addresses this list.
+ * file order (oldest first), each with its pin state and (req-169) its
+ * author and evidence. The pin toggle's and the removal's `index`
+ * addresses this list. The journal's read sits beside it — both are
+ * defined in `persona-records.ts`.
  */
-export type PersonaMemoryReply =
-  | { readonly ok: true; readonly entries: readonly { readonly text: string; readonly pinned: boolean }[] }
-  | { readonly ok: false; readonly error: string };
+import type { PersonaJournalRemove, PersonaJournalReply, PersonaMemoryRemove, PersonaMemoryReply } from './persona-records';
+export type { JournalEntry, PersonaJournalRemove, PersonaJournalReply, PersonaMemoryEntry, PersonaMemoryRemove, PersonaMemoryReply } from './persona-records';
 
 /** The chain's persona pause (U4): applied, with the state echoed back. */
 export type ChainPersonaPauseReply =
@@ -191,6 +192,12 @@ export interface TicketsRemotePort {
   personaMemoryAppend(cmd: { readonly persona: string; readonly text: string }): Promise<PersonaMemoryReply>;
   /** Flips one memory entry's pin (index = its position in the GET list); one commit. */
   personaMemoryPin(cmd: { readonly persona: string; readonly index: number; readonly pinned: boolean }): Promise<PersonaMemoryReply>;
+  /** req-169: removes one memory line — the owner's or the persona's — when its text is the one the client saw; one commit. */
+  personaMemoryRemove(cmd: PersonaMemoryRemove): Promise<PersonaMemoryReply>;
+  /** req-169: the persona's journal (`reviews.md`), oldest first. */
+  personaJournal(personaId: string): Promise<PersonaJournalReply>;
+  /** req-169: removes one journal entry when its stamp is the one the client saw; one commit. */
+  personaJournalRemove(cmd: PersonaJournalRemove): Promise<PersonaJournalReply>;
   /** The persona setup's PATCH (U4, concept §4.5): only sent keys are written; one commit. */
   personaPatch(cmd: {
     readonly persona: string;

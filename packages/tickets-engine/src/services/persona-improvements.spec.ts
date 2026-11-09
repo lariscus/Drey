@@ -5,7 +5,6 @@ import type { FleetPort } from './host';
 import { TicketsGit } from '../core/tickets-git';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools, type RunInfo } from '../fleet/protocol';
 import {
-  parseFriction,
   parseImprovements,
   renderImprovements,
   type ImprovementProposal,
@@ -107,8 +106,8 @@ function seeded(): Map<string, string> {
     ['tickets/_meta/personas/pia/persona.md', PERSONA],
     ['tickets/_meta/personas/pia/prompt.md', 'The old prompt.\n'],
     [
-      'tickets/_meta/personas/pia/friction.md',
-      '# Friction\n\n- 2026-11-01 · T-0007 · guessed the order.md shape\n- 2026-11-02 · Context pack missed the ledger\n',
+      'tickets/_meta/personas/pia/reviews.md',
+      '# Reviews\n\n- 2026-11-01T09:00:00Z · T-0007 · pia · claude-code/sonnet · gate red · $0.40\n  - signals: red-gate, friction\n  - friction: guessed the order.md shape\n- 2026-11-02T09:00:00Z · — · pia · claude-code/sonnet · gate green · $0.20\n  - signals: friction\n  - friction: Context pack missed the ledger\n- 2026-11-02T09:30:00Z · T-0008 · pia · claude-code/sonnet · gate red · $0.30\n  - signals: red-gate\n',
     ],
   ]);
 }
@@ -150,7 +149,7 @@ describe('personaImprovements (E6 read)', () => {
     files.set(
       'tickets/_meta/personas/pia/improvements.md',
       renderImprovements('pia', {
-        lastAggregation: '2026-11-02T10:00:00Z',
+        lastAggregation: '2026-11-01T12:00:00Z',
         proposals: [proposal({ id: 'imp-1' }), proposal({ id: 'imp-2', state: 'dismissed', decidedAt: '2026-11-02T11:00:00Z' })],
       }),
     );
@@ -162,7 +161,7 @@ describe('personaImprovements (E6 read)', () => {
     expect(reply.persona.title).toBe('Pia');
     expect(reply.proposals.map((p) => p.id)).toEqual(['imp-1', 'imp-2']);
     expect(reply.openCount).toBe(1);
-    expect(reply.frictionCount).toBe(2);
+    expect(reply.frictionCount).toBe(1); // req-169: the journal's frictions after the aggregation stamp
   });
 
   it('refuses an unknown or malformed persona id readably', async () => {
@@ -202,19 +201,27 @@ describe('improvementInput (E6 read)', () => {
     const input = await serviceOf(files, runs).improvementInput('pia');
     expect(input.lastAggregation).toBe('2026-11-02T08:00:00Z');
     expect(input.settledRuns).toBe(1);
-    expect(input.friction).toEqual(parseFriction(files.get('tickets/_meta/personas/pia/friction.md')!));
+    // req-169: the journal's friction fields after the aggregation stamp — the first entry is older.
+    expect(input.friction).toEqual([{ at: '2026-11-02', ticket: null, text: 'Context pack missed the ledger' }]);
   });
 
   it('reads 0 settled runs when never aggregated, and an empty input for an unknown persona', async () => {
     const files = seeded();
     const input = await serviceOf(files, [run({})]).improvementInput('pia');
-    expect(input).toEqual({ friction: parseFriction(files.get('tickets/_meta/personas/pia/friction.md')!), lastAggregation: null, settledRuns: 0 });
+    expect(input).toEqual({
+      friction: [
+        { at: '2026-11-01', ticket: 'T-0007', text: 'guessed the order.md shape' },
+        { at: '2026-11-02', ticket: null, text: 'Context pack missed the ledger' },
+      ],
+      lastAggregation: null,
+      settledRuns: 0,
+    });
     expect(await serviceOf(files).improvementInput('ghost')).toEqual({ friction: [], lastAggregation: null, settledRuns: 0 });
   });
 });
 
 describe('applyAggregation (E6 write)', () => {
-  it('mints imp-<n> ids, stamps the aggregation, truncates friction.md to its heading', async () => {
+  it('mints imp-<n> ids, stamps the aggregation and leaves the journal whole (req-169)', async () => {
     const files = seeded();
     const service = serviceOf(files);
     const result = await service.applyAggregation({ id: 'pia', drafts: DRAFTS, now: '2026-11-02T10:00:00Z' });
@@ -226,8 +233,9 @@ describe('applyAggregation (E6 write)', () => {
     expect(file.proposals[0]).toMatchObject({ title: 'Order the context pack by name', evidence: DRAFTS[0]!.evidence, content: 'Read the pack first.', lesson: 'Keep the pack recipe explicit.', at: '2026-11-02T10:00:00Z', decidedAt: null });
     expect(file.proposals[1]!.content).toBe('Check the ledger\nbefore dispatch.');
 
-    // The findings moved into the evidence — only the heading stays.
-    expect(files.get('tickets/_meta/personas/pia/friction.md')).toBe('# Friction\n');
+    // req-169: the journal is never truncated — the stamp is where the next input starts.
+    expect(files.get('tickets/_meta/personas/pia/reviews.md')).toContain('guessed the order.md shape');
+    expect((await service.improvementInput('pia')).friction).toEqual([]);
 
     // The next aggregation mints from the file: ids are never reused.
     await service.applyAggregation({ id: 'pia', drafts: [DRAFTS[0]!], now: '2026-11-03T10:00:00Z' });
@@ -245,7 +253,7 @@ describe('applyAggregation (E6 write)', () => {
 
     expect(await service.applyAggregation({ id: 'pia', drafts: [], now: '2026-11-02T10:00:00Z' })).toEqual({ ok: true });
     expect(files.has('tickets/_meta/personas/pia/improvements.md')).toBe(false);
-    expect(files.get('tickets/_meta/personas/pia/friction.md')).toContain('guessed the order.md shape');
+    expect(files.get('tickets/_meta/personas/pia/reviews.md')).toContain('guessed the order.md shape');
   });
 });
 
@@ -265,7 +273,7 @@ describe('decideImprovement (E6 write)', () => {
     expect(file.lastAggregation).toBe('2026-11-02T10:00:00Z'); // the decision does not move the stamp
 
     // The lesson lands in memory.md even though the target was prompt.md.
-    expect(files.get('tickets/_meta/personas/pia/memory.md')).toBe('# Memory\n\n- Keep the pack recipe explicit.\n');
+    expect(files.get('tickets/_meta/personas/pia/memory.md')).toBe('# Memory\n\n- 2026-11-02 · you · Keep the pack recipe explicit.\n');
   });
 
   it('applying a models.default proposal patches only the frontmatter key — pool, comments and body survive', async () => {
@@ -297,7 +305,7 @@ describe('decideImprovement (E6 write)', () => {
 
     // The content is one memory line; the non-null lesson follows as a second.
     expect(files.get('tickets/_meta/personas/pia/memory.md')).toBe(
-      '# Memory\n\n- Check the ledger before dispatch.\n- Ledger first.\n',
+      '# Memory\n\n- 2026-11-02 · you · Check the ledger before dispatch.\n- 2026-11-02 · you · Ledger first.\n',
     );
   });
 
@@ -313,7 +321,7 @@ describe('decideImprovement (E6 write)', () => {
     expect(files.get('tickets/_meta/personas/pia/prompt.md')).toBe('The old prompt.\n'); // untouched
     const file = parseImprovements(files.get('tickets/_meta/personas/pia/improvements.md')!);
     expect(file.proposals[0]).toMatchObject({ state: 'dismissed', decidedAt: '2026-11-02T12:00:00Z' });
-    expect(files.get('tickets/_meta/personas/pia/memory.md')).toBe('# Memory\n\n- Do it by hand instead.\n');
+    expect(files.get('tickets/_meta/personas/pia/memory.md')).toBe('# Memory\n\n- 2026-11-02 · you · Do it by hand instead.\n');
   });
 
   it('refuses unknown and already-decided proposals readably', async () => {
