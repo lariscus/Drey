@@ -5,6 +5,7 @@
  * before the pool (a persona's default model, the provider pools' sizes).
  */
 import type { CapabilityClass, ClassRequest, PoolDecision, PoolEntry, PoolLoad, QueueEntry, WorkerProviderId } from '../protocol';
+import type { StartHold } from './start-hold';
 
 export interface ClassPool {
   choose(request: ClassRequest): PoolDecision;
@@ -26,4 +27,6 @@ export interface DispatchPool {
   load(): PoolLoad;
   /** The sessions a provider's slots serve in all — the dispatch plan's bound per provider; null = unbounded. */
   sessionsOf(provider: WorkerProviderId): number | null;
+  /** req-181: the burn rate's hold over every new start; absent = nothing holds. */
+  readonly hold?: StartHold;
 }

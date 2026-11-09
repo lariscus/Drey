@@ -30,6 +30,7 @@ import { SettledRuns, type FleetLedger } from './orchestrate/settled-runs';
 import { SupervisorDirectory, type SupervisorPort } from './orchestrate/supervisor-directory';
 import { TicketDispatch } from './orchestrate/ticket-dispatch';
 import { WaitNotes } from './orchestrate/wait-notes';
+import { PublishedHold, type StartHold } from './orchestrate/start-hold';
 import { TicketsGit } from '../core/tickets-git';
 import type { EventSink } from './ports/event-sink';
 import { AnomalyDetector } from './orchestrate/tranche/anomaly-detector';
@@ -101,6 +102,15 @@ function composeTranches(deps: OrchestratorDeps, state: ChainState, clock: Retur
   });
 }
 
+/** req-181: the pool's burn-rate hold, told on the event stream when there is one. */
+function holdOf(deps: OrchestratorDeps): { readonly hold?: StartHold } {
+  const inner = deps.pool?.hold;
+  if (inner === undefined) {
+    return {};
+  }
+  return { hold: deps.sink === undefined ? inner : new PublishedHold(inner, deps.sink) };
+}
+
 /** The chain status's optional sources (req-177's slots, req-170's pool) and the pool migration. */
 function statusParts(deps: OrchestratorDeps): Pick<OrchestratorParts, 'slots' | 'pool' | 'migratePools'> {
   return {
@@ -138,19 +148,21 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
   const dispatch = new TicketDispatch({ board, directory, personas, prompts: new PromptSource(note, fs, log, deps.shippedPrompt), notes, log, ...events });
   const humanGates = new HumanGates(board, personas, bookkeeper, log);
   const pool = deps.pool !== undefined ? { pool: deps.pool, ledgerCards: new LedgerCards({ state, board, bookkeeper, persist, log }) } : {};
+  const hold = holdOf(deps);
   const orchestrator: Orchestrator = new Orchestrator({
     state,
     store,
     directory,
     pools,
     settled: new SettledRuns({ state, directory, pools, breaker, clock, persist, ...events }),
-    dispatcher: new Dispatcher({ state, board, directory, pools, personas, humanGates, dispatch, notes, clock, log, pipelineRead, persist, tranches, ...pool }),
+    dispatcher: new Dispatcher({ state, board, directory, pools, personas, humanGates, dispatch, notes, clock, log, pipelineRead, persist, tranches, ...pool, ...hold }),
     ci: new CiSweep({ state, board, bookkeeper, shell: deps.execShell ?? execShell, clock, log, pipelineRead, persist }),
     clock,
     log,
     scanIntervalMs: deps.scanIntervalMs ?? 15_000,
     tranches,
     persist,
+    ...hold,
     ...statusParts(deps),
   });
   return orchestrator;

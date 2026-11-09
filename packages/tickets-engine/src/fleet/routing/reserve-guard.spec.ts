@@ -16,7 +16,7 @@ describe('ReserveGuard — a share of every window is kept back (req-178)', () =
     ['any window counts', [window({ remaining: 0.9 }), window({ name: '5h', remaining: 0.11 })], 0.05, DEFAULT_ROUTING, 'Claude A: 5h window 11 % left, a run takes about 5 %, 10 % is kept in reserve'],
     ['a learned large share waits earlier', [window({ remaining: 0.3 })], 0.25, DEFAULT_ROUTING, 'Claude A: 7d window 30 % left, a run takes about 25 %, 10 % is kept in reserve'],
     ['an unknown remaining share is not guarded', [window({ remaining: null })], 0.05, DEFAULT_ROUTING, null],
-    ['a reserve of 0 guards nothing', [window({ remaining: 0.01 })], 0.05, { upgradeAboveQ: 1.3, reservePerWindow: 0 }, null],
+    ['a reserve of 0 guards nothing', [window({ remaining: 0.01 })], 0.05, { upgradeAboveQ: 1.3, reservePerWindow: 0, burnRate: 0.2 }, null],
   ])('%s', (_name, windows, share, routing, expected) => {
     expect(guard(share, routing).refusal(view(windows), SUBJECT)).toBe(expected);
   });

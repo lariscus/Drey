@@ -8,6 +8,10 @@
 import type { PoolDesk } from './api/model-routes';
 import type { Clock } from './ports/clock';
 import { WORKER_PROVIDERS, type FleetPools, type PoolLoad, type SlotView, type WorkerProviderId } from './protocol';
+import { BurnRateDayBook, type BurnRateDayFile } from './routing/burn-rate-day';
+import { BurnRateGuard } from './routing/burn-rate-guard';
+import { BurnRateHoldSource } from './routing/burn-rate-hold-source';
+import { BurnRateMeter } from './routing/burn-rate-meter';
 import { CapabilityFilter } from './routing/capability-filter';
 import type { CapacityCap } from './routing/capacity-cap';
 import { CostEstimate } from './routing/cost-estimate';
@@ -40,6 +44,12 @@ export interface Pool {
   /** req-178: what runs take of their slots' windows (the reserve's estimate); an event sink beside the book. */
   readonly shares: RunShareTracker;
   readonly migration: PoolMigration;
+  /** req-181: today's share of the weekly quota over all slots; a slot's change goes in through `observe`. */
+  readonly burnMeter: BurnRateMeter;
+  /** req-181: the day's book behind the meter and the owner's lift (`burn-rate.json`), loaded at the start. */
+  readonly burnBook: BurnRateDayBook;
+  /** req-181: the burn rate's hold, as the chain asks it before every start. */
+  readonly burnRate: BurnRateHoldSource;
   /** The live load per slot and in all. */
   load(): PoolLoad;
   /** The sessions a provider's slots serve in all; null when one of them names none (unbounded). */
@@ -57,6 +67,17 @@ export interface PoolParts {
   readonly cap: CapacityCap;
   readonly reservations: SlotReservations;
   readonly config: ServiceConfigFile;
+  /** req-181: where the burn rate's day book is kept. */
+  readonly burnRateFile: BurnRateDayFile;
+  /** req-181: an instant as the runner log writes the resume time (`00:00`). */
+  readonly timeText: (iso: string) => string;
+}
+
+/** The parts of one decision the pool builds once and shares. */
+interface GrantInner {
+  readonly ledgers: Ledgers;
+  readonly shares: RunShareTracker;
+  readonly recorder: RouteRecorder;
 }
 
 /** The sessions a provider's slots serve in all; null when one of them is unbounded. */
@@ -71,11 +92,20 @@ function sizesOf(pools: FleetPools): Partial<Record<WorkerProviderId, number>> {
 }
 
 /** The pool's decision: the filter (req-170's checks, the capabilities, the reserve), the choice, the step up, the record. */
-function composeGrant(parts: PoolParts, ledgers: Ledgers, book: SessionBook, shares: RunShareTracker): PoolGrant {
+function composeGrant(parts: PoolParts, inner: GrantInner): PoolGrant {
   const { registry, settings, cap, reservations, throttle } = parts;
+  const { ledgers, shares, recorder } = inner;
   const reserve = new ReserveGuard(settings, shares);
   const fit = new SlotFit({ cap, reservations, ledgers, capabilities: new CapabilityFilter(), reserve, ...(throttle !== undefined ? { throttle } : {}) });
-  return new PoolGrant({ slots: registry, settings, ledgers, fit, choice: new SurplusChoice(), stepUp: new StepUp(settings, fit), recorder: new RouteRecorder(new CostEstimate(book)) });
+  return new PoolGrant({ slots: registry, settings, ledgers, fit, choice: new SurplusChoice(), stepUp: new StepUp(settings, fit), recorder });
+}
+
+/** req-181: the burn rate's meter over the slots and runs, its guard, and the hold the chain asks. */
+function composeBurnRate(parts: PoolParts, records: SessionBook, shares: RunShareTracker, recorder: RouteRecorder): Pick<Pool, 'burnMeter' | 'burnBook' | 'burnRate'> {
+  const burnBook = new BurnRateDayBook(parts.burnRateFile, parts.log);
+  const burnMeter = new BurnRateMeter({ slots: parts.registry, records, shares, book: burnBook, clock: parts.clock });
+  const guard = new BurnRateGuard(parts.settings, burnMeter, burnBook, parts.clock);
+  return { burnMeter, burnBook, burnRate: new BurnRateHoldSource({ guard, lines: recorder, timeText: parts.timeText, log: parts.log }) };
 }
 
 /** The capacity pool's parts over the slots (req-170). */
@@ -85,15 +115,17 @@ export function composePool(parts: PoolParts): Pool {
   const ledgers = new Ledgers(book, settings, parts.clock);
   const shares = new RunShareTracker(parts.clock);
   const migration = new PoolMigration(config, parts.log);
+  const recorder = new RouteRecorder(new CostEstimate(book));
   return {
     settings,
-    grant: composeGrant(parts, ledgers, book, shares),
+    grant: composeGrant(parts, { ledgers, shares, recorder }),
     cap,
     ledgers,
     queue: new RequestQueue(parts.clock),
     book,
     shares,
     migration,
+    ...composeBurnRate(parts, book, shares, recorder),
     load: () => cap.load(registry.views()),
     sessionsOf: (provider) => sessionsOf(registry.views(), provider),
     migrate: async (pools) => {

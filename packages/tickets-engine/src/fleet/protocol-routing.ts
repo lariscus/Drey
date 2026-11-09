@@ -32,9 +32,34 @@ export interface RoutingSettings {
   readonly upgradeAboveQ: number | null;
   /** `Reserve per window`, a share 0–1: a run whose estimated share would take a window below it waits. 0 = no reserve. */
   readonly reservePerWindow: number;
+  /** `Burn rate` (req-181), a share 0–1: at most this much of the weekly quota per day over all slots; reached = no new run starts until the day turns. 0 = off. */
+  readonly burnRate: number;
 }
 
-export const DEFAULT_ROUTING: RoutingSettings = { upgradeAboveQ: 1.3, reservePerWindow: 0.1 };
+export const DEFAULT_ROUTING: RoutingSettings = { upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 0.2 };
+
+/**
+ * Where a burn-rate figure comes from (req-181): every counted slot read its
+ * weekly window (`measured`), none did — counted windows or the runs' share
+ * estimates (`estimated`) — or some of each (`mixed`).
+ */
+export type BurnRateBasis = 'measured' | 'estimated' | 'mixed';
+
+/** One slot's part of today's burn rate: the share of its week spent since the day began. */
+export interface BurnRateSlotReading {
+  readonly slot: string;
+  readonly spent: number;
+  readonly basis: 'measured' | 'estimated';
+}
+
+/** The share of the weekly quota spent today over all counted slots (their mean); `basis` null = no slot counted. */
+export interface BurnRateReading {
+  /** The UTC date the figure is for. */
+  readonly day: string;
+  readonly spent: number;
+  readonly basis: BurnRateBasis | null;
+  readonly slots: readonly BurnRateSlotReading[];
+}
 
 /** What `POST /models/import` (the one-shot models.dev import) did: the rows it filled and with which columns, the models it did not find. */
 export interface CapabilityImportReport {

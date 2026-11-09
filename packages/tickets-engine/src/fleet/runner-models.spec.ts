@@ -59,10 +59,21 @@ describe('the runner serves the capacity pool (req-170)', () => {
     expect(chain['queue']).toEqual([]);
   });
 
+  it('req-181: the chain status carries the burn rate\'s hold; POST /chain/hold/lift allows the day and stores it', async () => {
+    expect((await call('GET', '/chain')).body['hold']).toBeNull();
+    const lifted = await call('POST', '/chain/hold/lift', {});
+    expect(lifted.status).toBe(200);
+    expect(lifted.body['hold']).toBeNull();
+    const day = JSON.parse(await fsp.readFile(path.join(tmp, 'burn-rate.json'), 'utf8')) as Record<string, unknown>;
+    expect(day).toMatchObject({ day: new Date().toISOString().slice(0, 10), lifted: true });
+    const refused = await call('POST', '/models/config', { routing: { upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 1.5 } });
+    expect(refused).toEqual({ status: 422, body: { ok: false, error: 'routing.burnRate must be a share from 0 to below 1 (0.2 = 20 % of the weekly quota per day; 0 = off)' } });
+  });
+
   it('req-178: reads and writes the routing; fills the capability columns from models.dev only when asked', async () => {
-    expect((await call('GET', '/models')).body['routing']).toEqual({ upgradeAboveQ: 1.3, reservePerWindow: 0.1 });
-    await call('POST', '/models/config', { routing: { upgradeAboveQ: 1.5, reservePerWindow: 0.2 }, models: [{ model: 'claude-sonnet-4-5', provider: 'claude-code', class: 'B', context: 100_000 }] });
-    expect((await serviceJson())['routing']).toEqual({ upgradeAboveQ: 1.5, reservePerWindow: 0.2 });
+    expect((await call('GET', '/models')).body['routing']).toEqual({ upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 0.2 });
+    await call('POST', '/models/config', { routing: { upgradeAboveQ: 1.5, reservePerWindow: 0.2, burnRate: 0.25 }, models: [{ model: 'claude-sonnet-4-5', provider: 'claude-code', class: 'B', context: 100_000 }] });
+    expect((await serviceJson())['routing']).toEqual({ upgradeAboveQ: 1.5, reservePerWindow: 0.2, burnRate: 0.25 });
     expect(http.calls.some((c) => c.url === MODELS_DEV_URL)).toBe(false);
     const imported = await call('POST', '/models/import', {});
     expect(imported.body['imported']).toEqual({ filled: [{ model: 'claude-sonnet-4-5', where: 'claude-code', fields: ['input', 'tools', 'output'] }], unmatched: [] });

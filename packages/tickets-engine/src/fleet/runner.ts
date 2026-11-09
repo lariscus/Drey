@@ -174,7 +174,7 @@ function seedRouting(routing: Routing, supervisors: SupervisorSet): void {
 /** The capacity pool as the chain's dispatch asks it (req-170). */
 function dispatchPoolOf(routing: Routing): DispatchPool {
   const { pool } = routing;
-  return { classes: pool.grant, queue: pool.queue, load: () => pool.load(), sessionsOf: (provider) => pool.sessionsOf(provider) };
+  return { classes: pool.grant, queue: pool.queue, load: () => pool.load(), sessionsOf: (provider) => pool.sessionsOf(provider), hold: pool.burnRate };
 }
 
 /** req-179: the day's budget a tranche takes its share of — the provider ledger over every slot; null while none is set. */

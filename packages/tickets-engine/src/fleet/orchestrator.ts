@@ -21,6 +21,7 @@ import type { ChainStateStore } from './orchestrate/chain-state-store';
 import type { CiSweep } from './orchestrate/ci-sweep';
 import type { Dispatcher } from './orchestrate/dispatcher';
 import type { PoolCapacity } from './orchestrate/pool-capacity';
+import type { StartHold } from './orchestrate/start-hold';
 import type { FleetLedger, SettledRuns } from './orchestrate/settled-runs';
 import type { SupervisorDirectory } from './orchestrate/supervisor-directory';
 
@@ -61,6 +62,8 @@ export interface OrchestratorParts {
   readonly tranches?: TrancheSource;
   /** The write of `chain.json` with what follows it (the tranche's event); absent = the store's write alone. */
   readonly persist?: () => Promise<void>;
+  /** req-181: the burn rate's hold — on the status, and lifted for the day by the owner. */
+  readonly hold?: StartHold;
 }
 
 /** The tranche as the orchestrator asks it (`orchestrate/tranche`'s `Tranches` satisfies it). */
@@ -104,7 +107,8 @@ export class Orchestrator {
     const withSlots = this.parts.slots === undefined ? status : { ...status, slots: this.parts.slots.summary() };
     const tranche = this.parts.tranches?.status() ?? null;
     const withTranche = tranche === null ? withSlots : { ...withSlots, tranche };
-    return pool === undefined ? withTranche : { ...withTranche, pool: pool.load(), queue: pool.queue.list() };
+    const withHold = this.parts.hold === undefined ? withTranche : { ...withTranche, hold: this.parts.hold.current() };
+    return pool === undefined ? withHold : { ...withHold, pool: pool.load(), queue: pool.queue.list() };
   }
 
   /** The effective parallel runs per provider; a provider without a bound of its own is left out. */
@@ -139,6 +143,15 @@ export class Orchestrator {
     if (record.resumeAt !== undefined) {
       this.startTimer();
     }
+    if (this.parts.state.master === 'run') {
+      await this.parts.dispatcher.pass();
+    }
+    return this.status();
+  }
+
+  /** req-181: "Allow today once" — the burn rate holds nothing more until the day turns; an On chain dispatches at once. */
+  async liftHold(): Promise<ChainStatus> {
+    await this.parts.hold?.lift();
     if (this.parts.state.master === 'run') {
       await this.parts.dispatcher.pass();
     }

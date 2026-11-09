@@ -60,6 +60,7 @@ function port(): TicketsRemotePort {
     chainColumn: vi.fn(ok),
     chainColumnStop: vi.fn(ok),
     chainAbort: vi.fn(ok),
+    chainHoldLift: vi.fn(ok),
     personaThread: vi.fn(async () => ({ ok: true, messages: [{ at: '2026-11-03T09:00:00.000Z', role: 'owner' as const, text: 'hi' }] })),
     personaThreadAppend: vi.fn(async () => ({ ok: true, messages: [{ at: '2026-11-03T09:00:00.000Z', role: 'owner' as const, text: 'hi' }] })),
     personaMemory: vi.fn(async () => ({ ok: true, entries: [{ text: 'lesson', pinned: false }] })),
@@ -561,6 +562,18 @@ describe('route', () => {
       body: { ok: false, error: 'bad_resume_at', code: 'bad_resume_at' },
     });
     expect(remote.chainAutopilot).toHaveBeenCalledTimes(3);
+  });
+
+  it('routes the burn rate\'s "Allow today once" (req-181); a read-only device cannot lift it', async () => {
+    const { deps, devices, remote } = setup();
+    const { token } = await devices.add('iPad', false, new Date());
+    const { token: ro } = await devices.add('Viewer', true, new Date());
+    const lift = (bearer: string): Promise<{ status: number; body: unknown }> =>
+      route(req({ method: 'POST', path: '/api/chain/hold/lift', origin: `http://${HOST}`, authorization: `Bearer ${bearer}`, body: {} }), deps);
+    expect((await lift(token)).status).toBe(200);
+    expect(remote.chainHoldLift).toHaveBeenCalledTimes(1);
+    expect((await lift(ro)).status).toBe(403);
+    expect(remote.chainHoldLift).toHaveBeenCalledTimes(1);
   });
 
   it('a read-only device reads the Autopilot but sets nothing and stops nothing (code read_only)', async () => {

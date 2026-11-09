@@ -23,6 +23,7 @@ import type { QuotaHttp, QuotaSource } from './routing/quota-source';
 import { ServiceConfigFile } from './routing/service-config-file';
 import type { Slot } from './routing/slot';
 import { parseServiceSlots, type SlotConfigParse } from './routing/slot-config';
+import type { BurnRateDayFile } from './routing/burn-rate-day';
 import { CapacityCap } from './routing/capacity-cap';
 import { PoolGate } from './routing/pool-gate';
 import type { ProviderThrottle } from './routing/pool-grant';
@@ -51,6 +52,8 @@ export interface RoutingDeps {
   readonly throttle?: ProviderThrottle;
   readonly http?: QuotaHttp;
   readonly schedule?: Schedule;
+  /** req-181: the burn rate's resume time in the runner log; the machine's local `HH:MM` by default. */
+  readonly timeText?: (iso: string) => string;
 }
 
 export interface Routing {
@@ -74,6 +77,24 @@ const nodeSchedule: Schedule = (fn, ms) => {
   timer.unref();
   return { cancel: () => clearTimeout(timer) };
 };
+
+/** `00:00`: an instant in the machine's local time, as the runner log writes the burn rate's resume time. */
+export function localTimeText(iso: string): string {
+  const at = new Date(iso);
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+}
+
+/** req-181: the burn rate's day book as a JSON file in the service home. */
+function burnRateFileOf(fs: FileSystem, file: string): BurnRateDayFile {
+  return {
+    read: async () => {
+      const text = await fs.readTextOrNull(file);
+      return text === null ? null : (JSON.parse(text) as unknown);
+    },
+    write: async (value) => fs.writeAtomic(file, `${JSON.stringify(value, null, 2)}\n`),
+  };
+}
 
 function opencodeAuthFile(deps: RoutingDeps): string {
   const data = deps.env['XDG_DATA_HOME'];
@@ -132,10 +153,22 @@ export function composeRouting(deps: RoutingDeps): Routing {
     onChange: (view) => {
       deps.publish(view);
       announce();
+      pool.burnMeter.observe(view); // req-181: the day's first weekly reading is its start
     },
     log: deps.log,
   });
-  const pool = composePool({ clock: deps.clock, log: deps.log, ...(deps.throttle !== undefined ? { throttle: deps.throttle } : {}), registry, settings, cap, reservations, config });
+  const pool: Pool = composePool({
+    clock: deps.clock,
+    log: deps.log,
+    ...(deps.throttle !== undefined ? { throttle: deps.throttle } : {}),
+    registry,
+    settings,
+    cap,
+    reservations,
+    config,
+    burnRateFile: burnRateFileOf(deps.fs, path.join(deps.home, 'burn-rate.json')),
+    timeText: deps.timeText ?? localTimeText,
+  });
   const loop = new QuotaRefreshLoop(registry, deps.schedule ?? nodeSchedule, deps.log);
   return {
     registry,
@@ -147,6 +180,7 @@ export function composeRouting(deps: RoutingDeps): Routing {
     poolDesk: poolDeskOf(pool, registry, http),
     start: async () => {
       await config.ensure().catch((error: unknown) => deps.log(`service.json could not be created: ${error instanceof Error ? error.message : String(error)}`));
+      await pool.burnBook.load();
       await loop.tick();
       announce();
       loop.start();

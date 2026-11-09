@@ -645,6 +645,8 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
       return write('chain persona pause', parseChainPersonaPause(body), (cmd) => port.chainPersonaPause(cmd));
     case '/api/chain/abort':
       return write('chain abort', { ok: true, value: null }, () => port.chainAbort());
+    case '/api/chain/hold/lift':
+      return write('chain hold lift', { ok: true, value: null }, () => port.chainHoldLift());
   }
   return fail(404, 'no such route');
 }

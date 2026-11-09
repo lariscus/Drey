@@ -4,7 +4,7 @@
  * written. The core publishes; the runner's `/events` route streams it.
  */
 import type { NormalizedEvent } from '../harness/contract';
-import type { PoolLoad, RunInfo, SlotView, TrancheStatus } from '../protocol';
+import type { ChainHold, PoolLoad, RunInfo, SlotView, TrancheStatus } from '../protocol';
 
 export type RunnerEvent =
   | { readonly kind: 'run'; readonly info: RunInfo }
@@ -14,7 +14,9 @@ export type RunnerEvent =
   /** req-170: the pool's live load changed (a grant, a release, a new cap). */
   | { readonly kind: 'pool'; readonly pool: PoolLoad }
   /** req-179: the tranche's status changed (a start, a settled run, a checkpoint, a release); null = none. */
-  | { readonly kind: 'tranche'; readonly tranche: TrancheStatus | null };
+  | { readonly kind: 'tranche'; readonly tranche: TrancheStatus | null }
+  /** req-181: the start hold (the burn rate) was raised, changed or cleared; null = nothing holds. */
+  | { readonly kind: 'hold'; readonly hold: ChainHold | null };
 
 export interface EventSink {
   publish(event: RunnerEvent): void;

@@ -151,6 +151,8 @@ export interface RemoteFleet {
   setColumn(phase: string, mode: ColumnMode): Promise<ChainStatus | null>;
   stopColumn(phase: string): Promise<ChainStatus | null>;
   abortAll(): Promise<ChainStatus | null>;
+  /** req-181: the burn rate's "Allow today once". */
+  liftHold(): Promise<ChainStatus | null>;
   /** The persona pause (U4): a paused persona's tickets hold until played again. */
   setPersonaPaused(persona: string, paused: boolean): Promise<ChainStatus | null>;
 }
@@ -449,6 +451,10 @@ export class DreyTicketsPort implements TicketsRemotePort {
 
   async chainAbort(): Promise<ChainReply> {
     return chainResult(await this.fleetClient.abortAll());
+  }
+
+  async chainHoldLift(): Promise<ChainReply> {
+    return chainResult(await this.fleetClient.liftHold());
   }
 
   async personas(): Promise<readonly PersonaView[]> {
