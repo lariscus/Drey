@@ -12,19 +12,7 @@
  * stream files via `GET /stream/:id` for the watch view.
  */
 import type { ExecFn } from '../fleet/procs';
-import type {
-  AutopilotRecord,
-  AutopilotRefusal,
-  ChainConfig,
-  ChainStoreConfig,
-  ChainMaster,
-  ChainStatus,
-  ColumnMode,
-  QuestionAnswers,
-  RunInfo,
-  RunRequest,
-  SlotView,
-} from '../fleet/protocol';
+import type { AutopilotRecord, AutopilotRefusal, ChainConfig, ChainMaster, ChainStatus, ChainStoreConfig, ColumnMode, ModelsReply, QuestionAnswers, RunInfo, RunRequest, SlotView } from '../fleet/protocol';
 import { RunHistory } from './run-history';
 import { RunnerConnection, type RunnerLocator } from './runner-connection';
 
@@ -369,6 +357,22 @@ export class FleetClient {
   /** Writes the `slots` of `service.json` (every other key kept); a broken entry refuses the whole list. */
   writeSlots(slots: readonly unknown[]): Promise<SlotsReply | { readonly ok: false; readonly error: string }> {
     return this.slotWrite<SlotsReply>('/slots/config', { slots });
+  }
+
+  // --- the capacity pool (req-170, board 7l) ----------------------------------
+
+  /** The model table, the caps, the ledger defaults, the live load and the queue; null when no runner is awake. Never wakes one. */
+  async models(): Promise<ModelsReply | null> {
+    try {
+      return (await this.conn.adopt()) ? await this.conn.get<ModelsReply>('/models') : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Replaces the pool keys it is sent (`models`, `capacity`, `ledgers`) in `service.json`; a broken row refuses the write. */
+  writeModels(keys: { readonly models?: readonly unknown[]; readonly capacity?: unknown; readonly ledgers?: unknown }): Promise<ModelsReply | { readonly ok: false; readonly error: string }> {
+    return this.slotWrite<ModelsReply>('/models/config', keys);
   }
 
   private async slotWrite<T>(pathname: string, body: unknown): Promise<T | { readonly ok: false; readonly error: string }> {

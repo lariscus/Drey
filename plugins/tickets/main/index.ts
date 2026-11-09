@@ -57,6 +57,7 @@ import { TicketDocuments, askToAddCheckout } from './ticket-documents';
 import { isStoreDocumentPath, storeDocumentHeader, storeDocumentHeaderEdit } from './store-document-header';
 import { checkoutOf, readStoreSettings } from '../../../packages/tickets-engine/src/store/store-settings';
 import { registerChatIpc } from './chat-ipc';
+import { registerModelsIpc } from './models-ipc';
 import { MissionControlHost, createMissionControlView } from './mission-control';
 
 function messageOf(error: unknown): string {
@@ -188,6 +189,7 @@ const plugin: MainPluginModule = {
     ctx.ipc.handle('serviceStatus', () => serviceSettings.status());
     ctx.ipc.handle('serviceControl', (payload) => serviceSettings.control(payload));
     ctx.ipc.handle('serviceOpenLogFolder', () => serviceSettings.openLogFolder());
+    registerModelsIpc((channel, handler) => ctx.ipc.handle(channel, handler), fleet); // req-170: Settings → Models (board 7l)
     ctx.app.registerQuitGuard(
       createServiceQuitGuard({
         config: ctx.config,

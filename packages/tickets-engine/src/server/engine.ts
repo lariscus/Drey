@@ -31,6 +31,7 @@ import { RemoteService, type RemoteStatus } from './service';
 import { parseSettingsPatch } from './settings';
 import { FsEngineHost } from './standalone-host';
 import { createPlaywrightVerifyHarness } from './verify-harness';
+import { FLEET_METHODS } from './fleet-methods';
 
 /**
  * The tickets engine (ADR-0088, E2b): the whole board service, the fleet
@@ -103,7 +104,6 @@ const BOARD_METHODS = [
   'initialize', 'onVaultEvent',
 ] as const;
 
-const FLEET_METHODS = ['runs', 'start', 'chainStatus', 'stop', 'send', 'answerPermission', 'answerQuestion', 'stream', 'setMaster', 'setAutopilot', 'setColumn', 'stopColumn', 'abortAll', 'startPolling', 'attach', 'control', 'log', 'status', 'retireIfIdle'] as const;
 
 // The team's reads and controls (E13-8): the remote port's own methods, so
 // Drey's Team tab and Capacity band show exactly what the phone shows.
