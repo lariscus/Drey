@@ -302,9 +302,16 @@ test('board 7k: the Persona page', async ({ page, electronApp }) => {
   await page.locator('app-tab-bar .tab', { hasText: 'persona' }).first().click();
   await expect(page.locator('.persona-page [data-proposal]')).toBeVisible({ timeout: 15_000 });
   await expect(page.locator('.persona-page .persona-pool-row .persona-tag').first()).toBeVisible({ timeout: 15_000 });
-  // The page gets the whole window, as the mockup's frame does.
+  // The page gets the whole window, as the mockup's frame does, and the height to show every block.
   await page.keyboard.press('Control+B');
-  await page.keyboard.press('Control+Alt+B');
+  await electronApp.evaluate(({ BrowserWindow }) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.webContents.getURL().startsWith('app://')) {
+        win.setContentSize(1440, 1700);
+      }
+    }
+  });
+  await page.waitForTimeout(500);
   // The layout is the view's saved one: no changed dot on the view tab.
   await page.locator('app-view-switcher .vs-layout').click();
   await page.getByRole('menuitem', { name: /^Save/ }).first().click();

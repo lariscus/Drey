@@ -36,10 +36,10 @@ export function avatarNode(className: string, title: string, color: string): HTM
   return node;
 }
 
-/** A block's heading: the title, and where the mockup has one the control at its right. */
-export function blockHead(title: string, ...controls: readonly (HTMLElement | null)[]): HTMLElement {
+/** A block's heading: the title, the small note right after it, and where the mockup has them the controls at the right. */
+export function blockHead(title: string, note?: HTMLElement | null, ...controls: readonly (HTMLElement | null)[]): HTMLElement {
   const head = h('div', 'persona-block-head');
-  head.append(h('b', 'persona-title', title), h('span', 'persona-grow'), ...controls.filter((node): node is HTMLElement => node !== null));
+  head.append(h('b', 'persona-title', title), ...(note === undefined || note === null ? [] : [note]), h('span', 'persona-grow'), ...controls.filter((node): node is HTMLElement => node !== null));
   return head;
 }
 
