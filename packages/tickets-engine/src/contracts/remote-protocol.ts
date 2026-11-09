@@ -26,6 +26,7 @@ import type { BoardSnapshot, CreateResult, MutationResult, RecentDone, TicketCar
 import type { ImprovementProposal, ImprovementState } from '../core/improvements';
 import type { Persona } from '../core/persona';
 import type { ScoutReport } from './scout';
+import type { SkillsPort } from './skills';
 
 /** What the "Needs you" list holds, in the order it shows them. */
 export type NeedKind =
@@ -140,7 +141,7 @@ import type { TicketDiff, TicketFileReply, WorktreeFile } from '../core/worktree
  * ticket Log records (`owner@<device>`); the gateway derives it from the
  * paired device, never from the request.
  */
-export interface TicketsRemotePort {
+export interface TicketsRemotePort extends SkillsPort {
   board(): Promise<BoardSnapshot>;
   fleet(): Promise<FleetSnapshot>;
   needs(): Promise<readonly NeedItem[]>;

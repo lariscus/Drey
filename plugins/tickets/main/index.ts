@@ -870,6 +870,34 @@ const plugin: MainPluginModule = {
         ? { ok: false, error: 'bad journal removal payload' }
         : client.invoke('personaJournalRemove', { persona, index: index.index, at });
     });
+    // req-172: the Skills tab (list, switch, upload, delete an own skill) and the prompt preview; the engine answers with codes.
+    ctx.ipc.handle('sharedSkills', () => client.invoke('sharedSkills'));
+    ctx.ipc.handle('personaSkills', (payload) => {
+      const persona = str(payload, 'persona');
+      return persona === null ? { ok: false, code: 'no_persona', error: 'bad persona payload' } : client.invoke('personaSkills', persona);
+    });
+    ctx.ipc.handle('personaSkillToggle', (payload) => {
+      const persona = str(payload, 'persona');
+      const skill = str(payload, 'skill');
+      const on = ((payload ?? {}) as { on?: unknown }).on;
+      return persona === null || skill === null || typeof on !== 'boolean'
+        ? { ok: false, code: 'bad_name', error: 'bad skill toggle payload' }
+        : client.invoke('personaSkillToggle', { persona, skill, on });
+    });
+    ctx.ipc.handle('personaSkillRemove', (payload) => {
+      const persona = str(payload, 'persona');
+      const name = str(payload, 'name');
+      return persona === null || name === null ? { ok: false, code: 'bad_name', error: 'bad skill removal payload' } : client.invoke('personaSkillRemove', { persona, name });
+    });
+    ctx.ipc.handle('skillUpload', (payload) => client.invoke('skillUpload', payload));
+    ctx.ipc.handle('personaPromptPreview', (payload) => {
+      const persona = str(payload, 'persona');
+      const step = str(payload, 'step');
+      const model = str(payload, 'model');
+      return persona === null
+        ? { ok: false, code: 'no_persona', error: 'bad persona payload' }
+        : client.invoke('personaPromptPreview', { persona, ...(step === null ? {} : { step }), ...(model === null ? {} : { model }) });
+    });
     ctx.ipc.handle('personaMemoryPin', (payload) => {
       const persona = str(payload, 'persona');
       const p = (payload ?? {}) as { index?: unknown; pinned?: unknown };

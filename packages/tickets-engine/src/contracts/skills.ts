@@ -155,7 +155,7 @@ export type PromptPreviewReply = SkillsReply<{
   readonly text: string;
   readonly tokens: number;
   readonly tokenizer: TokenizerView;
-  /** `instructions`, `skills`, `memory` and `rest` (everything else), in the order they sit in the text. */
+  /** `instructions` (the persona's prompt), `skills`, `memory` and `rest` (everything else), in that fixed order. */
   readonly parts: readonly PromptPartTokens[];
   /** The selected skills, each as the run loads it. */
   readonly skills: readonly PromptPartTokens[];

@@ -33,6 +33,7 @@ import { parseAutopilotSet } from '../fleet/autopilot';
 import type { AutopilotRefusal } from '../fleet/protocol';
 import { parseReviewComments, sendBackNoteOf, type ReviewComment } from '../core/review-feedback';
 import { parsePersonaPatch } from './persona-patch-body';
+import { parseSkillRemove, parseSkillToggle, parseSkillUpload } from './skill-bodies';
 import { TICKET_ID_PATTERN } from '../contracts/tickets';
 import { parseRevoke, parseSettingsPatch, type SettingsAccess } from './settings';
 import type { DeviceRegistry, DeviceView, FailureLimiter, PairingCodes, RemoteDevice } from './auth';
@@ -381,6 +382,8 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
         return json(await port.needs());
       case '/api/personas':
         return json(await port.personas());
+      case '/api/skills':
+        return json(await port.sharedSkills());
       case '/api/chat/sessions':
         return json(await port.chatSessions());
       case '/api/settings':
@@ -402,6 +405,17 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
     const improvements = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/improvements$/.exec(req.path);
     if (improvements !== null) {
       return json(await port.personaImprovements(improvements[1]!));
+    }
+    // req-172: a persona's skills and its prompt preview; the id is pinned by the personaRef grammar.
+    const skills = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/skills$/.exec(req.path);
+    if (skills !== null) {
+      return json(await port.personaSkills(skills[1]!));
+    }
+    const preview = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/prompt$/.exec(req.path);
+    if (preview !== null) {
+      const step = req.query?.get('step') ?? undefined;
+      const model = req.query?.get('model') ?? undefined;
+      return json(await port.personaPromptPreview({ persona: preview[1]!, ...(step === undefined ? {} : { step }), ...(model === undefined ? {} : { model }) }));
     }
     // U4: the persona chat and memory reads; the persona id is pinned by
     // the personaRef grammar before it reaches the port.
@@ -487,6 +501,17 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
     // vocabulary (unknown ids fall back to its default, as always).
     const priorities = (await port.board()).priorities;
     return write('create', parseCreate(body, priorities), (cmd) => port.create(cmd, actor));
+  }
+  if (req.path === '/api/skills') {
+    return write('skill upload', parseSkillUpload(body), (cmd) => port.skillUpload(cmd));
+  }
+  // req-172: a persona's skill switch and the removal of an own skill; the id is pinned by the path.
+  const skillWrite = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/skills\/(toggle|remove)$/.exec(req.path);
+  if (skillWrite !== null) {
+    const id = skillWrite[1]!;
+    return skillWrite[2] === 'toggle'
+      ? write(`skill toggle ${id}`, parseSkillToggle(id, body), (cmd) => port.personaSkillToggle(cmd))
+      : write(`skill remove ${id}`, parseSkillRemove(id, body), (cmd) => port.personaSkillRemove(cmd));
   }
   if (req.path === '/api/attachments') {
     return write('attachment', parseAttachment(body), (cmd) => port.saveAttachment(cmd, actor));

@@ -61,6 +61,7 @@ export interface PersonaSessionPort {
 }
 import type { BoardSnapshot, CreateResult, MutationResult, RecentDone } from '../contracts/tickets';
 import type { EstimateKey, RunEstimate } from '../core/estimate';
+import type { PromptPreviewCommand, PromptPreviewReply, SkillListReply, SkillRemoveCommand, SkillsPort, SkillToggleCommand, SkillUploadCommand, SkillUploadReply } from '../contracts/skills';
 import type { PlanPartsEdit, PlanPartsReply, PlanReleaseReply, PlanReleaseScope } from '../contracts/plan-approval';
 import type { FlowDraftReply, FlowOp, FlowReply, FlowSaveReply, FlowTarget } from '../contracts/flow';
 import type { ReviewComment } from '../core/review-feedback';
@@ -237,7 +238,40 @@ export class DreyTicketsPort implements TicketsRemotePort {
     private readonly chatService: ChatServicePort | null = null,
     private readonly personaSessions: PersonaSessionPort | null = null,
     private readonly records: PersonaRecordsPort | null = null,
+    private readonly skillService: SkillsPort | null = null,
   ) {}
+
+  /** req-172: the skill routes throw a clear line when the engine did not wire the service. */
+  private skills(): SkillsPort {
+    if (this.skillService === null) {
+      throw new Error('the skills service is not wired on this port');
+    }
+    return this.skillService;
+  }
+
+  sharedSkills(): Promise<SkillListReply> {
+    return this.skills().sharedSkills();
+  }
+
+  personaSkills(personaId: string): Promise<SkillListReply> {
+    return this.skills().personaSkills(personaId);
+  }
+
+  personaSkillToggle(cmd: SkillToggleCommand): Promise<SkillListReply> {
+    return this.skills().personaSkillToggle(cmd);
+  }
+
+  personaSkillRemove(cmd: SkillRemoveCommand): Promise<SkillListReply> {
+    return this.skills().personaSkillRemove(cmd);
+  }
+
+  skillUpload(cmd: SkillUploadCommand): Promise<SkillUploadReply> {
+    return this.skills().skillUpload(cmd);
+  }
+
+  personaPromptPreview(cmd: PromptPreviewCommand): Promise<PromptPreviewReply> {
+    return this.skills().personaPromptPreview(cmd);
+  }
 
   /** req-169: the journal and the per-line removals throw a clear line when the engine did not wire them. */
   private personaRecords(): PersonaRecordsPort {
