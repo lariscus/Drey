@@ -280,8 +280,9 @@ A plan that splits into parts lists them in an optional `### Parts`
 chapter under `## Plan`, one `- [ ] <title>` checkbox per part in
 execution order (the order IS the plan's order; moving a part is a
 list edit). Each part's detail lines indent under its item: the
-builder persona (`persona: ben`), the reason, and an optional
-per-part `chain:` entry list in the chain delta grammar. The parts
+builder persona (`persona: ben`), the size (`size: M`, req-170), the
+model capabilities it needs (`needs: image`, req-178), the reason, and an
+optional per-part `chain:` entry list in the chain delta grammar. The parts
 become **their own tickets** when the owner approves the plan
 ("Start" in the Plan-to-approve card): each carries `parent: <id>`,
 its own description, its own `persona:` pin and its own `chain:`
@@ -300,6 +301,7 @@ The canonical shape (`core/plan-parts.ts`):
 - [ ] Split a file diff into hunks
   persona: ben
   size: M
+  needs: image
   reason: pure logic first, so the panel can build on it
   chain: insert security(ralf, notify) after review; skip qa
 - [x] Hunk rows in the Source control panel
@@ -310,7 +312,7 @@ The canonical shape (`core/plan-parts.ts`):
 ticket yet into one (or only the first, "Run part 1 only"): the ticket
 lands in the build queue (`created in <first phase>`, then `<first> ->
 build` in its Log), named by the part's title, with `parent: <id>`, the
-part's `persona:` pin, its `size:` (req-170), its own `chain:` entries, the parent's repo,
+part's `persona:` pin, its `size:` (req-170) and `needs:` (req-178), its own `chain:` entries, the parent's repo,
 repos and priority, and `blocked-by:` the ticket of the part before it
 (none for part 1), so the plan's order is the order of the work. A part
 is matched to its ticket by title among the tickets that name the
@@ -350,7 +352,8 @@ of the Plan and removes it for fewer than two parts.
 | `class` | `A \| B \| C` | Optional class pin (req-170): the run asks the capacity pool for exactly this class, whatever the size, the floor or the persona's default say. Any other value warns and reads as no pin. Dricket: `x-class`. |
 | `model` | string | Optional model pin (req-170): the run asks the pool for this model of the model table (its row's class); it beats `class:` and every class rule. Dricket: `x-model`. |
 | `size` | `S \| M \| L` | The plan part's size (req-170), written by the release from the part's `size:` detail: the run asks for class C, B or A (raised to the phase's `min-class:`). Absent = the class of the persona's default model. Dricket: `x-size`. |
-| `allowance` | number (USD) | The ticket's ledger (req-170, absorbs req-113): once the ticket's runs have spent it, the pool grants no further run and a Needs-you card (a keyed `blocked: [ledger-ticket]` comment) says so — unless the persona's `allowed: spend-above-allowance: true`. Absent = the default of Settings → Models (`service.json` `ledgers.ticketAllowance`); `$2.50` reads too. Dricket: `x-allowance`. |
+| `allowance` | number (USD) | The ticket's ledger (req-170, absorbs req-113): once the ticket's runs have spent it, the pool grants no further run and a Needs-you card (a keyed `blocked: [ledger-ticket]` comment) says so — unless the persona's `allowed: spend-above-allowance: true`. Absent = the default of Settings → Models (`service.json` `ledgers.ticketAllowance`); `$2.50` reads too. Dricket: `x-allowance`. |
+| `needs` | a list of tokens, one line or a YAML list | What the run's model must be able to do (req-178): `image` (image input — a step that reads screenshots), `tools` (tool calls declared; every agent session uses them, so only an explicit need asks for the declaration), `context-<n>` and `output-<n>` in tokens with `k` / `m` (`context-200k`, `output-32k`, `context-1m`). Merged with the phase's `needs:` (every capability either names, the larger size). The routing's filter takes only a model whose row in Settings → Models declares it — "not declared" filters too, so the owner sees which column to fill. Written by the release from the part's `needs:` detail; canonical form one line, `needs: image, context-200k`. An unknown token warns and is left out. Absent = nothing beyond the class. Dricket: `x-needs`. |
 | `proof` | `ui \| tests` | Optional pin (E11, concept v2 §5.3). Overrides the Handover's proof declaration (see [Proof mode](#proof-mode-e11)). Absent, or any other value (a warning), means no pin; with no pin and no readable declaration the mode reads as `ui`. |
 | `rank` | integer 0-999999 | Default `5000`. Fine ordering inside derived order. |
 | `branch` | `t/<id>` | Written by machine writers; validated against the rule; rule wins. |
@@ -967,6 +970,10 @@ commit per change; hand edits win on refresh):
   ignored with a noise badge. The stock pipeline sets none (its one agent
   column, Building, runs every step); a pipeline with a plan or review
   column gives it `min-class: B`.
+- `needs:` — what every run of the column needs of its model (req-178),
+  the ticket key's grammar (`needs: image`, `needs: [image, context-200k]`);
+  merged with each ticket's own `needs:`. Absent = nothing; an unknown
+  token is ignored with a noise badge.
 - `token-budget:` — the column's daily token budget (the pool's settled
   runs are summed per day); over budget trips the breaker. Off by
   default.
@@ -1008,7 +1015,8 @@ then column rank — the rightmost column first, so
 finishing beats starting — then the column's derived order. A persona run asks the capacity pool for its class
 (req-170, ADR-0095: `class:` / `model:` pin, else `size:` or the persona's default class, raised to
 `min-class:`) and gets exactly that class or waits — queued, no process — while the next candidate whose class
-has room goes ahead; a ring run (no persona) takes a slot of the provider pool its assignment resolves to. A
+has room goes ahead; within the class the routing (req-178) filters by the phase's and the ticket's `needs:`
+and takes the slot with the largest surplus; a ring run (no persona) takes a slot of the provider pool its assignment resolves to. A
 running run is never preempted.
 
 ## `_meta/personas/` — the agent personas (E3)
@@ -1458,6 +1466,7 @@ its changed chapters back inside the claim (D-30, [FLEET.md](../plugins/tickets/
 | `x-rank` | `rank` | |
 | `x-worker` `x-persona` `x-track` `x-form` `x-proof` `x-awaiting` | `worker` `persona` `track` `form` `proof` `awaiting` | raw values |
 | `x-class` `x-model` `x-size` `x-allowance` | `class` `model` `size` `allowance` | raw values (req-170); `allowance` as a number |
+| `x-needs` | `needs` | the one-line form (req-178), `image, context-200k` |
 | `x-interactive` | `interactive` | only `true` |
 | `x-chain` | `chain` | entries separated by `;` |
 | `x-references` | `references` | separated by `,` |

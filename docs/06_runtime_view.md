@@ -4844,3 +4844,49 @@ sequenceDiagram
 The seat goes when the run settles (`SlotRunListener` releases it); the cost the run reported lands in its record,
 and the ledgers' next sum includes it. `GET /chain` carries `pool` (the live load, "Now: 2.4 of 6 · Claude A 2 of
 5") and `queue`; the `pool` event goes out on the runner's stream when the load changes.
+
+## 6.103 The choice within the class — filter, surplus, step up, reserve (req-178, milestone 219)
+
+Inside 6.102's `choose`, since req-178. Every row of the class in the persona's pool on every slot that serves it is
+judged by the hard filter; among what passes the soft choice takes the largest surplus; above `Upgrade above q` the
+same slot may run the next stronger model of the pool. Nothing of the class passes → the task waits (R10).
+
+```mermaid
+sequenceDiagram
+    participant P as PoolGrant
+    participant F as SlotFit (filter)
+    participant CF as CapabilityFilter
+    participant R as ReserveGuard
+    participant S as RunShareTracker
+    participant X as SurplusChoice
+    participant U as StepUp
+    participant RR as RouteRecorder
+    participant E as CostEstimate
+    P->>P: options = the pool's rows of exactly the class
+    loop each option × each slot of its provider
+        P->>P: profile — another profile's slot → filtered ("work profile")
+        P->>F: refusal(option, slot, request)
+        F->>CF: the step's needs vs the row's input / tools / context / output
+        F->>F: slot state, row sessions, provider throttle, caps, slot's day
+        F->>R: would a run take any window below the reserve?
+        R->>S: shareOf(ticket, persona, slot, window) — learned median, else 5 %
+        F-->>P: null (candidate) or {reason, text, short} (filtered)
+    end
+    alt no candidate
+        P-->>P: wait (capacity / ledger / config) — never a smaller class
+    else candidates
+        P->>X: pick(candidates, prefer = the ticket's last slot)
+        X-->>P: the last slot if it passed, else largest q → cheaper cost → cheaper price → pool order
+        P->>U: consider(chosen, request)
+        U-->>P: q > upgradeAboveQ, no pin, the next stronger row on the same slot passes the filter → that row; else none
+        P->>RR: record(chosen, stepped, filtered)
+        RR->>E: usdFor(ticket, persona, model) — median of the most similar ended runs
+        RR-->>P: RouteRecord + "route T-0121 → claude-a/sonnet: class B, q 1.4, est $0.40 · filtered: kimi (no image input)"
+        P-->>P: grant {slot, model, class, cost, reason, route}
+    end
+    Note over P: the dispatch puts the route on the request (poolRoute, poolNeeds); the start's gate keeps its slot and class, filters the needs again, and the run start logs the line once and writes it to the stream; RunInfo.grant.route keeps it
+```
+
+The share a run takes is learned after it: `PoolGate` tells `RunShareTracker` the windows at the grant; when the run
+has ended, the first newer reading of the slot (a `slot` event) gives each window's drop, shared among the runs the
+slot carried at once, and becomes a sample for the ticket and the persona on that slot.

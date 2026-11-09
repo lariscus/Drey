@@ -1280,6 +1280,18 @@ room goes ahead, and as soon as a run ends the waiting tickets go in
 order of importance. The worker's thread names the model it got and why
 (*pool: claude-sonnet-4-5, class B, cost 1 on Claude A — size M → B*).
 
+**Which account and model a run gets.** Within its class a run goes to
+the account with the most quota to spare (the largest `q`; equal → the
+cheaper model), skipping every account whose model cannot do what the
+step needs (`needs: image` on a ticket, a part or a column — the model
+table says what each model reads) and every account that would fall
+below the reserve kept in each quota window (10 % unless you set
+`routing.reservePerWindow`); above `q` 1.3 (`routing.upgradeAboveQ`) the
+same account runs the next stronger model of the persona's list. The
+worker's thread and the background service's log say where it went and
+why in one line (*route T-0121 → claude-a/sonnet: class B, q 1.4, est
+$0.40 · filtered: kimi (no image input)*).
+
 **What a ticket, a persona and an account may spend.** Three limits,
 each counted from the runs themselves: a ticket's **allowance**
 (`allowance:` on the ticket, else the default), a persona's day

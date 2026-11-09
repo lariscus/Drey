@@ -113,8 +113,9 @@ Invoke-RestMethod "http://127.0.0.1:$($d.port)/health" -Headers $h
 | `POST /slots/refresh` `{id?}` | read the quotas now (one slot, or all), the config reloaded first |
 | `POST /slots/login-done` `{id}` | the owner signed the slot's account in again: `needs-login` clears, its quota is read |
 | `POST /slots/config` `{slots: [...]}` | write the `slots` of `service.json` (every other key kept) and reload; a broken entry refuses the whole list (422), a file that does not parse refuses the write (409) |
-| `GET /models` | the capacity pool (req-170): `{ok, models: [{model, slot, provider, category, class, cost, sessions}], capacity: {global, perSlot}, ledgers: {ticketAllowance, personaPerDay, providerPerDay}, now: <the live load>, queue: [...], providerDay: [{id, spent, limit}], errors, configPath}` — see "The capacity pool" below |
-| `POST /models/config` `{models?, capacity?, ledgers?}` | replace the pool keys it sends in `service.json` (the others, and every other key, kept) and reload; a broken row refuses the whole write (422), a file that does not parse refuses it (409) |
+| `GET /models` | the capacity pool (req-170): `{ok, models: [{model, slot, provider, category, class, cost, sessions, input?, tools?, context?, output?}], capacity: {global, perSlot}, ledgers: {ticketAllowance, personaPerDay, providerPerDay}, routing: {upgradeAboveQ, reservePerWindow}, now: <the live load>, queue: [...], providerDay: [{id, spent, limit}], errors, configPath}` — see "The capacity pool" below |
+| `POST /models/config` `{models?, capacity?, ledgers?, routing?}` | replace the pool keys it sends in `service.json` (the others, and every other key, kept) and reload; a broken row refuses the whole write (422), a file that does not parse refuses it (409) |
+| `POST /models/import` | req-178: fill the model table's **undeclared** capability columns from `https://models.dev/api.json` — the one network call of the routes, only when the owner asks; what a row declares stays (the local override). The `GET /models` reply plus `imported: {filled: [{model, where, fields}], unmatched: [model]}`; 502 when the registry does not answer (nothing written) |
 | `GET /report` | token telemetry grouped by ticket, phase and model, sorted by total desc: `{ok, groups: [{ticket, phase, model, runs, total, input, cacheRead, cacheCreation, output, beforeFirstWrite, beforeFirstWriteShare}]}` — a counter the provider never reports counts 0 into the sums; pre-T-0048 records fall back to their cumulative `tokensIn`+`tokensOut` (T-0048) |
 | `POST /stop` `{runId, reason}` | stop one run |
 | `POST /send` `{runId, text}` | steer a live run (rung: inject/resume/refused); while the run waits on a question it is the answer, not a takeover. To an ended run (done/stopped/failed) with a session it reopens that session under a new held run, the text as its first prompt — the reply carries the new `runId` |
@@ -540,8 +541,10 @@ pool grants a model of **exactly the class the start asked for**, on a
 free slot of the repository's profile, while the caps and the ledgers
 have room — or the start waits: no process, no slot. **Never a smaller
 class.** Code: `fleet/routing/` (`ModelTable`, `CapacityCap`, `Ledgers`,
-`PoolGrant`, `PoolGate`, `RequestQueue`, `PoolMigration`), wired in
-`fleet/compose-routing.ts`; the chain asks it through
+`PoolGrant`, `PoolGate`, `RequestQueue`, `PoolMigration`; req-178's
+`SlotFit`, `CapabilityFilter`, `ReserveGuard`, `SurplusChoice`, `StepUp`,
+`RouteRecorder`, `CostEstimate`, `RunShareTracker`, `ModelsDevImport`),
+wired in `fleet/compose-routing.ts` and `fleet/compose-pool.ts`; the chain asks it through
 `orchestrate/dispatch-pool.ts`, every start through `slot-binder.ts`.
 
 ### `service.json` — the pool keys
@@ -550,13 +553,15 @@ class.** Code: `fleet/routing/` (`ModelTable`, `CapacityCap`, `Ledgers`,
 {
   "slots": [ … ],
   "models": [
-    { "model": "claude-opus-4-1",   "slot": "claude-a", "category": "frontier", "class": "A", "cost": 5,   "sessions": 1 },
+    { "model": "claude-opus-4-1",   "slot": "claude-a", "category": "frontier", "class": "A", "cost": 5,   "sessions": 1,
+      "input": ["text", "image"], "tools": true, "context": 200000, "output": 32000 },
     { "model": "claude-sonnet-4-5", "slot": "claude-a", "category": "everyday", "class": "B", "cost": 1,   "sessions": 2 },
     { "model": "glm-5.3",           "slot": "zai",      "category": "everyday", "class": "B", "cost": 0.4, "sessions": 3 },
     { "model": "kimi-k2.5",     "provider": "kimi",     "category": "bulk",     "class": "C", "cost": 0.3, "sessions": 2 }
   ],
   "capacity": { "global": 6, "perSlot": {} },
   "ledgers": { "ticketAllowance": 2.5, "personaPerDay": 5, "providerPerDay": 15 },
+  "routing": { "upgradeAboveQ": 1.3, "reservePerWindow": 0.1 },
   "migrations": ["fleet.pool.size"]
 }
 ```
@@ -569,9 +574,12 @@ class.** Code: `fleet/routing/` (`ModelTable`, `CapacityCap`, `Ledgers`,
 | `models[].class` | `A`, `B` or `C`, A strongest |
 | `models[].cost` | the cost factor: what one active session weighs against the caps (default 1) |
 | `models[].sessions` | concurrent sessions of this model one slot serves (default 1) |
+| `models[].input` / `.tools` / `.context` / `.output` | req-178, optional: the declared capabilities — inputs (`text`, `image`; others are dropped), tool calls (`false` keeps every agent session off the model), the context window and the output limit in tokens. Absent = not declared: a step that needs it does not take the model. `POST /models/import` fills what is absent from models.dev |
 | `capacity.global` | the summed cost factors of every active session may not exceed it; `null` = no global cap |
 | `capacity.perSlot` | a slot's cap by id; a slot not named takes its **derived cap** — its largest row at full sessions (board 7l: Claude A 5 = opus 5 × 1) |
 | `ledgers.*` | USD defaults: a ticket's allowance when its frontmatter sets none, a persona's day when its `persona.md` sets no `budget:`, every slot's day |
+| `routing.upgradeAboveQ` | req-178, board 7l's `Upgrade above q` (default `1.3`): above this surplus the chosen slot runs the next stronger model of the persona's pool it serves; `null` = never step up |
+| `routing.reservePerWindow` | req-178, board 7l's `Reserve per window` as a share (default `0.1` = 10 %): a start whose estimated share would take any window of the slot below it waits; `0` = no reserve |
 | `migrations` | `fleet.pool.size` once req-63's sizes moved into the slots (below) |
 
 Only **active sessions** count: runs and held 1:1 sessions from their
@@ -595,15 +603,63 @@ ticket with a persona:
 4. raised, if the persona's `models.pool` holds no model of that class, to
    the lightest stronger class it does hold — raised, never lowered.
 
-The pool walks the persona's `models.pool` (strongest first) and takes the
-first row of the class on a slot that has room: slot not blocked
-(`needs-login`, `exhausted`, `busy n/n`), the row's sessions free, the
-provider not paused or throttled (req-63's quota pause and rate-limit
-shrink stand), the slot's cap and the global cap not exceeded, the slot's
-day ledger not full. The decision rides the run: `RunRequest.poolClass`,
-`poolWhy`, `ledger`; `RunInfo.grant` `{requested, class, model, cost,
-reason}`; the stream's opening note `pool: claude-sonnet-4-5, class B,
-cost 1 on Claude A — size M → B`; the dispatch log line.
+The request also carries the step's `needs:` (the phase's and the
+ticket's, merged — `specs/ticket-schema.md`), the slot of the ticket's
+last run (`prefer`) and whether the choice may step up (not on a pin).
+The pool then routes within the class (next section). The decision rides
+the run: `RunRequest.poolClass`, `poolWhy`, `ledger`, `poolNeeds`,
+`poolRoute`; `RunInfo.grant` `{requested, class, model, cost, reason,
+route}`; the stream's opening notes `pool: claude-sonnet-4-5, class B,
+cost 1 on Claude A — size M → B` and the route line; the dispatch log
+line.
+
+### Routing within the class (req-178)
+
+Two stages, then a possible step up, over every row of the class in the
+persona's pool on every slot that serves it:
+
+1. **The filter** (hard; `SlotFit`): the repository's profile; the
+   step's needs against the row's declared capabilities (`no image input`,
+   `image input not declared`, `context 128k < 200k`, `no tool calls`); the
+   slot's state (`needs-login`, `exhausted`, `busy n/n`); the row's
+   sessions; the provider's pause or throttle (req-63); the slot's and the
+   global cap; the slot's day ledger; **the reserve per window** — a start
+   whose estimated share would take any window below
+   `routing.reservePerWindow` waits. The share is learned per slot and
+   window from the readings around each run's end (the drop, shared among
+   the runs the slot carried at once): the median of the ticket's runs
+   there, else the persona's, else 5 %; in memory, so a restart starts at
+   5 % again.
+2. **The choice** (soft; `SurplusChoice`) among what passed: the slot of
+   the ticket's last run first (its session can only resume there), then
+   the **largest surplus `q`** (a slot without a reading ranks as `q` 1),
+   then the cheaper cost factor, then the cheaper slot price, then the
+   pool's order.
+3. **The step up** (`StepUp`): when the chosen slot's `q` is above
+   `routing.upgradeAboveQ`, it runs the next stronger model of the
+   persona's pool that **the same slot** serves (the lightest class above
+   the granted one), if that model passes the filter there too. One step,
+   only upwards, never onto another slot, never on a `model:` / `class:`
+   pin. **Never a smaller class** — nothing of the class passed → the
+   start waits.
+
+Every decision is one line in the runner log and the run's stream:
+
+```
+route T-0121 → claude-a/sonnet: class B, q 1.4, est $0.40 · filtered: kimi (no image input)
+route T-0130 → claude-a/opus: class A (step up from sonnet, B), q 1.6, est $1.80
+```
+
+`est` is the median cost of the most similar ended runs (the ticket on
+the model, the ticket, the persona on the model, the model; `?` without
+history); `filtered` names each other slot once with its reasons (the
+chosen slot's own refusals stay on the record only). The record is
+`RunInfo.grant.route` `{slot, model, class, requested, q, estimatedUsd,
+stepUp, filtered: [{slot, model, reason}], line}` — on `GET /status`
+and `GET /status/<run>`. The chain's dispatch routes first; the start's gate
+(`PoolGate`) keeps that slot and class (a step up stays one), filters the
+needs again and records the dispatch's route when the start landed where
+it routed.
 
 ### Waiting
 
