@@ -1,5 +1,6 @@
 import type { PersonaMessage } from '../contracts/persona-session';
 import { loadPersonaSkills, type Persona } from '../core/persona';
+import { parseWorkerValue } from '../fleet/assignment';
 import { BRIEF_RUNS, composeOneOnOneBrief, type BriefRun } from '../fleet/one-on-one-brief';
 import { NO_TOOLS, type OneOnOneToolSeam } from '../fleet/one-on-one-toolset';
 import type { RunInfo } from '../fleet/protocol';
@@ -9,7 +10,7 @@ import type { EngineHost, EngineVault } from './host';
 export interface PersonaSessionContextDeps {
   readonly host: EngineHost;
   readonly runs: () => Promise<readonly RunInfo[]>;
-  /** The tools attached to a 1:1 (req-167's harness MCP configuration); absent = none. */
+  /** The tools attached to a 1:1 (req-217: the service's vault MCP); absent = none. */
   readonly tools?: OneOnOneToolSeam;
 }
 
@@ -50,7 +51,7 @@ export class PersonaSessionContext {
       memory,
       runs: latestRunsOf(runs, persona.id),
       conversation: conversation.map((m) => ({ role: m.role, text: m.text })),
-      tools: (this.deps.tools ?? NO_TOOLS).attached(persona.id),
+      tools: (this.deps.tools ?? NO_TOOLS).attached({ persona: persona.id, provider: parseWorkerValue(persona.worker)?.provider ?? null }),
       workingDirectory: vault.path,
     });
   }

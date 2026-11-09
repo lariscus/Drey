@@ -1171,8 +1171,9 @@ Control (*Talk to <name> 1:1*); all three show the same conversation.
   starts a new one that reads the conversation back. A held session takes
   one of the crew's places, like a run; an idle one costs nothing.
 - **The persona only reads.** It can look at the board, the tickets and
-  its own memory, but changes nothing, and a 1:1 does not write into its
-  memory.
+  its own memory, and — through the same key the crew's agents use — list,
+  search and read your notes (see [The crew's vault](#crews-vault)), but it
+  changes nothing, and a 1:1 does not write into its memory.
 - **Proposals.** When the persona suggests changing its instructions or
   adding a skill, the suggestion is a card under its answer. **Accept**
   writes the change into the persona; **Dismiss** leaves everything as it
@@ -1821,7 +1822,7 @@ Closing it keeps the service running. Three tabs:
   the ticket in Drey — Drey's thread shows the same session cleaned up.
 - **Logs** — the service log at full height, filtered by level and by part.
 
-### The crew's vault
+### The crew's vault {#crews-vault}
 
 Every agent the Crew runner starts can use your notes: Drey Service hands it
 the vault tools — list, search, read, edit, write and move, never delete — as
@@ -1851,9 +1852,12 @@ Every call shows in the run: in the window's **Sessions** tab, the stream and
 with who made it, whether it was allowed and how long it took; refused calls
 also land in the service log. The **MCP server** row of *Components* shows the
 service's address and how many agents hold a key. A note an agent changed
-reaches an open tab in Drey at the next refresh of the vault (or at once with
-*Watch the vault for external changes* on); its change is not in the note's
-**File history**. Drey's own MCP server for other programs (Settings → MCP,
+reaches Drey at once: a clean open tab reloads, a tab you have changed is
+marked *Changed on disk*, and the tag index refreshes — with *Watch the vault
+for external changes* on or off (with Drey closed, the next start simply reads
+the notes as they are). The change is not in the note's **File history**.
+A persona's **1:1** gets the same server with a read-only key: it can list,
+search and read your notes and nothing else, whatever the persona may write. Drey's own MCP server for other programs (Settings → MCP,
 below) is separate and works as before.
 
 ### The resource governor

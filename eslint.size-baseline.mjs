@@ -39,7 +39,6 @@ export const SIZE_BASELINE = [
   'packages/tickets-engine/src/server/drey-port.spec.ts',
   'packages/tickets-engine/src/server/drey-port.ts',
   'packages/tickets-engine/src/server/engine.spec.ts',
-  'packages/tickets-engine/src/server/engine.ts',
   'packages/tickets-engine/src/server/gateway.ts',
   'packages/tickets-engine/src/server/needs.ts',
   'packages/tickets-engine/src/server/notes-routes.ts',

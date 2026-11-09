@@ -1035,9 +1035,16 @@ A persona's 1:1 is a run record with `kind: '1:1'` (`fleet/protocol-session.ts`)
   its `run_settled` ledger line carries `ticket: "1:1"` and the persona,
   so the persona's day counts it.
 - **The toolset** — the harness's own read tools in the tickets repo under
-  the read-only mode; the MCP read tools (`fleet_status`, `fleet_watch`,
-  `vault_list`, `vault_search`, `vault_read`) once req-167's harness MCP
-  configuration implements `OneOnOneToolSeam` (req-217).
+  the read-only mode, and the vault read tools `vault_list`, `vault_search`,
+  `vault_read` from Drey Service's vault MCP (req-217, milestone 234; see
+  *The vault over MCP* below). `OneOnOneToolSeam` is implemented by the
+  vault MCP component: it answers the three names when the endpoint listens
+  and the persona's harness takes an MCP configuration, and nothing for an
+  `api` persona; the brief's `## Tools` names exactly that answer and the
+  spawn path attaches exactly that. `fleet_status` / `fleet_watch` are Drey's
+  own MCP server's tools (the plugin-tool registry lives in the Drey process),
+  not the service's, so they are **not attached** — the 1:1 reads the board in
+  the tickets repository with its harness's read tools (req-252).
 - **Seeing it** — `GET /status` lists it with `kind`, `persona`,
   `workingDirectory`, `chatFile`, `held`, `turn`, `costUsd`; the service
   window's Sessions tab draws `1:1 · <Name>` — `held · releases in <span>`.
@@ -1361,6 +1368,20 @@ and for a read-only run. A refused write is `Error: <persona> may not write
 vault "<id>" (allowed: read)` to the model, an audit line on the stream and a
 warning in the service log; a write from a read the disk has moved past is
 refused too (ADR-0060). No `tickets/`, `chats/` or dot-folder is reachable.
+A **1:1's token** is read-only in the grant itself and carries a tool cut
+(`VaultGrant.tools`): the list offers `vault_list`, `vault_search`,
+`vault_read` and nothing else is callable (`Error: there is no tool
+"vault_write".`), whatever its persona may write; its calls are audited like
+any other. A **free session** shares the starter but not the cut: its token is
+its persona's (the full set, writes where `allowed: write-vaults` says —
+read-only only when the session's permission mode is). A worker's successful
+`vault_write` / `vault_edit` / `vault_move` is **announced** (milestone 234,
+req-213): the service host hands `VaultMcpCalls` the engine's `emitPaths`, the
+hub's paths channel a phone's note save uses, so the tickets plugin's
+`PathAnnouncer` tells Drey's vault round at once — clean open tabs reload, a
+dirty tab is marked *Changed on disk*, the tag index refreshes — with the
+watcher on or off (a move reports the new path changed and the old one
+deleted; a refused write and every read report nothing).
 A harness that takes no MCP, or an ACP agent that advertises no HTTP MCP,
 starts without the vault and the stream says so once. Diagnose: the `mcp`
 row of `service.lock` (`running · 127.0.0.1:<port> · <n> workers`), the

@@ -6,6 +6,7 @@ import { PersonaRights } from './persona-rights';
 import { RunTokens, type TokenSession } from './run-tokens';
 import { VaultCallAuditor } from './vault-call-auditor';
 import { VaultMcpCalls } from './vault-mcp-calls';
+import type { VaultPathsChange } from './vault-paths-change';
 
 /**
  * req-167: a worker's vault calls end to end over a memory disk — the shared
@@ -17,26 +18,28 @@ const SITES: VaultSite[] = [
   { id: 'work', name: 'Work', path: '/v/work', active: false, exists: true },
 ];
 
-function harness(persona: string | null = 'ben', readOnly = false) {
+function harness(persona: string | null = 'ben', readOnly = false, tools?: readonly string[]) {
   const disk = new MemoryVaultDisk()
     .seed('/v/notes', { 'a.md': '# A\n\nalpha\n', 'tickets/T-1.md': 'ticket\n' })
     .seed('/v/work', { 'w.md': 'work one\n', 'index.md': 'See [w](w.md).\n' });
   const events: NormalizedEvent[] = [];
   const logged: string[] = [];
+  const changes: VaultPathsChange[] = [];
   let clock = 0;
   const calls = new VaultMcpCalls({
     vaults: { current: async () => SITES },
     disk,
     rights: new PersonaRights({ writeVaultsOf: async (id) => (id === 'ben' ? ['work'] : null) }),
     auditor: new VaultCallAuditor({ now: () => new Date(Date.UTC(2026, 10, 9, 12, 0, 0, (clock += 5))), log: (m) => logged.push(m) }),
+    changed: (change) => changes.push(change),
   });
   const tokens = new RunTokens({ token: () => 'tok', hash: (t) => t });
-  const session: TokenSession = tokens.resolve(tokens.mint({ runId: 'run-1', ticketId: 'T-9', persona, readOnly, emit: (e) => events.push(e) }))!;
+  const session: TokenSession = tokens.resolve(tokens.mint({ runId: 'run-1', ticketId: 'T-9', persona, readOnly, ...(tools === undefined ? {} : { tools }), emit: (e) => events.push(e) }))!;
   const call = async (name: string, args: Record<string, unknown>): Promise<{ text: string; isError: boolean }> => {
     const result = await calls.call(session, name, args);
     return { text: result.content.map((c) => c.text).join('\n'), isError: result.isError === true };
   };
-  return { calls, disk, events, logged, call };
+  return { calls, disk, events, logged, changes, session, call };
 }
 
 describe('VaultMcpCalls (req-167)', () => {
@@ -117,5 +120,53 @@ describe('VaultMcpCalls (req-167)', () => {
     expect(moved.text).toContain('Moved w.md → done/w.md.');
     expect(h.disk.files.get('/v/work/index.md')!.text).toBe('See [w](done/w.md).\n');
     expect(h.events.at(-1)!.audit).toEqual(expect.objectContaining({ path: 'w.md → done/w.md', verdict: 'allowed' }));
+  });
+
+  it("announces a worker's write, edit and move with the vault's folder, and nothing for a read or a refusal (req-213)", async () => {
+    const h = harness();
+    await h.call('vault_read', { path: 'w.md', vault: 'work' });
+    await h.call('vault_write', { path: 'x.md', content: 'x', mode: 'create', vault: 'notes' }); // refused
+    expect(h.changes).toEqual([]);
+    await h.call('vault_edit', { path: 'w.md', vault: 'work', edits: [{ old_text: 'one', new_text: 'two' }] });
+    await h.call('vault_write', { path: 'new.md', content: 'n', mode: 'create', vault: 'work' });
+    await h.call('vault_move', { from: 'w.md', to: 'done/w.md', vault: 'work' });
+    expect(h.changes).toEqual([
+      { vaultPath: '/v/work', changed: ['w.md'], deleted: [] },
+      { vaultPath: '/v/work', changed: ['new.md'], deleted: [] },
+      // the old path is gone, the new one is there, the note whose link was rewritten changed
+      { vaultPath: '/v/work', changed: ['index.md', 'done/w.md'], deleted: ['w.md'] },
+    ]);
+  });
+});
+
+describe('VaultMcpCalls — a tool cut (a 1:1, req-217)', () => {
+  const READ = ['vault_list', 'vault_search', 'vault_read'];
+
+  it('offers only the cut and calls nothing outside it', async () => {
+    const h = harness('ben', true, READ);
+    expect((await h.calls.list(h.session)).map((t) => t.name)).toEqual(READ);
+    expect((await h.call('vault_read', { path: 'a.md', vault: 'notes' })).text).toContain('3: alpha');
+    expect((await h.call('vault_write', { path: 'x.md', content: 'x', mode: 'create', vault: 'work' })).text).toBe('Error: there is no tool "vault_write".');
+    expect((await h.call('vault_move', { from: 'w.md', to: 'z.md', vault: 'work' })).isError).toBe(true);
+    expect(h.disk.files.has('/v/work/x.md')).toBe(false);
+    expect(h.changes).toEqual([]);
+  });
+
+  it('is read-only in the grant itself: even with the write tools offered, a 1:1 token changes nothing', async () => {
+    const h = harness('ben', true); // ben may write "work", but this token is read-only
+    const result = await h.call('vault_write', { path: 'x.md', content: 'x', mode: 'create', vault: 'work' });
+    expect(result.text).toBe('Error: ben may not write vault "work" (allowed: read)');
+    expect(h.disk.files.has('/v/work/x.md')).toBe(false);
+  });
+
+  it('audits a refused call on the stream like any other', async () => {
+    const h = harness('ben', true, READ);
+    await h.call('vault_write', { path: 'x.md', content: 'x', mode: 'create', vault: 'work' });
+    expect(h.events.at(-1)).toEqual(expect.objectContaining({ kind: 'tool', tool: 'mcp__drey__vault_write', detail: 'audit' }));
+  });
+
+  it('a session without a cut sees all six tools', async () => {
+    const h = harness();
+    expect((await h.calls.list(h.session)).map((t) => t.name)).toEqual(['vault_list', 'vault_search', 'vault_read', 'vault_edit', 'vault_write', 'vault_move']);
   });
 });

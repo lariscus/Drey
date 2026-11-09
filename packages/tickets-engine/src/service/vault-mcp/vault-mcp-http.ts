@@ -19,7 +19,7 @@ import { VAULT_MCP_NAME } from './vault-call-auditor';
 /** What the endpoint asks for each request. */
 export interface VaultMcpHandler {
   resolve(token: string): TokenSession | null;
-  list(): Promise<McpToolDef[]>;
+  list(session: TokenSession): Promise<McpToolDef[]>;
   call(session: TokenSession, name: string, args: Readonly<Record<string, unknown>>): Promise<McpToolResult>;
 }
 
@@ -101,7 +101,7 @@ export class VaultMcpHttp implements McpEndpoint {
   /** One MCP server per request (stateless), bound to the caller's session. */
   private serverFor(session: TokenSession): Server {
     const server = new Server({ name: VAULT_MCP_NAME, version: this.version }, { capabilities: { tools: {} } });
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: await this.handler.list() }));
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: await this.handler.list(session) }));
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const result = await this.handler.call(session, request.params.name, request.params.arguments ?? {});
       return { content: result.content, ...(result.isError === true ? { isError: true } : {}) };

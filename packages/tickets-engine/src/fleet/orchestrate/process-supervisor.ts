@@ -1,5 +1,7 @@
 import type { ProcessTable } from '../ports/process-table';
+import { ONE_ON_ONE_VAULT_TOOLS } from '../one-on-one-toolset';
 import type { RunInfo } from '../protocol';
+import { isOneOnOne } from '../protocol-session';
 import type { NormalizedEvent, ProviderAdapter, UsageTotals, WorkerHandle } from '../harness/contract';
 import type { BackgroundWork } from './background-work';
 import type { EventFold } from './event-fold';
@@ -154,6 +156,8 @@ export class ProcessSupervisor {
       ticketId: run.request.ticketId,
       persona: run.info.persona ?? null,
       readOnly: run.request.permissionMode === 'read-only',
+      // A 1:1 is offered the read cut only (req-217); a free session has its persona's rights, a run the full set.
+      ...(isOneOnOne(run.request) ? { tools: ONE_ON_ONE_VAULT_TOOLS } : {}),
       runDir: run.dir,
       harness: adapter.label,
       emit: (event) => this.deps.events.onEvent(run, event),

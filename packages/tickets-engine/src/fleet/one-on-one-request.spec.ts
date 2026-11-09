@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Persona } from '../core/persona';
 import { composeOneOnOneBrief, type OneOnOneBriefInput } from './one-on-one-brief';
 import { OneOnOneRequestBuilder } from './one-on-one-request';
-import { cutToOneOnOne, NO_TOOLS, ONE_ON_ONE_TOOLS } from './one-on-one-toolset';
+import { cutToOneOnOne, NO_TOOLS, ONE_ON_ONE_TOOLS, ONE_ON_ONE_VAULT_TOOLS } from './one-on-one-toolset';
 
 function persona(over: Partial<Persona> = {}): Persona {
   return {
@@ -69,7 +69,7 @@ describe('the 1:1 toolset is the read-only cut (R1)', () => {
     const offered = ['fleet_status', 'fleet_run', 'fleet_stop', 'fleet_steer', 'fleet_watch', 'vault_read', 'vault_edit', 'vault_write', 'vault_move', 'vault_delete'].map((name) => ({ name }));
     expect(cutToOneOnOne(offered).map((t) => t.name)).toEqual(['fleet_status', 'fleet_watch', 'vault_read']);
     expect(ONE_ON_ONE_TOOLS.every((name) => !/run|stop|steer|edit|write|move|delete/.test(name))).toBe(true);
-    expect(NO_TOOLS.attached('ben')).toEqual([]);
+    expect(NO_TOOLS.attached({ persona: 'ben', provider: 'claude-code' })).toEqual([]);
   });
 });
 
@@ -103,7 +103,13 @@ describe('composeOneOnOneBrief — the context of R2', () => {
 
   it('names a tool only when it is attached', () => {
     expect(brief()).not.toContain('## Tools');
-    expect(brief({ tools: ['fleet_status', 'vault_read'] })).toContain('## Tools\n\nRead the board, the tickets and the vault with: fleet_status, vault_read.');
+    expect(brief({ tools: ['fleet_status', 'vault_read'] })).toContain("## Tools\n\nRead the crew's runs with: fleet_status. Read the owner's notes (the vault) with: vault_read. They only read.");
+  });
+
+  it('names exactly the vault read tools when only they are attached (req-217)', () => {
+    const text = brief({ tools: [...ONE_ON_ONE_VAULT_TOOLS] });
+    expect(text).toContain("## Tools\n\nRead the owner's notes (the vault) with: vault_list, vault_search, vault_read. They only read.");
+    expect(text).not.toMatch(/fleet_|vault_(edit|write|move|delete)/);
   });
 
   it('says so when memory and runs are empty, and carries the conversation so far', () => {

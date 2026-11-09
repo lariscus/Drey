@@ -428,7 +428,8 @@ Your persona's skills, loaded in full. Use them where they apply.
 
 ## Tools
 
-Read the board, the tickets and the vault with: <the attached tool names>. They only read.
+Read the crew's runs with: <the attached fleet_ tools>. Read the owner's notes (the vault) with: <the attached vault_ tools>. They only read.
+(each sentence only when a tool of its kind is attached; with none the section is absent)
 
 ## The conversation so far
 
@@ -454,9 +455,15 @@ or `{"kind": "skill", "summary": "<one line>", "skill": "<the name of a skill to
 - **`## Tools` names a tool only when it is attached** (ADR-0071's rule).
   The 1:1 may be given exactly the read-only MCP tools `fleet_status`,
   `fleet_watch`, `vault_list`, `vault_search`, `vault_read`
-  (`fleet/one-on-one-toolset.ts`); they reach the harness through
-  req-167's harness MCP configuration, which is not on this base — no
-  tool is attached yet and the section is absent (follow-up req-217).
+  (`fleet/one-on-one-toolset.ts`). Since milestone 234 (req-217) the
+  vault tools reach the harness through Drey Service's vault MCP
+  (req-167's `mcpLaunch`) with a read-only token, and
+  `OneOnOneToolSeam` (`service/vault-mcp/one-on-one-tools.ts`) answers
+  `vault_list`, `vault_search`, `vault_read` when the endpoint
+  listens and the persona's harness takes an MCP launch — none for an
+  `api` persona. The fleet's two tools are Drey's own server's, not
+  served by the service: not attached, so the section names the vault
+  tools only (req-252). The tool texts themselves did not change.
 - **The answer** is the `text` events of the run's stream after the
   owner's `you › <line>` note, joined by a blank line, once a `result`
   follows (`services/persona-turn-watcher.ts`, `answerAfterLastPrompt`).

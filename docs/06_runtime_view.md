@@ -5255,8 +5255,10 @@ sequenceDiagram
     participant VT as VaultTools (shared/vault-tools)
     participant D as DiskToolVault (registered vaults)
     participant S as run stream (stream.jsonl)
+    participant E as Engine (service host: emitPaths)
+    participant DR as Drey (tickets plugin, main)
 
-    PS->>G: open({run, ticket, persona, readOnly, runDir, emit}, adapter.mcpLaunch)
+    PS->>G: open({run, ticket, persona, readOnly, tools?, runDir, emit}, adapter.mcpLaunch)
     alt the harness takes no MCP, or the endpoint does not listen
         G-->>S: note "… — this run has no vault"
         G-->>PS: null → spawn without a vault
@@ -5289,6 +5291,12 @@ sequenceDiagram
         end
         C-->>S: tool {detail: audit, tool: mcp__drey__vault_edit, text: "vault › vault_edit work:a.md · 12 ms",<br/>audit: {persona, vault, path, verdict: allowed|refused|failed, ms}}
         C-->>G: a refusal also → service log (mcp)
+        opt a successful vault_write / vault_edit / vault_move (req-213, milestone 234)
+            C->>E: changed {vaultPath, changed, deleted} — one report per vault and call, a move = new path changed + old deleted
+            E->>E: Engine.emitPaths → ChangeHub paths channel
+            E-->>DR: /api/events frame {change: paths, …} — Drey's tickets plugin (EngineClient)
+            DR->>DR: PathAnnouncer batches (400 ms) → ctx.vault.announceChanges → vault round:<br/>clean open tabs reload, dirty ones "Changed on disk", the tag index refreshes
+        end
         H-->>W: the tool result (an Error: is the text the model acts on)
     end
     W-->>PS: exits
@@ -5297,8 +5305,11 @@ sequenceDiagram
 
 The token lives as long as its worker: a respawn of the same run (a resume, a fallback) opens a fresh one. The
 service re-reads the registered vaults and the persona at every call, so a vault Drey added or a right the owner
-granted applies to the next call. A write does not pass through an open Drey tab and leaves no local history entry
-(ADR-0094's price); Drey sees it at its next vault round (the opt-in watcher, a refresh — req-213).
+granted applies to the next call. A write leaves no local history entry (ADR-0094's price, req-215), but since
+milestone 234 it is **announced**: the service host wires `VaultMcpCalls`' `changed` to `Engine.emitPaths`, the same
+paths channel a phone's note save uses, so Drey's vault round hears it at once, watcher on or off (with Drey closed
+nobody listens, and Drey's next start reads the files as they are). `tools` is set only for a 1:1's token (6.112):
+the tool list and the callable set are cut to `vault_list`, `vault_search`, `vault_read` on top of `readOnly`.
 
 ## 6.112 The owner's 1:1 line → held session → answer → idle release (req-168, milestone 228, [ADR-0093](09_architecture_decisions/0093-persona-sessions-the-1on1.md) as built)
 
@@ -5316,6 +5327,7 @@ sequenceDiagram
     participant P as Pool (SlotBinder: slot, ledgers)
     participant W as Persona's harness (read-only, tickets repo)
     participant X as IdleRelease (the reaper's round)
+    participant M as Vault MCP component (Drey Service, 6.111)
     O->>S: personaThreadAppend(ben, line)
     S->>F: open the 1:1 (the first one: thread.md migrated, removed — one commit)
     S->>F: owner line — one commit
@@ -5326,6 +5338,8 @@ sequenceDiagram
         R->>P: bind (class of ben's default model; persona + provider ledgers, no ticket allowance)
         P-->>R: slot + grant (or a refusal → the failure on the 1:1)
         R->>W: spawn quiet (holdAtSpawn), held — no prompt yet
+        R->>M: open the vault gate {persona ben, readOnly, tools: vault_list · vault_search · vault_read} (req-217)
+        M-->>W: token + mcp.json / acpServers — the worker reaches the vault MCP, read-only, its calls audited on the run's stream
     end
     S->>R: send(runId, line)
     R->>W: first line: brief + "The owner starts the dialog:" + line · later: the line alone
@@ -5350,6 +5364,14 @@ sequenceDiagram
 The session record carries `kind: '1:1'`, the persona, the working directory and the chat file; the service window's
 Sessions tab lists it as `1:1 · Ben` with `held · releases in <span>` and a Directory row. An ended 1:1 never reopens
 in place, and the worker's own end ends it `done` (exit verdict `session`).
+
+**The 1:1's tools (req-217, milestone 234).** The brief's `## Tools` is built from `OneOnOneToolSeam`, implemented by
+the vault MCP component: `vault_list`, `vault_search`, `vault_read` when the endpoint listens and the persona's harness
+describes an MCP launch, none for an `api` persona (the chat bridge carries no tools) or without a service. The same
+list is what the spawn path asks the gate for, so the brief names exactly what is attached. The grant refuses every
+change (a 1:1's token is read-only), the tool list is cut to the three, and every call lands on the run's stream as the
+audit event of 6.111. `fleet_status` / `fleet_watch` are served by Drey's own MCP server, not the service: not attached
+(req-252). A **free session** shares the starter but not the cut: it keeps its persona's rights (6.111).
 
 ## 6.113 Gate verdict → signal → closing round → journal + lesson → Memory tab (req-169, milestone 229, [ADR-0093](09_architecture_decisions/0093-persona-sessions-the-1on1.md) as built, memory half)
 
