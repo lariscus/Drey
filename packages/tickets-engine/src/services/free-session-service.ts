@@ -88,6 +88,17 @@ export class FreeSessionService {
     };
   }
 
+  /** The block below Pia's board digest (req-173): the personas and folders a startSession card may name. */
+  async promptContext(): Promise<string | null> {
+    const options = await this.options().catch(() => null);
+    if (options === null || !options.ok || options.personas.length === 0) {
+      return null;
+    }
+    const personas = options.personas.map((p) => `${p.id} (${p.worker})`).join(', ');
+    const folders = [`${options.ticketsVault} (the tickets repository)`, ...options.repos.map((r) => `${r.path} (${r.name})`)].join('; ');
+    return `## Sessions you may propose\n\npersonas: ${personas}\nfolders: ${folders}`;
+  }
+
   private async startChecked(ask: FreeSessionAsk, origin: string): Promise<FreeSessionStartReply> {
     const vault = await this.deps.board.detect();
     if (vault === null) {

@@ -282,7 +282,9 @@ async function seedSession(
                 ? command.blockedBy.length === 0
                   ? `Clear ${command.id} blockers`
                   : `Block ${command.id} by ${command.blockedBy.join(', ')}`
-                : `Set ${command.id} priority to ${command.priority}`;
+                : command.kind === 'setPriority'
+                  ? `Set ${command.id} priority to ${command.priority}`
+                  : `Start a session of ${command.persona} in ${command.directory}`;
     text = appendProposal(text, new Date('2026-11-02T08:02:00Z'), summary, command).text;
   }
   const file = `tickets/_meta/chat/20261102-080000-${sessionSlug(title)}.md`;

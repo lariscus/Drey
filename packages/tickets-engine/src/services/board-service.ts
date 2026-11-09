@@ -70,6 +70,7 @@ import { trancheConfigOf } from './tranche-config';
 import { isWorkerProvider, WORKER_PROVIDERS, type ChainConfig, type ChainStoreConfig, FleetCaps, FleetHandoverConfig, HandoverMode, InteractiveMode, PermissionMode, RunDkTarget, RunInfo, FleetPools } from '../fleet/protocol';
 import { type EngineHost, type EngineVaultChangeEvent, EngineVault, FleetPort } from './host';
 import { handoverFromConfig, handoverOverrideKeys } from './handover-config';
+import type { EffectiveCrew } from '../fleet/config/layered-config-resolver';
 import { appendMemory, memoryPathFor, parseMemoryEntries, toggleMemoryPin } from './persona-store';
 import { HUMAN_PERSONA_ID, humanPersona, inPipelineOrder, isHumanPersona, loadPersonaSkills, personaFileText, personaMigrationFor, parsePersonaFile, personaRef, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaMigration, type PersonaSkill } from '../core/persona';
 import { scanRepoFolder } from './repos-scan';
@@ -225,6 +226,13 @@ export interface LedgerEvents {
 export interface BoardServiceOptions {
   /** The fleet ledger writes behind the board's lifecycle events; absent = silent no-op. */
   readonly events?: LedgerEvents;
+  /**
+   * req-173 (R13): the vault layer — `_meta/crew.md` resolved. Present (the engine), the default
+   * worker, the permission mode, the caps, the handover thresholds, the tranche and the default
+   * persona come from it, never from a device's config; absent (older specs), the constructor's
+   * values and the config keys stand.
+   */
+  readonly crew?: { effective(vault: EngineVault): Promise<EffectiveCrew> };
 }
 
 /** A dricket write that met a ticket changed in the meantime (dk exit 12): nothing was written, the caller asks the user. */
@@ -254,19 +262,21 @@ export class EngineBoardService {
   /** The commit steps Accept started on a store (ticket id -> run id), until their run settles; see {@link settleCommitSteps}. */
   private readonly commitSteps = new Map<string, string>();
   private settling: Promise<void> = Promise.resolve();
+  /** req-173: the vault layer as the last snapshot resolved it; null before one (or without `options.crew`). */
+  private crew: EffectiveCrew | null = null;
 
   constructor(
     /** The host ports: every Drey/Electron affordance the service needs (ADR-0088, E2a). */
     private readonly host: EngineHost,
     private readonly git: TicketsGit,
-    private readonly defaultWorker: string,
-    private readonly autoPermissionMode: PermissionMode,
+    private defaultWorker: string,
+    private autoPermissionMode: PermissionMode,
     private readonly gitPath: string,
     private readonly fleet: FleetPort,
     /** The fleet root — the worktrees the context pack stats live there. */
     private readonly fleetRoot: string,
     /** The instruction output caps (T-0048), resolved once at activation. */
-    private readonly caps: FleetCaps,
+    private caps: FleetCaps,
     /** The per-provider pools (req-63), resolved once at activation. */
     private readonly pools: FleetPools,
     /** The handover thresholds (T-0049) — refreshed from the config with
@@ -395,6 +405,7 @@ export class EngineBoardService {
       this.locate(vault.path),
       this.readOptional(vault.id, LEDGER_FILE),
     ]);
+    await this.applyCrew(vault);
     const paths = mdFiles.filter((p) => p.startsWith('tickets/') && !p.startsWith('tickets/_meta/'));
     const files = await Promise.all(
       paths.map(async (path) => ({
@@ -481,8 +492,31 @@ export class EngineBoardService {
     }
   }
 
-  /** Re-reads the handover thresholds with the board's override keys (T-0049). */
+  /** req-173: the vault layer's values take the place of the constructor's (one resolve per snapshot). */
+  private async applyCrew(vault: EngineVault): Promise<void> {
+    const crew = (await this.options.crew?.effective(vault).catch((error: unknown) => (this.host.log(`crew.md: ${messageOf(error)}`, 'warn'), null))) ?? null;
+    if (crew !== null) {
+      this.crew = crew;
+      this.defaultWorker = crew.defaultWorker;
+      this.autoPermissionMode = crew.permissionMode;
+      this.caps = crew.caps;
+    }
+  }
+
+  /** The default persona: the vault layer's (req-173), else the legacy config key. */
+  private async defaultPersonaOf(): Promise<string | null> {
+    if (this.crew !== null) {
+      return this.crew.defaultPersona;
+    }
+    return ((await this.host.configGet<string>('personas.default')) ?? '').trim() || null;
+  }
+
+  /** Re-reads the handover thresholds with the board's override keys (T-0049); the vault layer's once there is one (req-173). */
   private async refreshHandover(snap: BoardSnapshot): Promise<void> {
+    if (this.crew !== null) {
+      this.handover = this.crew.handover;
+      return;
+    }
     this.handover = await handoverFromConfig(
       this.host.configGet.bind(this.host),
       handoverOverrideKeys(snap, this.defaultWorker),
@@ -544,7 +578,7 @@ export class EngineBoardService {
     if (dricket !== null && (dricket.dkStore === '' || checkoutOf(dricket) === null)) {
       return null; // the dispatcher reads the store's checkout (E14-5b): without one there is nothing to point it at
     }
-    const defaultPersona = ((await this.host.configGet<string>('personas.default')) ?? '').trim() || null;
+    const defaultPersona = await this.defaultPersonaOf();
     const chain: ChainConfig | null =
       vault !== null && pipeline.some((phase) => isAutoPhase(phase))
         ? {
@@ -557,7 +591,7 @@ export class EngineBoardService {
             caps: this.caps,
             pools: this.pools,
             handover: this.handover,
-            tranche: await trancheConfigOf(this.host), // req-179
+            tranche: this.crew?.tranche ?? (await trancheConfigOf(this.host)), // req-179; req-173: the vault layer's
           }
         : null;
     const json = chain === null ? null : JSON.stringify(chain);
@@ -1276,7 +1310,7 @@ export class EngineBoardService {
     const buildAt = snap.pipeline.findIndex((p) => p.id === build.id);
     const queue = new Set(snap.pipeline.slice(0, buildAt + 1).map((p) => p.id));
     const personas = await this.listPersonas();
-    const defaultPersona = build.persona ?? (((await this.host.configGet<string>('personas.default')) ?? '').trim() || null);
+    const defaultPersona = build.persona ?? (await this.defaultPersonaOf());
     const phases = snap.pipeline.map((p) => ({ id: p.id, title: p.title }));
     const parts: PlanPartCard[] = parsed.parts.map((part, index) => {
       const own = matches[index] ?? null;
@@ -1434,7 +1468,7 @@ export class EngineBoardService {
       return { error: 'no such part in this plan' };
     }
     const locked = lockedIndices(matchPartTickets(parts, this.childrenOf(snap, target.id))).has(target.part);
-    const defaultPersona = build.persona ?? (((await this.host.configGet<string>('personas.default')) ?? '').trim() || null);
+    const defaultPersona = build.persona ?? (await this.defaultPersonaOf());
     return {
       vault,
       card,
@@ -3074,7 +3108,7 @@ export class EngineBoardService {
         : {
             ticketPersona: card.meta.persona,
             phasePersona: workingPhase?.persona ?? null,
-            defaultPersona: ((await this.host.configGet<string>('personas.default')) ?? '').trim() || null,
+            defaultPersona: await this.defaultPersonaOf(),
           },
     );
     let personaDispatch: PersonaDispatch | null = null;

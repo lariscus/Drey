@@ -378,7 +378,7 @@ describe('createChatBridge', () => {
     expect(system).toContain('Tickets the owner named');
   });
 
-  it('prompts the promote intent — the scout → ship promotion is one of the six intents', async () => {
+  it('prompts the promote intent — the scout → ship promotion is one of the seven intents', async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
@@ -388,7 +388,7 @@ describe('createChatBridge', () => {
 
     const body = JSON.parse(String(calls[0]!.init.body)) as { messages: { role: string; content: string }[] };
     const system = body.messages[0]!.content;
-    expect(system).toContain('exactly six intents');
+    expect(system).toContain('exactly seven intents');
     expect(system).toContain('- promote —');
     expect(system).toContain('scout');
     expect(system).toMatch(/createTicket, transition, setPriority, promote, setChain, setBlockedBy/);

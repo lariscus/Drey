@@ -109,7 +109,15 @@ export type ChatCommand =
    * the board at execution (an unknown id stays written — it simply never
    * resolves, per the dependency pass's tolerance).
    */
-  | { readonly kind: 'setBlockedBy'; readonly id: string; readonly blockedBy: readonly string[] };
+  | { readonly kind: 'setBlockedBy'; readonly id: string; readonly blockedBy: readonly string[] }
+  /**
+   * req-173 (R12): Pia proposes a free session — a persona at work in a
+   * folder the owner named, with a first line. Confirmed, it starts through
+   * the same door as the service window's "New session…" (the pool, the
+   * persona's and the provider's ledgers, the vault's permission mode —
+   * Pia never sets one).
+   */
+  | { readonly kind: 'startSession'; readonly persona: string; readonly directory: string; readonly poolClass: 'A' | 'B' | 'C' | null; readonly brief: string };
 
 /** One chat session = one file under `tickets/_meta/chat/`. */
 export interface ChatSession {
