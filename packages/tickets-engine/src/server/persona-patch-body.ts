@@ -39,42 +39,43 @@ const PERSONA_PATCH_KEYS: readonly (keyof PersonaPatchInput)[] = [
   'allowed',
 ];
 
+/** One key's value as the patch carries it: the shape checked, or the refusal. */
+function valueOf(key: keyof PersonaPatchInput, value: unknown): Parsed<unknown> {
+  switch (key) {
+    case 'pool':
+    case 'skills':
+      return Array.isArray(value) && value.every((v) => typeof v === 'string')
+        ? { ok: true, value: value.map((v) => (v as string).trim()) }
+        : { ok: false, error: `${key} is a list of names` };
+    case 'budget':
+      return value === null || typeof value === 'number' ? { ok: true, value } : { ok: false, error: 'budget is a number of dollars or null' };
+    case 'allowed':
+      return asObject(value) !== null ? { ok: true, value } : { ok: false, error: 'allowed is an object' };
+    default:
+      return typeof value === 'string' ? { ok: true, value } : { ok: false, error: `${key} is a string` };
+  }
+}
+
 export function parsePersonaPatch(body: unknown): Parsed<PersonaPatchInput> {
   const obj = asObject(body);
   if (obj === null) {
     return { ok: false, error: 'bad persona patch payload' };
   }
-  const out: PersonaPatchInput = {};
+  const out: Record<string, unknown> = {};
   let any = false;
   for (const key of PERSONA_PATCH_KEYS) {
-    const value = obj[key];
-    if (value === undefined) {
+    if (obj[key] === undefined) {
       continue;
     }
-    if (key === 'pool' || key === 'skills') {
-      if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) {
-        return { ok: false, error: `${key} is a list of names` };
-      }
-      out[key] = value.map((v) => (v as string).trim());
-    } else if (key === 'budget') {
-      if (value !== null && typeof value !== 'number') {
-        return { ok: false, error: 'budget is a number of dollars or null' };
-      }
-      out.budget = value;
-    } else if (key === 'allowed') {
-      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-        return { ok: false, error: 'allowed is an object' };
-      }
-      out.allowed = value as PersonaAllowedPatch;
-    } else if (typeof value !== 'string') {
-      return { ok: false, error: `${key} is a string` };
-    } else {
-      out[key] = value;
+    const parsed = valueOf(key, obj[key]);
+    if (!parsed.ok) {
+      return parsed;
     }
+    out[key] = parsed.value;
     any = true;
   }
   if (!any) {
     return { ok: false, error: `the patch carries none of the writable keys: ${PERSONA_PATCH_KEYS.join(', ')}` };
   }
-  return { ok: true, value: out };
+  return { ok: true, value: out as PersonaPatchInput };
 }
