@@ -590,7 +590,12 @@ extraction, ADR-0088):
   (req-177) and the capacity pool — model table, cap, class grant, the
   three ledgers (req-170) — and the routing within the class: filter,
   surplus choice, step up, reserve per window (req-178), and the burn rate over all slots (req-181); configured in the service home's
-  `service.json`, `api/` the
+  `service.json`, `config/` the one resolver of the three configuration
+  layers (req-173, R13: machine `service.json` · vault
+  `tickets/_meta/crew.md` · the session record; session > vault >
+  default, a machine key never overridden), `session/` the session
+  record (kind run | 1:1 | shape | free, working directory, state) and
+  the free session's directory rule, `api/` the
   HTTP routes and the `GET /events` stream, `ports/` (clock, file
   system, process table and spawner, event sink — the core imports no
   Node built-in), and `runner.ts` the composition root; worktrees,
