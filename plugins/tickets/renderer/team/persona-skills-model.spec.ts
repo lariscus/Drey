@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SkillListData } from '../../../../packages/tickets-engine/src/contracts/skills';
 import { writeVaultsText, writeVaultsToggled } from './persona-allowed-model';
-import { failureKeyOf, skillCountsOf, skillPathOf, skillRowsOf, skillTitleOf } from './persona-skills-model';
+import { failureKeyOf, failureTextOf, skillCountsOf, skillPathOf, skillRowsOf, skillTitleOf } from './persona-skills-model';
 import { skillsOf } from './persona-skills.fixture';
 
 const list = (over: Partial<SkillListData> = {}): SkillListData => ({
@@ -21,14 +21,14 @@ describe('the skill rows (R11, req-237)', () => {
 
   it('draws one row per listed skill in the engine’s order, off rows included; only an own skill is removable', () => {
     expect(skillRowsOf(list(), 'ben')).toEqual([
-      { name: 'tdd', title: 'Tdd', path: 'personas/ben/skills/tdd/SKILL.md', origin: 'own', tokens: 240, on: true, removable: true },
-      { name: 'go-conventions', title: 'Go conventions', path: '_meta/skills/go-conventions/SKILL.md', origin: 'shared', tokens: 310, on: true, removable: false },
-      { name: 'diff-review', title: 'Diff review', path: '_meta/skills/diff-review/SKILL.md', origin: 'shared', tokens: 400, on: false, removable: false },
+      { name: 'tdd', title: 'Tdd', description: 'tdd skill', path: 'personas/ben/skills/tdd/SKILL.md', origin: 'own', tokens: 240, on: true, removable: true },
+      { name: 'go-conventions', title: 'Go conventions', description: 'go-conventions skill', path: '_meta/skills/go-conventions/SKILL.md', origin: 'shared', tokens: 310, on: true, removable: false },
+      { name: 'diff-review', title: 'Diff review', description: 'diff-review skill', path: '_meta/skills/diff-review/SKILL.md', origin: 'shared', tokens: 400, on: false, removable: false },
     ]);
   });
 
   it('adds a row, on, for every name that no folder holds, so it can be switched off', () => {
-    expect(skillRowsOf(list({ skills: [], missing: ['ghost'] }), 'ben')).toEqual([{ name: 'ghost', title: 'Ghost', path: null, origin: null, tokens: null, on: true, removable: false }]);
+    expect(skillRowsOf(list({ skills: [], missing: ['ghost'] }), 'ben')).toEqual([{ name: 'ghost', title: 'Ghost', description: '', path: null, origin: null, tokens: null, on: true, removable: false }]);
   });
 
   it('shows a flat file the migration has not turned into a folder as its file', () => {
@@ -44,6 +44,13 @@ describe('the skill rows (R11, req-237)', () => {
   it('turns a code into its catalog key; a transport failure or an unknown code has none', () => {
     expect(failureKeyOf({ ok: false, code: 'not_own', error: 'x' })).toBe('skills.error.not_own');
     expect(failureKeyOf({ ok: false, code: null, error: 'fetch failed' })).toBeNull();
+  });
+
+  it('says what a failure says: the catalog line, else the engine’s text, else the catalog’s internal line', () => {
+    const t = (key: string): string => `<${key}>`;
+    expect(failureTextOf(t, { ok: false, code: 'exists', error: 'x' })).toBe('<skills.error.exists>');
+    expect(failureTextOf(t, { ok: false, code: null, error: 'fetch failed' })).toBe('fetch failed');
+    expect(failureTextOf(t, { ok: false, code: null, error: '' })).toBe('<skills.error.internal>');
   });
 });
 

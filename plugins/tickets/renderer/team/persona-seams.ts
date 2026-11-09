@@ -47,9 +47,13 @@ export type Invoke = (method: string, payload?: unknown) => Promise<unknown>;
 
 const isCode = (code: unknown): code is SkillErrorCode => (SKILL_ERROR_CODES as readonly unknown[]).includes(code);
 
+/** An answer that is no object is the engine's `internal`; an unknown code keeps the engine's own text; no text at all falls to the catalog's `internal` line. */
 function failureOf(reply: unknown): SkillsFailure {
-  const { code, error } = (reply ?? {}) as { code?: unknown; error?: unknown };
-  return { ok: false, code: isCode(code) ? code : null, error: typeof error === 'string' && error !== '' ? error : 'the engine answered nothing' };
+  if (reply === null || typeof reply !== 'object') {
+    return { ok: false, code: 'internal', error: '' };
+  }
+  const { code, error } = reply as { code?: unknown; error?: unknown };
+  return { ok: false, code: isCode(code) ? code : null, error: typeof error === 'string' ? error : '' };
 }
 
 async function call<T extends { readonly ok: boolean }>(invoke: Invoke, method: string, payload: unknown): Promise<T | SkillsFailure> {

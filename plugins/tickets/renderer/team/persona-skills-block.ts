@@ -14,7 +14,7 @@ import type { BlockContext } from './persona-block-context';
 import { blockHead } from './persona-dom';
 import { skillAddControl } from './persona-skill-add';
 import { skillRowNode } from './persona-skill-row';
-import { failureKeyOf, skillCountsOf, skillRowsOf } from './persona-skills-model';
+import { failureTextOf, skillCountsOf, skillRowsOf } from './persona-skills-model';
 import { uploadPlanOf } from './skill-upload-model';
 
 export interface SkillsBlock {
@@ -35,7 +35,9 @@ export function createSkillsBlock(ctx: BlockContext): SkillsBlock {
   let confirming: string | null = null;
 
   const add = skillAddControl(t, (kind, files) => {
-    void uploadPlanOf(kind, files).then((plan) => (plan.ok ? state.upload(plan.command) : state.fail({ ok: false, code: plan.code, error: plan.code })));
+    void uploadPlanOf(kind, files)
+      .then((plan) => (plan.ok ? state.upload(plan.command) : state.fail({ ok: false, code: plan.code, error: '' })))
+      .catch(() => state.fail({ ok: false, code: 'internal', error: '' }));
   });
 
   const paint = (): void => {
@@ -73,8 +75,7 @@ export function createSkillsBlock(ctx: BlockContext): SkillsBlock {
       counts.textContent = t('persona.skills.count', { on: total.on, total: total.total, tokens: total.tokens });
     }
     const failure = state.failure;
-    const key = failure === null ? null : failureKeyOf(failure);
-    problem.textContent = failure === null ? '' : key !== null ? t(key) : failure.error;
+    problem.textContent = failure === null ? '' : failureTextOf(t, failure);
     problem.hidden = failure === null;
     add.setBusy(state.busy);
   };

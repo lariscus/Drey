@@ -85,6 +85,9 @@ export function skillRowNode(api: DreyPluginApi, t: Translate, row: SkillRow, ac
     return node;
   }
   const name = h('span', 'persona-grow', row.title);
+  if (row.description !== '') {
+    name.title = row.description;
+  }
   if (row.path !== null) {
     name.append(h('code', 'persona-muted persona-mono persona-skill-path', row.path));
   }

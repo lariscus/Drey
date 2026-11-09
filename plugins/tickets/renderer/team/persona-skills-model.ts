@@ -18,6 +18,8 @@ export function skillTitleOf(id: string): string {
 export interface SkillRow {
   readonly name: string;
   readonly title: string;
+  /** The frontmatter's description: the row's tooltip, never a line of its own; '' for a name no folder holds. */
+  readonly description: string;
   /** Where the skill lives, as the mockup shows it; null for a name no folder holds. */
   readonly path: string | null;
   readonly origin: 'own' | 'shared' | null;
@@ -38,6 +40,7 @@ export function skillRowsOf(list: SkillListData, persona: string): readonly Skil
   const rows: SkillRow[] = list.skills.map((skill) => ({
     name: skill.name,
     title: skillTitleOf(skill.name),
+    description: skill.description,
     path: skillPathOf(skill, persona),
     origin: skill.origin,
     tokens: skill.tokens,
@@ -45,7 +48,7 @@ export function skillRowsOf(list: SkillListData, persona: string): readonly Skil
     removable: skill.origin === 'own',
   }));
   for (const name of list.missing) {
-    rows.push({ name, title: skillTitleOf(name), path: null, origin: null, tokens: null, on: true, removable: false });
+    rows.push({ name, title: skillTitleOf(name), description: '', path: null, origin: null, tokens: null, on: true, removable: false });
   }
   return rows;
 }
@@ -58,4 +61,10 @@ export function skillCountsOf(list: SkillListData): { readonly on: number; reado
 /** The catalog key of an engine refusal; an unknown code or a transport failure has none and shows the text it came with. */
 export function failureKeyOf(failure: SkillsFailure): `skills.error.${SkillErrorCode}` | null {
   return failure.code === null ? null : `skills.error.${failure.code}`;
+}
+
+/** What a failure says: the catalog's line for its code, else the text it came with, else the catalog's `internal` line. */
+export function failureTextOf(t: (key: `skills.error.${SkillErrorCode}`) => string, failure: SkillsFailure): string {
+  const key = failureKeyOf(failure);
+  return key !== null ? t(key) : failure.error !== '' ? failure.error : t('skills.error.internal');
 }

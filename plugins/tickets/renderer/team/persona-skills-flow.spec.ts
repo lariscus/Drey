@@ -23,6 +23,7 @@ describe('the Skills block over the engine routes (req-237)', () => {
     expect(rows()).toEqual(['tdd', 'go-conventions', 'diff-review']);
     expect(q('[data-skill="tdd"]').textContent).toContain('personas/ben/skills/tdd/SKILL.md');
     expect(q('[data-skill="tdd"]').textContent).toContain('own · 240 tokens');
+    expect(q('[data-skill="tdd"] .persona-grow').getAttribute('title')).toBe('tdd skill');
     expect(q('[data-skill="go-conventions"]').textContent).toContain('_meta/skills/go-conventions/SKILL.md');
     expect(q('[data-skill="go-conventions"]').textContent).toContain('shared · 310 tokens');
     expect(switchOf('tdd').getAttribute('aria-checked')).toBe('true');

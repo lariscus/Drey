@@ -22,7 +22,7 @@ function bytesOf(file: File): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.addEventListener('load', () => resolve(new Uint8Array(reader.result as ArrayBuffer)));
-    reader.addEventListener('error', () => reject(reader.error ?? new Error('the file could not be read')));
+    reader.addEventListener('error', () => reject(reader.error ?? new DOMException('', 'NotReadableError')));
     reader.readAsArrayBuffer(file);
   });
 }

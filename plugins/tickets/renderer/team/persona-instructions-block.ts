@@ -16,7 +16,7 @@ import { blockHead, iconButton, outlineButton } from './persona-dom';
 import { createPreviewPanel, type PreviewPanel } from './persona-preview-panel';
 import { atStartTokensOf } from './persona-preview-model';
 import { estimateTokens, tokenizerFor } from '../../../../packages/tickets-engine/src/core/token-count';
-import { failureKeyOf } from './persona-skills-model';
+import { failureTextOf } from './persona-skills-model';
 
 const STRIP: readonly { readonly action: MarkdownFormatAction; readonly icon: string; readonly label: 'persona.format.bold' | 'persona.format.italic' | 'persona.format.heading' | 'persona.format.bullet' | 'persona.format.task' | 'persona.format.code' }[] = [
   { action: 'bold', icon: 'bold', label: 'persona.format.bold' },
@@ -114,8 +114,7 @@ export function createInstructionsBlock(ctx: BlockContext, initial: string, edit
     }
     await ctx.preview.ensure(true);
     const failure = ctx.preview.failure;
-    const key = failure === null ? null : failureKeyOf(failure);
-    problem.textContent = failure === null ? '' : key !== null ? t(key) : failure.error;
+    problem.textContent = failure === null ? '' : failureTextOf(t, failure);
     problem.hidden = failure === null;
     if (failure === null) {
       drawPanel();

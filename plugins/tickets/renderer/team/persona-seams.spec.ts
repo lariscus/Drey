@@ -22,7 +22,7 @@ describe('the skills seam over the plugin IPC (req-237)', () => {
   it('keeps the engine’s code on a refusal, drops a code it does not know, and turns a thrown call into a failure', async () => {
     expect(await engineSkillsSeam(async () => ({ ok: false, code: 'exists', error: 'a skill named x exists' })).upload({ scope: 'own', format: 'zip' })).toEqual({ ok: false, code: 'exists', error: 'a skill named x exists' });
     expect(await engineSkillsSeam(async () => ({ ok: false, code: 'brand_new', error: 'new' })).list('ben')).toEqual({ ok: false, code: null, error: 'new' });
-    expect(await engineSkillsSeam(async () => null).list('ben')).toMatchObject({ ok: false, code: null });
+    expect(await engineSkillsSeam(async () => null).list('ben')).toEqual({ ok: false, code: 'internal', error: '' });
     expect(
       await engineSkillsSeam(async () => {
         throw new TypeError('fetch failed');
