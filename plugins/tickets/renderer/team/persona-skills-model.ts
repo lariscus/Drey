@@ -4,7 +4,7 @@
  * listing since req-237): one row per skill the engine lists — the persona's
  * own folder and the shared pool, `on` for those in the record's `skills:`
  * — plus a row for every name the record holds that no folder does (so the
- * owner can switch it off). DOM-free.
+ * owner can switch it off); the ones on come first. DOM-free.
  */
 import type { SkillErrorCode, SkillListData, SkillView } from '../../../../packages/tickets-engine/src/contracts/skills';
 import type { SkillsFailure } from './persona-seams';
@@ -50,7 +50,8 @@ export function skillRowsOf(list: SkillListData, persona: string): readonly Skil
   for (const name of list.missing) {
     rows.push({ name, title: skillTitleOf(name), description: '', path: null, origin: null, tokens: null, on: true, removable: false });
   }
-  return rows;
+  // The skills that are on first, as the mockup has it; the engine's order (by name) holds within each group.
+  return [...rows.filter((row) => row.on), ...rows.filter((row) => !row.on)];
 }
 
 /** What the block's head counts: the skills on, all that are available, the estimated tokens the ones on cost a run. */

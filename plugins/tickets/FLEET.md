@@ -1114,6 +1114,14 @@ the format, the order, the upload rules and the migration.
   estimate** — `claude-estimate` (3.5 characters per token) for the Claude Code
   worker or a Claude model id, `openai-estimate` (4.0) for everything else;
   `exact` is false. No tokenizer ships.
+- **The Persona page** (milestone 233, req-237/238) is the first client of these
+  routes: its Skills block lists both folders (`GET …/skills`), switches
+  (`toggle`, one commit each, no part of the page's Save), removes an own
+  skill after one question and uploads a `SKILL.md`, a zip or a folder (packed
+  into a stored zip in the page); the Instructions head reads the preview's
+  total as `≈ N tokens at start` and **Preview full prompt** shows the brief.
+  The persona list carries `committedAt` (when `personas/<id>/` was last
+  committed) for the page's `Saved · committed 2 days ago`.
 - **Checking one by hand**, against a service you started with your own home
   (never the owner's): `curl -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/api/personas/<id>/skills`.
   A `code` in the answer is what failed (`no_skill`, `exists`, `path_escape`, …).

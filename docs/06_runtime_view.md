@@ -5486,15 +5486,17 @@ sequenceDiagram
     participant Run as Next run (instruction composer)
     Owner->>Page: Edit persona (Crew tab)
     par the record and what lies beside it
-        Page->>IPC: personaImprovements (skills, open proposal)
+        Page->>IPC: personaImprovements (the open proposal)
+        Page->>IPC: personaSkills (both folders, on / off, tokens), personaPromptPreview (the brief at the start of a run)
         Page->>Host: vault.readFile prompt.md (a missing file = empty prompt)
-        Page->>IPC: poolModels, slots (class, factor, busy), personaMemory, personaJournal (counts)
-        Page->>Host: vault.listVaults, the skills seam (D-46 reading)
+        Page->>IPC: poolModels, slots (class, factor, sessions per slot), personaMemory, personaJournal (counts)
+        Page->>Host: vault.listVaults
+        Note over Page: the persona record carries committedAt (PersonaCommitAges: git log -1 per persona folder, kept until HEAD moves) — the head reads Saved · committed 2 days ago; a model row's busy / total is deps.runs() against the slots
     end
     Page->>Host: createMarkdownView({content: prompt.md, mode: live})
     Owner->>Host: types, formats (format), flips Live / Source (setMode)
     Host-->>Page: onChange(text) — the draft, the token estimate
-    Owner->>Page: edits the form (name, one line, models, allowed, skill switches)
+    Owner->>Page: edits the form (name, one line, models, allowed)
     Owner->>Page: Save
     Page->>Host: vault.readFile prompt.md again — refuse if it moved since the load
     Page->>IPC: personaPatch {only the changed keys, prompt, allowed: {...}}
@@ -5504,6 +5506,34 @@ sequenceDiagram
     Page->>Page: the saved draft becomes the base; the tab follows the new name
     Note over Run,Git: a new run reads prompt.md and the persona record at its start; a running one keeps the prompt it began with
     Run->>Git: personas/<id>/persona.md + prompt.md (+ skills, memory)
+```
+
+The Skills block and the brief act on their own routes, not through Save (req-237/238, milestone 233): a switch, a removal and an upload are one engine call and one commit each, and the head's token figure and **Preview full prompt** follow every change.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner
+    participant Page as Persona page (Skills block, Instructions head)
+    participant IPC as Plugin IPC (tickets)
+    participant Eng as SkillService (engine)
+    participant Host as Host (ui.createMarkdownView)
+    Owner->>Page: switch a skill
+    Page->>IPC: personaSkillToggle {persona, skill, on}
+    IPC->>Eng: toggle — one personaPatch commit
+    Eng-->>Page: the whole listing (rows, on, origin, tokens, selectedTokens)
+    Page->>IPC: personaPromptPreview {persona, step, model} (the count again)
+    Page-->>Owner: rows repaint; the head reads ≈ N tokens at start
+    Owner->>Page: ⋯ → Remove skill (an own skill only), asked once in the row
+    Page->>IPC: personaSkillRemove {persona, name}
+    Owner->>Page: Add skill… → file or zip / folder (input type=file, webkitdirectory)
+    Note over Page: a folder is packed into a stored zip (skill-upload-model); a pick the engine would refuse (too large, not a skill file) is refused here with the same words
+    Page->>IPC: skillUpload {scope: own, persona, format: markdown / zip, text / zipBase64}
+    Eng-->>Page: the listing, or {ok: false, code} — shown as skills.error.<code>
+    Owner->>Page: Preview full prompt
+    Page->>IPC: personaPromptPreview (again, forced)
+    Page->>Host: createMarkdownView({content: the brief, mode: view, readOnly}) under chips: instructions, skills, memory, rest, each skill — tokens
+    Note over Page: while the instructions are unsaved the panel shows the saved brief; the head figure follows the editor (atStartTokensOf) — req-248
 ```
 
 At every engine start the persona files are first made one-prose: a `persona.md` that still has text below its fence loses it to the top of `prompt.md`.

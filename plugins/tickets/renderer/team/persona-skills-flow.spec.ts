@@ -67,7 +67,7 @@ describe('the Skills block over the engine routes (req-237)', () => {
   it('a name the record holds that no folder does is a row to switch off', async () => {
     fx.missing = ['ghost'];
     await mount();
-    expect(rows()).toEqual(['tdd', 'go-conventions', 'diff-review', 'ghost']);
+    expect(rows()).toEqual(['tdd', 'go-conventions', 'ghost', 'diff-review']); // on first, the off row last
     expect(q('[data-skill="ghost"]').textContent).toContain('not found');
     expect(q('.persona-skill-counts').textContent).toContain('3 of 4 on');
     switchOf('ghost').click();

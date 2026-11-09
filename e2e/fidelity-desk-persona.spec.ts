@@ -264,18 +264,22 @@ test.use({
 test.beforeEach(({ vaultDir }) => {
   // The Work panel's footer warns about a vault without git; the board has none.
   execFileSync('git', ['init', '-q'], { cwd: vaultDir, windowsHide: true });
-  // The head says when the persona's folder was last committed (milestone 233): two days ago, as the mockup has it.
+});
+
+/** The head says when the persona's folder was last committed (milestone 233): two days ago, as the mockup has it. The seed is on disk once the app has launched, so the commit comes then. */
+function commitSeed(vaultDir: string): void {
   const twoDaysAgo = new Date(Date.now() - 2 * 24 * 3_600_000).toISOString();
   const git = (...args: string[]): void => {
-    execFileSync('git', ['-c', 'user.name=Fidelity', '-c', 'user.email=fidelity@example.test', '-c', 'core.autocrlf=false', ...args], { cwd: vaultDir, windowsHide: true, env: { ...process.env, GIT_COMMITTER_DATE: twoDaysAgo, GIT_AUTHOR_DATE: twoDaysAgo } });
+    execFileSync('git', ['-c', 'user.name=Fidelity', '-c', 'user.email=fidelity@example.test', '-c', 'core.autocrlf=false', '-c', 'commit.gpgsign=false', ...args], { cwd: vaultDir, windowsHide: true, env: { ...process.env, GIT_COMMITTER_DATE: twoDaysAgo, GIT_AUTHOR_DATE: twoDaysAgo } });
   };
   git('add', '-A');
   git('commit', '-q', '-m', 'seed');
-});
+}
 
-test('board 7k: the Persona page', async ({ page, electronApp }) => {
+test('board 7k: the Persona page', async ({ page, electronApp, vaultDir }) => {
   test.setTimeout(180_000);
   fs.mkdirSync(OUT, { recursive: true });
+  commitSeed(vaultDir);
   await sizeWindow(electronApp);
   await expect(page.locator('app-titlebar [role="tab"]', { hasText: 'Work' })).toBeVisible({ timeout: 30_000 });
   await page.keyboard.press('Control+2');
@@ -307,9 +311,10 @@ test('board 7k: the Persona page', async ({ page, electronApp }) => {
   await crewTab.locator('button').last().click();
   // The board shows Board and the persona tab only; today's daily note may have opened by itself.
   const strayTab = page.locator('app-tab-bar .tab', { hasText: '.md' });
-  while ((await strayTab.count()) > 0) {
-    await strayTab.first().hover();
-    await strayTab.first().locator('button').last().click();
+  for (let tries = 0; tries < 5 && (await strayTab.count()) > 0; tries += 1) {
+    // The daily note may close by itself between the count and the click.
+    await strayTab.first().hover({ timeout: 3_000 }).catch(() => undefined);
+    await strayTab.first().locator('button').last().click({ timeout: 3_000 }).catch(() => undefined);
   }
   await page.locator('app-tab-bar .tab', { hasText: 'persona' }).first().click();
   await expect(page.locator('.persona-page [data-proposal]')).toBeVisible({ timeout: 15_000 });

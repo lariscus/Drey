@@ -27,6 +27,12 @@ describe('the skill rows (R11, req-237)', () => {
     ]);
   });
 
+  it('lists the skills that are on first and keeps the engine’s order within each group', () => {
+    const [first, second, third] = skillsOf();
+    const mixed = [{ ...first!, name: 'a', on: false }, { ...second!, name: 'b', on: true }, { ...third!, name: 'c', on: false }, { ...first!, name: 'd', on: true }];
+    expect(skillRowsOf(list({ skills: mixed }), 'ben').map((row) => row.name)).toEqual(['b', 'd', 'a', 'c']);
+  });
+
   it('adds a row, on, for every name that no folder holds, so it can be switched off', () => {
     expect(skillRowsOf(list({ skills: [], missing: ['ghost'] }), 'ben')).toEqual([{ name: 'ghost', title: 'Ghost', description: '', path: null, origin: null, tokens: null, on: true, removable: false }]);
   });
