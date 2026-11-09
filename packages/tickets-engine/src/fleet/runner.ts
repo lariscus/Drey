@@ -44,6 +44,7 @@ import { nodeKimiUsageReader } from './harness/kimi-usage';
 import type { Orchestrator, FleetEvents } from './orchestrator';
 import type { RunSupervisor } from './orchestrate/run-supervisor';
 import { SupervisorSet } from './orchestrate/supervisor-set';
+import type { WorkerVaultGate } from './orchestrate/worker-vault';
 import { freePort, nodeSpawnFn, scrubInheritedEnv } from './procs';
 import type { GovernorSettings, PoolLoad, RunnerDescriptor, SlotView, WorkerProviderId } from './protocol';
 import { claudeCodeAdapter } from './harness/claude-code';
@@ -93,6 +94,8 @@ export interface RunnerDeps {
   readonly quotaHttp?: QuotaHttp;
   /** req-180: Settings → Background service's Load group, read live; the defaults when absent (standalone). */
   readonly governorSettings?: () => GovernorSettings;
+  /** req-167: Drey Service's vault MCP for the workers; absent = no worker gets a vault (the standalone runner). */
+  readonly vault?: WorkerVaultGate;
 }
 
 /** What `startRunner` hands back: the spec reads the descriptor and ends the runner through it. */
@@ -151,6 +154,8 @@ interface FleetContext {
   readonly capacity: PoolCapacity;
   /** req-180: the resource governor every spawn asks for a seat. */
   readonly governor: Governor;
+  /** req-167: the service's vault MCP gate. */
+  readonly vault?: WorkerVaultGate;
 }
 
 /** The service home: `--home`, else the parent of a `<home>/fleet` root, else the root itself (a spec's temp root). */
@@ -227,6 +232,7 @@ function composeFleet(ctx: FleetContext): { supervisors: SupervisorSet; orchestr
         secondOpinion: (request) => orchestrator.secondOpinion(request),
         slots: routing.gate,
         seats,
+        ...(ctx.vault !== undefined ? { vault: ctx.vault } : {}),
       }),
     ]),
   );
@@ -312,7 +318,7 @@ export async function startRunner(args: Args, deps: RunnerDeps = {}): Promise<Ru
   const capacity = new PoolCapacity(fetchTotalSlots, SYSTEM_CLOCK, log.line);
   const routing = routingFor(args, deps, { log: log.line, hub, capacity });
   const governor = await governorOf(args, deps, { log: log.line, hub, routing });
-  const { supervisors, orchestrator } = composeFleet({ root: args.root, log: log.line, events: ledger.events, hub, routing, capacity, governor });
+  const { supervisors, orchestrator } = composeFleet({ root: args.root, log: log.line, events: ledger.events, hub, routing, capacity, governor, ...(deps.vault !== undefined ? { vault: deps.vault } : {}) });
   await supervisors.adoptAll();
   seedRouting(routing, supervisors, governor);
   await routing.start();

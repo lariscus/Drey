@@ -11,13 +11,14 @@ import type { SpawnFn } from '../ports/process-spawner';
 import { AcpClient } from './acp-client';
 import { AcpForms } from './acp-forms';
 import type { AcpHarness } from './acp-harness';
+import { acpMcpLaunch } from './acp-mcp';
 import { AcpRequests } from './acp-requests';
 import { AcpSessionOpener } from './acp-session-open';
 import { acpEmit, newAcpState, type AcpContext } from './acp-state';
 import { AcpTurns } from './acp-turns';
 import { AcpUpdateFold } from './acp-update-fold';
 import { AcpWorker } from './acp-worker';
-import type { NowFn, ProviderAdapter, ProviderStart, WorkerHandle } from './contract';
+import type { NowFn, ProviderAdapter, ProviderStart, WorkerHandle, WorkerMcpLaunch, WorkerMcpServer } from './contract';
 
 export class AcpAdapter implements ProviderAdapter {
   readonly liveInject = true;
@@ -34,6 +35,11 @@ export class AcpAdapter implements ProviderAdapter {
 
   get label(): string {
     return this.harness.label;
+  }
+
+  /** req-167: the vault MCP rides the session's `mcpServers`; the agent's `initialize` decides whether it takes it. */
+  mcpLaunch(server: WorkerMcpServer): WorkerMcpLaunch {
+    return acpMcpLaunch(server);
   }
 
   /** One worker's parts, wired; the client's handlers and the finish reach them through late-bound arrows. */

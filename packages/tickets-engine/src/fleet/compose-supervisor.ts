@@ -58,6 +58,7 @@ import { TicketCopy } from './orchestrate/ticket-copy';
 import { WaitClaim } from './orchestrate/wait-claim';
 import { WorkcopyFiles } from './orchestrate/workcopy-files';
 import { WorkerLauncher, type WorkerSeats } from './orchestrate/worker-launcher';
+import type { WorkerVaultGate } from './orchestrate/worker-vault';
 
 type TicketsGitSeam = Pick<TicketsGit, 'run' | 'locate' | 'commitPaths' | 'push'>;
 
@@ -127,6 +128,8 @@ export interface RunSupervisorDeps {
   readonly slots?: SlotBinder;
   /** req-180: the resource governor's seats — light for the worker, heavy per gate command; absent = none. */
   readonly seats?: WorkerSeats & GateSeats;
+  /** req-167: Drey Service's vault MCP, handed to every worker this supervisor spawns. */
+  readonly vault?: WorkerVaultGate;
   /** req-183: the review checkout's on-disk guard; absent = Node's (`NodeTreeMode`). */
   readonly treeMode?: TreeMode;
 }
@@ -170,7 +173,7 @@ function runtimeOf(deps: RunSupervisorDeps): Runtime {
   const settler = new RunSettler({ machine, repo, bookkeeper, clock, log, review, ...(deps.onRunSettled !== undefined ? { onRunSettled: deps.onRunSettled } : {}) });
   const takeover = new RunTakeover(repo, bookkeeper);
   const events: EventFold = new EventFold({ repo, streams, bookkeeper, background, log, interrupt: (run) => takeover.interrupt(run.info.id), claimLost: (run, why): Promise<void> => stopper.claimLost(run, why) });
-  const processes: ProcessSupervisor = new ProcessSupervisor({ adapter: deps.adapter, repo, events, background, settings, table, log, ...slotEnvOf(deps.slots), onExit: (run, code): Promise<void> => completion.onWorkerExit(run, code) });
+  const processes: ProcessSupervisor = new ProcessSupervisor({ adapter: deps.adapter, repo, events, background, settings, table, log, ...slotEnvOf(deps.slots), ...(deps.vault !== undefined ? { vault: deps.vault } : {}), onExit: (run, code): Promise<void> => completion.onWorkerExit(run, code) });
   const stopper: RunStopper = new RunStopper(machine, repo, processes, { settler, bookkeeper, log });
   const gate = new GateRunner({ bookkeeper, shell: deps.execShell ?? execShell, trailers: deps.validateTrailers ?? validateTrailers, repo, review, ...(deps.seats !== undefined ? { seats: deps.seats } : {}) });
   const opinion = deps.secondOpinion !== undefined ? { secondOpinion: deps.secondOpinion } : {};
