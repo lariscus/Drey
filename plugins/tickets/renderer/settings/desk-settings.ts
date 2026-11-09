@@ -11,13 +11,12 @@
 import { autopilotViewOf, resumeAtOfTime, timeFieldOfResume, type AutopilotView } from '../../../../shared/autopilot';
 import { writeAutopilot } from '../autopilot/controller';
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
-import { WORKER_PROVIDERS } from '../../../../packages/tickets-engine/src/fleet/protocol';
-import { fleetSettingDefault } from '../../shared/fleet-defaults';
+import type { SlotView } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { PersonaView } from '../../shared/remote-protocol';
 import type { BoardSnapshot } from '../../shared/tickets';
-import { RUNNER_LABEL } from '../settings-workers';
 import { el, textButton } from '../settings-dom';
-import { budgetLineOf, maxMbOf, parseDeskVideos, runnersLineOf, standardFlowOf, type DeskVideos } from './desk-model';
+import { budgetLineOf, maxMbOf, parseDeskVideos, standardFlowOf, type DeskVideos } from './desk-model';
+import { slotSessionsLine } from './models-model';
 
 export interface DeskSettingsHooks {
   /** Opens the Team tab ("Edit crew"). */
@@ -28,6 +27,8 @@ export interface DeskSettingsHooks {
   readonly manageRunners: () => void;
   /** Opens the Autopilot popover over the status item ("Change…"). */
   readonly openAutopilot: () => void;
+  /** A part of the page that sits between Autopilot and Budget and runners (board 7l's Models). */
+  readonly afterAutopilot?: HTMLElement;
 }
 
 export interface DeskSettings {
@@ -194,7 +195,7 @@ export function createDeskSettings(api: DreyPluginApi, hooks: DeskSettingsHooks)
   keepSetting.append(el('b', 'tset-set-name', 'Keep videos in Git'), keepLabel, confirmBox, videoNote);
   video.list.append(keepSetting, setting('Largest video', 'One limit per video. Nothing is removed automatically.', limit, limitUnit));
 
-  root.append(team.root, flow.root, autopilot.root, budget.root);
+  root.append(team.root, flow.root, autopilot.root, ...(hooks.afterAutopilot === undefined ? [] : [hooks.afterAutopilot]), budget.root);
 
   // --- painting ------------------------------------------------------------
   const paintTeam = (): void => {
@@ -228,15 +229,14 @@ export function createDeskSettings(api: DreyPluginApi, hooks: DeskSettingsHooks)
     openFlow.disabled = tickets.length === 0;
   };
 
+  // The Runners line is the slots' sessions (req-186): what the pool serves, not a pool size per runner.
   const paintRunners = async (): Promise<void> => {
-    const pools = await Promise.all(
-      WORKER_PROVIDERS.map(async (id) => {
-        const size = await api.settings.get<number>(`fleet.pool.${id}.size`);
-        const fallback = fleetSettingDefault(`fleet.pool.${id}.size`);
-        return { label: RUNNER_LABEL[id], size: typeof size === 'number' && size >= 1 ? size : typeof fallback === 'number' ? fallback : 1 };
-      }),
-    );
-    runnersLine.textContent = runnersLineOf(pools);
+    try {
+      const reply = (await api.backend.invoke('slots')) as { readonly slots?: readonly SlotView[] } | null;
+      runnersLine.textContent = slotSessionsLine(reply?.slots ?? [], api.i18n);
+    } catch {
+      // The line keeps what it said.
+    }
   };
 
   const paintVideos = (): void => {

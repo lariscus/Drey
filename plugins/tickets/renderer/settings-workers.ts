@@ -19,14 +19,6 @@ export const RUNNER_LABEL: Readonly<Record<WorkerProviderId, string>> = {
   kimi: 'Kimi Code',
 };
 
-const poolField = (provider: WorkerProviderId): RunnerField => ({
-  id: `tset-pool-${provider}`,
-  label: 'Pool size',
-  key: `fleet.pool.${provider}.size`,
-  kind: 'number',
-  hint: `How many ${RUNNER_LABEL[provider]} runs go at once, across every column. Empty uses the default.`,
-});
-
 const compactField = (provider: WorkerProviderId): RunnerField => ({
   id: `tset-compact-${provider}`,
   label: 'Resume compact threshold — tokens',
@@ -44,7 +36,6 @@ const compactField = (provider: WorkerProviderId): RunnerField => ({
  */
 export const RUNNER_FIELDS: Readonly<Record<WorkerProviderId, readonly RunnerField[]>> = {
   opencode: [
-    poolField('opencode'),
     {
       id: 'tset-pool-opencode-probe',
       label: 'Pool probe',
@@ -55,7 +46,6 @@ export const RUNNER_FIELDS: Readonly<Record<WorkerProviderId, readonly RunnerFie
     compactField('opencode'),
   ],
   'claude-code': [
-    poolField('claude-code'),
     {
       id: 'tset-permissions',
       label: 'Dispatched-run permissions',
@@ -71,7 +61,7 @@ export const RUNNER_FIELDS: Readonly<Record<WorkerProviderId, readonly RunnerFie
     compactField('claude-code'),
   ],
   // Kimi's approvals ride the card like OpenCode's (ACP permission requests), so no permission flag of its own beyond the dispatched-run mode.
-  kimi: [poolField('kimi'), compactField('kimi')],
+  kimi: [compactField('kimi')],
 };
 
 /**
