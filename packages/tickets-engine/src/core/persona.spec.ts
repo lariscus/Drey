@@ -132,6 +132,15 @@ describe('allowed: and the pool entries (req-170)', () => {
     expect(personaFileText(parsePersonaFile('pia', PIA))).not.toContain('allowed:');
   });
 
+  it('reads and writes allowed: write-vaults (req-167, R5); one id reads as a list, duplicates drop', () => {
+    const writer = parsePersonaFile('ben', `---\ntitle: Ben\nallowed:\n  write-vaults: [work, notes, work]\n---\n`);
+    expect(writer.allowed).toEqual({ spendAboveAllowance: false, writeVaults: ['work', 'notes'] });
+    expect(personaFileText(writer)).toContain('allowed:\n  write-vaults: [work, notes]');
+    expect(parsePersonaFile('ben', personaFileText(writer))).toEqual(writer);
+    expect(parsePersonaFile('ben', `---\nallowed:\n  write-vaults: work\n---\n`).allowed.writeVaults).toEqual(['work']);
+    expect(parsePersonaFile('ben', `---\nallowed:\n  write-vaults: []\n---\n`).allowed.writeVaults).toBeUndefined();
+  });
+
   it('a pool entry is <model> or <provider>/<model>; a slash after anything else is part of the id', () => {
     expect(splitPoolEntry('kimi/k2')).toEqual({ provider: 'kimi', model: 'k2' });
     expect(splitPoolEntry('zai/glm-5.3')).toEqual({ provider: null, model: 'zai/glm-5.3' });
