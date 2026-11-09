@@ -2,7 +2,7 @@ import { parseAutopilotSet } from '../autopilot';
 import { dkTargetFor } from '../dk-target';
 import type { Orchestrator } from '../orchestrator';
 import type { SupervisorSet } from '../orchestrate/supervisor-set';
-import { normalizeChainStore, normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools, type ChainConfig, type ChainMaster, type ColumnMode } from '../protocol';
+import { normalizeChainStore, normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools, normalizeTranche, type ChainConfig, type ChainMaster, type ColumnMode } from '../protocol';
 import type { RunnerExit } from '../runner-exit';
 import type { RouteContext, RouteGroup } from './route-context';
 
@@ -61,6 +61,7 @@ export class ChainRoutes implements RouteGroup {
       caps: normalizeFleetCaps(body.caps),
       pools: normalizeFleetPools(body.pools),
       handover,
+      tranche: normalizeTranche(body.tranche),
     });
     this.onVault(body.ticketsVaultPath);
     this.supervisors.setHandoverConfig(handover); // the start-time resolution reads it (T-0049)

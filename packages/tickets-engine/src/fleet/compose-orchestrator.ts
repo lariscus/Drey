@@ -30,6 +30,16 @@ import { SettledRuns, type FleetLedger } from './orchestrate/settled-runs';
 import { SupervisorDirectory, type SupervisorPort } from './orchestrate/supervisor-directory';
 import { TicketDispatch } from './orchestrate/ticket-dispatch';
 import { WaitNotes } from './orchestrate/wait-notes';
+import { TicketsGit } from '../core/tickets-git';
+import type { EventSink } from './ports/event-sink';
+import { AnomalyDetector } from './orchestrate/tranche/anomaly-detector';
+import { CheckpointReporter } from './orchestrate/tranche/checkpoint-reporter';
+import { GitChangeSize } from './orchestrate/tranche/git-change-size';
+import { RunFacts, type ChangeSizeReader } from './orchestrate/tranche/run-facts';
+import { TrancheBudget, type DayBudget } from './orchestrate/tranche/tranche-budget';
+import { TrancheLedger } from './orchestrate/tranche/tranche-ledger';
+import { TranchePublisher } from './orchestrate/tranche/tranche-publisher';
+import { Tranches } from './orchestrate/tranche/tranches';
 
 export interface OrchestratorDeps {
   readonly root: string;
@@ -63,6 +73,32 @@ export interface OrchestratorDeps {
   readonly capacity?: PoolCapacity;
   /** req-170: moves `fleet.pool.<provider>.size` into `service.json` once, when a chain config arrives. */
   readonly migratePools?: (config: ChainConfig) => Promise<void>;
+  /** req-179: the day's budget a tranche takes its share of (the provider ledger over the slots); absent = none. */
+  readonly dayBudget?: DayBudget;
+  /** req-179: the runner's event stream — the tranche's changes go out as `tranche` events; absent = none. */
+  readonly sink?: EventSink;
+  /** req-179: what a settled run changed (default: git in its worktree); a spec passes its own. */
+  readonly changeSize?: ChangeSizeReader;
+}
+
+/** The tranche parts (req-179); their changes go out after each write of `chain.json`. */
+function composeTranches(deps: OrchestratorDeps, state: ChainState, clock: ReturnType<typeof clockOf>): Tranches {
+  const git =
+    deps.changeSize ??
+    new GitChangeSize(() => {
+      const runner = new TicketsGit(() => state.config?.git ?? 'git');
+      return (cwd, args) => runner.run(cwd, args);
+    });
+  return new Tranches({
+    state,
+    ledger: new TrancheLedger(state, clock),
+    budget: new TrancheBudget(deps.dayBudget ?? { limitUsd: () => null }, clock),
+    reporter: new CheckpointReporter(),
+    detector: new AnomalyDetector(),
+    facts: new RunFacts(git),
+    clock,
+    log: deps.log,
+  });
 }
 
 /** The chain status's optional sources (req-177's slots, req-170's pool) and the pool migration. */
@@ -80,7 +116,12 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
   const state = new ChainState();
   const fs = deps.fs ?? new NodeFileSystem();
   const store = new ChainStateStore(deps.root, fs, clock, log);
-  const persist = (): Promise<void> => store.persist(state);
+  const tranches = composeTranches(deps, state, clock);
+  const published = deps.sink === undefined ? null : new TranchePublisher(deps.sink, () => tranches.status());
+  const persist = async (): Promise<void> => {
+    await store.persist(state);
+    published?.publish();
+  };
   const pipelineRead = (): Promise<void> => orchestrator.pipelineRead();
   const board = new ChainBoard({
     doorFor: deps.storeChainFor ?? ((config) => new StoreChainBoard(chainStoreIoOf(config), log)),
@@ -103,11 +144,13 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
     directory,
     pools,
     settled: new SettledRuns({ state, directory, pools, breaker, clock, persist, ...events }),
-    dispatcher: new Dispatcher({ state, board, directory, pools, personas, humanGates, dispatch, notes, clock, log, pipelineRead, persist, ...pool }),
+    dispatcher: new Dispatcher({ state, board, directory, pools, personas, humanGates, dispatch, notes, clock, log, pipelineRead, persist, tranches, ...pool }),
     ci: new CiSweep({ state, board, bookkeeper, shell: deps.execShell ?? execShell, clock, log, pipelineRead, persist }),
     clock,
     log,
     scanIntervalMs: deps.scanIntervalMs ?? 15_000,
+    tranches,
+    persist,
     ...statusParts(deps),
   });
   return orchestrator;

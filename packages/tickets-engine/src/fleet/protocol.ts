@@ -30,7 +30,9 @@ export type { CapabilityImportReport, FilteredSlot, InputModality, ModelCapabili
 export type { ModelNeeds } from '../contracts/ticket-pool-meta';
 export { SLOT_PROFILES } from './protocol-slots';
 export type { QuotaKind, QuotaReliability, QuotaWindow, SlotBilling, SlotProfile, SlotStateName, SlotSummary, SlotView } from './protocol-slots';
-export type { AutopilotRecord, AutopilotRefusal, AutopilotState, ChainConfig, ChainMaster, ChainStatus, ChainStoreConfig, ChainTrip, ColumnMode } from './protocol-chain';
+export type { AutopilotRecord, AutopilotReason, AutopilotRefusal, AutopilotState, ChainConfig, ChainMaster, ChainStatus, ChainStoreConfig, ChainTrip, ColumnMode } from './protocol-chain';
+export { DEFAULT_EARLY_STOP, DEFAULT_TRANCHE, normalizeTranche, tranchesOff, tranchesPerDay } from './protocol-tranche';
+export type { AnomalyRule, CheckpointReport, EarlyStop, EarlyStopConfig, RedTicket, TrancheConfig, TrancheEnd, TrancheStatus } from './protocol-tranche';
 
 /** The workers of milestone 84, in fleet order (the assignment default). */
 export type WorkerProviderId = 'opencode' | 'claude-code' | 'kimi';

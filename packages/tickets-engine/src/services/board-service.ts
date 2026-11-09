@@ -65,6 +65,7 @@ import { unlinkShared } from '../fleet/worktrees';
 import { statusLogPathOf } from '../fleet/event-writer';
 import { legacyWorktreeBase, worktreeBaseFor, worktreePathFor, WORKTREES_DIR } from '../fleet/worktree-home';
 import { dkTargetFor, retreatStages } from '../fleet/dk-target';
+import { trancheConfigOf } from './tranche-config';
 import { type ChainConfig, type ChainStoreConfig, FleetCaps, FleetHandoverConfig, HandoverMode, InteractiveMode, PermissionMode, RunDkTarget, RunInfo, FleetPools } from '../fleet/protocol';
 import { type EngineHost, type EngineVaultChangeEvent, EngineVault, FleetPort } from './host';
 import { handoverFromConfig, handoverOverrideKeys } from './handover-config';
@@ -556,6 +557,7 @@ export class EngineBoardService {
             caps: this.caps,
             pools: this.pools,
             handover: this.handover,
+            tranche: await trancheConfigOf(this.host), // req-179
           }
         : null;
     const json = chain === null ? null : JSON.stringify(chain);

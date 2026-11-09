@@ -63,11 +63,12 @@ export function restoreAutopilot(value: unknown): AutopilotRecord | null {
   if (typeof value !== 'object' || value === null) {
     return null;
   }
-  const { state, resumeAt } = value as { state?: unknown; resumeAt?: unknown };
-  if (state === 'paused' && typeof resumeAt === 'string' && !Number.isNaN(Date.parse(resumeAt))) {
-    return { state, resumeAt };
+  const { state, resumeAt, reason } = value as { state?: unknown; resumeAt?: unknown; reason?: unknown };
+  if (state === 'paused') {
+    const at = typeof resumeAt === 'string' && !Number.isNaN(Date.parse(resumeAt)) ? { resumeAt } : {};
+    return { state, ...at, ...(reason === 'checkpoint' ? { reason } : {}) };
   }
-  return state === 'on' || state === 'off' || state === 'paused' ? { state } : null;
+  return state === 'on' || state === 'off' ? { state } : null;
 }
 
 /**
