@@ -191,6 +191,12 @@ test.describe('Board, Team and Capacity (E13-8)', () => {
             redStreak: {},
             cooldownUntil: {},
             poolSize: { opencode: 2, 'claude-code': 3 },
+            // Board 7e's Slots row: the chain status carries one summary per slot (req-177).
+            slots: [
+              { id: 'claude-a', label: 'Claude A', profile: 'private', state: 'busy', busy: 1, total: 2, remaining: 0.62, reliability: 'measured', q: 1.4, resetsAt: new Date(Date.now() + 3 * 86_400_000).toISOString() },
+              { id: 'zai', label: 'z.ai', profile: 'private', state: 'busy', busy: 1, total: 3, remaining: 0.7, reliability: 'estimated', q: 1.2, resetsAt: null },
+              { id: 'kimi', label: 'Kimi', profile: 'private', state: 'ready', busy: 0, total: 2, remaining: null, reliability: 'unknown', q: null, resetsAt: null },
+            ],
           },
         },
       },
@@ -252,6 +258,19 @@ test.describe('Board, Team and Capacity (E13-8)', () => {
     await expect(page.locator('app-dock[side="bottom"]')).toBeVisible();
     await expect(band.locator('.desk-cap-person').filter({ hasText: 'Tessa' })).toContainText('stuck on T-0126');
     await expect(band.locator('.desk-cap-today')).toHaveText('$4.22 of $19 today');
+    // Header value (board 7e): live sessions over the pools, what waits for a slot.
+    await expect(page.locator('app-panel-frame', { has: band }).locator('.status')).toHaveText(/^2 of 5 sessions( · d+ queued)?$/);
+    // The Slots row: one chip per slot, the share with its bar, q and its upgrade mark, `unknown` without a bar.
+    await expect(band.locator('.desk-slot .desk-slot-name')).toHaveText(['Claude A', 'z.ai', 'Kimi']);
+    await expect(band.locator('.desk-slot[data-slot="claude-a"] .desk-slot-share')).toHaveText('62 %');
+    await expect(band.locator('.desk-slot[data-slot="claude-a"] .desk-slot-q')).toHaveText('q 1.4');
+    await expect(band.locator('.desk-slot[data-slot="claude-a"] .desk-slot-upgrade')).toHaveCount(1);
+    await expect(band.locator('.desk-slot[data-slot="zai"] .desk-slot-fill-estimated')).toHaveCount(1);
+    await expect(band.locator('.desk-slot[data-slot="kimi"] .desk-slot-note')).toHaveText('unknown');
+    await expect(band.locator('.desk-slot[data-slot="kimi"] .desk-slot-bar')).toHaveCount(0);
+    // The Tranche-and-queue row: the queue part names what waits (the seeded Prioritized column), the tranche part is empty (req-179).
+    await expect(band.locator('.desk-cap-queuerow .desk-queue-text')).toHaveText(/^T-d+ queued · waits for a slot · 1st$/);
+    await expect(band.locator('.desk-tranche-text')).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('desk-capacity.png') });
 
     // The band rule (E12-15, board 7e): hidden once another tab (a ticket) is the active one.

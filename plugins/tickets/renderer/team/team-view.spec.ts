@@ -7,7 +7,8 @@ import type { ChainStatus, RunInfo } from '../../../../packages/tickets-engine/s
 import type { BoardSnapshot, TicketCard } from '../../shared/tickets';
 import type { DeskDeps } from '../desk-deps';
 import { mountBoard } from '../board/board-view';
-import { bandHeaderStatusOf, bandShownFor, bandStatusOf, mountCapacity, personaLineOf } from './capacity-view';
+import { bandHeaderStatusOf, bandStatusOf } from './capacity-model';
+import { bandShownFor, mountCapacity, personaLineOf, trancheNodes } from './capacity-view';
 import { personaCardOf } from './team-model';
 import type { TeamStore } from './team-store';
 import { mountTeam } from './team-view';
@@ -241,7 +242,7 @@ describe('the Capacity band', () => {
     const personas = [persona({}), persona({ id: 'tessa', title: 'Tessa', role: 'Tester' })];
     const open = vi.fn();
     mountCapacity(deps(), store(personas), host, open);
-    expect([...host.querySelectorAll('.desk-cap-person .desk-cap-line')].map((p) => p.textContent)).toEqual(['idle', 'stuck on T-0126']);
+    expect([...host.querySelectorAll('.desk-cap-person .desk-cap-line')].map((p) => p.textContent)).toEqual(['idle', 'stuck on T-0126 · 9 min']);
     expect(host.querySelector('.desk-cap-today')!.textContent).toBe('$5.34 of $10 today');
     expect(host.querySelector('.desk-cap-stuckdot')).not.toBeNull();
     host.querySelector<HTMLButtonElement>('.desk-cap-crew')!.click();
@@ -261,14 +262,88 @@ describe('the Capacity band', () => {
   });
 
   it('names a persona line and the header status', () => {
-    expect(personaLineOf(personaCardOf(persona({ id: 'tessa' }), [run({})], [], () => null, Date.now()))).toBe('stuck on T-0126');
-    expect(personaLineOf(personaCardOf(persona({ id: 'tessa' }), [run({ stuck: false }), run({ id: 'r2', stuck: false })], [], () => null, Date.now()))).toBe('works on T-0126 +1');
-    expect(personaLineOf(personaCardOf(persona({ id: 'tessa' }), [run({ stuck: false, waiting: { kind: 'question', text: '?', since: '' } as never })], [], () => null, Date.now()))).toBe('T-0126 waits for you');
-    expect(bandStatusOf([run({})])).toBe('1 stuck');
-    expect(bandStatusOf([run({ stuck: false })])).toBe('1 running');
-    expect(bandStatusOf([])).toBeNull();
-    expect(bandHeaderStatusOf([run({})], chain)).toBe('1 of 5 slots busy');
-    expect(bandHeaderStatusOf([run({})], null)).toBe('1 stuck');
+    expect(personaLineOf(personaCardOf(persona({ id: 'tessa' }), [run({})], [], () => null, Date.now()), i18n)).toBe('stuck on T-0126 · 9 min');
+    expect(personaLineOf(personaCardOf(persona({ id: 'tessa' }), [run({ stuck: false }), run({ id: 'r2', stuck: false })], [], () => null, Date.now()), i18n)).toBe('works on T-0126 +1');
+    expect(personaLineOf(personaCardOf(persona({ id: 'tessa' }), [run({ stuck: false, waiting: { kind: 'question', text: '?', since: '' } as never })], [], () => null, Date.now()), i18n)).toBe('T-0126 waits for you');
+    expect(bandStatusOf([run({})], i18n)).toBe('1 stuck');
+    expect(bandStatusOf([run({ stuck: false })], i18n)).toBe('1 running');
+    expect(bandStatusOf([], i18n)).toBeNull();
+    expect(bandHeaderStatusOf([run({})], chain, 0, i18n)).toBe('1 of 5 sessions');
+    expect(bandHeaderStatusOf([run({})], chain, 1, i18n)).toBe('1 of 5 sessions · 1 queued');
+    expect(bandHeaderStatusOf([run({})], null, 0, i18n)).toBe('1 stuck');
+  });
+});
+
+describe('the Capacity band: Slots row and queue row (board 7e)', () => {
+  const inThreeDays = new Date(Date.now() + 3 * 86_400_000);
+  inThreeDays.setHours(9, 0, 0, 0);
+  const monday = inThreeDays.toISOString();
+  const weekday = new Intl.DateTimeFormat('en', { weekday: 'short' }).format(inThreeDays);
+  const slotsChain = (): ChainStatus =>
+    ({
+      master: 'run',
+      poolSize: { opencode: 2, 'claude-code': 3 },
+      slots: [
+        { id: 'a', label: 'Claude A', profile: 'private', state: 'busy', busy: 1, total: 2, remaining: 0.62, reliability: 'measured', q: 1.4, resetsAt: monday },
+        { id: 'z', label: 'z.ai', profile: 'private', state: 'busy', busy: 1, total: 3, remaining: 0.7, reliability: 'estimated', q: 1.2, resetsAt: monday },
+        { id: 'k', label: 'Kimi', profile: 'private', state: 'ready', busy: 0, total: 2, remaining: null, reliability: 'unknown', q: null, resetsAt: null },
+        { id: 'l', label: 'Claude B', profile: 'private', state: 'needs-login', busy: 0, total: 1, remaining: 0.3, reliability: 'measured', q: 0.8, resetsAt: monday },
+      ],
+    }) as unknown as ChainStatus;
+  const queuedSnapshot = {
+    ...snapshot,
+    columns: [
+      { phase: { id: 'inbox', title: 'Inbox', persona: null, handover: 'manual' }, unknown: false, tickets: [] },
+      { phase: { id: 'prioritized', title: 'Prioritized', persona: null, handover: 'manual' }, unknown: false, tickets: [ticketCard('T-0123', 'prioritized'), ticketCard('T-0124', 'prioritized')] },
+      { phase: { id: 'build', title: 'Build', persona: 'ben', handover: 'agent build-default' }, unknown: false, tickets: [] },
+    ],
+  } as unknown as BoardSnapshot;
+
+  it('draws one chip per slot: dots, bar by reliability, share, q with the upgrade mark, the reset', () => {
+    chain = slotsChain();
+    const host = document.body.appendChild(document.createElement('div'));
+    mountCapacity(deps(), store([persona({})]), host, vi.fn());
+    const chips = [...host.querySelectorAll<HTMLElement>('.desk-slot')];
+    expect(chips.map((c) => c.querySelector('.desk-slot-name')!.textContent)).toEqual(['Claude A', 'z.ai', 'Kimi', 'Claude B']);
+    const [a, z, kimi, login] = chips;
+    expect([...a!.querySelectorAll('.desk-cap-slot')].map((d) => d.classList.contains('desk-cap-slot-busy'))).toEqual([true, false]);
+    expect(a!.querySelector('.desk-slot-share')!.textContent).toBe('62 %');
+    expect(a!.querySelector<HTMLElement>('.desk-slot-fill')!.style.width).toBe('62%');
+    expect(a!.querySelector('.desk-slot-fill-estimated')).toBeNull();
+    expect(a!.querySelector('.desk-slot-q')!.textContent).toBe('q 1.4');
+    expect(a!.querySelector('.desk-slot-upgrade')!.getAttribute('aria-label')).toBe('Upgrade allowed');
+    expect(a!.querySelector('.desk-slot-reset')!.textContent).toBe(`${weekday} 09:00`);
+    expect(a!.title).toBe(`resets ${weekday} 09:00`);
+    expect(z!.querySelector('.desk-slot-fill-estimated')).not.toBeNull();
+    expect(z!.querySelector('.desk-slot-q')!.textContent).toBe('q 1.2');
+    expect(z!.querySelector('.desk-slot-upgrade')).toBeNull();
+    expect(kimi!.querySelector('.desk-slot-note')!.textContent).toBe('unknown');
+    expect(kimi!.querySelector('.desk-slot-bar, .desk-slot-q, .desk-slot-reset')).toBeNull();
+    expect(kimi!.title).toBe('quota unknown');
+    expect(login!.querySelector('.desk-slot-note-attention')!.textContent).toBe('needs login');
+    expect(login!.querySelector('.desk-slot-bar')).toBeNull();
+  });
+
+  it('puts the first queued ticket on the right of the last row and leaves the tranche part empty', () => {
+    chain = slotsChain();
+    const host = document.body.appendChild(document.createElement('div'));
+    mountCapacity({ ...deps(), snapshot: () => queuedSnapshot }, store([persona({})]), host, vi.fn());
+    const row = host.querySelector('.desk-cap-queuerow')!;
+    expect(row.querySelector('.desk-queue-text')!.textContent).toBe('T-0123 queued · waits for a slot · 1st');
+    expect(row.querySelector('.desk-tranche-text')).toBeNull();
+  });
+
+  it('draws the tranche part as board 7e does once the chain carries a tranche', () => {
+    const nodes = trancheNodes({ runs: 4, size: 10, cost: 4.1, budget: 15, runsLeft: 6, msLeft: 2 * 3_600_000 + 10 * 60_000 }, i18n);
+    expect(nodes[0]!.textContent).toBe('Tranche 4 of 10 runs · $4.10 of $15 · checkpoint in 6 runs or 2 hr 10 min');
+    expect(nodes[1]!.querySelector<HTMLElement>('.desk-tranche-fill')!.style.width).toBe('40%');
+  });
+
+  it('draws no queue part while nothing is queued', () => {
+    const host = document.body.appendChild(document.createElement('div'));
+    mountCapacity(deps(), store([persona({})]), host, vi.fn());
+    expect(host.querySelector('.desk-queue')).toBeNull();
+    expect(host.querySelectorAll('.desk-cap-persons, .desk-cap-slotrow, .desk-cap-queuerow')).toHaveLength(3);
   });
 });
 

@@ -19,8 +19,8 @@ export const WORK_PANELS = {
   bottom: ['tickets-capacity'],
 } as const;
 
-/** Board 7e: the Capacity band's first height. */
-export const WORK_CAPACITY_HEIGHT = 103;
+/** Board 7e: the Capacity band's first height: header 28 + persona row 62 + Slots row 32 + queue row 34 + 12 above the status bar (the dock's own top border is drawn above it). */
+export const WORK_CAPACITY_HEIGHT = 168;
 
 /** The Crew view (boards 9a, 7h: Notes · Work · Crew): the tickets panel and the Assistant, the Board's and Crew's tabs are opened from the panel. */
 export const CREW_VIEW_ID = 'tickets.crew';
