@@ -16,7 +16,7 @@
  *   and is the ticket header's (E13-6).
  */
 import type { PlanPartCard } from '../../../../packages/tickets-engine/src/contracts/plan-approval';
-import type { RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
+import type { QueueEntry, RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { BoardSnapshot, TicketCard } from '../../shared/tickets';
 import { isLiveRun, usd } from '../team/team-model';
 import { needKindLabel, workGroups } from '../work-groups';
@@ -46,6 +46,8 @@ export interface BoardCardModel {
   readonly cost: number | null;
   /** The card's second line (`queued, waits for a slot`, the worker's activity, ...); '' = none. */
   readonly line: string;
+  /** The ticket waits for the pool (req-186): its entry in the chain's queue; null = it does not. */
+  readonly queue: QueueEntry | null;
   readonly running: boolean;
   readonly parts: readonly BoardPartModel[];
 }
@@ -97,6 +99,7 @@ export function boardModelOf(
   snap: BoardSnapshot,
   runs: readonly RunInfo[],
   planParts: PlanPartsById = new Map(),
+  queue: readonly QueueEntry[] = [],
 ): BoardModel {
   const configured = snap.columns.filter((column) => !column.unknown);
   const byId = new Map<string, TicketCard>();
@@ -175,6 +178,7 @@ export function boardModelOf(
           personaId: personaOf(card),
           cost: costOf(card),
           line: run?.activity ?? (card.blocked.length > 0 ? `blocked by ${card.blocked.join(', ')}` : ''),
+          queue: queue.find((entry) => entry.ticket === card.id) ?? null,
           running: run !== null,
           parts,
         };

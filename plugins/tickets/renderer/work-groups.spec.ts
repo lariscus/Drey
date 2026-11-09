@@ -407,12 +407,12 @@ describe('needKindLabel', () => {
 });
 
 describe('runningStepOf', () => {
-  const stepOf = (id: string, snap: BoardSnapshot, runs: readonly RunInfo[] = []): ReturnType<typeof runningStepOf> => {
+  const stepOf = (id: string, snap: BoardSnapshot, runs: readonly RunInfo[] = [], queueWords: string | null = null): ReturnType<typeof runningStepOf> => {
     const row = workGroups(snap, runs).running.find((r) => r.card.id === id);
     if (row === undefined) {
       throw new Error(`${id} is not in Running`);
     }
-    return runningStepOf(row, snap);
+    return runningStepOf(row, snap, queueWords);
   };
 
   it('names the step by the phase id, with the run’s activity as the line', () => {
@@ -447,6 +447,8 @@ describe('runningStepOf', () => {
     });
     expect(stepOf('T-0001', snap)).toEqual({ step: 'queued', line: 'waits for “Ticket T-0002”', live: false });
     expect(stepOf('T-0003', snap)).toEqual({ step: 'queued', line: 'waits for a free worker', live: false });
+    // The pool's own words replace the plain word while it holds the ticket back (req-186).
+    expect(stepOf('T-0003', snap, [], 'queued · waits for a B slot · 2nd').step).toBe('queued · waits for a B slot · 2nd');
     // An unknown blocker falls back to its id.
     const orphan = board({ build: [card('T-0004', 'build', { blocked: ['T-0099'] })] });
     expect(stepOf('T-0004', orphan).line).toBe('waits for “T-0099”');

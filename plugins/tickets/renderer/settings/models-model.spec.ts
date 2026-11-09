@@ -182,7 +182,7 @@ describe('the Ledgers group', () => {
     expect(moneyText(null, i18n)).toBe('');
     expect(parseMoney('$15.00')).toEqual({ ok: true, value: 15 });
     expect(parseMoney(' 2,5 ')).toEqual({ ok: true, value: 2.5 });
-    expect(parseMoney('').value).toBeNull();
+    expect(parseMoney('')).toEqual({ ok: true, value: null });
     expect(parseMoney('lots').ok).toBe(false);
   });
 

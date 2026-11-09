@@ -11,6 +11,7 @@
  * store beside the folds.
  */
 import type { DreyPluginApi } from '../../../shared/plugin-api/renderer';
+import { allowanceStateOf, allowanceTitle } from './allowance';
 import { usd } from './team/team-model';
 import {
   DEFAULT_PRIORITY_CONFIG,
@@ -76,6 +77,12 @@ export interface WorkPanelDeps {
   clearFilter(): void;
   /** A persona id as its name (E13-8, the rows' persona chip); absent = the id itself. */
   personaName?(id: string): string;
+  /** The pool's words for a ticket it holds back (`queued · waits for a B slot · 2nd`, req-186); null = none. */
+  queueWords?(ticketId: string): string | null;
+  /** The ticket's allowance in USD (its own key, else the default of Settings → Models); null = none known. */
+  allowanceOf?(card: TicketCard): number | null;
+  /** The class pin of the row menu's Class › (req-186): A, B, C or null to drop the pin. */
+  setClass(card: TicketCard, value: 'A' | 'B' | 'C' | null): void;
 }
 
 /** Which groups the owner folded — per viewer, never in the repo. */
@@ -224,11 +231,12 @@ export function workListLivePaint(
         }
         continue;
       }
-      const step = runningStepOf(row, snap);
+      const step = runningStepOf(row, snap, deps.queueWords?.(id) ?? null);
       setAge(node, step.live ? ageWords(row.run?.startedAt ?? null, nowMs) : '');
       const stepWord = node.querySelector<HTMLElement>('.work-run-step');
       if (stepWord !== null) {
         stepWord.textContent = step.step;
+        stepWord.hidden = step.step.toLowerCase() === row.phase.title.toLowerCase();
       }
       continue;
     }
@@ -482,17 +490,24 @@ function costNode(row: WorkRow): HTMLElement | null {
 }
 
 /** The cost, grey, at the line's right end; its title says it is the cost so far. */
-function costNodes(row: WorkRow): HTMLElement[] {
+function costNodes(row: WorkRow, allowance: { readonly deps: WorkPanelDeps } | null = null): HTMLElement[] {
   const cost = costNode(row);
   if (cost === null) {
     return [];
   }
   cost.title = 'So far';
+  // A Running row's cost turns orange from 70 % of the ticket's allowance, red when it is used up (req-186, board 7e).
+  const limit = allowance?.deps.allowanceOf?.(row.card) ?? null;
+  const state = allowanceStateOf(row.card.usage?.cost ?? null, limit);
+  if (state !== null && limit !== null && allowance !== null) {
+    cost.classList.add(`work-row-cost-${state.level}`);
+    cost.title = allowanceTitle(state, limit, allowance.deps.api.i18n);
+  }
   return [cost];
 }
 
 /** The rich rows' second line, board 7a: id · phase · what it is · age, the cost at the right end. */
-function richSub(row: WorkRow, parts: readonly HTMLElement[], age: string): HTMLElement {
+function richSub(row: WorkRow, parts: readonly HTMLElement[], age: string, allowance: { readonly deps: WorkPanelDeps } | null = null): HTMLElement {
   const sub = el('div', 'work-row-sub');
   const pieces = [idNode(row.card.id), ...parts];
   if (age !== '') {
@@ -503,7 +518,7 @@ function richSub(row: WorkRow, parts: readonly HTMLElement[], age: string): HTML
     empty.hidden = true;
     pieces.push(empty);
   }
-  sub.append(metaLine(...pieces), ...costNodes(row));
+  sub.append(metaLine(...pieces), ...costNodes(row, allowance));
   return sub;
 }
 
@@ -571,7 +586,7 @@ function shapingRowNode(deps: WorkPanelDeps, row: WorkRow): HTMLElement {
 function runningRowNode(deps: WorkPanelDeps, snap: BoardSnapshot, row: WorkRow): HTMLElement {
   const { card } = row;
   const { node, more } = baseRow(deps, card);
-  const step = runningStepOf(row, snap);
+  const step = runningStepOf(row, snap, deps.queueWords?.(card.id) ?? null);
   if (step.live) {
     node.dataset['running'] = 'true';
   }
@@ -579,7 +594,7 @@ function runningRowNode(deps: WorkPanelDeps, snap: BoardSnapshot, row: WorkRow):
   // The step word is dropped when it only repeats the phase (board 7a: "Building · queued").
   const stepWord = el('span', 'work-run-step', step.step);
   stepWord.hidden = step.step.toLowerCase() === row.phase.title.toLowerCase();
-  node.append(richSub(row, [phaseChipNode(row), stepWord], step.live ? ageWords(row.run?.startedAt ?? null, Date.now()) : ''));
+  node.append(richSub(row, [phaseChipNode(row), stepWord], step.live ? ageWords(row.run?.startedAt ?? null, Date.now()) : '', { deps }));
   return node;
 }
 

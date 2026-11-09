@@ -141,6 +141,24 @@ export function parseSetTrack(payload: unknown): Parsed<SetTrackCommand> {
   return ok({ id: p['id'], track });
 }
 
+/** The card's class control (req-186): the ticket's `class:` key, or null to remove the pin. */
+export interface SetClassCommand {
+  readonly id: string;
+  readonly class: 'A' | 'B' | 'C' | null;
+}
+
+export function parseSetClass(payload: unknown): Parsed<SetClassCommand> {
+  const p = record(payload);
+  if (typeof p['id'] !== 'string') {
+    return refuse('bad class payload');
+  }
+  const value = p['class'];
+  if (value !== null && value !== 'A' && value !== 'B' && value !== 'C') {
+    return refuse('class must be A, B, C or null');
+  }
+  return ok({ id: p['id'], class: value });
+}
+
 export interface UnarchiveCommand {
   readonly id: string;
   readonly to: string;

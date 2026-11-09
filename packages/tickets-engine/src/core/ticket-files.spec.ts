@@ -5,6 +5,7 @@ import {
   parseTicketFile,
   patchHeaderFields,
   patchTicketFile,
+  patchClass,
   patchTrack,
   ticketPathParts,
   type NewTicketInput,
@@ -385,6 +386,29 @@ describe('patchTrack (req-75 W1b)', () => {
 
   it('refuses a file without a parseable fence', () => {
     expect(() => patchTrack('no fence', 'auto', now, 'owner@desk')).toThrow('no frontmatter fence');
+  });
+});
+
+describe('patchClass (req-186)', () => {
+  const now = new Date('2026-11-09T09:00:00Z');
+
+  it('pins the class, keeps everything else and logs the value', () => {
+    const out = patchClass(CANONICAL, 'B', now, 'owner@desk');
+    expect(out).toContain('class: B');
+    expect(out).toContain("- '2026-11-09T09:00:00Z' owner@desk — class B");
+    expect(parseTicketFile(out, 'tickets/inbox/T-0042.md').meta.class).toBe('B');
+    expect(out).toContain('title: "Fix the palette race in CI"');
+  });
+
+  it('null drops the pin and logs "class none"', () => {
+    const pinned = CANONICAL.replace('priority: high', 'class: A\npriority: high');
+    const out = patchClass(pinned, null, now, 'owner@desk');
+    expect(out).not.toContain('class:');
+    expect(out).toContain('— class none');
+  });
+
+  it('refuses a file without a parseable fence', () => {
+    expect(() => patchClass('no fence', 'A', now, 'owner@desk')).toThrow('no frontmatter fence');
   });
 });
 
