@@ -40,6 +40,8 @@ import { RunAdoption } from './orchestrate/run-adoption';
 import { RunBookkeeper } from './orchestrate/run-bookkeeper';
 import { RunClaims, type LeaseTimers } from './orchestrate/run-claims';
 import { RunCompletion } from './orchestrate/run-completion';
+import { IdleRelease } from './orchestrate/idle-release';
+import { OneOnOneStarter } from './orchestrate/one-on-one-starter';
 import { RunReaper } from './orchestrate/run-reaper';
 import { RunReopener } from './orchestrate/run-reopener';
 import { RunRepository } from './orchestrate/run-repository';
@@ -132,6 +134,8 @@ export interface RunSupervisorDeps {
   readonly vault?: WorkerVaultGate;
   /** req-183: the review checkout's on-disk guard; absent = Node's (`NodeTreeMode`). */
   readonly treeMode?: TreeMode;
+  /** req-168: how long a held 1:1 stands idle before it is released; absent = the default span. */
+  readonly oneOnOneIdleMs?: number;
 }
 
 /** The parts that touch the worker, the ticket and the record, with the loops between them closed. */
@@ -193,12 +197,24 @@ function prepareOf(rt: Runtime, git: TicketsGitSeam): PrepareWorktree {
   return (request, worktreePath) => defaultPrepareWorktree({ git, request, worktreePath, now: () => rt.clock.now(), isLive });
 }
 
-function starterOf(rt: Runtime, handover: RunnerHandover, git: TicketsGitSeam): RunStarter {
+/** The two starts over one launcher: a ticket run's and a 1:1's (req-168). */
+function startersOf(rt: Runtime, handover: RunnerHandover, git: TicketsGitSeam): { starter: RunStarter; oneOnOne: OneOnOneStarter } {
   const { machine, repo, streams, stores, claims, bookkeeper, processes, background, clock } = rt;
   const log = rt.deps.log;
   const launcher = new WorkerLauncher({ machine, repo, processes, claims, background, streams, log, ...(rt.deps.seats !== undefined ? { seats: rt.deps.seats } : {}) });
   const sessions = new SessionHandover(repo, rt.settings, rt.deps.adapter.id, clock);
-  return new RunStarter({ machine, repo, streams, stores, claims, bookkeeper, sessions, launcher, prepareWorktree: prepareOf(rt, git), review: rt.review, clock, log, retiring: () => handover.retiring, ...(rt.deps.slots !== undefined ? { slots: rt.deps.slots } : {}) });
+  const slots = rt.deps.slots !== undefined ? { slots: rt.deps.slots } : {};
+  const retiring = (): boolean => handover.retiring;
+  return {
+    starter: new RunStarter({ machine, repo, streams, stores, claims, bookkeeper, sessions, launcher, prepareWorktree: prepareOf(rt, git), review: rt.review, clock, log, retiring, ...slots }),
+    oneOnOne: new OneOnOneStarter({ machine, repo, streams, bookkeeper, launcher, clock, log, retiring, ...slots }),
+  };
+}
+
+/** req-168: the idle release of held 1:1 sessions, the reaper's first look at a live run. */
+function idleOf(rt: Runtime): IdleRelease {
+  const idleMs = rt.deps.oneOnOneIdleMs !== undefined ? { idleMs: rt.deps.oneOnOneIdleMs } : {};
+  return new IdleRelease({ settler: rt.settler, bookkeeper: rt.bookkeeper, clock: rt.clock, log: rt.deps.log, ...idleMs });
 }
 
 /** One provider's supervisor, every part wired. */
@@ -208,7 +224,7 @@ export function composeRunSupervisor(deps: RunSupervisorDeps): RunSupervisor {
   const log = deps.log;
   const git = rt.git;
   const handover = new RunnerHandover(repo, processes, table, { clock, line: log });
-  const starter = starterOf(rt, handover, git);
+  const { starter, oneOnOne } = startersOf(rt, handover, git);
   const reopener = new RunReopener(repo, starter, settler, { processes, provider: deps.adapter.id });
   const answers = new OwnerAnswers(repo, bookkeeper, streams);
   const limits = deps.limits !== undefined ? { limits: deps.limits } : {};
@@ -219,13 +235,14 @@ export function composeRunSupervisor(deps: RunSupervisorDeps): RunSupervisor {
     adoption: new RunAdoption({ machine, repo, streams, processes, claims, bookkeeper, table, clock, log }),
     handover,
     starter,
+    oneOnOne,
     stopper: rt.stopper,
     steer: new SteerService(repo, bookkeeper, { answers, reopener, hold: (run, why) => rt.takeover.hold(run, why) }, streams),
     takeover: rt.takeover,
     answers,
     attachments: new AttachmentStore(repo, git, rt.fs, clock),
     reopener,
-    reaper: new RunReaper({ repo, settler, bookkeeper, settings, background, clock, table, log, ...limits, replayExit: (run) => rt.completion.onWorkerExit(run, null) }),
+    reaper: new RunReaper({ repo, settler, bookkeeper, settings, background, clock, table, log, ...limits, idle: idleOf(rt), replayExit: (run) => rt.completion.onWorkerExit(run, null) }),
     leftovers: new LeftoverClaims(deps.storeFor, log),
   });
 }

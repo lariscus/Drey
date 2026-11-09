@@ -193,6 +193,30 @@
                     <div class="bubble">{{ message.text }}</div>
                   </div>
                 }
+                @for (card of threadProposals(); track card.id) {
+                  <div class="msg">
+                    <div class="confirm">
+                      <div class="ck">{{ card.kind === 'prompt' ? ('one_on_one.proposal.prompt' | t) : ('one_on_one.proposal.skill' | t: { skill: card.skill }) }}</div>
+                      <p class="confirm-ask">{{ card.summary }}</p>
+                      @if (card.state === 'pending' && !readOnly()) {
+                        <div class="row">
+                          <button type="button" class="btn" (click)="decideThreadProposal(card.id, 'dismiss')">{{ 'one_on_one.dismiss' | t }}</button>
+                          <button type="button" class="btn primary" (click)="decideThreadProposal(card.id, 'confirm')">{{ 'one_on_one.accept' | t }}</button>
+                        </div>
+                      } @else if (card.state === 'confirmed') {
+                        <div class="res">{{ card.outcome === null ? ('one_on_one.accepted' | t) : ('one_on_one.accepted_with' | t: { outcome: card.outcome }) }}</div>
+                      } @else if (card.state === 'dismissed') {
+                        <div class="res">{{ 'one_on_one.dismissed' | t }}</div>
+                      }
+                    </div>
+                  </div>
+                }
+                @if (threadFailure(); as failure) {
+                  <p class="pane-error" role="alert">{{ 'one_on_one.could_not_answer' | t: { name: title() } }} — {{ failure }}</p>
+                }
+                @if (sessionLine(); as line) {
+                  <p class="session-line">{{ line.key | t: line.params }}</p>
+                }
                 @for (card of cards(); track card.id) {
                   <div class="msg me">
                     @if (card.kind === 'ticket') {

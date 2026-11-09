@@ -52,7 +52,7 @@ import { storeFooterLine } from '../store/store-footer';
 import { loadShippedPrompts } from '../core/default-prompts';
 import { type AttachmentCommand, RefineCommand } from '../core/commands';
 import { nextImprovementId, parseFriction, parseImprovements, renderImprovements, type FrictionLine, type ImprovementDraft, type ImprovementProposal } from '../core/improvements';
-import type { ImprovementDecision, PersonaImprovementsReply, PersonaMemoryReply, PersonaThreadReply } from '../contracts/remote-protocol';
+import type { ImprovementDecision, PersonaImprovementsReply, PersonaMemoryReply } from '../contracts/remote-protocol';
 import { isMap, isScalar, parseDocument } from 'yaml';
 import { splitFrontmatter } from '../../../../shared/frontmatter';
 import { composeRunRequest, type PersonaDispatch } from '../fleet/request';
@@ -72,7 +72,6 @@ import { type EngineHost, type EngineVaultChangeEvent, EngineVault, FleetPort } 
 import { handoverFromConfig, handoverOverrideKeys } from './handover-config';
 import { appendMemory, memoryPathFor, parseMemoryEntries, toggleMemoryPin } from './persona-store';
 import { HUMAN_PERSONA_ID, humanPersona, inPipelineOrder, isHumanPersona, loadPersonaSkills, personaFileText, personaMigrationFor, parsePersonaFile, personaRef, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaMigration, type PersonaSkill } from '../core/persona';
-import { appendThreadOwner, newThreadText, parseThread, threadPathFor } from '../core/persona-thread';
 import { scanRepoFolder } from './repos-scan';
 
 const PIPELINE_PATH = 'tickets/_meta/pipeline.md';
@@ -3809,72 +3808,11 @@ export class EngineBoardService {
     });
   }
 
-  // --- persona chat, memory read/pin, setup patch (U4, concept §4.4/§4.5) ---
+  // --- persona memory read/pin, setup patch (U4, concept §4.4); the 1:1 is PersonaSessionService (req-168) ---
 
-  /**
-   * The persona chat's read (U4, concept §4.5): the coaching thread's
-   * owner messages, file order. A thread that does not exist yet reads as
-   * no messages — the persona exists, the conversation just never started.
-   */
-  async personaThread(personaId: string): Promise<PersonaThreadReply> {
-    let id: string;
-    try {
-      id = personaRef(personaId);
-    } catch (error) {
-      return { ok: false, error: messageOf(error) };
-    }
-    const vault = await this.detect();
-    if (vault === null) {
-      return { ok: false, error: 'no tickets vault detected' };
-    }
-    if ((await this.personaLoaderFor(vault).load(id)) === null) {
-      return { ok: false, error: personaMissing(id) };
-    }
-    const text = await this.readOptional(vault.id, threadPathFor(id));
-    return { ok: true, messages: parseThread(text ?? '') };
-  }
-
-  /**
-   * One owner message into the coaching thread (U4): appended as exactly
-   * one line (a file is created chat-session style when absent), one
-   * commit `personas: <id> thread`. Since milestone 212 (D-61) no run reads
-   * it back: nothing is adopted unreviewed; req-168 makes it a session.
-   */
-  personaThreadAppend(input: { id: string; text: string; actor?: string }): Promise<PersonaThreadReply> {
-    return this.enqueue(async () => {
-      let id: string;
-      try {
-        id = personaRef(input.id);
-      } catch (error) {
-        return { ok: false, error: messageOf(error) };
-      }
-      const vault = await this.detect();
-      if (vault === null) {
-        return { ok: false, error: 'no tickets vault detected' };
-      }
-      const persona = await this.personaLoaderFor(vault).load(id);
-      if (persona === null) {
-        return { ok: false, error: personaMissing(id) };
-      }
-      const path = threadPathFor(id);
-      let updated: string;
-      try {
-        const existing = await this.readOptional(vault.id, path);
-        const base = existing ?? newThreadText(persona.title, new Date());
-        updated = appendThreadOwner(base, new Date(), input.text);
-      } catch (error) {
-        return { ok: false, error: messageOf(error) };
-      }
-      try {
-        await this.host.write(vault.id, path, updated);
-      } catch (error) {
-        return { ok: false, error: `write failed: ${messageOf(error)}` };
-      }
-      const warning = await this.commit(vault, [path], `personas: ${id} thread`);
-      this.host.announceChanges(vault.id, [path]);
-      this.announceChanged();
-      return { ok: true, messages: parseThread(updated), ...(warning === null ? {} : { warning }) };
-    });
+  /** The persona as the vault holds it (req-168: the 1:1 service reads it here); null when absent. */
+  loadPersona(vault: EngineVault, id: string): Promise<Persona | null> {
+    return this.personaLoaderFor(vault).load(id);
   }
 
   /**

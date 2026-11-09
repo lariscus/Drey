@@ -39,7 +39,7 @@ export function dotOf(state: ComponentState): DotKind {
 const LIVE_STATES: readonly SessionRun['state'][] = ['starting', 'running', 'stopping'];
 
 function oneToOnePart(i18n: I18n, runs: readonly SessionRun[], nowMs: number): string | null {
-  const held = runs.find((run) => run.interactive && run.held && LIVE_STATES.includes(run.state));
+  const held = runs.find((run) => (run.kind === '1:1' || run.interactive) && run.held && LIVE_STATES.includes(run.state));
   if (held === undefined || held.persona === null) {
     return null;
   }

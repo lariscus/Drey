@@ -1042,7 +1042,7 @@ tickets/_meta/personas/
     persona.md        # frontmatter: title, kind, role, worker, models, color, skills, budget
     prompt.md         # the persona prompt — the run's instruction base when present
     memory.md         # curated memory (format and cap below)
-    thread.md         # the coaching thread — the owner's chat with the persona (U4)
+    thread.md         # retired (req-168): migrated once into the persona's first 1:1 session, then removed
     friction.md       # the worker's findings (E6 — format below)
     improvements.md   # the aggregation's proposals (E6 — format below)
     avatar.png        # optional
@@ -1079,7 +1079,8 @@ tickets/_meta/personas/
   ```
 
   Two writers append (a writer never rewrites existing entries): the
-  fleet settles a persona run with its outcome line — the outcome word
+  fleet settles a persona's ticket run with its outcome line (a 1:1
+  session writes none, req-168) — the outcome word
   (`handed-over` / `failed` / `stopped`) plus the token count; a memory
   write failure is logged and never fails the settle. And the board
   service's confirmed `personaLearn` entry is the owner's hand-confirmed
@@ -1095,22 +1096,18 @@ tickets/_meta/personas/
   pinned|unpinned`. An entry's index in `GET /api/personas/<id>/memory`
   is its position in the file's entry list (oldest first).
 
-- `thread.md` — the coaching thread (U4, concept §4.5): the owner's chat
-  with the persona, one file, shaped like a `_meta/chat/` session —
-  created on first append with `title`/`created` frontmatter, one message
-  per line below:
-
-  ```markdown
-  - '<ISO-8601>' owner — <one line of coaching>
-  ```
-
-  The writer is strict (a multi-line message flattens to one line); the
-  reader forgives — an unparseable line is skipped, never guessed. Every
-  append is one commit `personas: <id> thread`. No run brief carries the
-  thread (milestone 212, D-61 — until then the last 5 messages rode as a
-  `## Coaching` section without the owner's review): nothing a persona
-  reads is adopted automatically (concept R2/R14); req-168 turns the
-  thread into a persona session, req-169 brings the reviewed memory.
+- `thread.md` — **retired (req-168, ADR-0093, R3).** The coaching thread
+  of U4 (`- '<ISO-8601>' owner — <line>`, one line per message) is no
+  longer written. The persona's 1:1 is a chat session file under
+  `_meta/chat/` with a `persona:` key (below). A thread that still exists
+  migrates **once**, when the persona's first 1:1 session is created: its
+  readable owner lines open that session with their own stamps, a
+  `migrated — <n> lines from thread.md` line follows, and `thread.md` is
+  removed in the same commit (`personas: <id> thread.md migrated into
+  <file> (<n> lines)`); the engine logs it. A persona never talked to keeps
+  its `thread.md` until its first 1:1. No run brief ever carried the thread
+  after milestone 212 (D-61); nothing a 1:1 says reaches a run unasked —
+  only what the owner accepts as a card, or writes into memory.
 
 **The improvement loop (E6).** Two more files may live in the persona
 directory — the worker's findings and the aggregation's proposals (the
@@ -1281,7 +1278,8 @@ transcript the owner reads in the chat is the file itself. The filename
 minted at start is `<stamp>-<slug>.md` (`20261102-090100-costs-export.md`):
 the UTC stamp keeps names unique, the slug — the title lowercased to
 `[a-z0-9-]`, cut on a word boundary, `chat` when empty — keeps them
-readable. The frontmatter is two keys, plus a third on a shape session:
+readable. The frontmatter is two keys, plus a third on a shape session or
+a persona's 1:1:
 
 ```markdown
 ---
@@ -1355,6 +1353,47 @@ line is skipped, never guessed — the asymmetric-tolerance rule):
   ` → <outcome>` tail (the moved path, a refusal) rides when the
   execution reported one. Proposals are append-only history — a
   decision adds a line, never rewrites one.
+
+**A persona's 1:1 (req-168, ADR-0093, R3).** `persona: <id>` (a persona
+id) marks the persona's 1:1 session: the conversation of the Crew tab's
+1:1, the Assistant's 1:1 target and Mission Control's *Talk to <name>
+1:1*. Its title is `1:1 with <Title>`, its file name
+`<stamp>-1-1-with-<title>.md`. The newest file with a persona's key is its
+1:1; a new one is created only when the persona has none (the first one
+takes `thread.md`'s lines, above). A 1:1 file is never listed among the
+Mission Control sessions. Beyond the lines above it holds:
+
+````markdown
+- '2026-11-03T09:01:00.000Z' owner — Treat rank fields as the owner's word
+- '2026-11-09T10:00:00.000Z' migrated — 1 line from thread.md
+- '2026-11-09T10:01:00.000Z' owner — Why did T-0007 fail?
+- '2026-11-09T10:02:10.000Z' persona — The gate ran `npm test`:
+  
+  three specs failed on the date format.
+- '2026-11-09T10:02:10.000Z' proposal p-1 pending — Name the date format in my instructions
+  ```json
+  {"kind":"prompt","text":"Build small. Dates are ISO 8601."}
+  ```
+````
+
+- `- '<UTC>' persona — <text>` — the persona's answer. A 1:1 message
+  (the owner's too) may span lines: every line after the first is
+  indented two spaces, an empty line inside is written as the two spaces —
+  so a reader of the plain MC grammar still sees one line per message.
+- `- '<UTC>' migrated — <n> line(s) from thread.md` — the one migration.
+- A 1:1's proposal card carries a persona command instead of a
+  `ChatCommand`: `{"kind":"prompt","text":"<the whole new prompt.md>"}` or
+  `{"kind":"skill","skill":"<skill name>"}`
+  (`contracts/persona-session.ts`). It is decided with the same
+  `confirmed|dismissed` line; **accepting** adopts it through the persona
+  patch (`prompt.md` rewritten, or the skill added to `skills:`) — the
+  outcome reads `prompt.md written` / `skill <name> added`. Nothing a
+  persona proposes is adopted before that.
+
+Every 1:1 round is one commit (`tickets: 1:1 <file>`): the owner's line
+when it is sent, the persona's answer with its cards when the turn ends; a
+card's decision commits once. The writers live in
+`core/persona-session-file.ts`, the reader in `core/persona-session-parse.ts`.
 
 **The one exception — the shared plan (E10-3).** In a shape session
 Paul's turn may carry a new `## Plan` chapter, which the engine writes

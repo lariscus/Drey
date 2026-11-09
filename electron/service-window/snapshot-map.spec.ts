@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { componentsOf, governorFactsOf, loadOf, sessionsOf, slotFactsOf, spendOf, streamEventsOf } from './snapshot-map';
+import { componentsOf, governorFactsOf, loadOf, sessionRunOf, sessionsOf, slotFactsOf, spendOf, streamEventsOf } from './snapshot-map';
 
 /** The service's, the runner's and the engine's answers in the window's shapes (req-165/166). */
 describe('snapshot mapping', () => {
@@ -86,6 +86,13 @@ describe('snapshot mapping', () => {
     const sessions = sessionsOf(runs, now);
     expect(sessions.map((s) => s.id)).toEqual(['R-2', 'R-1']);
     expect(sessions[1]).toMatchObject({ interactive: true, held: true, grantClass: 'B', model: 'sonnet' });
+  });
+
+  it("a persona's 1:1 (req-168): its kind, its directory and when its idle release falls", () => {
+    const live = { id: 'R-9', state: 'running', kind: '1:1', persona: 'ben', held: true, startedAt: '2026-11-09T10:00:00.000Z', lastActivity: '2026-11-09T10:04:00.000Z', worktreePath: 'E:/tickets', workingDirectory: 'E:/tickets' };
+    expect(sessionRunOf(live)).toMatchObject({ kind: '1:1', workingDirectory: 'E:/tickets', releaseAt: '2026-11-09T10:19:00.000Z' });
+    expect(sessionRunOf({ ...live, state: 'done' }).releaseAt).toBeNull();
+    expect(sessionRunOf({ id: 'R-1', state: 'running', worktreePath: 'W:/T-0001' })).toMatchObject({ kind: 'run', workingDirectory: 'W:/T-0001', releaseAt: null });
   });
 
   it("a stream file's lines, a cut first line skipped", () => {

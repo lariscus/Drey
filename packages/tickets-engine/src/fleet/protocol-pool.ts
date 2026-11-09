@@ -150,6 +150,8 @@ export interface RunLedgerInput {
   readonly personaBudget: number | null;
   /** The persona's `allowed: spend-above-allowance` — it may run on past its ticket allowance. */
   readonly spendAboveAllowance: boolean;
+  /** req-168: a session without a ticket (a 1:1) — no ticket allowance applies; the persona's and the provider's ledgers still do. */
+  readonly noTicket?: boolean;
 }
 
 export type LedgerName = 'ticket' | 'persona' | 'provider';

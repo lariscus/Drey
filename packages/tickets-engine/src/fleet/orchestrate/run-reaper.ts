@@ -5,6 +5,7 @@ import { DEFAULT_RUN_LIMITS, limitExceeded, type RunLimits } from '../run/run-li
 import { isTerminal } from '../run/run-state';
 import type { BackgroundWork } from './background-work';
 import type { HandoverSettings } from './handover-settings';
+import type { IdleRelease } from './idle-release';
 import { currentPid, messageOf, type LiveRun } from './live-run';
 import type { RunBookkeeper } from './run-bookkeeper';
 import type { RunRepository } from './run-repository';
@@ -30,6 +31,8 @@ export interface RunReaperDeps {
   readonly limits?: Partial<RunLimits>;
   /** A lost exit event of a worker that finished its turn: replayed, never reaped as a failure. */
   readonly replayExit: (run: LiveRun) => Promise<void>;
+  /** req-168: lets a held 1:1 go after its idle span; absent = no sessions released (a spec). */
+  readonly idle?: IdleRelease;
 }
 
 /**
@@ -57,6 +60,9 @@ export class RunReaper {
       return this.settleIfWorkerGone(run);
     }
     if (isTerminal(state) || state === 'stopping' || run.gating || run.handover !== undefined) {
+      return;
+    }
+    if ((await this.deps.idle?.releaseIfDue(run)) === true) {
       return;
     }
     const over = this.overLimit(run) ?? this.overContextCap(run) ?? this.hung(run);

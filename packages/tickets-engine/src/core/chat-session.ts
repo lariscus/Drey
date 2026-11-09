@@ -48,12 +48,18 @@ export function sessionSlug(title: string): string {
   return slug === '' ? 'chat' : slug;
 }
 
-/** The strict canonical shape of a fresh session file. */
-export function newSessionText(title: string, now: Date, ticket?: string): string {
+/** The strict canonical shape of a fresh session file; a persona's 1:1 (req-168) carries `persona:`. */
+export function newSessionText(title: string, now: Date, ticket?: string, persona?: string): string {
   const stamp = now.toISOString();
   const name = title.trim() === '' ? 'Chat' : title.trim();
   const shaped = ticket !== undefined && /^T-\d{4,}$/.test(ticket) ? `ticket: ${ticket}\n` : '';
-  return `---\ntitle: "${name.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\ncreated: '${stamp}'\n${shaped}---\n\n`;
+  const owned = persona !== undefined && /^[a-z0-9][a-z0-9-]{0,63}$/.test(persona) ? `persona: ${persona}\n` : '';
+  return `---\ntitle: "${name.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\ncreated: '${stamp}'\n${shaped}${owned}---\n\n`;
+}
+
+/** The persona a session file talks to (req-168: a 1:1); null for a Mission Control or shape session. */
+export function sessionPersonaOf(yamlText: string): string | null {
+  return /^persona:\s*([a-z0-9][a-z0-9-]{0,63})\s*$/m.exec(yamlText)?.[1] ?? null;
 }
 
 /** Appends the "You edited the plan" card: the summary line and the fenced diff the model read. */
@@ -264,7 +270,8 @@ export function parseSessionFile(
     }
   }
   const ticket = /^ticket:\s*(T-\d{4,})\s*$/m.exec(yamlText)?.[1] ?? null;
-  return { file, title, createdAt, messages, proposals, ticket, ...(sources.length > 0 ? { sources } : {}) };
+  const persona = sessionPersonaOf(yamlText);
+  return { file, title, createdAt, messages, proposals, ticket, ...(persona !== null ? { persona } : {}), ...(sources.length > 0 ? { sources } : {}) };
 }
 
 function rec(value: unknown): Record<string, unknown> | null {

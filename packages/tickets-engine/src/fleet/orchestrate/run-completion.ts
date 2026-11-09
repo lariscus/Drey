@@ -51,6 +51,9 @@ export class RunCompletion {
       case 'interactive':
         await bookkeeper.note(run, `interactive dialog ended (${exitWord(code)}) — the owner moves the ticket`);
         return settler.finish(run, 'done');
+      case 'session':
+        await bookkeeper.note(run, `1:1 session ended (${exitWord(code)})`);
+        return settler.finish(run, 'done');
       case 'no-result':
         return this.noResult(run, code);
       case 'reopened':

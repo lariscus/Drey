@@ -147,6 +147,17 @@ mc-app-bar {
   overflow-wrap: anywhere;
 }
 
+/* req-168: a persona's answer keeps its lines; the session's state is one quiet line under the thread. */
+.msg .bubble {
+  white-space: pre-wrap;
+}
+
+.session-line {
+  margin: 0;
+  font-size: calc(13px * var(--mc-text, 1));
+  color: var(--text-3);
+}
+
 .handoff {
   margin-top: 8px;
   font-family: var(--mono);

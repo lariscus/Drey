@@ -63,8 +63,6 @@ function fakes(): { board: RemoteBoard; fleet: RemoteFleet } {
     decideImprovement: vi.fn(async () => ok),
     statusOf: vi.fn(async () => [] as readonly StatusLine[]),
     snapshot: vi.fn(async () => ({ columns: [], checkpoints: [], pipeline: [] }) as unknown as BoardSnapshot),
-    personaThread: vi.fn(async () => ({ ok: true as const, messages: [] })),
-    personaThreadAppend: vi.fn(async () => ({ ok: true as const, messages: [] })),
     personaMemory: vi.fn(async () => ({ ok: true as const, entries: [] })),
     personaMemoryAppend: vi.fn(async () => ({ ok: true as const, entries: [] })),
     personaMemoryPin: vi.fn(async () => ({ ok: true as const, entries: [] })),

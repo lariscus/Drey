@@ -1,6 +1,6 @@
 /**
  * The pure halves of the Assistant's Mission Control targets (E13-5): the
- * engine's chat session and the persona thread mapped to the SDK's
+ * engine's chat session mapped to the SDK's (the persona 1:1 is persona-map.ts)
  * content-agnostic `ConversationThread`. No DOM, no IPC -- the target in
  * `targets.ts` calls these with what the plugin IPC returned.
  */
@@ -195,29 +195,4 @@ export function errorMessageOf(failure: ChatModelFailure | undefined, error: str
     return { id: 'error', role: 'agent', text: '', error: { title: `${failure.providerLabel} could not answer`, lines } };
   }
   return { id: 'error', role: 'agent', text: '', error: { title: 'Mission Control could not answer', lines: [error ?? 'unknown error'] } };
-}
-
-/** One persona-thread reply (`personaThread`) as the 1:1 thread. */
-export function threadOfPersona(
-  personaId: string,
-  title: string,
-  reply: unknown,
-): ConversationThread {
-  const notice = `${title} reads this thread before the next run.`;
-  const r = reply as { ok?: unknown; messages?: unknown; error?: unknown } | null;
-  if (r === null || typeof r !== 'object' || r.ok !== true || !Array.isArray(r.messages)) {
-    const error = typeof r?.error === 'string' ? r.error : 'the thread could not be read';
-    return {
-      id: personaId,
-      title,
-      notice,
-      messages: [{ id: 'error', role: 'agent', text: '', error: { title: `${title}'s thread could not be read`, lines: [error] } }],
-    };
-  }
-  const messages: ConversationMessage[] = (r.messages as { text?: unknown }[]).map((message, index) => ({
-    id: `t-${index}`,
-    role: 'user' as const,
-    text: typeof message.text === 'string' ? message.text : '',
-  }));
-  return { id: personaId, title, notice, messages };
 }

@@ -24,6 +24,7 @@ import {
 } from '../ticket/ticket.model';
 import { AppBar } from '../app-bar/app-bar';
 import { McI18nPipe } from '../i18n/i18n.pipe';
+import { McI18n } from '../i18n/i18n.service';
 import { PhoneAvatar } from '../phone/avatar';
 import { PhoneIcon } from '../phone/icon';
 import { padSignal } from '../phone/phone';
@@ -113,6 +114,20 @@ export function snippetOf(text: string): string {
 }
 
 /** The ` · HH:MM` stamp a message's who-line shows; '' when the stamp is unusable. */
+/** req-168: the key and params of the 1:1's session line; null while no session starts, answers or stands held. */
+export function oneOnOneLineOf(thread: PersonaThreadView | null, name: string, time: (date: Date) => string): { readonly key: string; readonly params: Record<string, string> } | null {
+  switch (thread?.session) {
+    case 'starting':
+      return { key: 'one_on_one.state.starting', params: { name } };
+    case 'answering':
+      return { key: 'one_on_one.state.answering', params: { name } };
+    case 'held':
+      return thread.releaseAt === undefined ? null : { key: 'one_on_one.state.held', params: { time: time(new Date(thread.releaseAt)) } };
+    default:
+      return null;
+  }
+}
+
 export function timeWordsOf(at: string): string {
   if (at === '') {
     return '';
@@ -221,6 +236,8 @@ export interface TeamDetailVm {
   threadError?(): string | null;
   /** Sends one owner line into the thread (the desk echoes and answers). */
   sendThread?(text: string): Promise<DetailActionReply>;
+  /** req-168: accepts or dismisses one of the persona's 1:1 cards. */
+  decideThreadProposal?(proposal: string, decision: 'confirm' | 'dismiss'): Promise<DetailActionReply>;
   /** The memory entries; null while the first fetch runs. Absent = the list stays empty. */
   memory?(): PersonaMemoryView | null;
   /** Why the memory load failed; null when all is well. */
@@ -279,6 +296,7 @@ export const MC_TEAM_DETAIL = new InjectionToken<TeamDetailVm>('mc-team-detail',
 export class PersonaDetail {
   private readonly vm = inject(MC_TEAM_DETAIL);
   private readonly team = inject(MC_TEAM_STATE);
+  private readonly i18n = inject(McI18n);
 
   // --- the iPad's right part (board 5d) -----------------------------------------------
 
@@ -406,6 +424,22 @@ export class PersonaDetail {
   protected readonly thread = computed(() => this.vm.thread?.() ?? null);
 
   protected readonly threadError = computed(() => this.vm.threadError?.() ?? null);
+
+  /** req-168: the session behind the 1:1 as one quiet line; null while none runs or waits. */
+  protected readonly sessionLine = computed(() => oneOnOneLineOf(this.thread(), this.title(), (date) => this.i18n.formatTime(date)));
+
+  /** req-168: the persona's own proposal cards (instructions, a skill), adopted only on Accept. */
+  protected readonly threadProposals = computed(() => this.thread()?.proposals ?? []);
+
+  /** req-168: why the last line was not answered; null when it was. */
+  protected readonly threadFailure = computed(() => this.thread()?.failure ?? null);
+
+  protected async decideThreadProposal(proposal: string, decision: 'confirm' | 'dismiss'): Promise<void> {
+    const reply = await this.vm.decideThreadProposal?.(proposal, decision);
+    if (reply !== undefined && !reply.ok) {
+      this.sendError.set(reply.error ?? null);
+    }
+  }
 
   protected readonly draft = signal('');
 

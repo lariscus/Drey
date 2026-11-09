@@ -16,6 +16,7 @@ import type {
 } from '../api/dto';
 import { ACCEPT_ARM_WINDOW_MS, type AcceptArmState } from '../ticket/ticket.model';
 import {
+  oneOnOneLineOf,
   CARD_SNIPPET_CAP,
   CONTENT_PREVIEW_LINES,
   EVIDENCE_PREVIEW_CAP,
@@ -1021,5 +1022,43 @@ describe('the merged 1:1 tab', () => {
     expect(el.querySelectorAll('.imp')).toHaveLength(1);
     expect(el.querySelector('.thread .bubble')?.textContent).toContain('Why the ranks?');
     expect(el.querySelector('.composer input')).not.toBeNull();
+  });
+});
+
+describe('the 1:1 as a persona session (req-168)', () => {
+  const time = (date: Date): string => date.toISOString().slice(11, 16);
+
+  it('names the session behind the thread: starting, answering, held until; nothing otherwise', () => {
+    expect(oneOnOneLineOf({ messages: [], session: 'starting' }, 'Pia', time)).toEqual({ key: 'one_on_one.state.starting', params: { name: 'Pia' } });
+    expect(oneOnOneLineOf({ messages: [], session: 'answering' }, 'Pia', time)).toEqual({ key: 'one_on_one.state.answering', params: { name: 'Pia' } });
+    expect(oneOnOneLineOf({ messages: [], session: 'held', releaseAt: '2026-11-09T10:15:00Z' }, 'Pia', time)).toEqual({ key: 'one_on_one.state.held', params: { time: '10:15' } });
+    expect(oneOnOneLineOf({ messages: [], session: 'none' }, 'Pia', time)).toBeNull();
+    expect(oneOnOneLineOf({ messages: [], session: 'bridge' }, 'Pia', time)).toBeNull();
+    expect(oneOnOneLineOf(null, 'Pia', time)).toBeNull();
+  });
+
+  it("carries the persona's cards and its failure, and a card's decision goes to the desk", async () => {
+    const decided: { proposal: string; decision: string }[] = [];
+    const vm = makeVm({
+      threadValue: {
+        messages: [{ role: 'persona', text: 'Yes.', at: '2026-11-09T10:04:00Z' }],
+        proposals: [{ id: 'p-1', state: 'pending', summary: 'Name the date format', kind: 'prompt', skill: '', outcome: null }],
+        session: 'held',
+        releaseAt: '2026-11-09T10:19:00Z',
+        failure: 'the runner is not running',
+      },
+      decideThreadProposal: async (proposal, decision) => (decided.push({ proposal, decision }), { ok: true }),
+    } as Partial<FakeVm>);
+    const detail = setup(vm) as unknown as {
+      threadProposals: Signal<readonly { id: string }[]>;
+      threadFailure: Signal<string | null>;
+      sessionLine: Signal<{ key: string } | null>;
+      decideThreadProposal(proposal: string, decision: 'confirm' | 'dismiss'): Promise<void>;
+    };
+    expect(detail.threadProposals().map((card) => card.id)).toEqual(['p-1']);
+    expect(detail.threadFailure()).toBe('the runner is not running');
+    expect(detail.sessionLine()?.key).toBe('one_on_one.state.held');
+    await detail.decideThreadProposal('p-1', 'confirm');
+    expect(decided).toEqual([{ proposal: 'p-1', decision: 'confirm' }]);
   });
 });

@@ -111,17 +111,40 @@ describe('the Mission Control target', () => {
   });
 });
 
-describe('a persona target', () => {
-  it('reads and appends the persona thread', async () => {
+describe('a persona target (req-168)', () => {
+  it('reads the 1:1, sends a line and routes a card button to the proposal decision', async () => {
     const { deps: d, calls } = deps();
     const ben = createConversationProvider(d).targets()[2]!;
     await ben.thread();
-    const thread = await ben.send('Prefer small commits');
+    await ben.send('Prefer small commits');
+    await ben.act('p-1', 'accept');
+    await ben.act('p-2', 'dismiss');
     expect(calls.map((c) => [c.method, c.payload])).toEqual([
       ['personaThread', { persona: 'ben' }],
       ['personaThreadAppend', { persona: 'ben', text: 'Prefer small commits' }],
+      ['personaProposalDecide', { persona: 'ben', id: 'p-1', decision: 'confirm' }],
+      ['personaProposalDecide', { persona: 'ben', id: 'p-2', decision: 'dismiss' }],
     ]);
-    expect(thread.notice).toBe('Ben reads this thread before the next run.');
+    expect(ben.description).toBe('one_on_one.talk_to');
+  });
+
+  it('follows board changes always, fleet changes only while a session starts or a turn runs', async () => {
+    let fire: (what: 'board' | 'fleet') => void = () => undefined;
+    let reply: unknown = { ok: true, messages: [], session: 'answering' };
+    const { deps: d } = deps({
+      invoke: () => Promise.resolve(reply),
+      subscribeChanges: (listener) => ((fire = listener), () => undefined),
+    });
+    const ben = createConversationProvider(d).targets()[2]!;
+    const heard: string[] = [];
+    ben.onThreadChange!(() => heard.push('read'));
+    await ben.thread();
+    fire('fleet');
+    reply = { ok: true, messages: [], session: 'held', releaseAt: '2026-11-09T10:15:00Z' };
+    await ben.thread();
+    fire('fleet');
+    fire('board');
+    expect(heard).toEqual(['read', 'read']);
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatSession } from '../../../../packages/tickets-engine/src/contracts/chat';
-import { burnRateMessageOf, errorMessageOf, threadOfPersona, threadOfSession, trancheMessageOf, VIA_MISSION_CONTROL, withTrancheMessage } from './map';
+import { burnRateMessageOf, errorMessageOf, threadOfSession, trancheMessageOf, VIA_MISSION_CONTROL, withTrancheMessage } from './map';
 
 const base: ChatSession = {
   file: 'tickets/_meta/chat/20261104-100000-demo.md',
@@ -109,19 +109,6 @@ describe('errorMessageOf', () => {
     expect(failed.error?.title).toBe('Claude Code could not answer');
     expect(failed.error?.lines).toEqual(['the CLI providers cannot drive the chat']);
     expect(errorMessageOf(undefined, 'boom').error?.lines).toEqual(['boom']);
-  });
-});
-
-describe('threadOfPersona', () => {
-  it('maps the owner messages and names who reads the thread', () => {
-    const thread = threadOfPersona('ben', 'Ben', { ok: true, messages: [{ at: 'a', role: 'owner', text: 'Prefer small commits' }] });
-    expect(thread.messages).toEqual([{ id: 't-0', role: 'user', text: 'Prefer small commits' }]);
-    expect(thread.notice).toBe('Ben reads this thread before the next run.');
-  });
-
-  it('turns a failed read into an error message', () => {
-    const thread = threadOfPersona('ben', 'Ben', { ok: false, error: 'no such persona' });
-    expect(thread.messages[0]?.error?.lines).toEqual(['no such persona']);
   });
 });
 

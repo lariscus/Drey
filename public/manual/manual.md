@@ -480,9 +480,8 @@ speech bubble (**Model**), a rocket (**Mission Control**) and two heads
   Z.ai GLM); with a CLI provider it answers with an error card saying so.
   The head's list button opens the earlier Mission Control chats, `+`
   starts a new one.
-- **1:1** opens a menu of the crew's agent personas. Your messages go into
-  that persona's thread — a note to the persona; no run reads it until the
-  1:1 becomes a conversation with the persona.
+- **1:1** opens a menu of the crew's agent personas: a conversation with
+  that persona, answered by the persona itself — see [The 1:1](#one-on-one).
 
 #### Shape a ticket in the editor {#shape-in-editor}
 
@@ -1155,6 +1154,37 @@ Talking to the crew does not need it: Mission Control, *Shape with Paul* and a
 run starts the runner when it is not running. If the runner cannot be started,
 the switch says why (*The runner could not be started: …*).
 
+### The 1:1 {#one-on-one}
+
+A 1:1 is a conversation with one persona of the crew, answered by the
+persona itself — on its own worker and model, from its instructions, its
+skills, its memory and its latest runs. You find it on the Crew tab (a
+persona's **1:1**), in the Assistant (the **1:1** menu) and in Mission
+Control (*Talk to <name> 1:1*); all three show the same conversation.
+
+- **Send a line** and it is in the conversation at once. The first line
+  starts a session for the persona (the line under the conversation reads
+  *Starting Ben's session*, then *Ben is answering*); the answer appears
+  when the persona has finished its turn.
+- **The session stays** while you keep talking (*Session held until
+  10:42*) and is let go after 15 minutes without a line; the next line
+  starts a new one that reads the conversation back. A held session takes
+  one of the crew's places, like a run; an idle one costs nothing.
+- **The persona only reads.** It can look at the board, the tickets and
+  its own memory, but changes nothing, and a 1:1 does not write into its
+  memory.
+- **Proposals.** When the persona suggests changing its instructions or
+  adding a skill, the suggestion is a card under its answer. **Accept**
+  writes the change into the persona; **Dismiss** leaves everything as it
+  was. Nothing changes without your Accept.
+- A persona on the **api** worker answers with the assistant's model
+  instead of a session of its own.
+- The conversation is kept as a chat file in the tickets repository, so
+  you can open it like any note. Notes you wrote to a persona before this
+  version move into its first 1:1.
+- The background service's **Sessions** tab lists a held 1:1 as
+  *1:1 · Ben* with the time it will be let go.
+
 ### Tranches and the checkpoint report
 
 **On** never lets the crew run open-ended: it releases one **tranche** — up to
@@ -1303,8 +1333,8 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   budgets, the pool load (*Local 1/2*), **Pause all** (running work
   finishes, nothing new starts; the button then reads **Resume all**) and
   **Stop all** (press twice — it aborts every live run and halts the
-  chain). Click a card to open the persona's **1:1** (your messages to it;
-  Ctrl+Enter sends), **Memory** (its entries — pin the ones that must
+  chain). Click a card to open the persona's **1:1** (a conversation with
+  the persona, [The 1:1](#one-on-one); Ctrl+Enter sends), **Memory** (its entries — pin the ones that must
   always ride along — and a line to teach it) and **Setup** (worker,
   model, pool, phases, cost; **Pause** or **Resume** the persona).
   **Edit persona** on that head opens the persona's own page: its name,

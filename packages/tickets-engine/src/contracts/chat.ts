@@ -126,6 +126,8 @@ export interface ChatSession {
   readonly sources?: readonly string[];
   /** The model that answers in a shape session (the chat model), for the context line. */
   readonly model?: string;
+  /** req-168: a persona's 1:1 (`persona:` in the file) — read through the persona's thread, never listed as a Mission Control session. */
+  readonly persona?: string;
 }
 
 /** The streaming unit the UI renders (thought dim, then text, cards). */

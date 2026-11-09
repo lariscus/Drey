@@ -149,6 +149,15 @@ describe('PoolGrant — the three ledgers (req-170)', () => {
     expect(pool.choose(ask({ ledger: { allowance: null, personaBudget: null, spendAboveAllowance: true } }))).toMatchObject({ kind: 'grant' });
   });
 
+  it('a 1:1 has no ticket: no allowance applies, the persona day still does (req-168)', async () => {
+    const { pool, book } = await rig({ models: TABLE, ledgers: { ticketAllowance: 1, personaPerDay: 5 } });
+    book.seed([run({ id: 'R-a', ticketId: '1:1', costUsd: 2 })]);
+    const session = { ticket: '1:1', ledger: { allowance: null, personaBudget: null, spendAboveAllowance: false, noTicket: true } };
+    expect(pool.choose(ask(session))).toMatchObject({ kind: 'grant' });
+    book.seed([run({ id: 'R-a', ticketId: '1:1', costUsd: 2 }), run({ id: 'R-b', ticketId: '1:1', costUsd: 4 })]);
+    expect(pool.choose(ask(session))).toMatchObject({ kind: 'wait', reason: 'ledger', ledger: { key: 'ledger-persona-ben' } });
+  });
+
   it("the persona's day counts today's sessions only; budget: beats the default", async () => {
     const { pool, book } = await rig({ models: TABLE, ledgers: { personaPerDay: 5 } });
     book.seed([run({ id: 'R-a', ticketId: 'T-0009', costUsd: 4 }), run({ id: 'R-b', ticketId: 'T-0009', costUsd: 3, startedAt: '2026-11-08T23:00:00Z' })]);

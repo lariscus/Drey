@@ -8,9 +8,9 @@ import { messageOf, type LiveRun } from './live-run';
 import type { RunRepository } from './run-repository';
 import type { VaultGrantRequest, WorkerVaultAccess, WorkerVaultGate } from './worker-vault';
 
-/** Where the worker works: a review's read-only checkout (req-183), else the run's worktree. */
+/** Where the worker works: a session's explicit directory (req-168, R12), a review's read-only checkout (req-183), else the run's worktree. */
 function workFolderOf(info: RunInfo): string {
-  return info.review?.checkout ?? info.worktreePath;
+  return info.workingDirectory ?? info.review?.checkout ?? info.worktreePath;
 }
 
 /** What one worker is started with; the caller composes the instruction. */

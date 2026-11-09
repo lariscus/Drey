@@ -1,6 +1,7 @@
 import { PERSONAS_DIR } from '../../core/persona';
 import type { Clock } from '../ports/clock';
 import type { FileSystem } from '../ports/file-system';
+import { isOneOnOne } from '../protocol-session';
 import type { TerminalRunState } from '../run/run-state';
 import { messageOf, type LiveRun } from './live-run';
 
@@ -16,7 +17,9 @@ export const PERSONA_MEMORY_LINE_CAP = 200;
  * `- <date> · <ticket> · <outcome> · <tokens> tokens` appended to
  * `tickets/_meta/personas/<persona>/memory.md`. The next dispatch of the
  * persona reads it back as the instruction's `## Memory` slice. Every
- * failure is a log line, never a thrown error.
+ * failure is a log line, never a thrown error. A 1:1 (req-168) writes
+ * nothing: what a conversation teaches lands in memory only through the
+ * owner (or req-169's closing round), never unasked.
  */
 export class PersonaMemory {
   constructor(
@@ -27,7 +30,7 @@ export class PersonaMemory {
 
   async append(run: LiveRun, state: TerminalRunState): Promise<void> {
     const persona = run.info.persona ?? null;
-    if (persona === null || persona.trim() === '') {
+    if (persona === null || persona.trim() === '' || isOneOnOne(run.request)) {
       return;
     }
     const outcome = state === 'done' ? 'handed-over' : state;

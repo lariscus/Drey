@@ -246,7 +246,8 @@ export class ChatService implements ChatServicePort {
         continue;
       }
       const session = parseSessionFile(text, file, snap.priorities);
-      if (session === null) {
+      // req-168: a persona's 1:1 is read through its persona, not listed among the Mission Control sessions.
+      if (session === null || session.persona !== undefined) {
         continue;
       }
       metas.push({

@@ -12,7 +12,7 @@
  */
 import { autopilotSwitchViewOf, autopilotToneOf } from '../../../../shared/autopilot';
 import type { PersonaView } from '../../shared/remote-protocol';
-import type { PersonaMemoryReply, PersonaThreadReply } from '../../shared/remote-protocol';
+import type { PersonaMemoryReply } from '../../shared/remote-protocol';
 import { h, textButton, type DeskDeps } from '../desk-deps';
 import { NUDGE_TEXT } from '../workers-view';
 import {
@@ -25,6 +25,7 @@ import {
   type RunRowModel,
   type TeamModel,
 } from './team-model';
+import { mountOneOnOnePane } from './one-on-one-pane';
 import { personaPictureNode } from './persona-picture';
 import type { TeamStore } from './team-store';
 
@@ -198,58 +199,6 @@ function messageNode(text: string, kind: 'empty' | 'error' = 'empty'): HTMLEleme
   return h('div', kind === 'error' ? 'desk-note desk-note-error' : 'desk-note', text);
 }
 
-function threadPane(deps: DeskDeps, persona: PersonaView, body: HTMLElement): void {
-  const list = h('div', 'desk-thread');
-  const input = h('textarea', 'desk-input');
-  input.rows = 3;
-  input.setAttribute('aria-label', `Message to ${persona.title}`);
-  const send = textButton('Send', 'desk-btn desk-btn-primary', 'Add the message to the coaching thread', () => void submit());
-  const paint = (reply: PersonaThreadReply): void => {
-    list.replaceChildren();
-    if (!reply.ok) {
-      list.append(messageNode(reply.error, 'error'));
-      return;
-    }
-    if (reply.messages.length === 0) {
-      list.append(messageNode('No messages yet.'));
-    }
-    for (const message of reply.messages) {
-      const bubble = h('div', 'desk-msg');
-      bubble.append(h('div', 'desk-msg-text', message.text), h('div', 'desk-msg-at', message.at.slice(0, 16).replace('T', ' ')));
-      list.append(bubble);
-    }
-    list.scrollTop = list.scrollHeight;
-  };
-  const submit = async (): Promise<void> => {
-    const text = input.value.trim();
-    if (text === '') {
-      return;
-    }
-    send.disabled = true;
-    try {
-      paint((await deps.invoke('personaThreadAppend', { persona: persona.id, text })) as PersonaThreadReply);
-      input.value = '';
-    } catch (error) {
-      list.append(messageNode(error instanceof Error ? error.message : String(error), 'error'));
-    } finally {
-      send.disabled = false;
-    }
-  };
-  input.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-      event.preventDefault();
-      void submit();
-    }
-  });
-  const composer = h('div', 'desk-composer');
-  composer.append(input, send);
-  body.append(list, composer);
-  void deps
-    .invoke('personaThread', { persona: persona.id })
-    .then((reply) => paint(reply as PersonaThreadReply))
-    .catch((error: unknown) => paint({ ok: false, error: error instanceof Error ? error.message : String(error) }));
-}
-
 function memoryPane(deps: DeskDeps, persona: PersonaView, body: HTMLElement): void {
   const list = h('div', 'desk-memory');
   const input = h('input', 'desk-input desk-input-line');
@@ -373,7 +322,7 @@ function detailNode(deps: DeskDeps, store: TeamStore, card: PersonaCardModel, pe
   main.append(tabs, body);
   detail.append(head, main);
   if (tab === '1:1') {
-    threadPane(deps, persona, body);
+    mountOneOnOnePane(deps, persona, body);
   } else if (tab === 'Memory') {
     memoryPane(deps, persona, body);
   } else {

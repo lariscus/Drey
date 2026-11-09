@@ -72,6 +72,9 @@ function baseRun(): Omit<SessionRun, 'id' | 'ticketId' | 'persona' | 'worktreePa
     turns: null,
     held: false,
     interactive: false,
+    kind: 'run',
+    workingDirectory: '',
+    releaseAt: null,
     origin: 'chain',
     handoverMode: 'fresh',
     slot: null,
@@ -138,18 +141,21 @@ export function demoRuns(): readonly SessionRun[] {
   const oneToOne: SessionRun = {
     ...baseRun(),
     id: 'S-ben-1on1',
-    ticketId: 'T-0000',
+    ticketId: '1:1',
     persona: 'ben',
     phase: null,
     pid: 19102,
     startedAt: today('08:27:15'),
     lastActivity: minutesAgo(4),
     held: true,
-    interactive: true,
-    origin: 'drey:crew-1on1',
+    kind: '1:1',
+    releaseAt: new Date(Date.parse(minutesAgo(4)) + 15 * 60_000).toISOString(),
+    origin: 'drey:1:1',
+    permission: 'read-only',
     worktreePath: 'E:\\projects\\drey-tickets',
   };
-  return [tessa, ben, oneToOne, ...Array.from({ length: 7 }, (_, index) => endedRun(index))];
+  // R12: the directory is explicit on every record — a run's worktree, the 1:1's tickets repository.
+  return [tessa, ben, oneToOne, ...Array.from({ length: 7 }, (_, index) => endedRun(index))].map((run) => ({ ...run, workingDirectory: run.worktreePath }));
 }
 
 export function demoStream(): readonly StreamEvent[] {

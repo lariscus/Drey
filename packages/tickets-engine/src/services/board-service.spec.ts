@@ -748,41 +748,6 @@ describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () =>
     );
   }
 
-  it('personaThreadAppend creates the thread chat-session style and appends one line per message', async () => {
-    await writePia();
-    const service = serviceOf();
-
-    const first = await service.personaThreadAppend({ id: 'pia', text: 'Treat rank fields as the word of the owner' });
-    if (!first.ok) {
-      throw new Error(first.error);
-    }
-    const file = await fsp.readFile(path.join(vaultDir, ...PERSONA_DIR, 'thread.md'), 'utf8');
-    expect(file).toContain('title: "Pia"');
-    expect(file).toMatch(/- '\d{4}-\d{2}-\d{2}T.*' owner — Treat rank fields as the word of the owner\n$/);
-    expect(first.messages).toHaveLength(1);
-    expect(first.messages[0]).toMatchObject({ role: 'owner', text: 'Treat rank fields as the word of the owner' });
-
-    const second = await service.personaThreadAppend({ id: 'pia', text: 'second line' });
-    if (!second.ok) {
-      throw new Error(second.error);
-    }
-    expect(second.messages).toHaveLength(2);
-
-    // a multi-line message flattens to one line
-    await service.personaThreadAppend({ id: 'pia', text: 'a\nb' });
-    const file2 = await fsp.readFile(path.join(vaultDir, ...PERSONA_DIR, 'thread.md'), 'utf8');
-    expect(file2).toContain('owner — a b\n');
-  });
-
-  it('personaThread reads the messages back and a thread-less persona reads as none', async () => {
-    await writePia();
-    const service = serviceOf();
-    expect(await service.personaThread('pia')).toEqual({ ok: true, messages: [] });
-    await service.personaThreadAppend({ id: 'pia', text: 'hello' });
-    const read = await service.personaThread('pia');
-    expect(read.ok && read.messages).toHaveLength(1);
-  });
-
   it('personaMemoryAppend appends through the persona store and personaMemory reads entries with pins', async () => {
     await writePia();
     const service = serviceOf();
@@ -829,8 +794,6 @@ describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () =>
   it('every persona-scoped method refuses an unknown persona id', async () => {
     const service = serviceOf();
     const missing = { ok: false, error: 'persona "ghost" does not exist — create tickets/_meta/personas/ghost/persona.md first' };
-    expect(await service.personaThread('ghost')).toEqual(missing);
-    expect(await service.personaThreadAppend({ id: 'ghost', text: 'x' })).toEqual(missing);
     expect(await service.personaMemory('ghost')).toEqual(missing);
     expect(await service.personaMemoryAppend({ id: 'ghost', text: 'x' })).toEqual(missing);
     expect(await service.personaMemoryPin({ id: 'ghost', index: 0, pinned: true })).toEqual(missing);
