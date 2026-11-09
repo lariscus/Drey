@@ -12,6 +12,8 @@ export interface PersonaPatchFields {
   skills?: readonly string[];
   prompt?: string;
   summary?: string;
+  /** The daily budget in USD; null clears it (req-171). */
+  budget?: number | null;
   allowed?: PersonaAllowedPatch;
 }
 
@@ -46,6 +48,7 @@ const RULES: readonly Rule[] = [
   [(i) => i.skills !== undefined && i.skills.some((s) => typeof s !== 'string'), 'the skills are a list of skill names'],
   [(i) => i.prompt !== undefined && typeof i.prompt !== 'string', 'the prompt is markdown text'],
   [(i) => i.summary !== undefined && (typeof i.summary !== 'string' || i.summary.length > 200), 'the one line for the crew list is text of at most 200 characters'],
+  [(i) => i.budget !== undefined && i.budget !== null && !(typeof i.budget === 'number' && Number.isFinite(i.budget) && i.budget >= 0), 'the daily budget is a number of dollars, zero or more, or null'],
   [(i) => i.allowed !== undefined && allowedBroken(i.allowed), 'allowed is { spendAboveAllowance?, runCommands?, network?, writeVaults? } with run-commands accept-edits or bypass'],
 ];
 

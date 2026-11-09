@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PersonaView } from '../../shared/remote-protocol';
 import type { PipelinePhase } from '../../shared/tickets';
-import { draftOf, isDirty, isMissingFileError, patchOf, personaIdOfKey, personaKeyOf, personaPathsOf, poolRowsOf, skillTitleOf, stepsOf, wordsOf } from './persona-model';
+import { budgetOf, draftOf, isDirty, isMissingFileError, patchOf, personaIdOfKey, personaKeyOf, personaPathsOf, savedBaseOf, stepsOf, wordsOf } from './persona-model';
 
 const view: PersonaView = { id: 'ben', title: 'Ben', role: 'builder', worker: 'opencode', model: 'qwen3-coder', pool: ['qwen3-coder', 'sonnet'], color: '#8ecbef', budget: 5 };
 
@@ -66,22 +66,7 @@ describe('the steps', () => {
   });
 });
 
-describe('the pool rows', () => {
-  it('numbers them and marks the overflow from the second row', () => {
-    expect(poolRowsOf('opencode', ['a', 'b'])).toEqual([
-      { index: 1, label: 'Local', model: 'a', overflow: false },
-      { index: 2, label: 'Local', model: 'b', overflow: true },
-    ]);
-    expect(poolRowsOf('kimi', ['a'])[0]?.label).toBe('Kimi Code');
-  });
-});
-
 describe('small helpers', () => {
-  it('words a skill id', () => {
-    expect(skillTitleOf('go-conventions')).toBe('Go conventions');
-    expect(skillTitleOf('tdd')).toBe('Tdd');
-  });
-
   it('counts words', () => {
     expect(wordsOf('')).toBe(0);
     expect(wordsOf('  one two\n three ')).toBe(3);
@@ -90,5 +75,43 @@ describe('small helpers', () => {
   it('tells a missing file from a failed read', () => {
     expect(isMissingFileError(new Error("ENOENT: no such file or directory, open 'x'"))).toBe(true);
     expect(isMissingFileError(new Error('EISDIR: illegal operation on a directory'))).toBe(false);
+  });
+});
+
+describe('the v2 fields (R11, req-171)', () => {
+  const rich: PersonaView = { ...view, summary: 'Builds one part.', allowed: { spendAboveAllowance: false, writeVaults: ['notes'], runCommands: 'bypass', network: true } };
+  const base = draftOf(rich, 'P', []);
+
+  it('reads the one line, the harness, the budget and the allowed keys off the record', () => {
+    expect(base.summary).toBe('Builds one part.');
+    expect(base.worker).toBe('opencode');
+    expect(base.budget).toBe('5');
+    expect(base.allowed).toEqual({ writeVaults: ['notes'], runCommands: 'bypass', network: true, spend: false });
+    expect(draftOf(view, '', []).allowed).toEqual({ writeVaults: [], runCommands: '', network: false, spend: false });
+  });
+
+  it('sends the one line, the harness and the budget only when they changed', () => {
+    expect(patchOf(base, { ...base, summary: ' Builds. ' })).toEqual({ summary: 'Builds.' });
+    expect(patchOf(base, { ...base, summary: '' })).toEqual({ summary: '' });
+    expect(patchOf(base, { ...base, worker: 'claude-code' })).toEqual({ worker: 'claude-code' });
+    expect(patchOf(base, { ...base, budget: '$7.50' })).toEqual({ budget: 7.5 });
+    expect(patchOf(base, { ...base, budget: '' })).toEqual({ budget: null });
+    expect(patchOf(base, { ...base, budget: '$5.00' })).toEqual({});
+    expect(patchOf(base, { ...base, budget: 'lots' })).toEqual({});
+  });
+
+  it('sends only the allowed keys that differ; a cleared mode is null', () => {
+    expect(patchOf(base, { ...base, allowed: { ...base.allowed, network: false } })).toEqual({ allowed: { network: false } });
+    expect(patchOf(base, { ...base, allowed: { ...base.allowed, runCommands: '' } })).toEqual({ allowed: { runCommands: null } });
+    expect(patchOf(base, { ...base, allowed: { ...base.allowed, spend: true, writeVaults: ['notes', 'work'] } })).toEqual({ allowed: { spendAboveAllowance: true, writeVaults: ['notes', 'work'] } });
+    expect(isDirty(base, { ...base, allowed: { ...base.allowed } })).toBe(false);
+  });
+
+  it('reads a typed budget as dollars, none as null, nonsense as nothing to send', () => {
+    expect([budgetOf('$12'), budgetOf(' 3.5 '), budgetOf(''), budgetOf('-1'), budgetOf('x')]).toEqual([12, 3.5, null, undefined, undefined]);
+  });
+
+  it('makes the saved form the new base', () => {
+    expect(savedBaseOf({ ...base, title: ' Benno ', role: 'reviewer', summary: ' x ', worker: ' kimi ', budget: '$3' })).toMatchObject({ title: 'Benno', role: 'Reviewer', summary: 'x', worker: 'kimi', budget: '3' });
   });
 });

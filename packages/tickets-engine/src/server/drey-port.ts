@@ -143,6 +143,7 @@ export interface RemoteBoard {
     skills?: readonly string[];
     prompt?: string;
     summary?: string;
+    budget?: number | null;
     allowed?: PersonaAllowedPatch;
   }): Promise<MutationResult>;
 }

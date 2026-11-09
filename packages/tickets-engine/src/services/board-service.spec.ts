@@ -807,17 +807,21 @@ describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () =>
     const outcome = await service.personaPatch({
       id: 'pia',
       summary: '  Plans one part,\n test first. ',
+      budget: 7.5,
       allowed: { spendAboveAllowance: true, runCommands: 'bypass', network: true, writeVaults: ['notes', 'notes', 'work'] },
     });
     expect(outcome.ok).toBe(true);
     const pia = (await service.listPersonas()).find((p) => p.id === 'pia');
     expect(pia?.summary).toBe('Plans one part, test first.');
+    expect(pia?.budget).toBe(7.5);
     expect(pia?.allowed).toEqual({ spendAboveAllowance: true, runCommands: 'bypass', network: true, writeVaults: ['notes', 'work'] });
-    const cleared = await service.personaPatch({ id: 'pia', allowed: { runCommands: null, network: false, writeVaults: [] } });
+    const cleared = await service.personaPatch({ id: 'pia', budget: null, allowed: { runCommands: null, network: false, writeVaults: [] } });
     expect(cleared.ok).toBe(true);
     const after = (await service.listPersonas()).find((p) => p.id === 'pia');
     expect(after?.allowed).toEqual({ spendAboveAllowance: true });
     expect(after?.summary).toBe('Plans one part, test first.');
+    expect(after?.budget).toBeNull();
+    expect(await service.personaPatch({ id: 'pia', budget: -1 })).toMatchObject({ ok: false });
     expect(await service.personaPatch({ id: 'pia', allowed: { runCommands: 'root' as never } })).toMatchObject({ ok: false });
   });
 

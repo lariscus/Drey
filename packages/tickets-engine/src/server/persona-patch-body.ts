@@ -21,6 +21,7 @@ export interface PersonaPatchInput {
   skills?: string[];
   prompt?: string;
   summary?: string;
+  budget?: number | null;
   allowed?: PersonaAllowedPatch;
 }
 
@@ -34,6 +35,7 @@ const PERSONA_PATCH_KEYS: readonly (keyof PersonaPatchInput)[] = [
   'skills',
   'prompt',
   'summary',
+  'budget',
   'allowed',
 ];
 
@@ -54,6 +56,11 @@ export function parsePersonaPatch(body: unknown): Parsed<PersonaPatchInput> {
         return { ok: false, error: `${key} is a list of names` };
       }
       out[key] = value.map((v) => (v as string).trim());
+    } else if (key === 'budget') {
+      if (value !== null && typeof value !== 'number') {
+        return { ok: false, error: 'budget is a number of dollars or null' };
+      }
+      out.budget = value;
     } else if (key === 'allowed') {
       if (typeof value !== 'object' || value === null || Array.isArray(value)) {
         return { ok: false, error: 'allowed is an object' };

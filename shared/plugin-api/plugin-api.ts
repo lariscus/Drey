@@ -866,6 +866,9 @@ export interface MarkdownViewOptions {
   readonly onSubmit?: (text: string) => void;
 }
 
+/** One formatting-strip action of the host's editor (SDK 1.57): what `MarkdownViewHandle.format` applies to the selection. */
+export type MarkdownFormatAction = 'bold' | 'italic' | 'heading' | 'bullet' | 'task' | 'code';
+
 /** Handle to a mounted Markdown view (see `ui.createMarkdownView`). */
 export interface MarkdownViewHandle {
   /** The view root — append it into your pane DOM and give it a height (flex or fixed). */
@@ -879,6 +882,10 @@ export interface MarkdownViewHandle {
   setContent(text: string): void;
   getContent(): string;
   setReadOnly(readOnly: boolean): void;
+  /** Switches Live Preview (`live`) and raw Markdown (`source`) of the mounted view (SDK 1.57); `view` is read-only reading. */
+  setMode(mode: NonNullable<MarkdownViewOptions['mode']>): void;
+  /** Applies one formatting-strip action to the selection (SDK 1.57), the same reducer the editor's own strip uses; a toggle where it makes sense. */
+  format(action: MarkdownFormatAction): void;
   focus(): void;
   /** Detaches the view and releases it; call when the pane unmounts. */
   dispose(): void;

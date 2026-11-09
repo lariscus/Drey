@@ -212,6 +212,8 @@ export interface TicketsRemotePort {
     readonly prompt?: string;
     /** req-171: the one line for the crew list. */
     readonly summary?: string;
+    /** req-171: the daily budget in USD; null clears it. */
+    readonly budget?: number | null;
     /** req-171: the `allowed:` keys the page's block sets. */
     readonly allowed?: PersonaAllowedPatch;
   }): Promise<MutationResult>;

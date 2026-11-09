@@ -71,6 +71,7 @@ export type {
   FilesContextMenuItem,
   FilesContextMenuTarget,
   HighlightedSpan,
+  MarkdownFormatAction,
   MarkdownViewHandle,
   MarkdownViewOptions,
   NotifyRequest,

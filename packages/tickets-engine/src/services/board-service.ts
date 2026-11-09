@@ -3974,6 +3974,7 @@ export class EngineBoardService {
     skills?: readonly string[];
     prompt?: string;
     summary?: string;
+    budget?: number | null;
     allowed?: PersonaAllowedPatch;
   }): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
@@ -3995,8 +3996,8 @@ export class EngineBoardService {
         return { ok: false, error: refusal };
       }
       const sent = (key: string): boolean =>
-        input[key as 'title' | 'role' | 'worker' | 'model' | 'pool' | 'color' | 'skills' | 'prompt' | 'summary' | 'allowed'] !== undefined;
-      if (!['title', 'role', 'worker', 'model', 'pool', 'color', 'skills', 'prompt', 'summary', 'allowed'].some(sent)) {
+        input[key as 'title' | 'role' | 'worker' | 'model' | 'pool' | 'color' | 'skills' | 'prompt' | 'summary' | 'budget' | 'allowed'] !== undefined;
+      if (!['title', 'role', 'worker', 'model', 'pool', 'color', 'skills', 'prompt', 'summary', 'budget', 'allowed'].some(sent)) {
         return { ok: true }; // nothing to change
       }
       const personaPath = `${PERSONAS_DIR}/${id}/persona.md`;
@@ -4019,6 +4020,7 @@ export class EngineBoardService {
         ...(input.color !== undefined ? { color: input.color.trim() } : {}),
         ...(input.skills !== undefined ? { skills: input.skills.map((s) => s.trim()) } : {}),
         ...(input.summary !== undefined ? { summary: input.summary.replace(/\s+/g, ' ').trim() } : {}),
+        ...(input.budget !== undefined ? { budget: input.budget } : {}),
         ...(input.allowed !== undefined ? { allowed: allowedAfter(persona.allowed, input.allowed) } : {}),
       };
       const patched = personaFileText(next, hadFence ? body : undefined);
