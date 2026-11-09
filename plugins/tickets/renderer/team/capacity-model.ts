@@ -1,6 +1,6 @@
 // i18n: catalog
 /**
- * The Capacity band's pure model (board 7e, milestone 217): the header
+ * The Capacity band's pure model (board 7e, milestone 218): the header
  * value, the Slots row's chips and the Tranche-and-queue row. DOM-free, so
  * the band and its spec share it. The chips read the chain status's
  * `slots` (req-177); the queue reads the board; the tranche has no engine

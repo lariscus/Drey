@@ -1,7 +1,7 @@
 // i18n: catalog
 /**
  * The Capacity band (E13-8, board 7e; the Slots and Tranche-and-queue rows
- * milestone 217): a dock panel in the bottom dock - what each persona is
+ * milestone 218): a dock panel in the bottom dock - what each persona is
  * doing right now, today's cost against the budget, Pause all and "Open
  * Team", then one chip per slot (account) with its busy dots, quota and
  * reset, then the tranche and the queue. The same model as the Team tab
