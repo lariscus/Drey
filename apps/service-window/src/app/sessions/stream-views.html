@@ -1,0 +1,38 @@
+<div class="pane" [swFollow]="following()" [swTick]="tick()" (followLost)="state.follow.set(false)">
+  @switch (state.view()) {
+    @case ('stream') {
+      @for (row of stream(); track row.key) {
+        <div class="ll" [class.error]="row.tone === 'error'">
+          <span class="t">{{ row.time }}</span>
+          <span class="k">{{ row.kind }}</span>
+          <span class="x">{{ row.text }}</span>
+        </div>
+      }
+    }
+    @case ('tools') {
+      @for (row of tools(); track row.key) {
+        <div class="ll" [class.error]="row.tone === 'error'">
+          <span class="t">{{ row.time }}</span>
+          <span class="k">{{ row.kind }}</span>
+          <span class="x">{{ row.text }}</span>
+        </div>
+      }
+    }
+    @case ('instruction') {
+      <pre class="instruction">{{ state.instruction() }}</pre>
+    }
+    @case ('process') {
+      <div class="grid">
+        @for (row of process(); track row.label) {
+          <span class="gk">{{ row.label }}</span>
+          <span class="gv">{{ row.value }}</span>
+        }
+      </div>
+    }
+    @case ('raw') {
+      @for (line of raw(); track $index) {
+        <div class="raw">{{ line }}</div>
+      }
+    }
+  }
+</div>

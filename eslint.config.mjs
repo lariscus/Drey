@@ -208,6 +208,8 @@ export default tseslint.config(
           'tsconfig.spec.json',
           'apps/mission-control/tsconfig.app.json',
           'apps/mission-control/tsconfig.spec.json',
+          'apps/service-window/tsconfig.app.json',
+          'apps/service-window/tsconfig.spec.json',
           'libs/mission-ui/tsconfig.json',
           'libs/markdown-surface/tsconfig.json',
           'plugins/tsconfig.main.json',

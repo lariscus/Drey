@@ -1,6 +1,7 @@
 import { promises as fsp } from 'node:fs';
 import type { SupervisorSet } from '../orchestrate/supervisor-set';
 import { personaCostReport, tokenReport, type ReportRun } from '../report';
+import { attachCommandOf } from './attach-command';
 import type { RouteContext, RouteGroup } from './route-context';
 
 /** The runs, read: every record, the token report (T-0048), one record with its stream path, a stream's tail. */
@@ -20,11 +21,35 @@ export class RunReadRoutes implements RouteGroup {
       return true;
     }
     const [kind, runId] = ctx.parts;
-    if (ctx.parts.length !== 2 || runId === undefined || (kind !== 'status' && kind !== 'stream')) {
+    if (ctx.parts.length !== 2 || runId === undefined) {
+      return false;
+    }
+    if (kind === 'instruction' || kind === 'attach') {
+      this.inspect(ctx, kind, runId);
+      return true;
+    }
+    if (kind !== 'status' && kind !== 'stream') {
       return false;
     }
     await this.one(ctx, kind, runId);
     return true;
+  }
+
+  /**
+   * The Sessions tab (req-166): `GET /instruction/<run>` — the composed
+   * instruction the run started with; `GET /attach/<run>` — the command that
+   * attaches a terminal to its harness session.
+   */
+  private inspect(ctx: RouteContext, kind: 'instruction' | 'attach', runId: string): void {
+    const record = this.supervisors.ofRun(runId)?.records().find((r) => r.info.id === runId);
+    if (record === undefined) {
+      ctx.respond(404, { ok: false, error: `unknown run "${runId}"` });
+    } else if (kind === 'instruction') {
+      ctx.respond(200, { ok: true, instruction: record.request.instruction });
+    } else {
+      const { provider, sessionRef, worktreePath } = record.info;
+      ctx.respond(200, { ok: true, command: attachCommandOf(provider, sessionRef, worktreePath) });
+    }
   }
 
   /** One run's record with its stream path, or its stream's tail. */

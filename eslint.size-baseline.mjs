@@ -52,8 +52,6 @@ export const SIZE_BASELINE = [
   'packages/tickets-engine/src/server/verify-harness.ts',
   'packages/tickets-engine/src/server/web-harness.ts',
   'packages/tickets-engine/src/service/legacy.ts',
-  'packages/tickets-engine/src/service/service-host.ts',
-  'packages/tickets-engine/src/service/service-main.ts',
   'packages/tickets-engine/src/services/board-service-dricket.spec.ts',
   'packages/tickets-engine/src/services/board-service.spec.ts',
   'packages/tickets-engine/src/services/board-service.ts',

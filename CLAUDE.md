@@ -459,6 +459,10 @@ Main process (`electron/`):
   (ADR-0010 later change); `content-security-policy.ts` — the
   renderer CSP (ADR-0001 later change)
 - `ipc/` — thin, feature-free base channel handlers
+- `boot.ts` + `service-window/` — the entry branches on
+  `--drey-service-window` into Drey Service's **tray and window process**
+  (req-165/166, ADR-0092 later change): started and ended by the service,
+  a client of its HTTP API only, its page `apps/service-window/`
 
 Renderer (`src/app/`):
 

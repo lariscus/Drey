@@ -5,6 +5,7 @@ import { componentRowsOf, statusActionsOf, statusLineOf } from './service-model'
 const running = (patch: Partial<ServiceStatusReply> = {}): ServiceStatusReply => ({
   running: true,
   home: 'C:\\Users\\x\\.drey-engine',
+  logFolder: 'C:\\Users\\x\\.drey-engine\\logs',
   startedAt: '2026-11-08T08:12:00',
   liveRuns: 2,
   gateway: { enabled: false, listening: false, devices: 0, failed: false },
@@ -36,7 +37,7 @@ describe('the status item (board 8c)', () => {
   });
 
   it('offers Restart and Stop to a running service, Start to a stopped one', () => {
-    expect(statusActionsOf(running())).toEqual(['restart', 'stop']);
+    expect(statusActionsOf(running())).toEqual(['open', 'restart', 'stop']);
     expect(statusActionsOf(SERVICE_STOPPED)).toEqual(['start']);
   });
 });

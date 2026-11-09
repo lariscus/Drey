@@ -1,0 +1,7 @@
+<div role="tablist" class="strip" [attr.aria-label]="'service_window.title' | t">
+  @for (tab of tabs; track tab.id) {
+    <button type="button" role="tab" class="sw-pill" [attr.aria-selected]="store.tab() === tab.id" (click)="store.tab.set(tab.id)">
+      {{ tab.key | t }}
+    </button>
+  }
+</div>

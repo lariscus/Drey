@@ -172,6 +172,8 @@ export interface ServiceStatusReply {
   readonly running: boolean;
   /** The service home (`~/.drey-engine`): where `service.log` lives. */
   readonly home: string;
+  /** The folder of the per-component log files (`<home>/logs`, req-165); empty while unknown. */
+  readonly logFolder: string;
   /** ISO time the service process started; null while it is not running. */
   readonly startedAt: string | null;
   /** The runs a quit would end (starting, running, stopping). */
@@ -185,6 +187,7 @@ export interface ServiceStatusReply {
 export const SERVICE_STOPPED: ServiceStatusReply = {
   running: false,
   home: '',
+  logFolder: '',
   startedAt: null,
   liveRuns: 0,
   gateway: { enabled: false, listening: false, devices: 0, failed: false },
@@ -194,10 +197,13 @@ export const SERVICE_STOPPED: ServiceStatusReply = {
 /** A component action the page can ask for. */
 export type ServiceAction = 'restart' | 'stop' | 'start';
 
+/** The status item's buttons: the service's actions, and opening its window (req-165). */
+export type StatusAction = ServiceAction | 'open';
+
 /** Where a control call goes: the whole service, or the Crew runner inside it. */
 export type ServiceControlTarget = 'service' | 'runner';
 
-export interface ServiceControlRequest {
-  readonly target: ServiceControlTarget;
-  readonly action: ServiceAction;
-}
+export type ServiceControlRequest =
+  | { readonly target: ServiceControlTarget; readonly action: ServiceAction }
+  /** *Open Drey Service…*: the service opens its window (req-165). */
+  | { readonly target: 'window'; readonly action: 'open' };

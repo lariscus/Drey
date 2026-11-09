@@ -45,6 +45,9 @@ files:
   # `npm run fetch:drawio` -- `npm run pack` runs it.
   - 'dist-electron/plugins/drawio/webapp/**'
   - 'dist/drey/browser/**'
+  # Drey Service's window (req-165): the page the service window process
+  # (`Drey.exe --drey-service-window`, electron/boot.ts) loads from disk.
+  - 'dist/service-window/browser/**'
   - 'package.json'
   - '!dist-electron/**/*.map'
   # Orphaned tsc output (tsc never cleans outDir); `npm run pack` also
@@ -105,6 +108,8 @@ nsis:
   allowToChangeInstallationDirectory: true
   license: LICENSE
   artifactName: ${productName}-${version}-setup.${ext}
+  # The uninstaller removes Drey Service's start with Windows (req-165).
+  include: build/installer.nsh
 
 portable:
   artifactName: ${productName}-${version}-portable.${ext}

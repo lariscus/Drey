@@ -1,0 +1,6 @@
+<sw-session-list />
+@if (state.run(); as run) {
+  <sw-session-detail [run]="run" />
+} @else {
+  <div class="empty"></div>
+}

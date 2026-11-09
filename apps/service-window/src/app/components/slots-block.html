@@ -1,0 +1,29 @@
+<section class="block">
+  <div class="head">{{ 'service_window.slots.title' | t }}</div>
+  @for (slot of slots(); track slot.id) {
+    <div class="srow">
+      <span class="slot-name">{{ slot.label }}</span>
+      <span class="seats" [attr.aria-label]="slot.busyTitle" [title]="slot.busyTitle">
+        @for (busy of slot.seats; track $index) {
+          <span class="seat" [class.on]="busy"></span>
+        }
+      </span>
+      <span class="bar">
+        @if (slot.fill !== null) {
+          <span class="fill" [class.estimated]="slot.reliability === 'estimated'" [style.width.%]="slot.fill"></span>
+        }
+      </span>
+      <span class="quota">{{ slot.text }}</span>
+      <span class="chip" [class.estimated]="slot.reliability === 'estimated'" [class.measured]="slot.reliability === 'measured'">{{ slot.reliabilityLabel }}</span>
+    </div>
+  }
+</section>
+<section class="block">
+  <div class="head">{{ 'service_window.governor.title' | t }}</div>
+  @for (row of governor(); track row.label) {
+    <div class="grow-row">
+      <span class="label">{{ row.label }}</span>
+      <span>{{ row.value }}</span>
+    </div>
+  }
+</section>

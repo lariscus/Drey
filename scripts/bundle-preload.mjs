@@ -28,3 +28,16 @@ await build({
   sourcemap: true,
   logLevel: 'warning',
 });
+
+// The service window's preload (req-165): its window is sandboxed too.
+await build({
+  entryPoints: [path.join(repoRoot, 'electron', 'service-window', 'service-window-preload.ts')],
+  outfile: path.join(repoRoot, 'dist-electron', 'electron', 'service-window', 'service-window-preload.js'),
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  target: 'es2022',
+  external: ['electron'],
+  sourcemap: true,
+  logLevel: 'warning',
+});

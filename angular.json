@@ -185,6 +185,51 @@
         }
       }
     },
+    "service-window": {
+      "projectType": "application",
+      "root": "apps/service-window",
+      "sourceRoot": "apps/service-window/src",
+      "prefix": "sw",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "apps/service-window/src/main.ts",
+            "tsConfig": "apps/service-window/tsconfig.app.json",
+            "outputPath": "dist/service-window",
+            "styles": [
+              "apps/service-window/src/styles.css"
+            ]
+          },
+          "configurations": {
+            "production": {
+              "outputHashing": "none",
+              "optimization": {
+                "scripts": true,
+                "styles": {
+                  "minify": true,
+                  "inlineCritical": false
+                },
+                "fonts": true
+              }
+            },
+            "development": {
+              "optimization": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "include": [
+              "apps/service-window/src/**/*.spec.ts"
+            ]
+          }
+        }
+      }
+    },
     "mission-ui": {
       "projectType": "application",
       "root": "libs/mission-ui",

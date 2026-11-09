@@ -9,6 +9,7 @@ import {
   parseQuietHours,
   wholeNumberIn,
   type ServiceAction,
+  type StatusAction,
   type ServiceControlRequest,
   type ServiceLogLevel,
   type ServicePrefs,
@@ -75,7 +76,7 @@ export class SettingsBackgroundService {
   protected readonly statusLine = computed(() => statusLineOf(this.status()));
   protected readonly statusActions = computed(() => statusActionsOf(this.status()));
   protected readonly rows = computed(() => componentRowsOf(this.status(), this.mcp()));
-  protected readonly logFolder = computed(() => this.status().home);
+  protected readonly logFolder = computed(() => this.status().logFolder);
 
   protected readonly levels = LOG_LEVEL_CHOICES;
   protected readonly levelKeys = LOG_LEVEL_KEYS;
@@ -161,8 +162,12 @@ export class SettingsBackgroundService {
     void this.client.openLogFolder();
   }
 
-  /** Restart or Stop (or Start) of the whole service, from the status item. */
-  protected serviceAction(action: ServiceAction): void {
+  /** Open Drey Service… (its window, req-165), Restart or Stop (or Start) of the whole service, from the status item. */
+  protected serviceAction(action: StatusAction): void {
+    if (action === 'open') {
+      void this.run('status:open', () => this.client.control({ target: 'window', action: 'open' }));
+      return;
+    }
     void this.run(`status:${action}`, () => this.client.control({ target: 'service', action }));
   }
 

@@ -1,0 +1,13 @@
+<sw-title-bar />
+<sw-tab-strip />
+@switch (store.tab()) {
+  @case ('components') {
+    <sw-components-tab />
+  }
+  @case ('sessions') {
+    <sw-sessions-tab />
+  }
+  @case ('logs') {
+    <sw-logs-tab />
+  }
+}

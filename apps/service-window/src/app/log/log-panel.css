@@ -1,0 +1,59 @@
+:host {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.head {
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.title {
+  font-weight: 600;
+}
+.grow {
+  flex-grow: 1;
+}
+.list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 12px;
+  background: var(--bg);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 18px;
+}
+.line {
+  height: 18px;
+  display: flex;
+  gap: 10px;
+  white-space: nowrap;
+}
+.time {
+  width: 56px;
+  flex-shrink: 0;
+  color: var(--text-2);
+}
+.text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.warn .text {
+  color: var(--warn);
+}
+.error .text {
+  color: var(--danger);
+}

@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Args, RunnerDeps, RunnerHandle } from '../fleet/runner';
 import type { Engine, EngineOptions } from '../server/engine';
 import type { RemoteStatus } from '../server/service';
-import { ServiceHost, formatServiceLogLine } from './service-host';
+import { ServiceHost, formatServiceLogLine, type ServiceHostOptions } from './service-host';
+import type { WindowChild } from './launch';
 import { readServiceLock } from './service-lock';
 
 /**
@@ -27,6 +28,7 @@ describe('ServiceHost', () => {
   /** The engine's config: `service.enabled` decides the mode (the owner's Q3 ruling). */
   let engineConfig: Record<string, unknown> = {};
   let autostarts: boolean[] = [];
+  let invokes: Array<{ method: string; payload: unknown }> = [];
 
   const fakeEngine = async (_opts: EngineOptions): Promise<Engine> =>
     ({
@@ -39,7 +41,10 @@ describe('ServiceHost', () => {
         },
       } as never,
       ready: Promise.resolve(),
-      invoke: async () => null,
+      invoke: async (method: string, payload: unknown) => {
+        invokes.push({ method, payload });
+        return null;
+      },
       onEvent: () => () => undefined,
       onPaths: () => () => undefined,
       dreyClients: () => dreyClients,
@@ -91,7 +96,7 @@ describe('ServiceHost', () => {
     };
   };
 
-  const start = async (idleMs = 60_000, tickMs = 20, spans: { withDreyGraceMs?: number; firstDreyWaitMs?: number } = {}): Promise<ServiceHost> => {
+  const start = async (idleMs = 60_000, tickMs = 20, spans: { withDreyGraceMs?: number; firstDreyWaitMs?: number } = {}, extra: Partial<ServiceHostOptions> = {}): Promise<ServiceHost> => {
     // This test's own list: a previous test's host exits a moment after its teardown.
     const mine = exits;
     host = await ServiceHost.start({
@@ -108,6 +113,7 @@ describe('ServiceHost', () => {
         autostarts.push(on);
       },
       ...spans,
+      ...extra,
     });
     return host;
   };
@@ -142,6 +148,7 @@ describe('ServiceHost', () => {
     // The background mode unless a test says otherwise.
     engineConfig = { 'service.enabled': true };
     autostarts = [];
+    invokes = [];
   });
 
   afterEach(async () => {
@@ -313,6 +320,67 @@ describe('ServiceHost', () => {
       expect(autostarts).toEqual([false, true]);
       await control('POST', '/settings', { autostart: false });
       expect(autostarts).toEqual([false, true, false]);
+    });
+  });
+
+  describe('req-165: the settings applied live, the window process, the atomic restart', () => {
+    const fakeSpawn = (modes: string[]) => (mode: 'tray' | 'open'): WindowChild => {
+      modes.push(mode);
+      return { pid: 1, onExit: () => undefined, kill: () => modes.push(`kill:${mode}`) };
+    };
+
+    it('the status carries the settings and the log folder; the log level and the idle span apply on the next tick', async () => {
+      engineConfig = { 'service.enabled': true, 'service.logLevel': 'quiet', 'service.idleMinutes': 1 };
+      await start(60_000, 20, {}, { idleFromSettings: true });
+      const status = (await control('GET', '/status')).json;
+      expect(status['settings']).toMatchObject({ logLevel: 'quiet', idleMinutes: 1, trayIcon: true });
+      expect(String(status['logFolder'])).toContain('logs');
+      host!.log('runner', 'an info line nobody keeps');
+      expect(host!.status().settings.logLevel).toBe('quiet');
+      const lock = await readServiceLock(home);
+      const tail = await (await fetch(`http://127.0.0.1:${lock!.port}/log?component=runner`, { headers: { Authorization: `Bearer ${lock!.token}` } })).text();
+      expect(tail).not.toContain('nobody keeps');
+    });
+
+    it('keeps a tray process while the icon is shown, opens the window on request, ends them with the service', async () => {
+      const modes: string[] = [];
+      await start(60_000, 20, {}, { spawnWindow: fakeSpawn(modes) });
+      expect(modes).toEqual(['tray']);
+      expect((await control('POST', '/window/open')).status).toBe(200);
+      expect((await control('GET', '/status')).json['trayRunning']).toBe(true);
+      await host!.shutdown({ handover: false });
+      expect(modes).toEqual(['tray', 'open', 'kill:tray', 'kill:open']);
+      host = null;
+    });
+
+    it('without a window spawner /window/open refuses', async () => {
+      await start();
+      expect((await control('POST', '/window/open')).status).toBe(409);
+    });
+
+    it('the gateway is stopped from the service through the remote configure', async () => {
+      await start();
+      expect((await control('POST', '/components/gateway/stop')).status).toBe(200);
+      expect(invokes).toEqual([{ method: 'configure', payload: { enabled: false } }]);
+    });
+
+    it('/restart hands the runs over, starts the successor once the lock is gone, and exits', async () => {
+      let lockAtRespawn: unknown = 'unset';
+      await start(60_000, 20, {}, { respawn: () => void readServiceLock(home).then((l) => (lockAtRespawn = l)) });
+      await control('POST', '/components/runner/start');
+      expect((await control('POST', '/restart')).status).toBe(200);
+      await until(() => exits.length > 0 && lockAtRespawn !== 'unset');
+      expect(lockAtRespawn).toBeNull();
+      expect(runnerStops).toBe(0);
+      host = null;
+    });
+
+    it('a restart a busy runner refuses is a 409, and the service serves on', async () => {
+      handoverRefusal = 'T-0007 is in its gate';
+      await start();
+      await control('POST', '/components/runner/start');
+      expect(await control('POST', '/restart')).toMatchObject({ status: 409, json: { error: 'T-0007 is in its gate' } });
+      expect((await control('GET', '/health')).status).toBe(200);
     });
   });
 });
