@@ -50,7 +50,10 @@ Top-level rules, once, up front:
 <tickets repo root>/
   _worktrees/       # reserved (T-0044): the fleet's worktree home —
                     #   <ticket-id>/ per ticket, gitignored, invisible to
-                    #   the vault's tree/index/watcher
+                    #   the vault's tree/index/watcher; a review run's
+                    #   read-only checkout <ticket-id>-review/ (req-183)
+  _workcopy/        # reserved (req-183): a store ticket's working copy,
+                    #   <ticket-id>.ticket.md per running ticket, gitignored
   tickets/
     _meta/
       pipeline.md     # the phases + handover config (config, never data)
@@ -91,8 +94,16 @@ ticket data: the board, the vault's markdown index and the file watcher
 skip them entirely, and the repo's `.gitignore` covers them (ensured by
 the boot sweep, one commit when appended). The fleet's worktrees live in
 `_worktrees/<ticket-id>/` by default; a repo can override its base with
-a `worktrees:` key in repos.md. The skip is root-depth only —
-`tickets/_meta` stays indexed and watched.
+a `worktrees:` key in repos.md. A review run (req-183: the `review`
+phase, or any gate whose persona has the role `reviewer`) reads the branch
+in a second worktree beside it, `<ticket-id>-review/`, detached at the
+commit the builder handed over, read-only on disk and removed when the run
+ends — never a place to work in. A store ticket's working copy is
+`_workcopy/<ticket-id>.ticket.md` (req-183; until then
+`_worktrees/<ticket-id>.ticket.md`, which the runner still reads — and moves
+into `_workcopy/` — for one release, so a copy is never mistaken for a
+worktree). `.gitignore` carries `/_worktrees/` and `/_workcopy/`. The skip
+is root-depth only — `tickets/_meta` stays indexed and watched.
 
 ### Numbered folders (T-0041)
 
@@ -1218,8 +1229,10 @@ menu opens a terminal there ("Open work folder in terminal": run
 `.\dev.ps1`, the repo's build, whatever it uses). `worker` (M84) is the repo's default fleet worker for tickets on this
 repo. `worktrees` (T-0044, ADR-0080) overrides where the fleet's
 worktrees for this repo live — an absolute folder, or one relative to
-the tickets repo root; the worktree is `<base>/<ticket-id>`. Unset (the
-default) is `<ticketsRepo>/_worktrees`. `launch` (req-75 W3,
+the tickets repo root; the worktree is `<base>/<ticket-id>`, a review's
+read-only checkout `<base>/<ticket-id>-review` (req-183). Unset (the
+default) is `<ticketsRepo>/_worktrees`. The working copies stay in
+`<ticketsRepo>/_workcopy` whatever the base. `launch` (req-75 W3,
 T-0057) is the command that starts the repository's program in a
 ticket's worktree — "Launch this version" runs it there in a new
 console; a non-string value warns and reads as unset. Unset means the
@@ -1454,7 +1467,7 @@ board's tickets come from a dricket store (`docs/design/dricket/`) instead of
 from the tickets vault. A store ticket is folded into the layout above by
 `packages/tickets-engine/src/store/store-board.ts`; the card's `path` stays
 the virtual `tickets/<phase>/<id>.md` (there is no such file). A worker edits a
-working copy beside the worktrees instead, `_worktrees/<id>.ticket.md`; the runner takes
+working copy instead, `_workcopy/<id>.ticket.md` (req-183; `_worktrees/<id>.ticket.md` before, read for one release); the runner takes
 its changed chapters back inside the claim (D-30, [FLEET.md](../plugins/tickets/FLEET.md)).
 
 | dricket | Ticket key here | Note |

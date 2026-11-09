@@ -178,3 +178,34 @@ sleep and the next demand wakes it; its loopback routes and token are
 unchanged and recorded in `~/.drey-engine/service.lock` instead of
 `fleet/runner.json`. The stale-build handover (req-51) is now the whole
 service's. Operations: `plugins/tickets/SERVICE.md` and `FLEET.md`.
+
+## Later change — the review in a read-only checkout (req-183, milestone 225, as built 2026-11-09)
+
+One run = one worktree stays the rule for the work; a **review** no longer
+reads that worktree. A review run — the standard `review` phase, or any
+gate whose resolved persona has the role `reviewer` (`fleet/review-run.ts`)
+— carries `RunRequest.reviewCheckout`, a second git worktree
+`<worktree base>/<id>-review` beside the ticket's. The start refuses while
+another run of the ticket is live or detached (the builder's process has
+ended before the hand-over), reads the branch head — the commit the
+builder handed over — and runs `git worktree add --detach` at it; the
+checkout's files are set read-only on disk (`TreeMode` port, `NodeTreeMode`:
+POSIX files and folders, Windows files only). The worker's working folder
+is the checkout (`RunInfo.review`); the machine gate keeps running in the
+ticket's worktree (writable, with its `link:` folders) but first fails the
+review when the branch moved past the reviewed commit. The settle unlocks
+and removes the checkout (`orchestrate/review-checkout.ts`,
+`ReviewCheckout`, wired in `compose-supervisor.ts`).
+
+**Trade-offs taken.** Detection, not prevention: git has no lock for a
+local branch, so a commit after the hand-over is caught at the gate and
+fails the review rather than being impossible. The gate stays in the
+worktree: a read-only checkout cannot hold build output, and a second
+writable one would only move the problem. The harness's own permission
+mode (Claude Code `plan`, opencode's `plan` agent) is the second layer the
+concept asked for and is not built yet — it needs `fleet/harness/`, which
+req-182 reworks; roadmap req-199. Until then the disk is the guard, and on
+Windows a reviewer could still create a new file in the checkout (no
+folder guard there); it could not change or delete an existing one, and
+nothing it writes reaches the branch. Rejected alternatives:
+`specs/decisions.md`.

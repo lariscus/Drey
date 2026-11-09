@@ -80,3 +80,22 @@ every re-run with git's "already checked out".
 - The reserved-root skip is a new vault-root convention: any feature that
   wants machine state beside the vault's content uses a `_`-prefix at the
   root and is invisible to the board, the index and the watcher.
+
+## Later change — `_workcopy/` and the review checkout (req-183, milestone 225, 2026-11-09)
+
+- **The working copies leave `_worktrees/`.** A store ticket's working copy
+  (D-30) was `_worktrees/<id>.ticket.md` — a file in the worktree home,
+  easy to take for a worktree. It is `_workcopy/<id>.ticket.md` now, a
+  reserved root folder of its own under the same `_` convention, at the
+  tickets repo root whatever a repo's `worktrees:` base says. For one
+  release the runner reads the old place too (`WorkcopyFiles`): new path
+  first, an old copy moved into place on that first read with one log
+  line, the old one dropped when both exist. The ensured `.gitignore`
+  carries `/_workcopy/` beside `/_worktrees/` (`services/reserved-ignore.ts`).
+- **A second checkout per reviewed ticket.** A review run's read-only
+  checkout lives beside the ticket's worktree as `<id>-review`
+  (`reviewCheckoutPathFor`); ticket ids never end in `-review`, so the
+  names cannot collide. It is registered with git like any worktree and
+  removed through git; the Files panel's *Remove worktree* does not match
+  it (the run's end removes it), and *Clean up worktrees* unlocks a
+  leftover before `git worktree remove` (ADR-0075 later change).
