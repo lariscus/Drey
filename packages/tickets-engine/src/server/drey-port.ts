@@ -40,6 +40,7 @@ import type {
   NeedItem,
   PersonaImprovementsReply,
   PersonaMemoryReply,
+  PersonaProposalDecision,
   PersonaThreadReply,
   PersonaView,
   RemoteChange,
@@ -48,6 +49,13 @@ import type {
   TicketReply,
   TicketsRemotePort,
 } from '../contracts/remote-protocol';
+
+/** req-168: the persona 1:1 as the port delegates it (`PersonaSessionService`). */
+export interface PersonaSessionPort {
+  thread(personaId: string): Promise<PersonaThreadReply>;
+  send(personaId: string, text: string): Promise<PersonaThreadReply>;
+  decide(personaId: string, proposalId: string, decision: PersonaProposalDecision): Promise<PersonaThreadReply>;
+}
 import type { BoardSnapshot, CreateResult, MutationResult, RecentDone } from '../contracts/tickets';
 import type { EstimateKey, RunEstimate } from '../core/estimate';
 import type { PlanPartsEdit, PlanPartsReply, PlanReleaseReply, PlanReleaseScope } from '../contracts/plan-approval';
@@ -113,10 +121,6 @@ export interface RemoteBoard {
   statusOf(ticketId: string): Promise<readonly StatusLine[]>;
   /** The assembled board from the files (a read — no normalize, no migration). */
   snapshot(): Promise<BoardSnapshot>;
-  /** The persona chat's read (U4, concept §4.5). */
-  personaThread(personaId: string): Promise<PersonaThreadReply>;
-  /** One owner message into the coaching thread; one commit. */
-  personaThreadAppend(input: { id: string; text: string }): Promise<PersonaThreadReply>;
   /** The persona memory's read (U4, concept §4.4). */
   personaMemory(personaId: string): Promise<PersonaMemoryReply>;
   /** One owner-taught memory entry; one commit. */
@@ -221,7 +225,16 @@ export class DreyTicketsPort implements TicketsRemotePort {
     private readonly changes: ChangeHub,
     private readonly options: DreyPortOptions,
     private readonly chatService: ChatServicePort | null = null,
+    private readonly personaSessions: PersonaSessionPort | null = null,
   ) {}
+
+  /** req-168: the 1:1 delegations throw a clear line when the engine did not wire the service. */
+  private oneOnOne(): PersonaSessionPort {
+    if (this.personaSessions === null) {
+      throw new Error('the persona 1:1 service is not wired on this port');
+    }
+    return this.personaSessions;
+  }
 
   /** The chat delegations throw a clear line when the engine did not wire the service. */
   private chat(): ChatServicePort {
@@ -504,11 +517,15 @@ export class DreyTicketsPort implements TicketsRemotePort {
   }
 
   personaThread(personaId: string): Promise<PersonaThreadReply> {
-    return this.boardService.personaThread(personaId);
+    return this.oneOnOne().thread(personaId);
   }
 
   personaThreadAppend(cmd: { readonly persona: string; readonly text: string }): Promise<PersonaThreadReply> {
-    return this.boardService.personaThreadAppend({ id: cmd.persona, text: cmd.text });
+    return this.oneOnOne().send(cmd.persona, cmd.text);
+  }
+
+  personaProposalDecide(cmd: { readonly persona: string; readonly id: string; readonly decision: PersonaProposalDecision }): Promise<PersonaThreadReply> {
+    return this.oneOnOne().decide(cmd.persona, cmd.id, cmd.decision);
   }
 
   personaMemory(personaId: string): Promise<PersonaMemoryReply> {

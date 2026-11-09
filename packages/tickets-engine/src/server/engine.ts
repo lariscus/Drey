@@ -17,6 +17,7 @@ import { ChatService } from '../services/chat-service';
 import { AGGREGATOR_SYSTEM_PROMPT, createChatBridge } from '../services/chat-llm';
 import { FleetClient, type RunnerLocator } from '../services/fleet-client';
 import { RunnerComponent } from '../service/runner-component';
+import { composePersonaSessions } from '../services/compose-persona-sessions';
 import { ImprovementsService } from '../services/improvements-service';
 import { NotesService } from '../services/notes-service';
 import { VerifyService } from '../services/verify-service';
@@ -109,7 +110,7 @@ const BOARD_METHODS = [
 // Drey's Team tab and Capacity band show exactly what the phone shows.
 // None of these names is in the board or fleet tables (a later register() wins).
 const TEAM_METHODS = [
-  'personas', 'handoffRun', 'chainPersonaPause', 'chainAutopilot', 'personaThread', 'personaThreadAppend',
+  'personas', 'handoffRun', 'chainPersonaPause', 'chainAutopilot', 'personaThread', 'personaThreadAppend', 'personaProposalDecide',
   'personaMemory', 'personaMemoryAppend', 'personaMemoryPin', 'planParts',
   // The Persona page (board 7k): the phone's setup write and improvements card.
   'personaPatch', 'personaImprovements', 'personaImprovementDecide',
@@ -218,7 +219,19 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
     onEvent: (file, event) => hub.emit('chat', { file, event }),
   });
 
-  const remotePort = new DreyTicketsPort(board, fleet, hub, { allowBypass: () => remoteService.allowBypass() }, chat);
+  // req-168 (ADR-0093): the persona 1:1 — a held session of the persona's own harness over the runner,
+  // or the chat bridge for an `api` persona; the conversation in its chat session file.
+  const personaSessions = composePersonaSessions({
+    board,
+    host,
+    git,
+    fleet,
+    fleetChanges: (listener) => hub.subscribe((what) => (what === 'fleet' ? listener() : undefined)),
+    changed: (file) => hub.emit('chat', { file, event: { kind: 'done' } }),
+    bridge: (systemPrompt) => opts.chatBridge ?? createChatBridge({ config, systemPrompt }),
+    log,
+  });
+  const remotePort = new DreyTicketsPort(board, fleet, hub, { allowBypass: () => remoteService.allowBypass() }, chat, personaSessions);
   // req-100: the active vault's notes for paired devices. Drey keeps the key on
   // its active vault; without Drey it is the last one it named, or the hosted vault.
   const notes = new NotesService({

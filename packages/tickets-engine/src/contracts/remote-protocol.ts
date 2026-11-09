@@ -93,12 +93,12 @@ export type PersonaImprovementsReply =
 export type RemoteChange = 'board' | 'fleet' | 'remote' | 'chat';
 
 /**
- * The persona thread's read (U4, concept §4.5): the coaching protocol's
- * messages, file order (oldest first). Only owner messages exist today.
+ * The persona 1:1's read (req-168, ADR-0093): the conversation of the
+ * persona's chat session file, its proposal cards and the session state —
+ * defined beside the session format (`persona-session.ts`).
  */
-export type PersonaThreadReply =
-  | { readonly ok: true; readonly messages: readonly { readonly at: string; readonly role: 'owner'; readonly text: string }[] }
-  | { readonly ok: false; readonly error: string };
+import type { PersonaProposalDecision, PersonaThreadReply } from './persona-session';
+export type { PersonaMessage, PersonaProposal, PersonaProposalCommand, PersonaProposalDecision, PersonaSessionState, PersonaThreadReply } from './persona-session';
 
 /**
  * The persona memory's read (U4, concept §4.4): the curated entries in
@@ -179,10 +179,12 @@ export interface TicketsRemotePort {
   /** The team: every persona, read-only (the Team tab's cards). */
   personas(): Promise<readonly PersonaView[]>;
 
-  /** The persona chat's read (U4, concept §4.5): the coaching thread's owner messages. */
+  /** The persona 1:1's read (req-168): the conversation of its chat session file, the cards, the session state. */
   personaThread(personaId: string): Promise<PersonaThreadReply>;
-  /** Appends one owner message to the coaching thread; one commit. */
+  /** One owner line into the 1:1 (req-168): written and committed, sent to the persona's session; the answer lands later. */
   personaThreadAppend(cmd: { readonly persona: string; readonly text: string }): Promise<PersonaThreadReply>;
+  /** req-168: accepts or dismisses one proposal card of the persona's 1:1. */
+  personaProposalDecide(cmd: { readonly persona: string; readonly id: string; readonly decision: PersonaProposalDecision }): Promise<PersonaThreadReply>;
   /** The persona memory's read (U4, concept §4.4): entries with their pin state. */
   personaMemory(personaId: string): Promise<PersonaMemoryReply>;
   /** Appends one owner-taught memory entry; one commit. */

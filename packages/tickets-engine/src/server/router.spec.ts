@@ -63,6 +63,7 @@ function port(): TicketsRemotePort {
     chainHoldLift: vi.fn(ok),
     personaThread: vi.fn(async () => ({ ok: true, messages: [{ at: '2026-11-03T09:00:00.000Z', role: 'owner' as const, text: 'hi' }] })),
     personaThreadAppend: vi.fn(async () => ({ ok: true, messages: [{ at: '2026-11-03T09:00:00.000Z', role: 'owner' as const, text: 'hi' }] })),
+    personaProposalDecide: vi.fn(async () => ({ ok: true, messages: [] })),
     personaMemory: vi.fn(async () => ({ ok: true, entries: [{ text: 'lesson', pinned: false }] })),
     personaMemoryAppend: vi.fn(async () => ({ ok: true, entries: [{ text: 'lesson', pinned: false }] })),
     personaMemoryPin: vi.fn(async () => ({ ok: true, entries: [{ text: 'lesson', pinned: true }] })),
@@ -478,6 +479,11 @@ describe('route', () => {
 
     await route(req({ method: 'POST', path: '/api/personas/pia/thread', origin, authorization: auth, body: { text: '  teach this  ' } }), deps);
     expect(remote.personaThreadAppend).toHaveBeenCalledWith({ persona: 'pia', text: 'teach this' });
+    // req-168: a 1:1 proposal card's decision, the card id pinned in the path
+    await route(req({ method: 'POST', path: '/api/personas/pia/thread/proposals/p-2/confirm', origin, authorization: auth, body: {} }), deps);
+    expect(remote.personaProposalDecide).toHaveBeenCalledWith({ persona: 'pia', id: 'p-2', decision: 'confirm' });
+    await route(req({ method: 'POST', path: '/api/personas/pia/thread/proposals/x-2/dismiss', origin, authorization: auth, body: {} }), deps);
+    expect(remote.personaProposalDecide).toHaveBeenCalledTimes(1);
     await route(req({ method: 'POST', path: '/api/personas/pia/memory', origin, authorization: auth, body: { text: 'a lesson' } }), deps);
     expect(remote.personaMemoryAppend).toHaveBeenCalledWith({ persona: 'pia', text: 'a lesson' });
     await route(req({ method: 'POST', path: '/api/personas/pia/memory/pin', origin, authorization: auth, body: { index: 1, pinned: true } }), deps);

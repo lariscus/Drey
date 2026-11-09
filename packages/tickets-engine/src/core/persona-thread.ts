@@ -2,26 +2,17 @@ import { splitFrontmatter } from '../../../../shared/frontmatter';
 import { PERSONAS_DIR } from './persona';
 
 /**
- * The persona thread (ADR-0088, U4 — concept §4.5): the owner's coaching
- * protocol, one Markdown file per persona under
- * `tickets/_meta/personas/<id>/thread.md`, shaped like a chat session
- * (core/chat-session.ts) so it stays openable in Drey's editor:
- *
- *     ---
- *     title: "Paul"
- *     created: '2026-11-03T09:00:00.000Z'
- *     ---
+ * The retired persona thread (ADR-0088, U4 — concept §4.5): the owner's
+ * coaching notes, one Markdown file per persona under
+ * `tickets/_meta/personas/<id>/thread.md`. req-168 (ADR-0093, R3) retired
+ * it: the 1:1 is a persona session in a chat session file, and a thread's
+ * lines migrate ONCE into the persona's first 1:1 session
+ * (`persona-session-file.ts` `migrateThread`), after which the file is
+ * removed. Only the reader stays, for that migration; nothing writes a
+ * thread any more. The reader forgives: an unreadable line is skipped,
+ * never a guess (ADR-0076's asymmetric tolerance).
  *
  *     - '2026-11-03T09:01:00.000Z' owner — Treat rank fields as the owner's word
- *     - '2026-11-03T09:04:00.000Z' owner — Ask before any dependency bump
- *
- * Writes are strict — exactly the line shape above, one line per message
- * (a multi-line message flattens to one); the reader forgives: an
- * unreadable line is skipped, never a guess (ADR-0076's asymmetric
- * tolerance). The thread is the owner's note to the persona, read on the
- * Crew tab's 1:1 pane; since milestone 212 (D-61) no run brief carries
- * it — nothing is adopted without the owner's review (concept R2/R14),
- * and req-168 turns the thread into a persona session.
  */
 
 export interface PersonaThreadMessage {
@@ -38,21 +29,6 @@ const NL = String.fromCharCode(10);
 /** The vault-relative path of one persona's coaching thread. */
 export function threadPathFor(id: string): string {
   return `${PERSONAS_DIR}/${id}/thread.md`;
-}
-
-/** The strict canonical shape of a fresh thread file. */
-export function newThreadText(title: string, now: Date): string {
-  const name = title.trim() === '' ? 'Coaching' : title.trim();
-  return `---\ntitle: "${name.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\ncreated: '${now.toISOString()}'\n---\n\n`;
-}
-
-/** Appends one owner message as exactly one line; empty messages refuse. */
-export function appendThreadOwner(text: string, now: Date, message: string): string {
-  const line = message.trim().replace(/\s*\r?\n\s*/g, ' ');
-  if (line === '') {
-    throw new Error('a thread message is one non-empty line');
-  }
-  return `${text.endsWith('\n') ? text : `${text}\n`}- '${now.toISOString()}' owner — ${line}\n`;
 }
 
 /** Reads a thread file back; the body only — the frontmatter is not messages. */

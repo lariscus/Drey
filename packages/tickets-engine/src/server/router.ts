@@ -206,7 +206,7 @@ function parseAnswerNeed(body: unknown): Parsed<{ id: string; key?: string; text
   return { ok: true, value: { id: (obj as { id: string }).id, ...(key === '' ? {} : { key }), ...(text === '' ? {} : { text: text.slice(0, 4000) }) } };
 }
 
-/** One owner message into a persona's coaching thread (U4, concept §4.5). */
+/** One owner line into a persona's 1:1 (req-168). */
 function parseThreadSend(body: unknown): Parsed<{ text: string }> {
   const obj = asObject(body);
   const text = typeof obj?.['text'] === 'string' ? obj['text'].trim() : '';
@@ -589,6 +589,12 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
   if (thread !== null) {
     const id = thread[1]!;
     return write(`persona ${id} thread`, parseThreadSend(body), (value) => port.personaThreadAppend({ persona: id, text: value.text }));
+  }
+  // req-168: a 1:1 proposal card's decision — the persona id and the card id pinned in the path.
+  const card = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/thread\/proposals\/(p-\d{1,6})\/(confirm|dismiss)$/.exec(req.path);
+  if (card !== null) {
+    const [, id, proposal, decision] = card;
+    return write(`persona ${id!} proposal ${proposal!}`, { ok: true, value: null }, () => port.personaProposalDecide({ persona: id!, id: proposal!, decision: decision as 'confirm' | 'dismiss' }));
   }
   const memoryPin = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/memory\/pin$/.exec(req.path);
   if (memoryPin !== null) {
