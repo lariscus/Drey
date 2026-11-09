@@ -5,6 +5,7 @@
  * responses wrap in `{data}`, and a turn ends with an `idle` message in the
  * list. The shapes are truncated to what the adapter reads.
  */
+import type { PermissionMode } from '../protocol';
 import type { UsageTotals } from './contract';
 
 export interface OcUsage {
@@ -125,6 +126,11 @@ export function modelBody(model: string | null, text: string): { text: string; m
     return { text, model: { providerID: '', modelID: model.trim() } };
   }
   return { text, model: { providerID: model.slice(0, slashAt).trim(), modelID: model.slice(slashAt + 1).trim() } };
+}
+
+/** req-183: the agent a prompt asks for — a read-only start runs opencode's built-in `plan` agent (edits denied); otherwise the default. */
+export function agentBody(mode: PermissionMode): { agent?: string } {
+  return mode === 'read-only' ? { agent: 'plan' } : {};
 }
 
 /** Drops a `#variant` suffix a pin or a catalog id may carry (`glm-5.3#fast`). */

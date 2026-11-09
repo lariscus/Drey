@@ -38,7 +38,8 @@ function checkoutLine(input: InstructionInput): string {
   if (input.reviewCheckout !== undefined) {
     return (
       `Review checkout: ${input.reviewCheckout} (branch ${input.branch} at the commit the builder handed over, detached${repo}). ` +
-      `It is read-only: you judge this tree, you do not change it — no edits, no commits. Your verdict goes into the ticket file.`
+      `It is read-only, and so is your session: you judge this tree, you change no file — the ticket file included. ` +
+      `Give your verdict in your final message; end it with \`BLOCKED: <why>\` to send the step back.`
     );
   }
   return `Work checkout: ${input.worktreePath} (branch ${input.branch}${repo}). Stay on that branch; it and the worktree are your only writable places.`;
@@ -73,6 +74,10 @@ function ticketFileParts(input: InstructionInput, plan: string): string[] {
   const ticketFile = input.ticketFile;
   if (ticketFile === undefined || ticketFile === '') {
     return [];
+  }
+  if (input.reviewCheckout !== undefined) {
+    // req-183: a review's session is read-only — the ticket file is there to read, never to edit.
+    return [`The ticket file: ${ticketFile} — read it if you need more than this brief quotes; your session cannot change it.`];
   }
   const fileLine =
     input.ticketFileIsCopy === true

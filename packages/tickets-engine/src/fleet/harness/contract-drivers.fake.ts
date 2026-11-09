@@ -17,21 +17,25 @@ export interface ContractSession {
   settle(): Promise<void>;
   /** The worker's exit has resolved. */
   ended(): boolean;
+  /** req-183: the permission the adapter handed its harness, in the harness's own words (CLI flag, agent, ACP mode). */
+  permission(): string | null;
 }
 
 export interface ContractDriver {
   readonly name: string;
-  start(): Promise<ContractSession>;
+  /** req-183: what a `read-only` start must reach the harness as. */
+  readonly readOnly: string;
+  start(over?: Partial<ProviderStart>): Promise<ContractSession>;
   dispose(): void;
 }
 
-function collect(): { start: ProviderStart; events: NormalizedEvent[] } {
+function collect(over: Partial<ProviderStart> = {}): { start: ProviderStart; events: NormalizedEvent[] } {
   const events: NormalizedEvent[] = [];
-  const start: ProviderStart = { cwd: 'W:/kt', instruction: 'Do the ticket.', model: null, permissionMode: 'accept-edits', resumeRef: null, ticketId: 'T-0001', onEvent: (e) => events.push(e), onSessionRef: () => undefined };
+  const start: ProviderStart = { cwd: 'W:/kt', instruction: 'Do the ticket.', model: null, permissionMode: 'accept-edits', resumeRef: null, ticketId: 'T-0001', onEvent: (e) => events.push(e), onSessionRef: () => undefined, ...over };
   return { start, events };
 }
 
-function session(handle: WorkerHandle, events: NormalizedEvent[], drive: Pick<ContractSession, 'endTurn' | 'settle'>): ContractSession {
+function session(handle: WorkerHandle, events: NormalizedEvent[], drive: Pick<ContractSession, 'endTurn' | 'settle' | 'permission'>): ContractSession {
   let done = false;
   void handle.exited.then(() => {
     done = true;
@@ -47,10 +51,15 @@ const ticks = async (): Promise<void> => {
 
 export const claudeCodeDriver: ContractDriver = {
   name: 'claude-code',
-  async start() {
+  readOnly: 'plan',
+  async start(over) {
     const proc = new ContractProcess();
-    const { start, events } = collect();
-    const handle = claudeCodeAdapter(proc.spawnFn()).spawn(start);
+    const { start, events } = collect(over);
+    let args: readonly string[] = [];
+    const handle = claudeCodeAdapter((_cmd, a) => {
+      args = a;
+      return proc;
+    }).spawn(start);
     proc.say({ type: 'system', subtype: 'init', session_id: 'ses_c' });
     return session(handle, events, {
       endTurn: async (text) => {
@@ -58,18 +67,26 @@ export const claudeCodeDriver: ContractDriver = {
         await ticks();
       },
       settle: ticks,
+      permission: () => args[args.indexOf('--permission-mode') + 1] ?? null,
     });
   },
   dispose: () => undefined,
 };
 
+/** Kimi 2.5.2's advertised modes (`session/new` → `modes.availableModes`). */
+const KIMI_MODES = { currentModeId: 'default', availableModes: ['default', 'plan', 'auto', 'yolo'].map((id) => ({ id, name: id })) };
+
 /** A scripted ACP agent: the setup calls answer at once, a prompt waits for `endTurn` or a cancel. */
-function acpAgent(): { proc: ContractProcess; endTurn: (text: string) => void } {
+function acpAgent(): { proc: ContractProcess; endTurn: (text: string) => void; mode: () => string | null } {
   let prompt: number | string | null = null;
+  let mode: string | null = null;
   const reply = (proc: ContractProcess, id: number | string, result: unknown): void => proc.say({ jsonrpc: '2.0', id, result });
   const proc = new ContractProcess((text, self) => {
     for (const line of text.split('\n').filter((l) => l.trim() !== '')) {
-      const msg = JSON.parse(line) as { id?: number | string; method?: string };
+      const msg = JSON.parse(line) as { id?: number | string; method?: string; params?: { modeId?: string } };
+      if (msg.method === 'session/set_mode') {
+        mode = msg.params?.modeId ?? null;
+      }
       if (msg.method === 'session/prompt') {
         prompt = msg.id ?? null;
       } else if (msg.method === 'session/cancel' && prompt !== null) {
@@ -77,7 +94,7 @@ function acpAgent(): { proc: ContractProcess; endTurn: (text: string) => void } 
         prompt = null;
         reply(self, id, { stopReason: 'cancelled' });
       } else if (msg.id !== undefined && msg.method !== undefined) {
-        reply(self, msg.id, msg.method === 'session/new' ? { sessionId: 'ses_k' } : {});
+        reply(self, msg.id, msg.method === 'session/new' ? { sessionId: 'ses_k', modes: KIMI_MODES } : {});
       }
     }
   });
@@ -91,14 +108,16 @@ function acpAgent(): { proc: ContractProcess; endTurn: (text: string) => void } 
         reply(proc, id, { stopReason: 'end_turn' });
       }
     },
+    mode: () => mode,
   };
 }
 
 export const kimiDriver: ContractDriver = {
   name: 'kimi',
-  async start() {
+  readOnly: 'plan',
+  async start(over) {
     const agent = acpAgent();
-    const { start, events } = collect();
+    const { start, events } = collect(over);
     const handle = kimiAdapter(agent.proc.spawnFn()).spawn(start);
     await ticks();
     return session(handle, events, {
@@ -107,21 +126,24 @@ export const kimiDriver: ContractDriver = {
         await ticks();
       },
       settle: ticks,
+      permission: agent.mode,
     });
   },
   dispose: () => undefined,
 };
 
 /** A scripted OpenCode server: the message list grows with each prompt and each ended turn. */
-function opencodeServer(): { fetch: FetchFn; endTurn: (text: string) => void } {
+function opencodeServer(): { fetch: FetchFn; endTurn: (text: string) => void; agent: () => string | null } {
   const list: unknown[] = []; // newest first, as the API lists it
   let n = 0;
+  let agent: string | null = null;
   const json = (body: unknown): Response => ({ ok: true, status: 200, json: async () => body }) as unknown as Response;
   const fetch: FetchFn = async (url, init) => {
     if (url.endsWith(OPENCODE_API.createSession)) {
       return json({ data: { id: 'ses_oc' } });
     }
     if (url.endsWith(OPENCODE_API.prompt('ses_oc'))) {
+      agent = (JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as { agent?: string }).agent ?? 'default';
       list.unshift({ id: `u${++n}`, type: 'user', time: { created: Date.now() } });
       return json({ data: {} });
     }
@@ -141,16 +163,17 @@ function opencodeServer(): { fetch: FetchFn; endTurn: (text: string) => void } {
     list.unshift({ id: `a${++n}`, type: 'assistant', time: { created: t, completed: t }, content: [{ type: 'text', text }] });
     list.unshift({ id: `i${n}`, type: 'idle', time: { created: t }, outcome: 'succeeded' });
   };
-  return { fetch, endTurn };
+  return { fetch, endTurn, agent: () => agent };
 }
 
 export const opencodeDriver: ContractDriver = {
   name: 'opencode',
-  async start() {
+  readOnly: 'plan',
+  async start(over) {
     vi.useFakeTimers();
     const proc = new ContractProcess();
     const server = opencodeServer();
-    const { start, events } = collect();
+    const { start, events } = collect(over);
     const handle = opencodeAdapter(proc.spawnFn(), server.fetch, async () => 47000, () => new Date(Date.now())).spawn(start);
     await vi.advanceTimersByTimeAsync(10);
     proc.say('server password sekrit');
@@ -165,6 +188,7 @@ export const opencodeDriver: ContractDriver = {
         await settle();
       },
       settle,
+      permission: server.agent,
     });
   },
   dispose: () => {
@@ -174,9 +198,10 @@ export const opencodeDriver: ContractDriver = {
 
 export const fakeDriver: ContractDriver = {
   name: 'fake harness',
-  async start() {
+  readOnly: 'read-only',
+  async start(over) {
     const adapter: ProviderAdapter & { workers: FakeHarnessAdapter['workers'] } = new FakeHarnessAdapter();
-    const { start, events } = collect();
+    const { start, events } = collect(over);
     const handle = adapter.spawn(start);
     return session(handle, events, {
       endTurn: async (text) => {
@@ -184,6 +209,7 @@ export const fakeDriver: ContractDriver = {
         await ticks();
       },
       settle: ticks,
+      permission: () => start.permissionMode,
     });
   },
   dispose: () => undefined,

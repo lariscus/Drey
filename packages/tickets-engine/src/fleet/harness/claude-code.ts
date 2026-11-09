@@ -8,6 +8,11 @@ import type { SpawnFn } from '../ports/process-spawner';
 import { ClaudeCodeWorker } from './claude-code-worker';
 import type { NowFn, ProviderAdapter, ProviderStart, WorkerHandle } from './contract';
 
+/** The CLI's `--permission-mode` for a start's mode; `read-only` (req-183, a review) is the CLI's `plan`. */
+export function claudeCodePermission(mode: ProviderStart['permissionMode']): string {
+  return mode === 'bypass' ? 'bypassPermissions' : mode === 'read-only' ? 'plan' : 'acceptEdits';
+}
+
 /** The CLI's arguments for a start: headless stream-json both ways, the permission mode, the model, the resume. */
 export function claudeCodeArgs(start: ProviderStart): string[] {
   return [
@@ -18,7 +23,7 @@ export function claudeCodeArgs(start: ProviderStart): string[] {
     'stream-json',
     '--verbose',
     '--permission-mode',
-    start.permissionMode === 'bypass' ? 'bypassPermissions' : 'acceptEdits',
+    claudeCodePermission(start.permissionMode),
     ...(start.model !== null ? ['--model', start.model] : []),
     ...(start.resumeRef !== null ? ['--resume', start.resumeRef] : []),
   ];

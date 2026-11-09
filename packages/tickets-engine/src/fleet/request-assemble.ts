@@ -60,7 +60,8 @@ function workParts(plan: RunPlan, worker: RunWorkerPin, instruction: ComposedIns
   return {
     provider: worker.provider,
     model: worker.model,
-    permissionMode: input.permissionMode,
+    // req-183: a review's session runs read-only, whatever the board's setting says.
+    permissionMode: plan.reviewCheckout !== null ? 'read-only' : input.permissionMode,
     instruction: instruction.text,
     continuationInstruction: instruction.continuation,
     briefDigest: createHash('sha256').update(instruction.stable).digest('hex'),

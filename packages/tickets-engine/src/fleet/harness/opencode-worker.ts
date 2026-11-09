@@ -1,6 +1,6 @@
 import type { PermissionDecision, QuestionAnswers, SteerRung } from '../protocol';
 import type { AttachInfo, NormalizedEvent, WorkerHandle } from './contract';
-import { INTERRUPT_WAIT_MS, modelBody, OPENCODE_API } from './opencode-api';
+import { agentBody, INTERRUPT_WAIT_MS, modelBody, OPENCODE_API } from './opencode-api';
 import type { OpencodeCatalog } from './opencode-catalog';
 import type { OpencodeEventStream } from './opencode-event-stream';
 import type { OpencodePoller } from './opencode-poller';
@@ -97,7 +97,7 @@ export class OpencodeWorker implements WorkerHandle {
       return;
     }
     try {
-      const res = await client.post(OPENCODE_API.prompt(state.sessionRef), modelBody(start.model, text));
+      const res = await client.post(OPENCODE_API.prompt(state.sessionRef), { ...modelBody(start.model, text), ...agentBody(start.permissionMode) });
       if (!res.ok) {
         this.emit({ kind: 'error', text: `prompt failed: ${res.status}` });
       }

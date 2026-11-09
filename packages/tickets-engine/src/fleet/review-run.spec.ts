@@ -33,11 +33,15 @@ describe('composeRunRequest — a review run carries its checkout (req-183)', ()
     }
     const expected = path.join('V:/tickets', '_worktrees', 'T-0001-review');
     expect(result.request.reviewCheckout).toBe(expected);
+    expect(result.request.permissionMode).toBe('read-only'); // the session's own guard, whatever the board says
     expect(result.request.worktreePath).toBe(path.join('V:/tickets', '_worktrees', 'T-0001')); // the gate's ground stays the worktree
     expect(result.request.instruction).toContain(`Review checkout: ${expected}`);
     expect(result.request.instruction).toContain('It is read-only');
     expect(result.request.instruction).not.toContain('Work checkout:');
     expect(result.request.instruction).toContain('in the worktree at the commit you reviewed');
+    expect(result.request.instruction).toContain('BLOCKED: <why>');
+    expect(result.request.instruction).toContain('your session cannot change it');
+    expect(result.request.instruction).not.toContain('you may edit');
   });
 
   it('a reviewer persona on an inserted gate gets one too', () => {
@@ -49,6 +53,7 @@ describe('composeRunRequest — a review run carries its checkout (req-183)', ()
   it('a build run carries none, and its brief is unchanged', () => {
     const result = composeRunRequest(base({ workingPhase: phase('build', { handover: 'agent build-default' }), nextPhaseId: 'review' }));
     expect(result.ok && result.request.reviewCheckout).toBeUndefined();
+    expect(result.ok && result.request.permissionMode).toBe('accept-edits');
     expect(result.ok && result.request.instruction).toContain('Work checkout:');
   });
 });

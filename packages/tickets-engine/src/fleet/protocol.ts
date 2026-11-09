@@ -45,8 +45,13 @@ export function isWorkerProvider(value: unknown): value is WorkerProviderId {
   return typeof value === 'string' && (WORKER_PROVIDERS as readonly string[]).includes(value);
 }
 
-/** How the runner may let the agent answer itself (blast radius; ADR-0075). */
-export type PermissionMode = 'accept-edits' | 'bypass';
+/**
+ * How the runner may let the agent answer itself (blast radius; ADR-0075).
+ * `read-only` (req-183) is the review run's: no edits, no state-changing
+ * commands — set by `composeRunRequest` for a review, never chosen by an
+ * owner; each adapter maps it to its harness's read-only mode.
+ */
+export type PermissionMode = 'accept-edits' | 'bypass' | 'read-only';
 
 /**
  * The interactive dialog modes (req-65): the owner drives the run as a
@@ -241,7 +246,7 @@ export interface RunRequest {
   readonly poolRoute?: RouteRecord;
   /**
    * req-183: a review run (`isReviewRun`) reads the ticket branch in its own
-   * checkout � this path, a second worktree `<id>-review` beside the
+   * checkout — this path, a second worktree `<id>-review` beside the
    * ticket's, detached at the commit the builder handed over and read-only
    * on disk. Computed in `composeRunRequest` like `worktreePath`; absent =
    * every other run, and every older sender.

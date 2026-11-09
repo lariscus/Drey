@@ -2,6 +2,7 @@ import type { PermissionDecision, QuestionAnswers, SteerRung } from '../protocol
 import type { RunnerProcess } from '../ports/process-spawner';
 import type { NormalizedEvent, WorkerHandle } from './contract';
 import type { KimiRequests } from './kimi-requests';
+import { kimiModeFor, kimiModesOf } from './kimi-modes';
 import { kimiEmit, kimiText, type KimiContext } from './kimi-state';
 import type { KimiTurns } from './kimi-turns';
 
@@ -18,6 +19,8 @@ const REPLAY_SETTLE_MS = 300;
 export class KimiWorker implements WorkerHandle {
   readonly exited: Promise<number | null>;
   private readonly emit: (event: Omit<NormalizedEvent, 'ts'>) => void;
+  /** The modes the session advertised (req-183: is there a read-only one?); null until it opened or when it names none. */
+  private modes: readonly string[] | null = null;
 
   constructor(
     private readonly ctx: KimiContext,
@@ -114,7 +117,11 @@ export class KimiWorker implements WorkerHandle {
     }
     state.initDone = true;
     start.onSessionRef(state.sessionId!);
-    await acp.result('session/set_mode', { sessionId: state.sessionId, modeId: start.permissionMode === 'bypass' ? 'yolo' : 'auto' });
+    const mode = kimiModeFor(start.permissionMode, this.modes);
+    if (mode.note !== null) {
+      this.emit({ kind: 'note', text: mode.note });
+    }
+    await acp.result('session/set_mode', { sessionId: state.sessionId, modeId: mode.modeId });
     if (start.model !== null) {
       await acp.result('session/set_config_option', { sessionId: state.sessionId, configId: 'model', value: start.model });
     }
@@ -128,12 +135,14 @@ export class KimiWorker implements WorkerHandle {
   private async openSession(): Promise<boolean> {
     const { state, acp, start } = this.ctx;
     if (start.resumeRef === null) {
-      state.sessionId = kimiText((await acp.result('session/new', { cwd: start.cwd, mcpServers: [] }))['sessionId']);
+      const opened = await acp.result('session/new', { cwd: start.cwd, mcpServers: [] });
+      state.sessionId = kimiText(opened['sessionId']);
+      this.modes = kimiModesOf(opened);
       return true;
     }
     state.replaying = true;
     try {
-      await acp.result('session/load', { sessionId: start.resumeRef, cwd: start.cwd, mcpServers: [] });
+      this.modes = kimiModesOf(await acp.result('session/load', { sessionId: start.resumeRef, cwd: start.cwd, mcpServers: [] }));
     } catch (error) {
       state.replaying = false;
       start.onResumeFailed?.(error instanceof Error ? error.message : String(error));

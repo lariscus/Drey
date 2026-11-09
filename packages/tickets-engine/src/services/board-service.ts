@@ -3498,13 +3498,13 @@ export class EngineBoardService {
 
   /**
    * The repo's .gitignore covers the worktrees base and the ticket copies'
-   * `_workcopy/` (ADR-0080, req-183: ensured, not documented — drifts on
+   * `_workcopy/` (ADR-0080, req-183: ensured, not documented â€” drifts on
    * new boards otherwise). One commit when it changes; never fails the caller.
    */
   private async ensureWorktreesIgnored(vault: EngineVault): Promise<void> {
     const location = await this.locate(vault.path);
     if (location === null) {
-      return; // not a git repo — nothing to ignore in
+      return; // not a git repo â€” nothing to ignore in
     }
     const gitignore = path.join(location.root, '.gitignore');
     const current = await fsp.readFile(gitignore, 'utf8').catch(() => null);
