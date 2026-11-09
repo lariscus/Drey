@@ -1662,6 +1662,41 @@ Closing it keeps the service running. Three tabs:
   the ticket in Drey — Drey's thread shows the same session cleaned up.
 - **Logs** — the service log at full height, filtered by level and by part.
 
+### The crew's vault
+
+Every agent the Crew runner starts can use your notes: Drey Service hands it
+the vault tools — list, search, read, edit, write and move, never delete — as
+an MCP server of its own, whether Drey is open or not. Each agent gets its own
+key for as long as it runs, and the service decides what it may do:
+
+- **It reads every registered vault.** The `tickets/` folder, `chats/` and
+  hidden folders stay out of reach.
+- **It writes only where its persona allows.** By default a persona writes
+  nowhere. To let it write a vault, add the vault's id to its
+  `persona.md` (in `tickets/_meta/personas/<persona>/`):
+
+  ```yaml
+  allowed:
+    write-vaults: [notes]
+  ```
+
+  Moving a note counts as writing. A review run writes nowhere, whatever its
+  persona may. When an agent tries anyway it is told
+  `ben may not write vault "notes" (allowed: read)` and carries on without
+  it — nobody is asked.
+- **It does not overwrite your edits.** If you changed a note after the agent
+  read it, its overwrite or edit is refused and it has to read the note again.
+
+Every call shows in the run: in the window's **Sessions** tab, the stream and
+**Tool calls** list each one as `vault › vault_edit notes:projects/site.md`
+with who made it, whether it was allowed and how long it took; refused calls
+also land in the service log. The **MCP server** row of *Components* shows the
+service's address and how many agents hold a key. A note an agent changed
+reaches an open tab in Drey at the next refresh of the vault (or at once with
+*Watch the vault for external changes* on); its change is not in the note's
+**File history**. Drey's own MCP server for other programs (Settings → MCP,
+below) is separate and works as before.
+
 ### The resource governor
 
 Agents do two kinds of work: they **think** (a model run — light) and they

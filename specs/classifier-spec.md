@@ -524,10 +524,12 @@ in choosing them.
 
 ### The vault tools (milestones 77–78)
 
-One set, defined in `electron/mcp/tools/defs.ts`, offered to programs
-connected to Drey's MCP server and attached to the assistant's asks
-while the Vault chip is on — and, for the attached note alone, while it
-is off. What a caller gets:
+One set, defined in `shared/vault-tools/defs.ts` (moved from
+`electron/mcp/tools/` by milestone 227; the texts did not change), offered
+to programs connected to Drey's MCP server and attached to the assistant's
+asks while the Vault chip is on — and, for the attached note alone, while it
+is off. Drey Service's vault MCP offers the Crew's workers the same texts
+without `vault_delete` and `tasks_list` (req-167, ADR-0094). What a caller gets:
 
 | | MCP client | Assistant |
 |---|---|---|

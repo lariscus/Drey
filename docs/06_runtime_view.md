@@ -5240,3 +5240,62 @@ harness reported for the session minus what it had spent before (a resumed sessi
 table), or the price table when the harness reports none or 0. A worker of an ACP harness is a stdio child of its
 runner: a runner handover resumes it in place (`session/resume` / `session/load`), an unplanned runner death detaches
 the run — nothing re-attaches (req-205).
+
+## 6.111 Spawn → token → a worker's `vault_edit` → the persona's right → the stream (req-167, milestone 227, [ADR-0094](09_architecture_decisions/0094-vault-mcp-served-by-drey-service.md) as built)
+
+```mermaid
+sequenceDiagram
+    participant PS as ProcessSupervisor (spawn path)
+    participant G as VaultMcpComponent (mcp, Drey Service)
+    participant AD as Adapter (mcpLaunch)
+    participant W as Worker (Claude Code / opencode / Kimi / Copilot)
+    participant H as VaultMcpHttp (/mcp)
+    participant C as VaultMcpCalls
+    participant R as PersonaRights (board personas)
+    participant VT as VaultTools (shared/vault-tools)
+    participant D as DiskToolVault (registered vaults)
+    participant S as run stream (stream.jsonl)
+
+    PS->>G: open({run, ticket, persona, readOnly, runDir, emit}, adapter.mcpLaunch)
+    alt the harness takes no MCP, or the endpoint does not listen
+        G-->>S: note "… — this run has no vault"
+        G-->>PS: null → spawn without a vault
+    else
+        G->>G: mint token (32 random bytes; SHA-256 kept with run, persona, ticket)
+        G->>AD: mcpLaunch({name: drey, url: 127.0.0.1:port/mcp, token, runDir})
+        AD-->>G: Claude Code: files [runDir/mcp.json] + --mcp-config, --allowedTools mcp__drey<br/>ACP: acpServers [{http, Authorization: Bearer …}]
+        G->>G: write the files owner-only
+        G-->>PS: access {launch, close}
+        PS->>W: spawn(start + mcp) — Claude Code reads the file; an ACP harness gets mcpServers in session/new|resume|load<br/>(an agent whose initialize offers no HTTP MCP: stream note, no vault)
+    end
+    W->>H: POST /mcp tools/call vault_edit {path, vault, edits} — Bearer token
+    H->>G: resolve(token)
+    alt unknown or revoked token
+        H-->>W: 401
+    else
+        H->>C: call(session, vault_edit, args)
+        C->>D: the registered vaults now (vaults.registered, Drey's registry)
+        C->>R: grantFor(persona, readOnly) — allowed: write-vaults
+        R-->>C: {who: ben, vaults: [work]} (read-only run / no persona: [])
+        alt the vault is not in the grant
+            C->>VT: call(…, {write: auto, grant, exclude: [vault_delete, tasks_list]})
+            VT-->>C: Error: ben may not write vault "notes" (allowed: read)
+        else the worker read this file and the disk moved since (ADR-0060)
+            C-->>C: Error: <path> changed on disk since you read it — read it again
+        else
+            C->>VT: call(…) — exact replacement that must match once (shared/text-edit)
+            VT->>D: readFile / writeFile (served paths only: no tickets/, chats/, dot-folders; atomic write)
+            VT-->>C: Edited <path>: 1 replacement at line n.
+        end
+        C-->>S: tool {detail: audit, tool: mcp__drey__vault_edit, text: "vault › vault_edit work:a.md · 12 ms",<br/>audit: {persona, vault, path, verdict: allowed|refused|failed, ms}}
+        C-->>G: a refusal also → service log (mcp)
+        H-->>W: the tool result (an Error: is the text the model acts on)
+    end
+    W-->>PS: exits
+    PS->>G: access.close() — the token is revoked, mcp.json removed
+```
+
+The token lives as long as its worker: a respawn of the same run (a resume, a fallback) opens a fresh one. The
+service re-reads the registered vaults and the persona at every call, so a vault Drey added or a right the owner
+granted applies to the next call. A write does not pass through an open Drey tab and leaves no local history entry
+(ADR-0094's price); Drey sees it at its next vault round (the opt-in watcher, a refresh — req-213).

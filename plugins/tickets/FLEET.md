@@ -37,7 +37,8 @@ The runner's port and token are in the service home's `service.lock`, under
 ├── chain.json      persisted chain state (only on daemon builds)
 ├── runs/<run-id>/
 │   ├── run.json    the full record: {request, info}
-│   └── stream.jsonl the run's output events (ndjson)
+│   ├── stream.jsonl the run's output events (ndjson)
+│   └── mcp.json    Claude Code's vault MCP config (req-167): owner-only, the worker's token, removed at its exit
 └── worktrees/      LEGACY (pre-T-0044): emptied by the boot migration
                     and the Clean up worktrees control, never written again
 
@@ -320,8 +321,11 @@ paths may be numbered (`tickets/30-plan/…`) or unprefixed — the stripped
 id is the identity everywhere. `stream.jsonl` lines are
 `{ts, kind, text, ...}` with kinds `note`
 (runner notices: gate lines, run bookkeeping), `text` (worker output),
-`usage` (token/cost updates), `result` (the worker's final answer) and
-`error`.
+`usage` (token/cost updates), `result` (the worker's final answer),
+`error` and `tool`. A `tool` line with `detail: 'audit'` is one call of
+Drey Service's vault MCP as the service saw it (req-167): `tool`
+`mcp__drey__<tool>`, text `vault › <tool> <vault>:<path>[ → Error: …] · <ms> ms`,
+and `audit: {persona, vault, path, verdict: allowed|refused|failed, ms}`.
 
 Since T-0048 the info also carries the run's **token telemetry** (all
 optional — adopted pre-T-0048 records lack them, and every reader
@@ -1141,6 +1145,37 @@ What the removed `opencode serve` adapter had and ACP does not carry:
 re-attaching a worker that outlived its runner (req-205), live text deltas
 (req-204), a steer queued behind the running turn instead of cancelling it
 (req-206), per-model-call telemetry (req-207).
+
+### The vault over MCP (req-167, ADR-0094)
+
+Every worker the service's runner starts gets Drey Service's vault MCP
+(`service/vault-mcp/`): the ADR-0071 tools `vault_list`, `vault_search`,
+`vault_read`, `vault_edit`, `vault_write`, `vault_move` (never
+`vault_delete`) as the server `drey` (the model calls
+`mcp__drey__vault_read`), with Drey open or not. The spawn path opens a
+token for the worker and hands its harness the configuration the adapter's
+`mcpLaunch` describes; the worker's exit revokes it.
+
+| Harness | Vault MCP | Proven |
+|---|---|---|
+| Claude Code | `<run folder>/mcp.json` named by `--mcp-config`, `--allowedTools mcp__drey` | fakes + live |
+| opencode 2.0.32 | ACP `mcpServers` in `session/new` / `resume` / `load` (`initialize`: `mcpCapabilities.http`) | fakes + live |
+| Kimi 2.5.2 | the same | fakes + live |
+| Copilot CLI | the same, as documented | fakes (req-208) |
+
+A worker **reads every registered vault** (Drey keeps the engine key
+`vaults.registered` on its registry) and **writes only where its persona's
+`allowed: write-vaults` names the vault** — none for a run without a persona
+and for a read-only run. A refused write is `Error: <persona> may not write
+vault "<id>" (allowed: read)` to the model, an audit line on the stream and a
+warning in the service log; a write from a read the disk has moved past is
+refused too (ADR-0060). No `tickets/`, `chats/` or dot-folder is reachable.
+A harness that takes no MCP, or an ACP agent that advertises no HTTP MCP,
+starts without the vault and the stream says so once. Diagnose: the `mcp`
+row of `service.lock` (`running · 127.0.0.1:<port> · <n> workers`), the
+audit lines in `stream.jsonl`, the service log's `mcp` file.
+`harness-mcp-live.spec.ts` (`DREY_LIVE_MCP=1`) starts the installed CLIs the
+runner's way with no prompt and checks each connects with its token.
 
 `acp-live.spec.ts` runs the protocol cases against the installed CLIs in a
 temporary data home; set `DREY_LIVE_ACP_MODEL` (e.g. `opencode/big-pickle`)
