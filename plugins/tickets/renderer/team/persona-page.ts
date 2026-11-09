@@ -24,6 +24,7 @@ import { profileBlock } from './persona-profile-block';
 import { proposalsBlock, syncApply } from './persona-proposals-block';
 import { noPromptPreview, vaultSkillsSeam, type PersonaSkillsSeam, type PromptPreviewSeam } from './persona-seams';
 import { skillsBlock } from './persona-skills-block';
+import type { CrewLinkTab } from './team-focus';
 import { workBlock } from './persona-work-block';
 import type { TeamStore } from './team-store';
 
@@ -43,7 +44,7 @@ export interface PersonaPageHost {
   /** The persona's name changed: the tab follows. */
   retitle(title: string): void;
   /** Opens the Crew tab on this persona's Memory or 1:1 tab. */
-  openCrew(persona: string, tab: 'Memory' | '1:1'): void;
+  openCrew(persona: string, tab: CrewLinkTab): void;
 }
 
 /** The two seams that wait for req-172; a spec swaps them. */

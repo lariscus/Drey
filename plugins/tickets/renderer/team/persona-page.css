@@ -359,7 +359,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-chip);
   color: var(--text-4);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .persona-add {
@@ -542,7 +542,7 @@
   height: 18px;
   padding: 0;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius-dialog);
   background: var(--field-border);
 }
 

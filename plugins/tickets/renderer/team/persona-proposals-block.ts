@@ -10,6 +10,7 @@ import type { ImprovementProposal } from '../../../../packages/tickets-engine/sr
 import { h } from '../desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { blockHead, outlineButton } from './persona-dom';
+import { CREW_TABS, type CrewLinkTab } from './team-focus';
 
 export interface ProposalsView {
   /** The first open proposal, if any. */
@@ -19,7 +20,7 @@ export interface ProposalsView {
   /** Applying a prompt proposal rewrites `prompt.md`: not while the page holds unsaved text. */
   readonly promptDirty: boolean;
   decide(proposal: ImprovementProposal, decision: 'accepted' | 'dismissed'): void;
-  openCrew(tab: 'Memory' | '1:1'): void;
+  openCrew(tab: CrewLinkTab): void;
 }
 
 /** Applying a prompt proposal rewrites `prompt.md`: the Apply button waits while the page holds unsaved instructions. The page calls this on every edit. */
@@ -62,9 +63,9 @@ function links(ctx: BlockContext, view: ProposalsView): HTMLElement {
   const link = (text: string, run: () => void): void => {
     row.append(outlineButton(text, 'persona-link', run));
   };
-  link(view.memory === null ? t('persona.links.memory') : t('persona.links.memory_count', { count: view.memory }), () => view.openCrew('Memory'));
-  link(view.journal === null ? t('persona.links.journal') : t('persona.links.journal_count', { count: view.journal }), () => view.openCrew('Memory'));
-  link(t('persona.links.talk', { name: ctx.draft().title }), () => view.openCrew('1:1'));
+  link(view.memory === null ? t('persona.links.memory') : t('persona.links.memory_count', { count: view.memory }), () => view.openCrew(CREW_TABS.memory));
+  link(view.journal === null ? t('persona.links.journal') : t('persona.links.journal_count', { count: view.journal }), () => view.openCrew(CREW_TABS.memory));
+  link(t('persona.links.talk', { name: ctx.draft().title }), () => view.openCrew(CREW_TABS.talk));
   return row;
 }
 

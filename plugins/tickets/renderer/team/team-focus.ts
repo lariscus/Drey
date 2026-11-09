@@ -4,9 +4,14 @@
  * on that persona's tab. The request waits here until a mounted Crew tab
  * takes it, or is handed to the one that is already mounted.
  */
+/** The Crew detail's tabs a link can open; the values are the tab names of the Crew tab. */
+export const CREW_TABS = { memory: 'Memory', talk: '1:1' } as const;
+
+export type CrewLinkTab = (typeof CREW_TABS)[keyof typeof CREW_TABS];
+
 export interface CrewFocus {
   readonly persona: string;
-  readonly tab: 'Memory' | '1:1';
+  readonly tab: CrewLinkTab;
 }
 
 let pending: CrewFocus | null = null;

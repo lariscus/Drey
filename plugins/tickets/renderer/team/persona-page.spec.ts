@@ -82,6 +82,7 @@ describe('the Persona page v2 (R11, board 7k)', () => {
     ]);
     expect(stateText()).toBe('Saved');
     expect(fx.retitled.at(-1)).toBe('Benno');
+    expect(q('.persona-head-name').textContent).toBe('Benno');
   });
 
   it('the write-vaults choice is the vault ids, per vault', async () => {

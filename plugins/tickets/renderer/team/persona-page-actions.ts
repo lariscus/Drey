@@ -78,6 +78,7 @@ export async function savePersona(env: ActionEnv): Promise<void> {
     const saved = env.store.personas().find((entry) => entry.id === id);
     if (saved !== undefined) {
       loaded.view = saved;
+      loaded.ctx = { ...loaded.ctx, persona: saved };
       session.viewKey = env.keyOf(saved);
     }
   } catch (error) {
