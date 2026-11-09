@@ -2,8 +2,9 @@ import type { PermissionDecision, QuestionAnswers, WaitQuestion } from '../proto
 import type { RpcMessage } from './acp-client';
 import type { NormalizedEvent } from './contract';
 import { permissionText } from './event-text';
-import { kimiEmit, kimiText, type KimiContext } from './kimi-state';
-import type { KimiUpdateFold } from './kimi-update-fold';
+import type { AcpForms } from './acp-forms';
+import { acpEmit, acpText, type AcpContext } from './acp-state';
+import type { AcpUpdateFold } from './acp-update-fold';
 
 type AcpOption = { readonly optionId?: string; readonly name?: string; readonly kind?: string };
 
@@ -25,48 +26,65 @@ function outcome(optionId: string | null | undefined): Record<string, unknown> {
   return { outcome: optionId === null || optionId === undefined ? { outcome: 'cancelled' } : { outcome: 'selected', optionId } };
 }
 
+/** The tool a permission asks for, in one line: opencode's `name` + its title (`shell echo hi`), else Kimi's title. */
+function permissionAction(toolCall: { name?: string; title?: string }): { action: string; resources: readonly string[] } {
+  const name = acpText(toolCall.name);
+  const title = acpText(toolCall.title);
+  if (name !== '' && title !== '' && title !== name) {
+    return { action: name, resources: [title] };
+  }
+  return { action: title !== '' ? title : name !== '' ? name : 'tool', resources: [] };
+}
+
 /**
  * The agent's own requests held open for the owner (req-64): an approval
- * (`session/request_permission`) or a question of the AskUserQuestion tool,
- * reported as the run's wait and answered — or declined to make room for
- * the owner's free text, which then rides as the next turn.
+ * (`session/request_permission`), a question of Kimi's AskUserQuestion tool
+ * (a permission request in disguise), or a question form
+ * (`elicitation/create`, opencode — `AcpForms`), reported as the run's wait
+ * and answered — or declined to make room for the owner's free text, which
+ * then rides as the next turn.
  */
-export class KimiRequests {
+export class AcpRequests {
   private readonly pending = new Map<string, PendingRequest>();
   private readonly emit: (event: Omit<NormalizedEvent, 'ts'>) => void;
 
   constructor(
-    private readonly ctx: KimiContext,
-    private readonly fold: KimiUpdateFold,
+    private readonly ctx: AcpContext,
+    private readonly fold: AcpUpdateFold,
+    private readonly forms: AcpForms,
   ) {
-    this.emit = kimiEmit(ctx);
+    this.emit = acpEmit(ctx);
   }
 
   get open(): boolean {
-    return this.pending.size > 0;
+    return this.pending.size > 0 || this.forms.open;
   }
 
   onRequest(message: RpcMessage): void {
     const rpcId = message.id!;
+    if (message.method === 'elicitation/create') {
+      this.fold.flushThought();
+      return this.forms.onRequest(message);
+    }
     if (message.method !== 'session/request_permission') {
       this.ctx.acp.reply(rpcId, { error: { code: -32601, message: `${message.method ?? 'request'} is not supported` } });
       return;
     }
     const params = message.params ?? {};
     const options = (Array.isArray(params['options']) ? params['options'] : []) as readonly AcpOption[];
-    const toolCall = (params['toolCall'] ?? {}) as { toolCallId?: string; title?: string; content?: ReadonlyArray<{ content?: { text?: string } }> };
-    const title = kimiText(toolCall.title);
-    const body = kimiText(toolCall.content?.[0]?.content?.text).trim();
+    const toolCall = (params['toolCall'] ?? {}) as { toolCallId?: string; name?: string; title?: string; content?: ReadonlyArray<{ content?: { text?: string } }> };
+    const title = acpText(toolCall.title);
+    const body = acpText(toolCall.content?.[0]?.content?.text).trim();
     const key = String(rpcId);
     this.fold.flushThought();
     if (title === 'AskUserQuestion') {
-      const question = this.question(kimiText(toolCall.toolCallId), body, options);
+      const question = this.question(acpText(toolCall.toolCallId), body, options);
       this.pending.set(key, { rpcId, kind: 'question', options });
       this.emit({ kind: 'usage', turn: 'idle', waiting: { kind: 'question', text: question.question, requestId: key, questions: [question] } });
       return;
     }
     this.pending.set(key, { rpcId, kind: 'permission', options });
-    const text = permissionText({ action: title === '' ? 'tool' : title, message: body.replace(/^Requesting approval to\s*/i, '') });
+    const text = permissionText({ ...permissionAction(toolCall), message: body.replace(/^Requesting approval to\s*/i, '') });
     this.emit({ kind: 'usage', turn: 'idle', waiting: { kind: 'permission', text, requestId: key } });
   }
 
@@ -83,13 +101,16 @@ export class KimiRequests {
 
   /** A choice by its label; anything else declines the question and rides as the next turn. */
   answerQuestion(formId: string, answers: QuestionAnswers): boolean {
+    if (this.forms.answer(formId, answers)) {
+      return true;
+    }
     const request = this.pending.get(formId);
     if (request === undefined || request.kind !== 'question') {
       return false;
     }
     const given = answers['q0'];
     const said = (Array.isArray(given) ? given[0] : given) ?? '';
-    const choice = request.options.find((o) => o.kind !== 'reject_once' && kimiText(o.name).toLowerCase() === said.toLowerCase());
+    const choice = request.options.find((o) => o.kind !== 'reject_once' && acpText(o.name).toLowerCase() === said.toLowerCase());
     this.pending.delete(formId);
     if (choice?.optionId !== undefined) {
       this.ctx.acp.reply(request.rpcId, { result: outcome(choice.optionId) });
@@ -105,6 +126,9 @@ export class KimiRequests {
 
   /** A held request stands while the owner types: decline it, the text rides as the next turn. */
   declineFor(text: string): void {
+    if (this.forms.open) {
+      return this.forms.takeText(text);
+    }
     const first = [...this.pending.entries()][0];
     if (first === undefined) {
       return;
@@ -123,17 +147,17 @@ export class KimiRequests {
   private question(toolCallId: string, body: string, options: readonly AcpOption[]): WaitQuestion {
     const args = this.fold.argsOf(toolCallId);
     const asked = (Array.isArray(args?.['questions']) ? args['questions'] : []) as ReadonlyArray<{ header?: string; options?: ReadonlyArray<{ label?: string; description?: string }> }>;
-    const described = new Map((asked[0]?.options ?? []).map((o) => [kimiText(o.label), o.description]));
-    const header = kimiText(asked[0]?.header);
+    const described = new Map((asked[0]?.options ?? []).map((o) => [acpText(o.label), o.description]));
+    const header = acpText(asked[0]?.header);
     return {
       key: 'q0',
       ...(header !== '' ? { header } : {}),
-      question: body !== '' ? body : 'Kimi asks you',
+      question: body !== '' ? body : 'The worker asks you',
       options: options
-        .filter((o) => o.kind !== 'reject_once' && kimiText(o.name) !== '')
+        .filter((o) => o.kind !== 'reject_once' && acpText(o.name) !== '')
         .map((o) => {
-          const description = described.get(kimiText(o.name));
-          return { label: kimiText(o.name), ...(description !== undefined ? { description } : {}) };
+          const description = described.get(acpText(o.name));
+          return { label: acpText(o.name), ...(description !== undefined ? { description } : {}) };
         }),
       multiple: false,
     };

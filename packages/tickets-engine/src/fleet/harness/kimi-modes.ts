@@ -1,4 +1,5 @@
 import type { PermissionMode } from '../protocol';
+import type { AcpModeChoice } from './acp-harness';
 
 /**
  * The Kimi session's mode for a start's permission mode (ACP
@@ -11,26 +12,7 @@ import type { PermissionMode } from '../protocol';
  */
 export const KIMI_READ_ONLY_MODE = 'plan';
 
-export interface KimiModeChoice {
-  readonly modeId: string;
-  /** A note for the run's stream when the asked mode is not available; null otherwise. */
-  readonly note: string | null;
-}
-
-/** The mode ids a `session/new` or `session/load` result advertises; null when it names none. */
-export function kimiModesOf(result: Record<string, unknown>): readonly string[] | null {
-  const modes = result['modes'];
-  if (typeof modes !== 'object' || modes === null) {
-    return null;
-  }
-  const available = (modes as Record<string, unknown>)['availableModes'];
-  if (!Array.isArray(available)) {
-    return null;
-  }
-  return available.map((m) => (typeof m === 'object' && m !== null ? (m as Record<string, unknown>)['id'] : null)).filter((id): id is string => typeof id === 'string');
-}
-
-export function kimiModeFor(mode: PermissionMode, available: readonly string[] | null): KimiModeChoice {
+export function kimiModeFor(mode: PermissionMode, available: readonly string[] | null): AcpModeChoice {
   if (mode === 'bypass') {
     return { modeId: 'yolo', note: null };
   }

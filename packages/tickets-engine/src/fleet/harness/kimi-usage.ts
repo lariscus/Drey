@@ -8,14 +8,10 @@
 import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import type { AcpUsageRecord } from './acp-harness';
+
 /** One model call of the session, as Kimi's wire log records it. */
-export interface KimiUsageRecord {
-  readonly model: string | null;
-  readonly inputOther: number;
-  readonly output: number;
-  readonly cacheRead: number;
-  readonly cacheCreation: number;
-}
+export type KimiUsageRecord = AcpUsageRecord;
 
 /** Reads the session's usage records in order; empty when the log is unreadable. */
 export type KimiUsageReader = (sessionRef: string) => Promise<readonly KimiUsageRecord[]>;

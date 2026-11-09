@@ -1,37 +1,33 @@
 import type { PermissionDecision, QuestionAnswers, SteerRung } from '../protocol';
 import type { RunnerProcess } from '../ports/process-spawner';
 import type { NormalizedEvent, WorkerHandle } from './contract';
-import type { KimiRequests } from './kimi-requests';
-import { kimiModeFor, kimiModesOf } from './kimi-modes';
-import { kimiEmit, kimiText, type KimiContext } from './kimi-state';
-import type { KimiTurns } from './kimi-turns';
-
-/** How long a replayed history may keep streaming before the updates count again. */
-const REPLAY_SETTLE_MS = 300;
+import type { AcpRequests } from './acp-requests';
+import type { AcpSessionOpener } from './acp-session-open';
+import { acpEmit, type AcpContext } from './acp-state';
+import type { AcpTurns } from './acp-turns';
 
 /**
- * One Kimi worker's handle (E10-8): the ACP session set up (initialize,
- * `session/load` to resume or `session/new`, the mode, the model,
- * compact-first), then the brief as the first turn. A steer while a turn
+ * One ACP worker's handle (E10-8, req-182 — Kimi, Copilot CLI, opencode):
+ * the session opened (`AcpSessionOpener`), the mode the harness picks for
+ * the permission mode, the model pin, compact-first, then the brief as the
+ * first turn. A steer while a turn
  * runs cancels it (`session/cancel`) and rides next; the owner's interrupt
  * is the same cancel — the session stays for the owner (ADR-0096).
  */
-export class KimiWorker implements WorkerHandle {
+export class AcpWorker implements WorkerHandle {
   readonly exited: Promise<number | null>;
   private readonly emit: (event: Omit<NormalizedEvent, 'ts'>) => void;
-  /** The modes the session advertised (req-183: is there a read-only one?); null until it opened or when it names none. */
-  private modes: readonly string[] | null = null;
 
   constructor(
-    private readonly ctx: KimiContext,
+    private readonly ctx: AcpContext,
     private readonly proc: RunnerProcess,
-    private readonly parts: { readonly turns: KimiTurns; readonly requests: KimiRequests },
+    private readonly parts: { readonly turns: AcpTurns; readonly requests: AcpRequests; readonly opener: AcpSessionOpener },
   ) {
-    this.emit = kimiEmit(ctx);
+    this.emit = acpEmit(ctx);
     // Registered before `exited`: a resume that never got a session is reported first.
     proc.onExit((code) => {
       if (!ctx.state.initDone && ctx.start.resumeRef !== null) {
-        ctx.start.onResumeFailed?.(`kimi exited (${code ?? 'signal'}) before the session was established`);
+        ctx.start.onResumeFailed?.(`${ctx.harness.agent} exited (${code ?? 'signal'}) before the session was established`);
       }
     });
     this.exited = new Promise<number | null>((resolve) => proc.onExit(resolve));
@@ -44,7 +40,7 @@ export class KimiWorker implements WorkerHandle {
   /** The session's setup and the first turn, in the background; a failure ends the worker. */
   begin(): void {
     void this.setUp().catch((error: unknown) => {
-      this.emit({ kind: 'error', text: `kimi: ${(error instanceof Error ? error.message : String(error)).slice(0, 300)}` });
+      this.emit({ kind: 'error', text: `${this.ctx.harness.agent}: ${(error instanceof Error ? error.message : String(error)).slice(0, 300)}` });
       this.emit({ kind: 'usage', turn: 'idle' });
       this.ctx.finish();
     });
@@ -110,50 +106,27 @@ export class KimiWorker implements WorkerHandle {
   }
 
   private async setUp(): Promise<void> {
-    const { state, acp, start } = this.ctx;
-    await acp.result('initialize', { protocolVersion: 1, clientCapabilities: {} });
-    if (!(await this.openSession())) {
+    const { state, acp, start, harness } = this.ctx;
+    const offer = await this.parts.opener.open();
+    if (offer === null) {
       return;
     }
     state.initDone = true;
+    state.model = start.model ?? offer.model;
     start.onSessionRef(state.sessionId!);
-    const mode = kimiModeFor(start.permissionMode, this.modes);
+    const mode = harness.modeFor(start.permissionMode, offer.modes);
     if (mode.note !== null) {
       this.emit({ kind: 'note', text: mode.note });
     }
-    await acp.result('session/set_mode', { sessionId: state.sessionId, modeId: mode.modeId });
-    if (start.model !== null) {
+    if (mode.modeId !== null) {
+      await acp.result('session/set_mode', { sessionId: state.sessionId, modeId: mode.modeId });
+    }
+    if (start.model !== null && harness.model === 'config') {
       await acp.result('session/set_config_option', { sessionId: state.sessionId, configId: 'model', value: start.model });
     }
     if (start.compactFirst === true && start.resumeRef !== null) {
       await this.parts.turns.run('/compact');
     }
     await this.parts.turns.settle(await this.parts.turns.run(start.instruction));
-  }
-
-  /** `session/load` (resume) or `session/new`; false = the resume failed and was reported. */
-  private async openSession(): Promise<boolean> {
-    const { state, acp, start } = this.ctx;
-    if (start.resumeRef === null) {
-      const opened = await acp.result('session/new', { cwd: start.cwd, mcpServers: [] });
-      state.sessionId = kimiText(opened['sessionId']);
-      this.modes = kimiModesOf(opened);
-      return true;
-    }
-    state.replaying = true;
-    try {
-      this.modes = kimiModesOf(await acp.result('session/load', { sessionId: start.resumeRef, cwd: start.cwd, mcpServers: [] }));
-    } catch (error) {
-      state.replaying = false;
-      start.onResumeFailed?.(error instanceof Error ? error.message : String(error));
-      state.initDone = true;
-      this.ctx.finish();
-      return false;
-    }
-    await new Promise((resolve) => setTimeout(resolve, REPLAY_SETTLE_MS)); // the history replays as updates
-    state.replaying = false;
-    state.sessionId = start.resumeRef;
-    await this.parts.turns.skipEarlierUsage(state.sessionId);
-    return true;
   }
 }

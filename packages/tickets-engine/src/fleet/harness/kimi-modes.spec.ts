@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { kimiModeFor, kimiModesOf } from './kimi-modes';
+import { sessionOfferOf } from './acp-session-offer';
+import { kimiModeFor } from './kimi-modes';
+
+const kimiModesOf = (result: Record<string, unknown>): readonly string[] | null => sessionOfferOf(result).modes;
 
 /** req-183: a read-only start takes Kimi's `plan` mode when the session advertises it, else `auto` and a note. */
 describe('kimiModeFor — the ACP mode for a start', () => {
