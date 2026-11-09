@@ -53,6 +53,7 @@ import { SteerService } from './orchestrate/steer-service';
 import { StoreClaims } from './orchestrate/store-claims';
 import { TicketCopy } from './orchestrate/ticket-copy';
 import { WaitClaim } from './orchestrate/wait-claim';
+import { WorkcopyFiles } from './orchestrate/workcopy-files';
 import { WorkerLauncher, type WorkerSeats } from './orchestrate/worker-launcher';
 
 type TicketsGitSeam = Pick<TicketsGit, 'run' | 'locate' | 'commitPaths' | 'push'>;
@@ -79,7 +80,7 @@ export function composeShared(storeFor: StoreForTarget, log: (message: string) =
   const sink = ports.sink ?? NULL_SINK;
   const streams = new RunStreams(clock, fs, sink);
   const stores = new StoreClaims(storeFor, clock, log);
-  const copy = new TicketCopy(stores, fs, log);
+  const copy = new TicketCopy(stores, fs, new WorkcopyFiles(fs, log), log);
   const bookkeeper = new RunBookkeeper({
     streams,
     release: new ClaimRelease(stores, copy, clock, log),

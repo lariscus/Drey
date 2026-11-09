@@ -36,7 +36,7 @@ describe('RunCompletion — the gate, the move and the other ends', () => {
     expect(store.of('release').map((c) => c.stage)).toEqual(['build']);
     expect(store.stage).toBe('build');
     expect(store.of('comment').at(-1)?.text).toContain('moving to build');
-    expect(await fsp.readdir(dirs.vault).then((names) => names.filter((n) => n !== '_worktrees'))).toEqual([]);
+    expect(await fsp.readdir(dirs.vault).then((names) => names.filter((n) => n !== '_worktrees' && n !== '_workcopy'))).toEqual([]);
   });
 
   it('a run is `done` in memory before its settle has written the ticket — only onRunSettled marks the end (D-4)', async () => {
