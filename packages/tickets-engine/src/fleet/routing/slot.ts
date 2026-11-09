@@ -19,6 +19,8 @@ export interface SlotLogin {
   readonly kimiCredentials?: string;
   /** Kimi: a second account's home, spawned as `KIMI_HOME`. */
   readonly kimiHome?: string;
+  /** Copilot CLI (req-182): a second account's config folder, spawned as `COPILOT_HOME`; absent = `~/.copilot`. */
+  readonly copilotHome?: string;
 }
 
 /** A window the runner counts itself (no readout): its budget per span. */
@@ -51,6 +53,9 @@ export function slotEnv(slot: Slot): Readonly<Record<string, string>> | undefine
   }
   if (slot.provider === 'kimi' && slot.login.kimiHome !== undefined) {
     return { KIMI_HOME: slot.login.kimiHome };
+  }
+  if (slot.provider === 'copilot' && slot.login.copilotHome !== undefined) {
+    return { COPILOT_HOME: slot.login.copilotHome };
   }
   return undefined;
 }

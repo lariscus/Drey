@@ -44,6 +44,9 @@ export class AcpAdapter implements ProviderAdapter {
     const proc = this.spawnFn(launch.command, launch.args, env !== undefined ? { cwd: start.cwd, env } : { cwd: start.cwd });
     const state = newAcpState(start);
     const emit = acpEmit({ start, now: this.now });
+    if (launch.note !== undefined) {
+      emit({ kind: 'note', detail: 'runner', text: launch.note });
+    }
     const fold = new AcpUpdateFold({ start, now: this.now, state });
     const acp = new AcpClient(
       proc,

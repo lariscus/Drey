@@ -41,7 +41,7 @@ export interface PoolReading {
 export function effectivePoolSizes(reading: PoolReading): Record<WorkerProviderId, number> {
   const { pools, probed, shrink, nowMs } = reading;
   const pausedUntil = reading.pausedUntil ?? {};
-  const sizes: Record<WorkerProviderId, number> = { opencode: 1, 'claude-code': 1, kimi: 1 };
+  const sizes: Record<WorkerProviderId, number> = { opencode: 1, 'claude-code': 1, kimi: 1, copilot: 1 };
   for (const provider of WORKER_PROVIDERS) {
     let size = pools[provider].size;
     const slots = probed[provider] ?? null;

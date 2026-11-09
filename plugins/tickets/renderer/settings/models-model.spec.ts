@@ -120,8 +120,8 @@ describe('the model table rows', () => {
 describe('editing the table', () => {
   it('offers every slot, then the runners no slot names', () => {
     const options = placeOptionsOf(slots);
-    expect(options.map((o) => o.label)).toEqual(['Claude A', 'z.ai', 'Copilot', 'Kimi Code']);
-    expect(options.map((o) => o.value)).toEqual(['slot:claude-a', 'slot:zai', 'slot:copilot', 'provider:kimi']);
+    expect(options.map((o) => o.label)).toEqual(['Claude A', 'z.ai', 'Copilot', 'Kimi Code', 'Copilot CLI']);
+    expect(options.map((o) => o.value)).toEqual(['slot:claude-a', 'slot:zai', 'slot:copilot', 'provider:kimi', 'provider:copilot']);
   });
 
   it('moves a row to a slot (with its provider) or to a bare runner', () => {

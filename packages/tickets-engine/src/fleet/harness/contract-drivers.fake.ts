@@ -1,11 +1,11 @@
-import { vi } from 'vitest';
 import { claudeCodeAdapter } from './claude-code';
-import type { FetchFn, NormalizedEvent, ProviderAdapter, ProviderStart, WorkerHandle } from './contract';
+import { ScriptedAcpAgent, type AcpAgentScript } from './contract-acp-agent.fake';
+import type { NormalizedEvent, ProviderAdapter, ProviderStart, WorkerHandle } from './contract';
 import { ContractProcess } from './contract-process.fake';
+import { copilotAdapter } from './copilot';
 import { FakeHarnessAdapter } from './fake-harness.fake';
 import { kimiAdapter } from './kimi';
-import { OPENCODE_API } from './opencode-api';
-import { opencodeAdapter } from './opencode';
+import { opencodeAcpAdapter } from './opencode-acp';
 
 /** One worker under the contract suite, and how to drive it. */
 export interface ContractSession {
@@ -17,14 +17,24 @@ export interface ContractSession {
   settle(): Promise<void>;
   /** The worker's exit has resolved. */
   ended(): boolean;
-  /** req-183: the permission the adapter handed its harness, in the harness's own words (CLI flag, agent, ACP mode). */
+  /** req-183: the permission the adapter handed its harness, in the harness's own words (CLI flag, ACP mode). */
   permission(): string | null;
+  /** req-182: the session the harness was asked to resume; null when none. */
+  resumed(): string | null;
+  /** req-182: the harness asks for an approval (absent: it has none the runner sees). */
+  askPermission?(): Promise<void>;
+  /** req-182: the harness's own question tool asks the owner (absent: its questions are the `QUESTION:` marker only). */
+  askQuestion?(): Promise<void>;
+  /** What the harness received as the answer to its request `id`. */
+  reply(id: string): unknown;
 }
 
 export interface ContractDriver {
   readonly name: string;
   /** req-183: what a `read-only` start must reach the harness as. */
   readonly readOnly: string;
+  /** req-182: what the harness receives when the owner allows once, and when the owner picks "Blue". */
+  readonly answers: { readonly permission: unknown; readonly question: unknown } | null;
   start(over?: Partial<ProviderStart>): Promise<ContractSession>;
   dispose(): void;
 }
@@ -35,7 +45,9 @@ function collect(over: Partial<ProviderStart> = {}): { start: ProviderStart; eve
   return { start, events };
 }
 
-function session(handle: WorkerHandle, events: NormalizedEvent[], drive: Pick<ContractSession, 'endTurn' | 'settle' | 'permission'>): ContractSession {
+type Drive = Omit<ContractSession, 'handle' | 'events' | 'ended'>;
+
+function session(handle: WorkerHandle, events: NormalizedEvent[], drive: Drive): ContractSession {
   let done = false;
   void handle.exited.then(() => {
     done = true;
@@ -49,9 +61,13 @@ const ticks = async (): Promise<void> => {
   }
 };
 
+/** A session/load replays for 300 ms before the worker goes on. */
+const replaySettle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 320));
+
 export const claudeCodeDriver: ContractDriver = {
   name: 'claude-code',
   readOnly: 'plan',
+  answers: null,
   async start(over) {
     const proc = new ContractProcess();
     const { start, events } = collect(over);
@@ -68,137 +84,95 @@ export const claudeCodeDriver: ContractDriver = {
       },
       settle: ticks,
       permission: () => args[args.indexOf('--permission-mode') + 1] ?? null,
+      resumed: () => (args.includes('--resume') ? args[args.indexOf('--resume') + 1]! : null),
+      reply: () => undefined,
     });
   },
   dispose: () => undefined,
+};
+
+const ELICITATION_ANSWERS = { permission: { outcome: { outcome: 'selected', optionId: 'once' } }, question: { action: 'accept', content: { q0: 'Blue' } } };
+
+/** A driver over the one ACP adapter: the harness under test and its scripted agent. */
+function acpDriver(name: string, opts: { readOnly: string; script: AcpAgentScript; adapter: (agent: ScriptedAcpAgent, args: (a: readonly string[]) => void) => ProviderAdapter; answers: ContractDriver['answers']; permission?: (args: readonly string[]) => string | null }): ContractDriver {
+  return {
+    name,
+    readOnly: opts.readOnly,
+    answers: opts.answers,
+    async start(over) {
+      const agent = new ScriptedAcpAgent(opts.script);
+      let args: readonly string[] = [];
+      const { start, events } = collect(over);
+      const handle = opts.adapter(agent, (a) => (args = a)).spawn(start);
+      await (start.resumeRef !== null ? replaySettle() : ticks());
+      await ticks();
+      return session(handle, events, {
+        endTurn: async (text) => {
+          agent.endTurn(text);
+          await ticks();
+        },
+        settle: ticks,
+        permission: () => agent.mode ?? opts.permission?.(args) ?? null,
+        resumed: () => agent.resumed,
+        askPermission: async () => {
+          agent.requestPermission();
+          await ticks();
+        },
+        askQuestion: async () => {
+          agent.askQuestion();
+          await ticks();
+        },
+        reply: (id) => agent.replies.get(id),
+      });
+    },
+    dispose: () => undefined,
+  };
+}
+
+const recording = (agent: ScriptedAcpAgent, keep: (a: readonly string[]) => void) => (_cmd: string, a: readonly string[]) => {
+  keep(a);
+  return agent.proc;
 };
 
 /** Kimi 2.5.2's advertised modes (`session/new` → `modes.availableModes`). */
 const KIMI_MODES = { currentModeId: 'default', availableModes: ['default', 'plan', 'auto', 'yolo'].map((id) => ({ id, name: id })) };
 
-/** A scripted ACP agent: the setup calls answer at once, a prompt waits for `endTurn` or a cancel. */
-function acpAgent(): { proc: ContractProcess; endTurn: (text: string) => void; mode: () => string | null } {
-  let prompt: number | string | null = null;
-  let mode: string | null = null;
-  const reply = (proc: ContractProcess, id: number | string, result: unknown): void => proc.say({ jsonrpc: '2.0', id, result });
-  const proc = new ContractProcess((text, self) => {
-    for (const line of text.split('\n').filter((l) => l.trim() !== '')) {
-      const msg = JSON.parse(line) as { id?: number | string; method?: string; params?: { modeId?: string } };
-      if (msg.method === 'session/set_mode') {
-        mode = msg.params?.modeId ?? null;
-      }
-      if (msg.method === 'session/prompt') {
-        prompt = msg.id ?? null;
-      } else if (msg.method === 'session/cancel' && prompt !== null) {
-        const id = prompt;
-        prompt = null;
-        reply(self, id, { stopReason: 'cancelled' });
-      } else if (msg.id !== undefined && msg.method !== undefined) {
-        reply(self, msg.id, msg.method === 'session/new' ? { sessionId: 'ses_k', modes: KIMI_MODES } : {});
-      }
-    }
-  });
-  return {
-    proc,
-    endTurn: (text) => {
-      proc.say({ jsonrpc: '2.0', method: 'session/update', params: { update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text } } } });
-      if (prompt !== null) {
-        const id = prompt;
-        prompt = null;
-        reply(proc, id, { stopReason: 'end_turn' });
-      }
-    },
-    mode: () => mode,
-  };
-}
-
-export const kimiDriver: ContractDriver = {
-  name: 'kimi',
+export const kimiDriver = acpDriver('kimi', {
   readOnly: 'plan',
-  async start(over) {
-    const agent = acpAgent();
-    const { start, events } = collect(over);
-    const handle = kimiAdapter(agent.proc.spawnFn()).spawn(start);
-    await ticks();
-    return session(handle, events, {
-      endTurn: async (text) => {
-        agent.endTurn(text);
-        await ticks();
-      },
-      settle: ticks,
-      permission: agent.mode,
-    });
-  },
-  dispose: () => undefined,
+  script: { offer: { modes: KIMI_MODES }, capabilities: { loadSession: true }, questions: 'ask-user-question' },
+  adapter: (agent, keep) => kimiAdapter(recording(agent, keep)),
+  answers: { permission: { outcome: { outcome: 'selected', optionId: 'once' } }, question: { outcome: { outcome: 'selected', optionId: 'blue' } } },
+});
+
+/** opencode 2.0.32's offer: the modes as a config option of category `mode`. */
+const OPENCODE_OFFER = {
+  configOptions: [
+    { id: 'model', category: 'model', type: 'select', currentValue: 'zai-coding-plan/glm-5.3', options: [{ value: 'zai-coding-plan/glm-5.3' }] },
+    { id: 'mode', category: 'mode', type: 'select', currentValue: 'build', options: [{ value: 'build' }, { value: 'plan' }] },
+  ],
 };
+const RESUMABLE = { loadSession: true, sessionCapabilities: { resume: {}, fork: {}, list: {} } };
 
-/** A scripted OpenCode server: the message list grows with each prompt and each ended turn. */
-function opencodeServer(): { fetch: FetchFn; endTurn: (text: string) => void; agent: () => string | null } {
-  const list: unknown[] = []; // newest first, as the API lists it
-  let n = 0;
-  let agent: string | null = null;
-  const json = (body: unknown): Response => ({ ok: true, status: 200, json: async () => body }) as unknown as Response;
-  const fetch: FetchFn = async (url, init) => {
-    if (url.endsWith(OPENCODE_API.createSession)) {
-      return json({ data: { id: 'ses_oc' } });
-    }
-    if (url.endsWith(OPENCODE_API.prompt('ses_oc'))) {
-      agent = (JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as { agent?: string }).agent ?? 'default';
-      list.unshift({ id: `u${++n}`, type: 'user', time: { created: Date.now() } });
-      return json({ data: {} });
-    }
-    if (url.endsWith(OPENCODE_API.messages('ses_oc'))) {
-      return json({ data: list });
-    }
-    if (url.endsWith(OPENCODE_API.session('ses_oc'))) {
-      return json({ data: { tokens: { input: 1, output: 1 }, cost: 0 } });
-    }
-    if (url.endsWith(OPENCODE_API.permissions('ses_oc')) || url.endsWith(OPENCODE_API.forms('ses_oc'))) {
-      return json({ data: [] });
-    }
-    return init?.method === 'POST' || url.endsWith(OPENCODE_API.info) ? json({}) : json({ data: [] });
-  };
-  const endTurn = (text: string): void => {
-    const t = Date.now();
-    list.unshift({ id: `a${++n}`, type: 'assistant', time: { created: t, completed: t }, content: [{ type: 'text', text }] });
-    list.unshift({ id: `i${n}`, type: 'idle', time: { created: t }, outcome: 'succeeded' });
-  };
-  return { fetch, endTurn, agent: () => agent };
-}
-
-export const opencodeDriver: ContractDriver = {
-  name: 'opencode',
+export const opencodeDriver = acpDriver('opencode', {
   readOnly: 'plan',
-  async start(over) {
-    vi.useFakeTimers();
-    const proc = new ContractProcess();
-    const server = opencodeServer();
-    const { start, events } = collect(over);
-    const handle = opencodeAdapter(proc.spawnFn(), server.fetch, async () => 47000, () => new Date(Date.now())).spawn(start);
-    await vi.advanceTimersByTimeAsync(10);
-    proc.say('server password sekrit');
-    await vi.advanceTimersByTimeAsync(1_000);
-    const settle = async (): Promise<void> => {
-      await vi.advanceTimersByTimeAsync(2_500);
-    };
-    return session(handle, events, {
-      endTurn: async (text) => {
-        await vi.advanceTimersByTimeAsync(5);
-        server.endTurn(text);
-        await settle();
-      },
-      settle,
-      permission: server.agent,
-    });
-  },
-  dispose: () => {
-    vi.useRealTimers();
-  },
-};
+  script: { offer: OPENCODE_OFFER, capabilities: RESUMABLE, questions: 'elicitation' },
+  adapter: (agent, keep) => opencodeAcpAdapter(recording(agent, keep)),
+  answers: ELICITATION_ANSWERS,
+});
+
+/** Copilot CLI as documented: no session modes; the tool permission rides the launch. */
+export const copilotDriver = acpDriver('copilot', {
+  readOnly: 'tools ask',
+  script: { offer: {}, capabilities: RESUMABLE, questions: 'elicitation' },
+  adapter: (agent, keep) => copilotAdapter(recording(agent, keep)),
+  answers: ELICITATION_ANSWERS,
+  permission: (args) => (args.includes('--allow-all-tools') ? 'allow-all-tools' : 'tools ask'),
+});
 
 export const fakeDriver: ContractDriver = {
   name: 'fake harness',
   readOnly: 'read-only',
+  answers: null,
   async start(over) {
     const adapter: ProviderAdapter & { workers: FakeHarnessAdapter['workers'] } = new FakeHarnessAdapter();
     const { start, events } = collect(over);
@@ -210,6 +184,8 @@ export const fakeDriver: ContractDriver = {
       },
       settle: ticks,
       permission: () => start.permissionMode,
+      resumed: () => start.resumeRef,
+      reply: () => undefined,
     });
   },
   dispose: () => undefined,

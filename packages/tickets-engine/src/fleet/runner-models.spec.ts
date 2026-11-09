@@ -98,6 +98,7 @@ describe('the runner serves the capacity pool (req-170)', () => {
       ['opencode', 1],
       ['claude-code', 2],
       ['kimi', 1],
+      ['copilot', 1],
     ]);
     await call('POST', '/chain/config', { ticketsVaultPath: vault, pools: { 'claude-code': { size: 5 } } });
     expect(((await serviceJson())['slots'] as { sessions: number }[])[1]!.sessions).toBe(2);

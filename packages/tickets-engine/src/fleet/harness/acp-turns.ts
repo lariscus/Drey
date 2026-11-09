@@ -23,6 +23,8 @@ export class AcpTurns {
   private totalIn = 0;
   private totalOut = 0;
   private totalCacheRead = 0;
+  /** The model calls the last turn added (0 = the harness reported none). */
+  private turnRecords = 0;
   private readonly cost: AcpCost;
   private readonly emit: (event: Omit<NormalizedEvent, 'ts'>) => void;
 
@@ -57,11 +59,34 @@ export class AcpTurns {
       return 'error';
     }
     await this.turnOver(reply);
-    if (acpText(reply['stopReason']) === 'cancelled') {
+    const stop = acpText(reply['stopReason']);
+    if (stop === 'cancelled') {
       this.emit({ kind: 'usage', ...this.totals(), turn: 'idle' });
       return 'cancelled';
     }
+    const refused = this.refusalOf(stop);
+    if (refused !== null) {
+      this.emit({ kind: 'usage', ...this.totals() });
+      this.emit({ kind: 'error', text: refused });
+      this.emit({ kind: 'usage', turn: 'idle' });
+      return 'error';
+    }
     return 'end_turn';
+  }
+
+  /**
+   * A turn the provider refused is no finished step (T-0061): ACP's
+   * `refusal`, or a turn that ended with no message, no tool call and no
+   * tokens — no agent-done, no gate on untouched code.
+   */
+  private refusalOf(stop: string): string | null {
+    if (stop === 'refusal') {
+      return 'the provider refused the turn';
+    }
+    if (stop === 'end_turn' && this.ctx.harness.emptyTurnIsRefusal && this.fold.answer === '' && this.fold.toolCalls === 0 && this.turnRecords === 0) {
+      return 'the provider answered the prompt with nothing — no model message, no tokens';
+    }
+    return null;
   }
 
   async settle(outcome: TurnOutcome): Promise<void> {
@@ -119,6 +144,7 @@ export class AcpTurns {
       return;
     }
     const records = await this.meter.turnRecords(state.sessionId, reply).catch(() => []);
+    this.turnRecords = records.length;
     let turnIn = 0;
     let turnOut = 0;
     for (const record of records) {

@@ -67,7 +67,7 @@ import { legacyWorktreeBase, worktreeBaseFor, worktreePathFor, WORKTREES_DIR } f
 import { reservedIgnoreEntries, withIgnoreEntries } from './reserved-ignore';
 import { dkTargetFor, retreatStages } from '../fleet/dk-target';
 import { trancheConfigOf } from './tranche-config';
-import { type ChainConfig, type ChainStoreConfig, FleetCaps, FleetHandoverConfig, HandoverMode, InteractiveMode, PermissionMode, RunDkTarget, RunInfo, FleetPools } from '../fleet/protocol';
+import { isWorkerProvider, WORKER_PROVIDERS, type ChainConfig, type ChainStoreConfig, FleetCaps, FleetHandoverConfig, HandoverMode, InteractiveMode, PermissionMode, RunDkTarget, RunInfo, FleetPools } from '../fleet/protocol';
 import { type EngineHost, type EngineVaultChangeEvent, EngineVault, FleetPort } from './host';
 import { handoverFromConfig, handoverOverrideKeys } from './handover-config';
 import { appendMemory, memoryPathFor, parseMemoryEntries, toggleMemoryPin } from './persona-store';
@@ -3565,8 +3565,8 @@ export class EngineBoardService {
       }
       if (input.worker !== undefined) {
         const worker = input.worker?.trim() ?? '';
-        if (worker !== '' && worker !== 'opencode' && worker !== 'claude-code' && worker !== 'kimi') {
-          return { ok: false, error: 'the worker is "opencode", "claude-code" or "kimi"' };
+        if (worker !== '' && !isWorkerProvider(worker)) {
+          return { ok: false, error: `the worker is one of ${WORKER_PROVIDERS.map((p) => `"${p}"`).join(', ')}` };
         }
       }
       if (input.color !== undefined) {

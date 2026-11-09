@@ -233,7 +233,7 @@ export class Dispatcher {
 
   /** A worker waiting on the owner takes no pool slot (a pool of one used to block on one question); its ticket stays busy. */
   private occupancy(): Occupancy {
-    const liveByPool: Record<WorkerProviderId, number> = { opencode: 0, 'claude-code': 0, kimi: 0 };
+    const liveByPool: Record<WorkerProviderId, number> = { opencode: 0, 'claude-code': 0, kimi: 0, copilot: 0 };
     const busy = new Set<string>();
     for (const record of this.deps.directory.all()) {
       if (LIVE_RUN_STATES.includes(record.info.state) && record.info.waiting == null) {

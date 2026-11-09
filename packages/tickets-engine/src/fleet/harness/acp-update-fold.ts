@@ -38,6 +38,11 @@ export class AcpUpdateFold {
     this.toolNames = new Map();
   }
 
+  /** The tool calls the turn made so far. */
+  get toolCalls(): number {
+    return this.toolNames.size;
+  }
+
   /** The turn's answer so far: the message text after its last tool call. */
   get answer(): string {
     return this.text.trim();

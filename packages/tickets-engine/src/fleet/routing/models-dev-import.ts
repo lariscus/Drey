@@ -27,6 +27,7 @@ const PROVIDERS_OF: Readonly<Record<WorkerProviderId, readonly string[]>> = {
   'claude-code': ['anthropic'],
   opencode: ['zai-coding-plan', 'zai', 'anthropic', 'github-copilot'],
   kimi: ['kimi-code-plan-global', 'moonshotai', 'kimi-code-plan-cn', 'moonshotai-cn'],
+  copilot: ['github-copilot', 'anthropic', 'openai'],
 };
 
 const objectOf = (value: unknown): Json | null => (value !== null && typeof value === 'object' && !Array.isArray(value) ? (value as Json) : null);

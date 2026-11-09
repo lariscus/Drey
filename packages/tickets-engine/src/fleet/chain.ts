@@ -218,7 +218,7 @@ function sortedCandidates(input: PlanDispatchInput): DispatchCandidate[] {
 
 /** Each candidate takes a slot of its provider's pool while one is free; a running run is never preempted. */
 function assignSlots(input: PlanDispatchInput, candidates: readonly DispatchCandidate[]): PlannedDispatch[] {
-  const free: Record<WorkerProviderId, number> = { opencode: 0, 'claude-code': 0, kimi: 0 };
+  const free: Record<WorkerProviderId, number> = { opencode: 0, 'claude-code': 0, kimi: 0, copilot: 0 };
   for (const provider of WORKER_PROVIDERS) {
     free[provider] = (input.poolSize[provider] ?? 0) - (input.liveByPool[provider] ?? 0);
   }

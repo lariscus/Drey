@@ -148,6 +148,7 @@ export const WORKER_LABEL: ReadonlyArray<readonly [string, string]> = [
   ['opencode', 'OpenCode'],
   ['claude-code', 'Claude Code'],
   ['kimi', 'Kimi Code'],
+  ['copilot', 'Copilot CLI'],
 ];
 
 /** A provider id as its label (`opencode` → `OpenCode`); unknown ids stay as they are. */

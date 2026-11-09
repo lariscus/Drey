@@ -25,9 +25,10 @@ export function kimiHarness(readUsage: KimiUsageReader): AcpHarness {
     launch: () => ({ command: 'kimi', args: ['acp'] }),
     clientCapabilities: {},
     resume: ['load'],
-    model: 'config',
+    modelSettings: (model) => [{ configId: 'model', value: model }],
     modeFor: kimiModeFor,
     meter: () => new KimiWireMeter(readUsage),
+    emptyTurnIsRefusal: false,
   };
 }
 

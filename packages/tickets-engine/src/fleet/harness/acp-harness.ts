@@ -14,6 +14,14 @@ export interface AcpLaunch {
   readonly command: string;
   readonly args: readonly string[];
   readonly env?: Readonly<Record<string, string>>;
+  /** One line for the run's stream about how the process was set up (opencode's context cap); absent = none. */
+  readonly note?: string;
+}
+
+/** One session config option the model pin sets (`session/set_config_option`). */
+export interface AcpConfigSetting {
+  readonly configId: string;
+  readonly value: string;
 }
 
 /** The session mode a start asks for (`session/set_mode`); null = none is set. */
@@ -54,10 +62,21 @@ export interface AcpHarness {
   /** What `initialize` advertises — e.g. `elicitation.form`, the questions of opencode's question tool. */
   readonly clientCapabilities: Readonly<Record<string, unknown>>;
   readonly resume: readonly AcpResumeMethod[];
-  /** The model pin: per session over `session/set_config_option` (`config`), or fixed at launch (`launch`). */
-  readonly model: 'config' | 'launch';
+  /**
+   * The config options a model pin sets per session (`model`, opencode's
+   * `effort` for a `#variant`); empty = the pin is fixed at launch
+   * (Copilot CLI's `--model`). An option other than `model` is set only
+   * when the session offers it.
+   */
+  modelSettings(model: string): readonly AcpConfigSetting[];
   /** The session mode for a start's permission mode, given the modes the session offered (null: it named none). */
   modeFor(mode: PermissionMode, offered: readonly string[] | null): AcpModeChoice;
   /** The usage source of one worker. */
   meter(): AcpUsageMeter;
+  /**
+   * A turn with no message, no tool call and no usage record is the
+   * provider's refusal (T-0061). Only where the meter reads the turn off the
+   * prompt reply; Kimi's wire log may simply be unreadable.
+   */
+  readonly emptyTurnIsRefusal: boolean;
 }

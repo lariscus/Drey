@@ -162,5 +162,5 @@ export function normalizeFleetPools(value: unknown): FleetPools {
       probeUrl: typeof probe === 'string' && /^https?:\/\/\S+$/.test(probe.trim()) ? probe.trim() : null,
     };
   };
-  return { opencode: one('opencode'), 'claude-code': one('claude-code'), kimi: one('kimi') };
+  return { opencode: one('opencode'), 'claude-code': one('claude-code'), kimi: one('kimi'), copilot: one('copilot') };
 }

@@ -121,8 +121,10 @@ export class AcpWorker implements WorkerHandle {
     if (mode.modeId !== null) {
       await acp.result('session/set_mode', { sessionId: state.sessionId, modeId: mode.modeId });
     }
-    if (start.model !== null && harness.model === 'config') {
-      await acp.result('session/set_config_option', { sessionId: state.sessionId, configId: 'model', value: start.model });
+    for (const setting of start.model === null ? [] : harness.modelSettings(start.model)) {
+      if (setting.configId === 'model' || offer.configIds.includes(setting.configId)) {
+        await acp.result('session/set_config_option', { sessionId: state.sessionId, ...setting });
+      }
     }
     if (start.compactFirst === true && start.resumeRef !== null) {
       await this.parts.turns.run('/compact');

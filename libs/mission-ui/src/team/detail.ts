@@ -129,7 +129,7 @@ export function timeWordsOf(at: string): string {
 // --- the setup tab's pure moves ---------------------------------------------------
 
 /** The workers the setup sheet offers (the desk's harnesses). */
-export const WORKER_OPTIONS: readonly string[] = ['claude-code', 'opencode', 'kimi'];
+export const WORKER_OPTIONS: readonly string[] = ['claude-code', 'opencode', 'kimi', 'copilot'];
 
 /** The skill list a toggle produces: the name dropped when carried, added when not. */
 export function skillsToggled(skills: readonly string[], name: string): readonly string[] {

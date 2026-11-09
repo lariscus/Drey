@@ -37,9 +37,9 @@ export { DEFAULT_DEV_PORTS, DEFAULT_GOVERNOR_SETTINGS } from './protocol-governo
 export type { DevServerLease, GovernorSettings, GovernorStatus, GovernorWait, GovernorWaitCause, HeavyTask, PortRange, SeatClass, SeatHolder } from './protocol-governor';
 
 /** The workers of milestone 84, in fleet order (the assignment default). */
-export type WorkerProviderId = 'opencode' | 'claude-code' | 'kimi';
+export type WorkerProviderId = 'opencode' | 'claude-code' | 'kimi' | 'copilot';
 
-export const WORKER_PROVIDERS: readonly WorkerProviderId[] = ['opencode', 'claude-code', 'kimi'];
+export const WORKER_PROVIDERS: readonly WorkerProviderId[] = ['opencode', 'claude-code', 'kimi', 'copilot'];
 
 export function isWorkerProvider(value: unknown): value is WorkerProviderId {
   return typeof value === 'string' && (WORKER_PROVIDERS as readonly string[]).includes(value);

@@ -56,6 +56,9 @@ export async function listWorkerModels(
     const probe = await probeKimi(nodeKimiProbeSeams(exec));
     return { worker, models: probe.models, note: probe.note };
   }
+  if (worker === 'copilot') {
+    return { worker, models: [], note: null }; // req-182: Copilot CLI takes its model at launch (`--model`) and lists none over ACP; the id is typed
+  }
   if (worker !== 'opencode') {
     return { worker, models: [], note: 'A manual column has no worker.' };
   }

@@ -55,6 +55,7 @@ describe('the runner serves the slots (req-177)', () => {
       ['opencode', 'private', true],
       ['claude-code', 'private', true],
       ['kimi', 'private', true],
+      ['copilot', 'private', true],
     ]);
     expect(body['configPath']).toBe(path.join(tmp, 'service.json'));
     expect(http.calls).toEqual([]);
@@ -69,12 +70,12 @@ describe('the runner serves the slots (req-177)', () => {
     expect(zai).toMatchObject({ quota: 'zai', state: 'ready', windows: [{ name: '5h', reliability: 'measured' }, { name: '7d', reliability: 'measured' }] });
     expect(http.calls[0]?.headers).toEqual({ Authorization: 'Bearer k-1' });
     const chain = await call('GET', '/chain');
-    expect((chain.body['slots'] as unknown[]).length).toBe(3);
+    expect((chain.body['slots'] as unknown[]).length).toBe(4);
     expect(chain.body['slots']).toContainEqual(expect.objectContaining({ id: 'zai', state: 'ready', reliability: 'measured' }));
   });
 
   it('refuses a slot list with a broken entry, and an unknown slot', async () => {
-    expect((await call('POST', '/slots/config', { slots: [{ id: 'x', provider: 'copilot' }] })).status).toBe(422);
+    expect((await call('POST', '/slots/config', { slots: [{ id: 'x', provider: 'gemini' }] })).status).toBe(422);
     expect((await call('POST', '/slots/config', {})).status).toBe(422);
     expect((await call('POST', '/slots/login-done', { id: 'nope' })).status).toBe(404);
     expect((await call('POST', '/slots/refresh', { id: 'nope' })).status).toBe(404);
