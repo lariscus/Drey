@@ -60,7 +60,7 @@ export function ticketCopyPathFor(vaultPath: string, ticketId: string): string {
 /**
  * Where the working copy lived before req-183 (`_worktrees/<id>.ticket.md`).
  * Read for one release only: the runner migrates a copy found there into
- * `_workcopy/` on its first read (`WorkcopyFiles`). Remove with req-199.
+ * `_workcopy/` on its first read (`WorkcopyFiles`). Removed by req-200.
  */
 export function legacyTicketCopyPathFor(vaultPath: string, ticketId: string): string {
   return path.join(vaultPath, WORKTREES_DIR, `${ticketId}.ticket.md`);
