@@ -4,7 +4,7 @@
  * asks of the service window, the Crew tab and Pia's card (`sessionStart`).
  * A wrong shape never reaches a service.
  */
-import { crewFieldOf, type CrewPatch } from '../contracts/crew-config';
+import { CREW_OVERRIDE_MAPS, crewFieldOf, type CrewOverrideMap, type CrewOverridePatch, type CrewPatch } from '../contracts/crew-config';
 import { SESSION_PERMISSIONS, type FreeSessionAsk, type SessionPermission } from '../contracts/free-session';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -20,6 +20,22 @@ export function parseCrewPatches(payload: unknown): readonly CrewPatch[] {
     const value = entry['value'];
     if (value === undefined || value === null || typeof value === 'string' || typeof value === 'number') {
       out.push({ key: crewFieldOf(entry['key'])!.key, value });
+    }
+  }
+  return out;
+}
+
+/** `{ overrides: [{ map, name, value? }] }`: the per-provider/model handover thresholds; without `value` the entry goes. */
+export function parseCrewOverrides(payload: unknown): readonly CrewOverridePatch[] {
+  const list = isRecord(payload) && Array.isArray(payload['overrides']) ? (payload['overrides'] as unknown[]) : [];
+  const out: CrewOverridePatch[] = [];
+  for (const entry of list) {
+    if (!isRecord(entry) || !(CREW_OVERRIDE_MAPS as readonly unknown[]).includes(entry['map']) || typeof entry['name'] !== 'string' || entry['name'].trim() === '') {
+      continue;
+    }
+    const value = entry['value'];
+    if (value === undefined || value === null || (typeof value === 'number' && Number.isFinite(value) && value >= 0)) {
+      out.push({ map: entry['map'] as CrewOverrideMap, name: entry['name'].trim(), value: typeof value === 'number' ? value : undefined });
     }
   }
   return out;

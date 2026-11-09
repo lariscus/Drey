@@ -1,13 +1,15 @@
 import type { DreyPluginApi } from '../../../shared/plugin-api/renderer';
 import { WORKER_PROVIDERS, type WorkerProviderId } from '../../../packages/tickets-engine/src/fleet/protocol';
-import { el, kv, numberConfig, selectConfig, textConfig } from './settings-dom';
+import { el, kv, textConfig } from './settings-dom';
+import type { CrewSettings } from './settings-crew';
 
 /** One per-runner field: the plugin-config key it writes and how. */
 export interface RunnerField {
   readonly id: string;
   readonly label: string;
   readonly key: string;
-  readonly kind: 'number' | 'text' | 'select';
+  /** req-173: `text` writes the plugin config (machine); the others the vault layer, tickets/_meta/crew.md. */
+  readonly kind: 'compact' | 'text' | 'permission';
   readonly choices?: ReadonlyArray<readonly [string, string]>;
   readonly fallback?: string;
   readonly hint: string;
@@ -23,8 +25,8 @@ export const RUNNER_LABEL: Readonly<Record<WorkerProviderId, string>> = {
 const compactField = (provider: WorkerProviderId): RunnerField => ({
   id: `tset-compact-${provider}`,
   label: 'Resume compact threshold — tokens',
-  key: `fleet.compactAboveTokens.${provider}`,
-  kind: 'number',
+  key: provider,
+  kind: 'compact',
   hint: 'A resumed session whose last context is at or above this many tokens is compacted first (T-0049). Empty uses the default.',
 });
 
@@ -50,8 +52,8 @@ export const RUNNER_FIELDS: Readonly<Record<WorkerProviderId, readonly RunnerFie
     {
       id: 'tset-permissions',
       label: 'Dispatched-run permissions',
-      key: 'autoPermissionMode',
-      kind: 'select',
+      key: 'permissionMode',
+      kind: 'permission',
       choices: [
         ['accept-edits', 'Accept edits (asks before commands)'],
         ['bypass', 'Bypass permissions (unattended)'],
@@ -75,6 +77,7 @@ export const RUNNER_FIELDS: Readonly<Record<WorkerProviderId, readonly RunnerFie
 export function createWorkersSection(
   api: DreyPluginApi,
   initial: WorkerProviderId,
+  crew: CrewSettings,
 ): { readonly root: HTMLElement; select(provider: WorkerProviderId): void } {
   const section = el('section', 'tset-section');
   section.setAttribute('aria-labelledby', 'tset-workers-head');
@@ -99,7 +102,7 @@ export function createWorkersSection(
       button.classList.toggle('active', id === provider);
       button.setAttribute('aria-pressed', String(id === provider));
     }
-    rows.replaceChildren(...RUNNER_FIELDS[provider].flatMap((field) => kv(field.id, field.label, control(api, field), field.hint)));
+    rows.replaceChildren(...RUNNER_FIELDS[provider].flatMap((field) => kv(field.id, field.label, control(api, crew, field), field.hint)));
   };
   for (const provider of WORKER_PROVIDERS) {
     const button = el('button', undefined, RUNNER_LABEL[provider]);
@@ -112,13 +115,13 @@ export function createWorkersSection(
   return { root: section, select };
 }
 
-function control(api: DreyPluginApi, field: RunnerField): HTMLInputElement | HTMLSelectElement {
+function control(api: DreyPluginApi, crew: CrewSettings, field: RunnerField): HTMLInputElement | HTMLSelectElement {
   switch (field.kind) {
-    case 'number':
-      return numberConfig(api, field.key);
+    case 'compact':
+      return crew.override('compactAboveTokensBy', field.key);
     case 'text':
       return textConfig(api, field.key);
-    case 'select':
-      return selectConfig(api, field.key, field.choices ?? [], field.fallback ?? '');
+    case 'permission':
+      return crew.select('permissionMode', field.choices ?? []);
   }
 }

@@ -42,6 +42,7 @@ import { ageWords, checkpointActionOf, crewLineOf, ideaPhaseIds, needKindLabel, 
 import { readyBarNode, readyCardNode, storyNode } from './ready-view';
 import { stepCardOf } from '../shared/step-card';
 import type { ChangesReply } from '../shared/changes';
+import type { CrewConfigReply } from '../shared/crew-config';
 import { checkpointControls, headerControls, liveStateWord, threadSteps, durationWords, type ThreadStep } from './thread-steps';
 import { stuckOf } from './stuck';
 import type { WorktreeFile } from '../../../packages/tickets-engine/src/core/worktree-changes';
@@ -1501,21 +1502,12 @@ function openRunModal(api: DreyPluginApi, card: TicketCard): void {
     renderHandover();
     worker.addEventListener('change', renderHandover);
     void (async () => {
-      const raw: Record<string, number> = {};
-      const base = await api.settings.get<number>('fleet.compactAboveTokens').catch(() => undefined);
-      if (base !== undefined) {
-        raw.compactAboveTokens = base;
-      }
-      const ttl = await api.settings.get<number>('fleet.resumePauseTtlMin').catch(() => undefined);
-      if (ttl !== undefined) {
-        raw.resumePauseTtlMin = ttl;
-      }
-      const providerOverride = await api.settings
-        .get<number>(`fleet.compactAboveTokens.${worker.value}`)
-        .catch(() => undefined);
+      // req-173: the thresholds are the vault layer's (tickets/_meta/crew.md), resolved by the engine.
+      const crew = (await api.backend.invoke('crewConfig').catch(() => null)) as CrewConfigReply | null;
+      const resolved = crew !== null && crew.ok ? crew.resolved : null;
       handoverConfig = normalizeFleetHandover({
-        ...raw,
-        ...(providerOverride !== undefined ? { compactAboveTokensOverrides: { [worker.value]: providerOverride } } : {}),
+        ...(typeof resolved?.['handover.compactAboveTokens'] === 'number' ? { compactAboveTokens: resolved['handover.compactAboveTokens'] } : {}),
+        ...(typeof resolved?.['handover.resumePauseTtlMin'] === 'number' ? { resumePauseTtlMin: resolved['handover.resumePauseTtlMin'] } : {}),
       });
       renderHandover();
     })();

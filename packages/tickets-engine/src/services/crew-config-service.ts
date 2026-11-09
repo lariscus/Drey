@@ -1,4 +1,4 @@
-import { CREW_FILE, type CrewConfigReply, type CrewPatch } from '../contracts/crew-config';
+import { CREW_FILE, type CrewConfigReply, type CrewOverridePatch, type CrewPatch } from '../contracts/crew-config';
 import { patchCrewFile } from '../core/crew-file-write';
 import { LayeredConfigResolver, type EffectiveCrew } from '../fleet/config/layered-config-resolver';
 import type { CrewConfigFiles } from './crew-config-files';
@@ -43,23 +43,24 @@ export class CrewConfigService {
     await this.migrator.ensure(vault);
     const read = await this.files.read(vault);
     const crew = this.resolver.crew(read.parse.config);
-    return { ok: true, file: CREW_FILE, values: read.parse.config.values, resolved: crew.values, sources: crew.sources, error: read.parse.error };
+    return { ok: true, file: CREW_FILE, values: read.parse.config.values, resolved: crew.values, sources: crew.sources, overrides: read.parse.config.overrides, error: read.parse.error };
   }
 
   /** Applies the patches to the file: one commit; nothing written when the text does not change. */
-  async set(vault: EngineVault | null, patches: readonly CrewPatch[]): Promise<CrewSetResult> {
+  async set(vault: EngineVault | null, patches: readonly CrewPatch[], overrides: readonly CrewOverridePatch[] = []): Promise<CrewSetResult> {
     if (vault === null) {
       return { ok: false, error: 'no tickets vault detected' };
     }
     await this.migrator.ensure(vault);
     return this.files.serial(async () => {
       const read = await this.files.read(vault);
-      const out = patchCrewFile(read.text, patches);
+      const out = patchCrewFile(read.text, patches, overrides);
       if (!out.ok) {
         return out;
       }
       if (out.text !== read.text) {
-        await this.files.write(vault, out.text, `tickets: crew settings (${patches.map((p) => p.key).join(', ')})`);
+        const names = [...patches.map((p) => p.key), ...overrides.map((o) => `handover.${o.map}.${o.name}`)];
+        await this.files.write(vault, out.text, `tickets: crew settings (${names.join(', ')})`);
       }
       return { ok: true };
     });

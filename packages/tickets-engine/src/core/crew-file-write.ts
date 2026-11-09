@@ -7,15 +7,10 @@
  */
 import { isMap, parseDocument, type Document } from 'yaml';
 import { splitFrontmatter } from '../../../../shared/frontmatter';
-import { crewFieldOf, type CrewOverrideMap, type CrewPatch } from '../contracts/crew-config';
+import { crewFieldOf, type CrewOverridePatch, type CrewPatch } from '../contracts/crew-config';
 import { crewValueOf, overridePath } from './crew-file';
 
-/** One per-provider/model override set or removed (the migration moves the flat keys this way). */
-export interface CrewOverridePatch {
-  readonly map: CrewOverrideMap;
-  readonly name: string;
-  readonly value: number | undefined;
-}
+export type { CrewOverridePatch } from '../contracts/crew-config';
 
 export type CrewWrite = { readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string };
 

@@ -111,6 +111,13 @@ export interface VaultCrewConfig {
 
 export const EMPTY_CREW_CONFIG: VaultCrewConfig = { values: {}, overrides: { compactAboveTokensBy: {}, contextCapTokensBy: {} } };
 
+/** One per-provider/model override set (a number of tokens) or removed (`undefined`). */
+export interface CrewOverridePatch {
+  readonly map: CrewOverrideMap;
+  readonly name: string;
+  readonly value: number | undefined;
+}
+
 /** One change of the file: a value, or `undefined` to remove the key (the default applies again). */
 export interface CrewPatch {
   readonly key: CrewKey;
@@ -129,6 +136,8 @@ export type CrewConfigReply =
       readonly values: Readonly<Partial<Record<CrewKey, CrewValue>>>;
       readonly resolved: Readonly<Record<CrewKey, CrewValue>>;
       readonly sources: Readonly<Record<CrewKey, CrewSource>>;
+      /** The per-provider/model handover overrides the file holds. */
+      readonly overrides: VaultCrewConfig['overrides'];
       /** The file does not parse: the owner's text stays, nothing is written over it. */
       readonly error: string | null;
     }

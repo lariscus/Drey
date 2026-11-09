@@ -58,6 +58,7 @@ import { TicketDocuments, askToAddCheckout } from './ticket-documents';
 import { isStoreDocumentPath, storeDocumentHeader, storeDocumentHeaderEdit } from './store-document-header';
 import { checkoutOf, readStoreSettings } from '../../../packages/tickets-engine/src/store/store-settings';
 import { registerChatIpc } from './chat-ipc';
+import { registerSessionIpc } from './session-ipc';
 import { registerModelsIpc } from './models-ipc';
 import { MissionControlHost, createMissionControlView } from './mission-control';
 
@@ -125,7 +126,12 @@ const plugin: MainPluginModule = {
     const fleet = client.fleet();
     engineFleet = fleet;
     const remoteService = client.remote();
-    const defaultWorker = ((await ctx.config.get<string>('defaultWorker')) ?? '').trim() || 'opencode';
+    // req-173: the default worker is the vault layer's (tickets/_meta/crew.md), resolved by the engine.
+    const defaultWorker = async (): Promise<string> => {
+      const crew = (await client.invoke('crewConfig').catch(() => null)) as { ok?: boolean; resolved?: { defaultWorker?: unknown } } | null;
+      const value = crew?.ok === true ? crew.resolved?.defaultWorker : undefined;
+      return typeof value === 'string' && value.trim() !== '' ? value : 'opencode';
+    };
     // The vault's priority vocabulary (pipeline.md's `priorities:`), as
     // the engine's board service reads it. The header/headerEdit parsers
     // and setPriority need it without rebuilding the board, so it is
@@ -539,7 +545,7 @@ const plugin: MainPluginModule = {
     // The model picker's list: what the worker CLI offers (req-46).
     ctx.ipc.handle('models', async (payload) => {
       const p = payload as { worker?: unknown };
-      return listWorkerModels(typeof p.worker === 'string' ? p.worker : defaultWorker);
+      return listWorkerModels(typeof p.worker === 'string' ? p.worker : await defaultWorker());
     });
 
     ctx.ipc.handle('archive', async (payload) => {
@@ -826,6 +832,7 @@ const plugin: MainPluginModule = {
         : client.invoke('personaProposalDecide', { persona, id, decision });
     });
     registerChatIpc(ctx, (method, payload) => client.invoke(method, payload));
+    registerSessionIpc(ctx, (method, payload) => client.invoke(method, payload)); // req-173
     // The Flow tab (E13-11) and the Settings page's engine half (E13-12):
     // the engine's own flow calls and `videos.*` settings, one channel each.
     for (const method of ['flow', 'flowEdit', 'flowDraft', 'flowSave', 'settingsRead', 'settingsPatch']) {

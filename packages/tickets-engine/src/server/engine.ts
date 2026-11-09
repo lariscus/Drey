@@ -29,7 +29,7 @@ import { ChangeHub, DreyTicketsPort, type PathsChange } from './drey-port';
 import { DreyPresence } from './drey-presence';
 import { FileConfigStore } from './file-config';
 import { composeCrewConfig, composeFreeSessions } from '../services/compose-crew-sessions';
-import { parseCrewPatches, parseFreeSessionAsk } from './session-payloads';
+import { parseCrewOverrides, parseCrewPatches, parseFreeSessionAsk } from './session-payloads';
 import { RemoteService, type RemoteStatus } from './service';
 import { parseSettingsPatch } from './settings';
 import { FsEngineHost } from './standalone-host';
@@ -365,7 +365,7 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
   });
   // req-173: the vault layer (Settings -> Tickets) and the free sessions.
   table.set('crewConfig', async () => crew.reply(await board.detect()));
-  table.set('crewConfigSet', async (payload) => crew.set(await board.detect(), parseCrewPatches(payload)));
+  table.set('crewConfigSet', async (payload) => crew.set(await board.detect(), parseCrewPatches(payload), parseCrewOverrides(payload)));
   table.set('sessionOptions', () => freeSessions.options());
   table.set('sessionStart', (payload) => {
     const ask = parseFreeSessionAsk(payload);
