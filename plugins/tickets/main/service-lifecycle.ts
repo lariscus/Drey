@@ -2,6 +2,7 @@ import { promises as fsp } from 'node:fs';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
 import { NOTES_VAULT_KEY } from '../../../packages/tickets-engine/src/contracts/notes';
+import { VAULTS_KEY, type RegisteredVault } from '../../../packages/tickets-engine/src/contracts/vaults';
 import { fleetBuildStamp, isStaleDaemon } from '../../../packages/tickets-engine/src/fleet/build-stamp';
 import { WORKER_PROVIDERS } from '../../../packages/tickets-engine/src/fleet/protocol';
 import { FileConfigStore } from '../../../packages/tickets-engine/src/server/file-config';
@@ -227,6 +228,25 @@ export async function syncNotesVault(
   const active = (await ctx.vault.listVaults()).find((vault) => vault.active && vault.exists);
   if (active !== undefined) {
     await client.invoke('configSet', { key: NOTES_VAULT_KEY, value: active.path });
+  }
+}
+
+/**
+ * Tells Drey Service which vaults are registered (req-167): the workers' vault
+ * MCP reaches every one of them, with Drey closed too (the service keeps the
+ * last list). Pushed only when the list changed since `memo` saw it — this
+ * rides every board fetch.
+ */
+export async function syncVaultRegistry(
+  client: ConfigSyncClient,
+  ctx: { vault: { listVaults(): Promise<readonly { id: string; name: string; path: string; active: boolean }[]> } },
+  memo: { pushed: string | null },
+): Promise<void> {
+  const value: RegisteredVault[] = (await ctx.vault.listVaults()).map(({ id, name, path, active }) => ({ id, name, path, active }));
+  const signature = JSON.stringify(value);
+  if (signature !== memo.pushed) {
+    await client.invoke('configSet', { key: VAULTS_KEY, value });
+    memo.pushed = signature;
   }
 }
 

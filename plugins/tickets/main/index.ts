@@ -50,7 +50,7 @@ import { createFleetSnapshotSender } from './fleet-snapshot';
 import { listWorkerModels } from './worker-models';
 import { EngineClient } from './engine-client';
 import { PathAnnouncer } from './path-announcer';
-import { ensureService, syncChatConfig, syncNotesVault, syncStoreConfig } from './service-lifecycle';
+import { ensureService, syncChatConfig, syncNotesVault, syncStoreConfig, syncVaultRegistry } from './service-lifecycle';
 import { createServiceQuitGuard, liveRunsOf, quitWordsOf, type QuitChoice } from './service-quit-guard';
 import { ServiceControl, serviceHomeOf } from './service-control';
 import { ServiceSettingsHandlers } from './service-settings';
@@ -106,8 +106,12 @@ const plugin: MainPluginModule = {
     let pushedChat = chatSignature(ctx.appConfig.get().llm);
     // req-100: the Notes API follows the active vault. The SDK has no event for a
     // switch, so this runs at activation and with every board fetch.
+    // req-167: the vault registry rides along — the workers' vault MCP reaches every registered vault.
+    const registry = { pushed: null as string | null };
     const pushNotesVault = (): Promise<void> =>
-      syncNotesVault(client, ctx).catch((error: unknown) => ctx.log(`engine notes vault sync failed: ${messageOf(error)}`, 'warn'));
+      Promise.all([syncNotesVault(client, ctx), syncVaultRegistry(client, ctx, registry)])
+        .then(() => undefined)
+        .catch((error: unknown) => ctx.log(`engine notes vault sync failed: ${messageOf(error)}`, 'warn'));
     void pushNotesVault();
     ctx.appConfig.onChange((config) => {
       // Unrelated config writes (a spell-check word, a layout) change nothing here.
