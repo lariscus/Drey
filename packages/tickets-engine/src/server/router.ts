@@ -32,7 +32,7 @@ import { remoteActorOf, type ImprovementDecision, type TicketsRemotePort } from 
 import { parseAutopilotSet } from '../fleet/autopilot';
 import type { AutopilotRefusal } from '../fleet/protocol';
 import { parseReviewComments, sendBackNoteOf, type ReviewComment } from '../core/review-feedback';
-import type { PersonaRouter } from '../core/persona';
+import { parsePersonaPatch } from './persona-patch-body';
 import { TICKET_ID_PATTERN } from '../contracts/tickets';
 import { parseRevoke, parseSettingsPatch, type SettingsAccess } from './settings';
 import type { DeviceRegistry, DeviceView, FailureLimiter, PairingCodes, RemoteDevice } from './auth';
@@ -247,62 +247,6 @@ function parseMemoryPin(body: unknown): Parsed<{ index: number; pinned: boolean 
 }
 
 /** The persona PATCH's writable keys (U4, concept §4.5) — only sent keys are written. */
-export interface PersonaPatchInput {
-  title?: string;
-  role?: string;
-  worker?: string;
-  model?: string;
-  pool?: string[];
-  router?: PersonaRouter;
-  color?: string;
-  skills?: string[];
-  prompt?: string;
-}
-
-const PERSONA_PATCH_KEYS: readonly (keyof PersonaPatchInput)[] = [
-  'title',
-  'role',
-  'worker',
-  'model',
-  'pool',
-  'router',
-  'color',
-  'skills',
-  'prompt',
-];
-
-function parsePersonaPatch(body: unknown): Parsed<PersonaPatchInput> {
-  const obj = asObject(body);
-  if (obj === null) {
-    return { ok: false, error: 'bad persona patch payload' };
-  }
-  const out: PersonaPatchInput = {};
-  let any = false;
-  for (const key of PERSONA_PATCH_KEYS) {
-    const value = obj[key];
-    if (value === undefined) {
-      continue;
-    }
-    if (key === 'pool' || key === 'skills') {
-      if (!Array.isArray(value) || value.some((v) => typeof v !== 'string')) {
-        return { ok: false, error: `${key} is a list of names` };
-      }
-      out[key] = value.map((v) => (v as string).trim());
-    } else if (typeof value !== 'string') {
-      return { ok: false, error: `${key} is a string` };
-    } else if (key === 'router') {
-      out[key] = value as PersonaRouter;
-    } else {
-      out[key] = value;
-    }
-    any = true;
-  }
-  if (!any) {
-    return { ok: false, error: `the patch carries none of the writable keys: ${PERSONA_PATCH_KEYS.join(', ')}` };
-  }
-  return { ok: true, value: out };
-}
-
 /** The chain's persona pause (U4): which persona, and whether it is paused. */
 function parseChainPersonaPause(body: unknown): Parsed<{ persona: string; paused: boolean }> {
   const obj = asObject(body);

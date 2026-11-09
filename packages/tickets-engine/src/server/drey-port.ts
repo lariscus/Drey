@@ -131,7 +131,6 @@ export interface RemoteBoard {
     worker?: string;
     model?: string;
     pool?: readonly string[];
-    router?: string;
     color?: string;
     skills?: readonly string[];
     prompt?: string;

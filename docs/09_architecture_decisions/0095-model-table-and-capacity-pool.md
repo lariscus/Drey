@@ -104,3 +104,58 @@ retried) and `unknown`; `GET /slots`, the `slot` event and the chain status's `s
 Deviation from the text above: until req-178 the slot is chosen by preference (the resumed session's slot) and then by
 `service.json`'s order, not by surplus; `q` is shown, not used. The reserve share, the burn rate (req-181), the model
 table, cap, class requests and ledgers (req-170) are not built. Operations: `plugins/tickets/FLEET.md`, "Slots".
+
+## As built (req-170, milestone 217, 2026-11-09 — the Decision above)
+
+**Where it lives.** `fleet/routing/` beside req-177's slots: `ModelTable` (+ `pool-config.ts`, `PoolSettingsRegistry`),
+`CapacityCap`, `Ledgers` over `SessionBook`, `PoolGrant` (the one decision), `PoolGate` (every start's
+`SlotBinder` — it replaced `SlotGate`, so the slot binding and the grant are one step), `RequestQueue`,
+`PoolMigration`; the chain asks through `orchestrate/dispatch-pool.ts` (`ClassRequestBuilder`, `LedgerCards` in
+`orchestrate/`); `GET /models` and `POST /models/config` serve the page (board 7l, a later session), the chain
+status carries `pool` and `queue`, a `pool` event goes out on `GET /events`. The orchestration and the API never
+import `routing/` (ESLint + `architecture.spec.ts`).
+
+**The open points, settled:**
+
+- **Class names:** `A | B | C`, A strongest — board 7l's.
+- **Cap unit:** cost factors, globally and per slot. A slot's cap is set in `service.json` (`capacity.perSlot`) or
+  **derived** from its rows: its largest row at full sessions (board 7l's numbers: Claude A 5 = opus 5 × 1, z.ai
+  1.2 = glm 0.4 × 3). "Per provider" on the page is per slot (account, req-177).
+- **Sessions:** two bounds beside the cost cap — a row's `sessions` (concurrent sessions of that model on one
+  slot, board 7l's column) and req-177's slot `sessions` (the account in all). Req-63's `fleet.pool.<provider>.size`
+  moved into the slots' `sessions` once (`migrations: ["fleet.pool.size"]`); the dispatch plan's per-provider
+  bound is the sum of a provider's slots' sessions. Req-63's quota pause and rate-limit shrink stand, as the pool's
+  provider throttle.
+- **S/M/L → class:** S → C, M → B, L → A. Paul writes `size:` on each part (the shape prompt names it); the release
+  copies it onto the part's ticket (`size:`, dricket `x-size`).
+- **Who asks which class** (the assumption above, built as stated, with two precisions): a ticket pin `model:` (that
+  model, its row's class) or `class:` (exactly that class) beats everything; else the size, or — unsized — the
+  class of the persona's `models.default`; raised to the phase's `min-class:`; raised once more, when the persona's
+  pool holds no model of that class, to the lightest stronger class it holds — **raised, never lowered**. The
+  stock pipeline has one agent column (Building), so it carries no floor; a pipeline with plan or review columns
+  sets `min-class: B` there. "The owner changes the class on the card" is the ticket's `class:` key today; the
+  card control is UI work (follow-up).
+- **Only active sessions count:** a run or a held 1:1 from its start until it settles — a worker waiting for the
+  owner keeps its seat (req-63's "a waiting worker takes no slot" no longer holds for the cost cap: R10 counts a held
+  session). A queued task holds nothing and spawns nothing.
+- **A model the table does not hold** weighs 1 and has no class: it runs on a start that pins it without a class
+  (an owner's dialog with an explicit model, a ring dispatch) and on every start while the table is empty (a machine
+  not set up yet, so an upgrade runs as before); a class request never takes it.
+- **Waiting:** the queue is rebuilt by every dispatch pass in dispatch order (priority class, rightmost column,
+  position) and served front to back when capacity frees; the dispatcher takes the next task whose class has room,
+  as R10 says — a heavy task can therefore wait behind lighter ones while they keep fitting (no reservation for the
+  head of the queue; a follow-up if it bites). A wait has a reason: `capacity` (frees by itself), `ledger`, or
+  `config` (no model of the class in the pool, a cost above a cap, no slot of the profile — waiting will not help).
+- **Ledgers:** sums over every `run.json` the runner holds (its `SessionBook`, fed by the runner's own events); a day
+  is the UTC date a session started; the provider ledger is per slot (`ledgers.providerPerDay`, one figure for every
+  slot). A full ledger raises one keyed `blocked:` status comment (`ledger-ticket`, `ledger-persona-<id>`,
+  `ledger-provider-<slot>`) — the Needs-you list reads open blockers — kept in `chain.json` (`ledgerCards`) and
+  resolved on the next grant. `allowed: spend-above-allowance: true` in `persona.md` lets a persona past the ticket
+  allowance (req-142 adds the other permissions).
+- **The router policies** (`off | budget | escalate-on-fail`) and `personaModelFor` are removed, with Mission
+  Control's router row; an old `router:` line is ignored.
+
+**Deviations and gaps:** the context size rides the request but filters nothing (req-178's hard filter); the card's
+`queued · waits for a B slot` line and the class on the card are data on the chain status — the Work panel and board
+do not draw them yet; the queue does not survive a runner restart (the next pass rebuilds it). Surplus routing,
+reserve and burn rate stay req-178/181.

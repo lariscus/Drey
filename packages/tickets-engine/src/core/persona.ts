@@ -31,15 +31,21 @@ export type PersonaRole = 'planner' | 'builder' | 'reviewer' | 'tester' | 'custo
 
 export const PERSONA_ROLES: readonly PersonaRole[] = ['planner', 'builder', 'reviewer', 'tester', 'custom'];
 
-export type PersonaRouter = 'off' | 'budget' | 'escalate-on-fail';
-
 export interface PersonaModels {
-  /** What runs when nothing else decides. */
+  /** What runs when the model table cannot decide (an estimate, a machine without a table). */
   readonly default: string;
-  /** Allowed models, order = fallback on rate-limits/outages. */
+  /**
+   * The models the persona may run, strongest first (req-170): the pool
+   * grants the first one of the requested class with room. Every entry
+   * must be a row of the model table (Settings → Models).
+   */
   readonly pool: readonly string[];
-  /** Optional routing policy inside the pool; default off (deterministic). */
-  readonly router: PersonaRouter;
+}
+
+/** What a persona may do beyond its runs (`allowed:`, R11; req-142 adds the rest). */
+export interface PersonaAllowed {
+  /** `spend-above-allowance: true` — it runs on past a ticket's allowance instead of waiting for the owner (req-170). */
+  readonly spendAboveAllowance: boolean;
 }
 
 /**
@@ -74,6 +80,8 @@ export interface Persona {
    * Team view shows the day's costs against it); null = no budget set.
    */
   readonly budget: number | null;
+  /** `allowed:` — what it may do beyond its runs; absent in the file = nothing beyond. */
+  readonly allowed: PersonaAllowed;
 }
 
 export const PERSONAS_DIR = 'tickets/_meta/personas';
@@ -106,6 +114,25 @@ function asStringList(value: unknown): readonly string[] {
   return value.filter((v): v is string => typeof v === 'string' && v.trim() !== '').map((v) => v.trim());
 }
 
+/** `models:` — the default and the pool (the default alone when the pool is empty). */
+function modelsOf(raw: unknown): PersonaModels {
+  const map = (raw ?? {}) as Record<string, unknown>;
+  const defaultModel = asString(map['default']) ?? 'opus';
+  const pool = asStringList(map['pool']);
+  return { default: defaultModel, pool: pool.length > 0 ? pool : [defaultModel] };
+}
+
+/** `budget:` is USD per day; tolerant — absent, non-numeric or negative reads as null. */
+function budgetOf(raw: unknown): number | null {
+  const amount = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw.trim()) : Number.NaN;
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
+/** `allowed:` — only `spend-above-allowance: true` reads (req-170); req-142 adds the rest. */
+function allowedOf(raw: unknown): PersonaAllowed {
+  return { spendAboveAllowance: raw !== null && typeof raw === 'object' && (raw as Record<string, unknown>)['spend-above-allowance'] === true };
+}
+
 /** Parse one persona file; tolerant like the ticket reader — what parses
  *  reads, the rest falls back to defaults and is reported by the caller's
  *  own validation if it cares. */
@@ -114,31 +141,19 @@ export function parsePersonaFile(id: string, text: string): Persona {
   const { yamlText, hadFence } = splitFrontmatter(text);
   const js = hadFence && yamlText !== null ? (parseDocument(yamlText).toJS() as Record<string, unknown> | null) : null;
   const get = (key: string): unknown => (js === null || typeof js !== 'object' ? undefined : js[key]);
-
-  const title = asString(get('title')) ?? id;
-  const kind: PersonaKind = asString(get('kind')) === 'human' ? 'human' : 'agent';
   const roleRaw = asString(get('role')) ?? 'custom';
-  const role = (PERSONA_ROLES as readonly string[]).includes(roleRaw) ? (roleRaw as PersonaRole) : 'custom';
-  const worker = asString(get('worker')) ?? 'opencode';
-
-  const modelsMap = (get('models') ?? {}) as Record<string, unknown>;
-  const defaultModel = asString(modelsMap['default']) ?? 'opus';
-  const poolRaw = asStringList(modelsMap['pool']);
-  const pool = poolRaw.length > 0 ? poolRaw : [defaultModel];
-  const routerRaw = asString(modelsMap['router']) ?? 'off';
-  const router = (['off', 'budget', 'escalate-on-fail'] as const).includes(routerRaw as PersonaRouter)
-    ? (routerRaw as PersonaRouter)
-    : 'off';
-
-  const color = asString(get('color')) ?? '#a78bfa';
-  const skills = asStringList(get('skills'));
-
-  // `budget:` is USD per day; tolerant — absent, non-numeric or negative reads as null.
-  const budgetRaw = get('budget');
-  const budgetNum = typeof budgetRaw === 'number' ? budgetRaw : typeof budgetRaw === 'string' ? Number(budgetRaw.trim()) : Number.NaN;
-  const budget = Number.isFinite(budgetNum) && budgetNum >= 0 ? budgetNum : null;
-
-  return { id, kind, title, role, worker, models: { default: defaultModel, pool, router }, color, skills, budget };
+  return {
+    id,
+    kind: asString(get('kind')) === 'human' ? 'human' : 'agent',
+    title: asString(get('title')) ?? id,
+    role: (PERSONA_ROLES as readonly string[]).includes(roleRaw) ? (roleRaw as PersonaRole) : 'custom',
+    worker: asString(get('worker')) ?? 'opencode',
+    models: modelsOf(get('models')),
+    color: asString(get('color')) ?? '#a78bfa',
+    skills: asStringList(get('skills')),
+    budget: budgetOf(get('budget')),
+    allowed: allowedOf(get('allowed')),
+  };
 }
 
 /** True for the owner's own persona (E10-6) — no run, no model, no budget. */
@@ -154,10 +169,11 @@ export function humanPersona(title: string, id: string = HUMAN_PERSONA_ID): Pers
     title,
     role: 'custom',
     worker: 'opencode',
-    models: { default: 'opus', pool: ['opus'], router: 'off' },
+    models: { default: 'opus', pool: ['opus'] },
     color: '#38bdf8',
     skills: [],
     budget: null,
+    allowed: { spendAboveAllowance: false },
   };
 }
 
@@ -182,10 +198,10 @@ export function personaFileText(persona: Persona, body?: string): string {
     'models:',
     `  default: ${persona.models.default}`,
     `  pool: [${persona.models.pool.join(', ')}]`,
-    `  router: ${persona.models.router}`,
     `color: '${persona.color}'`,
     `skills: [${persona.skills.join(', ')}]`,
     ...(persona.budget !== null ? [`budget: ${persona.budget}`] : []),
+    ...(persona.allowed.spendAboveAllowance ? ['allowed:', '  spend-above-allowance: true'] : []),
     '---',
     '',
     prose,
@@ -222,32 +238,6 @@ export function resolvePersona(input: {
 }
 
 /**
- * What a dispatch knows when it picks a persona's model (D-62): the
- * phase, the persona's own harness provider, the free slots of every
- * provider pool at this point of the pass (`fleet.pool.<provider>.size`
- * minus the live runs, as the planner counts them), and how many runs of
- * this ticket failed in this phase in a row (the escalation ladder).
- */
-export interface PersonaModelContext {
-  readonly phase: string;
-  /** The persona's worker provider — a pool entry without a provider prefix runs there. */
-  readonly provider: string;
-  /** Free slots per provider right now; a provider not listed is taken as free. */
-  readonly freeSlots: Readonly<Partial<Record<string, number>>>;
-  /** Consecutive failed runs of the ticket in this phase (0 on a first run). */
-  readonly failedRuns: number;
-}
-
-export interface PersonaModelChoice {
-  readonly model: string;
-  /** The provider the chosen pool entry names (`kimi/k2`); null = the persona's own worker. */
-  readonly provider: string | null;
-  readonly viaRouter: boolean;
-  /** Why this model — one short clause for runner.log. */
-  readonly reason: string;
-}
-
-/**
  * A pool entry is `<model>` or `<provider>/<model>` with one of the fleet's
  * worker providers (the worker value grammar of `fleet/assignment.ts`); a
  * slash after anything else is part of the model id (`zai/glm-5.3`).
@@ -259,74 +249,6 @@ export function splitPoolEntry(entry: string): { readonly provider: string | nul
     return { provider: text.slice(0, slashAt), model: text.slice(slashAt + 1) };
   }
   return { provider: null, model: text };
-}
-
-/**
- * The model a persona actually runs on a dispatch (D-62): the pool is the
- * fallback order, the router the policy inside it (concept §4.6).
- *
- * - router `off`: the default first, then the pool in order;
- * - `budget`: the pool in order (the owner curates it cheapest first);
- * - `escalate-on-fail`: the default, then one pool step further per
- *   failed run of the ticket in this phase (the pool's end holds).
- *
- * An entry whose provider pool has no free slot is skipped; when every
- * entry is full the first one is named and the provider gate makes the
- * ticket wait, as before. Without a context (the Crew tab, an estimate)
- * the default stands. req-170 replaces this with a class request against
- * the model table and a capacity cap — never a smaller class.
- */
-export function personaModelFor(persona: Persona, context: PersonaModelContext | null): PersonaModelChoice {
-  const fallback: PersonaModelChoice = { model: persona.models.default, provider: null, viaRouter: false, reason: 'the default' };
-  if (context === null) {
-    return fallback;
-  }
-  const entries = persona.models.pool.map(splitPoolEntry);
-  const router = persona.models.router;
-  const defaultEntry = { provider: null, model: persona.models.default };
-  const defaultAt = entries.findIndex((e) => e.provider === null && e.model === persona.models.default);
-  // The order the dispatch walks: budget = the pool as curated; off = the
-  // default, then the rest of the pool; escalate = the default, then the
-  // pool entries after it (the ones before it are the cheaper ones).
-  const order =
-    router === 'budget'
-      ? entries
-      : router === 'escalate-on-fail'
-        ? [defaultEntry, ...(defaultAt === -1 ? entries : entries.slice(defaultAt + 1))]
-        : [defaultEntry, ...entries.filter((_, i) => i !== defaultAt)];
-  if (order.length === 0) {
-    return fallback;
-  }
-  const step = router === 'escalate-on-fail' ? Math.min(context.failedRuns, order.length - 1) : 0;
-  const candidates = order.slice(step);
-  const policy =
-    router === 'escalate-on-fail' && step > 0
-      ? `escalate-on-fail: step ${step} after ${context.failedRuns} failed run${context.failedRuns === 1 ? '' : 's'} in ${context.phase}`
-      : router === 'budget'
-        ? 'budget router: the pool in order'
-        : router === 'escalate-on-fail'
-          ? 'escalate-on-fail: the default on a first run'
-          : 'the default';
-  // The persona's own provider is the slot gate's business (unknown = free
-  // here); an entry naming another provider needs that provider's pool
-  // configured, else it is skipped with its reason — never a crash.
-  const free = (provider: string | null): number | null =>
-    provider === null ? (context.freeSlots[context.provider] ?? Number.POSITIVE_INFINITY) : (context.freeSlots[provider] ?? null);
-  const skipped: string[] = [];
-  for (const entry of candidates) {
-    const slots = free(entry.provider);
-    if (slots === null) {
-      skipped.push(`${entry.model}: no ${entry.provider} pool is configured`);
-      continue;
-    }
-    if (slots > 0) {
-      const because = skipped.length > 0 ? `${skipped.join(', ')} — pool fallback` : policy;
-      return { model: entry.model, provider: entry.provider, viaRouter: router !== 'off', reason: because };
-    }
-    skipped.push(`${entry.model}: the ${entry.provider ?? context.provider} pool is full`);
-  }
-  const first = candidates[0]!;
-  return { model: first.model, provider: first.provider, viaRouter: router !== 'off', reason: `every pool entry is full or unconfigured (${skipped.join(', ')}) — the ticket waits` };
 }
 
 /**

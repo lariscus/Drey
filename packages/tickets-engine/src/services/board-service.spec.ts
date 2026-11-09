@@ -820,7 +820,6 @@ describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () =>
       id: 'pia',
       model: 'sonnet',
       pool: ['sonnet', 'haiku'],
-      router: 'budget',
       color: '#ff8800',
       skills: ['diff-review'],
       prompt: 'You are Pia, the careful planner.\n',
@@ -829,7 +828,7 @@ describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () =>
     const personaMd = await fsp.readFile(path.join(vaultDir, ...PERSONA_DIR, 'persona.md'), 'utf8');
     expect(personaMd).toContain('default: sonnet');
     expect(personaMd).toContain('pool: [sonnet, haiku]');
-    expect(personaMd).toContain('router: budget');
+    expect(personaMd).not.toContain('router:'); // req-170: the router policies are gone, the old key drops on rewrite
     expect(personaMd).toContain("color: '#ff8800'");
     expect(personaMd).toContain('skills: [diff-review]');
     expect(personaMd).toContain('role: builder'); // not sent — untouched
@@ -841,7 +840,7 @@ describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () =>
     // the rewritten file parses back to the same persona plus the changes
     const parsed = await service.listPersonas();
     const pia = parsed.find((p) => p.id === 'pia');
-    expect(pia?.models).toEqual({ default: 'sonnet', pool: ['sonnet', 'haiku'], router: 'budget' });
+    expect(pia?.models).toEqual({ default: 'sonnet', pool: ['sonnet', 'haiku'] });
     expect(pia?.skills).toEqual(['diff-review']);
   });
 
@@ -850,7 +849,6 @@ describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () =>
     const service = serviceOf();
     const before = await fsp.readFile(path.join(vaultDir, ...PERSONA_DIR, 'persona.md'), 'utf8');
 
-    expect(await service.personaPatch({ id: 'pia', router: 'chaos' })).toEqual({ ok: false, error: 'the router is "off", "budget" or "escalate-on-fail"' });
     expect(await service.personaPatch({ id: 'pia', color: 'red' })).toEqual({ ok: false, error: 'the color is a #rrggbb hex value' });
     expect(await service.personaPatch({ id: 'pia', pool: [] })).toEqual({ ok: false, error: 'the model pool is a non-empty list of model names' });
     expect(await service.personaPatch({ id: 'pia', title: '  ' })).toEqual({ ok: false, error: 'the title is not empty' });

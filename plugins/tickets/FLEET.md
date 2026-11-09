@@ -106,13 +106,15 @@ Invoke-RestMethod "http://127.0.0.1:$($d.port)/health" -Headers $h
 | `GET /status` | all runs (newest info per run) |
 | `GET /status/<runId>` | one run: `{run, streamPath}` |
 | `GET /stream/<runId>` | the run's stream.jsonl tail (last ~200 KB, ndjson) |
-| `GET /events` | the runner's events as server-sent events (req-176): `event: run` with a run's record each time it is persisted, `event: line` with `{runId, event}` for each line of a run's stream, `event: slot` with a slot's view when its state, windows or busy count changed (req-177); a `: ping` comment every 15 s, `retry: 3000` at the start. A read: it never keeps the runner awake, and it ends when the runner goes to sleep — reconnect then. `curl.exe -N -H "Authorization: Bearer …" http://127.0.0.1:<port>/events` |
+| `GET /events` | the runner's events as server-sent events (req-176): `event: run` with a run's record each time it is persisted, `event: line` with `{runId, event}` for each line of a run's stream, `event: slot` with a slot's view when its state, windows or busy count changed (req-177), `event: pool` with the pool's live load when it changed (req-170); a `: ping` comment every 15 s, `retry: 3000` at the start. A read: it never keeps the runner awake, and it ends when the runner goes to sleep — reconnect then. `curl.exe -N -H "Authorization: Bearer …" http://127.0.0.1:<port>/events` |
 | `GET /log?tail=N` | daemon log tail, plain text (default 300 lines, max 2000; daemon builds) |
-| `GET /chain` | chain state + config (daemon builds); `slots` carries the 7e summary per slot (req-177) |
+| `GET /chain` | chain state + config (daemon builds); `slots` carries the 7e summary per slot (req-177); `pool` the live load (`{used, global, slots: [{id, label, used, cap, derived}]}`) and `queue` the tasks waiting for the pool (req-170) |
 | `GET /slots` | every slot (req-177): `{ok, slots: [{id, label, provider, profile, billing, quota, state, busy, total, windows: [{name, spanMs, remaining, resetsAt, reliability, fetchedAt, used?, limit?, unit?, rejected?}], q, reason, lastFetch, lastFetchError, implied}], configPath}` — see "Slots" below |
 | `POST /slots/refresh` `{id?}` | read the quotas now (one slot, or all), the config reloaded first |
 | `POST /slots/login-done` `{id}` | the owner signed the slot's account in again: `needs-login` clears, its quota is read |
 | `POST /slots/config` `{slots: [...]}` | write the `slots` of `service.json` (every other key kept) and reload; a broken entry refuses the whole list (422), a file that does not parse refuses the write (409) |
+| `GET /models` | the capacity pool (req-170): `{ok, models: [{model, slot, provider, category, class, cost, sessions}], capacity: {global, perSlot}, ledgers: {ticketAllowance, personaPerDay, providerPerDay}, now: <the live load>, queue: [...], providerDay: [{id, spent, limit}], errors, configPath}` — see "The capacity pool" below |
+| `POST /models/config` `{models?, capacity?, ledgers?}` | replace the pool keys it sends in `service.json` (the others, and every other key, kept) and reload; a broken row refuses the whole write (422), a file that does not parse refuses it (409) |
 | `GET /report` | token telemetry grouped by ticket, phase and model, sorted by total desc: `{ok, groups: [{ticket, phase, model, runs, total, input, cacheRead, cacheCreation, output, beforeFirstWrite, beforeFirstWriteShare}]}` — a counter the provider never reports counts 0 into the sums; pre-T-0048 records fall back to their cumulative `tokensIn`+`tokensOut` (T-0048) |
 | `POST /stop` `{runId, reason}` | stop one run |
 | `POST /send` `{runId, text}` | steer a live run (rung: inject/resume/refused); while the run waits on a question it is the answer, not a takeover. To an ended run (done/stopped/failed) with a session it reopens that session under a new held run, the text as its first prompt — the reply carries the new `runId` |
@@ -423,7 +425,9 @@ breaker holds it; playing the column clears it and resets the
 column's `redStreak`) · `ownerHold` (per ticket the phase whose run the
 owner stopped; the ticket holds until it moves or a newer run starts) ·
 `pausedPersonas` (the personas the owner paused from the Crew view; their
-tickets hold until the persona is played again — U4) · `handoverAt`
+tickets hold until the persona is played again — U4) · `ledgerCards`
+(per ticket the keys of the ledger cards the pool raised and has not
+resolved yet — req-170) · `handoverAt`
 (written by a runner retiring for a newer build; a successor booting
 within five minutes keeps the Autopilot as it stood — any other boot
 ends as Off, also a Paused whose resume time has not passed).
@@ -431,7 +435,8 @@ ends as Off, also a Paused whose resume time has not passed).
 `GET /chain` reports the same plus `quotaPausedUntil` (per provider,
 the ISO instant its quota pause ends — not persisted) and `slots` (per
 slot: busy/total, the longest window's remaining share, its reliability,
-`q` and reset — req-177). The Work panel
+`q` and reset — req-177), `pool` (the live load) and `queue` (the tasks
+waiting for the pool — req-170). The Work panel
 draws both as alerts with a Resume button (chain alerts fix); a runner
 that predates them omits the fields and the panel reads a hold with a
 full red streak as a trip.
@@ -482,7 +487,7 @@ then works with the implied slots and logs why.
 | `label` | what the boards show; default the id |
 | `provider` | `claude-code`, `opencode` or `kimi` — the harness the slot's runs use |
 | `profile` | `private` (default) or `work`: a repository runs only on slots of its own `profile:` (`_meta/repos.md`) |
-| `sessions` | concurrent runs the account serves; absent = no cap of its own (the provider's pool decides) |
+| `sessions` | concurrent runs the account serves; absent = no cap of its own. Req-63's `fleet.pool.<provider>.size` moved here once (req-170): see "The capacity pool" |
 | `billing` | `{kind: "subscription", pricePerMonth}` or `{kind: "credits", pricePerCredit}`, optional `currency` — display data |
 | `login` | the harness login, **never a key**: `claudeConfigDir` (spawned as `CLAUDE_CONFIG_DIR`; absent = the default login), `opencodeAuthEntry` / `opencodeAuthFile` (the entry of opencode's `auth.json` the z.ai quota is read with), `kimiCredentials` / `kimiHome` (the Kimi CLI's credentials file; `kimiHome` is spawned as `KIMI_HOME`) |
 | `quota` | where the windows come from — `claude-code`, `zai`, `kimi` or `counting`; absent = by provider (`opencode` with a `zai…` auth entry → `zai`, other `opencode` → `counting`) |
@@ -527,6 +532,125 @@ slot the resumed session lives on first, else the first in
 on a private slot — …`). A failed start frees its slot; a restarted
 runner re-reserves the slots of the runs it adopts. The run's own
 `failed` card is the Needs-you card of an expired login.
+
+## The capacity pool — model table, cap, class requests, ledgers (req-170)
+
+Every start asks the pool before a worker spawns (ADR-0095, R10). The
+pool grants a model of **exactly the class the start asked for**, on a
+free slot of the repository's profile, while the caps and the ledgers
+have room — or the start waits: no process, no slot. **Never a smaller
+class.** Code: `fleet/routing/` (`ModelTable`, `CapacityCap`, `Ledgers`,
+`PoolGrant`, `PoolGate`, `RequestQueue`, `PoolMigration`), wired in
+`fleet/compose-routing.ts`; the chain asks it through
+`orchestrate/dispatch-pool.ts`, every start through `slot-binder.ts`.
+
+### `service.json` — the pool keys
+
+```json
+{
+  "slots": [ … ],
+  "models": [
+    { "model": "claude-opus-4-1",   "slot": "claude-a", "category": "frontier", "class": "A", "cost": 5,   "sessions": 1 },
+    { "model": "claude-sonnet-4-5", "slot": "claude-a", "category": "everyday", "class": "B", "cost": 1,   "sessions": 2 },
+    { "model": "glm-5.3",           "slot": "zai",      "category": "everyday", "class": "B", "cost": 0.4, "sessions": 3 },
+    { "model": "kimi-k2.5",     "provider": "kimi",     "category": "bulk",     "class": "C", "cost": 0.3, "sessions": 2 }
+  ],
+  "capacity": { "global": 6, "perSlot": {} },
+  "ledgers": { "ticketAllowance": 2.5, "personaPerDay": 5, "providerPerDay": 15 },
+  "migrations": ["fleet.pool.size"]
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `models[].model` | the model id the harness is started with |
+| `models[].slot` / `.provider` | the slot (account) that serves it, or a harness provider — then every slot of that provider serves it |
+| `models[].category` | free text (`frontier`, `everyday`, `bulk`) — display |
+| `models[].class` | `A`, `B` or `C`, A strongest |
+| `models[].cost` | the cost factor: what one active session weighs against the caps (default 1) |
+| `models[].sessions` | concurrent sessions of this model one slot serves (default 1) |
+| `capacity.global` | the summed cost factors of every active session may not exceed it; `null` = no global cap |
+| `capacity.perSlot` | a slot's cap by id; a slot not named takes its **derived cap** — its largest row at full sessions (board 7l: Claude A 5 = opus 5 × 1) |
+| `ledgers.*` | USD defaults: a ticket's allowance when its frontmatter sets none, a persona's day when its `persona.md` sets no `budget:`, every slot's day |
+| `migrations` | `fleet.pool.size` once req-63's sizes moved into the slots (below) |
+
+Only **active sessions** count: runs and held 1:1 sessions from their
+start until they settle (a worker waiting for the owner still holds its
+seat); a queued task holds nothing. A model the table does not hold is
+*untabled*: it weighs 1 and has no class — it runs on a start that pins
+it without a class (an owner's dialog with an explicit model, a ring
+dispatch), or on every start while the table is empty (a machine not set
+up yet); a class request never takes it.
+
+### Who asks for which class
+
+The chain's dispatch builds the request (`ClassRequestBuilder`) for every
+ticket with a persona:
+
+1. a ticket pin `model:` asks for that model (its row's class), `class:`
+   for exactly that class — a pin beats everything below;
+2. else the plan part's `size:` — **S → C, M → B, L → A** — or, unsized,
+   the class of the persona's `models.default`;
+3. raised to the phase's floor `min-class:` (`pipeline.md`);
+4. raised, if the persona's `models.pool` holds no model of that class, to
+   the lightest stronger class it does hold — raised, never lowered.
+
+The pool walks the persona's `models.pool` (strongest first) and takes the
+first row of the class on a slot that has room: slot not blocked
+(`needs-login`, `exhausted`, `busy n/n`), the row's sessions free, the
+provider not paused or throttled (req-63's quota pause and rate-limit
+shrink stand), the slot's cap and the global cap not exceeded, the slot's
+day ledger not full. The decision rides the run: `RunRequest.poolClass`,
+`poolWhy`, `ledger`; `RunInfo.grant` `{requested, class, model, cost,
+reason}`; the stream's opening note `pool: claude-sonnet-4-5, class B,
+cost 1 on Claude A — size M → B`; the dispatch log line.
+
+### Waiting
+
+No grant → the task **queues**: the chain status's `queue` lists it
+(`{ticket, persona, class, reason: capacity | ledger | config, line,
+detail, position, since}` — `line` is the card's `waits for a B slot`),
+the log says it once (`dispatch waits T-0122: queued · waits for a B slot
+— Claude A: 2 of 2 claude-sonnet-4-5 sessions busy (asked B: size M →
+B)`), and the dispatcher goes on with the next task whose class has room.
+Every pass rebuilds the queue in dispatch order (priority class, the
+rightmost column, position), so when a run settles the next pass serves
+it front to back. `reason: config` means waiting will not help: the
+persona's pool holds no model of the class, a row's cost is above a cap,
+no slot of the profile serves it — fix `service.json` or the persona.
+
+### The three ledgers
+
+Sums over the session records (every `run.json` the runner holds — run
+telemetry, ADR-0081), never counters of their own; a day is the UTC date
+a session started:
+
+| Ledger | Limit | Full → |
+|---|---|---|
+| ticket | the ticket's `allowance:`, else `ledgers.ticketAllowance` | waits — unless the persona's `allowed: spend-above-allowance: true` |
+| persona per day | the persona's `budget:`, else `ledgers.personaPerDay` | waits until tomorrow (or a higher budget) |
+| provider per day | `ledgers.providerPerDay`, per slot | that slot grants nothing today; another slot of the class may |
+
+A full ledger raises **one Needs-you card**: a keyed status comment on the
+ticket (`blocked: [ledger-ticket] T-0122 has spent $2.61 of its $2.50
+allowance — raise the ticket's allowance: …`; keys `ledger-ticket`,
+`ledger-persona-<id>`, `ledger-provider-<slot>`), written once, kept in
+`chain.json`'s `ledgerCards`, and closed with `resolved: <key>` when the
+pool grants the ticket again.
+
+### The old pool sizes (req-63)
+
+`fleet.pool.<provider>.size` (Settings → Runners) moved once, on the first
+chain config after this build: the size became the `sessions` of that
+provider's slots that named none, a provider without a slot got its
+implied slot written out with it, and `migrations: ["fleet.pool.size"]`
+marks it done — a later size in the plugin config changes nothing. The
+dispatch plan's per-provider bound is now the sum of the provider's slots'
+`sessions` (unbounded when one slot names none); the probe of a local
+server (`fleet.pool.opencode.probe`) and the rate-limit shrink still lower
+it. The router policies of `models.router` (`off | budget |
+escalate-on-fail`) are gone; an old `router:` key in `persona.md` is
+ignored and dropped on the next rewrite.
 
 ## The tickets remote is not the runner
 

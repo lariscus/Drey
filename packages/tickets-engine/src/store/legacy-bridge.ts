@@ -1,4 +1,5 @@
 import { parse } from 'yaml';
+import { EXTENSION_KEYS } from './extension-keys';
 import { toDricketId } from './ids';
 
 /**
@@ -16,8 +17,6 @@ import { toDricketId } from './ids';
 
 const FENCE = '---';
 
-/** Legacy keys that ride in an `x-` extension field (same list as `store-board`). */
-const EXTENSION_KEYS = ['worker', 'persona', 'track', 'form', 'proof', 'awaiting'] as const;
 
 /** The label a closed-and-archived ticket carries (the archive is a label under dricket, migration plan §3). */
 export const ARCHIVED_LABEL = 'archived';
@@ -80,7 +79,7 @@ function fieldsOf(legacy: Record<string, unknown>, stage: string): Map<string, s
   out.set('x-rank', rank === undefined || rank === null ? null : flat(rank));
   for (const key of EXTENSION_KEYS) {
     const value = legacy[key];
-    out.set(`x-${key}`, typeof value === 'string' && value.trim() !== '' ? flat(value) : null);
+    out.set(`x-${key}`, typeof value === 'string' && value.trim() !== '' ? flat(value) : typeof value === 'number' ? String(value) : null);
   }
   out.set('x-interactive', legacy['interactive'] === true ? 'true' : null);
   const chain = listOf(legacy['chain']);

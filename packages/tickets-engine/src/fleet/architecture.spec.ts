@@ -113,6 +113,9 @@ function violations(edges: readonly ImportEdge[]): readonly string[] {
     if (inFolder(edge.from, 'harness') && edge.target !== null && /^(orchestrate|api|store)\/|^runner$/.test(edge.target)) {
       found.push(`${where}: an adapter never imports the orchestration`);
     }
+    if ((inFolder(edge.from, 'orchestrate') || inFolder(edge.from, 'api')) && edge.target !== null && inFolder(edge.target, 'routing')) {
+      found.push(`${where}: the orchestration and the API ask the slots and the pool through their own interfaces (slot-binder, dispatch-pool, model-routes), never fleet/routing`);
+    }
     if (inFolder(edge.from, 'routing') && edge.target !== null && !ROUTING_TARGETS.some((re) => re.test(edge.target!))) {
       found.push(`${where}: fleet/routing takes the protocol, the ports, the adapter contract and the run core only`);
     }
@@ -167,6 +170,14 @@ describe('the Crew runner import graph (ADR-0096)', () => {
       "import { y } from './y';",
     ];
     expect(violations(importsOf('routing/x.ts', allowed.join('\n')))).toEqual([]);
+  });
+
+  it('keeps the orchestration and the API off fleet/routing: the pool is asked through their own interfaces (req-170)', () => {
+    expect(violations(importsOf('orchestrate/dispatcher.ts', "import type { PoolGrant } from '../routing/pool-grant';"))).toHaveLength(1);
+    expect(violations(importsOf('api/model-routes.ts', "import { ModelTable } from '../routing/model-table';"))).toHaveLength(1);
+    expect(violations(importsOf('orchestrate/pool.fake.ts', "import { PoolGrant } from '../routing/pool-grant';"))).toEqual([]);
+    expect(violations(importsOf('compose-routing.ts', "import { PoolGrant } from './routing/pool-grant';"))).toEqual([]);
+    expect(violations(importsOf('orchestrate/dispatcher.ts', "import type { ClassRequest } from '../protocol';"))).toEqual([]);
   });
 
   it('reports a concrete adapter wired outside the composition root', () => {

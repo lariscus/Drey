@@ -114,6 +114,11 @@ const ROUTING_ONLY = [
     message: 'fleet/routing takes only types from ../ports and ../harness/contract (ADR-0096).',
   },
 ];
+/** req-170: the orchestration and the API ask the slots and the pool through their own interfaces (slot-binder, dispatch-pool, model-routes). */
+const NOT_ROUTING = {
+  group: ['../routing', '../routing/**'],
+  message: 'The orchestration and the API never import fleet/routing (req-170): they ask the pool through the consumer interface the composition root satisfies.',
+};
 const HARNESS_NOT_ORCHESTRATE = {
   group: ['../orchestrate', '../orchestrate/**', '../api', '../api/**', '../store', '../store/**', '../runner', '../../**/orchestrate/**'],
   message: 'An adapter never imports the orchestration (ADR-0096): it reports normalized events, the orchestrator decides.',
@@ -352,7 +357,14 @@ export default tseslint.config(
     files: [`${FLEET}/orchestrate/**/*.ts`],
     ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`, `${FLEET}/**/*spec-support.ts`],
     rules: {
-      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS, NODE_BUILTINS] }],
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS, NODE_BUILTINS, NOT_ROUTING] }],
+    },
+  },
+  {
+    files: [`${FLEET}/api/**/*.ts`],
+    ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS, NOT_ROUTING] }],
     },
   },
   {

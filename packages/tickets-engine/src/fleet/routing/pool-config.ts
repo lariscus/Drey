@@ -1,0 +1,133 @@
+/**
+ * The pool keys of `service.json` (req-170; machine scope, R13): `models`
+ * (the model table), `capacity` (the cap) and `ledgers` (the defaults). A
+ * row is checked on its own — a broken one is left out with its reason,
+ * the others stand — against the slots of req-177: a row names a slot, or
+ * a harness provider whose every slot serves it.
+ */
+import { isWorkerProvider, WORKER_PROVIDERS, isCapabilityClass, type CapacityConfig, type LedgerDefaults, type ModelRow, type PoolSettings } from '../protocol';
+import type { Slot } from './slot';
+
+export interface PoolConfigParse {
+  readonly settings: PoolSettings;
+  readonly errors: readonly string[];
+}
+
+type Entry = Record<string, unknown>;
+
+export const NO_CAPACITY: CapacityConfig = { global: null, perSlot: {} };
+export const NO_LEDGERS: LedgerDefaults = { ticketAllowance: null, personaPerDay: null, providerPerDay: null };
+
+const text = (value: unknown): string | null => (typeof value === 'string' && value.trim() !== '' ? value.trim() : null);
+const amount = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null);
+
+/** Where a row runs: its slot (and with it the provider), or a provider's every slot. */
+function placeOf(entry: Entry, slots: readonly Slot[]): Pick<ModelRow, 'slot' | 'provider'> | string {
+  const slotId = text(entry['slot']);
+  if (slotId !== null) {
+    const slot = slots.find((s) => s.id === slotId);
+    return slot === undefined ? `names slot "${slotId}", which service.json does not define` : { slot: slot.id, provider: slot.provider };
+  }
+  const provider = entry['provider'];
+  return isWorkerProvider(provider) ? { slot: null, provider } : `needs a slot or a provider (${WORKER_PROVIDERS.join(', ')})`;
+}
+
+/** A row's cost factor (default 1) and sessions (default 1), or why they do not read. */
+function weightOf(entry: Entry, model: string): Pick<ModelRow, 'cost' | 'sessions'> | string {
+  const cost = entry['cost'] === undefined ? 1 : amount(entry['cost']);
+  if (cost === null) {
+    return `model "${model}": the cost factor must be a number of 0 or more`;
+  }
+  const sessions = entry['sessions'] === undefined ? 1 : entry['sessions'];
+  if (typeof sessions !== 'number' || !Number.isInteger(sessions) || sessions < 1) {
+    return `model "${model}": sessions must be a whole number of 1 or more`;
+  }
+  return { cost, sessions };
+}
+
+/** One row of `models`, or the reason it is left out. */
+export function modelRowOf(raw: unknown, slots: readonly Slot[], seen: readonly ModelRow[]): ModelRow | string {
+  const entry = (raw !== null && typeof raw === 'object' ? raw : {}) as Entry;
+  const model = text(entry['model']);
+  if (model === null) {
+    return `a model row needs a model id (got ${JSON.stringify(entry['model'] ?? null)})`;
+  }
+  const place = placeOf(entry, slots);
+  if (typeof place === 'string') {
+    return `model "${model}" ${place}`;
+  }
+  const rowClass = entry['class'];
+  if (!isCapabilityClass(rowClass)) {
+    return `model "${model}": class must be A, B or C`;
+  }
+  const weight = weightOf(entry, model);
+  if (typeof weight === 'string') {
+    return weight;
+  }
+  if (seen.some((row) => row.model === model && row.slot === place.slot && row.provider === place.provider)) {
+    return `model "${model}" is named twice for ${place.slot ?? place.provider}`;
+  }
+  return { model, ...place, category: text(entry['category']) ?? '', class: rowClass, ...weight };
+}
+
+function rowsOf(raw: unknown, slots: readonly Slot[], errors: string[]): ModelRow[] {
+  const rows: ModelRow[] = [];
+  for (const entry of Array.isArray(raw) ? (raw as unknown[]) : []) {
+    const row = modelRowOf(entry, slots, rows);
+    if (typeof row === 'string') {
+      errors.push(row);
+    } else {
+      rows.push(row);
+    }
+  }
+  return rows;
+}
+
+function perSlotOf(raw: unknown, errors: string[]): Record<string, number> {
+  const perSlot: Record<string, number> = {};
+  for (const [id, value] of Object.entries(raw !== null && typeof raw === 'object' ? raw : {})) {
+    const cap = amount(value);
+    if (cap === null) {
+      errors.push(`capacity.perSlot.${id} must be a number of 0 or more`);
+    } else {
+      perSlot[id] = cap;
+    }
+  }
+  return perSlot;
+}
+
+function capacityOf(raw: unknown, errors: string[]): CapacityConfig {
+  const entry = (raw !== null && typeof raw === 'object' ? raw : {}) as Entry;
+  const given = entry['global'] ?? null;
+  const global = given === null ? null : amount(given);
+  if (given !== null && global === null) {
+    errors.push('capacity.global must be a number of 0 or more');
+  }
+  return { global, perSlot: perSlotOf(entry['perSlot'], errors) };
+}
+
+function ledgersOf(raw: unknown): LedgerDefaults {
+  const entry = (raw !== null && typeof raw === 'object' ? raw : {}) as Entry;
+  return { ticketAllowance: amount(entry['ticketAllowance']), personaPerDay: amount(entry['personaPerDay']), providerPerDay: amount(entry['providerPerDay']) };
+}
+
+/** `service.json`'s parsed root as the pool's settings. */
+export function parsePoolSettings(root: unknown, slots: readonly Slot[]): PoolConfigParse {
+  const config = (root !== null && typeof root === 'object' && !Array.isArray(root) ? root : {}) as Entry;
+  const errors: string[] = [];
+  const models = rowsOf(config['models'], slots, errors);
+  return { settings: { models, capacity: capacityOf(config['capacity'], errors), ledgers: ledgersOf(config['ledgers']) }, errors };
+}
+
+/** The pool keys as `service.json` stores them: a row keeps only what it names. */
+export function poolKeysOf(settings: PoolSettings): Record<string, unknown> {
+  const models = settings.models.map((row) => ({
+    model: row.model,
+    ...(row.slot !== null ? { slot: row.slot } : { provider: row.provider }),
+    category: row.category,
+    class: row.class,
+    cost: row.cost,
+    sessions: row.sessions,
+  }));
+  return { models, capacity: settings.capacity, ledgers: settings.ledgers };
+}

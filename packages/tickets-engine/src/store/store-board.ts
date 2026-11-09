@@ -1,3 +1,4 @@
+import { EXTENSION_KEYS } from './extension-keys';
 import { stringify } from 'yaml';
 import { TICKETS_ARCHIVE_DIR, type BoardSnapshot, type PipelinePhase } from '../contracts/tickets';
 import type { TicketDetail } from '../ports/ticket-store';
@@ -29,6 +30,8 @@ import { openStatusItems } from '../core/status-log';
  *   x-rank                         -> rank
  *   x-worker x-persona x-track     -> worker persona track
  *   x-form x-proof x-awaiting      -> form proof awaiting
+ *   x-class x-model x-size         -> class model size     (req-170)
+ *   x-allowance                    -> allowance            (req-170)
  *   x-interactive                  -> interactive          ("true")
  *   x-chain                        -> chain                (entries separated by `;`)
  *   x-references                   -> references           (separated by `,`)
@@ -40,8 +43,7 @@ import { openStatusItems } from '../core/status-log';
  * lease (dricket data the legacy board has no field for).
  */
 
-/** Drey keys that ride in an `x-` extension field, in header order. */
-export const EXTENSION_KEYS = ['worker', 'persona', 'track', 'form', 'proof', 'awaiting'] as const;
+export { EXTENSION_KEYS } from './extension-keys';
 
 export interface RecordsBoardInput extends Omit<AssembleInput, 'files'> {
   readonly records: readonly TicketDetail[];

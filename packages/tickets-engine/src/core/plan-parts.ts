@@ -9,6 +9,7 @@
  *
  *     - [ ] Split a file diff into hunks
  *       persona: ben
+ *       size: M
  *       reason: pure logic first, so the panel can build on it
  *       chain: insert security(ralf, notify) after review; skip qa
  *     - [ ] Hunk rows in the Source control panel
@@ -35,6 +36,8 @@ export interface PlanPart {
   readonly reason: string | null;
   /** The part's own chain delta, canonical strings; the parent's never leaks in. */
   readonly chain: readonly string[];
+  /** req-170: Paul's size of the part (`size: S|M|L`) — its ticket asks the pool for class C, B or A; absent = unsized. */
+  readonly size?: 'S' | 'M' | 'L' | null;
 }
 
 export interface ParsedPlanParts {
@@ -80,6 +83,47 @@ function partsBounds(text: string): { start: number; end: number } | null {
   return { start: plan.start + heading.index, end: plan.start + end };
 }
 
+/** The chain detail's entries; an unreadable one warns and drops. */
+function chainDetail(title: string, value: string, warnings: string[]): string[] {
+  const entries: string[] = [];
+  for (const raw of value.split(';').map((e) => e.trim()).filter((e) => e !== '')) {
+    if (parseChainEntry(raw) === null) {
+      warnings.push(`part "${title}": chain entry "${raw}" is not readable`);
+    } else {
+      entries.push(raw);
+    }
+  }
+  return entries;
+}
+
+/** One `key: value` detail line onto the part it follows. */
+function applyDetail(current: MutablePart, key: string, value: string, warnings: string[]): void {
+  switch (key) {
+    case 'persona':
+      if (PERSONA.test(value)) {
+        current.persona = value;
+      } else {
+        warnings.push(`part "${current.title}": persona "${value}" is not a persona id`);
+      }
+      break;
+    case 'reason':
+      current.reason = value === '' ? null : value;
+      break;
+    case 'chain':
+      current.chain = chainDetail(current.title, value, warnings);
+      break;
+    case 'size':
+      if (value === 'S' || value === 'M' || value === 'L') {
+        current.size = value;
+      } else {
+        warnings.push(`part "${current.title}": size "${value}" is not S, M or L`);
+      }
+      break;
+    default:
+      warnings.push(`part "${current.title}": unknown detail "${key}"`);
+  }
+}
+
 /** Reads the parts of a whole ticket file; empty without the chapter. */
 export function parsePlanParts(ticketText: string): ParsedPlanParts {
   const text = ticketText.replace(/\r\n/g, '\n');
@@ -105,33 +149,7 @@ export function parsePlanParts(ticketText: string): ParsedPlanParts {
       warnings.push(`parts line "${line.trim()}" is not readable — expected "- [ ] <title>"`);
       continue;
     }
-    const value = detail[2]!.trim();
-    switch (detail[1]) {
-      case 'persona':
-        if (PERSONA.test(value)) {
-          current.persona = value;
-        } else {
-          warnings.push(`part "${current.title}": persona "${value}" is not a persona id`);
-        }
-        break;
-      case 'reason':
-        current.reason = value === '' ? null : value;
-        break;
-      case 'chain': {
-        const entries: string[] = [];
-        for (const raw of value.split(';').map((e) => e.trim()).filter((e) => e !== '')) {
-          if (parseChainEntry(raw) === null) {
-            warnings.push(`part "${current.title}": chain entry "${raw}" is not readable`);
-          } else {
-            entries.push(raw);
-          }
-        }
-        current.chain = entries;
-        break;
-      }
-      default:
-        warnings.push(`part "${current.title}": unknown detail "${detail[1]}"`);
-    }
+    applyDetail(current, detail[1]!, detail[2]!.trim(), warnings);
   }
   return { parts, warnings };
 }
@@ -149,6 +167,9 @@ export function renderPlanParts(parts: readonly PlanPart[]): string {
     }
     if (part.chain.length > 0) {
       lines.push(`  chain: ${part.chain.join('; ')}`);
+    }
+    if (part.size !== undefined && part.size !== null) {
+      lines.push(`  size: ${part.size}`);
     }
   }
   return `${lines.join('\n')}\n`;

@@ -12,6 +12,7 @@
  * worker process, its pipes, the worktree and the machine gate.
  */
 import type { HandoverMode } from './protocol-fleet-config';
+import type { CapabilityClass, PoolGrantRecord, RunLedgerInput } from './protocol-pool';
 import type { SlotProfile } from './protocol-slots';
 import type { ShapedQuestion } from '../contracts/question-shape';
 import type { TicketForm } from '../contracts/tickets';
@@ -20,6 +21,8 @@ import type { TicketForm } from '../contracts/tickets';
 export { DEFAULT_FLEET_CAPS, DEFAULT_FLEET_HANDOVER, DEFAULT_FLEET_POOL, normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from './protocol-fleet-config';
 export type { FleetCaps, FleetHandoverConfig, FleetPool, FleetPools, HandoverMode } from './protocol-fleet-config';
 export { normalizeChainStore } from './protocol-chain';
+export { CAPABILITY_CLASSES, isCapabilityClass, isPartSize, PART_SIZE_CLASS } from './protocol-pool';
+export type { CapabilityClass, CapacityConfig, ClassRequest, FullLedger, LedgerDefaults, LedgerFigure, LedgerName, ModelRow, ModelsReply, PartSize, PoolDecision, PoolEntry, PoolGrantDecision, PoolGrantRecord, PoolLoad, PoolSettings, PoolWaitDecision, QueueEntry, QueueReason, RunLedgerInput, SlotLoad } from './protocol-pool';
 export { SLOT_PROFILES } from './protocol-slots';
 export type { QuotaKind, QuotaReliability, QuotaWindow, SlotBilling, SlotProfile, SlotStateName, SlotSummary, SlotView } from './protocol-slots';
 export type { AutopilotRecord, AutopilotRefusal, AutopilotState, ChainConfig, ChainMaster, ChainStatus, ChainStoreConfig, ChainTrip, ColumnMode } from './protocol-chain';
@@ -217,6 +220,12 @@ export interface RunRequest {
   readonly dk?: RunDkTarget;
   /** req-177: the repository's profile (`profile:` in `_meta/repos.md`); absent = `private`. A run is served only by a slot of this profile. */
   readonly profile?: SlotProfile;
+  /** req-170: the class the start asked the pool for (the dispatch's class request); absent = a pinned model decides by its own row. */
+  readonly poolClass?: CapabilityClass;
+  /** req-170: why that class — the plan part's size, the phase floor, the ticket pin; lands on the run record. */
+  readonly poolWhy?: string;
+  /** req-170: what the ledgers need (the ticket's allowance, the persona's budget and permission); absent = the Settings defaults. */
+  readonly ledger?: RunLedgerInput;
 }
 
 /** How the run's worktree was obtained — `prepareWorktree` (T-0047) is
@@ -420,6 +429,8 @@ export interface RunInfo {
   readonly gateResult?: 'green' | 'red' | null;
   /** req-177: the slot (account) the run is bound to; absent on runs before slots or without one. */
   readonly slot?: { readonly id: string; readonly label: string };
+  /** req-170: the pool's decision — the class asked for, the model that ran, its weight, why; absent on runs before the pool. */
+  readonly grant?: PoolGrantRecord;
   /**
    * Why the worker declared the step incomplete (`BLOCKED:` in its final
    * message): no gate ran, nothing moved — the ticket waits for the

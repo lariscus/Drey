@@ -434,7 +434,7 @@
               >
                 <div class="sl">
                   <span class="lt">Default model</span>
-                  <span class="ls">Resolution: ticket pin &gt; default &gt; router</span>
+                  <span class="ls">Resolution: ticket pin &gt; default</span>
                 </div>
                 <span class="val">{{ persona()?.model || '—' }}</span>
               </button>
@@ -444,13 +444,6 @@
                   <span class="ls">Allowed models, order = fallback</span>
                 </div>
                 <span class="val muted">{{ poolWords() || '—' }}</span>
-              </button>
-              <button type="button" class="set-row" (click)="cycleRouter()" [disabled]="readOnly()">
-                <div class="sl">
-                  <span class="lt">Router</span>
-                  <span class="ls">Picks only within the pool</span>
-                </div>
-                <span class="val">{{ routerValue() }}</span>
               </button>
               <button
                 type="button"

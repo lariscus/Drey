@@ -24,7 +24,7 @@ import type { AutopilotRecord, AutopilotRefusal, ChainMaster, ChainStatus, Colum
 import type { ShapedQuestion } from './question-shape';
 import type { BoardSnapshot, CreateResult, MutationResult, RecentDone, TicketCard } from './tickets';
 import type { ImprovementProposal, ImprovementState } from '../core/improvements';
-import type { Persona, PersonaRouter } from '../core/persona';
+import type { Persona } from '../core/persona';
 import type { ScoutReport } from './scout';
 
 /** What the "Needs you" list holds, in the order it shows them. */
@@ -195,7 +195,6 @@ export interface TicketsRemotePort {
     readonly worker?: string;
     readonly model?: string;
     readonly pool?: readonly string[];
-    readonly router?: PersonaRouter;
     readonly color?: string;
     readonly skills?: readonly string[];
     readonly prompt?: string;

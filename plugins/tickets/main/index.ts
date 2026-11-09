@@ -37,7 +37,6 @@ import {
 } from '../../../packages/tickets-engine/src/core/commands';
 import { parseTicketFile, patchHeaderFields, type HeaderPatch } from '../../../packages/tickets-engine/src/core/ticket-files';
 import { parseReviewComments, sendBackNoteOf } from '../../../packages/tickets-engine/src/core/review-feedback';
-import { personaModelFor } from '../../../packages/tickets-engine/src/core/persona';
 import { planWorktreeRemoval } from '../../../packages/tickets-engine/src/core/worktree-removal';
 import { captureTidyMessages, parseCaptureTidy } from '../shared/capture-tidy';
 import type { AttachmentReply, RefineReply, TicketReply } from '../shared/remote-protocol';
@@ -58,6 +57,7 @@ import { TicketDocuments, askToAddCheckout } from './ticket-documents';
 import { isStoreDocumentPath, storeDocumentHeader, storeDocumentHeaderEdit } from './store-document-header';
 import { checkoutOf, readStoreSettings } from '../../../packages/tickets-engine/src/store/store-settings';
 import { registerChatIpc } from './chat-ipc';
+import { registerModelsIpc } from './models-ipc';
 import { MissionControlHost, createMissionControlView } from './mission-control';
 
 function messageOf(error: unknown): string {
@@ -189,6 +189,7 @@ const plugin: MainPluginModule = {
     ctx.ipc.handle('serviceStatus', () => serviceSettings.status());
     ctx.ipc.handle('serviceControl', (payload) => serviceSettings.control(payload));
     ctx.ipc.handle('serviceOpenLogFolder', () => serviceSettings.openLogFolder());
+    registerModelsIpc((channel, handler) => ctx.ipc.handle(channel, handler), fleet); // req-170: Settings → Models (board 7l)
     ctx.app.registerQuitGuard(
       createServiceQuitGuard({
         config: ctx.config,
@@ -598,7 +599,7 @@ const plugin: MainPluginModule = {
       if (persona === undefined) {
         return { estimate: null };
       }
-      const model = personaModelFor(persona, null).model;
+      const model = persona.models.default;
       return { estimate: await board.estimateOf({ gate: p['gate'], persona: persona.id, model }) };
     });
 

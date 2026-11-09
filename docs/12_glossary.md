@@ -78,6 +78,13 @@ and [ADR-0002](09_architecture_decisions/0002-quick-capture-opens-daily-note.md)
 | Reliability | How far a window's numbers can be trusted: `measured` (read from the provider), `estimated` (counted by the runner, or a cache), `unknown`. |
 | Surplus (q) | A window's remaining share divided by its remaining share of time; a slot's q is the minimum over its windows. Above 1 the account has more left than an even pace would use. |
 | Slot state | `ready`, `busy` (runs of the cap), `exhausted` (a window spent), `needs login` (the account's login was refused; no run starts until it is signed in again) or `unknown` (nothing read or counted yet). |
+| Model table | Settings → Models, kept in the service home's `service.json`: one row per model and slot (or provider) with its category, capability class, cost factor and sessions — the only models a persona's pool may name (req-170, [ADR-0095](09_architecture_decisions/0095-model-table-and-capacity-pool.md)). |
+| Capability class | A model's class in the model table: `A` (strongest), `B` or `C`. A session gets exactly the class it asked for, never a smaller one. |
+| Cost factor | What one active session of a model weighs against the capacity cap (board 7l: opus 5, sonnet 1, glm 0.4). |
+| Capacity cap | The most the active sessions may weigh at once, in cost factors: one global, one per slot (set, or derived from the slot's largest row at full sessions). Only active sessions count — a queued task weighs nothing. |
+| Class request | What a session asks the pool for before it starts: its persona, a capability class and its context size. The chain derives the class from a ticket pin, the plan part's size (S → C, M → B, L → A) or the persona's default, raised to the phase's `min-class:`. |
+| Queued | A task the pool did not grant: no process starts, the card reads `queued · waits for a B slot`, and the next pass serves the queue in priority order. |
+| Ledger | One of three spend limits the pool checks, each a sum over the session records: the ticket's allowance (`allowance:`), the persona's day (`budget:`), the provider's (slot's) day. A full ledger grants nothing and raises a Needs-you card. |
 
 ## The Crew (tickets and agents)
 

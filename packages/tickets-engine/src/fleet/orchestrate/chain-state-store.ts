@@ -15,6 +15,7 @@ const isText = (value: unknown): value is string => typeof value === 'string';
 const isMode = (value: unknown): value is ColumnMode => value === 'playing' || value === 'held';
 const isFailure = (value: unknown): value is TicketFailure => typeof (value as TicketFailure | null)?.count === 'number' && typeof (value as TicketFailure).until === 'string';
 const isHold = (value: unknown): value is OwnerHold => typeof (value as OwnerHold | null)?.phase === 'string' && typeof (value as OwnerHold).at === 'string';
+const isKeys = (value: unknown): value is string[] => Array.isArray(value) && value.every((key) => typeof key === 'string');
 const isTrip = (value: unknown): value is ChainTrip => typeof (value as ChainTrip | null)?.reason === 'string' && typeof (value as ChainTrip).at === 'string';
 
 /** Copies the entries a check accepts; a broken entry of an older or torn file is dropped. */
@@ -36,6 +37,7 @@ function restoreMaps(state: ChainState, parsed: ChainFile): void {
   copyValid(parsed.ciBackoff, state.ciBackoff, isStamp);
   copyValid(parsed.ticketFailures, state.ticketFailures, isFailure, (f) => ({ count: f.count, until: f.until }));
   copyValid(parsed.ownerHold, state.ownerHold, isHold, (h) => ({ phase: h.phase, at: h.at }));
+  copyValid(parsed.ledgerCards, state.ledgerCards, isKeys, (keys) => [...keys]);
   const held = Object.fromEntries(Object.entries(parsed.tripped ?? {}).filter(([phase]) => state.columns[phase] === 'held'));
   copyValid(held, state.tripped, isTrip, (t) => ({ reason: t.reason, at: t.at }));
   for (const persona of (parsed.pausedPersonas ?? []).filter((p) => typeof p === 'string' && p.trim() !== '')) {

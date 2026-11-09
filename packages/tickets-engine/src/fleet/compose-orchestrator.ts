@@ -5,10 +5,10 @@
  */
 import type { PipelinePhase } from '../contracts/tickets';
 import { NodeFileSystem } from './node-file-system';
-import { Orchestrator, type SlotSummarySource } from './orchestrator';
+import { Orchestrator, type OrchestratorParts, type SlotSummarySource } from './orchestrator';
 import type { FileSystem } from './ports/file-system';
 import { clockOf } from './ports/clock';
-import type { ChainStoreConfig, WorkerProviderId } from './protocol';
+import type { ChainConfig, ChainStoreConfig, WorkerProviderId } from './protocol';
 import { execShell } from './shell-exec';
 import { chainStoreIoOf, StoreChainBoard } from './store-chain-board';
 import type { RunBookkeeper } from './orchestrate/run-bookkeeper';
@@ -18,9 +18,11 @@ import { ChainBoard } from './orchestrate/chain-board';
 import { ChainState } from './orchestrate/chain-state';
 import { ChainStateStore } from './orchestrate/chain-state-store';
 import { CiSweep } from './orchestrate/ci-sweep';
+import type { DispatchPool } from './orchestrate/dispatch-pool';
 import { Dispatcher } from './orchestrate/dispatcher';
 import type { GateShell } from './orchestrate/gate-runner';
 import { HumanGates } from './orchestrate/human-gates';
+import { LedgerCards } from './orchestrate/ledger-cards';
 import { PoolCapacity, type SlotProbe } from './orchestrate/pool-capacity';
 import { fetchTotalSlots } from './orchestrate/pool-sizes';
 import { PromptSource } from './orchestrate/prompt-source';
@@ -55,6 +57,21 @@ export interface OrchestratorDeps {
   readonly fs?: FileSystem;
   /** req-177: the slots' summary the chain status carries (the 7e band). */
   readonly slots?: SlotSummarySource;
+  /** req-170: the capacity pool the dispatch asks for each persona's class; absent = no class requests. */
+  readonly pool?: DispatchPool;
+  /** req-170: the provider pools' throttle, shared with the pool (the runner builds it once); absent = its own. */
+  readonly capacity?: PoolCapacity;
+  /** req-170: moves `fleet.pool.<provider>.size` into `service.json` once, when a chain config arrives. */
+  readonly migratePools?: (config: ChainConfig) => Promise<void>;
+}
+
+/** The chain status's optional sources (req-177's slots, req-170's pool) and the pool migration. */
+function statusParts(deps: OrchestratorDeps): Pick<OrchestratorParts, 'slots' | 'pool' | 'migratePools'> {
+  return {
+    ...(deps.slots !== undefined ? { slots: deps.slots } : {}),
+    ...(deps.pool !== undefined ? { pool: deps.pool } : {}),
+    ...(deps.migratePools !== undefined ? { migratePools: deps.migratePools } : {}),
+  };
 }
 
 export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
@@ -71,7 +88,7 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
     log,
   });
   const directory = new SupervisorDirectory(deps.supervisorOf);
-  const pools = new PoolCapacity(deps.probeSlots ?? fetchTotalSlots, clock, log);
+  const pools = deps.capacity ?? new PoolCapacity(deps.probeSlots ?? fetchTotalSlots, clock, log);
   const notes = new WaitNotes(log);
   const note = (key: string, line: string): void => notes.skip(key, line);
   const personas = new BoardPersonas(note, fs);
@@ -79,18 +96,19 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
   const breaker = new Breaker(state, board, bookkeeper, { clock, log, persist });
   const dispatch = new TicketDispatch({ board, directory, personas, prompts: new PromptSource(note, fs, log, deps.shippedPrompt), notes, log, ...events });
   const humanGates = new HumanGates(board, personas, bookkeeper, log);
+  const pool = deps.pool !== undefined ? { pool: deps.pool, ledgerCards: new LedgerCards({ state, board, bookkeeper, persist, log }) } : {};
   const orchestrator: Orchestrator = new Orchestrator({
     state,
     store,
     directory,
     pools,
     settled: new SettledRuns({ state, directory, pools, breaker, clock, persist, ...events }),
-    dispatcher: new Dispatcher({ state, board, directory, pools, personas, humanGates, dispatch, notes, clock, log, pipelineRead, persist }),
+    dispatcher: new Dispatcher({ state, board, directory, pools, personas, humanGates, dispatch, notes, clock, log, pipelineRead, persist, ...pool }),
     ci: new CiSweep({ state, board, bookkeeper, shell: deps.execShell ?? execShell, clock, log, pipelineRead, persist }),
     clock,
     log,
     scanIntervalMs: deps.scanIntervalMs ?? 15_000,
-    ...(deps.slots !== undefined ? { slots: deps.slots } : {}),
+    ...statusParts(deps),
   });
   return orchestrator;
 }

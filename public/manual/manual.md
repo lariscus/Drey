@@ -1242,6 +1242,45 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   the Board tab is active. As the only panel of the bottom dock it has no
   icon strip above it; the chevron in its header folds it to the header.
 
+**Accounts and their quota.** Each worker runs on one of your accounts —
+for example two Claude Code logins, z.ai and Kimi. Every repository is
+either *private* or *work*, and its tickets run only on accounts of the
+same kind, never on the other, even when those are free. A run that
+finds no free account of its kind does not start, and the reason says
+which accounts are busy, out of quota or signed out. When an account's
+login expires, the run that hit it ends and its card in **Needs you**
+names the refused login; no further run starts on that account until you
+sign in to it again. Nothing is retried on its own.
+
+**Models, classes and the capacity pool.** Every model you let the crew
+use has a row in the model table (`service.json` in the background
+service's folder; the Settings → Models page comes later): its account,
+a **class** — **A** strongest, then **B**, then **C** — and a **cost
+factor**, what one running session of it weighs. A cap says how much may
+run at once, summed over the running sessions only: one for all accounts
+together and one per account. Before a worker starts, its ticket asks
+for a class: a part your planner sized **S**, **M** or **L** asks for C,
+B or A; a ticket without a size asks for the class of its persona's
+default model; a column with `min-class:` in its pipeline raises that,
+and a ticket's own `class:` or `model:` decides outright. The ticket gets
+a model of exactly that class from its persona's list — **never a weaker
+one**. When nothing of that class has room, no worker starts: the
+ticket waits in the pool's queue and the background service's log says
+why (*queued · waits for a B slot*), the next ticket whose class has
+room goes ahead, and as soon as a run ends the waiting tickets go in
+order of importance. The worker's thread names the model it got and why
+(*pool: claude-sonnet-4-5, class B, cost 1 on Claude A — size M → B*).
+
+**What a ticket, a persona and an account may spend.** Three limits,
+each counted from the runs themselves: a ticket's **allowance**
+(`allowance:` on the ticket, else the default), a persona's day
+(`budget:` in its file, else the default) and each account's day. A
+ticket that reached one does not start; **Needs you** shows a card that
+says which limit and by how much (*T-0122 has spent $2.61 of its $2.50
+allowance*). Raise the limit (or, for the allowance, allow the persona
+to spend above it with `allowed: spend-above-allowance: true`) and the
+ticket starts on the next round; the card closes itself.
+
 **Pause and stuck workers.** **Pause** (on the thread and on a Crew
 run) waits for the current action — a command or an edit — to finish and
 then pauses; it never cuts one off half-way. A worker silent for ten
@@ -1578,9 +1617,10 @@ default worker and shows only the settings of the selected worker:
   are hosted (`api.kimi.ai`, `api.z.ai`), so it is opt-in: the default worker
   stays OpenCode. Its cost is estimated from a price table, not reported.
 
-**How many runs go at once** is set per worker, not per column: the
-**Pool size** of each worker (one when empty). Every run of that worker takes a
-slot, wherever its column is. When a slot frees up, the next ticket is
+**How many runs go at once** is set per account, not per column: the
+sessions each account serves and the capacity pool above. The worker's old
+**Pool size** was copied into its accounts once and no longer applies.
+Every run takes a seat on its account, wherever its column is. When a slot frees up, the next ticket is
 chosen like this: tickets marked **urgent** or **high** first, then the
 column furthest to the right (finishing work beats starting new work),
 then the column's own order. A running ticket is never interrupted for
@@ -2234,7 +2274,7 @@ history store is deliberately outside it).
 ---
 
 *Manual for Drey 0.8.1; manual content last changed
-2026-11-08. Screenshots were captured automatically from
+2026-11-09. Screenshots were captured automatically from
 the built app (Anthrazit theme, 1600Ã—1000) by
 `e2e/manual-screenshots.spec.ts` — run
 `$env:DREY_MANUAL_SHOTS='1'; npm run e2e:run -- manual-screenshots`

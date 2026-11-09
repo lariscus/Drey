@@ -6,7 +6,7 @@ import type { ClaudeCodeQuotaSource } from './claude-code-quota-source';
 import type { CountingQuotaSource } from './counting-quota-source';
 import { isLoginFailure } from './login-failure';
 import type { SlotRegistry } from './slot-registry';
-import type { SlotReservations } from './slot-reservations';
+import type { Seat, SlotReservations } from './slot-reservations';
 
 export interface SlotRunListenerDeps {
   readonly registry: Pick<SlotRegistry, 'flagLogin' | 'refresh' | 'announce'>;
@@ -18,6 +18,11 @@ export interface SlotRunListenerDeps {
 /** What a finished run used, as the counting fallback measures it: input without cache reads, plus output. */
 function tokensOf(info: RunInfo): number {
   return Math.max(0, info.tokensIn - (info.cacheReadTokens ?? 0)) + info.tokensOut;
+}
+
+/** The weight a run's record says it holds (req-170): what the pool granted it; none on a run before the pool. */
+function seatOf(info: RunInfo): Seat | undefined {
+  return info.grant === undefined ? undefined : { model: info.grant.model, class: info.grant.class, cost: info.grant.cost };
 }
 
 /**
@@ -53,7 +58,7 @@ export class SlotRunListener implements EventSink {
         this.ended.add(info.id);
         this.count(slotId, info);
       } else {
-        this.deps.reservations.reserve(slotId, info.id);
+        this.deps.reservations.reserve(slotId, info.id, seatOf(info));
       }
     }
     void this.deps.registry.refresh();
@@ -65,7 +70,7 @@ export class SlotRunListener implements EventSink {
       return;
     }
     if (!isTerminal(info.state)) {
-      this.deps.reservations.reserve(slotId, info.id);
+      this.deps.reservations.reserve(slotId, info.id, seatOf(info));
       this.deps.registry.announce();
       return;
     }

@@ -7,7 +7,7 @@ export const HEARTBEAT_MS = 15_000;
 
 /** One event as a server-sent event: its kind names it, the data is the event as JSON. */
 export function sseFrame(event: RunnerEvent): string {
-  const data = event.kind === 'run' ? event.info : event.kind === 'slot' ? event.slot : { runId: event.runId, event: event.event };
+  const data = event.kind === 'run' ? event.info : event.kind === 'slot' ? event.slot : event.kind === 'pool' ? event.pool : { runId: event.runId, event: event.event };
   return `event: ${event.kind}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 

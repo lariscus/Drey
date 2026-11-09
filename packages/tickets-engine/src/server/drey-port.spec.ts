@@ -23,10 +23,11 @@ function fakePersona(id: string, title: string): import('../core/persona').Perso
     title,
     role: 'builder',
     worker: 'claude-code',
-    models: { default: 'opus', pool: ['opus'], router: 'off' },
+    models: { default: 'opus', pool: ['opus'] },
     color: '#a78bfa',
     skills: [],
     budget: null,
+    allowed: { spendAboveAllowance: false },
   };
 }
 

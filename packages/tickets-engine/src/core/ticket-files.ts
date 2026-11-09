@@ -30,6 +30,7 @@ import {
 import { rawCaptureLogText } from '../contracts/capture-tidy';
 import { parseChainEntry } from './chain-delta';
 import { parseProofMode } from './proof-mode';
+import { parseTicketPoolKeys } from './ticket-pool-keys';
 import type { ChainEntry } from '../contracts/chain';
 
 /** `entered-<phase>` key grammar (phase ids: lowercase, digits, dashes). */
@@ -127,6 +128,7 @@ export function parseTicketFile(text: string, relPath: string, priorities: Prior
       parent = rawParent;
     }
   }
+  const poolKeys = parseTicketPoolKeys(obj, issues); // req-170: class, model, size, allowance
   const rawProof = asText(obj['proof']);
   const proof = parseProofMode(rawProof);
   if (rawProof !== null && proof === null) {
@@ -238,6 +240,7 @@ export function parseTicketFile(text: string, relPath: string, priorities: Prior
       persona,
       ...(proof !== null ? { proof } : {}),
       ...(parent !== null ? { parent } : {}),
+      ...poolKeys,
       track,
       ...(form !== undefined ? { form } : {}),
       ...(chain.length > 0 ? { chain } : {}),

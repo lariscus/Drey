@@ -21,6 +21,8 @@ export interface SeedOptions {
   readonly form?: string;
   /** `x-chain:` — the delta entries (`assign plan you`, `insert manual(you) after plan`). */
   readonly chain?: readonly string[];
+  /** Further `x-` keys (`{ size: 'S' }` → `x-size: S`). */
+  readonly extensions?: Readonly<Record<string, string>>;
 }
 
 /** One `put` the chain made. */
@@ -61,6 +63,7 @@ export function ticketDocument(id: string, stage: string, rev: number, options: 
     ...(options.persona !== undefined ? [`x-persona: ${options.persona}`] : []),
     ...(options.form !== undefined ? [`x-form: ${options.form}`] : []),
     ...(options.chain !== undefined ? [`x-chain: ${options.chain.join(';')}`] : []),
+    ...Object.entries(options.extensions ?? {}).map(([key, value]) => `x-${key}: ${value}`),
   ];
   return [
     '---',

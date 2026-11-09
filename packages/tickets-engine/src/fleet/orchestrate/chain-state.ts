@@ -38,6 +38,8 @@ export interface ChainFile {
   readonly ownerHold?: Record<string, OwnerHold>;
   /** The personas the owner paused (U4, concept §4.3): their tickets hold until played again. */
   readonly pausedPersonas?: string[];
+  /** req-170: per ticket, the ledger cards (Needs-you blockers) the pool raised and has not resolved yet. */
+  readonly ledgerCards?: Record<string, string[]>;
 }
 
 /**
@@ -59,6 +61,8 @@ export class ChainState {
   readonly ownerHold: Record<string, OwnerHold> = {};
   readonly ciBackoff: Record<string, string> = {};
   readonly pausedPersonas = new Set<string>();
+  /** req-170: per ticket, the open ledger cards' keys (`ledger-ticket`, `ledger-persona-ben`). */
+  readonly ledgerCards: Record<string, string[]> = {};
   /** The pipeline of the last pass — the breaker's thresholds and the quality rungs read it (not persisted). */
   phases: readonly PipelinePhase[] = [];
 
@@ -118,6 +122,7 @@ export class ChainState {
       ticketFailures: { ...this.ticketFailures },
       ownerHold: { ...this.ownerHold },
       pausedPersonas: [...this.pausedPersonas].sort(),
+      ledgerCards: Object.fromEntries(Object.entries(this.ledgerCards).map(([ticket, keys]) => [ticket, [...keys]])),
       ...(handoverAt !== undefined ? { handoverAt } : {}),
     };
   }

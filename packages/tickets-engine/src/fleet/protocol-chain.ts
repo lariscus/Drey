@@ -1,5 +1,6 @@
 import type { FleetCaps, FleetHandoverConfig, FleetPools } from './protocol-fleet-config';
 import type { PermissionMode } from './protocol';
+import type { PoolLoad, QueueEntry } from './protocol-pool';
 import type { SlotSummary } from './protocol-slots';
 
 // ---------------------------------------------------------------------------
@@ -134,6 +135,10 @@ export interface ChainStatus {
   readonly poolSize?: Readonly<Record<string, number>>;
   /** req-177: per slot (account) the busy count, the remaining share, its reliability, q and the reset — the 7e Capacity band's Slots row. Absent on older runners. */
   readonly slots?: readonly SlotSummary[];
+  /** req-170: the capacity pool's live sum — "Now: 2.4 of 6 · Claude A 2 of 5" (the 7l page and the 7e band). Absent on older runners. */
+  readonly pool?: PoolLoad;
+  /** req-170: the tasks waiting for the pool, in the order they are served (the card's `queued · waits for a B slot`). Absent on older runners. */
+  readonly queue?: readonly QueueEntry[];
 }
 
 /** One circuit-breaker trip (the chain alerts fix). */

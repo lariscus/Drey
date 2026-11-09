@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { RunRequest } from '../protocol';
-import type { SlotBinder } from './slot-binder';
+import type { PoolGrantRecord, RunRequest } from '../protocol';
+import type { BindContext, SlotBinder } from './slot-binder';
 import { settled } from './run-spec-support';
 import { harness, runRequest, streamText, useTempDirs } from './supervisor-harness.fake';
 
@@ -9,10 +9,16 @@ class FakeSlots implements SlotBinder {
   readonly binds: { runId: string; prefer: string | null; profile: string | undefined }[] = [];
   readonly released: string[] = [];
   refuse: string | null = null;
+  grant: PoolGrantRecord | null = null;
+  persona: (string | null)[] = [];
 
-  bind(request: RunRequest, runId: string, prefer: string | null): { id: string; label: string } | { refused: string } {
-    this.binds.push({ runId, prefer, profile: request.profile });
-    return this.refuse !== null ? { refused: this.refuse } : { id: 'claude-b', label: 'Claude B' };
+  bind(request: RunRequest, runId: string, context: BindContext): { id: string; label: string; grant?: PoolGrantRecord } | { refused: string } {
+    this.binds.push({ runId, prefer: context.prefer, profile: request.profile });
+    this.persona.push(context.persona);
+    if (this.refuse !== null) {
+      return { refused: this.refuse };
+    }
+    return this.grant === null ? { id: 'claude-b', label: 'Claude B' } : { id: 'claude-b', label: 'Claude B', grant: this.grant };
   }
 
   release(runId: string): void {
@@ -36,6 +42,16 @@ describe('RunStarter — the slot a run starts on (req-177)', () => {
     expect(slots.binds).toEqual([{ runId: outcome.ok ? outcome.run.id : '', prefer: null, profile: 'work' }]);
     expect(adapter.starts[0]?.env).toEqual({ CLAUDE_CONFIG_DIR: '/home/u/.claude-b' });
     expect(await streamText(dirs.fleet, outcome.ok ? outcome.run.id : '')).toContain('slot: Claude B');
+  });
+
+  it("req-170: the pool's grant lands on the run record and in its stream, and the binder hears the persona", async () => {
+    const slots = new FakeSlots();
+    slots.grant = { requested: 'B', class: 'B', model: 'claude-sonnet-4-5', cost: 1, reason: 'claude-sonnet-4-5, class B, cost 1 on Claude B — part M' };
+    const { sup } = harness(dirs.fleet, { slots });
+    const outcome = await sup.start(request(), { persona: 'ben' });
+    expect(outcome.ok && outcome.run.grant).toEqual(slots.grant);
+    expect(slots.persona).toEqual(['ben']);
+    expect(await streamText(dirs.fleet, outcome.ok ? outcome.run.id : '')).toContain('pool: claude-sonnet-4-5, class B, cost 1 on Claude B — part M');
   });
 
   it('a refused slot refuses the start: nothing is claimed, nothing spawns', async () => {
