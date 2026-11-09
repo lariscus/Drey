@@ -6,6 +6,7 @@
  * `specs/classifier-spec.md` ("The free session brief").
  */
 import type { PermissionMode } from './protocol';
+import { skillsSection } from './skills-section';
 
 export interface FreeSessionBriefInput {
   readonly title: string;
@@ -48,7 +49,7 @@ export function composeFreeSessionBrief(input: FreeSessionBriefInput): string {
   const parts: (string | null)[] = [
     header(input),
     input.prompt.trim() === '' ? null : section('Your instructions', input.prompt),
-    input.skills.length === 0 ? null : section('Skills', input.skills.map((s) => `### ${s.name}\n\n${s.text.trim()}`).join('\n\n')),
+    skillsSection(input.skills),
   ];
   return parts.filter((part): part is string => part !== null).join('\n\n');
 }

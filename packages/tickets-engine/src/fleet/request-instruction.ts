@@ -1,12 +1,13 @@
 import { ticketSections } from '../core/ticket-files';
 import { composeInstruction, composeScoutInstruction, type InstructionInput, type ScoutInstructionInput } from './assignment';
-import { personaMemorySection, personaSkillsSection } from './context-pack';
+import { personaMemorySection } from './context-pack';
+import { skillsSection } from './skills-section';
 import type { ComposedInstruction } from './instruction-parts';
 import { DEFAULT_FLEET_CAPS, type InteractiveMode } from './protocol';
 import type { ComposeRunInput, PersonaDispatch } from './request';
 import type { RunPlan } from './request-plan';
 
-type PersonaParts = Pick<InstructionInput, 'skillsSection' | 'memorySection' | 'personaId' | 'personaRole'>;
+export type PersonaParts = Pick<InstructionInput, 'skillsSection' | 'memorySection' | 'personaId' | 'personaRole'>;
 
 /** The worker's brief: an exploration brief for a scout ticket, the build brief otherwise. */
 export function composeRunInstruction(plan: RunPlan): ComposedInstruction {
@@ -29,7 +30,7 @@ function scoutInstructionInput(plan: RunPlan): ScoutInstructionInput {
     repoInstructions: input.repoInstructions,
     ...(plan.extras.readGrounds.length > 0 ? { extraRepos: plan.extras.readGrounds } : {}),
     ...interactivePart(input),
-    ...personaParts(input.persona ?? null),
+    ...personaInstructionParts(input.persona ?? null),
   };
 }
 
@@ -59,7 +60,7 @@ function shipInstructionInput(plan: RunPlan): InstructionInput {
     gateFailure: input.gateFailure,
     caps: input.caps ?? DEFAULT_FLEET_CAPS,
     ...interactivePart(input),
-    ...personaParts(input.persona ?? null),
+    ...personaInstructionParts(input.persona ?? null),
     ...(plan.reviewCheckout !== null ? { reviewCheckout: plan.reviewCheckout } : {}),
   };
 }
@@ -80,12 +81,12 @@ function interactivePart(input: ComposeRunInput): { interactive?: InteractiveMod
 }
 
 /** The persona's skills, memory slice, id and role for the brief; nothing on a ring dispatch. */
-function personaParts(persona: PersonaDispatch | null): PersonaParts {
+export function personaInstructionParts(persona: PersonaDispatch | null): PersonaParts {
   if (persona === null) {
     return {};
   }
   return {
-    skillsSection: personaSkillsSection(persona.skills),
+    skillsSection: skillsSection(persona.skills),
     memorySection: personaMemorySection(persona.memory),
     personaId: persona.id,
     personaRole: persona.role ?? null,

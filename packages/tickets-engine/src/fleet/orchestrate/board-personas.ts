@@ -93,6 +93,7 @@ export class BoardPersonas {
       return none;
     }
     const loaded = await loadPersonaSkills(fileOf, persona.id, persona.skills);
+    loaded.warnings.forEach((warning, i) => this.note(`${card.id}:skill-name:${i}`, `persona ${persona.id}: ${warning}`));
     if (loaded.missing.length > 0) {
       this.note(`${card.id}:skills`, `persona ${persona.id}: no text for skill ${loaded.missing.join(', ')} - ${card.id} runs without it`);
     }
