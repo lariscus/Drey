@@ -5,7 +5,7 @@ import { ContractProcess } from './contract-process.fake';
 import { copilotAdapter } from './copilot';
 import { FakeHarnessAdapter } from './fake-harness.fake';
 import { kimiAdapter } from './kimi';
-import { opencodeAcpAdapter } from './opencode-acp';
+import { opencodeAdapter } from './opencode';
 
 /** One worker under the contract suite, and how to drive it. */
 export interface ContractSession {
@@ -156,7 +156,7 @@ const RESUMABLE = { loadSession: true, sessionCapabilities: { resume: {}, fork: 
 export const opencodeDriver = acpDriver('opencode', {
   readOnly: 'plan',
   script: { offer: OPENCODE_OFFER, capabilities: RESUMABLE, questions: 'elicitation' },
-  adapter: (agent, keep) => opencodeAcpAdapter(recording(agent, keep)),
+  adapter: (agent, keep) => opencodeAdapter(recording(agent, keep)),
   answers: ELICITATION_ANSWERS,
 });
 

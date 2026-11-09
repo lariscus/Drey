@@ -48,7 +48,7 @@ import { freePort, nodeSpawnFn, scrubInheritedEnv } from './procs';
 import type { GovernorSettings, PoolLoad, RunnerDescriptor, SlotView, WorkerProviderId } from './protocol';
 import { claudeCodeAdapter } from './harness/claude-code';
 import { copilotAdapter } from './harness/copilot';
-import { opencodeAcpAdapter } from './harness/opencode-acp';
+import { opencodeAdapter } from './harness/opencode';
 import { peerAlive, readDescriptor, removeDescriptor, writeDescriptor } from './runner-descriptor';
 import { RunnerExit } from './runner-exit';
 import { governorFor, seedsOf } from './runner-governor';
@@ -209,7 +209,7 @@ function composeFleet(ctx: FleetContext): { supervisors: SupervisorSet; orchestr
   const stores = new DkTicketStores();
   const shared = composeShared(stores.storeFor, log, undefined, { sink: hub });
   // req-182: every harness that speaks ACP runs through the one AcpAdapter; Claude Code stays on stream-json.
-  const adapters = [opencodeAcpAdapter(nodeSpawnFn()), claudeCodeAdapter(nodeSpawnFn()), kimiAdapter(nodeSpawnFn(), nodeKimiUsageReader()), copilotAdapter(nodeSpawnFn())];
+  const adapters = [opencodeAdapter(nodeSpawnFn()), claudeCodeAdapter(nodeSpawnFn()), kimiAdapter(nodeSpawnFn(), nodeKimiUsageReader()), copilotAdapter(nodeSpawnFn())];
   const byProvider = new Map<WorkerProviderId, RunSupervisor>(
     adapters.map((adapter) => [
       adapter.id,

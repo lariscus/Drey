@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { SpawnFn } from '../ports/process-spawner';
 import { ScriptedAcpAgent, type AcpAgentScript } from './contract-acp-agent.fake';
 import type { NormalizedEvent, ProviderStart } from './contract';
-import { opencodeAcpAdapter } from './opencode-acp';
+import { opencodeAdapter } from './opencode';
 import { opencodeModelSettings, stripVariant } from './opencode-settings';
 
 /** opencode 2.0.32's offer and capabilities, as `opencode acp` sent them on 2026-11-09. */
@@ -30,7 +30,7 @@ function run(over: Partial<ProviderStart> = {}, script: AcpAgentScript = SCRIPT)
     return agent.proc;
   };
   const start: ProviderStart = { cwd: 'W:/kt', instruction: 'Do it.', model: null, permissionMode: 'accept-edits', resumeRef: null, ticketId: 'T-1', onEvent: (e) => events.push(e), onSessionRef: () => undefined, ...over };
-  const handle = opencodeAcpAdapter(spawnFn).spawn(start);
+  const handle = opencodeAdapter(spawnFn).spawn(start);
   const sent = (method: string): Array<Record<string, unknown>> =>
     agent.proc.writes.map((w) => JSON.parse(w) as { method?: string; params?: Record<string, unknown> }).filter((m) => m.method === method).map((m) => m.params ?? {});
   return { agent, events, spawned, handle, sent };

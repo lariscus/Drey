@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { nodeSpawnFn } from '../procs';
 import type { NormalizedEvent, ProviderAdapter, ProviderStart, WorkerHandle } from './contract';
 import { copilotAdapter } from './copilot';
-import { opencodeAcpAdapter } from './opencode-acp';
+import { opencodeAdapter } from './opencode';
 
 /**
  * The ACP harnesses against the real CLIs (req-182). Each block skips when
@@ -90,7 +90,7 @@ describe.skipIf(!installed('opencode'))('opencode over ACP, live (req-182)', { t
   let sessionRef: string | null = null;
 
   it('opens a read-only session, interrupts its turn with session/cancel and keeps the worker', async () => {
-    const live = spawn(opencodeAcpAdapter(nodeSpawnFn()), { cwd, env, permissionMode: 'read-only' });
+    const live = spawn(opencodeAdapter(nodeSpawnFn()), { cwd, env, permissionMode: 'read-only' });
     await openAndInterrupt(live);
     sessionRef = live.ref();
     await live.handle.stop();
@@ -98,14 +98,14 @@ describe.skipIf(!installed('opencode'))('opencode over ACP, live (req-182)', { t
 
   it('resumes that session (session/resume)', async () => {
     expect(sessionRef).not.toBeNull();
-    const live = spawn(opencodeAcpAdapter(nodeSpawnFn()), { cwd, env, resumeRef: sessionRef });
+    const live = spawn(opencodeAdapter(nodeSpawnFn()), { cwd, env, resumeRef: sessionRef });
     await openAndInterrupt(live);
     expect(live.ref()).toBe(sessionRef);
     await live.handle.stop();
   });
 
   it.skipIf(LIVE_MODEL === '')('carries a permission request, a question form and the turn usage', async () => {
-    const live = spawn(opencodeAcpAdapter(nodeSpawnFn()), {
+    const live = spawn(opencodeAdapter(nodeSpawnFn()), {
       cwd,
       env: { ...env, OPENCODE_CONFIG_CONTENT: JSON.stringify({ permission: { bash: 'ask' } }) },
       model: LIVE_MODEL,

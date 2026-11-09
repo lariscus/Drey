@@ -99,7 +99,7 @@ export class ProcessSupervisor {
     return handle;
   }
 
-  /** Binds a worker that outlived its runner (OpenCode's server) to the run; throws when the adapter cannot attach. */
+  /** Binds a worker that outlived its runner to the run (no adapter can since req-182); throws when the adapter cannot attach. */
   attach(run: LiveRun, server: RecordedServer): WorkerHandle {
     const attach = this.deps.adapter.attach;
     if (attach === undefined) {
