@@ -20,7 +20,7 @@ type Action = (typeof ACTIONS)[number];
 /** Why a component refuses an action; null = it takes it. */
 export function refusalOf(name: ComponentName, action: Action): string | null {
   if (name === 'mcp') {
-    return 'the MCP server is served by Drey until req-167';
+    return 'the vault MCP runs as long as the service runs — live workers hold its address';
   }
   if (name === 'engine' && action !== 'restart') {
     return 'the engine runs as long as the service runs — restart it, or quit the service';
@@ -32,8 +32,8 @@ export function refusalOf(name: ComponentName, action: Action): string | null {
  * `POST /components/<name>/<start|stop|restart>` (req-164, req-165): the
  * Crew runner wakes, sleeps (its live runs stopped first) or both; the
  * remote gateway is switched like Settings → Remote access; the engine's
- * restart is the service's atomic restart; the MCP server is Drey's until
- * req-167 and refuses with the reason.
+ * restart is the service's atomic restart; the vault MCP (req-167) runs
+ * with the service and refuses with the reason.
  */
 export class ComponentRoutes implements RouteGroup {
   constructor(private readonly controls: ComponentControls) {}

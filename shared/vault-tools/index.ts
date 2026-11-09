@@ -24,3 +24,4 @@ export type {
   VaultWriteRule,
 } from './types';
 export { READ_TOOLS, WRITE_TOOLS, WRITE_TOOL_NAMES } from './defs';
+export { ToolScope, cleanPath } from './scope';

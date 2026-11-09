@@ -8,7 +8,8 @@
  *   sleeps on req-110's verdict and wakes on demand.
  * - **gateway** — the remote gateway inside the engine (ADR-0086); its row
  *   follows the remote settings.
- * - **mcp** — Drey's MCP server stays in the Drey process until req-167.
+ * - **mcp** — the vault MCP the workers use (req-167, {@link VaultMcpComponent});
+ *   Drey's own MCP server for other programs stays in the Drey process.
  *
  * The host wires the parts and runs the tick: the control port
  * ({@link ControlServer} and its route groups), the log ({@link ServiceLog}
@@ -48,6 +49,8 @@ import type { ServiceMode, ServiceStatus, ShutdownReply } from './service-status
 import { ServiceStay } from './service-stay';
 import { serviceSleepVerdict, type ServiceLiveness } from './sleep';
 import { WindowProcesses } from './window-processes';
+import { composeVaultMcp } from './vault-mcp/compose-vault-mcp';
+import type { VaultMcpComponent } from './vault-mcp/vault-mcp-component';
 
 export { formatServiceLogLine, type LogLevel } from './service-log';
 export { FIRST_DREY_WAIT_MS, WITH_DREY_GRACE_MS } from './service-stay';
@@ -59,6 +62,7 @@ const NO_WINDOWS = { open: () => ({ ok: false as const, error: 'this service sta
 export class ServiceHost {
   private engine: Engine | null = null;
   private readonly runner: RunnerComponent;
+  private readonly vaultMcp: VaultMcpComponent;
   private readonly serviceLog: ServiceLog;
   private readonly logFiles: DailyLogFiles;
   private readonly settings: ServiceSettingsReader;
@@ -85,6 +89,14 @@ export class ServiceHost {
     this.windows = opts.spawnWindow === undefined ? null : new WindowProcesses({ spawn: opts.spawnWindow, log: (m, l) => this.log('window', m, l) });
     this.logRoutes = new LogRoutes(this.serviceLog);
     const ownConfig = new FileConfigStore(path.join(opts.home, 'config.json'));
+    this.vaultMcp = composeVaultMcp({
+      config: { get: (key) => (this.engine?.config ?? ownConfig).get(key) },
+      invoke: () => (this.engine === null ? null : (method) => this.engine!.invoke(method)),
+      hostedVault: opts.vaultPath,
+      build: opts.build,
+      log: (message, level) => this.log('mcp', message, level ?? 'info'),
+      onChange: () => void this.refreshLock(),
+    });
     this.runner = new RunnerComponent({
       root: path.join(opts.home, 'fleet'),
       ...(opts.runnerIdleMs === undefined ? {} : { idleMs: opts.runnerIdleMs }),
@@ -95,6 +107,7 @@ export class ServiceHost {
       // req-180: the governor reads the Load group from the settings the tick refreshes.
       governorSettings: () => ({ heavySeats: this.prefs.heavySeats, reserve: this.prefs.reserve, lowPriority: this.prefs.lowPriority, quietHours: this.prefs.quietHours }),
       ...(opts.startRunner === undefined ? {} : { start: opts.startRunner }),
+      vault: this.vaultMcp,
     });
     this.lockWriter = new LockWriter(opts.home, (message) => this.log('service', message, 'error'));
     this.legacyGate = new LegacyRunnerGate(opts.home, this.runner, (c, m, l) => this.log(c, m, l), opts.legacy);
@@ -128,6 +141,7 @@ export class ServiceHost {
       ...this.opts.engineOptions,
     });
     this.token = this.engine.token;
+    await this.vaultMcp.start();
     await this.applySettings();
     this.control = new ControlServer(() => this.token, this.routes(), (message) => this.log('service', message, 'error'));
     this.port = await this.control.listen();
@@ -235,6 +249,7 @@ export class ServiceHost {
       vaultPath: this.opts.vaultPath,
       runner: this.runner.record(),
       gateway: this.engine?.remoteStatus() ?? null,
+      mcp: this.vaultMcp.record(),
     });
   }
 
@@ -318,6 +333,7 @@ export class ServiceHost {
       clearInterval(this.ticker);
     }
     this.windows?.stopAll();
+    await this.vaultMcp.stop();
     await this.engine?.close().catch((error: unknown) => this.log('engine', `close failed: ${String(error)}`, 'warn'));
     await removeServiceLock(this.opts.home, process.pid).catch(() => undefined);
     if (successor && this.opts.respawn !== undefined) {

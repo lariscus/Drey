@@ -78,8 +78,6 @@ export class ProcessSupervisor {
 
   spawn(run: LiveRun, plan: SpawnPlan): WorkerHandle {
     const request = run.request;
-    const slotEnv = run.info.slot === undefined ? undefined : this.deps.slotEnv?.(run.info.slot.id);
-    const env = plan.env === undefined && slotEnv === undefined ? undefined : { ...plan.env, ...slotEnv };
     const vault = this.openVault(run);
     const handle = this.deps.adapter.spawn({
       cwd: workFolderOf(run.info),
@@ -92,7 +90,7 @@ export class ProcessSupervisor {
       ...(plan.holdAtSpawn === true ? { holdAtSpawn: true } : {}),
       ...(plan.usageBase !== undefined ? { usageBase: plan.usageBase } : {}),
       ticketId: request.ticketId,
-      ...(env !== undefined ? { env } : {}),
+      ...this.envOf(run, plan),
       ...(vault !== null ? { mcp: vault.launch } : {}),
       onEvent: (event) => this.deps.events.onEvent(run, event),
       onSessionRef: (ref) => this.keepSession(run, ref),
@@ -105,6 +103,12 @@ export class ProcessSupervisor {
       void handle.exited.then(() => vault.close());
     }
     return handle;
+  }
+
+  /** The worker's environment: the plan's (the light seat's) under the run's slot's login folder. */
+  private envOf(run: LiveRun, plan: SpawnPlan): { env?: Readonly<Record<string, string>> } {
+    const slotEnv = run.info.slot === undefined ? undefined : this.deps.slotEnv?.(run.info.slot.id);
+    return plan.env === undefined && slotEnv === undefined ? {} : { env: { ...plan.env, ...slotEnv } };
   }
 
   /** req-167: the worker's vault — its own token, minted now, dead when it exits. */
