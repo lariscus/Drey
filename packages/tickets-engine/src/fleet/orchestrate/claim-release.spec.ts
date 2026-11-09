@@ -28,8 +28,8 @@ describe('ClaimRelease — release is the one door', () => {
     expect(t.store.of('comment')[0]?.text).toContain('moving to commit');
     expect(t.store.of('comment')[0]?.text).toMatch(/^done: handed over on /); // E14-6: the keyed status verb leads
     expect(t.store.calls.map((c) => c.op)).not.toContain('extend');
-    expect((await fsp.readdir(dirs.vault)).filter((name) => name !== '_worktrees')).toEqual([]); // not a single ticket file or commit (D-30)
-    expect(await fsp.readdir(path.join(dirs.vault, '_worktrees')).catch(() => [])).toEqual([]); // the working copy went with the run
+    expect((await fsp.readdir(dirs.vault)).filter((name) => name !== '_worktrees' && name !== '_workcopy')).toEqual([]); // not a single ticket file or commit (D-30)
+    expect(await fsp.readdir(path.join(dirs.vault, '_workcopy')).catch(() => [])).toEqual([]); // the working copy went with the run (req-183: _workcopy/)
     expect(t.timers.armed).toBeNull(); // the keep-alive ended with the release
   });
 

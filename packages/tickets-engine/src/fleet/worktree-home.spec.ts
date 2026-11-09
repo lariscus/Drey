@@ -4,8 +4,13 @@ import { phaseWithoutPoolKeys, type PipelinePhase, type RepoRef, type TicketCard
 import { parseRepos } from '../core/ticket-board';
 import { composeRunRequest } from './request';
 import {
+  isReviewCheckoutPath,
   isUnderAnyBase,
+  legacyTicketCopyPathFor,
   legacyWorktreeBase,
+  reviewCheckoutPathFor,
+  ticketCopyPathFor,
+  WORKCOPY_DIR,
   WORKTREES_DIR,
   worktreeBaseFor,
   worktreeFolderName,
@@ -211,5 +216,24 @@ describe('composeRunRequest carries the home rule', () => {
     const expected = path.join(path.resolve('E:/checkouts'), 'T-0001');
     expect(result.request.worktreePath).toBe(expected);
     expect(result.request.instruction).toContain(`Work checkout: ${expected}`);
+  });
+});
+
+describe('the working copy and the review checkout (req-183)', () => {
+  it('the ticket copy lives in _workcopy/, the old place is _worktrees/', () => {
+    expect(WORKCOPY_DIR).toBe('_workcopy');
+    expect(ticketCopyPathFor('V:/tickets', 'T-0001')).toBe(path.join('V:/tickets', '_workcopy', 'T-0001.ticket.md'));
+    expect(legacyTicketCopyPathFor('V:/tickets', 'T-0001')).toBe(path.join('V:/tickets', '_worktrees', 'T-0001.ticket.md'));
+  });
+
+  it('the review checkout sits beside the ticket worktree as <id>-review, under an override base too', () => {
+    expect(reviewCheckoutPathFor('V:/tickets', repo(), 'T-0044')).toBe(path.join('V:/tickets', '_worktrees', 'T-0044-review'));
+    expect(reviewCheckoutPathFor('V:/tickets', repo({ worktrees: 'E:/checkouts' }), 'T-0044')).toBe(path.join(path.resolve('E:/checkouts'), 'T-0044-review'));
+  });
+
+  it('a review checkout is told apart from a ticket worktree by its name', () => {
+    expect(isReviewCheckoutPath(reviewCheckoutPathFor('V:/tickets', repo(), 'T-0044'))).toBe(true);
+    expect(isReviewCheckoutPath(`${reviewCheckoutPathFor('V:/tickets', repo(), 'T-0044')}/`)).toBe(true);
+    expect(isReviewCheckoutPath(worktreePathFor('V:/tickets', repo(), 'T-0044'))).toBe(false);
   });
 });
