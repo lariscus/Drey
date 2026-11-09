@@ -299,6 +299,7 @@ The canonical shape (`core/plan-parts.ts`):
 
 - [ ] Split a file diff into hunks
   persona: ben
+  size: M
   reason: pure logic first, so the panel can build on it
   chain: insert security(ralf, notify) after review; skip qa
 - [x] Hunk rows in the Source control panel
@@ -309,7 +310,7 @@ The canonical shape (`core/plan-parts.ts`):
 ticket yet into one (or only the first, "Run part 1 only"): the ticket
 lands in the build queue (`created in <first phase>`, then `<first> ->
 build` in its Log), named by the part's title, with `parent: <id>`, the
-part's `persona:` pin, its own `chain:` entries, the parent's repo,
+part's `persona:` pin, its `size:` (req-170), its own `chain:` entries, the parent's repo,
 repos and priority, and `blocked-by:` the ticket of the part before it
 (none for part 1), so the plan's order is the order of the work. A part
 is matched to its ticket by title among the tickets that name the
@@ -346,6 +347,10 @@ of the Plan and removes it for fewer than two parts.
 | `form` | `ship \| scout` | Optional (concept §5.6, E8). The ticket's form: `ship` (the default — an absent key reads as ship) is the known way, plan → worktree → gate → move. `scout` is exploration only: a scout run reads repo/history/data and writes the ticket's `## Report` section — no worktree, no diff, no gate, no move; the report surfaces as a card in "Needs you" and the owner promotes the ticket to ship from there. Any other value warns (`form must be ship or scout — read as ship`) and reads as ship. See [The scout form](#the-scout-form-e8-concept-56). |
 | `chain` | list of strings | Optional (concept §5.7, E9). The ticket's **delta** against the pipeline's standard flow — the standard flow itself is crew configuration in `_meta/pipeline.md` and applies to every ticket silently; the ticket stores only the deviations, one declarative entry per item in the strict grammar: `insert <phase>[(<persona>[, notify] \| notify)] after\|before <anchor>` (add a gate at the anchor — a standard-flow phase may be revisited this way, at most once), `skip <phase>` (bypass a gate), `notify <phase>` (the notify rule: a card lands in "Needs you" when the gate completes), `move <phase> after\|before <anchor>` (a standard gate runs elsewhere, E10-5), `assign <phase> <persona>` (a standard gate's persona, E10-5); an inserted gate may be the manual step `manual` / `manual-<word>` (E10-6, see "The manual step"). Absent (or empty) reads as the standard flow. An entry outside the grammar warns and drops (`chain entry "<raw>" is not readable — expected e.g. "insert design after review"`). See [The chain delta](#the-chain-delta-e9-concept-57). |
 | `parent` | ticket id | Optional (E10, concept v2 §5.9). Set on a ticket that is one **part** of a split plan: `parent: T-0130` names the ticket whose `### Parts` list produced it. The parent keeps the plan; the part carries its own description, builder persona and `chain:` delta (a per-part scope — the parent's `chain:` never leaks into a part). A value that is no ticket id, or the ticket's own id, warns and reads as no parent; whether the parent still exists is not checked (a finished parent is archived). |
+| `class` | `A \| B \| C` | Optional class pin (req-170): the run asks the capacity pool for exactly this class, whatever the size, the floor or the persona's default say. Any other value warns and reads as no pin. Dricket: `x-class`. |
+| `model` | string | Optional model pin (req-170): the run asks the pool for this model of the model table (its row's class); it beats `class:` and every class rule. Dricket: `x-model`. |
+| `size` | `S \| M \| L` | The plan part's size (req-170), written by the release from the part's `size:` detail: the run asks for class C, B or A (raised to the phase's `min-class:`). Absent = the class of the persona's default model. Dricket: `x-size`. |
+| `allowance` | number (USD) | The ticket's ledger (req-170, absorbs req-113): once the ticket's runs have spent it, the pool grants no further run and a Needs-you card (a keyed `blocked: [ledger-ticket]` comment) says so — unless the persona's `allowed: spend-above-allowance: true`. Absent = the default of Settings → Models (`service.json` `ledgers.ticketAllowance`); `$2.50` reads too. Dricket: `x-allowance`. |
 | `proof` | `ui \| tests` | Optional pin (E11, concept v2 §5.3). Overrides the Handover's proof declaration (see [Proof mode](#proof-mode-e11)). Absent, or any other value (a warning), means no pin; with no pin and no readable declaration the mode reads as `ui`. |
 | `rank` | integer 0-999999 | Default `5000`. Fine ordering inside derived order. |
 | `branch` | `t/<id>` | Written by machine writers; validated against the rule; rule wins. |
@@ -937,8 +942,8 @@ commit per change; hand edits win on refresh):
   `providerID/modelID`). **Deprecated with personas (E3):** readable
   until migrated onto the persona's `models`, then cleared to null.
 - `workers:` — **retired (req-63).** The parallel slots belong to the
-  worker providers (`fleet.pool.<provider>.size` in the plugin config,
-  Settings → Tickets → Workers, req-71), shared by every column. A leftover key is
+  accounts (`sessions` of the slots in `service.json`, req-177; req-63's
+  `fleet.pool.<provider>.size` moved there once, req-170), shared by every column. A leftover key is
   ignored with a noise badge; clearing a column's worker removes it.
 - `prompt:` — the prompt ref override; the default is the handover's
   ref (and setting a worker in the dialog writes the matching
@@ -955,6 +960,13 @@ commit per change; hand edits win on refresh):
   before the lease reaper stops it and the step fails into the back-off.
   Positive integers; absent or invalid = the runner's defaults (250
   turns, 90 minutes).
+- `min-class:` — the column's class floor (req-170): `A`, `B` or `C`; no
+  run of the column asks the capacity pool for a lighter class (a size S
+  ticket in a `min-class: B` column asks for B). A ticket's `class:` /
+  `model:` pin is not raised. Absent = no floor; any other value is
+  ignored with a noise badge. The stock pipeline sets none (its one agent
+  column, Building, runs every step); a pipeline with a plan or review
+  column gives it `min-class: B`.
 - `token-budget:` — the column's daily token budget (the pool's settled
   runs are summed per day); over budget trips the breaker. Off by
   default.
@@ -993,10 +1005,11 @@ is the circuit breaker's park into inbox, always logged.
 automatic column, ordered by priority class (the configured
 vocabulary's first half before its second — see `priorities:` above),
 then column rank — the rightmost column first, so
-finishing beats starting — then the column's derived order. Each candidate takes a slot of the provider pool its
-assignment resolves to — for a persona run the pool of the model entry its
-pool and router pick (D-62, `models.pool` above); a full pool makes it wait, a running run is
-never preempted.
+finishing beats starting — then the column's derived order. A persona run asks the capacity pool for its class
+(req-170, ADR-0095: `class:` / `model:` pin, else `size:` or the persona's default class, raised to
+`min-class:`) and gets exactly that class or waits — queued, no process — while the next candidate whose class
+has room goes ahead; a ring run (no persona) takes a slot of the provider pool its assignment resolves to. A
+running run is never preempted.
 
 ## `_meta/personas/` — the agent personas (E3)
 
@@ -1028,11 +1041,12 @@ tickets/_meta/personas/
   | `role` | `planner \| builder \| reviewer \| tester \| custom` | `custom` |
   | `worker` | the CLI harness (`claude-code`, `opencode`, `api`) | `opencode` |
   | `models.default` | the model nothing else decides | `opus` |
-  | `models.pool` | allowed models in fallback order. An entry is `<model>` or `<worker provider>/<model>` (`kimi/k2`; a slash after anything else is part of the model id, `zai/glm-5.3`) — the entry's provider pool takes the run, else the persona's `worker`. At dispatch (milestone 212, D-62) an entry whose provider pool has no free slot is skipped | `[models.default]` |
-  | `models.router` | `off \| budget \| escalate-on-fail` — a router only ever picks inside the pool: `off` walks the default then the pool in order, `budget` the pool in order (curated cheapest first), `escalate-on-fail` the default then one pool step further per failed run of the ticket in this phase. `runner.log` names the chosen model and why. req-170 replaces this with a class request | `off` |
+  | `models.pool` | the models the persona may run, **strongest first**; every entry must be a row of the model table (Settings → Models, `service.json`). An entry is `<model>` or `<worker provider>/<model>` (`kimi/k2`; a slash after anything else is part of the model id, `zai/glm-5.3`). At dispatch the capacity pool grants the first entry of the requested class with room (req-170); an entry the table does not hold is never granted to a class request. `models.default`'s class is the class an unsized ticket asks for | `[models.default]` |
+  | ~~`models.router`~~ | **removed (req-170).** The router policies `off \| budget \| escalate-on-fail` gave way to the class request; an old `router:` line is ignored and dropped on the next rewrite | — |
   | `color` | `#rrggbb`, the chips and avatars | `#a78bfa` |
   | `skills` | names of skill files the persona carries: `<name>.md` or `<name>/SKILL.md`, in the persona's own `skills/` folder, else `_meta/skills/`. A run's brief carries their text as `## Skills` (D-46) | `[]` |
-  | `budget` | USD per day — the Crew card shows the day's costs against it | unset (null) |
+  | `budget` | USD per day — the Crew card shows the day's costs against it; the capacity pool's persona ledger (req-170): once the persona's runs of the day have spent it, it starts nothing more that day (a Needs-you card says so). Unset = `service.json` `ledgers.personaPerDay` | unset (null) |
+  | `allowed` | a map; today one key: `spend-above-allowance: true` — the persona runs on past a ticket's `allowance:` instead of waiting for the owner (req-170; req-142 adds the other permissions). Written only when set | nothing beyond |
 
 - `prompt.md` — the longform persona prompt, free Markdown. When a
   persona resolves at dispatch, this file is the run's instruction base,
@@ -1135,8 +1149,9 @@ E6 record):
 3. the engine default, the config key `personas.default`.
 
 A resolved persona drives the dispatch: worker and model come from the
-persona (the model from `models.default`, a router only climbs inside
-`models.pool`) and `prompt.md` replaces the handover prompt. When nothing
+persona (the model the capacity pool grants from `models.pool` for the
+requested class — req-170 — or `models.default` while no pool decides) and
+`prompt.md` replaces the handover prompt. When nothing
 resolves, or the persona file is missing, the legacy assignment ring runs
 unchanged — a board without personas behaves exactly as before. Every run
 records the resolved id in its `RunInfo.persona` (null on ring
@@ -1442,6 +1457,7 @@ its changed chapters back inside the claim (D-30, [FLEET.md](../plugins/tickets/
 | `owner`, `claimed_at` | `claimed-by`, `claimed-at` | |
 | `x-rank` | `rank` | |
 | `x-worker` `x-persona` `x-track` `x-form` `x-proof` `x-awaiting` | `worker` `persona` `track` `form` `proof` `awaiting` | raw values |
+| `x-class` `x-model` `x-size` `x-allowance` | `class` `model` `size` `allowance` | raw values (req-170); `allowance` as a number |
 | `x-interactive` | `interactive` | only `true` |
 | `x-chain` | `chain` | entries separated by `;` |
 | `x-references` | `references` | separated by `,` |

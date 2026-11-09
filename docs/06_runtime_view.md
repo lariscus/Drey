@@ -4795,3 +4795,52 @@ sequenceDiagram
     H-->>UI: SSE event: slot
     UI->>API: GET /chain (slots summary), GET /slots (windows, q, state)
 ```
+
+## 6.102 A task asks the pool for its class, gets it or queues (req-170, milestone 217)
+
+Since req-170 the gate of 6.101 is `PoolGate`: the slot binding and the pool's grant are one decision. The chain's
+dispatcher asks first (so a task that cannot have its class never reaches a start); every start — the owner's
+dialog too — passes the gate, which reserves the seat before the worker spawns.
+
+```mermaid
+sequenceDiagram
+    participant D as Dispatcher (one pass)
+    participant B as ClassRequestBuilder
+    participant P as PoolGrant
+    participant L as Ledgers (session records)
+    participant C as CapacityCap
+    participant Q as RequestQueue
+    participant T as TicketDispatch / RunStarter
+    participant G as PoolGate
+    participant K as LedgerCards
+    D->>B: card, phase, persona, repo
+    B-->>D: {persona, class, pool strongest first, profile, ledger inputs, why}<br/>pin model:/class: > size S/M/L → C/B/A or the default's class, raised to min-class: and to the pool's classes
+    D->>P: choose(class request)
+    P->>L: ticket allowance, persona day — full?
+    alt a ledger is full
+        P-->>D: wait (ledger)
+        D->>Q: queued · waits: T-0122 has spent $2.61 of its $2.50 allowance
+        D->>K: raise — one blocked: [ledger-ticket] comment (Needs-you), kept in chain.json
+    else rows of exactly the class in the persona's pool
+        loop each row, each slot of the repository's profile (never a smaller class)
+            P->>C: slot not blocked, row sessions free, provider not throttled, slot cap + global cap, slot's day
+        end
+        alt a slot has room
+            P-->>D: grant {slot, provider, model, class, cost, reason}
+            D->>T: dispatch with the granted model and provider; poolClass, poolWhy, ledger on the request
+            T->>G: bind(request, runId, {prefer, persona})
+            G->>P: choose(the one model, of its class)
+            G-->>T: {slot, grant} — seat (model, class, cost) reserved
+            T-->>D: dispatched — RunInfo.grant, stream note "pool: …"
+            D->>K: resolve the ticket's open ledger cards (resolved: <key>)
+        else no room
+            P-->>D: wait (capacity, or config when no wait can help)
+            D->>Q: queued · waits for a B slot (position n) — no process
+        end
+    end
+    Note over D,Q: the next pass (a run settled, the 15 s scan) rebuilds the queue in dispatch order and serves it front to back
+```
+
+The seat goes when the run settles (`SlotRunListener` releases it); the cost the run reported lands in its record,
+and the ledgers' next sum includes it. `GET /chain` carries `pool` (the live load, "Now: 2.4 of 6 · Claude A 2 of
+5") and `queue`; the `pool` event goes out on the runner's stream when the load changes.

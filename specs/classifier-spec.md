@@ -235,6 +235,15 @@ create as a `raw capture:` Log line (ticket-schema).
   appended to a user's own Action template prompt when the Action rewrites
   the document. The Action context carries the current selection
   (`SELECTED SECTION`) next to the whole document.
+- **`SHAPE_SYSTEM_PROMPT`** (`packages/tickets-engine/src/services/shape-system-prompt.ts`,
+  re-exported by `chat-llm.ts`; E10-3) — Paul shapes one ticket with the
+  owner; the system message is the prompt plus `## Ticket <id>` and the
+  ticket text. The reply is one JSON object `{say, thought?, plan?,
+  question?, split?, read?}`; `plan` is the whole Plan chapter with
+  `### Goal`, `### Architecture`, `### Parts`, `### Acceptance criteria`,
+  `### Open questions`. A part carries indented `persona:`, **`size: S|M|L`**
+  (req-170: how demanding it is — the capacity pool maps it to class C, B
+  or A), `reason:` and optionally `chain:` lines.
 - **`FLOW_SYSTEM_PROMPT`** (`packages/tickets-engine/src/services/chat-llm.ts`,
   E10-5) — Paul drafts one ticket's or one plan part's flow. The system
   message is the prompt plus `## Flow` (the standard flow's phase ids, the
