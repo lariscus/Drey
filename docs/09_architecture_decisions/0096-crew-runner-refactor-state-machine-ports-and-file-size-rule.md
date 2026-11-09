@@ -124,7 +124,12 @@ and questions are proven over ACP per harness (req-182).
 - What Go would have done better — a native helper for Windows Job Objects
   and `nice` in the governor — stays possible as a small native piece behind
   the `ResourceGovernor` port, and is not a reason to change the core's
-  language.
+  language. The port exists since milestone 223 (req-180, ADR-0092 later
+  change): `fleet/governor/` with `ResourceGovernor`, `SeatGovernor`,
+  `SeatTable` (the planned `SeatPool`) and the rules; the priority runs over a
+  `ProcessPriority` port with a Node adapter (`os.setPriority`) — no native
+  helper was needed for the priority class (a Job Object's CPU cap stays
+  req-194).
 - Risk: splitting a 3000-line class with 2500 lines of coupled specs takes
   discipline; the step order and the "specs stay green" gate are the
   protection, and a step that needs a spec rewrite says so in its ticket.

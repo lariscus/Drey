@@ -1607,8 +1607,8 @@ Closing it keeps the service running. Three tabs:
   point at (the engine's restart restarts the whole service and hands the live
   runs over). Below: **Slots** (each account: busy sessions, how much quota is
   left, *q*, when it resets, and whether that is measured or estimated) and
-  **Governor** (the Load settings; the live numbers come with the resource
-  governor). On the right the **Log**, filtered to warnings or errors if you
+  **Governor** (the resource governor, below: heavy and light seats, the reserve
+  against the machine's load, what waits and why, the dev servers). On the right the **Log**, filtered to warnings or errors if you
   like; *Follow* keeps the newest line in view.
 - **Sessions** — every agent session as the coding tool itself speaks it: the
   live runs, and today's ended ones under *Show*. Pick one to see its facts
@@ -1623,6 +1623,37 @@ Closing it keeps the service running. Three tabs:
   into the run's stream and the ticket's thread, exactly like a message from
   the ticket in Drey — Drey's thread shows the same session cleaned up.
 - **Logs** — the service log at full height, filtered by level and by part.
+
+### The resource governor
+
+Agents do two kinds of work: they **think** (a model run — light) and they
+**run things** (tests, builds, dev servers — heavy). Heavy work can make your
+machine sluggish, so Drey Service keeps a few **seats**: every heavy task takes
+one before it starts and gives it back when it ends. The numbers are yours —
+Settings → Background service → *Load*:
+
+- **Heavy seats** — how many heavy tasks run at once (1 or 2 keeps a laptop
+  usable). A third test run waits until a seat frees.
+- **Reserve** — a new heavy task starts only while that share of CPU and memory
+  is free. On a desk that stays busy for ten minutes it starts anyway, so the
+  agents never wait for ever.
+- **Low priority for heavy tasks** — tests and builds run behind everything you
+  do.
+- **Quiet hours** — e.g. `22:00 – 07:00`: no new heavy task starts in the span;
+  running ones finish, agents keep working on everything else.
+
+Each agent's worktree also gets its own dev-server port (from 4300 up, in the
+variable `DREY_DEV_PORT`), so two agents' dev servers never fight over one
+port, and test tools get a bounded number of workers (`DREY_TEST_WORKERS` and
+the tools' own variables).
+
+**What you see.** The service window's *Governor* block: `1 of 2 busy · tests
+for T-0126`, the light seats, `25 % CPU and RAM kept free · load 41 %`, what
+waits and when it starts (`1 heavy task (build T-0121) · starts when a seat
+frees`, `starts at 07:00`, `starts when the load drops`) and the dev servers
+that are up. A waiting step says so on its row in the Work panel and on its
+board card — `waits for a heavy seat · 2 of 2 heavy seats busy` — and every
+grant, wait and refusal is a line in the log (`governor: …`).
 
 ### The chain runs itself (milestone 85)
 
@@ -2208,8 +2239,12 @@ The page holds the controls of **Drey Service**, the background process that com
   restarts, stops and starts from here; the gateway's buttons switch Settings →
   Tickets → Devices' *Serve* setting; the MCP server's switch the *MCP server*
   category's *Enable* setting (Drey serves it for now).
-- **Load** — heavy seats, reserve, low priority and quiet hours are stored for the
-  resource governor; they take effect once it exists.
+- **Load** — how much the agents may load your machine (the resource governor,
+  see *Tickets → The resource governor*): **Heavy seats** — tests, builds, dev
+  servers at once; **Reserve** — the share of CPU and memory a new heavy task
+  leaves free; **Low priority for heavy tasks** — they run behind your own work;
+  **Quiet hours** — no new heavy task starts in the span (agents keep thinking,
+  they just don't build or test). A change applies within a few seconds.
 - **Logs** — the log level (*Quiet* keeps warnings and errors, *Normal* adds the
   ordinary events, *Detailed* everything; a change applies at once) and the log
   folder — one file per component per day, kept 14 days — which *Open folder*

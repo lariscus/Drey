@@ -25,7 +25,7 @@ at once):
 | Component | What | State |
 |---|---|---|
 | **engine** | the tickets engine (ADR-0088): board service, chat, verify, the invoke channel Drey talks to | always `running` while the service runs |
-| **runner** | the Crew runner (the fleet runner, ADR-0075), **in the service's own process** | `sleeping` until something needs it, `running` while awake, `failed` with the reason when it cannot start |
+| **runner** | the Crew runner (the fleet runner, ADR-0075), **in the service's own process**; its resource governor (req-180, `FLEET.md` *The resource governor*) seats every spawn within Settings → Background service → *Load* | `sleeping` until something needs it, `running` while awake, `failed` with the reason when it cannot start |
 | **gateway** | the remote gateway for phone and iPad (ADR-0086), inside the engine | `running` (address, paired devices), `stopped` (remote access off) or `failed` (why it does not listen) |
 | **mcp** | Drey's MCP server for other programs | `external` — still served by the Drey process until req-167 moves it |
 
@@ -55,8 +55,10 @@ below, the runner's and the engine's.
   (`POST /settings {autostart}`), *Quit service* (asks while runs live;
   `POST /shutdown`). A click on the icon opens the window.
 - **Window:** *Components* (status line, the five rows with restart / stop /
-  start, Slots from the runner's `GET /slots`, the Governor block — Load
-  settings and `—` until req-180 —, the log following `GET /log/stream`),
+  start, Slots from the runner's `GET /slots`, the Governor block from the
+  runner's `GET /governor` — heavy and light seats, the reserve against the
+  load, the waiting tasks, the dev servers (req-180) —, the log following
+  `GET /log/stream`),
   *Sessions* (every live run and today's ended ones raw: the run's stream,
   instruction, tool calls, process, raw lines; *Send* = the runner's `/send`,
   logged to the run's stream and the ticket like a steer from Drey; *Interrupt
@@ -79,7 +81,7 @@ e2e isolation stay where they were (req-173 may move it).
 ├── service-window/     the tray / window process's own userData (its single-instance lock)
 ├── service-start.log   stdout/stderr of the last start (a start that dies says why here)
 ├── start-service.vbs   the Windows sign-in launcher (only while start with Windows is on)
-├── config.json         the engine's config (keys unchanged; added: `service.enabled`, `service.autostart`, `service.vaultPath`, `service.idleMinutes`; Drey writes every Settings → Background service key here too — `service.trayIcon`, `service.logLevel`, `service.load.*` — and the service applies them each tick)
+├── config.json         the engine's config (keys unchanged; added: `service.enabled`, `service.autostart`, `service.vaultPath`, `service.idleMinutes`; Drey writes every Settings → Background service key here too — `service.trayIcon`, `service.logLevel`, `service.load.*` — and the service applies them each tick; the Load group goes to the in-process runner's resource governor live, req-180)
 └── fleet/              the Crew runner's root (FLEET.md): runs/, chain.json, runner.log
 ```
 
