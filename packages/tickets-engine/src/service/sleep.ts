@@ -68,6 +68,13 @@ export class ServiceIdleWatch {
     this.releasedAt = now();
   }
 
+  /** The same clock against another span (Settings changed `service.idleMinutes`): the time already idle counts. */
+  withSpan(idleMs: number): ServiceIdleWatch {
+    const next = new ServiceIdleWatch(idleMs, this.now);
+    next.releasedAt = this.releasedAt;
+    return next;
+  }
+
   /** True when nothing has held the service for the whole span. */
   expired(state: ServiceLiveness): boolean {
     if (!serviceSleepVerdict(state).sleep) {

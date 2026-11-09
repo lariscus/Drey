@@ -7,10 +7,10 @@
  * optional, so neither case needs Electron: "enabled → starts with Windows"
  * is a hidden `wscript` launcher that sets the variable, "disabled → dies
  * with Drey" is the service's own with-Drey mode — and Node mode costs no
- * Chromium (the ~50–80 MB the owner watches). The tray of req-165 is the
- * one thing that would need Electron; it can start as a separate small
- * window process on demand. Both the spawn from Drey and the log-in entry
- * are built here and only here.
+ * Chromium (the ~50–80 MB the owner watches). The tray and the window of
+ * req-165 are a separate small Electron process the service starts
+ * ({@link windowLaunchCommand}). The spawn from Drey, the log-in entry and
+ * the window process are built here and only here.
  */
 import { execFile, spawn } from 'node:child_process';
 import { closeSync, openSync, promises as fsp } from 'node:fs';
@@ -57,6 +57,84 @@ export function spawnService(cmd: LaunchCommand, home: string): number | null {
   closeSync(output);
   child.unref();
   return child.pid ?? null;
+}
+
+/** The flag `electron/boot.ts` branches on: Drey's binary runs the service window process instead of Drey. */
+export const SERVICE_WINDOW_FLAG = '--drey-service-window';
+
+export type WindowMode = 'tray' | 'open';
+
+export interface WindowTarget {
+  /** The app root (the folder of `package.json`); a dev Electron needs it as its first argument. */
+  readonly appRoot: string;
+  readonly home: string;
+  /** The service the window process belongs to: it leaves when that service is gone. */
+  readonly servicePid: number;
+  readonly mode: WindowMode;
+  /** The binary to run; the current process's (Electron's) by default. */
+  readonly execPath?: string;
+}
+
+export interface WindowLaunchCommand {
+  readonly command: string;
+  readonly args: readonly string[];
+  /** Variables the child must NOT inherit: without `ELECTRON_RUN_AS_NODE` the binary is Electron again. */
+  readonly unsetEnv: readonly string[];
+}
+
+/** A dev checkout's bare `electron(.exe)` runs the app folder it is given; a packaged `Drey.exe` runs its own. */
+export function isBareElectron(execPath: string): boolean {
+  return /^electron(\.exe)?$/i.test(path.basename(execPath));
+}
+
+/**
+ * The service window process (req-165, ADR-0092 later change 2026-11-09):
+ * Electron's binary — this very one, minus `ELECTRON_RUN_AS_NODE` — with
+ * the flag, the home and the service's pid. `tray` keeps the tray icon,
+ * `open` opens the window (a running window process takes it over through
+ * Electron's single-instance lock).
+ */
+export function windowLaunchCommand(target: WindowTarget): WindowLaunchCommand {
+  const exec = target.execPath ?? process.execPath;
+  return {
+    command: exec,
+    args: [
+      ...(isBareElectron(exec) ? [target.appRoot] : []),
+      SERVICE_WINDOW_FLAG,
+      '--home',
+      target.home,
+      '--service-pid',
+      String(target.servicePid),
+      `--${target.mode}`,
+    ],
+    unsetEnv: ['ELECTRON_RUN_AS_NODE'],
+  };
+}
+
+/** One spawned window process. */
+export interface WindowChild {
+  readonly pid: number | null;
+  onExit(listener: (code: number | null) => void): void;
+  kill(): void;
+}
+
+/** Starts a window process as a child of the service (not detached: the service ends it). */
+export function spawnWindow(cmd: WindowLaunchCommand): WindowChild {
+  const env = { ...process.env };
+  for (const key of cmd.unsetEnv) {
+    delete env[key];
+  }
+  const child = spawn(cmd.command, [...cmd.args], { env, stdio: 'ignore', windowsHide: false });
+  return {
+    pid: child.pid ?? null,
+    onExit: (listener) => {
+      child.once('exit', (code) => listener(code));
+      child.once('error', () => listener(null));
+    },
+    kill: () => {
+      child.kill();
+    },
+  };
 }
 
 const RUN_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run';
