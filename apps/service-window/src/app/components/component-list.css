@@ -1,0 +1,40 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.row {
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 0 12px;
+  border-radius: 4px;
+}
+.row:hover {
+  background: var(--panel-2);
+}
+.sw-icon-btn {
+  visibility: hidden;
+}
+.row:hover .sw-icon-btn,
+.sw-icon-btn:focus-visible {
+  visibility: visible;
+}
+.body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.name {
+  font-weight: 600;
+}
+.detail {
+  color: var(--text-2);
+  min-height: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

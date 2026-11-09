@@ -1,0 +1,17 @@
+<header class="head">
+  <span class="title">{{ 'service_window.log.title' | t }}</span>
+  <span class="grow"></span>
+  @if (withComponents()) {
+    <sw-segmented [options]="componentOptions" [value]="component()" [label]="'service_window.log.component_all' | t" (picked)="component.set($event)" />
+  }
+  <sw-segmented [options]="levelOptions" [value]="level()" [label]="'service_window.log.title' | t" (picked)="level.set($event)" />
+  <sw-switch [checked]="follow()" [label]="'service_window.log.follow' | t" (toggled)="follow.set($event)" />
+</header>
+<div class="list" [swFollow]="follow()" [swTick]="rows()" (followLost)="follow.set(false)">
+  @for (row of rows(); track row.key) {
+    <div class="line" [class.warn]="row.level === 'warn'" [class.error]="row.level === 'error'">
+      <span class="time">{{ row.time }}</span>
+      <span class="text" [title]="row.message">{{ row.message }}</span>
+    </div>
+  }
+</div>

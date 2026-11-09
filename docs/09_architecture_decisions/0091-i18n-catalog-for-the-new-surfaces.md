@@ -130,6 +130,8 @@ existing strings do not move in this step.
    `libs/mission-ui/src/phone/`,
    `apps/mission-control/src/app/notes/`, `src/app/i18n/`,
    `src/app/settings/service/` (Settings → Background service, req-165),
+   `apps/service-window/src/app/present/`, `apps/service-window/src/app/ui/`, `apps/service-window/src/app/components/`, `apps/service-window/src/app/sessions/`, `apps/service-window/src/app/log/`, `apps/service-window/src/app/shell/`
+   (the Drey Service window, req-165/166),
    `plugins/tickets/renderer/autopilot/`,
    `plugins/tickets/renderer/decision/`, `plugins/tickets/renderer/cost/`,
    `packages/tickets-engine/src/autopilot/`,

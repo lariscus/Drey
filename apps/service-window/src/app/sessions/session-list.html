@@ -1,0 +1,37 @@
+<div class="summary">{{ list().summary }}</div>
+@for (row of list().live; track row.id) {
+  <div class="sx" [class.selected]="row.id === state.selectedId()">
+    <button type="button" class="main" (click)="state.select(row.id)">
+      <span class="sw-dot" [class]="row.dot === 'held' ? 'warn' : row.dot"></span>
+      <span class="body">
+        <span class="name">{{ row.title }}</span>
+        <span class="detail">{{ row.detail }}</span>
+      </span>
+    </button>
+    <button type="button" class="sw-icon-btn" [title]="row.buttonLabel" [attr.aria-label]="row.buttonLabel" (click)="stop(row.id)">
+      <sw-icon [name]="row.held ? 'release' : 'stop'" />
+    </button>
+  </div>
+}
+@if (list().endedCount > 0) {
+  <div class="group">
+    <span>{{ 'service_window.sessions.ended' | t: { count: list().endedCount } }}</span>
+    <span class="sep">·</span>
+    <button type="button" class="link" (click)="toggleEnded()">
+      {{ (state.showEnded() ? 'service_window.sessions.hide' : 'service_window.sessions.show') | t }}
+    </button>
+  </div>
+  @if (state.showEnded()) {
+    @for (row of list().ended; track row.id) {
+      <div class="sx" [class.selected]="row.id === state.selectedId()">
+        <button type="button" class="main" (click)="state.select(row.id)">
+          <span class="sw-dot" [class]="row.dot"></span>
+          <span class="body">
+            <span class="name">{{ row.title }}</span>
+            <span class="detail">{{ row.detail }}</span>
+          </span>
+        </button>
+      </div>
+    }
+  }
+}

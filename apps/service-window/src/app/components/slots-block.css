@@ -1,0 +1,90 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.block {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.head {
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+.srow,
+.grow-row {
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+}
+.slot-name {
+  width: 64px;
+  flex-shrink: 0;
+}
+.seats {
+  width: 40px;
+  flex-shrink: 0;
+  display: flex;
+  gap: 4px;
+}
+.seat {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--control-border);
+}
+.seat.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.bar {
+  width: 48px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.fill {
+  display: block;
+  height: 4px;
+  background: var(--accent);
+}
+.fill.estimated {
+  background: var(--warn);
+}
+.quota {
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.chip {
+  height: 22px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text-2);
+  margin-left: auto;
+}
+.chip.measured {
+  color: var(--mint);
+}
+.chip.estimated {
+  color: var(--warn);
+}
+.label {
+  width: 96px;
+  flex-shrink: 0;
+  color: var(--text-2);
+}

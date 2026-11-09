@@ -1,0 +1,46 @@
+<div class="head">
+  <div class="titles">
+    <div class="title-row">
+      <span class="sw-dot" [class]="dot()"></span>
+      <span class="title">{{ title() }}</span>
+    </div>
+    <span class="ids sw-mono">{{ ids() }}</span>
+  </div>
+  <button type="button" class="sw-btn" (click)="openWorktree()">{{ 'service_window.detail.open_worktree' | t }}</button>
+  <button type="button" class="sw-btn" (click)="copyAttach()">{{ 'service_window.detail.copy_attach' | t }}</button>
+  <button type="button" class="sw-btn" [disabled]="!live()" (click)="stop()">{{ 'service_window.detail.stop' | t }}</button>
+</div>
+<div class="facts">
+  @for (fact of facts(); track fact.label) {
+    <div class="fl">
+      <span class="k">{{ fact.label }}</span>
+      <span>
+        @if (fact.mono) {
+          <span class="sw-mono ref">{{ fact.mono }}</span>
+          @if (fact.value) {
+            <span> · {{ fact.value }}</span>
+          }
+        } @else {
+          {{ fact.value }}
+        }
+      </span>
+    </div>
+  }
+</div>
+<div class="tabs">
+  <div role="tablist" class="tablist">
+    @for (view of views; track view.id) {
+      <button type="button" role="tab" class="sw-pill" [attr.aria-selected]="state.view() === view.id" (click)="state.view.set(view.id)">
+        {{ view.key | t }}
+      </button>
+    }
+  </div>
+  <span class="grow"></span>
+  <sw-switch [checked]="state.follow()" [label]="'service_window.log.follow' | t" (toggled)="state.follow.set($event)" />
+</div>
+<sw-stream-views [run]="run()" />
+<sw-composer [runId]="run().id" />
+<footer class="foot">
+  <span class="note">{{ 'service_window.detail.footer' | t }}</span>
+  <button type="button" class="sw-btn" (click)="openDrey()">{{ 'service_window.detail.open_in_drey' | t }}</button>
+</footer>

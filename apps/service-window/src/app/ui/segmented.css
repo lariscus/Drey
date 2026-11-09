@@ -1,0 +1,12 @@
+.seg {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.sw-pill {
+  padding: 0 10px;
+}

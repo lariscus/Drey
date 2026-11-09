@@ -1,0 +1,19 @@
+@if (error(); as message) {
+  <div class="error" role="alert">{{ message }}</div>
+}
+<div class="bar">
+  <input
+    class="field"
+    type="text"
+    [value]="text()"
+    [attr.aria-label]="'service_window.composer.label' | t"
+    (input)="onInput($event)"
+    (keydown.enter)="send()"
+  />
+  <button type="button" class="send" (click)="send()">{{ 'service_window.composer.send' | t }}</button>
+  <button type="button" class="sw-btn" (click)="interrupt()">{{ 'service_window.composer.interrupt' | t }}</button>
+  <button type="button" class="sw-btn" (click)="resume()">
+    {{ 'service_window.composer.resume' | t }}
+    <sw-icon name="chevron-down" [size]="14" />
+  </button>
+</div>

@@ -1,0 +1,17 @@
+<div class="status">
+  <span class="sw-dot" [class.running]="status().running"></span>
+  <span>{{ status().text }}</span>
+</div>
+<div class="body">
+  <div class="left">
+    <sw-component-list />
+    <sw-slots-block />
+  </div>
+  <sw-log-panel />
+</div>
+<footer class="foot">
+  <span class="note">{{ 'service_window.footer.note' | t }}</span>
+  <span class="grow"></span>
+  <button type="button" class="sw-btn" (click)="openDrey()">{{ 'service_window.footer.open_drey' | t }}</button>
+  <button type="button" class="sw-btn quit" (click)="quit()">{{ 'service_window.footer.quit' | t }}</button>
+</footer>

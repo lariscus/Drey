@@ -1,0 +1,20 @@
+@for (row of rows(); track row.id) {
+  <div class="row">
+    <span class="sw-dot" [class]="row.dot"></span>
+    <span class="body">
+      <span class="name">{{ row.name }}</span>
+      <span class="detail">{{ row.detail }}</span>
+    </span>
+    @for (button of row.buttons; track button.action) {
+      <button
+        type="button"
+        class="sw-icon-btn"
+        [title]="button.label"
+        [attr.aria-label]="button.label"
+        (click)="act(row.id, button.action)"
+      >
+        <sw-icon [name]="button.icon" />
+      </button>
+    }
+  </div>
+}

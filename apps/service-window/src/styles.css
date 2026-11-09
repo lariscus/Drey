@@ -1,0 +1,124 @@
+/*
+ * The Drey Service window's tokens and base (Anthrazit, copied from
+ * src/styles.css). Components read the tokens, they never invent colours.
+ */
+:root {
+  --bg: #18191b;
+  --panel: #222326;
+  --panel-2: #2c2d31;
+  --line: #3b3d42;
+  --control-border: #747980;
+  --text: #f4f5f6;
+  --text-2: #b3b7bc;
+  --accent: #8ecbef;
+  --on-accent: #101113;
+  --ok: #93c47f;
+  --warn: #e0bb6e;
+  --danger: #ee8f89;
+  --mint: #bfe3cd;
+  --off: #747980;
+  --sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'Helvetica Neue', sans-serif;
+  --mono: ui-monospace, 'IBM Plex Mono', 'Consolas', monospace;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+button {
+  font: inherit;
+  cursor: default;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.sw-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--off);
+}
+.sw-dot.running {
+  background: var(--ok);
+}
+.sw-dot.failed {
+  background: var(--danger);
+}
+.sw-dot.warn {
+  background: var(--warn);
+}
+
+.sw-icon-btn {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text-2);
+}
+.sw-icon-btn:hover {
+  background: var(--line);
+  color: var(--text);
+}
+
+.sw-btn {
+  height: 30px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.sw-btn:hover {
+  background: var(--panel-2);
+}
+.sw-btn:disabled {
+  opacity: 0.5;
+}
+
+.sw-pill {
+  height: 26px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text-2);
+}
+.sw-pill[aria-selected='true'] {
+  background: var(--panel-2);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.sw-mono {
+  font-family: var(--mono);
+}
