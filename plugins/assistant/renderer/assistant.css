@@ -2036,6 +2036,26 @@
   text-overflow: ellipsis;
 }
 
+.target-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Board 10u's chips: 26 high, 0 10 padding, 1px border, radius 4, 13px quiet text. */
+.target-card-chip {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  color: var(--text-4);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 .target-card-rich .target-card-actions {
   margin-top: 0;
   gap: 8px;

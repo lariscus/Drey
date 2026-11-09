@@ -1,8 +1,9 @@
+import type { Clock } from '../ports/clock';
 import type { BurnRateHold } from '../protocol';
 
 /** The decision (`BurnRateGuard` satisfies it). */
 export interface BurnRateDecision {
-  hold(): BurnRateHold | null;
+  hold(): Omit<BurnRateHold, 'since'> | null;
   lift(): Promise<void>;
 }
 
@@ -17,6 +18,7 @@ export interface BurnRateHoldSourceDeps {
   /** `00:00`: an instant as the machine's clock writes it. */
   readonly timeText: (iso: string) => string;
   readonly log: (message: string) => void;
+  readonly clock: Clock;
 }
 
 /**
@@ -31,7 +33,8 @@ export class BurnRateHoldSource {
   constructor(private readonly deps: BurnRateHoldSourceDeps) {}
 
   current(): BurnRateHold | null {
-    const hold = this.deps.guard.hold();
+    const decided = this.deps.guard.hold();
+    const hold = decided === null ? null : { ...decided, since: this.last?.since ?? this.deps.clock.now().toISOString() };
     this.announce(hold);
     return hold;
   }

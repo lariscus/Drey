@@ -78,7 +78,7 @@ describe('the burn rate holds new starts (req-181)', () => {
     expect(b.fleet.records).toHaveLength(1);
     const status = b.orch.status();
     expect(status.autopilot).toEqual({ state: 'on' });
-    expect(status.hold).toEqual({ reason: 'burn-rate', spent: 0.21, limit: 0.2, resumesAt: '2026-11-10T00:00:00.000Z', basis: 'measured' });
+    expect(status.hold).toEqual({ reason: 'burn-rate', spent: 0.21, limit: 0.2, resumesAt: '2026-11-10T00:00:00.000Z', basis: 'measured', since: '2026-11-09T22:00:00.000Z' });
     expect(b.logs).toContain('route refused · burn rate 21 % of 20 % today · resumes 00:00');
     expect(b.events.filter((e) => e.kind === 'hold')).toEqual([{ kind: 'hold', hold: status.hold }]);
   });

@@ -105,7 +105,7 @@ function composeBurnRate(parts: PoolParts, records: SessionBook, shares: RunShar
   const burnBook = new BurnRateDayBook(parts.burnRateFile, parts.log);
   const burnMeter = new BurnRateMeter({ slots: parts.registry, records, shares, book: burnBook, clock: parts.clock });
   const guard = new BurnRateGuard(parts.settings, burnMeter, burnBook, parts.clock);
-  return { burnMeter, burnBook, burnRate: new BurnRateHoldSource({ guard, lines: recorder, timeText: parts.timeText, log: parts.log }) };
+  return { burnMeter, burnBook, burnRate: new BurnRateHoldSource({ guard, lines: recorder, timeText: parts.timeText, log: parts.log, clock: parts.clock }) };
 }
 
 /** The capacity pool's parts over the slots (req-170). */

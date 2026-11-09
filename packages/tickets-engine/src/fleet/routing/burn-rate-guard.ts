@@ -35,8 +35,8 @@ export class BurnRateGuard {
     private readonly clock: Clock,
   ) {}
 
-  /** Why nothing new may start today; null while it may. */
-  hold(): BurnRateHold | null {
+  /** Why nothing new may start today; null while it may. The hold source adds when it rose. */
+  hold(): Omit<BurnRateHold, 'since'> | null {
     const limit = this.settings.routing().burnRate;
     if (limit <= 0) {
       return null;

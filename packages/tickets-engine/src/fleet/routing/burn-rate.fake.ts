@@ -84,7 +84,7 @@ export class BurnRateRig {
     this.meter = new BurnRateMeter({ slots: { views: () => this.views }, records: this.records, shares, book: this.book, clock: this.clock });
     this.guard = new BurnRateGuard({ routing: () => this.settings }, this.meter, this.book, this.clock);
     const lines = new RouteRecorder(new CostEstimate(this.records));
-    this.source = new BurnRateHoldSource({ guard: this.guard, lines, timeText: (iso) => iso.slice(11, 16), log: (line) => this.logs.push(line) });
+    this.source = new BurnRateHoldSource({ guard: this.guard, lines, timeText: (iso) => iso.slice(11, 16), log: (line) => this.logs.push(line), clock: this.clock });
   }
 
   /** Sets the views and lets the meter see each (a slot's change). */

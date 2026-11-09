@@ -75,10 +75,11 @@ describe('BurnRateGuard — at most a share of the weekly quota per day (req-181
 });
 
 describe('BurnRateHoldSource — the hold the chain asks, told in the runner log (req-181)', () => {
-  it('logs the refusal once when the hold rises and once when it clears', () => {
+  it('logs the refusal once when the hold rises and once when it clears; the hold keeps the time it rose', () => {
     const rig = spent(0.21);
-    expect(rig.source.current()).toMatchObject({ reason: 'burn-rate', spent: 0.21, limit: 0.2 });
-    rig.source.current();
+    expect(rig.source.current()).toMatchObject({ reason: 'burn-rate', spent: 0.21, limit: 0.2, since: '2026-11-09T12:00:00.000Z' });
+    rig.clock.advance(60_000);
+    expect(rig.source.current()?.since).toBe('2026-11-09T12:00:00.000Z');
     expect(rig.logs).toEqual(['route refused · burn rate 21 % of 20 % today · resumes 00:00']);
     rig.clock.advance(12 * 3_600_000);
     expect(rig.source.current()).toBeNull();

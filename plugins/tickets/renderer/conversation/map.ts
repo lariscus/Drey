@@ -10,6 +10,7 @@ import type {
   ConversationThread,
   ConversationThreadMeta,
 } from '../../../../shared/plugin-api/renderer';
+import type { BurnRateCard } from '../../../../shared/burn-rate';
 import type { TrancheCard } from '../../../../shared/tranche';
 import type { ChatModelFailure, ChatProposal, ChatSession, ChatSessionMeta } from '../../../../packages/tickets-engine/src/contracts/chat';
 
@@ -140,6 +141,33 @@ export function trancheMessageOf(card: TrancheCard, meta: string): ConversationM
 /** The thread with the checkpoint card at its end; the thread itself when none waits. */
 export function withTrancheMessage(thread: ConversationThread, message: ConversationMessage | null): ConversationThread {
   return message === null ? thread : { ...thread, messages: [...thread.messages, message] };
+}
+
+/**
+ * The burn rate's card (req-181; board 10u's chrome, laid out like part 4,
+ * the quota stop) as the agent message that closes the Mission Control
+ * thread while the hold stands: title with the peach dot, body, the chips
+ * (SDK 1.56), `Wait` and `Allow today once`. `meta` is `Mission Control ·
+ * 22:40` with the time the hold rose; empty when the runner did not say.
+ */
+export function burnRateMessageOf(card: BurnRateCard, meta: string): ConversationMessage {
+  return {
+    id: card.id,
+    role: 'agent',
+    text: '',
+    cards: [
+      {
+        id: card.id,
+        kind: 'card',
+        title: card.title,
+        dot: card.tone,
+        text: card.body,
+        chips: card.chips,
+        actions: card.actions.map((action) => ({ id: action.id, label: action.label, tone: action.primary ? ('primary' as const) : ('quiet' as const) })),
+        ...(meta === '' ? {} : { meta }),
+      },
+    ],
+  };
 }
 
 /** The history rows of the engine's session list. */

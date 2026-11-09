@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- the spec stands in for the host, which owns the catalog at runtime
 import { i18n } from '../../../../shared/i18n';
+import { burnRateHoldOf } from '../../../../shared/burn-rate';
 import { trancheViewOf } from '../../../../shared/tranche';
 import type { PersonaView } from '../../shared/remote-protocol';
 import {
@@ -9,6 +10,7 @@ import {
   PERSONA_GROUP,
   personaTargetId,
   type ConversationDeps,
+  type HoldBinding,
   type TrancheBinding,
 } from './targets';
 
@@ -224,6 +226,86 @@ describe('the checkpoint card in Mission Control (req-179, board 10u)', () => {
     set(block(REPORT));
     expect(listener).toHaveBeenCalledTimes(1);
     set(block(null));
+    expect(listener).toHaveBeenCalledTimes(2);
+    off();
+  });
+});
+
+describe('Mission Control: the burn rate card (req-181, board 10u chrome)', () => {
+  const HOLD = { reason: 'burn-rate', spent: 0.21, limit: 0.2, resumesAt: '2026-11-10T00:00:00.000Z', basis: 'measured', since: '2026-11-09T22:40:00.000Z' };
+
+  function withHold(initial: object | null, liftWords: string | null = null) {
+    let current = burnRateHoldOf({ hold: initial });
+    const listeners = new Set<() => void>();
+    const lifted: string[] = [];
+    const binding: HoldBinding = {
+      view: () => current,
+      format: () => ({ t: (key, params) => i18n.t(key, params), time: (date) => date.toISOString().slice(11, 16) }),
+      lift: () => {
+        lifted.push('lift');
+        if (liftWords === null) {
+          current = null;
+        }
+        return Promise.resolve(liftWords);
+      },
+      subscribe: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    };
+    const mission = createConversationProvider({ ...deps().deps, hold: binding }).targets()[0]!;
+    return {
+      mission,
+      lifted,
+      set: (next: object | null) => {
+        current = burnRateHoldOf({ hold: next });
+        listeners.forEach((listener) => listener());
+      },
+    };
+  }
+
+  it('ends the thread with the card while the hold stands, and not before', async () => {
+    const { mission, set } = withHold(null);
+    expect((await mission.thread()).messages).toHaveLength(0);
+    set(HOLD);
+    const card = (await mission.thread()).messages[0]!.cards![0]!;
+    expect(card).toMatchObject({
+      title: 'Burn rate reached · 20 % of the week today',
+      dot: 'attention',
+      text: 'Nothing new starts until 00:00. Running steps finish.',
+      chips: ['spent 21 %', 'resumes 00:00'],
+      meta: 'Mission Control · 22:40',
+    });
+    expect(card.actions!.map((a) => [a.label, a.tone])).toEqual([['Wait', 'primary'], ['Allow today once', 'quiet']]);
+  });
+
+  it('Wait dismisses the card for the day; Allow today once lifts the hold', async () => {
+    const { mission, lifted } = withHold(HOLD);
+    const id = (await mission.thread()).messages[0]!.cards![0]!.id;
+    expect((await mission.act(id, 'wait')).messages).toHaveLength(0);
+    expect(lifted).toEqual([]);
+    const other = withHold(HOLD);
+    const second = (await other.mission.thread()).messages[0]!.cards![0]!.id;
+    expect((await other.mission.act(second, 'allow_once')).messages).toHaveLength(0);
+    expect(other.lifted).toEqual(['lift']);
+  });
+
+  it('a refused lift shows the words and keeps the card', async () => {
+    const { mission } = withHold(HOLD, 'the fleet runner is not running');
+    const id = (await mission.thread()).messages[0]!.cards![0]!.id;
+    const after = await mission.act(id, 'allow_once');
+    expect(after.messages.some((m) => m.error !== undefined || m.text.includes('the fleet runner is not running'))).toBe(true);
+    expect(after.messages.at(-1)!.cards![0]!.id).toBe(id);
+  });
+
+  it('tells the Assistant when the hold rises or clears', () => {
+    const { mission, set } = withHold(null);
+    const listener = vi.fn();
+    const off = mission.onThreadChange!(listener);
+    set(HOLD);
+    set({ ...HOLD, spent: 0.25 });
+    expect(listener).toHaveBeenCalledTimes(1);
+    set(null);
     expect(listener).toHaveBeenCalledTimes(2);
     off();
   });

@@ -27,6 +27,8 @@ export interface StatusSlotInput {
   readonly inNotesView: boolean;
   /** The tranche's run count (req-179); its tooltip names it when the tranche has a run limit. */
   readonly tranche?: { readonly done: number; readonly total: number | null } | null;
+  /** req-181: the burn rate holds every new start until this time of day (`00:00`, the locale's); null = nothing holds. */
+  readonly holdUntil?: string | null;
 }
 
 /** The part of a status item this file decides; empty text = hidden. */
@@ -75,17 +77,21 @@ export function autopilotSlotOf(
   autopilot: AutopilotState | null,
   t: Translate,
   tranche: StatusSlotInput['tranche'] = null,
+  holdUntil: string | null = null,
 ): StatusSlotPatch {
   if (autopilot === null) {
     return HIDDEN;
   }
   const state = t(`autopilot.state.${autopilot}`);
+  const tooltip =
+    holdUntil !== null && autopilot !== 'off'
+      ? t('status.autopilot.tooltip_burn_rate', { state, time: holdUntil, chord: AUTOPILOT_CHORD })
+      : tranche?.total == null
+        ? t('status.autopilot.tooltip', { state, chord: AUTOPILOT_CHORD })
+        : t('status.autopilot.tooltip_tranche', { state, done: tranche.done, total: tranche.total, chord: AUTOPILOT_CHORD });
   return {
     text: t('status.autopilot', { state }),
-    tooltip:
-      tranche?.total == null
-        ? t('status.autopilot.tooltip', { state, chord: AUTOPILOT_CHORD })
-        : t('status.autopilot.tooltip_tranche', { state, done: tranche.done, total: tranche.total, chord: AUTOPILOT_CHORD }),
+    tooltip,
     ...(autopilot === 'on' ? { dot: 'positive' as const } : autopilot === 'paused' ? { dot: 'attention' as const } : {}),
   };
 }
@@ -94,7 +100,7 @@ export function statusSlotsOf(input: StatusSlotInput, t: Translate): StatusSlots
   return {
     cost: costSlotOf(input.cost, input.budget, t),
     needs: needsSlotOf(input.needsYou, input.inNotesView, t),
-    autopilot: autopilotSlotOf(input.autopilot, t, input.tranche),
+    autopilot: autopilotSlotOf(input.autopilot, t, input.tranche, input.holdUntil ?? null),
   };
 }
 

@@ -36,6 +36,7 @@ import { AUTOPILOT_COMMAND_ID, costSlotOf, createStatusSlots, type StatusSlotCon
 import { createAutopilotCommand } from './autopilot/command';
 import { writeAutopilot } from './autopilot/controller';
 import { autopilotSwitchViewOf } from '../../../shared/autopilot';
+import { burnRateHoldOf } from '../../../shared/burn-rate';
 import { trancheViewOf } from '../../../shared/tranche';
 import { ageWords, checkpointActionOf, crewLineOf, ideaPhaseIds, needKindLabel, queueTargetOf, workGroups, workListSignature } from './work-groups';
 import { readyBarNode, readyCardNode, storyNode } from './ready-view';
@@ -398,10 +399,17 @@ const refreshStatusItem = (): void => {
     autopilot: autopilotSwitchViewOf(hasTicketsVault(), chain)?.state ?? null,
     inNotesView: statusApi.ui.activeViewId() === 'notes',
     tranche: trancheViewOf(chain),
+    holdUntil: holdUntilOf(statusApi),
   });
   // Board 7h: the dot on the Work view's tab while something needs the owner there (SDK 1.50).
   statusApi.ui.setViewBadge(WORK_VIEW_ID, needs > 0);
 };
+
+/** req-181: the burn rate's resume time for the status item's tooltip (`00:00`, the locale's); null while nothing holds. */
+function holdUntilOf(api: DreyPluginApi): string | null {
+  const hold = burnRateHoldOf(chain);
+  return hold === null ? null : api.i18n.formatTime(new Date(hold.resumesAt));
+}
 
 /** Keeps the header's master switch in step (the buttons live outside the board). */
 const masterButtons: { run: HTMLButtonElement; halt: HTMLButtonElement; abort: HTMLButtonElement }[] = [];
@@ -3110,6 +3118,7 @@ const plugin: { activate(api: DreyPluginApi): void } = {
         return text === '' ? null : text;
       },
       tranche: () => trancheViewOf(chain),
+      hold: () => burnRateHoldOf(chain),
       adjust: openTicketsSettings,
       anchor: () => slots.autopilotElement(),
       onOpenChange: (open) => slots.setAutopilotExpanded(open),
@@ -3172,6 +3181,26 @@ const plugin: { activate(api: DreyPluginApi): void } = {
             return outcome.ok ? null : outcome.words;
           },
           adjust: openTicketsSettings,
+          subscribe: (listener) => {
+            fleetListeners.add(listener);
+            return () => fleetListeners.delete(listener);
+          },
+        },
+        hold: {
+          view: () => burnRateHoldOf(chain),
+          format: () => ({ t: (key, params) => api.i18n.t(key, params), time: (date) => api.i18n.formatTime(date) }),
+          lift: async () => {
+            try {
+              const reply = (await api.backend.invoke('chainHoldLift')) as { ok: true; status: ChainStatus } | { ok: false; error: string };
+              if (!reply.ok) {
+                return reply.error;
+              }
+              applyChainStatus(reply.status);
+              return null;
+            } catch (error) {
+              return error instanceof Error ? error.message : String(error);
+            }
+          },
           subscribe: (listener) => {
             fleetListeners.add(listener);
             return () => fleetListeners.delete(listener);

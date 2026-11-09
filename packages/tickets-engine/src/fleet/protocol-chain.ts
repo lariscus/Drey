@@ -165,6 +165,8 @@ export interface BurnRateHold {
   readonly limit: number;
   readonly resumesAt: string;
   readonly basis: BurnRateBasis;
+  /** When the hold rose (ISO): the card's time. */
+  readonly since: string;
 }
 
 /** What can hold every new start while the Autopilot stays in its state (one reason today). */

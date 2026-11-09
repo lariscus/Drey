@@ -1,8 +1,9 @@
 /**
- * A proposal card under a conversation message (SDK 1.41, extended in 1.55):
- * the body, the buttons and the quiet note every card has, plus the optional
- * title with its status dot, the 2 x 2 figure grid, the list of lines and
- * the meta line a richer card brings (board 10u's Mission Control cards).
+ * A proposal card under a conversation message (SDK 1.41, extended in 1.55
+ * and 1.56): the body, the buttons and the quiet note every card has, plus
+ * the optional title with its status dot, the 2 x 2 figure grid, the list of
+ * lines, the chips and the meta line a richer card brings (board 10u's
+ * Mission Control cards).
  * A card with none of the 1.55 fields is drawn exactly as before. The
  * Assistant only draws it; what the card says is the target's.
  */
@@ -17,7 +18,7 @@ export interface CardActions {
 
 /** True when the card carries a 1.55 field: it then wears the larger board look. */
 export function isRichCard(card: ConversationCard): boolean {
-  return card.title !== undefined || card.metrics !== undefined || card.rows !== undefined || card.meta !== undefined;
+  return card.title !== undefined || card.metrics !== undefined || card.rows !== undefined || card.chips !== undefined || card.meta !== undefined;
 }
 
 function dotNode(tone: 'attention' | 'negative'): HTMLElement {
@@ -75,6 +76,11 @@ export function proposalNode(targets: CardActions, card: ConversationCard): HTML
     const list = el('div', 'target-card-rows');
     list.append(...(card.rows ?? []).map(rowNode));
     box.appendChild(list);
+  }
+  if ((card.chips ?? []).length > 0) {
+    const chips = el('div', 'target-card-chips');
+    chips.append(...(card.chips ?? []).map((text) => el('span', 'target-card-chip', text)));
+    box.appendChild(chips);
   }
   if (card.note !== undefined) {
     box.appendChild(el('p', 'target-card-note', card.note));
