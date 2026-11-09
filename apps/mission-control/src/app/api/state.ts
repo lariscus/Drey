@@ -1736,6 +1736,21 @@ export class McState {
     return { ok: true };
   }
 
+  /** req-181: the burn rate's "Allow today once" (`POST /api/chain/hold/lift`), its refusal as data (no toast). */
+  async liftHold(): Promise<McAutopilotReply> {
+    const body = await this.client
+      .request<Record<string, unknown>>('POST', '/api/chain/hold/lift', {})
+      .catch((error: unknown) => ({
+        ...fail(error),
+        ...(error instanceof ApiError && error.code !== null ? { code: error.code } : {}),
+      }));
+    if (isFailure(body) || body['ok'] !== true) {
+      return autopilotRefusalOf(body, '');
+    }
+    await this.refreshTeam();
+    return { ok: true };
+  }
+
   /** Stop-now from the Autopilot sheet: the chain's stop-all, its refusal as data (no toast). */
   async stopAllQuietly(): Promise<McAutopilotReply> {
     const body = await this.client

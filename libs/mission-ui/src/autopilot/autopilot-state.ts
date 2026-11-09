@@ -1,5 +1,6 @@
 import { InjectionToken, type Signal } from '@angular/core';
 import { autopilotRefusalCodeOf, type AutopilotRefusalCode, type AutopilotView } from '../../../../shared/autopilot';
+import type { BurnRateHoldView } from '../../../../shared/burn-rate';
 import type { TrancheView } from '../../../../shared/tranche';
 
 export type { AutopilotView };
@@ -26,6 +27,10 @@ export interface McAutopilotState {
   set(record: AutopilotView): Promise<McAutopilotReply>;
   /** "Stop all running steps now" — the chain's existing stop-all (`POST /api/chain/abort`). */
   stopAll(): Promise<McAutopilotReply>;
+  /** The burn rate's hold (req-181): nothing new starts until the day turns; null while nothing holds. Absent = the desk never says. */
+  readonly hold?: Signal<BurnRateHoldView | null>;
+  /** "Allow today once" (`POST /api/chain/hold/lift`). */
+  liftHold?(): Promise<McAutopilotReply>;
 }
 
 export const MC_AUTOPILOT = new InjectionToken<McAutopilotState | null>('mc-autopilot', {

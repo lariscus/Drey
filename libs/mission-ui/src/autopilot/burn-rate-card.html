@@ -1,0 +1,33 @@
+@if (model.card(); as card) {
+  <section class="card" data-kind="burn-rate" [attr.aria-label]="card.title">
+    <h3 class="title">
+      <span class="dot" aria-hidden="true"></span>
+      {{ card.title }}
+    </h3>
+    <p class="body">{{ card.body }}</p>
+    <div class="chips">
+      @for (chip of card.chips; track chip) {
+        <span class="chip">{{ chip }}</span>
+      }
+    </div>
+    <div class="actions">
+      @for (action of card.actions; track action.id) {
+        <button
+          type="button"
+          class="btn"
+          [class.primary]="action.primary"
+          [disabled]="action.id === 'allow_once' && model.readOnly()"
+          (click)="act(action.id)"
+        >
+          {{ action.label }}
+        </button>
+      }
+    </div>
+    @if (model.error(); as words) {
+      <p class="err" role="alert">{{ words }}</p>
+    }
+    @if (model.meta(); as meta) {
+      <span class="meta">{{ meta }}</span>
+    }
+  </section>
+}
