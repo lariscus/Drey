@@ -2,7 +2,8 @@ import path from 'node:path';
 import { branchForTicket } from '../contracts/tickets';
 import type { ComposeRunInput } from './request';
 import type { ExtraRepos } from './request-repos';
-import { ticketCopyPathFor, worktreePathFor } from './worktree-home';
+import { isReviewRun } from './review-run';
+import { reviewCheckoutPathFor, ticketCopyPathFor, worktreePathFor } from './worktree-home';
 
 /** What the checks settled: the input, the ticket's form, the gate's commands, the further repos. */
 export interface RunBasis {
@@ -20,6 +21,8 @@ export interface RunPlan extends RunBasis {
   readonly ticketFile: string;
   /** Whether a green gate moves the ticket on. */
   readonly moves: boolean;
+  /** req-183: the review run's read-only checkout; null on every other run. */
+  readonly reviewCheckout: string | null;
 }
 
 export function planRun(basis: RunBasis): RunPlan {
@@ -40,7 +43,19 @@ export function planRun(basis: RunBasis): RunPlan {
     // move-target rule as an interactive dialog: the ticket stays where it
     // sits until the owner promotes it from the report card.
     moves: !scout && input.interactive === undefined,
+    reviewCheckout: reviewCheckoutOf(input, scout),
   };
+}
+
+/** req-183: a review run reads the branch in `<id>-review` beside the ticket's worktree. */
+function reviewCheckoutOf(input: ComposeRunInput, scout: boolean): string | null {
+  const review = isReviewRun({
+    phaseId: input.workingPhase?.id ?? input.card.phase,
+    personaRole: input.persona?.role ?? null,
+    scout,
+    interactive: input.interactive !== undefined,
+  });
+  return review && input.repo !== null ? reviewCheckoutPathFor(input.vaultPath, input.repo, input.card.id) : null;
 }
 
 /** D-30: a store card's path is virtual, no such file exists: the worker gets a copy the runner takes back. */

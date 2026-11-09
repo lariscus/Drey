@@ -1,9 +1,9 @@
 import { mergeWorkerChapters } from '../../core/ticket-chapters';
 import type { FileSystem } from '../ports/file-system';
 import type { RunRequest } from '../protocol';
-import { ticketCopyPathFor } from '../worktree-home';
 import { messageOf, type LiveRun } from './live-run';
 import type { StoreClaims } from './store-claims';
+import type { WorkcopyFiles } from './workcopy-files';
 
 /** The ticket text the worker's copy started from, in the run's folder (D-30). */
 const TICKET_GIVEN_FILE = 'ticket-given.md';
@@ -13,12 +13,15 @@ const TICKET_GIVEN_FILE = 'ticket-given.md';
  * store card is on no disk, and a worker told to edit it went looking and
  * wrote a legacy file into the meta vault. So it gets a copy of the
  * ticket; the text it was given stays in the run's folder, so a later
- * take-back knows what the worker changed.
+ * take-back knows what the worker changed. The copy lives in `_workcopy/`
+ * (req-183); `WorkcopyFiles` still finds one an older runner left in
+ * `_worktrees/`.
  */
 export class TicketCopy {
   constructor(
     private readonly claims: StoreClaims,
     private readonly fs: FileSystem,
+    private readonly files: WorkcopyFiles,
     private readonly log: (message: string) => void,
   ) {}
 
@@ -26,9 +29,7 @@ export class TicketCopy {
   async write(request: RunRequest, dir: string): Promise<void> {
     try {
       const { text } = await this.claims.storeOf(request.dk!).show(request.ticketId);
-      const copy = ticketCopyPathFor(request.ticketsVaultPath, request.ticketId);
-      await this.fs.mkdirp(this.fs.dirname(copy));
-      await this.fs.writeText(copy, text);
+      await this.files.write(request.ticketsVaultPath, request.ticketId, text);
       await this.fs.writeText(this.fs.join(dir, TICKET_GIVEN_FILE), text);
     } catch (error) {
       this.log(`${request.ticketId}: the worker's copy of the ticket could not be written - ${messageOf(error)}`);
@@ -42,7 +43,7 @@ export class TicketCopy {
     }
     const givenPath = this.fs.join(run.dir, TICKET_GIVEN_FILE);
     const given = await this.fs.readTextOrNull(givenPath);
-    const worker = await this.fs.readTextOrNull(ticketCopyPathFor(run.request.ticketsVaultPath, run.request.ticketId));
+    const worker = await this.files.read(run.request.ticketsVaultPath, run.request.ticketId);
     if (given === null || worker === null || given === worker) {
       return;
     }
@@ -67,7 +68,7 @@ export class TicketCopy {
   /** The copy goes with the run's end. */
   async drop(run: LiveRun): Promise<void> {
     if (run.request.dk !== undefined) {
-      await this.fs.remove(ticketCopyPathFor(run.request.ticketsVaultPath, run.request.ticketId));
+      await this.files.drop(run.request.ticketsVaultPath, run.request.ticketId);
     }
   }
 }

@@ -64,6 +64,7 @@ import { cleanWorktrees, listOrphans, removeWorktree, type CleanupReport } from 
 import { unlinkShared } from '../fleet/worktrees';
 import { statusLogPathOf } from '../fleet/event-writer';
 import { legacyWorktreeBase, worktreeBaseFor, worktreePathFor, WORKTREES_DIR } from '../fleet/worktree-home';
+import { reservedIgnoreEntries, withIgnoreEntries } from './reserved-ignore';
 import { dkTargetFor, retreatStages } from '../fleet/dk-target';
 import { trancheConfigOf } from './tranche-config';
 import { type ChainConfig, type ChainStoreConfig, FleetCaps, FleetHandoverConfig, HandoverMode, InteractiveMode, PermissionMode, RunDkTarget, RunInfo, FleetPools } from '../fleet/protocol';
@@ -3496,25 +3497,24 @@ export class EngineBoardService {
   }
 
   /**
-   * The repo's .gitignore covers the worktrees base (ADR-0080: ensured,
-   * not documented — drifts on new boards otherwise). One commit when
-   * it changes; never fails the caller.
+   * The repo's .gitignore covers the worktrees base and the ticket copies'
+   * `_workcopy/` (ADR-0080, req-183: ensured, not documented — drifts on
+   * new boards otherwise). One commit when it changes; never fails the caller.
    */
   private async ensureWorktreesIgnored(vault: EngineVault): Promise<void> {
     const location = await this.locate(vault.path);
     if (location === null) {
       return; // not a git repo — nothing to ignore in
     }
-    const entry = `/${location.prefix}_worktrees/`;
     const gitignore = path.join(location.root, '.gitignore');
     const current = await fsp.readFile(gitignore, 'utf8').catch(() => null);
-    if (current !== null && current.split('\n').some((line) => line.trim() === entry)) {
+    const next = withIgnoreEntries(current, reservedIgnoreEntries(location.prefix));
+    if (next === null) {
       return;
     }
-    const lead = current === null || current === '' ? '' : current.endsWith('\n') ? '' : '\n';
     try {
-      await fsp.writeFile(gitignore, `${current ?? ''}${lead}${entry}\n`, 'utf8');
-      await this.git.commitPaths(location.root, ['.gitignore'], 'tickets: ignore the worktrees base');
+      await fsp.writeFile(gitignore, next, 'utf8');
+      await this.git.commitPaths(location.root, ['.gitignore'], 'tickets: ignore the worktrees base and the working copies');
     } catch (error) {
       this.host.log(`ignoring the worktrees base failed: ${messageOf(error)}`, 'warn');
     }

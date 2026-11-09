@@ -41,6 +41,13 @@ export interface GateRunnerDeps {
   /** req-180: the governor's heavy seats and the record the wait shows on; absent = no governor (a spec). */
   readonly seats?: GateSeats;
   readonly repo?: Pick<RunRepository, 'persist'>;
+  /** req-183: the review checkout's question — null while the branch still points at the reviewed commit; absent = no reviews (a spec). */
+  readonly review?: ReviewHead;
+}
+
+/** The review checkout as the gate asks it (req-183). */
+export interface ReviewHead {
+  moved(run: LiveRun): Promise<string | null>;
 }
 
 /** `dk validate --trailers <range>` inside the worktree: null = passes, else the output. */
@@ -67,6 +74,10 @@ export class GateRunner {
 
   /** Null when green, else the failure (multi-line, bounded by SANITY_CAP so run.json stays sane). */
   async run(run: LiveRun): Promise<string | null> {
+    const moved = await this.reviewMoved(run);
+    if (moved !== null) {
+      return moved;
+    }
     if (run.request.gate === 'structural') {
       return this.structural(run);
     }
@@ -118,6 +129,15 @@ export class GateRunner {
       await this.deps.bookkeeper.note(run, `gate: \`${command}\` waits — ${reason}`);
     }
     await this.deps.repo?.persist(run).catch(() => undefined);
+  }
+
+  /** req-183: a review gates only the commit the reviewer judged — a later commit on the branch fails it. */
+  private async reviewMoved(run: LiveRun): Promise<string | null> {
+    if (run.info.review === undefined || this.deps.review === undefined) {
+      return null;
+    }
+    await this.deps.bookkeeper.note(run, `gate: the branch still at the reviewed commit ${run.info.review.commit.slice(0, 10)}`);
+    return this.deps.review.moved(run);
   }
 
   private async structural(run: LiveRun): Promise<string | null> {

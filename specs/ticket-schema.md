@@ -50,7 +50,10 @@ Top-level rules, once, up front:
 <tickets repo root>/
   _worktrees/       # reserved (T-0044): the fleet's worktree home —
                     #   <ticket-id>/ per ticket, gitignored, invisible to
-                    #   the vault's tree/index/watcher
+                    #   the vault's tree/index/watcher; a review run's
+                    #   read-only checkout <ticket-id>-review/ (req-183)
+  _workcopy/        # reserved (req-183): a store ticket's working copy,
+                    #   <ticket-id>.ticket.md per running ticket, gitignored
   tickets/
     _meta/
       pipeline.md     # the phases + handover config (config, never data)
@@ -91,8 +94,16 @@ ticket data: the board, the vault's markdown index and the file watcher
 skip them entirely, and the repo's `.gitignore` covers them (ensured by
 the boot sweep, one commit when appended). The fleet's worktrees live in
 `_worktrees/<ticket-id>/` by default; a repo can override its base with
-a `worktrees:` key in repos.md. The skip is root-depth only —
-`tickets/_meta` stays indexed and watched.
+a `worktrees:` key in repos.md. A review run (req-183: the `review`
+phase, or any gate whose persona has the role `reviewer`) reads the branch
+in a second worktree beside it, `<ticket-id>-review/`, detached at the
+commit the builder handed over, read-only on disk and removed when the run
+ends — never a place to work in. A store ticket's working copy is
+`_workcopy/<ticket-id>.ticket.md` (req-183; until then
+`_worktrees/<ticket-id>.ticket.md`, which the runner still reads — and moves
+into `_workcopy/` — for one release, so a copy is never mistaken for a
+worktree). `.gitignore` carries `/_worktrees/` and `/_workcopy/`. The skip
+is root-depth only — `tickets/_meta` stays indexed and watched.
 
 ### Numbered folders (T-0041)
 
@@ -352,7 +363,7 @@ of the Plan and removes it for fewer than two parts.
 | `class` | `A \| B \| C` | Optional class pin (req-170): the run asks the capacity pool for exactly this class, whatever the size, the floor or the persona's default say. Any other value warns and reads as no pin. The Work row's menu (**Class ›**, req-186) writes it — one header patch, a Log line `class B` / `class none`, one commit `tickets: <id> class <value>`; a live run refuses. Dricket: `x-class`. |
 | `model` | string | Optional model pin (req-170): the run asks the pool for this model of the model table (its row's class); it beats `class:` and every class rule. Dricket: `x-model`. |
 | `size` | `S \| M \| L` | The plan part's size (req-170), written by the release from the part's `size:` detail: the run asks for class C, B or A (raised to the phase's `min-class:`). Absent = the class of the persona's default model. Dricket: `x-size`. |
-| `allowance` | number (USD) | The ticket's ledger (req-170, absorbs req-113): once the ticket's runs have spent it, the pool grants no further run and a Needs-you card (a keyed `blocked: [ledger-ticket]` comment) says so — unless the persona's `allowed: spend-above-allowance: true`. Absent = the default of Settings → Models (`service.json` `ledgers.ticketAllowance`); `$2.50` reads too. Dricket: `x-allowance`. |
+| `allowance` | number (USD) | The ticket's ledger (req-170, absorbs req-113): once the ticket's runs have spent it, the pool grants no further run and a Needs-you card (a keyed `blocked: [ledger-ticket]` comment) says so — unless the persona's `allowed: spend-above-allowance: true`. Absent = the default of Settings → Models (`service.json` `ledgers.ticketAllowance`); `$2.50` reads too. Dricket: `x-allowance`. |
 | `needs` | a list of tokens, one line or a YAML list | What the run's model must be able to do (req-178): `image` (image input — a step that reads screenshots), `tools` (tool calls declared; every agent session uses them, so only an explicit need asks for the declaration), `context-<n>` and `output-<n>` in tokens with `k` / `m` (`context-200k`, `output-32k`, `context-1m`). Merged with the phase's `needs:` (every capability either names, the larger size). The routing's filter takes only a model whose row in Settings → Models declares it — "not declared" filters too, so the owner sees which column to fill. Written by the release from the part's `needs:` detail; canonical form one line, `needs: image, context-200k`. An unknown token warns and is left out. Absent = nothing beyond the class. Dricket: `x-needs`. |
 | `proof` | `ui \| tests` | Optional pin (E11, concept v2 §5.3). Overrides the Handover's proof declaration (see [Proof mode](#proof-mode-e11)). Absent, or any other value (a warning), means no pin; with no pin and no readable declaration the mode reads as `ui`. |
 | `rank` | integer 0-999999 | Default `5000`. Fine ordering inside derived order. |
@@ -1218,8 +1229,10 @@ menu opens a terminal there ("Open work folder in terminal": run
 `.\dev.ps1`, the repo's build, whatever it uses). `worker` (M84) is the repo's default fleet worker for tickets on this
 repo. `worktrees` (T-0044, ADR-0080) overrides where the fleet's
 worktrees for this repo live — an absolute folder, or one relative to
-the tickets repo root; the worktree is `<base>/<ticket-id>`. Unset (the
-default) is `<ticketsRepo>/_worktrees`. `launch` (req-75 W3,
+the tickets repo root; the worktree is `<base>/<ticket-id>`, a review's
+read-only checkout `<base>/<ticket-id>-review` (req-183). Unset (the
+default) is `<ticketsRepo>/_worktrees`. The working copies stay in
+`<ticketsRepo>/_workcopy` whatever the base. `launch` (req-75 W3,
 T-0057) is the command that starts the repository's program in a
 ticket's worktree — "Launch this version" runs it there in a new
 console; a non-string value warns and reads as unset. Unset means the
@@ -1454,7 +1467,7 @@ board's tickets come from a dricket store (`docs/design/dricket/`) instead of
 from the tickets vault. A store ticket is folded into the layout above by
 `packages/tickets-engine/src/store/store-board.ts`; the card's `path` stays
 the virtual `tickets/<phase>/<id>.md` (there is no such file). A worker edits a
-working copy beside the worktrees instead, `_worktrees/<id>.ticket.md`; the runner takes
+working copy instead, `_workcopy/<id>.ticket.md` (req-183; `_worktrees/<id>.ticket.md` before, read for one release); the runner takes
 its changed chapters back inside the claim (D-30, [FLEET.md](../plugins/tickets/FLEET.md)).
 
 | dricket | Ticket key here | Note |

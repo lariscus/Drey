@@ -46,6 +46,12 @@ The runner's port and token are in the service home's `service.lock`, under
                     gitignored, skipped by the vault's tree/index/watcher;
                     a repo's `worktrees:` key in _meta/repos.md overrides
                     the base
+<tickets repo root>/_worktrees/<ticket-id>-review/   a review run's checkout
+                    (req-183): detached at the handed-over commit,
+                    read-only on disk, removed when the run ends
+<tickets repo root>/_workcopy/<ticket-id>.ticket.md  a store ticket's working
+                    copy while a run holds it (req-183; read at the old
+                    _worktrees/<ticket-id>.ticket.md for one release)
 ```
 
 `components.runner.state` `sleeping` means the runner is **down** (it goes
@@ -198,12 +204,56 @@ commit step on Ready to try.
 ### A worker's ticket on a store (D-30)
 
 A store ticket has no file: a card's path is virtual. So the brief names a working copy,
-`<vault>/_worktrees/<id>.ticket.md`, written after the claim; the text it started from is
+`<vault>/_workcopy/<id>.ticket.md` (req-183), written after the claim; the text it started from is
 `ticket-given.md` in the run's folder. When the turn ends, before a structural gate, a wait for the owner or
 any release, the runner `put`s what the worker changed back inside its claim: a changed or new chapter
 replaces the ticket's own, new Log lines are appended, frontmatter and `## Verlauf` do not count, a chapter
 the owner edited meanwhile stands unless the worker changed the same one. The copy goes when the run ends.
 A failed `put` is a log line and the next take-back tries again.
+
+Before req-183 the copy lived at `<vault>/_worktrees/<id>.ticket.md`, beside the worktrees — easy to take for
+one. For one release the runner still reads it there (`WorkcopyFiles`): the new path first; a copy found only at
+the old place is moved into `_workcopy/` on that first read, with one runner-log line (`T-0001: the working copy
+moved from … to …`); when both exist the new one wins and the old one is dropped. The run's end removes both.
+The boot sweep adds `/_workcopy/` to the tickets repo's `.gitignore` beside `/_worktrees/` (one commit).
+
+### The review checkout (req-183)
+
+A **review run** — the `review` phase, or any gate whose resolved persona has the role `reviewer` (an
+`insert security(ralf) after review` with Ralf a reviewer) — never works in the builder's worktree. The request
+carries `reviewCheckout` (`<worktree base>/<id>-review`, computed in `composeRunRequest` like `worktreePath`), and
+the start:
+
+1. refuses while another run of the ticket is live **or detached** — the builder's process has ended before
+   the hand-over (a detached worker may still write);
+2. prepares the ticket's worktree as always (the gate runs there), then reads the branch head
+   (`git rev-parse refs/heads/t/<id>`) — the commit the builder handed over; no branch = `worktree failed: …
+   nothing was handed over to review`;
+3. removes a leftover checkout at the path, runs `git worktree add --detach <id>-review <commit>` and sets the
+   checkout **read-only on disk** (`NodeTreeMode`: POSIX clears the write bits of files and folders; Windows
+   sets every file's read-only attribute — folders carry no guard there, so a new file could still be created);
+   a checkout that cannot be locked is removed and the start fails;
+4. spawns the worker with the checkout as its working folder; the brief names it (`Review checkout: … It is
+   read-only`) instead of `Work checkout:`; the run record carries `review: {checkout, commit}` and the
+   stream an opening line `review checkout … at <sha> — detached, read-only`.
+
+At the reviewer's exit the gate first asks whether the branch still points at the reviewed commit (`gate: the
+branch still at the reviewed commit <sha>`); a later commit fails the review red — `the branch t/<id> moved after
+the review began: the reviewer judged <sha>, the branch is at <sha> now — a later commit was never reviewed, so the
+review fails` — and no acceptance command runs. Otherwise the acceptance commands run in the ticket's worktree
+(writable, with its `link:` folders) at that same commit. The settle unlocks the checkout and removes it
+(`git worktree remove --force`, `git worktree prune`); a failure is a log line and the next review's start clears
+what is left; **Clean up worktrees** unlocks a leftover `-review` checkout before removing it. The review
+checkout takes the worker's light seat like any run (req-180) — no seat kind of its own.
+
+The second layer is the harness session's own: a review's request carries `permissionMode: 'read-only'`
+(set by `composeRunRequest`, never offered to an owner), and each adapter maps it — Claude Code
+`--permission-mode plan`, opencode's built-in `plan` agent on every prompt, Kimi `session/set_mode plan` when
+the session advertises it (Kimi Code 2.5.2 does; an older CLI keeps `auto` and the run's stream says the disk
+is the only guard). A read-only session cannot edit the ticket's working copy either, so the brief asks for the
+verdict in the final message (`BLOCKED: <why>` sends the step back); what a reviewer used to write into
+`## Handover` is not written now (roadmap req-199). opencode's `plan` agent asks before shell commands, so a
+reviewer's `git diff` there becomes a wait for the owner.
 
 The store is the runner's one ticket backend (req-176, ADR-0096): every ticket write — a run's and the chain's —
 goes through the one `RunBookkeeper` over the claim (release, comments, the in-claim `put`); a start whose
@@ -306,7 +356,8 @@ sends `auto`, an older sender's absence means `fresh`. One resolver —
 `packages/tickets-engine/src/fleet/handover.ts`, pure — decides:
 
 - The **review phase always resolves fresh** (an independent worker
-  judges the step).
+  judges the step) — and since req-183 it judges it in its own
+  read-only checkout (see *The review checkout*).
 - The candidate is the **newest terminal run** (`done`/`stopped`/
   `failed`) of the same ticket, provider and model in that supervisor —
   `detached` never qualifies (its worker may still live). No candidate,

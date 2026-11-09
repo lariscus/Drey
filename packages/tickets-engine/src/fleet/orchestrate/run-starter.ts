@@ -1,6 +1,6 @@
 import type { HandoverDecision } from '../handover';
 import type { Clock } from '../ports/clock';
-import type { RunInfo, RunRequest } from '../protocol';
+import type { ReviewCheckoutRecord, RunInfo, RunRequest } from '../protocol';
 import type { RunLease } from '../run-lease';
 import type { StartOutcome } from '../run/run-record';
 import { INITIAL_RUN_STATE, isTerminal } from '../run/run-state';
@@ -37,6 +37,19 @@ export interface RunStarterDeps {
   readonly retiring: () => boolean;
   /** req-177: the slot (account) a run starts on; absent = no slots, every older wiring. */
   readonly slots?: SlotBinder;
+  /** req-183: opens a review run's read-only checkout; absent = no review checkouts (a spec). */
+  readonly review?: ReviewOpener;
+}
+
+/** The review checkout as the starter asks it (req-183). */
+export interface ReviewOpener {
+  open(request: RunRequest): Promise<ReviewCheckoutRecord | null>;
+}
+
+/** What a run's preparation produced: the worktree (null on a scout run) and a review's checkout. */
+interface Prepared {
+  readonly worktree: PreparedWorktree | null;
+  readonly review: ReviewCheckoutRecord | null;
 }
 
 /** How a start was asked for beyond its request. */
@@ -89,8 +102,8 @@ export class RunStarter {
     if (typeof prepared === 'string') {
       return { ok: false, error: prepared };
     }
-    const session = this.session(id, request, ask, prepared);
-    const opening: RunOpening = { id, request, prepared, ...session, persona: ask.persona ?? null, stamp, slot };
+    const session = this.session(id, request, ask, prepared.worktree);
+    const opening: RunOpening = { id, request, prepared: prepared.worktree, review: prepared.review, ...session, persona: ask.persona ?? null, stamp, slot };
     return this.open(opening, ask.reopened === true, claimed);
   }
 
@@ -146,6 +159,11 @@ export class RunStarter {
     if (live !== undefined) {
       return `${request.ticketId} already has a live run (${live.id}) — stop it first`;
     }
+    // req-183: the builder's process has ended before a review starts — a detached worker may still write.
+    const detached = request.reviewCheckout !== undefined ? this.deps.repo.list().find((r) => r.ticketId === request.ticketId && r.state === 'detached') : undefined;
+    if (detached !== undefined) {
+      return `${request.ticketId} has a detached run (${detached.id}) whose worker may still live — the review starts once it has ended`;
+    }
     // A reopened session belongs to a ticket that may have moved on since.
     const failures = reopened ? [] : validateRequest(request);
     return failures.length > 0 ? failures.join(' ') : null;
@@ -168,23 +186,25 @@ export class RunStarter {
   /**
    * The run's folder, the worker's ticket copy and the worktrees: the
    * primary's and one per further repo (req-72), same branch. A scout run
-   * (E8) prepares none — it reads the named checkouts in place.
+   * (E8) prepares none — it reads the named checkouts in place. A review
+   * (req-183) also gets its read-only checkout at the branch's commit.
    */
-  private async prepare(request: RunRequest, id: string, lease: RunLease | null): Promise<PreparedWorktree | null | string> {
+  private async prepare(request: RunRequest, id: string, lease: RunLease | null): Promise<Prepared | string> {
     try {
       await this.deps.repo.ensureDir(this.deps.repo.dirFor(id));
       if (lease !== null) {
         await this.deps.bookkeeper.writeCopy(request, this.deps.repo.dirFor(id));
       }
       if (request.form === 'scout') {
-        return null;
+        return { worktree: null, review: null };
       }
-      const prepared = await this.deps.prepareWorktree(request, request.worktreePath);
+      const worktree = await this.deps.prepareWorktree(request, request.worktreePath);
       for (const extra of request.extraRepos ?? []) {
         const links = extra.links !== undefined ? { links: extra.links } : {};
         await this.deps.prepareWorktree({ ...request, repoPath: extra.repoPath, baseRef: extra.baseRef, ...links }, extra.worktreePath);
       }
-      return prepared;
+      const review = (await this.deps.review?.open(request)) ?? null;
+      return { worktree, review };
     } catch (error) {
       if (lease !== null) {
         await lease.release(this.deps.stores.stayPutStages(request, lease), `run ${id} did not start - worktree failed: ${messageOf(error)}`, { restoreTo: lease.preStage });

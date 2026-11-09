@@ -178,3 +178,36 @@ sleep and the next demand wakes it; its loopback routes and token are
 unchanged and recorded in `~/.drey-engine/service.lock` instead of
 `fleet/runner.json`. The stale-build handover (req-51) is now the whole
 service's. Operations: `plugins/tickets/SERVICE.md` and `FLEET.md`.
+
+## Later change — the review in a read-only checkout (req-183, milestone 225, as built 2026-11-09)
+
+One run = one worktree stays the rule for the work; a **review** no longer
+reads that worktree. A review run — the standard `review` phase, or any
+gate whose resolved persona has the role `reviewer` (`fleet/review-run.ts`)
+— carries `RunRequest.reviewCheckout`, a second git worktree
+`<worktree base>/<id>-review` beside the ticket's. The start refuses while
+another run of the ticket is live or detached (the builder's process has
+ended before the hand-over), reads the branch head — the commit the
+builder handed over — and runs `git worktree add --detach` at it; the
+checkout's files are set read-only on disk (`TreeMode` port, `NodeTreeMode`:
+POSIX files and folders, Windows files only). The worker's working folder
+is the checkout (`RunInfo.review`); the machine gate keeps running in the
+ticket's worktree (writable, with its `link:` folders) but first fails the
+review when the branch moved past the reviewed commit. The settle unlocks
+and removes the checkout (`orchestrate/review-checkout.ts`,
+`ReviewCheckout`, wired in `compose-supervisor.ts`). The session itself runs
+read-only too: `PermissionMode` gained `'read-only'`, set for every review
+and mapped per adapter — Claude Code `--permission-mode plan`, opencode's
+`plan` agent, Kimi's `plan` mode when the session advertises it.
+
+**Trade-offs taken.** Detection, not prevention: git has no lock for a
+local branch, so a commit after the hand-over is caught at the gate and
+fails the review rather than being impossible. The gate stays in the
+worktree: a read-only checkout cannot hold build output, and a second
+writable one would only move the problem. Two layers because neither is
+whole alone: the disk guards files but, on Windows, not folders; a
+harness's read-only mode depends on the CLI version (an older Kimi has
+none). The price of the session layer: a reviewer can no longer write its
+verdict into the ticket — it is the final message, and the Handover note a
+reviewer used to leave is roadmap req-199. Rejected alternatives:
+`specs/decisions.md`.

@@ -4,7 +4,8 @@
  * surfaces — the file tree, the markdown index and the opt-in watcher.
  *
  * `_`-prefixed folders at the **vault root only** are reserved (the
- * fleet's worktrees base `_worktrees/` lives there; the board and the
+ * fleet's worktrees base `_worktrees/` and the workers' ticket copies
+ * `_workcopy/` live there; the board and the
  * md index skip it so agent writes never cause refresh storms). Under
  * `tickets/` nothing changes: `tickets/_meta` stays indexed and
  * watched. Dot entries stay invisible everywhere, as before.

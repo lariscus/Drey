@@ -5121,3 +5121,55 @@ sequenceDiagram
 
 A restart keeps the morning's spend and a lift (the day's book is read at the routing's start); `since` takes the
 restart's time.
+
+## 6.109 Hand-over → review checkout → verdict → removal (req-183, milestone 225, [ADR-0075](09_architecture_decisions/0075-agent-fleet-architecture-governance-and-run-control.md) later change)
+
+The builder's run ends (its worker has exited; a detached run of the ticket refuses the review). The chain
+dispatches the review column; the request carries `reviewCheckout`. The start opens a second worktree detached at the
+commit the branch points at — the builder's hand-over — and locks its files on disk; the reviewer works there. At the
+reviewer's exit the gate first checks that the branch has not moved; the settle removes the checkout either way.
+
+```mermaid
+sequenceDiagram
+    participant B as Builder run (worktree <id>)
+    participant D as Dispatcher / composeRunRequest
+    participant S as RunStarter
+    participant RC as ReviewCheckout
+    participant G as git (repo checkout)
+    participant TM as TreeMode (disk)
+    participant W as Reviewer (harness)
+    participant GR as GateRunner
+    participant ST as RunSettler
+    B->>B: commits on t/<id>, turn ends, gate green → ticket moves to review; worker exited
+    D->>D: isReviewRun(review phase | persona role reviewer) → reviewCheckout = <base>/<id>-review
+    D->>S: start(request)
+    S->>S: refuse while a run of the ticket is live or detached
+    S->>S: prepareWorktree(<id>) — reused; the gate's ground
+    S->>RC: open(request)
+    RC->>G: rev-parse refs/heads/t/<id> → commit C (the hand-over)
+    opt a leftover <id>-review
+        RC->>TM: setReadOnly(false)
+        RC->>G: worktree remove --force; worktree prune
+    end
+    RC->>G: worktree add --detach <id>-review C
+    RC->>TM: setReadOnly(true) — POSIX files + folders, Windows files
+    RC-->>S: {checkout, commit: C} → RunInfo.review, opening line
+    S->>W: spawn, cwd = <id>-review, permission read-only (Claude Code plan · opencode plan agent · Kimi plan); brief "Review checkout: … read-only"
+    W->>W: reads the tree; the verdict is its final message (BLOCKED: sends it back)
+    W-->>GR: turn ends
+    GR->>RC: moved(run)
+    RC->>G: rev-parse refs/heads/t/<id> → H
+    alt H = C
+        GR->>GR: acceptance commands in the worktree <id> (at C)
+        GR-->>ST: green → move on (or park), settle done
+    else H ≠ C (a commit after the hand-over)
+        GR-->>ST: red "the branch moved after the review began: the reviewer judged C, the branch is at H now"
+    end
+    ST->>RC: close(run)
+    RC->>TM: setReadOnly(false)
+    RC->>G: worktree remove --force <id>-review; worktree prune
+```
+
+A blocked verdict (`BLOCKED:` in the reviewer's last message) and a stop take the same settle, so the checkout goes
+with every end. A removal that fails is a log line; the next review's start clears the leftover, and *Clean up
+worktrees* unlocks a leftover before `git worktree remove`.

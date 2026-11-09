@@ -60,6 +60,7 @@ function shipInstructionInput(plan: RunPlan): InstructionInput {
     caps: input.caps ?? DEFAULT_FLEET_CAPS,
     ...interactivePart(input),
     ...personaParts(input.persona ?? null),
+    ...(plan.reviewCheckout !== null ? { reviewCheckout: plan.reviewCheckout } : {}),
   };
 }
 

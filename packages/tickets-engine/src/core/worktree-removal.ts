@@ -5,9 +5,10 @@
  * the `git worktree remove`. The main-side handler executes the plan
  * (`TicketsGit.worktreeRemove`); nothing here touches the disk.
  *
- * `_worktrees/<id>` at the repo root is T-0044's recommended home — this
- * ships dormant (the folder does not exist yet); only the matcher
- * constant moves if that ticket picks another layout.
+ * `_worktrees/<id>` at the repo root is the worktree home (T-0044). A
+ * review checkout `_worktrees/<id>-review` (req-183) is not matched: the
+ * runner removes it when the review ends, Clean up removes a leftover. The
+ * workers' ticket copies live in `_workcopy/` (req-183), never here.
  */
 import type { RepoRef, TicketCard } from '../contracts/tickets';
 

@@ -55,7 +55,7 @@ describe('planWorktreeRemoval (T-0042)', () => {
   });
 
   it('refuses anything that is not a _worktrees/<ticket-id> folder', () => {
-    for (const folder of ['_worktrees', '_worktrees/scratch', 'tickets/_worktrees/T-0042', 'worktrees/T-0042', 'notes']) {
+    for (const folder of ['_worktrees', '_worktrees/scratch', 'tickets/_worktrees/T-0042', 'worktrees/T-0042', 'notes', '_worktrees/T-0042-review', '_workcopy/T-0042.ticket.md']) {
       const plan = planWorktreeRemoval({ folder, cards: [card()], repos: repos() });
       expect(plan.ok).toBe(false);
     }

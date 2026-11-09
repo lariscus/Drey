@@ -7,7 +7,7 @@
  * or IPC.
  *
  * Scope (decision 10): the `tickets/` subtree ONLY — the rest of the
- * dedicated vault (loose notes, `_worktrees/`) stays free, and with no
+ * dedicated vault (loose notes, `_worktrees/`, `_workcopy/`) stays free, and with no
  * board detected everything is allowed.
  */
 import type { VaultFileOperation, VaultFileOperationVerdict } from '../../../shared/plugin-api';

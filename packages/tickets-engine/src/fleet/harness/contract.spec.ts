@@ -71,6 +71,13 @@ describe.each<ContractDriver>([claudeCodeDriver, opencodeDriver, kimiDriver, fak
     expect(await s.handle.steer('anyone there?')).toBe('refused');
   });
 
+  it('a read-only start (req-183, a review) reaches the harness as its read-only mode', async () => {
+    const s = await driver.start({ permissionMode: 'read-only' });
+    await s.settle();
+    expect(s.permission()).toBe(driver.readOnly);
+    await s.handle.stop();
+  });
+
   it('every event is stamped and of a known kind', async () => {
     const s = await driver.start();
     await s.endTurn('All done.');

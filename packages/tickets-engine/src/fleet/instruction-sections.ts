@@ -23,15 +23,26 @@ export function whoAndWhere(input: InstructionInput, context: WhoAndWhereContext
   return [
     `You are working ticket ${input.ticketId} — ${input.title}.`,
     ...optional(context.persona),
-    `Work checkout: ${input.worktreePath} (branch ${input.branch}` +
-      (input.repo !== null ? `, repo ${input.repo}` : '') +
-      `). Stay on that branch; it and the worktree are your only writable places.`,
+    checkoutLine(input),
     ...optional(extraReposPart(input)),
     `The ticket sits in the "${input.phase}" phase of the owner's board.`,
     ...optional(toolchainPart(input.links)),
     ...ticketFileParts(input, context.plan),
     ...(context.description !== '' ? [`What and why:\n${context.description}`] : []),
   ];
+}
+
+/** Where the worker works — or, on a review run (req-183), the read-only checkout it judges. */
+function checkoutLine(input: InstructionInput): string {
+  const repo = input.repo !== null ? `, repo ${input.repo}` : '';
+  if (input.reviewCheckout !== undefined) {
+    return (
+      `Review checkout: ${input.reviewCheckout} (branch ${input.branch} at the commit the builder handed over, detached${repo}). ` +
+      `It is read-only, and so is your session: you judge this tree, you change no file — the ticket file included. ` +
+      `Give your verdict in your final message; end it with \`BLOCKED: <why>\` to send the step back.`
+    );
+  }
+  return `Work checkout: ${input.worktreePath} (branch ${input.branch}${repo}). Stay on that branch; it and the worktree are your only writable places.`;
 }
 
 function extraReposPart(input: InstructionInput): string | null {
@@ -63,6 +74,10 @@ function ticketFileParts(input: InstructionInput, plan: string): string[] {
   const ticketFile = input.ticketFile;
   if (ticketFile === undefined || ticketFile === '') {
     return [];
+  }
+  if (input.reviewCheckout !== undefined) {
+    // req-183: a review's session is read-only — the ticket file is there to read, never to edit.
+    return [`The ticket file: ${ticketFile} — read it if you need more than this brief quotes; your session cannot change it.`];
   }
   const fileLine =
     input.ticketFileIsCopy === true

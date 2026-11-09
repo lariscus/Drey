@@ -45,8 +45,13 @@ export function isWorkerProvider(value: unknown): value is WorkerProviderId {
   return typeof value === 'string' && (WORKER_PROVIDERS as readonly string[]).includes(value);
 }
 
-/** How the runner may let the agent answer itself (blast radius; ADR-0075). */
-export type PermissionMode = 'accept-edits' | 'bypass';
+/**
+ * How the runner may let the agent answer itself (blast radius; ADR-0075).
+ * `read-only` (req-183) is the review run's: no edits, no state-changing
+ * commands — set by `composeRunRequest` for a review, never chosen by an
+ * owner; each adapter maps it to its harness's read-only mode.
+ */
+export type PermissionMode = 'accept-edits' | 'bypass' | 'read-only';
 
 /**
  * The interactive dialog modes (req-65): the owner drives the run as a
@@ -239,6 +244,20 @@ export interface RunRequest {
   readonly poolNeeds?: ModelNeeds;
   /** req-178: the dispatch's routing decision — the start's gate prefers its slot and keeps its class (a step up stays one); lands on the run record. */
   readonly poolRoute?: RouteRecord;
+  /**
+   * req-183: a review run (`isReviewRun`) reads the ticket branch in its own
+   * checkout — this path, a second worktree `<id>-review` beside the
+   * ticket's, detached at the commit the builder handed over and read-only
+   * on disk. Computed in `composeRunRequest` like `worktreePath`; absent =
+   * every other run, and every older sender.
+   */
+  readonly reviewCheckout?: string;
+}
+
+/** req-183: the review checkout a run's worker reads, and the commit it shows. */
+export interface ReviewCheckoutRecord {
+  readonly checkout: string;
+  readonly commit: string;
 }
 
 /** How the run's worktree was obtained — `prepareWorktree` (T-0047) is
@@ -446,6 +465,8 @@ export interface RunInfo {
   readonly slot?: { readonly id: string; readonly label: string };
   /** req-170: the pool's decision — the class asked for, the model that ran, its weight, why; absent on runs before the pool. */
   readonly grant?: PoolGrantRecord;
+  /** req-183: the review run's read-only checkout and the commit it was opened at; absent on every other run. */
+  readonly review?: ReviewCheckoutRecord;
   /**
    * Why the worker declared the step incomplete (`BLOCKED:` in its final
    * message): no gate ran, nothing moved — the ticket waits for the
