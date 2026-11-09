@@ -6,6 +6,7 @@
  */
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
+import { memoryEntriesOf, parseMemoryLine, type MemoryEntryText } from '../core/memory-line';
 import { PERSONAS_DIR } from '../core/persona';
 import type { TicketsGit } from '../core/tickets-git';
 
@@ -81,64 +82,57 @@ export async function worktreeDiffStat(
 // --- persona memory (ADR-0088, E3) --------------------------------------
 
 /**
- * The persona memory slice of a run's instruction (T-0048 context pack):
- * the tail of the persona's curated `memory.md` — what this agent has
- * already learned on earlier tickets. The caps keep the slice a nudge,
- * not a transcript: at most the last {@link PERSONA_MEMORY_MAX_LINES}
- * lines AND {@link PERSONA_MEMORY_MAX_TOKENS} estimated tokens
- * (~4 characters each — there is no tokenizer at compose time), the
- * newer entries winning the budget. Null when nothing worth including
- * is there, so a persona-less (or memory-less) run's instruction keeps
- * byte-identical prefix stability.
+ * The persona memory slice of a run's instruction (T-0048 context pack,
+ * R14): what this agent has learned on earlier tickets, the owner's lines
+ * and the pinned ones first, the persona's own lessons after. The caps keep
+ * the slice a nudge, not a transcript: at most
+ * {@link PERSONA_MEMORY_MAX_LINES} lines AND {@link PERSONA_MEMORY_MAX_TOKENS}
+ * estimated tokens (~4 characters each — there is no tokenizer at compose
+ * time); the first group takes the budget first, newest lines winning
+ * within a group, each group in file order. Null when nothing worth
+ * including is there, so a persona-less (or memory-less) run's instruction
+ * keeps byte-identical prefix stability.
  */
 export const PERSONA_MEMORY_MAX_LINES = 20;
 export const PERSONA_MEMORY_MAX_TOKENS = 500;
 
 const PERSONA_MEMORY_LEAD =
-  'What this agent has learned on previous tickets (its curated memory, newest last) — apply these lessons where they fit:';
+  "What this agent has learned on previous tickets (its curated memory: the owner's and pinned lines first, then its own lessons, newest last) — apply these lessons where they fit:";
+
+/** The budget one slice spends, group by group. */
+interface Budget {
+  lines: number;
+  tokens: number;
+}
 
 export function personaMemorySlice(
   memoryText: string,
   maxLines: number = PERSONA_MEMORY_MAX_LINES,
   maxTokens: number = PERSONA_MEMORY_MAX_TOKENS,
 ): string | null {
-  const lines = withoutBlankEdges(memoryText.split(NL));
-  if (lines.length === 0) {
+  const entries = memoryEntriesOf(memoryText).filter((e) => e.text !== '' && !e.text.startsWith('#'));
+  if (entries.length === 0) {
     return null;
   }
-  const picked = newestLessons(lines, maxLines, maxTokens);
-  // The file's own `# Memory` header is not a lesson either.
-  while (picked.length > 0 && picked[0]!.trimStart().startsWith('#')) {
-    picked.shift();
-  }
+  const first = entries.filter((e) => e.pinned || parseMemoryLine(e.text).author.kind === 'owner');
+  const rest = entries.filter((e) => !first.includes(e));
+  const budget: Budget = { lines: maxLines, tokens: maxTokens };
+  const picked = [...newestLessons(first, budget), ...newestLessons(rest, budget)];
   return picked.length === 0 ? null : picked.join(NL);
 }
 
-function withoutBlankEdges(lines: string[]): string[] {
-  while (lines.length > 0 && lines[0]!.trim() === '') {
-    lines.shift();
-  }
-  while (lines.length > 0 && lines[lines.length - 1]!.trim() === '') {
-    lines.pop();
-  }
-  return lines;
-}
-
-/** The newest non-blank lines that fit both budgets, in file order. */
-function newestLessons(lines: readonly string[], maxLines: number, maxTokens: number): string[] {
+/** The newest lines of one group that fit what is left of the budget, in file order. */
+function newestLessons(entries: readonly MemoryEntryText[], budget: Budget): string[] {
   const picked: string[] = [];
-  let tokens = 0;
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i]!;
-    if (line.trim() === '') {
-      continue; // separators carry no lesson
-    }
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const line = `- ${entries[i]!.text}`;
     const lineTokens = Math.max(1, Math.ceil(line.length / 4));
-    if (picked.length >= maxLines || tokens + lineTokens > maxTokens) {
+    if (budget.lines <= 0 || lineTokens > budget.tokens) {
       break;
     }
     picked.unshift(line);
-    tokens += lineTokens;
+    budget.lines -= 1;
+    budget.tokens -= lineTokens;
   }
   return picked;
 }

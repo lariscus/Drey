@@ -1,3 +1,4 @@
+import { MEMORY_PIN_MARKER, memoryEntriesOf, parseMemoryLine, type MemoryAuthor } from '../core/memory-line';
 import { PERSONAS_DIR } from '../core/persona';
 
 /**
@@ -27,7 +28,7 @@ export const MEMORY_HEADER = '# Memory';
 /** The memory file never grows past this many lines; the oldest entries go first. */
 export const MEMORY_LINE_CAP = 200;
 /** The pin marker a pinned entry carries at its line's end (U4, concept §4.4 — "gepflegtes Asset"). */
-export const MEMORY_PIN_MARKER = ' [pinned]';
+export { MEMORY_PIN_MARKER };
 
 /** The vault-relative path of one persona's memory file. */
 export function memoryPathFor(id: string): string {
@@ -66,12 +67,58 @@ function entryLineOf(entry: MemoryEntry): string {
  * index everywhere.
  */
 export function parseMemoryEntries(text: string): readonly MemoryEntry[] {
-  return entryLines(text).map((line) => {
-    const pinned = line.trimEnd().endsWith(MEMORY_PIN_MARKER);
-    const bare = pinned ? line.trimEnd().slice(0, -MEMORY_PIN_MARKER.length) : line;
-    const display = bare.trim().startsWith('- ') ? bare.trim().slice(2) : bare.trim();
-    return { text: display, pinned };
+  return memoryEntriesOf(text);
+}
+
+/** One entry as the Memory tab shows it (req-169): the text, the pin, and the line's author and evidence. */
+export interface DescribedMemoryEntry extends MemoryEntry {
+  /** `you` for the owner, the persona id for a persona's lesson, null when the line names no author (an older line). */
+  readonly author: string | null;
+  readonly model: string | null;
+  readonly date: string | null;
+  readonly ticket: string | null;
+  readonly lesson: string;
+}
+
+function authorOf(author: MemoryAuthor): { author: string | null; model: string | null } {
+  switch (author.kind) {
+    case 'owner':
+      return { author: 'you', model: null };
+    case 'persona':
+      return { author: author.persona, model: author.model };
+    default:
+      return { author: null, model: null };
+  }
+}
+
+/** The entries with their author and evidence (req-169), same order and index as {@link parseMemoryEntries}. */
+export function describeMemoryEntries(text: string): readonly DescribedMemoryEntry[] {
+  return parseMemoryEntries(text).map((entry) => {
+    const line = parseMemoryLine(entry.text);
+    return { ...entry, ...authorOf(line.author), date: line.date, ticket: line.ticket, lesson: line.lesson };
   });
+}
+
+/**
+ * Removes one entry (req-169: every line removable, the owner's and the
+ * persona's alike): the entry at `index` goes when its text is the one the
+ * caller saw (`expectText`), everything else survives byte for byte.
+ * Null when the index names no entry or the text differs (the file moved).
+ */
+export function removeMemoryEntry(text: string, index: number, expectText: string): string | null {
+  const lines = text.split(NL);
+  const firstIsHeader = (lines[0] ?? '').startsWith('#');
+  const entryIndexes: number[] = [];
+  for (let i = firstIsHeader ? 1 : 0; i < lines.length; i++) {
+    if ((lines[i] ?? '').trim() !== '') {
+      entryIndexes.push(i);
+    }
+  }
+  const target = entryIndexes[index];
+  if (target === undefined || parseMemoryEntries(text)[index]?.text !== expectText) {
+    return null;
+  }
+  return lines.filter((_, i) => i !== target).join(NL);
 }
 
 /**
