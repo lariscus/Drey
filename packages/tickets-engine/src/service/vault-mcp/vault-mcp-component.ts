@@ -11,9 +11,11 @@
  */
 import type { McpToolDef, McpToolResult } from '../../../../../shared/vault-tools';
 import type { WorkerMcpLaunch, WorkerMcpServer } from '../../fleet/harness/contract';
+import type { OneOnOneToolSeam } from '../../fleet/one-on-one-toolset';
 import type { VaultGrantRequest, WorkerVaultAccess, WorkerVaultGate } from '../../fleet/orchestrate/worker-vault';
 import type { ComponentRecord } from '../service-lock';
 import type { LaunchFiles } from './launch-files';
+import { OneOnOneVaultTools } from './one-on-one-tools';
 import type { RunTokens, TokenSession } from './run-tokens';
 import { VAULT_MCP_NAME } from './vault-call-auditor';
 import type { VaultMcpCalls } from './vault-mcp-calls';
@@ -32,6 +34,8 @@ export interface VaultMcpComponentDeps {
 }
 
 export class VaultMcpComponent implements WorkerVaultGate, VaultMcpHandler {
+  /** The 1:1's tool seam (req-217): what its brief may name is what this component attaches. */
+  readonly oneOnOneTools: OneOnOneToolSeam = new OneOnOneVaultTools({ listening: () => this.listening });
   private readonly endpoint: McpEndpoint;
   private port: number | null = null;
   private failure: string | null = null;
@@ -71,8 +75,8 @@ export class VaultMcpComponent implements WorkerVaultGate, VaultMcpHandler {
       request.emit({ ts: this.deps.now().toISOString(), kind: 'note', detail: 'runner', text: `${why} — this run has no vault` });
       return null;
     }
-    const { emit, runId, ticketId, persona, readOnly } = request;
-    const token = this.deps.tokens.mint({ runId, ticketId, persona, readOnly, emit });
+    const { emit, runId, ticketId, persona, readOnly, tools } = request;
+    const token = this.deps.tokens.mint({ runId, ticketId, persona, readOnly, ...(tools === undefined ? {} : { tools }), emit });
     const launch = describe({ name: VAULT_MCP_NAME, url: `http://127.0.0.1:${this.port}/mcp`, token, runDir: request.runDir });
     try {
       launch.files.forEach((file) => this.deps.files.write(file.path, file.text));
@@ -89,8 +93,13 @@ export class VaultMcpComponent implements WorkerVaultGate, VaultMcpHandler {
     return this.deps.tokens.resolve(token);
   }
 
-  list(): Promise<McpToolDef[]> {
-    return this.deps.calls.list();
+  list(session: TokenSession): Promise<McpToolDef[]> {
+    return this.deps.calls.list(session);
+  }
+
+  /** Is the endpoint listening — the 1:1's tool seam asks (req-217). */
+  get listening(): boolean {
+    return this.port !== null;
   }
 
   call(session: TokenSession, name: string, args: Readonly<Record<string, unknown>>): Promise<McpToolResult> {

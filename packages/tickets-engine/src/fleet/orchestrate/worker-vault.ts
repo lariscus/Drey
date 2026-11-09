@@ -15,6 +15,8 @@ export interface VaultGrantRequest {
   readonly persona: string | null;
   /** A read-only run (a review, req-183) writes no vault, whatever its persona may. */
   readonly readOnly: boolean;
+  /** The vault tools offered (a 1:1: the read cut, req-217); absent = all the service serves workers. */
+  readonly tools?: readonly string[];
   /** The run's own folder: a harness's config file lands here, never in the worktree. */
   readonly runDir: string;
   /** The harness's name, for the one stream line when it takes no MCP. */

@@ -95,9 +95,10 @@ export class ServiceHost {
       hostedVault: opts.vaultPath,
       build: opts.build,
       log: (message, level) => this.log('mcp', message, level ?? 'info'),
-      onChange: () => void this.refreshLock(),
+      // req-213: a worker's vault write reaches Drey's vault round through the engine's paths channel.
+      onChange: () => void this.refreshLock(), changed: (change) => this.engine?.emitPaths(change),
     });
-    this.runner = new RunnerComponent({
+    this.runner =new RunnerComponent({
       root: path.join(opts.home, 'fleet'),
       ...(opts.runnerIdleMs === undefined ? {} : { idleMs: opts.runnerIdleMs }),
       // The engine's store is the one Drey's sync writes; before it exists, the file.
@@ -138,6 +139,8 @@ export class ServiceHost {
       clientDir: this.opts.clientDir,
       log: (message, level) => this.log('engine', message, level ?? 'info'),
       runner: this.runner,
+      // req-217: the brief of a 1:1 names the vault read tools the service's MCP attaches to it.
+      oneOnOneTools: this.vaultMcp.oneOnOneTools,
       ...this.opts.engineOptions,
     });
     this.token = this.engine.token;

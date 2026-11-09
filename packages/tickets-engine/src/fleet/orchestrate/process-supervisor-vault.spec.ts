@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { NormalizedEvent, ProviderAdapter, ProviderStart, WorkerHandle, WorkerMcpServer } from '../harness/contract';
 import type { LiveRun } from './live-run';
 import { ProcessSupervisor, type ProcessSupervisorDeps } from './process-supervisor';
+import { ONE_ON_ONE_VAULT_TOOLS } from '../one-on-one-toolset';
 import type { VaultGrantRequest, WorkerVaultGate } from './worker-vault';
 
 /**
@@ -9,7 +10,7 @@ import type { VaultGrantRequest, WorkerVaultGate } from './worker-vault';
  * the persona and the read-only flag of the run, the run's own folder — hands
  * the adapter its launch, and closes the access when the worker exits.
  */
-function harness(withMcp: boolean) {
+function harness(withMcp: boolean, request: Record<string, unknown> = {}) {
   const starts: ProviderStart[] = [];
   let exit: (code: number | null) => void = () => undefined;
   const handle: WorkerHandle = { pid: 7, exited: new Promise((resolve) => (exit = resolve)), steer: async () => 'inject', stop: async () => undefined };
@@ -44,7 +45,7 @@ function harness(withMcp: boolean) {
   } as unknown as ProcessSupervisorDeps;
   const run = {
     info: { id: 'run-1', persona: 'ben', worktreePath: 'W:/kt' },
-    request: { ticketId: 'T-1', model: null, permissionMode: 'read-only', instruction: 'x' },
+    request: { ticketId: 'T-1', model: null, permissionMode: 'read-only', instruction: 'x', ...request },
     dir: 'R:/runs/run-1',
     handle: null,
   } as unknown as LiveRun;
@@ -80,5 +81,25 @@ describe('ProcessSupervisor and the vault (req-167)', () => {
     h.supervisor.spawn(h.run, { instruction: 'x', resumeRef: null });
     h.requests[0]!.emit({ ts: 't', kind: 'tool', detail: 'audit', tool: 'mcp__drey__vault_read' });
     expect(h.events).toEqual([expect.objectContaining({ detail: 'audit' })]);
+  });
+
+  it("offers a 1:1's token the read cut of the vault tools, read-only (req-217)", () => {
+    const h = harness(true, { ticketId: '1:1', permissionMode: 'read-only', session: { kind: '1:1', persona: 'ben', workingDirectory: 'W:/kt', chatFile: 'c.md' } });
+    h.supervisor.spawn(h.run, { instruction: 'x', resumeRef: null });
+    expect(h.requests[0]).toEqual(expect.objectContaining({ persona: 'ben', readOnly: true, tools: ONE_ON_ONE_VAULT_TOOLS }));
+    expect(ONE_ON_ONE_VAULT_TOOLS).toEqual(['vault_list', 'vault_search', 'vault_read']);
+  });
+
+  it("a free session keeps its persona's rights: the full set, read-only only when its mode says so (req-217)", () => {
+    const h = harness(true, { ticketId: 'free', permissionMode: 'accept-edits', session: { kind: 'free', persona: 'ben', workingDirectory: 'W:/x' } });
+    h.supervisor.spawn(h.run, { instruction: 'x', resumeRef: null });
+    expect(h.requests[0]!.readOnly).toBe(false);
+    expect(h.requests[0]!.tools).toBeUndefined();
+  });
+
+  it('a ticket run is offered every vault tool', () => {
+    const h = harness(true, { permissionMode: 'accept-edits' });
+    h.supervisor.spawn(h.run, { instruction: 'x', resumeRef: null });
+    expect(h.requests[0]!.tools).toBeUndefined();
   });
 });

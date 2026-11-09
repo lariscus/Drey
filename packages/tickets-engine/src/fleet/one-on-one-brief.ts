@@ -90,8 +90,19 @@ function conversationOf(messages: readonly BriefMessage[]): string {
     .join('\n\n');
 }
 
+/** The tools line per kind of tool, so it never says more than what is attached (ADR-0071). */
 function toolsOf(tools: readonly string[]): string | null {
-  return tools.length === 0 ? null : section('Tools', `Read the board, the tickets and the vault with: ${tools.join(', ')}. They only read.`);
+  const fleet = tools.filter((name) => name.startsWith('fleet_'));
+  const vault = tools.filter((name) => name.startsWith('vault_'));
+  if (fleet.length + vault.length === 0) {
+    return null;
+  }
+  const lines = [
+    ...(fleet.length === 0 ? [] : [`Read the crew's runs with: ${fleet.join(', ')}.`]),
+    ...(vault.length === 0 ? [] : [`Read the owner's notes (the vault) with: ${vault.join(', ')}.`]),
+    'They only read.',
+  ];
+  return section('Tools', lines.join(' '));
 }
 
 /** The brief as one text, sections in a fixed order; empty sections are left out. */

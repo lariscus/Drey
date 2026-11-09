@@ -12,6 +12,7 @@ import { VaultCallAuditor } from './vault-call-auditor';
 import { VaultMcpCalls } from './vault-mcp-calls';
 import { VaultMcpComponent } from './vault-mcp-component';
 import { VaultMcpHttp } from './vault-mcp-http';
+import type { VaultPathsChange } from './vault-paths-change';
 import { NodeLaunchFiles } from './launch-files';
 import { NodeTokenCrypto } from './node-token-crypto';
 import { NodeVaultDisk } from './node-vault-disk';
@@ -26,6 +27,8 @@ export interface VaultMcpWiring {
   readonly build: string;
   readonly log: (message: string, level?: 'info' | 'warn' | 'error') => void;
   readonly onChange: () => void;
+  /** A worker's call changed files (req-213): the engine's paths channel hears it. */
+  readonly changed?: (change: VaultPathsChange) => void;
 }
 
 /** A persona's `allowed: write-vaults`, read off the board's persona list at every call. */
@@ -51,6 +54,7 @@ export function composeVaultMcp(wiring: VaultMcpWiring): VaultMcpComponent {
     disk,
     rights: new PersonaRights(personaSource(wiring.invoke)),
     auditor: new VaultCallAuditor({ now, log: wiring.log }),
+    ...(wiring.changed === undefined ? {} : { changed: wiring.changed }),
   });
   return new VaultMcpComponent({
     endpoint: (handler) => new VaultMcpHttp(handler, wiring.build),

@@ -20,7 +20,7 @@ export interface PersonaSessionsWiring {
   /** A chat bridge over a system prompt — the `api` persona's way. */
   readonly bridge: (systemPrompt: string) => ChatBridge;
   readonly log: (message: string, level?: 'info' | 'warn' | 'error') => void;
-  /** The tools attached to a 1:1 (req-167's harness MCP configuration); absent = none yet. */
+  /** The tools attached to a 1:1 (req-217: the service's vault MCP); absent = none (no service). */
   readonly tools?: OneOnOneToolSeam;
 }
 

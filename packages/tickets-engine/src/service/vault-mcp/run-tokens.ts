@@ -22,6 +22,12 @@ export interface VaultGrant {
   readonly ticketId: string;
   readonly persona: string | null;
   readonly readOnly: boolean;
+  /**
+   * The vault tools this worker is offered and may call (a 1:1: the read
+   * cut, req-217); absent = every tool the service serves workers. A second
+   * line behind `readOnly`, which already refuses every change.
+   */
+  readonly tools?: readonly string[];
   /** The run's stream: every call is audited there. */
   readonly emit: (event: NormalizedEvent) => void;
 }

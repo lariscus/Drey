@@ -47,6 +47,7 @@ describe('ServiceHost', () => {
       },
       onEvent: () => () => undefined,
       onPaths: () => () => undefined,
+      emitPaths: () => undefined,
       dreyClients: () => dreyClients,
       remoteStatus: () =>
         ({
