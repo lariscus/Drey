@@ -145,6 +145,26 @@ function liveRun(id: string, ticketId: string, personaId: string, extra: Record<
   };
 }
 
+/** The slots of board 7e's Slots row, as the chain status carries them (req-177). */
+function slotSummaries(): Record<string, unknown>[] {
+  // Board 7e writes `Mon 09:00`: the next Monday 09:00 inside the week (the band says the weekday for a reset that is not today).
+  const reset = new Date();
+  reset.setHours(9, 0, 0, 0);
+  do {
+    reset.setDate(reset.getDate() + 1);
+  } while (reset.getDay() !== 1);
+  const resetsAt = reset.toISOString();
+  const slot = (id: string, label: string, busy: number, total: number, extra: Record<string, unknown>): Record<string, unknown> => ({
+    id, label, profile: 'private', state: busy > 0 ? 'busy' : 'ready', busy, total, remaining: null, reliability: 'unknown', q: null, resetsAt: null, ...extra,
+  });
+  return [
+    slot('claude-a', 'Claude A', 1, 2, { remaining: 0.62, reliability: 'measured', q: 1.4, resetsAt }),
+    slot('claude-b', 'Claude B', 0, 1, { remaining: 0.31, reliability: 'measured', q: 0.8, resetsAt }),
+    slot('zai', 'z.ai', 1, 3, { remaining: 0.7, reliability: 'estimated', q: 1.2, resetsAt }),
+    slot('kimi', 'Kimi', 0, 2, {}),
+  ];
+}
+
 async function pushFleet(app: ElectronApplication): Promise<void> {
   await app.evaluate(
     ({ BrowserWindow }, data) => {
@@ -160,7 +180,7 @@ async function pushFleet(app: ElectronApplication): Promise<void> {
           liveRun('r-ben', 'T-0121', 'ben', { waiting: { kind: 'question', text: 'Move the section body too?', since: new Date(Date.now() - 4 * 60_000).toISOString() }, turn: 'idle' }),
           liveRun('r-tessa', 'T-0126', 'tessa', { activity: 'Running the unit tests', stuck: true, lastActivity: new Date(Date.now() - 9 * 60_000).toISOString() }),
         ],
-        chain: { configured: true, master: 'run', columns: {}, redStreak: {}, cooldownUntil: {}, poolSize: { opencode: 2, 'claude-code': 3 } },
+        chain: { configured: true, master: 'run', columns: {}, redStreak: {}, cooldownUntil: {}, poolSize: { opencode: 2, 'claude-code': 3 }, slots: slotSummaries() },
       },
     },
   );
@@ -245,7 +265,7 @@ const WORK_DOCKS = {
   bottom: ['Capacity'],
   folded: ['Find'],
   rightW: 380,
-  bottomH: 103,
+  bottomH: 168,
 };
 
 async function reloadSized(page: Page, app: ElectronApplication): Promise<void> {
@@ -305,6 +325,26 @@ test('boards 7a 7e 7f 7h 7i: the desk screens', async ({ page, electronApp }) =>
   await page.locator('app-tab-bar .tab', { hasText: 'Board' }).first().click();
   await expect(page.locator('.desk-capacity').filter({ visible: true })).toBeVisible({ timeout: 15_000 });
   await shoot(page, 'DeskBoard');
+  // The band's rects, to set against the board's own markup (milestone 217).
+  const geometry = await page.evaluate(() => {
+    const rect = (e: Element): number[] => {
+      const b = e.getBoundingClientRect();
+      return [b.left, b.top, b.width, b.height].map((n) => Math.round(n * 10) / 10);
+    };
+    const band = document.querySelector('.desk-capacity:not([hidden])');
+    return {
+      dock: rect(document.querySelector('app-dock[side="bottom"]')!),
+      frame: rect(band!.closest('app-panel-frame')!),
+      band: rect(band!),
+      rows: [...band!.children].map(rect),
+      chips: [...band!.querySelectorAll('.desk-slot')].map(rect),
+      persons: [...band!.querySelectorAll('.desk-cap-person')].map(rect),
+      tail: ['.desk-cap-sep', '.desk-cap-budget', '.desk-cap-crew'].map((sel) => rect(band!.querySelector(sel)!)),
+      head: rect(band!.closest('app-panel-frame')!.querySelector('.head')!),
+      queue: [...band!.querySelectorAll('.desk-cap-queuerow > *')].map(rect),
+    };
+  });
+  fs.writeFileSync(path.join(OUT, 'DeskBoard.measure.json'), JSON.stringify(geometry, null, 1));
 
   await openFromMenu('Crew');
   await expect(page.locator('.desk-team').filter({ visible: true })).toBeVisible({ timeout: 15_000 });

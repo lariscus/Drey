@@ -73,7 +73,7 @@ test.describe('The Work view (E13-13)', () => {
     // Board 7e: the preset seeds the band's first height (SDK 1.51, fidelity ruling O7).
     await expect
       .poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('drey.dock') ?? '{}') as { views?: Record<string, { bottomH?: number }> }).views?.['tickets.work']?.bottomH))
-      .toBe(103);
+      .toBe(168);
     await expect(page.locator('app-dock-strip button[aria-label="Show Assistant"], app-dock-strip button[aria-label="Hide Assistant"]').first()).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('view-work.png') });
 

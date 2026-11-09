@@ -458,14 +458,29 @@
   cursor: pointer;
 }
 
-/* ---- Capacity band (the bottom dock, board 7e) ---- */
+/*
+ * ---- Capacity band (the bottom dock, board 7e) ----
+ * Measured from the board's rendered markup (its heights add the padding):
+ * persona row 62 (56 + 6 under), Slots row 32, Tranche-and-queue row 34
+ * (28 + 6 under); the board draws the band inside the board column's 16 px
+ * gutter and 12 px above the status bar, so the root keeps both.
+ */
 .desk-capacity {
   display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0 16px 12px;
+  overflow: hidden;
+}
+
+.desk-cap-persons {
+  display: flex;
+  flex: none;
   align-items: center;
   gap: 4px;
-  height: 56px;
+  box-sizing: border-box;
+  height: 62px;
   padding: 0 8px 6px;
-  overflow: hidden;
 }
 
 .desk-capacity[hidden] {
@@ -570,6 +585,148 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   background: var(--text-primary);
 }
 
+.desk-cap-slotrow {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-content: center;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 0 8px;
+}
+
+.desk-slot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  white-space: nowrap;
+}
+
+.desk-slot-name {
+  font-weight: 600;
+}
+
+.desk-slot-quota {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-slot-bar {
+  flex: none;
+  width: 48px;
+  height: 4px;
+  border-radius: var(--radius-chip);
+  background: var(--bg-input);
+}
+
+.desk-slot-fill {
+  display: block;
+  height: 4px;
+  border-radius: var(--radius-chip);
+  background: var(--accent);
+}
+
+.desk-slot-fill-estimated {
+  background: var(--status-modified);
+}
+
+.desk-slot-note {
+  color: var(--text-4);
+}
+
+.desk-slot-note-attention {
+  color: var(--needs-you, var(--status-modified));
+}
+
+.desk-slot-q {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--text-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.desk-slot-upgrade {
+  color: var(--accent);
+}
+
+.desk-slot-reset {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-4);
+  white-space: nowrap;
+}
+
+.desk-slot-reset svg {
+  flex: none;
+}
+
+.desk-cap-queuerow {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  height: 34px;
+  padding: 0 8px 6px;
+  color: var(--text-4);
+}
+
+.desk-tranche-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desk-tranche-bar {
+  flex: none;
+  width: 120px;
+  height: 4px;
+  border-radius: var(--radius-chip);
+  background: var(--bg-input);
+}
+
+.desk-tranche-fill {
+  display: block;
+  height: 4px;
+  border-radius: var(--radius-chip);
+  background: var(--accent);
+}
+
+.desk-cap-queue-gap {
+  flex-grow: 1;
+}
+
+.desk-queue {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.desk-queue svg {
+  flex: none;
+}
+
+.desk-queue-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .desk-cap-line {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -590,7 +747,7 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   flex: none;
   flex-direction: column;
   gap: 6px;
-  width: 180px;
+  width: 196px;
   padding: 0 8px;
 }
 
@@ -607,9 +764,12 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   font-variant-numeric: tabular-nums;
 }
 
-.desk-cap-crew {
+/* The board's link: 32 + border, padding 0 10, the control border (the generic .desk-btn is 30 high, padding 0 14). */
+.desk-capacity .desk-cap-crew {
   flex: none;
-  margin-left: 4px;
+  height: 34px;
+  padding: 0 10px;
+  border-color: var(--field-border);
 }
 
 /* A thin bar, shared by the Crew head and the band. */
@@ -621,12 +781,15 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   background: var(--bg-dock);
 }
 
+/* The board's budget bar: 4 high, the editor colour as track, the grey as fill. */
 .desk-cap-budget .desk-bar {
+  height: 4px;
   margin-top: 0;
-  background: var(--active-bg);
+  background: var(--bg-main);
 }
 
 .desk-cap-budget .desk-bar-fill {
+  height: 4px;
   background: var(--text-4);
 }
 
