@@ -4,14 +4,19 @@
  * block, over `prompt.md` — Live Preview ⇄ Source and the formatting strip
  * as the host offers them (`ui.createMarkdownView`, SDK 1.30 + 1.57; the
  * plugin never carries a CodeMirror of its own, ADR-0044 rule 1). The head
- * says what the prompt costs; "Preview full prompt" is drawn once an engine
- * route assembles the prompt (req-238, `PromptPreviewSeam`).
+ * says what a run costs at its start (`≈ N tokens at start`: the engine's
+ * count of the assembled brief with the editor's text as the instructions,
+ * req-238) and `Preview full prompt` opens that brief read-only below the
+ * editor (`persona-preview-panel.ts`).
  */
 import type { MarkdownFormatAction, MarkdownViewHandle } from '../../../../shared/plugin-api/renderer';
 import { h } from '../desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { blockHead, iconButton, outlineButton } from './persona-dom';
-import { estimateTokens, type PromptPreview } from './persona-seams';
+import { createPreviewPanel, type PreviewPanel } from './persona-preview-panel';
+import { atStartTokensOf } from './persona-preview-model';
+import { estimateTokens, tokenizerFor } from '../../../../packages/tickets-engine/src/core/token-count';
+import { failureKeyOf } from './persona-skills-model';
 
 const STRIP: readonly { readonly action: MarkdownFormatAction; readonly icon: string; readonly label: 'persona.format.bold' | 'persona.format.italic' | 'persona.format.heading' | 'persona.format.bullet' | 'persona.format.task' | 'persona.format.code' }[] = [
   { action: 'bold', icon: 'bold', label: 'persona.format.bold' },
@@ -36,10 +41,16 @@ export function createInstructionsBlock(ctx: BlockContext, initial: string, edit
   const block = h('section', 'persona-block');
   block.setAttribute('aria-label', t('persona.page.instructions'));
   const tokens = h('small', 'persona-muted persona-tokens');
+  let current = initial;
+  /** At the start of a run once the engine has counted the brief; the instructions alone until then (or when it cannot). */
   const countTokens = (text: string): void => {
-    tokens.textContent = t('persona.page.tokens', { count: estimateTokens(text) });
+    current = text;
+    const preview = ctx.preview.preview;
+    const own = ctx.draft();
+    tokens.textContent = preview === null ? t('persona.page.tokens', { count: estimateTokens(text.trim(), tokenizerFor(own.worker, own.pool[0] ?? null)) }) : t('persona.page.tokens_at_start', { count: atStartTokensOf(preview, text) });
   };
   countTokens(initial);
+  const offPreview = ctx.preview.subscribe(() => countTokens(current));
 
   let view: MarkdownViewHandle | null = api.ui.createMarkdownView({
     content: initial,
@@ -77,31 +88,48 @@ export function createInstructionsBlock(ctx: BlockContext, initial: string, edit
   const frame = h('div', 'persona-ed');
   frame.append(bar, view.element);
 
-  let preview: HTMLElement | null = null;
-  let previewView: MarkdownViewHandle | null = null;
+  let panel: PreviewPanel | null = null;
+  const problem = h('div', 'persona-note persona-state-error persona-problem');
+  problem.setAttribute('role', 'alert');
+  problem.hidden = true;
   const closePreview = (): void => {
-    previewView?.dispose();
-    previewView = null;
-    preview?.remove();
-    preview = null;
+    panel?.dispose();
+    panel = null;
+    previewButton.setAttribute('aria-pressed', 'false');
+  };
+  /** The panel shows the brief the engine last assembled; it follows a new one while it is open. */
+  const drawPanel = (): void => {
+    const brief = ctx.preview.preview;
+    panel?.dispose();
+    panel = brief === null ? null : createPreviewPanel(ctx, brief);
+    if (panel !== null) {
+      block.append(panel.element);
+    }
+    previewButton.setAttribute('aria-pressed', String(panel !== null));
   };
   const showPreview = async (): Promise<void> => {
-    if (preview !== null) {
+    if (panel !== null) {
       closePreview();
       return;
     }
-    const reply: PromptPreview | null = await ctx.previewSeam.preview(ctx.persona.id);
-    if (reply === null || preview !== null) {
-      return;
+    await ctx.preview.ensure(true);
+    const failure = ctx.preview.failure;
+    const key = failure === null ? null : failureKeyOf(failure);
+    problem.textContent = failure === null ? '' : key !== null ? t(key) : failure.error;
+    problem.hidden = failure === null;
+    if (failure === null) {
+      drawPanel();
     }
-    previewView = api.ui.createMarkdownView({ content: reply.text, mode: 'view', readOnly: true });
-    preview = h('div', 'persona-ed persona-ed-preview');
-    preview.append(h('small', 'persona-muted persona-tokens', t('persona.page.tokens', { count: reply.tokens })), previewView.element);
-    block.append(preview);
   };
-  const previewButton = ctx.previewSeam.available ? outlineButton(t('persona.page.preview_prompt'), 'persona-btn persona-btn-28', () => void showPreview()) : null;
+  const previewButton = outlineButton(t('persona.page.preview_prompt'), 'persona-btn persona-btn-28', () => void showPreview());
+  previewButton.setAttribute('aria-pressed', 'false');
+  const offPanel = ctx.preview.subscribe(() => {
+    if (panel !== null) {
+      drawPanel();
+    }
+  });
 
-  block.append(blockHead(t('persona.page.instructions'), tokens, previewButton), frame);
+  block.append(blockHead(t('persona.page.instructions'), tokens, previewButton), problem, frame);
   return {
     element: block,
     setText: (text) => {
@@ -110,6 +138,8 @@ export function createInstructionsBlock(ctx: BlockContext, initial: string, edit
     },
     setEditable: (value) => view?.setReadOnly(!value),
     dispose: () => {
+      offPreview();
+      offPanel();
       closePreview();
       view?.dispose();
       view = null;

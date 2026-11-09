@@ -1,85 +1,88 @@
 // i18n: catalog
 /**
- * The two client seams of the Persona page that wait for req-172 (skills as
- * Agent Skills, R8): where the page reads a persona's skills and where it
- * asks for the assembled prompt. Both are named here so the wiring is one
- * file: today's implementations read what the vault already holds (D-46's
- * `skills:` names, nearest folder first) and know no prompt assembler; the
- * req-172 routes (`personaSkills`, `skillUpload`, `personaPromptPreview`,
- * `contracts/skills.ts` on its branch) replace them without a change to the
- * blocks. Follow-up rows: req-237 (skills), req-238 (prompt preview).
+ * The two engine reads of the Persona page that came with skills as Agent
+ * Skills (milestone 232, req-172): a persona's skills with their switch,
+ * removal and upload, and the brief a run would start with. Both are named
+ * here so the wiring is one file and a spec swaps them for fakes; the
+ * implementations call the plugin's IPC (`personaSkills`,
+ * `personaSkillToggle`, `personaSkillRemove`, `skillUpload`,
+ * `personaPromptPreview`), which the engine answers with a stable `code` per
+ * failure (`skills.error.<code>` in the catalog). A transport failure is a
+ * failure with no code and the thrown text.
  */
-import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
+import type { PromptPreviewReply, SkillErrorCode, SkillListData, SkillUploadCommand, SkillUploadReply } from '../../../../packages/tickets-engine/src/contracts/skills';
+import { SKILL_ERROR_CODES } from '../../../../packages/tickets-engine/src/contracts/skills';
 
-/** One skill row as the page draws it. */
-export interface SkillInfo {
-  readonly name: string;
-  /** The folder-relative file the skill lives in, as shown under its name. */
-  readonly path: string;
-  /** `own` = the persona's folder, `shared` = the crew's `_meta/skills/`. */
-  readonly origin: 'own' | 'shared';
-  /** An estimate; null when unknown. */
-  readonly tokens: number | null;
+/** What a failed skill call tells the page. */
+export interface SkillsFailure {
+  readonly ok: false;
+  /** The engine's code; null for a failure that is no engine refusal (the transport, an unknown code). */
+  readonly code: SkillErrorCode | null;
+  readonly error: string;
 }
+
+export type SkillsResult = { readonly ok: true; readonly list: SkillListData } | SkillsFailure;
+
+export type UploadResult = { readonly ok: true; readonly name: string; readonly replaced: boolean; readonly list: SkillListData } | SkillsFailure;
 
 export interface PersonaSkillsSeam {
-  /** The skills these names resolve to; a name no folder holds is left out. */
-  list(personaId: string, names: readonly string[]): Promise<readonly SkillInfo[]>;
+  list(persona: string): Promise<SkillsResult>;
+  toggle(persona: string, skill: string, on: boolean): Promise<SkillsResult>;
+  /** Deletes an own skill's folder; the engine refuses a shared one. */
+  remove(persona: string, name: string): Promise<SkillsResult>;
+  upload(command: SkillUploadCommand): Promise<UploadResult>;
 }
 
-/** The assembled brief a run would start with (req-172's `personaPromptPreview`). */
-export interface PromptPreview {
-  readonly text: string;
-  readonly tokens: number;
-}
+/** The brief a run would start with: the text, the total and the parts the engine counted (an estimate, `exact: false`). */
+export type PromptPreview = Extract<PromptPreviewReply, { ok: true }>;
+
+export type PreviewResult = { readonly ok: true; readonly preview: PromptPreview } | SkillsFailure;
 
 export interface PromptPreviewSeam {
-  /** Null while no engine route assembles the prompt: the page then draws no preview button. */
-  preview(personaId: string): Promise<PromptPreview | null>;
-  readonly available: boolean;
+  /** The brief for `step` (default: the engine's `build`) counted for `model`'s family (default: the persona's own). */
+  preview(persona: string, options: { readonly step?: string; readonly model?: string }): Promise<PreviewResult>;
 }
 
-/** About four characters to a token: the page's stand-in until the engine counts (req-172); drawn with `≈`. */
-export function estimateTokens(text: string): number {
-  return Math.ceil(text.trim().length / 4);
+export type Invoke = (method: string, payload?: unknown) => Promise<unknown>;
+
+const isCode = (code: unknown): code is SkillErrorCode => (SKILL_ERROR_CODES as readonly unknown[]).includes(code);
+
+function failureOf(reply: unknown): SkillsFailure {
+  const { code, error } = (reply ?? {}) as { code?: unknown; error?: unknown };
+  return { ok: false, code: isCode(code) ? code : null, error: typeof error === 'string' && error !== '' ? error : 'the engine answered nothing' };
 }
 
-const SKILL_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+async function call<T extends { readonly ok: boolean }>(invoke: Invoke, method: string, payload: unknown): Promise<T | SkillsFailure> {
+  try {
+    const reply = (await invoke(method, payload)) as T | null;
+    return reply !== null && typeof reply === 'object' && reply.ok === true ? reply : failureOf(reply);
+  } catch (error) {
+    return { ok: false, code: null, error: error instanceof Error ? error.message : String(error) };
+  }
+}
 
-/** D-46's reading: the persona's own `skills/` first, then the crew's `_meta/skills/`; a name is `<name>.md` or `<name>/SKILL.md`. */
-export function vaultSkillsSeam(api: DreyPluginApi, vaultId: string | null): PersonaSkillsSeam {
-  const read = async (path: string): Promise<string | null> => {
-    if (vaultId === null) {
-      return null;
-    }
-    try {
-      return (await api.vault.readFile(path, { vaultId })).content;
-    } catch {
-      return null;
-    }
-  };
+const listOf = (reply: { readonly ok: true; readonly list: SkillListData } | SkillsFailure): SkillsResult => (reply.ok ? { ok: true, list: reply.list } : reply);
+
+/** The seam over the engine's skill routes. */
+export function engineSkillsSeam(invoke: Invoke): PersonaSkillsSeam {
+  type Listing = { readonly ok: true; readonly list: SkillListData };
   return {
-    list: async (personaId, names) => {
-      const found = await Promise.all(
-        names.map(async (name): Promise<SkillInfo | null> => {
-          if (!SKILL_NAME.test(name)) {
-            return null;
-          }
-          for (const [origin, base] of [['own', `tickets/_meta/personas/${personaId}/skills`], ['shared', 'tickets/_meta/skills']] as const) {
-            for (const rel of [`${base}/${name}/SKILL.md`, `${base}/${name}.md`]) {
-              const text = await read(rel);
-              if (text !== null && text.trim() !== '') {
-                return { name, path: rel.replace('tickets/_meta/', ''), origin, tokens: estimateTokens(text) };
-              }
-            }
-          }
-          return null;
-        }),
-      );
-      return found.filter((skill): skill is SkillInfo => skill !== null);
+    list: async (persona) => listOf(await call<Listing>(invoke, 'personaSkills', { persona })),
+    toggle: async (persona, skill, on) => listOf(await call<Listing>(invoke, 'personaSkillToggle', { persona, skill, on })),
+    remove: async (persona, name) => listOf(await call<Listing>(invoke, 'personaSkillRemove', { persona, name })),
+    upload: async (command) => {
+      const reply = await call<Extract<SkillUploadReply, { ok: true }>>(invoke, 'skillUpload', command);
+      return reply.ok ? { ok: true, name: reply.name, replaced: reply.replaced, list: reply.list } : reply;
     },
   };
 }
 
-/** No engine route assembles the prompt yet: nothing to preview. */
-export const noPromptPreview: PromptPreviewSeam = { available: false, preview: async () => null };
+/** The seam over `personaPromptPreview`. */
+export function enginePromptPreviewSeam(invoke: Invoke): PromptPreviewSeam {
+  return {
+    preview: async (persona, options) => {
+      const reply = await call<PromptPreview>(invoke, 'personaPromptPreview', { persona, ...options });
+      return reply.ok ? { ok: true, preview: reply } : reply;
+    },
+  };
+}

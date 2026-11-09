@@ -21,12 +21,12 @@ describe('the persona tab key and paths', () => {
 });
 
 describe('what a Save sends', () => {
-  const base = draftOf(view, 'Prompt', ['tdd']);
+  const base = draftOf(view, 'Prompt');
 
   it('shows the role as a label and falls back to the default model for an empty pool', () => {
     expect(base.role).toBe('Builder');
-    expect(draftOf({ ...view, pool: [] }, '', []).pool).toEqual(['qwen3-coder']);
-    expect(draftOf({ ...view, pool: [], model: '' }, '', []).pool).toEqual([]);
+    expect(draftOf({ ...view, pool: [] }, '').pool).toEqual(['qwen3-coder']);
+    expect(draftOf({ ...view, pool: [], model: '' }, '').pool).toEqual([]);
   });
 
   it('is empty for an untouched form, also with the role typed in another case', () => {
@@ -39,7 +39,7 @@ describe('what a Save sends', () => {
     expect(patchOf(base, { ...base, title: ' Benno ' })).toEqual({ title: 'Benno' });
     expect(patchOf(base, { ...base, prompt: 'New' })).toEqual({ prompt: 'New' });
     expect(patchOf(base, { ...base, pool: ['qwen3-coder', 'sonnet', 'opus'] })).toEqual({ pool: ['qwen3-coder', 'sonnet', 'opus'] });
-    expect(patchOf(base, { ...base, skills: [] })).toEqual({ skills: [] });
+    expect(Object.keys(base)).not.toContain('skills'); // a skill switch goes to the engine at once, not with Save
   });
 
   it('counts a reordered pool as a change: the order is the fallback order', () => {
@@ -80,14 +80,14 @@ describe('small helpers', () => {
 
 describe('the v2 fields (R11, req-171)', () => {
   const rich: PersonaView = { ...view, summary: 'Builds one part.', allowed: { spendAboveAllowance: false, writeVaults: ['notes'], runCommands: 'bypass', network: true } };
-  const base = draftOf(rich, 'P', []);
+  const base = draftOf(rich, 'P');
 
   it('reads the one line, the harness, the budget and the allowed keys off the record', () => {
     expect(base.summary).toBe('Builds one part.');
     expect(base.worker).toBe('opencode');
     expect(base.budget).toBe('5');
     expect(base.allowed).toEqual({ writeVaults: ['notes'], runCommands: 'bypass', network: true, spend: false });
-    expect(draftOf(view, '', []).allowed).toEqual({ writeVaults: [], runCommands: '', network: false, spend: false });
+    expect(draftOf(view, '').allowed).toEqual({ writeVaults: [], runCommands: '', network: false, spend: false });
   });
 
   it('sends the one line, the harness and the budget only when they changed', () => {

@@ -4,6 +4,7 @@
  * folder and the counts of memory, journal and open proposals; at the right
  * the save state and Back to Crew. The Save and Discard sit in the footer.
  */
+import type { I18n } from '../../../../shared/i18n/types';
 import { h } from '../desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { avatarNode, outlineButton } from './persona-dom';
@@ -19,6 +20,12 @@ export interface HeadCounts {
   readonly memory: number | null;
   readonly journal: number | null;
   readonly proposals: number;
+}
+
+/** `Saved · committed 2 days ago` (req-239, from the persona folder's last commit; relative time is `Intl`'s); plain `Saved` where git knows no commit. */
+export function savedTextOf(i18n: I18n, committedAt: string | null): string {
+  const at = committedAt === null ? Number.NaN : Date.parse(committedAt);
+  return Number.isNaN(at) ? i18n.t('persona.page.saved') : i18n.t('persona.page.saved_at', { when: i18n.formatRelative(new Date(at)) });
 }
 
 export function personaHead(ctx: BlockContext, counts: HeadCounts, back: () => void): PersonaHead {

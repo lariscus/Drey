@@ -17,13 +17,13 @@ describe('the Persona page v2 (R11, board 7k)', () => {
     expect([...fx.host.querySelectorAll('.persona-step')].map((node) => node.textContent)).toEqual(['Plan', '✓ Build']);
     expect(q<HTMLSelectElement>('[data-field="worker"]').value).toBe('claude-code');
     expect([...fx.host.querySelectorAll('.persona-pool-row')].map((node) => [node.querySelector('.persona-pool-n')?.textContent, node.querySelector('.persona-pool-name')?.textContent, node.querySelector('.persona-tag')?.textContent])).toEqual([
-      ['1', 'opusClaude Code · class A · factor 3', '1 / 3 busy'],
-      ['2', 'sonnetClaude Code · class B · factor 1', '1 / 3 busy'],
+      ['1', 'opusClaude Code · class A · factor 3', '0 / 2 busy'],
+      ['2', 'sonnetClaude Code · class B · factor 1', '0 / 3 busy'],
     ]);
     expect(q<HTMLInputElement>('[data-field="budget"]').value).toBe('$5');
     expect([...fx.host.querySelectorAll('.persona-allow-row')].map((row) => row.firstElementChild?.textContent)).toEqual(['Read vaults', 'Write vaults', 'Run commands in the worktree', 'Reach the network', 'Spend above the ticket allowance']);
     expect(q('.persona-vault-pick > button').textContent).toBe('notes▾');
-    expect(q('.persona-skill').textContent).toContain('skills/tdd/SKILL.md');
+    expect(q('.persona-skill').textContent).toContain('personas/ben/skills/tdd/SKILL.md');
     expect(q('.persona-skill').textContent).toContain('own · 240 tokens');
     expect(q('[data-proposal]').textContent).toContain('Add a line');
     expect(q('.persona-links').textContent).toBe('Memory · 3 →Journal · 2 →Talk to Ben 1:1 →');
@@ -38,7 +38,7 @@ describe('the Persona page v2 (R11, board 7k)', () => {
     expect(editor().readOnly).toBe(false);
     expect(fx.host.querySelector('.persona-block .fake-editor')).not.toBeNull();
     expect([...fx.host.querySelectorAll('button')].some((button) => /Markdown/.test(button.textContent ?? ''))).toBe(false);
-    expect(q('.persona-tokens').textContent).toBe('≈ 5 tokens');
+    expect(q('.persona-tokens').textContent).toBe('≈ 2,490 tokens at start');
   });
 
   it('the strip applies the host formatting and the mode switch flips Live and Source', async () => {
@@ -100,18 +100,6 @@ describe('the Persona page v2 (R11, board 7k)', () => {
     expect(patches()).toEqual([{ persona: 'ben', allowed: { writeVaults: ['v1'] } }]);
   });
 
-  it('a skill switch edits the skills list; a switched-off row stays until it is saved', async () => {
-    await mount();
-    const toggle = q<HTMLButtonElement>('[data-skill="tdd"] .persona-switch');
-    expect(toggle.getAttribute('aria-checked')).toBe('true');
-    toggle.click();
-    expect(q('[data-skill="tdd"] .persona-switch').getAttribute('aria-checked')).toBe('false');
-    expect(stateText()).toBe('Changed · not saved');
-    buttonOf('Save').click();
-    await settle();
-    expect(patches()).toEqual([{ persona: 'ben', skills: [] }]);
-  });
-
   it('the models come from the table; a row moves, goes, and a new one is picked from the table', async () => {
     await mount();
     q<HTMLElement>('[data-model="opus"] .persona-icon-btn').click();
@@ -158,21 +146,11 @@ describe('the Persona page v2 (R11, board 7k)', () => {
     expect(fx.host.querySelector('[title="Otherwise the run waits for you."]')).not.toBeNull();
   });
 
-  it('draws nothing the engine does not serve yet: no preview button, no upload, no notify rule', async () => {
+  it('draws nothing the engine does not serve yet: no portrait upload, no notify rule', async () => {
     await mount();
     const text = fx.host.textContent ?? '';
-    for (const absent of ['Preview full prompt', 'Add skill', 'Upload picture', 'Tell me when', 'committed']) {
+    for (const absent of ['Upload picture', 'Tell me when']) {
       expect(text, absent).not.toContain(absent);
     }
-  });
-
-  it('draws Preview full prompt once a seam assembles the prompt, and shows what it returns', async () => {
-    await mount({ preview: { available: true, preview: async () => ({ text: 'The whole brief', tokens: 2490 }) } });
-    buttonOf('Preview full prompt').click();
-    await settle();
-    expect(fx.views.find((entry) => entry.mode === 'view')?.text).toBe('The whole brief');
-    expect(q('.persona-ed-preview').textContent).toContain('≈ 2,490 tokens');
-    buttonOf('Preview full prompt').click();
-    expect(fx.host.querySelector('.persona-ed-preview')).toBeNull();
   });
 });

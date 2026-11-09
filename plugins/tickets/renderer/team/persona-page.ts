@@ -14,16 +14,20 @@ import { h, type DeskDeps } from '../desk-deps';
 import { allowedBlock } from './persona-allowed-block';
 import type { BlockContext } from './persona-block-context';
 import { outlineButton } from './persona-dom';
-import { personaHead } from './persona-head';
+import { personaHead, savedTextOf } from './persona-head';
 import { createInstructionsBlock } from './persona-instructions-block';
 import { draftOf, isDirty, personaPathsOf, wordsOf, type PersonaDraft } from './persona-model';
 import { decideProposal, openProposalOf, savePersona, type ActionEnv } from './persona-page-actions';
-import { readBeside, readPromptFile, type PersonaReads, type PromptRead } from './persona-page-load';
+import { blockContextOf, viewKeyOf } from './persona-page-context';
+import { readBeside, readPromptFile, type PromptRead } from './persona-page-load';
 import { drafts, newSession, wordCounts } from './persona-page-state';
 import { profileBlock } from './persona-profile-block';
 import { proposalsBlock, syncApply } from './persona-proposals-block';
-import { noPromptPreview, vaultSkillsSeam, type PersonaSkillsSeam, type PromptPreviewSeam } from './persona-seams';
-import { skillsBlock } from './persona-skills-block';
+import { PersonaPreviewState } from './persona-preview-state';
+import { previewRequestOf } from './persona-preview-model';
+import { enginePromptPreviewSeam, engineSkillsSeam, type PersonaSkillsSeam, type PromptPreviewSeam } from './persona-seams';
+import { createSkillsBlock } from './persona-skills-block';
+import { PersonaSkillsState } from './persona-skills-state';
 import type { CrewLinkTab } from './team-focus';
 import { workBlock } from './persona-work-block';
 import type { TeamStore } from './team-store';
@@ -47,15 +51,11 @@ export interface PersonaPageHost {
   openCrew(persona: string, tab: CrewLinkTab): void;
 }
 
-/** The two seams that wait for req-172; a spec swaps them. */
+/** The two engine-backed seams (skills, prompt preview); a spec swaps them. */
 export interface PersonaPageSeams {
   readonly skills?: PersonaSkillsSeam;
   readonly preview?: PromptPreviewSeam;
 }
-
-/** What a repaint of a loaded page depends on; the day's cost and the pause do not count. */
-const keyOf = (persona: PersonaView, deps: DeskDeps): string =>
-  JSON.stringify([persona.title, persona.role, persona.worker, persona.pool, persona.color, persona.budget, persona.phases, persona.summary, persona.allowed, deps.snapshot()?.pipeline.map((phase) => phase.id)]);
 
 export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HTMLElement, id: string, host: PersonaPageHost, seams: PersonaPageSeams = {}): () => void {
   const { api } = deps;
@@ -79,7 +79,8 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
     lastPromptRead = Date.now();
     return readPromptFile(api, vaultId(), paths.prompt, t('persona.page.no_vault'));
   };
-  const improvementsOf = async (): Promise<PersonaImprovementsReply> => (await deps.invoke('personaImprovements', { persona: id })) as PersonaImprovementsReply;
+  const invoke = (method: string, payload?: unknown): Promise<unknown> => deps.invoke(method, payload);
+  const improvementsOf = async (): Promise<PersonaImprovementsReply> => (await invoke('personaImprovements', { persona: id })) as PersonaImprovementsReply;
 
   const syncState = (): void => {
     const loaded = session.loaded;
@@ -89,7 +90,7 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
     }
     if (stateNode !== null) {
       const failed = loaded !== null && !loaded.promptRead.ok;
-      stateNode.textContent = session.message !== '' ? session.message : failed ? t('persona.page.prompt_unreadable') : dirty ? t('persona.page.changed') : t('persona.page.saved');
+      stateNode.textContent = session.message !== '' ? session.message : failed ? t('persona.page.prompt_unreadable') : dirty ? t('persona.page.changed') : savedTextOf(api.i18n, session.committedAt);
       stateNode.classList.toggle('persona-state-error', session.messageIsError || failed);
     }
     syncApply(root, loaded !== null && loaded.draft.prompt !== loaded.base.prompt, t('persona.proposals.apply_blocked'));
@@ -127,7 +128,7 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
     const right = h('div', 'persona-right');
     right.append(
       loaded.instructions.element,
-      skillsBlock(ctx),
+      loaded.skills.element,
       proposalsBlock(ctx, {
         proposal: loaded.proposal,
         memory: reads.memory,
@@ -149,7 +150,7 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
     syncState();
   };
 
-  const env: ActionEnv = { deps, t, id, store, session, readPrompt, improvementsOf, retitle: (title) => host.retitle(title), render, sync: syncState, fail, keyOf: (persona) => keyOf(persona, deps) };
+  const env: ActionEnv = { deps, t, id, store, session, readPrompt, improvementsOf, retitle: (title) => host.retitle(title), render, sync: syncState, fail, keyOf: (persona) => viewKeyOf(persona, deps) };
 
   const edit = (next: Partial<PersonaDraft>): void => {
     const loaded = session.loaded;
@@ -163,6 +164,9 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
       drafts.set(id, loaded.draft);
     } else {
       drafts.delete(id);
+    }
+    if (next.pool !== undefined) {
+      void loaded.ctx.preview.ensure();
     }
     syncState();
   };
@@ -179,24 +183,6 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
     loaded.instructions.setText(loaded.base.prompt);
     render();
   };
-
-  const blockContext = (loaded: { view: PersonaView; reads: PersonaReads; base: PersonaDraft }, seam: PersonaSkillsSeam, preview: PromptPreviewSeam): BlockContext => ({
-    deps,
-    api,
-    t,
-    persona: loaded.view,
-    extras: loaded.reads.extras,
-    paths,
-    skillsSeam: seam,
-    previewSeam: preview,
-    loadedSkills: loaded.base.skills,
-    draft: () => session.loaded?.draft ?? loaded.base,
-    edit,
-    change: (next) => {
-      edit(next);
-      render();
-    },
-  });
 
   const failLoad = (text: string): void => {
     if (disposed) {
@@ -224,18 +210,27 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
         failLoad(improvements.error);
         return;
       }
-      const seam = seams.skills ?? vaultSkillsSeam(api, vaultId());
-      const base = draftOf(persona, prompt.ok ? prompt.text : '', improvements.persona.skills);
-      const reads = await readBeside(deps, id, seam, base.skills);
+      const base = draftOf(persona, prompt.ok ? prompt.text : '');
+      const draft = drafts.get(id) ?? base;
+      const skills = new PersonaSkillsState(seams.skills ?? engineSkillsSeam(invoke), id);
+      const preview = new PersonaPreviewState(seams.preview ?? enginePromptPreviewSeam(invoke), id, () => previewRequestOf(session.loaded?.view.phases ?? persona.phases, (session.loaded?.draft ?? draft).pool));
+      const [reads] = await Promise.all([readBeside(deps, id), skills.load(), preview.ensure()]);
       if (disposed) {
         return;
       }
-      const draft = drafts.get(id) ?? base;
-      const ctx = blockContext({ view: persona, reads, base }, seam, seams.preview ?? noPromptPreview);
+      // A switch, a removal or an upload changes what a run loads: the brief is counted again.
+      skills.subscribe(() => {
+        if (!disposed && !skills.busy && skills.failure === null) {
+          void preview.ensure(true);
+        }
+      });
+      const ctx = blockContextOf({ deps, t, view: persona, reads, base, paths, skills, preview, session, edit, repaint: render });
       session.loaded?.instructions.dispose();
+      session.loaded?.skills.dispose();
       const instructions = createInstructionsBlock(ctx, draft.prompt, prompt.ok);
-      session.loaded = { view: persona, base, draft, reads, promptRead: prompt, proposal: openProposalOf(improvements), instructions, ctx };
-      session.viewKey = keyOf(persona, deps);
+      session.loaded = { view: persona, base, draft, reads, promptRead: prompt, proposal: openProposalOf(improvements), instructions, skills: createSkillsBlock(ctx), ctx };
+      session.viewKey = viewKeyOf(persona, deps);
+      session.committedAt = persona.committedAt ?? null;
       loadError = '';
       host.retitle(persona.title);
       render();
@@ -260,9 +255,13 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
       }
       return;
     }
+    if ((persona.committedAt ?? null) !== session.committedAt) {
+      session.committedAt = persona.committedAt ?? null;
+      syncState();
+    }
     const clean = !isDirty(loaded.base, loaded.draft);
-    if (keyOf(persona, deps) !== session.viewKey && !session.busy) {
-      session.viewKey = keyOf(persona, deps);
+    if (viewKeyOf(persona, deps) !== session.viewKey && !session.busy) {
+      session.viewKey = viewKeyOf(persona, deps);
       loaded.view = persona;
       if (clean) {
         void load(persona);
@@ -295,6 +294,7 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
     offStore();
     offDeps();
     session.loaded?.instructions.dispose();
+    session.loaded?.skills.dispose();
     root.remove();
   };
 }

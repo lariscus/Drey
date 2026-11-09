@@ -1,28 +1,49 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
+import { describe, expect, it } from 'vitest';
+import type { SkillListData } from '../../../../packages/tickets-engine/src/contracts/skills';
 import { writeVaultsText, writeVaultsToggled } from './persona-allowed-model';
-import { estimateTokens, vaultSkillsSeam } from './persona-seams';
-import { skillLinesOf, skillsToggled, skillTitleOf } from './persona-skills-model';
+import { failureKeyOf, skillCountsOf, skillPathOf, skillRowsOf, skillTitleOf } from './persona-skills-model';
+import { skillsOf } from './persona-skills.fixture';
 
-describe('the skill rows (R11)', () => {
+const list = (over: Partial<SkillListData> = {}): SkillListData => ({
+  persona: 'ben',
+  skills: skillsOf(),
+  missing: [],
+  selectedTokens: 550,
+  tokenizer: { id: 'claude-estimate', family: 'anthropic', exact: false, model: null },
+  ...over,
+});
+
+describe('the skill rows (R11, req-237)', () => {
   it('words a skill id', () => {
     expect(skillTitleOf('go-conventions')).toBe('Go conventions');
     expect(skillTitleOf('tdd')).toBe('Tdd');
   });
 
-  it('keeps the rows of the loaded skills and adds the ones switched on since; a row switched off stays', () => {
-    const infos = [{ name: 'tdd', path: 'skills/tdd/SKILL.md', origin: 'own' as const, tokens: 240 }];
-    expect(skillLinesOf(['tdd', 'diff-review'], ['tdd', 'new-one'], infos)).toEqual([
-      { name: 'tdd', title: 'Tdd', path: 'skills/tdd/SKILL.md', origin: 'own', tokens: 240, on: true },
-      { name: 'diff-review', title: 'Diff review', path: null, origin: null, tokens: null, on: false },
-      { name: 'new-one', title: 'New one', path: null, origin: null, tokens: null, on: true },
+  it('draws one row per listed skill in the engine’s order, off rows included; only an own skill is removable', () => {
+    expect(skillRowsOf(list(), 'ben')).toEqual([
+      { name: 'tdd', title: 'Tdd', path: 'personas/ben/skills/tdd/SKILL.md', origin: 'own', tokens: 240, on: true, removable: true },
+      { name: 'go-conventions', title: 'Go conventions', path: '_meta/skills/go-conventions/SKILL.md', origin: 'shared', tokens: 310, on: true, removable: false },
+      { name: 'diff-review', title: 'Diff review', path: '_meta/skills/diff-review/SKILL.md', origin: 'shared', tokens: 400, on: false, removable: false },
     ]);
   });
 
-  it('switches by adding last or removing; no duplicates', () => {
-    expect(skillsToggled(['a'], 'b', true)).toEqual(['a', 'b']);
-    expect(skillsToggled(['a', 'b'], 'b', true)).toEqual(['a', 'b']);
-    expect(skillsToggled(['a', 'b'], 'a', false)).toEqual(['b']);
+  it('adds a row, on, for every name that no folder holds, so it can be switched off', () => {
+    expect(skillRowsOf(list({ skills: [], missing: ['ghost'] }), 'ben')).toEqual([{ name: 'ghost', title: 'Ghost', path: null, origin: null, tokens: null, on: true, removable: false }]);
+  });
+
+  it('shows a flat file the migration has not turned into a folder as its file', () => {
+    expect(skillPathOf({ name: 'lint', origin: 'shared', legacy: true }, 'ben')).toBe('_meta/skills/lint.md');
+    expect(skillPathOf({ name: 'lint', origin: 'own', legacy: true }, 'ben')).toBe('personas/ben/skills/lint.md');
+  });
+
+  it('counts what is on, what is available and what the ones on cost a run', () => {
+    expect(skillCountsOf(list())).toEqual({ on: 2, total: 3, tokens: 550 });
+    expect(skillCountsOf(list({ missing: ['ghost'] }))).toEqual({ on: 3, total: 4, tokens: 550 });
+  });
+
+  it('turns a code into its catalog key; a transport failure or an unknown code has none', () => {
+    expect(failureKeyOf({ ok: false, code: 'not_own', error: 'x' })).toBe('skills.error.not_own');
+    expect(failureKeyOf({ ok: false, code: null, error: 'fetch failed' })).toBeNull();
   });
 });
 
@@ -40,32 +61,5 @@ describe('the write-vaults choice', () => {
   it('ticks and unticks in the registry order, unknown ids last', () => {
     expect(writeVaultsToggled(['gone'], vaults, 'notes', true)).toEqual(['notes', 'gone']);
     expect(writeVaultsToggled(['notes', 'v1'], vaults, 'notes', false)).toEqual(['v1']);
-  });
-});
-
-describe('the skills seam (D-46 reading) and the token stand-in', () => {
-  it('estimates about four characters to a token', () => {
-    expect(estimateTokens('')).toBe(0);
-    expect(estimateTokens('a'.repeat(41))).toBe(11);
-  });
-
-  it('finds a skill in the persona folder first, then the shared one; a name no folder holds is left out', async () => {
-    const files: Record<string, string> = {
-      'tickets/_meta/personas/ben/skills/tdd/SKILL.md': 'x'.repeat(40),
-      'tickets/_meta/skills/review.md': 'y'.repeat(80),
-      'tickets/_meta/skills/tdd.md': 'shadowed',
-    };
-    const readFile = vi.fn(async (path: string) => {
-      if (files[path] === undefined) {
-        throw new Error('ENOENT');
-      }
-      return { content: files[path]!, modifiedMs: 1 };
-    });
-    const api = { vault: { readFile } } as unknown as DreyPluginApi;
-    expect(await vaultSkillsSeam(api, 'v1').list('ben', ['tdd', 'review', 'ghost', '../escape'])).toEqual([
-      { name: 'tdd', path: 'personas/ben/skills/tdd/SKILL.md', origin: 'own', tokens: 10 },
-      { name: 'review', path: 'skills/review.md', origin: 'shared', tokens: 20 },
-    ]);
-    expect(await vaultSkillsSeam(api, null).list('ben', ['tdd'])).toEqual([]);
   });
 });

@@ -12,14 +12,14 @@ import type { DeskDeps } from '../desk-deps';
 import type { VaultChoice } from './persona-allowed-model';
 import type { Translate } from './persona-dom';
 import type { PersonaDraft, personaPathsOf } from './persona-model';
-import type { PersonaSkillsSeam, PromptPreviewSeam, SkillInfo } from './persona-seams';
+import type { PersonaPreviewState } from './persona-preview-state';
+import type { PersonaSkillsState } from './persona-skills-state';
 
 /** What the page reads beside the record; each part may be missing (an engine without a runner, no vault). */
 export interface PageExtras {
   readonly table: ModelsReply | null;
   readonly slots: readonly SlotView[];
   readonly vaults: readonly VaultChoice[];
-  readonly skills: readonly SkillInfo[];
 }
 
 export interface BlockContext {
@@ -29,10 +29,10 @@ export interface BlockContext {
   readonly persona: PersonaView;
   readonly extras: PageExtras;
   readonly paths: ReturnType<typeof personaPathsOf>;
-  readonly skillsSeam: PersonaSkillsSeam;
-  readonly previewSeam: PromptPreviewSeam;
-  /** The skills the record named when the page loaded (the Skills block keeps their rows). */
-  readonly loadedSkills: readonly string[];
+  /** The persona's skills as the engine lists them; the Skills block's switch, removal and upload act through it (req-237). */
+  readonly skills: PersonaSkillsState;
+  /** The brief a run would start with, counted by the engine (req-238). */
+  readonly preview: PersonaPreviewState;
   draft(): PersonaDraft;
   /** Changes the draft without a repaint (typing); Save and Discard follow. */
   edit(next: Partial<PersonaDraft>): void;

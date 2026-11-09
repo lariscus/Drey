@@ -1,44 +1,86 @@
 // i18n: catalog
 /**
- * The Skills block (R11, req-137's page half): one row per skill — its name
- * and path, shared or own with its token estimate, a switch. A switch on =
- * the name is in the record's `skills:`, saved with the page's one Save.
- * `Add skill…` joins the head with the upload route (req-172, req-237).
+ * The Skills block (R11; over the engine's routes since req-237): one row
+ * for every skill of the persona's own folder and the shared pool — name
+ * and path, shared or own with its estimated tokens, a switch, and on an
+ * own skill the `⋯` menu with Remove — with the counts after the title and
+ * `Add skill…` at the right. A switch, a removal and an upload each go to
+ * the engine at once and come back as the new listing (one commit each); they
+ * are not part of the page's Save. Like the Instructions block this one is
+ * built once per load and repaints itself from `PersonaSkillsState`.
  */
 import { h } from '../desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { blockHead } from './persona-dom';
-import { skillLinesOf, skillsToggled, type SkillLine } from './persona-skills-model';
+import { skillAddControl } from './persona-skill-add';
+import { skillRowNode } from './persona-skill-row';
+import { failureKeyOf, skillCountsOf, skillRowsOf } from './persona-skills-model';
+import { uploadPlanOf } from './skill-upload-model';
 
-function skillRow(ctx: BlockContext, line: SkillLine): HTMLElement {
-  const { t } = ctx;
-  const row = h('div', 'persona-skill');
-  row.dataset['skill'] = line.name;
-  const name = h('span', 'persona-grow', line.title);
-  if (line.path !== null) {
-    name.append(h('code', 'persona-muted persona-mono persona-skill-path', line.path));
-  }
-  const meta = line.origin === null ? '' : line.tokens === null ? t(`persona.skills.${line.origin}`) : t('persona.skills.meta', { origin: t(`persona.skills.${line.origin}`), count: line.tokens });
-  const toggle = h('button', `persona-switch${line.on ? ' persona-switch-on' : ''}`);
-  toggle.type = 'button';
-  toggle.setAttribute('role', 'switch');
-  toggle.setAttribute('aria-checked', String(line.on));
-  toggle.setAttribute('aria-label', t('persona.skills.switch', { name: line.title }));
-  toggle.title = t(line.on ? 'persona.skills.switch_off' : 'persona.skills.switch_on', { name: ctx.draft().title });
-  toggle.addEventListener('click', () => ctx.change({ skills: skillsToggled(ctx.draft().skills, line.name, !line.on) }));
-  row.append(name, h('span', 'persona-muted persona-skill-meta', meta), toggle);
-  return row;
+export interface SkillsBlock {
+  readonly element: HTMLElement;
+  dispose(): void;
 }
 
-export function skillsBlock(ctx: BlockContext): HTMLElement {
-  const { t } = ctx;
+export function createSkillsBlock(ctx: BlockContext): SkillsBlock {
+  const { t, api } = ctx;
+  const state = ctx.skills;
   const block = h('section', 'persona-block');
   block.setAttribute('aria-label', t('persona.page.skills'));
+  const counts = h('small', 'persona-muted persona-tokens persona-skill-counts');
   const list = h('div', 'persona-skill-list');
   list.setAttribute('role', 'list');
-  for (const line of skillLinesOf(ctx.loadedSkills, ctx.draft().skills, ctx.extras.skills)) {
-    list.append(skillRow(ctx, line));
-  }
-  block.append(blockHead(t('persona.page.skills')), list);
-  return block;
+  const problem = h('div', 'persona-note persona-state-error persona-skill-problem');
+  problem.setAttribute('role', 'alert');
+  let confirming: string | null = null;
+
+  const add = skillAddControl(t, (kind, files) => {
+    void uploadPlanOf(kind, files).then((plan) => (plan.ok ? state.upload(plan.command) : state.fail({ ok: false, code: plan.code, error: plan.code })));
+  });
+
+  const paint = (): void => {
+    const listing = state.list;
+    const rows = listing === null ? [] : skillRowsOf(listing, ctx.persona.id);
+    if (confirming !== null && !rows.some((row) => row.name === confirming)) {
+      confirming = null;
+    }
+    list.replaceChildren(
+      ...rows.map((row) =>
+        skillRowNode(api, t, row, {
+          persona: ctx.draft().title,
+          busy: state.busy,
+          confirming: confirming === row.name,
+          toggle: (name, on) => void state.toggle(name, on),
+          askRemove: (name) => {
+            confirming = name;
+            paint();
+          },
+          cancelRemove: () => {
+            confirming = null;
+            paint();
+          },
+          remove: (name) => {
+            confirming = null;
+            void state.remove(name);
+          },
+        }),
+      ),
+    );
+    if (listing === null) {
+      counts.textContent = '';
+    } else {
+      const total = skillCountsOf(listing);
+      counts.textContent = t('persona.skills.count', { on: total.on, total: total.total, tokens: total.tokens });
+    }
+    const failure = state.failure;
+    const key = failure === null ? null : failureKeyOf(failure);
+    problem.textContent = failure === null ? '' : key !== null ? t(key) : failure.error;
+    problem.hidden = failure === null;
+    add.setBusy(state.busy);
+  };
+
+  const off = state.subscribe(paint);
+  block.append(blockHead(t('persona.page.skills'), counts, add.element), problem, list);
+  paint();
+  return { element: block, dispose: off };
 }
