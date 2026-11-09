@@ -378,7 +378,8 @@
   height: 6px;
   flex-shrink: 0;
   overflow: hidden;
-  border-radius: 3px;
+  /* The board draws radius 3; a 4 px token on a 6 px bar is clamped to 3 by the browser. */
+  border-radius: var(--radius-chip);
   background: var(--bg-input);
 }
 

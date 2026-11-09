@@ -79,7 +79,7 @@ describe('Settings → Models page', () => {
     const { section } = setup();
     await section.refresh();
     const rows = [...section.root.querySelectorAll('tbody tr')];
-    expect(rows.map((r) => [...r.querySelectorAll('td')].map((td) => td.textContent).join('|'))).toEqual(['claude-opus-4-1|Claude A|frontier|A|5|1', 'gpt-5.4|CopilotWork|everyday|B|1|2']);
+    expect(rows.map((r) => [...r.querySelectorAll('td')].map((td) => td.textContent).join('|'))).toEqual(['claude-opus-4-1|Claude A|frontier|A|5|1', 'gpt-5.4|Copilot Work|everyday|B|1|2']);
     expect(rows[0]?.classList.contains('tset-models-work')).toBe(false);
     expect(rows[1]?.classList.contains('tset-models-work')).toBe(true);
     expect(section.root.querySelectorAll('thead th')).toHaveLength(6);
