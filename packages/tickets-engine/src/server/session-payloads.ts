@@ -28,17 +28,40 @@ export function parseCrewPatches(payload: unknown): readonly CrewPatch[] {
 /** `{ overrides: [{ map, name, value? }] }`: the per-provider/model handover thresholds; without `value` the entry goes. */
 export function parseCrewOverrides(payload: unknown): readonly CrewOverridePatch[] {
   const list = isRecord(payload) && Array.isArray(payload['overrides']) ? (payload['overrides'] as unknown[]) : [];
-  const out: CrewOverridePatch[] = [];
-  for (const entry of list) {
-    if (!isRecord(entry) || !(CREW_OVERRIDE_MAPS as readonly unknown[]).includes(entry['map']) || typeof entry['name'] !== 'string' || entry['name'].trim() === '') {
-      continue;
-    }
-    const value = entry['value'];
-    if (value === undefined || value === null || (typeof value === 'number' && Number.isFinite(value) && value >= 0)) {
-      out.push({ map: entry['map'] as CrewOverrideMap, name: entry['name'].trim(), value: typeof value === 'number' ? value : undefined });
-    }
+  return list.map(overrideOf).filter((patch): patch is CrewOverridePatch => patch !== null);
+}
+
+/** One override entry, or null when its map, name or value is wrong. */
+function overrideOf(entry: unknown): CrewOverridePatch | null {
+  if (!isRecord(entry) || !(CREW_OVERRIDE_MAPS as readonly unknown[]).includes(entry['map'])) {
+    return null;
   }
-  return out;
+  const name = text(entry['name']);
+  const value = entry['value'];
+  const valid = value === undefined || value === null || (typeof value === 'number' && Number.isFinite(value) && value >= 0);
+  return name === null || !valid ? null : { map: entry['map'] as CrewOverrideMap, name, value: typeof value === 'number' ? value : undefined };
+}
+
+const CLASSES = ['A', 'B', 'C'] as const;
+
+/** The optional fields of an ask, each checked; the error of the first wrong one. */
+function optionalsOf(payload: Record<string, unknown>): Omit<FreeSessionAsk, 'persona' | 'directory'> | string {
+  const poolClass = payload['poolClass'];
+  if (poolClass !== undefined && poolClass !== null && !(CLASSES as readonly unknown[]).includes(poolClass)) {
+    return `unknown class "${String(poolClass)}"`;
+  }
+  const permission = payload['permissionMode'];
+  if (permission !== undefined && !(SESSION_PERMISSIONS as readonly unknown[]).includes(permission)) {
+    return `unknown permission mode "${String(permission)}"`;
+  }
+  const model = text(payload['model']);
+  const firstLine = text(payload['firstLine']);
+  return {
+    ...(poolClass !== undefined && poolClass !== null ? { poolClass: poolClass as (typeof CLASSES)[number] } : {}),
+    ...(permission !== undefined ? { permissionMode: permission as SessionPermission } : {}),
+    ...(model !== null ? { model } : {}),
+    ...(firstLine !== null ? { firstLine } : {}),
+  };
 }
 
 export type ParsedAsk = { readonly ok: true; readonly value: FreeSessionAsk; readonly origin: string } | { readonly ok: false; readonly error: string };
@@ -55,23 +78,9 @@ export function parseFreeSessionAsk(payload: unknown): ParsedAsk {
   if (persona === null || directory === null) {
     return { ok: false, error: 'a session start names its persona and its directory' };
   }
-  const poolClass = payload['poolClass'];
-  if (poolClass !== undefined && poolClass !== null && poolClass !== 'A' && poolClass !== 'B' && poolClass !== 'C') {
-    return { ok: false, error: `unknown class "${String(poolClass)}"` };
+  const optionals = optionalsOf(payload);
+  if (typeof optionals === 'string') {
+    return { ok: false, error: optionals };
   }
-  const permission = payload['permissionMode'];
-  if (permission !== undefined && !(SESSION_PERMISSIONS as readonly unknown[]).includes(permission)) {
-    return { ok: false, error: `unknown permission mode "${String(permission)}"` };
-  }
-  const model = payload['model'];
-  const firstLine = text(payload['firstLine']);
-  const value: FreeSessionAsk = {
-    persona,
-    directory,
-    ...(poolClass === 'A' || poolClass === 'B' || poolClass === 'C' ? { poolClass } : {}),
-    ...(permission !== undefined ? { permissionMode: permission as SessionPermission } : {}),
-    ...(typeof model === 'string' && model.trim() !== '' ? { model: model.trim() } : {}),
-    ...(firstLine !== null ? { firstLine } : {}),
-  };
-  return { ok: true, value, origin: text(payload['origin']) ?? 'drey' };
+  return { ok: true, value: { persona, directory, ...optionals }, origin: text(payload['origin']) ?? 'drey' };
 }

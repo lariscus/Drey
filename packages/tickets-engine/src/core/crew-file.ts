@@ -42,11 +42,13 @@ export function crewValueOf(field: Pick<CrewField, 'kind'>, raw: unknown): CrewV
     case 'count':
       return numberOf(raw, 0);
     case 'limit':
-      if (raw === false || raw === 'off' || raw === 0 || raw === '0') {
-        return null;
-      }
-      return numberOf(raw, Number.MIN_VALUE);
+      return limitOf(raw);
   }
+}
+
+/** A limit: `off` / `false` / `0` is switched off (null), else a positive number. */
+function limitOf(raw: unknown): CrewValue | undefined {
+  return raw === false || raw === 'off' || raw === 0 || raw === '0' ? null : numberOf(raw, Number.MIN_VALUE);
 }
 
 function numberOf(raw: unknown, min: number): number | undefined {

@@ -65,6 +65,23 @@ function applyOverride(doc: Document, patch: CrewOverridePatch): string | null {
   return null;
 }
 
+/** Every patch in order; the first error stops it. */
+function applyAll(doc: Document, values: readonly CrewPatch[], overrides: readonly CrewOverridePatch[]): string | null {
+  for (const patch of values) {
+    const error = applyValue(doc, patch);
+    if (error !== null) {
+      return error;
+    }
+  }
+  for (const patch of overrides) {
+    const error = applyOverride(doc, patch);
+    if (error !== null) {
+      return error;
+    }
+  }
+  return null;
+}
+
 /**
  * The file with the patches applied; `before` null = a fresh file with
  * the default prose. The result always carries a fence.
@@ -79,17 +96,9 @@ export function patchCrewFile(before: string | null, values: readonly CrewPatch[
   if (doc.contents === null) {
     doc.contents = doc.createNode({}) as unknown as typeof doc.contents;
   }
-  for (const patch of values) {
-    const error = applyValue(doc, patch);
-    if (error !== null) {
-      return { ok: false, error };
-    }
-  }
-  for (const patch of overrides) {
-    const error = applyOverride(doc, patch);
-    if (error !== null) {
-      return { ok: false, error };
-    }
+  const error = applyAll(doc, values, overrides);
+  if (error !== null) {
+    return { ok: false, error };
   }
   const yaml = isMap(doc.contents) && doc.contents.items.length === 0 ? '\n' : doc.toString();
   return { ok: true, text: `---\n${yaml}---\n${body}` };

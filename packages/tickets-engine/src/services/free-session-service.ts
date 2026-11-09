@@ -140,12 +140,12 @@ export class FreeSessionService {
       ...(ask.poolClass !== undefined && ask.poolClass !== null ? { poolClass: ask.poolClass } : {}),
     };
     const permissionMode = overrides.permissionMode ?? crew.permissionMode;
-    const instruction = await this.brief(vault, persona, at.directory, permissionMode, at.ticketsVault);
+    const instruction = await this.brief(vault, persona, { directory: at.directory, permissionMode, ticketsVault: at.ticketsVault });
     const repo = repos.repos.find((r) => r.path !== null && (normalizedPath(at.directory) + '/').startsWith(normalizedPath(r.path) + '/'));
     return this.builder.build({ persona, ticketsVaultPath: vault.path, directory: at.directory, instruction, origin: at.origin, crew, overrides, classOf, ...(repo?.profile !== undefined ? { profile: repo.profile } : {}) });
   }
 
-  private async brief(vault: EngineVault, persona: Persona, directory: string, permissionMode: RunRequest['permissionMode'], ticketsVault: boolean): Promise<string> {
+  private async brief(vault: EngineVault, persona: Persona, where: { directory: string; permissionMode: RunRequest['permissionMode']; ticketsVault: boolean }): Promise<string> {
     const read = (rel: string): Promise<string | null> => this.deps.host.read(vault.id, rel).catch(() => null);
     const [prompt, skills] = await Promise.all([read(`tickets/_meta/personas/${persona.id}/prompt.md`), loadPersonaSkills(read, persona.id, persona.skills)]);
     return composeFreeSessionBrief({
@@ -153,9 +153,9 @@ export class FreeSessionService {
       role: persona.role,
       prompt: prompt ?? '',
       skills: skills.skills.map((s) => ({ name: s.name, text: s.text })),
-      workingDirectory: directory,
-      permissionMode,
-      ticketsVault,
+      workingDirectory: where.directory,
+      permissionMode: where.permissionMode,
+      ticketsVault: where.ticketsVault,
     });
   }
 

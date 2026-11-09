@@ -35,6 +35,16 @@ export interface SessionRecord {
   readonly endedAt: string | null;
 }
 
+/** Where the worker works: the session's own directory, a review's checkout, else the worktree. */
+function workFolderOf(info: RunInfo): string {
+  return info.workingDirectory ?? info.review?.checkout ?? info.worktreePath;
+}
+
+/** The model that ran (the pool's) and the class it granted. */
+function grantOf(info: RunInfo): { model: string | null; class: CapabilityClass | null } {
+  return { model: info.grant?.model ?? info.model ?? null, class: info.grant?.class ?? null };
+}
+
 /** The run record as a session record. */
 export function sessionRecordOf(info: RunInfo, permission: string | null = null): SessionRecord {
   const kind = sessionKindOf(info);
@@ -45,9 +55,8 @@ export function sessionRecordOf(info: RunInfo, permission: string | null = null)
     kind,
     persona,
     harness: info.provider,
-    model: info.grant?.model ?? info.model ?? null,
-    class: info.grant?.class ?? null,
-    workingDirectory: info.workingDirectory ?? info.review?.checkout ?? info.worktreePath,
+    ...grantOf(info),
+    workingDirectory: workFolderOf(info),
     state: sessionStateOf(info),
     ticketId,
     token: info.vaultMcp === true ? info.id : null,
