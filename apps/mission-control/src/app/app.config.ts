@@ -286,6 +286,10 @@ export const appConfig: ApplicationConfig = {
             const reply = await state.sendPersonaThread(open.id, text);
             return reply;
           },
+          decideThreadProposal: async (proposal, decision) => {
+            const open = state.personaDetail();
+            return open === null ? { ok: false, error: 'no persona is open' } : state.decidePersonaProposal(open.id, proposal, decision);
+          },
           memory: () => state.personaMemory(),
           memoryError: () => state.personaMemoryError(),
           addMemory: async (text) => {

@@ -1295,6 +1295,7 @@
   "service_window.sessions.writing": "writing",
   "service_window.sessions.quiet": "{span} quiet",
   "service_window.sessions.held_line": "held",
+  "service_window.sessions.releases_in": "held · releases in {span}",
   "service_window.sessions.stop": "Stop {name}",
   "service_window.sessions.release": "Release {name}",
   "service_window.detail.open_worktree": "Open worktree",

@@ -31,8 +31,8 @@ export interface SessionSpec {
  */
 export const ONE_ON_ONE_TICKET = '1:1';
 
-/** A held 1:1 is released after this long without a turn (req-157's lifecycle as req-168 builds it). */
-export const ONE_ON_ONE_IDLE_MS = 15 * 60_000;
+/** A held 1:1 is released after this long without a turn (req-157's lifecycle as req-168 builds it) — shared with the service window. */
+export { ONE_ON_ONE_IDLE_MS } from '../../../../shared/session-lifecycle';
 
 /** The kind of a record or request; absent = a ticket run, every record written before req-168. */
 export function sessionKindOf(subject: { readonly kind?: SessionKind; readonly session?: SessionSpec }): SessionKind {

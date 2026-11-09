@@ -167,8 +167,14 @@ export interface SessionRun {
   readonly turns: number | null;
   /** The owner holds the run (a takeover, an interactive dialog). */
   readonly held: boolean;
-  /** An interactive dialog run (req-65): a 1:1 with a persona. */
+  /** An interactive dialog run (req-65). */
   readonly interactive: boolean;
+  /** req-168 (R12): the session's kind — a ticket `run` or a persona's `1:1` (`shape`, `free`: req-173). */
+  readonly kind: 'run' | '1:1' | 'shape' | 'free';
+  /** req-168: where the worker works — the worktree, or a 1:1's tickets repository. */
+  readonly workingDirectory: string;
+  /** req-168: when a live 1:1 is released if no line follows (ISO); null for every other session. */
+  readonly releaseAt: string | null;
   readonly origin: string | null;
   readonly handoverMode: string | null;
   readonly worktreePath: string;

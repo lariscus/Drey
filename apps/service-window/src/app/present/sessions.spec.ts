@@ -21,12 +21,24 @@ describe('sessionList', () => {
     expect(list.live.map((row) => row.title)).toEqual(['T-0126 · test · Tessa', 'T-0121 · build · Ben', '1:1 · Ben']);
     expect(list.live[0]?.detail).toBe('opencode · qwen3-coder · turn 6 · 9 min quiet');
     expect(list.live[1]?.detail).toBe('claude-code · sonnet · turn 3 · writing');
-    expect(list.live[2]?.detail).toBe('claude-code · sonnet · held');
+    // Board 8b: a held 1:1 says when its idle release falls.
+    expect(list.live[2]?.detail).toMatch(/^claude-code · sonnet · held · releases in 1[01] min$/);
     expect(list.live.map((row) => row.dot)).toEqual(['running', 'running', 'held']);
     expect(list.live[2]?.buttonLabel).toBe('Release 1:1 · Ben');
   });
   it('marks failed ended runs red', () => {
     expect(list.ended.some((row) => row.dot === 'failed')).toBe(true);
+  });
+  it("titles a persona's 1:1 session (req-168) and counts it apart from the runs", () => {
+    const oneOnOne = runs[2]!;
+    expect(oneOnOne.kind).toBe('1:1');
+    expect(sessionTitle(i18n, oneOnOne)).toBe('1:1 · Ben');
+    expect(sessionList(i18n, [oneOnOne], Date.now()).summary).toBe('1 session · 0 runs · 1 held');
+  });
+  it('names the directory of a 1:1 instead of a worktree (R12)', () => {
+    const rows = processRows(i18n, runs[2]!);
+    expect(rows.find((row) => row.label === 'Directory')?.value).toBe(runs[2]!.workingDirectory);
+    expect(rows.some((row) => row.label === 'Worktree')).toBe(false);
   });
   it('titles an interactive run without a persona by its ticket', () => {
     expect(sessionTitle(i18n, { ...ben, interactive: true, persona: null })).toBe('T-0121');

@@ -23,6 +23,7 @@ export interface SessionStateView {
   readonly session: PersonaSessionState;
   readonly runId?: string;
   readonly releaseAt?: string;
+  readonly costUsd?: number | null;
 }
 
 /**
@@ -38,12 +39,13 @@ export function sessionStateOf(input: SessionStateInput): SessionStateView {
   if (run === null) {
     return { session: input.answering ? 'starting' : 'none' };
   }
+  const facts = { runId: run.id, costUsd: run.costUsd };
   if (run.state === 'starting') {
-    return { session: 'starting', runId: run.id };
+    return { session: 'starting', ...facts };
   }
   if (input.answering || run.turn === 'busy') {
-    return { session: 'answering', runId: run.id };
+    return { session: 'answering', ...facts };
   }
   const last = Math.max(Date.parse(run.startedAt) || 0, Date.parse(run.lastActivity) || 0);
-  return { session: 'held', runId: run.id, releaseAt: new Date(last + (input.idleMs ?? ONE_ON_ONE_IDLE_MS)).toISOString() };
+  return { session: 'held', ...facts, releaseAt: new Date(last + (input.idleMs ?? ONE_ON_ONE_IDLE_MS)).toISOString() };
 }

@@ -349,8 +349,31 @@ export interface PersonaThreadMessageView {
   readonly at: string;
 }
 
+/** One proposal card of the persona's 1:1 (req-168): its instructions rewritten or a skill added; adopted only on Accept. */
+export interface PersonaThreadProposalView {
+  readonly id: string;
+  readonly state: 'pending' | 'confirmed' | 'dismissed';
+  readonly summary: string;
+  readonly kind: 'prompt' | 'skill';
+  /** The skill a `skill` card adds; '' for a `prompt` card. */
+  readonly skill: string;
+  readonly outcome: string | null;
+}
+
+/** The session behind the 1:1 (req-168): none, starting, answering, held (until `releaseAt`), or the chat bridge. */
+export type PersonaSessionView = 'none' | 'starting' | 'answering' | 'held' | 'bridge';
+
 export interface PersonaThreadView {
   readonly messages: readonly PersonaThreadMessageView[];
+  /** req-168: the persona's proposal cards; absent from an older desk. */
+  readonly proposals?: readonly PersonaThreadProposalView[];
+  /** req-168: the persona's chat session file; absent while none exists. */
+  readonly file?: string;
+  readonly session?: PersonaSessionView;
+  readonly releaseAt?: string;
+  readonly costUsd?: number | null;
+  /** req-168: why the last line was not answered. */
+  readonly failure?: string;
 }
 
 /**
@@ -400,15 +423,49 @@ function threadMessageOf(raw: unknown): PersonaThreadMessageView | null {
   };
 }
 
+/** One 1:1 proposal card off the wire; null when it is no card. */
+function threadProposalOf(raw: unknown): PersonaThreadProposalView | null {
+  const card = rec(raw);
+  const command = rec(card?.['command']);
+  const state = card?.['state'];
+  const kind = command?.['kind'];
+  if (card === null || str(card['id']) === '' || (kind !== 'prompt' && kind !== 'skill') || (state !== 'pending' && state !== 'confirmed' && state !== 'dismissed')) {
+    return null;
+  }
+  const outcome = card['outcome'];
+  return { id: str(card['id']), state, summary: str(card['summary']), kind, skill: kind === 'skill' ? str(command?.['skill']) : '', outcome: typeof outcome === 'string' ? outcome : null };
+}
+
+const SESSION_VIEWS: readonly PersonaSessionView[] = ['none', 'starting', 'answering', 'held', 'bridge'];
+
+/** The 1:1's session facts off the wire (req-168); absent fields stay absent. */
+function threadSessionOf(json: Record<string, unknown> | null): Omit<PersonaThreadView, 'messages' | 'proposals'> {
+  const session = SESSION_VIEWS.find((view) => view === json?.['session']);
+  const cost = json?.['costUsd'];
+  return {
+    ...(str(json?.['file']) !== '' ? { file: str(json?.['file']) } : {}),
+    ...(session !== undefined ? { session } : {}),
+    ...(str(json?.['releaseAt']) !== '' ? { releaseAt: str(json?.['releaseAt']) } : {}),
+    ...(typeof cost === 'number' || cost === null ? { costUsd: cost } : {}),
+    ...(str(json?.['failure']) !== '' ? { failure: str(json?.['failure']) } : {}),
+  };
+}
+
 /**
  * The persona thread answer (`{messages}`) tolerantly mapped; junk yields
- * an empty thread — a torn message drops out instead of throwing.
+ * an empty thread — a torn message drops out instead of throwing. req-168
+ * adds the proposal cards and the session behind the conversation.
  */
 export function parsePersonaThread(json: unknown): PersonaThreadView {
+  const body = rec(json);
   return {
-    messages: arr(rec(json)?.['messages'])
+    messages: arr(body?.['messages'])
       .map(threadMessageOf)
       .filter((message): message is PersonaThreadMessageView => message !== null),
+    ...(Array.isArray(body?.['proposals'])
+      ? { proposals: arr(body?.['proposals']).map(threadProposalOf).filter((card): card is PersonaThreadProposalView => card !== null) }
+      : {}),
+    ...threadSessionOf(body),
   };
 }
 
@@ -1120,14 +1177,16 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
     if (persona === null) {
       continue;
     }
-    const liveRun = runs
+    // req-168: a persona's held 1:1 is a session, not work on a ticket — the card does not read "running" for it.
+    const ticketRuns = runs.filter((run) => rec(run)?.['kind'] !== '1:1');
+    const liveRun = ticketRuns
       .map((run) => rec(run))
       .find(
         (run) =>
           run !== null && str(run['persona']) === persona.id && runStateOf(run['state']) !== null,
       );
     const state = liveRun === null || liveRun === undefined ? null : runStateOf(liveRun['state']);
-    const liveRuns = runs.flatMap((run): LiveRunView[] => {
+    const liveRuns = ticketRuns.flatMap((run): LiveRunView[] => {
       const r = rec(run);
       const runState = r === null ? null : runStateOf(r['state']);
       if (r === null || runState === null || str(r['persona']) !== persona.id) {

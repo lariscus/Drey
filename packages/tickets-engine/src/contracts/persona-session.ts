@@ -61,6 +61,8 @@ export type PersonaThreadReply =
       readonly runId?: string;
       /** When the held session will be released if nothing follows (ISO). */
       readonly releaseAt?: string;
+      /** What the live session has cost so far (USD); null while its harness reported none. */
+      readonly costUsd?: number | null;
       /** The last turn failed: why (the answer never came). */
       readonly failure?: string;
       readonly warning?: string;

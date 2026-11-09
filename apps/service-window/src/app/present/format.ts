@@ -54,6 +54,12 @@ export function capitalize(text: string): string {
   return text === '' ? text : text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/** How long until `iso`, as `11 min` (none past it); empty for a value that is no date. */
+export function spanUntil(i18n: I18n, iso: string, nowMs: number): string {
+  const then = new Date(iso).getTime();
+  return Number.isNaN(then) ? '' : i18n.formatDuration(Math.max(0, then - nowMs));
+}
+
 /** How long ago `iso` was, as `4 min`; empty for a value that is no date. */
 export function spanSince(i18n: I18n, iso: string, nowMs: number): string {
   const then = new Date(iso).getTime();

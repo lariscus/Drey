@@ -93,7 +93,7 @@ export function sessionFacts(
 }
 
 export function processRows(i18n: I18n, run: SessionRun): readonly ProcessRowVm[] {
-  const row = (key: 'pid' | 'state' | 'harness' | 'started' | 'ended' | 'worktree' | 'session_ref' | 'origin', value: string): ProcessRowVm => ({
+  const row = (key: 'pid' | 'state' | 'harness' | 'started' | 'ended' | 'worktree' | 'directory' | 'session_ref' | 'origin', value: string): ProcessRowVm => ({
     label: i18n.t(`service_window.process.${key}`),
     value,
   });
@@ -104,7 +104,8 @@ export function processRows(i18n: I18n, run: SessionRun): readonly ProcessRowVm[
     row('harness', joinParts([run.provider, run.model])),
     row('started', stamp(run.startedAt)),
     row('ended', stamp(run.endedAt)),
-    row('worktree', run.worktreePath),
+    // R12: a 1:1 works in the tickets repository, not in a worktree — the row names the directory.
+    run.kind === 'run' ? row('worktree', run.worktreePath) : row('directory', run.workingDirectory),
     row('session_ref', run.sessionRef ?? ''),
     row('origin', joinParts([run.origin, run.handoverMode])),
   ];

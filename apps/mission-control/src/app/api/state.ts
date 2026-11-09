@@ -349,6 +349,7 @@ export class McState {
       return;
     }
     const event = parseChatEvent(name, data);
+    this.followPersonaThread(event.kind, event.kind === 'chat' ? event.file : null);
     switch (event.kind) {
       case 'board':
       case 'needs':
@@ -1562,6 +1563,40 @@ export class McState {
   }
 
   /**
+   * req-168: the open 1:1 follows the desk — its answer lands as a write of
+   * its session file (a `chat` change naming it, and a `board` change), and
+   * while its session starts or a turn runs every fleet change may move it.
+   */
+  private followPersonaThread(kind: string, file: string | null): void {
+    const open = this.personaDetail();
+    const thread = this.personaThread();
+    if (open === null) {
+      return;
+    }
+    const busy = thread?.session === 'starting' || thread?.session === 'answering';
+    if (kind === 'board' || (kind === 'chat' && file !== null && file === thread?.file) || (kind === 'fleet' && busy)) {
+      void this.loadPersonaThread(open.id);
+    }
+  }
+
+  /** req-168: accepts or dismisses one of the open persona's 1:1 cards; the desk's answer is the new thread. */
+  async decidePersonaProposal(id: string, proposal: string, decision: 'confirm' | 'dismiss'): Promise<McReply> {
+    const body = await this.client
+      .request('POST', `/api/personas/${encodeURIComponent(id)}/thread/proposals/${encodeURIComponent(proposal)}/${decision}`, {})
+      .catch(fail);
+    if (this.personaDetail()?.id !== id) {
+      return { ok: false, error: 'the persona thread closed' };
+    }
+    if (isFailure(body)) {
+      this.personaThreadError.set(body.error);
+      return body;
+    }
+    this.personaThreadError.set(null);
+    this.personaThread.set(parsePersonaThread(body));
+    return { ok: true };
+  }
+
+  /**
    * Sends one owner line into the open persona's thread: the echo lands
    * at once (optimistic append), then the POST runs; the desk's own
    * answer — when the reply carries `messages` — replaces the echo's
@@ -1591,9 +1626,10 @@ export class McState {
     }
     // The reply may carry the canonical thread — apply it when readable;
     // anything else keeps the optimistic echo (tolerant, never a throw).
+    // req-168: it also says the session behind it (starting, answering).
     const messages = (body as Record<string, unknown>)['messages'];
     if (Array.isArray(messages)) {
-      this.personaThread.set(parsePersonaThread({ messages }));
+      this.personaThread.set(parsePersonaThread(body));
     }
     this.personaThreadError.set(null);
     return { ok: true };
