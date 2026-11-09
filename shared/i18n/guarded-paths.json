@@ -19,6 +19,7 @@
     "apps/service-window/src/app/shell",
     "src/app/i18n",
     "src/app/settings/service",
+    "electron/service-window",
     "plugins/tickets/renderer/autopilot",
     "plugins/tickets/renderer/decision",
     "plugins/tickets/renderer/cost",

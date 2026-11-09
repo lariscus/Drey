@@ -4,7 +4,7 @@
   "description": "Drey — your private note vault that runs your work (local Markdown notes with an AI assistant, Electron + Angular).",
   "author": "Henrik Puls",
   "homepage": "https://drey.lariscus.de",
-  "main": "dist-electron/electron/main.js",
+  "main": "dist-electron/electron/boot.js",
   "workspaces": [
     "packages/*",
     "apps/*"
