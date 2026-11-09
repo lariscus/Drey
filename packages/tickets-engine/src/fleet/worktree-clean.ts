@@ -12,7 +12,8 @@ import * as path from 'node:path';
 import type { Dirent } from 'node:fs';
 import type { RepoRef } from '../contracts/tickets';
 import type { TicketsGit } from '../core/tickets-git';
-import { isUnderAnyBase, legacyWorktreeBase, worktreeBaseFor } from './worktree-home';
+import { NodeTreeMode } from './node-tree-mode';
+import { isReviewCheckoutPath, isUnderAnyBase, legacyWorktreeBase, worktreeBaseFor } from './worktree-home';
 import { normalizeForMatch, parseWorktreePorcelain, realPathOrNull, unlinkShared } from './worktrees';
 
 /** The exec seam cleanup drives (a `TicketsGit` instance). */
@@ -57,6 +58,9 @@ export async function removeWorktree(
     return { ok: false, dirty: true, status };
   }
   try {
+    if (isReviewCheckoutPath(worktreePath)) {
+      await new NodeTreeMode().setReadOnly(worktreePath, false); // req-183: a leftover review checkout is read-only on disk
+    }
     await unlinkShared(worktreePath, options.links ?? []);
     const args = ['worktree', 'remove', ...(options.force === true ? ['--force'] : []), worktreePath];
     await git.run(repoPath, args);
