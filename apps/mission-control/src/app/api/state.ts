@@ -32,6 +32,7 @@ import {
   parseChatFailure,
   parseImprovements,
   parseNeeds,
+  parsePersonaJournal,
   parsePersonaMemory,
   parsePersonaThread,
   parseProposal,
@@ -55,6 +56,7 @@ import {
   type McPlanStatus,
   type NeedView,
   type PersonaImprovementsView,
+  type PersonaJournalView,
   type PersonaMemoryView,
   type PersonaPatch,
   type PersonaThreadView,
@@ -246,6 +248,9 @@ export class McState {
   readonly personaMemory = signal<PersonaMemoryView | null>(null);
   /** Why the memory load failed; null when all is well. */
   readonly personaMemoryError = signal<string | null>(null);
+  /** req-169: the open persona's journal (reviews.md); null while it loads or when none is open. */
+  readonly personaJournal = signal<PersonaJournalView | null>(null);
+  readonly personaJournalError = signal<string | null>(null);
 
   private stopListen: (() => void) | null = null;
   private booted = false;
@@ -1441,9 +1446,12 @@ export class McState {
     this.personaThreadError.set(null);
     this.personaMemory.set(null);
     this.personaMemoryError.set(null);
+    this.personaJournal.set(null);
+    this.personaJournalError.set(null);
     void this.loadPersona(id);
     void this.loadPersonaThread(id);
     void this.loadPersonaMemory(id);
+    void this.loadPersonaJournal(id);
   }
 
   /** Back to the team list: drops the loaded views and any failure. */
@@ -1455,6 +1463,8 @@ export class McState {
     this.personaThreadError.set(null);
     this.personaMemory.set(null);
     this.personaMemoryError.set(null);
+    this.personaJournal.set(null);
+    this.personaJournalError.set(null);
   }
 
   /**
@@ -1560,6 +1570,59 @@ export class McState {
     }
     this.personaMemoryError.set(null);
     this.personaMemory.set(parsePersonaMemory(body));
+  }
+
+  /** req-169: the open persona's journal — tolerant like the memory's load. */
+  private async loadPersonaJournal(id: string): Promise<void> {
+    const body = await this.client
+      .request('GET', `/api/personas/${encodeURIComponent(id)}/journal`)
+      .catch(fail);
+    if (this.personaDetail()?.id !== id) {
+      return;
+    }
+    if (isFailure(body)) {
+      this.personaJournal.set(null);
+      this.personaJournalError.set(body.error);
+      return;
+    }
+    this.personaJournalError.set(null);
+    this.personaJournal.set(parsePersonaJournal(body));
+  }
+
+  /** req-169: removes one memory line (index + the text the pane showed); the desk's answer is the new list. */
+  async removePersonaMemory(id: string, index: number, text: string): Promise<McReply> {
+    const body = await this.client
+      .request('POST', `/api/personas/${encodeURIComponent(id)}/memory/remove`, { index, text })
+      .catch(fail);
+    if (this.personaDetail()?.id !== id) {
+      return { ok: false, error: 'the persona memory closed' };
+    }
+    if (isFailure(body) || (body as Record<string, unknown>)['ok'] !== true) {
+      const refused = isFailure(body) ? body : refusal(body, 'the desk did not remove the line');
+      this.personaMemoryError.set(refused.error);
+      return refused;
+    }
+    this.personaMemoryError.set(null);
+    this.personaMemory.set(parsePersonaMemory(body));
+    return { ok: true };
+  }
+
+  /** req-169: removes one journal entry (index + its stamp); the desk's answer is the new journal. */
+  async removePersonaJournal(id: string, index: number, at: string): Promise<McReply> {
+    const body = await this.client
+      .request('POST', `/api/personas/${encodeURIComponent(id)}/journal/remove`, { index, at })
+      .catch(fail);
+    if (this.personaDetail()?.id !== id) {
+      return { ok: false, error: 'the persona journal closed' };
+    }
+    if (isFailure(body) || (body as Record<string, unknown>)['ok'] !== true) {
+      const refused = isFailure(body) ? body : refusal(body, 'the desk did not remove the entry');
+      this.personaJournalError.set(refused.error);
+      return refused;
+    }
+    this.personaJournalError.set(null);
+    this.personaJournal.set(parsePersonaJournal(body));
+    return { ok: true };
   }
 
   /**

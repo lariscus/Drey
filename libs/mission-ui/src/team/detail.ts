@@ -12,6 +12,8 @@ import { NgTemplateOutlet } from '@angular/common';
 import type {
   ImprovementProposalView,
   PersonaImprovementsView,
+  PersonaJournalView,
+  PersonaMemoryEntryView,
   PersonaMemoryView,
   PersonaPatch,
   PersonaThreadView,
@@ -24,6 +26,7 @@ import {
 } from '../ticket/ticket.model';
 import { AppBar } from '../app-bar/app-bar';
 import { McI18nPipe } from '../i18n/i18n.pipe';
+import { journalRows, memoryMeta, memoryText, type JournalRowView } from './memory-rows';
 import { McI18n } from '../i18n/i18n.service';
 import { PhoneAvatar } from '../phone/avatar';
 import { PhoneIcon } from '../phone/icon';
@@ -246,6 +249,13 @@ export interface TeamDetailVm {
   addMemory?(text: string): Promise<DetailActionReply>;
   /** Pins or unpins the entry at `index` (the wire pins by position). */
   pinMemory?(index: number, pinned: boolean): Promise<DetailActionReply>;
+  /** req-169: removes the line at `index` — the text it showed guards against a moved file. */
+  removeMemory?(index: number, text: string): Promise<DetailActionReply>;
+  /** req-169: the journal (one entry per noteworthy run); null while it loads. Absent = no journal list. */
+  journal?(): PersonaJournalView | null;
+  journalError?(): string | null;
+  /** req-169: removes the journal entry at `index` (its stamp guards against a moved file). */
+  removeJournal?(index: number, at: string): Promise<DetailActionReply>;
   /** PATCH `/api/personas/<id>` — the setup tab's every change, one commit each. */
   patchPersona?(patch: PersonaPatch): Promise<DetailActionReply>;
   /** Hands the wording to Mission Control's chat composer (the create intent). */
@@ -744,6 +754,37 @@ export class PersonaDetail {
     } catch {
       this.memError.set('The entry did not stick.');
     }
+  }
+
+  // --- req-169: the memory's author and evidence, the journal, the per-line removals ---
+
+  protected readonly journalRows = computed(() => journalRows(this.vm.journal?.()?.entries ?? [], (key, params) => this.i18n.t(key, params)));
+  protected readonly journalLoaded = computed(() => this.vm.journal !== undefined && this.vm.journal() !== null);
+  protected readonly journalError = computed(() => this.vm.journalError?.() ?? null);
+  protected readonly removeError = signal<string | null>(null);
+
+  protected memoryMeta(entry: PersonaMemoryEntryView): string {
+    return memoryMeta(entry, (key, params) => this.i18n.t(key, params));
+  }
+
+  protected memoryText(entry: PersonaMemoryEntryView): string {
+    return memoryText(entry);
+  }
+
+  protected async removeMemoryLine(index: number, entry: PersonaMemoryEntryView): Promise<void> {
+    if (!this.readOnly()) {
+      this.settleRemoval(await this.vm.removeMemory?.(index, entry.text));
+    }
+  }
+
+  protected async removeJournalEntry(row: JournalRowView): Promise<void> {
+    if (!this.readOnly()) {
+      this.settleRemoval(await this.vm.removeJournal?.(row.index, row.at));
+    }
+  }
+
+  private settleRemoval(reply: DetailActionReply | undefined): void {
+    this.removeError.set(reply !== undefined && !reply.ok ? (reply.error ?? null) : null);
   }
 
   /** The pin toggle: optimistic on the desk, one POST per tap, revert on refusal. */

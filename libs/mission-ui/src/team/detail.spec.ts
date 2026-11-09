@@ -1062,3 +1062,43 @@ describe('the 1:1 as a persona session (req-168)', () => {
     expect(decided).toEqual([{ proposal: 'p-1', decision: 'confirm' }]);
   });
 });
+
+describe('the Memory pane: author and evidence, the journal, removal per line (req-169)', () => {
+  it('removes a memory line and a journal entry, each with what the pane showed', async () => {
+    const removed: unknown[] = [];
+    const vm = makeVm({
+      memoryValue: { entries: [{ text: '2026-11-09 · you · ask first', pinned: false, author: 'you', model: null, date: '2026-11-09', ticket: null, lesson: 'ask first' }] },
+      journal: () => ({
+        entries: [{ at: '2026-11-09T10:00:00Z', ticket: 'T-0102', harness: 'claude-code', model: 'sonnet', gate: 'red', costUsd: 0.42, signals: ['red-gate'], friction: null, finding: null, note: null }],
+      }),
+      journalError: () => null,
+      removeMemory: async (index: number, text: string) => (removed.push(['memory', index, text]), { ok: true }),
+      removeJournal: async (index: number, at: string) => (removed.push(['journal', index, at]), { ok: false, error: 'the journal changed' }),
+    } as Partial<FakeVm>);
+    const detail = setup(vm) as unknown as {
+      journalRows: Signal<readonly { index: number; at: string; head: string }[]>;
+      removeError: Signal<string | null>;
+      memoryMeta(entry: unknown): string;
+      removeMemoryLine(index: number, entry: unknown): Promise<void>;
+      removeJournalEntry(row: unknown): Promise<void>;
+    };
+    expect(detail.memoryMeta(vm.memoryValue!.entries[0])).toBe('you · 2026-11-09');
+    expect(detail.journalRows()[0]!.head).toBe('T-0102 · claude-code/sonnet · gate red · $0.42 · 2026-11-09');
+    await detail.removeMemoryLine(0, vm.memoryValue!.entries[0]);
+    await detail.removeJournalEntry(detail.journalRows()[0]);
+    expect(removed).toEqual([
+      ['memory', 0, '2026-11-09 · you · ask first'],
+      ['journal', 0, '2026-11-09T10:00:00Z'],
+    ]);
+    expect(detail.removeError()).toBe('the journal changed');
+  });
+
+  it('a read-only device removes nothing', async () => {
+    const removed: unknown[] = [];
+    const vm = makeVm({ readonly: true, removeMemory: async () => (removed.push(1), { ok: true }) } as Partial<FakeVm>);
+    const detail = setup(vm) as unknown as { removeMemoryLine(index: number, entry: unknown): Promise<void> };
+    await detail.removeMemoryLine(0, { text: 'x', pinned: false });
+    expect(removed).toEqual([]);
+  });
+});
+

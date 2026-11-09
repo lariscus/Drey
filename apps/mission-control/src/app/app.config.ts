@@ -306,6 +306,16 @@ export const appConfig: ApplicationConfig = {
             }
             return state.pinPersonaMemory(open.id, index, pinned);
           },
+          removeMemory: async (index, text) => {
+            const open = state.personaDetail();
+            return open === null ? { ok: false, error: 'no persona is open' } : state.removePersonaMemory(open.id, index, text);
+          },
+          journal: () => state.personaJournal(),
+          journalError: () => state.personaJournalError(),
+          removeJournal: async (index, at) => {
+            const open = state.personaDetail();
+            return open === null ? { ok: false, error: 'no persona is open' } : state.removePersonaJournal(open.id, index, at);
+          },
           patchPersona: async (patch) => {
             const open = state.personaDetail();
             if (open === null) {
