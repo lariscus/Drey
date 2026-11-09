@@ -9,6 +9,7 @@ import type { ImprovementProposal } from '../../../../packages/tickets-engine/sr
 import type { PersonaView } from '../../shared/remote-protocol';
 import type { BlockContext } from './persona-block-context';
 import type { InstructionsBlock } from './persona-instructions-block';
+import type { SkillsBlock } from './persona-skills-block';
 import type { PersonaDraft } from './persona-model';
 import type { PersonaReads, PromptRead } from './persona-page-load';
 
@@ -21,6 +22,7 @@ export interface Loaded {
   promptRead: PromptRead;
   proposal: ImprovementProposal | null;
   instructions: InstructionsBlock;
+  skills: SkillsBlock;
   ctx: BlockContext;
 }
 
@@ -34,10 +36,12 @@ export interface PageSession {
   messageIsError: boolean;
   /** What the last paint of the loaded page depended on (`keyOf`). */
   viewKey: string;
+  /** When `personas/<id>/` was last committed (ISO), as the Crew store last said; null = unknown. */
+  committedAt: string | null;
 }
 
 export function newSession(): PageSession {
-  return { loaded: null, busy: false, message: '', messageIsError: false, viewKey: '' };
+  return { loaded: null, busy: false, message: '', messageIsError: false, viewKey: '', committedAt: null };
 }
 
 /** The unsaved edits per persona: switching tabs remounts the page, a typed draft must survive that. */

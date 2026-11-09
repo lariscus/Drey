@@ -1206,7 +1206,8 @@ skills you already use with Claude drop in unchanged.
   instructions, under the skill's name. The files beside `SKILL.md` stay where
   they are; they are not put into the prompt.
 - **Upload.** Add a skill by uploading a `SKILL.md`, or a zip of a skill's
-  folder (the `SKILL.md` at the top of the zip or inside one folder). The skill
+  folder (the `SKILL.md` at the top of the zip or inside one folder); on the
+  Persona page, **Add skill…** also takes the folder itself. The skill
   is checked before anything is written: it needs a name and a description at
   the top and some text, and no file may reach outside its folder. A skill that
   already exists is not replaced unless you say so. Delete removes a skill from
@@ -1440,8 +1441,9 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   line for the crew list** — the line under the name on the crew cards, in
   Mission Control too), **Work** (the steps of your flows the persona takes,
   shown as chips — change them in the flow —; the harness; the models,
-  strongest first, each with its class, its factor and how busy its accounts
-  are; **Add a model…** picks from the model table and the **⋮** menu moves or
+  strongest first, each with its class, its factor and how many of its
+  sessions are busy (`1 / 3 busy`: the running runs and 1:1s on that model
+  against what its accounts allow); **Add a model…** picks from the model table and the **⋮** menu moves or
   removes a row; the daily budget) and **Allowed to** (which vaults the persona
   may change, whether its runs ask before running commands, whether it may
   reach the network, whether it may spend past a ticket's allowance — hover a
@@ -1449,11 +1451,24 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   the commands and network choices are recorded for the runner). On the right,
   **Instructions** is the persona's `prompt.md` in the same editor your notes
   use — Live Preview or **Source**, with the formatting buttons above it — and
-  the line above it counts the tokens; **Skills** lists the persona's skills
-  with a switch each (a skill that is on is part of every run's brief);
+  the line above it counts what a run of this persona starts with (`≈ 2,490
+  tokens at start`: the instructions, the skills that are on, the memory and the
+  rest of the brief — an estimate that follows what you type); **Preview full
+  prompt** opens that brief below the editor, read-only, with the four parts
+  and each skill marked with its tokens, and follows a skill you switch.
+  **Skills** lists every skill of the persona's own folder and of the shared
+  pool — the ones that are off too — with where it lives, `own` or `shared`
+  and its tokens, and a switch each (a skill that is on is part of every run's
+  brief). A switch acts at once, as its own commit, and is not part of Save. The
+  **⋯** on an own skill removes it after one question; a shared skill has no
+  such menu. **Add skill…** takes a `SKILL.md` or a zip, or a whole folder
+  (its scripts and files go up with it), into the persona's own folder; the
+  line above the list says what was refused and why;
   **Proposals** shows a change the persona's journal or your 1:1 suggested to
   its instructions, with **Show diff**, **Dismiss** and **Apply**, and under it
-  the links to its **Memory**, its **Journal** and its **1:1**. **Save**
+  the links to its **Memory**, its **Journal** and its **1:1**. At the top the
+  page says `Saved · committed 2 days ago` (when the persona's folder was last
+  committed), or `Changed · not saved`. **Save**
   writes everything you changed as one commit; new runs get it, running ones
   keep the prompt they started with. **Discard** goes back to what is saved. If
   the instructions cannot be read, the editor and Save stay off, so nothing

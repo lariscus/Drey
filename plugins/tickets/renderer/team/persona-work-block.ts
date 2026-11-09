@@ -111,7 +111,7 @@ export function workBlock(ctx: BlockContext): HTMLElement {
   harness.dataset['field'] = 'worker';
   const pool = h('div', 'persona-pool');
   pool.setAttribute('role', 'list');
-  for (const line of modelLinesOf(draft.pool, draft.worker, ctx.extras.table, ctx.extras.slots, ctx.api.i18n)) {
+  for (const line of modelLinesOf(draft.pool, draft.worker, ctx.extras.table, ctx.extras.slots, ctx.deps.runs(), ctx.api.i18n)) {
     pool.append(modelRow(ctx, line, draft.pool));
   }
   pool.append(addModel(ctx, draft.pool));

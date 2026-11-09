@@ -14,8 +14,11 @@ import { test, expect, type ElectronApplication, type Page } from './fixtures/dr
  *   $env:DREY_FIDELITY_SHOTS = '1'
  *   npm run e2e:run -- fidelity-desk-persona
  *
- * Output: `test-results/fidelity/DeskPersona.png` (1440x900, scale factor 1), and the same picture beside
- * the mockup as `docs/design/work-panel/crew-internals/persona-page-built.png` (milestone 231).
+ * Output: `test-results/fidelity/DeskPersona.png` (1440x1700, scale factor 1), and the same picture beside
+ * the mockup as `docs/design/work-panel/crew-internals/persona-page-built.png` (milestone 231, retaken in
+ * milestone 233 with the real skill routes, the prompt preview and the commit age: the engine runs on
+ * the seeded vault; only the model table and the slots are mocked), plus `persona-page-built-preview.png`
+ * with Preview full prompt open.
  */
 const RUN = !!process.env['DREY_FIDELITY_SHOTS'];
 test.skip(!RUN, 'set DREY_FIDELITY_SHOTS=1 -- the screenshot of board 7k');
@@ -86,8 +89,8 @@ const BEN = [
 const other = (title: string, role: string, color: string): string =>
   ['---', `title: ${title}`, `role: ${role}`, 'worker: opencode', 'models:', '  default: qwen3-coder', '  pool: [qwen3-coder]', `color: '${color}'`, 'skills: []', 'budget: 3', '---', ''].join('\n');
 
-/** A skill file of about `tokens` tokens at the page's four-characters-to-a-token estimate. */
-const skillText = (name: string, tokens: number): string => `# ${name}\n\n${'x'.repeat(Math.max(0, tokens * 4 - name.length - 4))}`;
+/** An Agent Skills file of about `tokens` tokens at the engine's 3.5-characters-to-a-token estimate for Claude. */
+const skillText = (name: string, tokens: number): string => `---\nname: ${name}\ndescription: The ${name} skill.\n---\n\n${'x'.repeat(Math.max(0, Math.round(tokens * 3.5) - name.length - 8))}\n`;
 
 const PROMPT = [
   '## Who Ben is',
@@ -130,6 +133,7 @@ const seed: Record<string, string> = {
   'tickets/_meta/personas/ben/improvements.md': IMPROVEMENTS,
   'tickets/_meta/skills/go-conventions/SKILL.md': skillText('go-conventions', 310),
   'tickets/_meta/skills/tdd/SKILL.md': skillText('tdd', 240),
+  'tickets/_meta/skills/diff-review/SKILL.md': skillText('diff-review', 400),
   'tickets/_meta/personas/ben/skills/drey-plugins/SKILL.md': skillText('drey-plugins', 1120),
   'tickets/_meta/personas/paul/persona.md': other('Paul', 'planner', '#f2d3e2'),
   'tickets/_meta/personas/ralf/persona.md': other('Ralf', 'reviewer', '#bfe3cd'),
@@ -165,6 +169,7 @@ async function pushFleet(app: ElectronApplication): Promise<void> {
         runs: [
           liveRun('r-ben', 'T-0121', 'ben', { waiting: { kind: 'question', text: 'Move the section body too?', since: new Date(Date.now() - 4 * 60_000).toISOString() }, turn: 'idle' }),
           liveRun('r-tessa', 'T-0126', 'tessa', { activity: 'Running the unit tests', stuck: true, lastActivity: new Date(Date.now() - 9 * 60_000).toISOString() }),
+          liveRun('r-ralf', 'T-0122', 'ralf', { provider: 'claude-code', model: 'sonnet', column: 'review' }),
         ],
         chain: { configured: true, master: 'run', columns: {}, redStreak: {}, cooldownUntil: {}, poolSize: { opencode: 2, 'claude-code': 3 } },
       },
@@ -261,9 +266,20 @@ test.beforeEach(({ vaultDir }) => {
   execFileSync('git', ['init', '-q'], { cwd: vaultDir, windowsHide: true });
 });
 
-test('board 7k: the Persona page', async ({ page, electronApp }) => {
+/** The head says when the persona's folder was last committed (milestone 233): two days ago, as the mockup has it. The seed is on disk once the app has launched, so the commit comes then. */
+function commitSeed(vaultDir: string): void {
+  const twoDaysAgo = new Date(Date.now() - 2 * 24 * 3_600_000).toISOString();
+  const git = (...args: string[]): void => {
+    execFileSync('git', ['-c', 'user.name=Fidelity', '-c', 'user.email=fidelity@example.test', '-c', 'core.autocrlf=false', '-c', 'commit.gpgsign=false', ...args], { cwd: vaultDir, windowsHide: true, env: { ...process.env, GIT_COMMITTER_DATE: twoDaysAgo, GIT_AUTHOR_DATE: twoDaysAgo } });
+  };
+  git('add', '-A');
+  git('commit', '-q', '-m', 'seed');
+}
+
+test('board 7k: the Persona page', async ({ page, electronApp, vaultDir }) => {
   test.setTimeout(180_000);
   fs.mkdirSync(OUT, { recursive: true });
+  commitSeed(vaultDir);
   await sizeWindow(electronApp);
   await expect(page.locator('app-titlebar [role="tab"]', { hasText: 'Work' })).toBeVisible({ timeout: 30_000 });
   await page.keyboard.press('Control+2');
@@ -295,9 +311,10 @@ test('board 7k: the Persona page', async ({ page, electronApp }) => {
   await crewTab.locator('button').last().click();
   // The board shows Board and the persona tab only; today's daily note may have opened by itself.
   const strayTab = page.locator('app-tab-bar .tab', { hasText: '.md' });
-  while ((await strayTab.count()) > 0) {
-    await strayTab.first().hover();
-    await strayTab.first().locator('button').last().click();
+  for (let tries = 0; tries < 5 && (await strayTab.count()) > 0; tries += 1) {
+    // The daily note may close by itself between the count and the click.
+    await strayTab.first().hover({ timeout: 3_000 }).catch(() => undefined);
+    await strayTab.first().locator('button').last().click({ timeout: 3_000 }).catch(() => undefined);
   }
   await page.locator('app-tab-bar .tab', { hasText: 'persona' }).first().click();
   await expect(page.locator('.persona-page [data-proposal]')).toBeVisible({ timeout: 15_000 });
@@ -323,4 +340,12 @@ test('board 7k: the Persona page', async ({ page, electronApp }) => {
   await page.screenshot({ path: path.join(OUT, 'DeskPersona.png') });
   const docs = path.resolve(__dirname, '..', 'docs', 'design', 'work-panel', 'crew-internals');
   fs.copyFileSync(path.join(OUT, 'DeskPersona.png'), path.join(docs, 'persona-page-built.png'));
+  // Preview full prompt open: the brief, read-only, with the parts marked.
+  await page.locator('.persona-page').getByRole('button', { name: 'Preview full prompt' }).click();
+  await expect(page.locator('.persona-page .persona-ed-preview .cm-content')).toBeVisible({ timeout: 15_000 });
+  await page.locator('.persona-page .persona-ed-preview').scrollIntoViewIfNeeded();
+  await page.mouse.move(700, 880);
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: path.join(OUT, 'DeskPersonaPreview.png') });
+  fs.copyFileSync(path.join(OUT, 'DeskPersonaPreview.png'), path.join(docs, 'persona-page-built-preview.png'));
 });

@@ -1,5 +1,6 @@
 import type { SkillErrorCode } from '../contracts/skills';
 import { isSkillName, parseSkillMarkdown, SKILL_FILE } from './skill';
+import { MAX_SKILL_BYTES, MAX_SKILL_FILES, MAX_SKILL_TEXT_BYTES } from './skill-limits';
 
 /**
  * The validation of an uploaded skill (req-172): a zipped folder arrives as
@@ -11,10 +12,7 @@ import { isSkillName, parseSkillMarkdown, SKILL_FILE } from './skill';
  * reader and the disk are other classes.
  */
 
-export const MAX_SKILL_FILES = 200;
-export const MAX_SKILL_BYTES = 8 * 1024 * 1024;
-/** A `SKILL.md` is a prompt part: past this it is refused, not truncated. */
-export const MAX_SKILL_TEXT_BYTES = 256 * 1024;
+export { MAX_SKILL_BYTES, MAX_SKILL_FILES, MAX_SKILL_TEXT_BYTES } from './skill-limits';
 
 export interface SkillBundleFile {
   /** Relative, `/`-separated (an archive's own names, checked here). */

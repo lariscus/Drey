@@ -6,6 +6,9 @@
  * own copy of the module, so nothing leaks between files.
  */
 import { vi } from 'vitest';
+import type { SkillView } from '../../../../packages/tickets-engine/src/contracts/skills';
+import type { RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
+import { estimateTokens } from '../../../../packages/tickets-engine/src/core/token-count';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- the spec stands in for the host, which owns the catalog at runtime
 import { i18n } from '../../../../shared/i18n';
 import type { MarkdownViewHandle, MarkdownViewOptions } from '../../../../shared/plugin-api/renderer';
@@ -14,6 +17,7 @@ import type { BoardSnapshot } from '../../shared/tickets';
 import type { DeskDeps } from '../desk-deps';
 import { mountPersonaPage, type PersonaPageHost, type PersonaPageSeams } from './persona-page';
 import type { TeamStore } from './team-store';
+import { skillsOf } from './persona-skills.fixture';
 
 export const view: PersonaView = {
   id: 'ben',
@@ -64,6 +68,13 @@ export const fx = {
   host: null as unknown as HTMLElement,
   dispose: null as (() => void) | null,
   failLoads: 0,
+  view: {} as Partial<PersonaView>,
+  skills: [] as SkillView[],
+  missing: [] as string[],
+  skillFail: null as { code: string; error: string } | null,
+  uploads: [] as unknown[],
+  previewFail: false,
+  runs: [] as RunInfo[],
 };
 
 export function resetFixture(): void {
@@ -81,6 +92,13 @@ export function resetFixture(): void {
   document.body.append(fx.host);
   fx.dispose = null;
   fx.failLoads = 0;
+  fx.view = {};
+  fx.skills = skillsOf();
+  fx.missing = [];
+  fx.skillFail = null;
+  fx.uploads = [];
+  fx.previewFail = false;
+  fx.runs = [];
 }
 
 export function cleanFixture(): void {
@@ -110,6 +128,54 @@ function fakeView(opts: MarkdownViewOptions): MarkdownViewHandle {
   };
 }
 
+/** The engine's skill routes over `fx.skills`: a switch, a removal and an upload change it and answer with the new listing. */
+function skillReply(method: string, payload: unknown): unknown {
+  const body = payload as { skill?: string; on?: boolean; name?: string };
+  if (fx.skillFail !== null && method !== 'personaSkills') {
+    return { ok: false, ...fx.skillFail };
+  }
+  if (method === 'personaSkillToggle') {
+    fx.skills = fx.skills.map((skill) => (skill.name === body.skill ? { ...skill, on: body.on === true } : skill));
+  } else if (method === 'personaSkillRemove') {
+    const target = fx.skills.find((skill) => skill.name === body.name);
+    if (target?.origin !== 'own') {
+      return { ok: false, code: 'not_own', error: 'a shared skill is not deleted from a persona' };
+    }
+    fx.skills = fx.skills.filter((skill) => skill.name !== body.name);
+  } else if (method === 'skillUpload') {
+    fx.uploads.push(payload);
+    fx.skills = [...fx.skills, { ...skillsOf()[0]!, name: 'uploaded', on: false }];
+  }
+  const list = { persona: 'ben', skills: fx.skills, missing: fx.missing, selectedTokens: fx.skills.filter((skill) => skill.on).reduce((sum, skill) => sum + skill.tokens, 0), tokenizer: TOKENIZER };
+  return method === 'skillUpload' ? { ok: true, name: 'uploaded', origin: 'own', files: 1, replaced: false, list } : { ok: true, list };
+}
+
+const TOKENIZER = { id: 'claude-estimate', family: 'anthropic', exact: false, model: null } as const;
+
+/** The brief the engine would assemble: 2,490 tokens at the start, the instructions' share counted from the saved prompt. */
+function previewReply(payload: unknown): unknown {
+  if (fx.previewFail) {
+    return { ok: false, code: 'no_persona', error: 'no persona' };
+  }
+  const instructions = 'error' in fx.prompt ? 0 : estimateTokens(fx.prompt.text.trim(), TOKENIZER);
+  const asked = payload as { step?: string };
+  return {
+    ok: true,
+    persona: 'ben',
+    step: asked.step ?? 'build',
+    text: 'The whole brief',
+    tokens: 2490,
+    tokenizer: TOKENIZER,
+    parts: [
+      { name: 'instructions', tokens: instructions },
+      { name: 'skills', tokens: 550 },
+      { name: 'memory', tokens: 90 },
+      { name: 'rest', tokens: 2490 - instructions - 550 - 90 },
+    ],
+    skills: fx.skills.filter((skill) => skill.on).map((skill) => ({ name: skill.name, tokens: skill.tokens })),
+  };
+}
+
 function depsOf(): DeskDeps {
   return {
     api: {
@@ -129,7 +195,7 @@ function depsOf(): DeskDeps {
       ui: { icon: () => document.createElementNS('http://www.w3.org/2000/svg', 'svg'), showDiff: fx.showDiff, createMarkdownView: fakeView },
     } as unknown as DeskDeps['api'],
     snapshot: () => ({ vaultId: 'v1', pipeline: [{ id: 'plan', title: 'Plan', handover: 'agent plan-default' }, { id: 'build', title: 'Build', handover: 'agent build-default' }] }) as unknown as BoardSnapshot,
-    runs: () => [],
+    runs: () => fx.runs,
     chain: () => null,
     invoke: async (method, payload) => {
       fx.invoked.push([method, payload]);
@@ -148,6 +214,13 @@ function depsOf(): DeskDeps {
           return { ok: true, entries: [1, 2, 3] };
         case 'personaJournal':
           return { ok: true, entries: [1, 2] };
+        case 'personaSkills':
+        case 'personaSkillToggle':
+        case 'personaSkillRemove':
+        case 'skillUpload':
+          return skillReply(method, payload);
+        case 'personaPromptPreview':
+          return previewReply(payload);
         default:
           return fx.replies[method] ?? { ok: true };
       }
@@ -162,7 +235,7 @@ function depsOf(): DeskDeps {
 }
 
 function storeOf(): TeamStore {
-  return { personas: () => [view], nameOf: () => 'Ben', loaded: () => true, error: () => '', refresh: async () => undefined, subscribe: () => () => undefined };
+  return { personas: () => [{ ...view, ...fx.view }], nameOf: () => 'Ben', loaded: () => true, error: () => '', refresh: async () => undefined, subscribe: () => () => undefined };
 }
 
 export async function settle(): Promise<void> {
@@ -173,8 +246,7 @@ export async function settle(): Promise<void> {
 
 export async function mount(seams: PersonaPageSeams = {}): Promise<void> {
   const pageHost: PersonaPageHost = { back: () => (fx.backs += 1), retitle: (title) => fx.retitled.push(title), openCrew: (persona, tab) => fx.crew.push([persona, tab]) };
-  const skills = { list: async (_id: string, names: readonly string[]) => names.filter((n) => n === 'tdd').map((name) => ({ name, path: 'skills/tdd/SKILL.md', origin: 'own' as const, tokens: 240 })) };
-  fx.dispose = mountPersonaPage(depsOf(), storeOf(), fx.host, 'ben', pageHost, { skills, ...seams });
+  fx.dispose = mountPersonaPage(depsOf(), storeOf(), fx.host, 'ben', pageHost, seams);
   await settle();
 }
 

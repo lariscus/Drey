@@ -56,7 +56,6 @@ export interface PersonaDraft {
   readonly budget: string;
   readonly prompt: string;
   readonly pool: readonly string[];
-  readonly skills: readonly string[];
   readonly allowed: AllowedDraft;
 }
 
@@ -69,7 +68,6 @@ export interface PersonaPatchKeys {
   budget?: number | null;
   prompt?: string;
   pool?: readonly string[];
-  skills?: readonly string[];
   allowed?: PersonaAllowedPatch;
 }
 
@@ -82,7 +80,7 @@ function allowedOf(view: PersonaView): AllowedDraft {
   };
 }
 
-export function draftOf(view: PersonaView, prompt: string, skills: readonly string[]): PersonaDraft {
+export function draftOf(view: PersonaView, prompt: string): PersonaDraft {
   return {
     title: view.title,
     role: roleLabel(view.role),
@@ -91,7 +89,6 @@ export function draftOf(view: PersonaView, prompt: string, skills: readonly stri
     budget: view.budget === null ? '' : String(view.budget),
     prompt,
     pool: view.pool.length > 0 ? view.pool : view.model === '' ? [] : [view.model],
-    skills,
     allowed: allowedOf(view),
   };
 }
@@ -153,9 +150,6 @@ export function patchOf(base: PersonaDraft, draft: PersonaDraft): PersonaPatchKe
   }
   if (!sameList(draft.pool, base.pool)) {
     patch.pool = draft.pool;
-  }
-  if (!sameList(draft.skills, base.skills)) {
-    patch.skills = draft.skills;
   }
   const allowed = allowedPatchOf(base.allowed, draft.allowed);
   if (allowed !== null) {

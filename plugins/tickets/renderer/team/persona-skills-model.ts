@@ -1,12 +1,13 @@
 // i18n: catalog
 /**
- * The page's Skills block, pure half (R11, req-171): one row per skill with
- * its switch. A switch on = the name is in the record's `skills:`; the rows
- * are the skills the record named when the page loaded plus any the owner
- * switched on since, so a skill switched off stays in view until it is
- * saved. DOM-free.
+ * The page's Skills block, pure half (R11, req-171; over the engine's
+ * listing since req-237): one row per skill the engine lists — the persona's
+ * own folder and the shared pool, `on` for those in the record's `skills:`
+ * — plus a row for every name the record holds that no folder does (so the
+ * owner can switch it off); the ones on come first. DOM-free.
  */
-import type { SkillInfo } from './persona-seams';
+import type { SkillErrorCode, SkillListData, SkillView } from '../../../../packages/tickets-engine/src/contracts/skills';
+import type { SkillsFailure } from './persona-seams';
 
 /** A skill's folder name as a row's name: `go-conventions` -> `Go conventions`. */
 export function skillTitleOf(id: string): string {
@@ -14,27 +15,57 @@ export function skillTitleOf(id: string): string {
   return words === '' ? id : words[0]!.toUpperCase() + words.slice(1);
 }
 
-export interface SkillLine {
+export interface SkillRow {
   readonly name: string;
   readonly title: string;
+  /** The frontmatter's description: the row's tooltip, never a line of its own; '' for a name no folder holds. */
+  readonly description: string;
+  /** Where the skill lives, as the mockup shows it; null for a name no folder holds. */
   readonly path: string | null;
   readonly origin: 'own' | 'shared' | null;
+  /** Estimated tokens of what a run loads; null for a name no folder holds. */
   readonly tokens: number | null;
   readonly on: boolean;
+  /** Only an own skill is deleted from here. */
+  readonly removable: boolean;
 }
 
-export function skillLinesOf(loaded: readonly string[], draft: readonly string[], infos: readonly SkillInfo[]): readonly SkillLine[] {
-  const names = [...new Set([...loaded, ...draft])];
-  return names.map((name) => {
-    const info = infos.find((entry) => entry.name === name);
-    return { name, title: skillTitleOf(name), path: info?.path ?? null, origin: info?.origin ?? null, tokens: info?.tokens ?? null, on: draft.includes(name) };
-  });
+/** `_meta/skills/<name>/SKILL.md` or `personas/<id>/skills/<name>/SKILL.md`; a flat file not yet migrated shows as `<name>.md`. */
+export function skillPathOf(skill: Pick<SkillView, 'name' | 'origin' | 'legacy'>, persona: string): string {
+  const base = skill.origin === 'own' ? `personas/${persona}/skills` : '_meta/skills';
+  return skill.legacy ? `${base}/${skill.name}.md` : `${base}/${skill.name}/SKILL.md`;
 }
 
-/** The `skills:` list after one switch; the order of the record is kept, a newly switched-on skill goes last. */
-export function skillsToggled(draft: readonly string[], name: string, on: boolean): readonly string[] {
-  if (on) {
-    return draft.includes(name) ? draft : [...draft, name];
+export function skillRowsOf(list: SkillListData, persona: string): readonly SkillRow[] {
+  const rows: SkillRow[] = list.skills.map((skill) => ({
+    name: skill.name,
+    title: skillTitleOf(skill.name),
+    description: skill.description,
+    path: skillPathOf(skill, persona),
+    origin: skill.origin,
+    tokens: skill.tokens,
+    on: skill.on,
+    removable: skill.origin === 'own',
+  }));
+  for (const name of list.missing) {
+    rows.push({ name, title: skillTitleOf(name), description: '', path: null, origin: null, tokens: null, on: true, removable: false });
   }
-  return draft.filter((entry) => entry !== name);
+  // The skills that are on first, as the mockup has it; the engine's order (by name) holds within each group.
+  return [...rows.filter((row) => row.on), ...rows.filter((row) => !row.on)];
+}
+
+/** What the block's head counts: the skills on, all that are available, the estimated tokens the ones on cost a run. */
+export function skillCountsOf(list: SkillListData): { readonly on: number; readonly total: number; readonly tokens: number } {
+  return { on: list.skills.filter((skill) => skill.on).length + list.missing.length, total: list.skills.length + list.missing.length, tokens: list.selectedTokens };
+}
+
+/** The catalog key of an engine refusal; an unknown code or a transport failure has none and shows the text it came with. */
+export function failureKeyOf(failure: SkillsFailure): `skills.error.${SkillErrorCode}` | null {
+  return failure.code === null ? null : `skills.error.${failure.code}`;
+}
+
+/** What a failure says: the catalog's line for its code, else the text it came with, else the catalog's `internal` line. */
+export function failureTextOf(t: (key: `skills.error.${SkillErrorCode}`) => string, failure: SkillsFailure): string {
+  const key = failureKeyOf(failure);
+  return key !== null ? t(key) : failure.error !== '' ? failure.error : t('skills.error.internal');
 }
