@@ -1045,8 +1045,8 @@ directory (ADR-0088 E3). One folder per persona, directly under
 ```text
 tickets/_meta/personas/
   paul/
-    persona.md        # frontmatter: title, kind, role, worker, models, color, skills, budget
-    prompt.md         # the persona prompt — the run's instruction base when present
+    persona.md        # frontmatter only: title, kind, role, summary, worker, models, color, skills, budget, allowed
+    prompt.md         # the persona prompt — "who Ben is" at its top; the run's instruction base when present
     memory.md         # curated memory (format and cap below)
     thread.md         # retired (req-168): migrated once into the persona's first 1:1 session, then removed
     reviews.md        # the journal: one entry per noteworthy run (req-169 — format below)
@@ -1065,6 +1065,7 @@ tickets/_meta/personas/
   | `title` | string | the id |
   | `kind` | `agent \| human` | `agent` (an absent key). `human` is the owner as a crew member (E10-6): `personas/you`, created once by the board service (title = config `personas.humanName`, default `You`; editable like any title, and Settings → Tickets → Crew → *Your name* retitles it; "Initialize board" writes it with the default pipeline, whose manual columns pin it). Inert for `role`/`worker`/`models`/`skills`/`budget` — the human is never dispatched, counted toward capacity or budgeted. Written only when `human` |
   | `role` | `planner \| builder \| reviewer \| tester \| custom` | `custom` |
+  | `summary` | the one line for the crew list (req-144, R11): at most 200 characters, one line, written as a double-quoted YAML string so a colon cannot break the fence. The Crew cards of Drey, Mission Control (pad, phone, desk) and the Persona page's Profile block draw it as the card's line 3 in place of the role. Written only when set | none (the cards draw the role) |
   | `worker` | the CLI harness (`claude-code`, `opencode`, `kimi`, `copilot`, `api`) | `opencode` |
   | `models.default` | the model nothing else decides | `opus` |
   | `models.pool` | the models the persona may run, **strongest first**; every entry must be a row of the model table (Settings → Models, `service.json`). An entry is `<model>` or `<worker provider>/<model>` (`kimi/k2`; a slash after anything else is part of the model id, `zai/glm-5.3`). At dispatch the capacity pool grants the first entry of the requested class with room (req-170); an entry the table does not hold is never granted to a class request. `models.default`'s class is the class an unsized ticket asks for | `[models.default]` |
@@ -1072,11 +1073,18 @@ tickets/_meta/personas/
   | `color` | `#rrggbb`, the chips and avatars | `#a78bfa` |
   | `skills` | names of skill files the persona carries: `<name>.md` or `<name>/SKILL.md`, in the persona's own `skills/` folder, else `_meta/skills/`. A run's brief carries their text as `## Skills` (D-46) | `[]` |
   | `budget` | USD per day — the Crew card shows the day's costs against it; the capacity pool's persona ledger (req-170): once the persona's runs of the day have spent it, it starts nothing more that day (a Needs-you card says so). Unset = `service.json` `ledgers.personaPerDay` | unset (null) |
-  | `allowed` | a map; two keys today. `spend-above-allowance: true` — the persona runs on past a ticket's `allowance:` instead of waiting for the owner (req-170). `write-vaults: [<vault id>, …]` — the registered vaults (Drey's registry ids, ADR-0051) its runs may change through Drey Service's vault MCP (req-167, R5; one id reads as a list, duplicates drop); every registered vault stays readable, a vault not named is read-only for it, and a read-only run (a review) writes none whatever this says — a refusal reaches the model as `Error: <persona> may not write vault "<id>" (allowed: read)` and the run's stream as an audit line. `vault_move` counts as writing. req-142's other permissions (commands, network) are not fields yet. Each key written only when set | nothing beyond: reads every vault, writes none |
+  | `allowed` | a map; four keys. `spend-above-allowance: true` — the persona runs on past a ticket's `allowance:` instead of waiting for the owner (req-170). `write-vaults: [<vault id>, …]` — the registered vaults (Drey's registry ids, ADR-0051) its runs may change through Drey Service's vault MCP (req-167, R5; one id reads as a list, duplicates drop); every registered vault stays readable, a vault not named is read-only for it, and a read-only run (a review) writes none whatever this says — a refusal reaches the model as `Error: <persona> may not write vault "<id>" (allowed: read)` and the run's stream as an audit line. `vault_move` counts as writing. `run-commands: accept-edits \| bypass` — the harness permission mode the persona's runs may take (the Persona page's "Run commands in the worktree"; absent = the crew's `permissionMode`) and `network: true` — it may reach the network (web search and fetch, package installs): both are **recorded and not yet read by the runner** (req-142's enforcement remainder; the page shows no more about them than the choice). Each key written only when set | nothing beyond: reads every vault, writes none |
 
-- `prompt.md` — the longform persona prompt, free Markdown. When a
-  persona resolves at dispatch, this file is the run's instruction base,
-  replacing the phase handover prompt.
+- `prompt.md` — the longform persona prompt, free Markdown, **the one prose of the persona** (R11, req-171: one prose, not two).
+  The "who Ben is" part stands at its top, as a `## Who Ben is` section; `persona.md` keeps the frontmatter and nothing below
+  the fence. When a persona resolves at dispatch, this file is the run's instruction base, replacing the phase handover prompt.
+  The Persona page edits it in Drey's Markdown editor.
+  **Migration (once, idempotent):** at every engine start `PersonaProseMigrator` finds a `persona.md` that still has prose below
+  its fence and moves it to the top of `prompt.md` under `## Who <title> is` — one logged commit per persona
+  (`personas: <id> prose moves from persona.md into prompt.md (req-171)`). The sentence the engine itself once wrote there
+  (`Who <title> is: role, tone, limits. Edit freely — the next run reads it.`, and the human's `… is you: manual steps park the ticket here…`)
+  carries nothing and is dropped; prose `prompt.md` already holds is not duplicated; a `persona.md` without a body is skipped. A
+  persona patch written over a file whose prose has not migrated yet keeps that prose in place.
 - `memory.md` — the persona's curated memory, its **lessons** (R4/R14,
   req-169). Created on first write with a `# Memory` header; **capped at
   200 lines**, the oldest lines drop off. One entry per line, every line

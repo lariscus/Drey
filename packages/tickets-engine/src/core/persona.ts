@@ -1,6 +1,5 @@
 import { parseDocument } from 'yaml';
 import { splitFrontmatter } from '../../../../shared/frontmatter';
-import { isWorkerProvider } from '../fleet/protocol';
 
 /**
  * Personas (ADR-0088, E3 — the concept's §4): a named agent is role +
@@ -283,19 +282,7 @@ export function resolvePersona(input: {
   return { persona: null, source: 'none' };
 }
 
-/**
- * A pool entry is `<model>` or `<provider>/<model>` with one of the fleet's
- * worker providers (the worker value grammar of `fleet/assignment.ts`); a
- * slash after anything else is part of the model id (`zai/glm-5.3`).
- */
-export function splitPoolEntry(entry: string): { readonly provider: string | null; readonly model: string } {
-  const text = entry.trim();
-  const slashAt = text.indexOf('/');
-  if (slashAt > 0 && isWorkerProvider(text.slice(0, slashAt)) && text.slice(slashAt + 1) !== '') {
-    return { provider: text.slice(0, slashAt), model: text.slice(slashAt + 1) };
-  }
-  return { provider: null, model: text };
-}
+export { splitPoolEntry } from './pool-entry';
 
 /**
  * The migration reader (concept §4.2): one pipeline column's legacy

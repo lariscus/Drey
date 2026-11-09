@@ -6,7 +6,7 @@
  * or `<provider>/<model>` (`splitPoolEntry`); an entry the table lacks is
  * shown with what the persona's own harness says. DOM-free.
  */
-import { splitPoolEntry } from '../../../../packages/tickets-engine/src/core/persona';
+import { splitPoolEntry } from '../../../../packages/tickets-engine/src/core/pool-entry';
 import type { ModelRow, ModelsReply } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { SlotView } from '../../../../packages/tickets-engine/src/fleet/protocol-slots';
 import type { I18n } from '../../../../shared/i18n/types';
