@@ -33,6 +33,8 @@ export type { QuotaKind, QuotaReliability, QuotaWindow, SlotBilling, SlotProfile
 export type { AutopilotRecord, AutopilotReason, AutopilotRefusal, AutopilotState, ChainConfig, ChainMaster, ChainStatus, ChainStoreConfig, ChainTrip, ColumnMode } from './protocol-chain';
 export { DEFAULT_EARLY_STOP, DEFAULT_TRANCHE, normalizeTranche, tranchesOff, tranchesPerDay } from './protocol-tranche';
 export type { AnomalyRule, CheckpointReport, EarlyStop, EarlyStopConfig, RedTicket, TrancheConfig, TrancheEnd, TrancheStatus } from './protocol-tranche';
+export { DEFAULT_DEV_PORTS, DEFAULT_GOVERNOR_SETTINGS } from './protocol-governor';
+export type { DevServerLease, GovernorSettings, GovernorStatus, GovernorWait, HeavyTask, PortRange, SeatClass, SeatHolder } from './protocol-governor';
 
 /** The workers of milestone 84, in fleet order (the assignment default). */
 export type WorkerProviderId = 'opencode' | 'claude-code' | 'kimi';
@@ -360,6 +362,8 @@ export interface RunInfo {
    * shows it. Absent on a run.json written before the lanes existed.
    */
   readonly activity?: string;
+  /** req-180: the dev-server port the governor leased the run's worktree (`DREY_DEV_PORT`); absent = none. */
+  readonly devPort?: number;
   /**
    * The size of the worker's current context window in tokens (the
    * last model call's input incl. cache reads); null/absent while the
