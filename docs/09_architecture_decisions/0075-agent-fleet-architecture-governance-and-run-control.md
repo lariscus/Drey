@@ -195,17 +195,19 @@ is the checkout (`RunInfo.review`); the machine gate keeps running in the
 ticket's worktree (writable, with its `link:` folders) but first fails the
 review when the branch moved past the reviewed commit. The settle unlocks
 and removes the checkout (`orchestrate/review-checkout.ts`,
-`ReviewCheckout`, wired in `compose-supervisor.ts`).
+`ReviewCheckout`, wired in `compose-supervisor.ts`). The session itself runs
+read-only too: `PermissionMode` gained `'read-only'`, set for every review
+and mapped per adapter — Claude Code `--permission-mode plan`, opencode's
+`plan` agent, Kimi's `plan` mode when the session advertises it.
 
 **Trade-offs taken.** Detection, not prevention: git has no lock for a
 local branch, so a commit after the hand-over is caught at the gate and
 fails the review rather than being impossible. The gate stays in the
 worktree: a read-only checkout cannot hold build output, and a second
-writable one would only move the problem. The harness's own permission
-mode (Claude Code `plan`, opencode's `plan` agent) is the second layer the
-concept asked for and is not built yet — it needs `fleet/harness/`, which
-req-182 reworks; roadmap req-199. Until then the disk is the guard, and on
-Windows a reviewer could still create a new file in the checkout (no
-folder guard there); it could not change or delete an existing one, and
-nothing it writes reaches the branch. Rejected alternatives:
+writable one would only move the problem. Two layers because neither is
+whole alone: the disk guards files but, on Windows, not folders; a
+harness's read-only mode depends on the CLI version (an older Kimi has
+none). The price of the session layer: a reviewer can no longer write its
+verdict into the ticket — it is the final message, and the Handover note a
+reviewer used to leave is roadmap req-199. Rejected alternatives:
 `specs/decisions.md`.

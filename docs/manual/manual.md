@@ -1253,8 +1253,9 @@ A **review** never works in the builder's checkout. The *Review* step —
 and any step whose persona has the role *reviewer*, such as a security
 check you inserted after it — gets a checkout of its own beside the
 ticket's, `_worktrees/<id>-review`, at exactly the commit the builder
-handed over, with its files read-only: the reviewer judges that tree and
-cannot change it. It starts only once the builder's run has ended. If
+handed over, with its files read-only and the agent's session in its read-only mode:
+the reviewer judges that tree and cannot change it, and it gives its
+verdict in its last message. It starts only once the builder's run has ended. If
 anything is committed on the ticket's branch while the review runs, the
 review fails with a note naming both commits — a later change was never
 reviewed. The review's checkout is removed when the run ends. The

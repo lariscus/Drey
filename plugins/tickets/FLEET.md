@@ -246,10 +246,14 @@ review fails` — and no acceptance command runs. Otherwise the acceptance comma
 what is left; **Clean up worktrees** unlocks a leftover `-review` checkout before removing it. The review
 checkout takes the worker's light seat like any run (req-180) — no seat kind of its own.
 
-The harness session itself does not yet run in a read-only permission mode: that layer needs
-`fleet/harness/` (Claude Code `--permission-mode plan`, opencode's `plan` agent; Kimi's ACP offers no read-only
-mode) and is roadmap req-199. Until then the disk layer is the guard, and the brief tells the reviewer its
-verdict goes into the ticket file — which lives in `_workcopy/`, outside the checkout, and stays writable.
+The second layer is the harness session's own: a review's request carries `permissionMode: 'read-only'`
+(set by `composeRunRequest`, never offered to an owner), and each adapter maps it — Claude Code
+`--permission-mode plan`, opencode's built-in `plan` agent on every prompt, Kimi `session/set_mode plan` when
+the session advertises it (Kimi Code 2.5.2 does; an older CLI keeps `auto` and the run's stream says the disk
+is the only guard). A read-only session cannot edit the ticket's working copy either, so the brief asks for the
+verdict in the final message (`BLOCKED: <why>` sends the step back); what a reviewer used to write into
+`## Handover` is not written now (roadmap req-199). opencode's `plan` agent asks before shell commands, so a
+reviewer's `git diff` there becomes a wait for the owner.
 
 The store is the runner's one ticket backend (req-176, ADR-0096): every ticket write — a run's and the chain's —
 goes through the one `RunBookkeeper` over the claim (release, comments, the in-claim `put`); a start whose

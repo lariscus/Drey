@@ -5154,8 +5154,8 @@ sequenceDiagram
     RC->>G: worktree add --detach <id>-review C
     RC->>TM: setReadOnly(true) — POSIX files + folders, Windows files
     RC-->>S: {checkout, commit: C} → RunInfo.review, opening line
-    S->>W: spawn, cwd = <id>-review; brief "Review checkout: … read-only"
-    W->>W: reads the tree; verdict into _workcopy/<id>.ticket.md (outside the checkout)
+    S->>W: spawn, cwd = <id>-review, permission read-only (Claude Code plan · opencode plan agent · Kimi plan); brief "Review checkout: … read-only"
+    W->>W: reads the tree; the verdict is its final message (BLOCKED: sends it back)
     W-->>GR: turn ends
     GR->>RC: moved(run)
     RC->>G: rev-parse refs/heads/t/<id> → H
