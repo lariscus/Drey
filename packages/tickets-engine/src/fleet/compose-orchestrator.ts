@@ -3,6 +3,7 @@
  * helper, beside `compose-supervisor.ts`. Its ticket writes go through the
  * runner's one `RunBookkeeper`; a spec without the shared part gets its own.
  */
+import { ChainConfigRestorer } from './config/chain-config-restorer';
 import type { PipelinePhase } from '../contracts/tickets';
 import { NodeFileSystem } from './node-file-system';
 import { Orchestrator, type OrchestratorParts, type SlotSummarySource } from './orchestrator';
@@ -164,6 +165,7 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
     scanIntervalMs: deps.scanIntervalMs ?? 15_000,
     tranches,
     persist,
+    restoreConfig: (vault) => new ChainConfigRestorer(fs).restore(vault),
     ...hold,
     ...statusParts(deps),
   });

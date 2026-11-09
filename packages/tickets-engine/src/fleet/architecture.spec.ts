@@ -84,7 +84,7 @@ function graph(): readonly ImportEdge[] {
 const inFolder = (file: string, folder: string): boolean => file.startsWith(`${folder}/`);
 
 /** The parts that reach the machine only through `fleet/ports` (req-176 step 4). */
-const NODE_FREE: readonly string[] = ['run', 'ports', 'orchestrate', 'routing', 'governor'];
+const NODE_FREE: readonly string[] = ['run', 'ports', 'orchestrate', 'routing', 'governor', 'config', 'session'];
 
 /** Single files of other parts that stay Node-free: the adapter contract. */
 const NODE_FREE_FILES: readonly string[] = ['harness/contract.ts'];
