@@ -15,6 +15,7 @@ import type { PriorityConfig, TicketPriority } from '../contracts/tickets';
 import type { PartState, PlanReleaseScope } from '../contracts/plan-approval';
 import { splitFrontmatter } from '../../../../shared/frontmatter';
 import { newTicketFileText, patchHeaderFields, patchTicketFile } from './ticket-files';
+import { needsText } from './model-needs';
 import type { PlanPart } from './plan-parts';
 
 /** One ticket that names the parent — what the matcher and the state read. */
@@ -157,7 +158,13 @@ export function partTicketText(input: PartTicketInput): string {
     ...(input.part.chain.length > 0 ? { chain: input.part.chain } : {}),
   }, input.priorities);
   const size = input.part.size ?? null;
-  const extra = [`parent: ${input.parentId}`, ...(input.part.persona !== null ? [`persona: ${input.part.persona}`] : []), ...(size !== null ? [`size: ${size}`] : [])];
+  const needs = needsText(input.part.needs);
+  const extra = [
+    `parent: ${input.parentId}`,
+    ...(input.part.persona !== null ? [`persona: ${input.part.persona}`] : []),
+    ...(size !== null ? [`size: ${size}`] : []),
+    ...(needs !== '' ? [`needs: ${needs}`] : []),
+  ];
   block = block.replace(/\n---$/, `\n${extra.join('\n')}\n---`);
   const created = `${block}\n${body}`;
   return input.phase === input.firstPhase

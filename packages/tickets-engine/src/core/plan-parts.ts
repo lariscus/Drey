@@ -10,6 +10,7 @@
  *     - [ ] Split a file diff into hunks
  *       persona: ben
  *       size: M
+ *       needs: image
  *       reason: pure logic first, so the panel can build on it
  *       chain: insert security(ralf, notify) after review; skip qa
  *     - [ ] Hunk rows in the Source control panel
@@ -22,6 +23,8 @@
  * all ("Keep as one"): {@link withPlanParts} removes the chapter then.
  */
 import type { ChainEntry } from '../contracts/chain';
+import type { ModelNeeds } from '../contracts/ticket-pool-meta';
+import { needsText, parseNeeds } from './model-needs';
 import { maskFences } from '../../../../shared/markdown/fences';
 import { parseChainEntry } from './chain-delta';
 
@@ -38,6 +41,8 @@ export interface PlanPart {
   readonly chain: readonly string[];
   /** req-170: Paul's size of the part (`size: S|M|L`) — its ticket asks the pool for class C, B or A; absent = unsized. */
   readonly size?: 'S' | 'M' | 'L' | null;
+  /** req-178: what the part's model must be able to do (`needs: image`) — copied onto its ticket; absent = nothing. */
+  readonly needs?: ModelNeeds | null;
 }
 
 export interface ParsedPlanParts {
@@ -96,6 +101,15 @@ function chainDetail(title: string, value: string, warnings: string[]): string[]
   return entries;
 }
 
+/** req-178: a part's `needs:` line; an unknown token warns and drops. */
+function needsDetail(title: string, value: string, warnings: string[]): ModelNeeds | null {
+  const parsed = parseNeeds(value);
+  for (const token of parsed.unknown) {
+    warnings.push(`part "${title}": need "${token}" is not image, tools, context-<n> or output-<n>`);
+  }
+  return parsed.needs;
+}
+
 /** One `key: value` detail line onto the part it follows. */
 function applyDetail(current: MutablePart, key: string, value: string, warnings: string[]): void {
   switch (key) {
@@ -118,6 +132,9 @@ function applyDetail(current: MutablePart, key: string, value: string, warnings:
       } else {
         warnings.push(`part "${current.title}": size "${value}" is not S, M or L`);
       }
+      break;
+    case 'needs':
+      current.needs = needsDetail(current.title, value, warnings);
       break;
     default:
       warnings.push(`part "${current.title}": unknown detail "${key}"`);
@@ -170,6 +187,10 @@ export function renderPlanParts(parts: readonly PlanPart[]): string {
     }
     if (part.size !== undefined && part.size !== null) {
       lines.push(`  size: ${part.size}`);
+    }
+    const needs = needsText(part.needs);
+    if (needs !== '') {
+      lines.push(`  needs: ${needs}`);
     }
   }
   return `${lines.join('\n')}\n`;
