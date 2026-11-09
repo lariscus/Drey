@@ -18,6 +18,7 @@ import { AGGREGATOR_SYSTEM_PROMPT, createChatBridge } from '../services/chat-llm
 import { FleetClient, type RunnerLocator } from '../services/fleet-client';
 import { RunnerComponent } from '../service/runner-component';
 import { composePersonaSessions } from '../services/compose-persona-sessions';
+import { PersonaProseMigrator } from '../services/persona-prose-migrator';
 import { PersonaRecords } from '../services/persona-records';
 import { ImprovementsService } from '../services/improvements-service';
 import { NotesService } from '../services/notes-service';
@@ -243,6 +244,8 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
   // req-169: the Memory tab's journal and per-line removals; friction.md migrates once into each persona's journal.
   const personaRecords = new PersonaRecords({ board, host, git, log });
   void personaRecords.migrateAll().catch((error: unknown) => log(`friction.md migration failed: ${error instanceof Error ? error.message : String(error)}`, 'warn'));
+  // req-171 (R11): one prose, not two - the prose below a persona.md fence moves once into prompt.md.
+  void new PersonaProseMigrator({ board, host, git, log }).migrateAll().catch((error: unknown) => log(`persona prose migration failed: ${error instanceof Error ? error.message : String(error)}`, 'warn'));
   const remotePort = new DreyTicketsPort(board, fleet, hub, { allowBypass: () => remoteService.allowBypass() }, chat, personaSessions, personaRecords);
   // req-100: the active vault's notes for paired devices. Drey keeps the key on
   // its active vault; without Drey it is the last one it named, or the hosted vault.

@@ -13,6 +13,7 @@ function persona(over: Partial<Persona> = {}): Persona {
     worker: 'claude-code',
     models: { default: 'opus', pool: ['opus', 'opencode/glm-5.3'] },
     color: '#888888',
+    summary: '',
     skills: [],
     budget: 4,
     allowed: { spendAboveAllowance: true },

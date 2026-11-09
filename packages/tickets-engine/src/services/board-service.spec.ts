@@ -801,6 +801,26 @@ describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () =>
     expect(await service.personaPatch({ id: 'ghost', title: 'X' })).toEqual(missing);
   });
 
+  it('personaPatch writes the one line and the allowed keys it is sent, in one commit-sized write, and leaves the other keys (req-171)', async () => {
+    await writePia();
+    const service = serviceOf();
+    const outcome = await service.personaPatch({
+      id: 'pia',
+      summary: '  Plans one part,\n test first. ',
+      allowed: { spendAboveAllowance: true, runCommands: 'bypass', network: true, writeVaults: ['notes', 'notes', 'work'] },
+    });
+    expect(outcome.ok).toBe(true);
+    const pia = (await service.listPersonas()).find((p) => p.id === 'pia');
+    expect(pia?.summary).toBe('Plans one part, test first.');
+    expect(pia?.allowed).toEqual({ spendAboveAllowance: true, runCommands: 'bypass', network: true, writeVaults: ['notes', 'work'] });
+    const cleared = await service.personaPatch({ id: 'pia', allowed: { runCommands: null, network: false, writeVaults: [] } });
+    expect(cleared.ok).toBe(true);
+    const after = (await service.listPersonas()).find((p) => p.id === 'pia');
+    expect(after?.allowed).toEqual({ spendAboveAllowance: true });
+    expect(after?.summary).toBe('Plans one part, test first.');
+    expect(await service.personaPatch({ id: 'pia', allowed: { runCommands: 'root' as never } })).toMatchObject({ ok: false });
+  });
+
   it('personaPatch writes only the sent keys over personaFileText and keeps the prose', async () => {
     await writePia();
     const service = serviceOf();

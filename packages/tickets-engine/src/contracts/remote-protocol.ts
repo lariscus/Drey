@@ -24,7 +24,8 @@ import type { AutopilotRecord, AutopilotRefusal, ChainMaster, ChainStatus, Colum
 import type { ShapedQuestion } from './question-shape';
 import type { BoardSnapshot, CreateResult, MutationResult, RecentDone, TicketCard } from './tickets';
 import type { ImprovementProposal, ImprovementState } from '../core/improvements';
-import type { Persona } from '../core/persona';
+import type { Persona, PersonaAllowed } from '../core/persona';
+import type { PersonaAllowedPatch } from './persona-allowed';
 import type { ScoutReport } from './scout';
 
 /** What the "Needs you" list holds, in the order it shows them. */
@@ -209,6 +210,10 @@ export interface TicketsRemotePort {
     readonly color?: string;
     readonly skills?: readonly string[];
     readonly prompt?: string;
+    /** req-171: the one line for the crew list. */
+    readonly summary?: string;
+    /** req-171: the `allowed:` keys the page's block sets. */
+    readonly allowed?: PersonaAllowedPatch;
   }): Promise<MutationResult>;
   /** The chain's persona pause (U4): a paused persona's tickets hold until played again. */
   chainPersonaPause(cmd: { readonly persona: string; readonly paused: boolean }): Promise<ChainPersonaPauseReply>;
@@ -280,6 +285,10 @@ export interface PersonaView {
   readonly pool: readonly string[];
   /** `#rrggbb`; the chips' and avatars' colour. */
   readonly color: string;
+  /** The one line for the crew list (`summary:`, req-144); absent = none, the cards then draw the role. */
+  readonly summary?: string;
+  /** `allowed:` (req-171): what the persona may do beyond its runs; absent on older servers and for the human. */
+  readonly allowed?: PersonaAllowed;
   /**
    * The persona's daily budget in USD (frontmatter `budget:`, concept
    * §4.3 — the Team card shows the day's costs against it); null = none.

@@ -1,3 +1,4 @@
+import type { PersonaAllowedPatch } from '../contracts/persona-allowed';
 import type { Parsed } from '../core/commands';
 
 /**
@@ -19,6 +20,8 @@ export interface PersonaPatchInput {
   color?: string;
   skills?: string[];
   prompt?: string;
+  summary?: string;
+  allowed?: PersonaAllowedPatch;
 }
 
 const PERSONA_PATCH_KEYS: readonly (keyof PersonaPatchInput)[] = [
@@ -30,6 +33,8 @@ const PERSONA_PATCH_KEYS: readonly (keyof PersonaPatchInput)[] = [
   'color',
   'skills',
   'prompt',
+  'summary',
+  'allowed',
 ];
 
 export function parsePersonaPatch(body: unknown): Parsed<PersonaPatchInput> {
@@ -49,6 +54,11 @@ export function parsePersonaPatch(body: unknown): Parsed<PersonaPatchInput> {
         return { ok: false, error: `${key} is a list of names` };
       }
       out[key] = value.map((v) => (v as string).trim());
+    } else if (key === 'allowed') {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return { ok: false, error: 'allowed is an object' };
+      }
+      out.allowed = value as PersonaAllowedPatch;
     } else if (typeof value !== 'string') {
       return { ok: false, error: `${key} is a string` };
     } else {

@@ -42,10 +42,23 @@ export interface PersonaModels {
   readonly pool: readonly string[];
 }
 
+/** The harness permission mode a persona's runs may take (`allowed: run-commands:`, req-171); absent = the crew setting decides. */
+export type PersonaRunCommands = 'accept-edits' | 'bypass';
+
+export const PERSONA_RUN_COMMANDS: readonly PersonaRunCommands[] = ['accept-edits', 'bypass'];
+
 /** What a persona may do beyond its runs (`allowed:`, R11; req-142 adds the rest). */
 export interface PersonaAllowed {
   /** `spend-above-allowance: true` — it runs on past a ticket's allowance instead of waiting for the owner (req-170). */
   readonly spendAboveAllowance: boolean;
+  /**
+   * `run-commands: accept-edits | bypass` (req-171, the page's "Run commands
+   * in the worktree"): recorded, not yet enforced — the runner takes the
+   * crew's `permissionMode` (req-142's remainder).
+   */
+  readonly runCommands?: PersonaRunCommands;
+  /** `network: true` (req-171, "Reach the network"): recorded, not yet enforced (req-142's remainder). */
+  readonly network?: boolean;
   /**
    * `write-vaults: [<vault id>, …]` — the registered vaults its runs may
    * change through Drey Service's vault MCP (req-167, R5); absent or empty =
@@ -79,6 +92,8 @@ export interface Persona {
   readonly models: PersonaModels;
   /** UI color (`#rrggbb`), chips and avatars. */
   readonly color: string;
+  /** `summary:` — the one line for the crew list (req-144, R11); '' = none (the cards then draw the role). */
+  readonly summary: string;
   /** Skill files this persona carries, by name; {@link loadPersonaSkills} says where a name is looked for. */
   readonly skills: readonly string[];
   /**
@@ -134,18 +149,35 @@ function budgetOf(raw: unknown): number | null {
   return Number.isFinite(amount) && amount >= 0 ? amount : null;
 }
 
-/** `allowed:` — `spend-above-allowance: true` (req-170) and `write-vaults:` (req-167); req-142 adds the rest. */
+/** `allowed:` — `spend-above-allowance: true` (req-170), `write-vaults:` (req-167), `run-commands:` and `network:` (req-171). */
 function allowedOf(raw: unknown): PersonaAllowed {
   const map = raw !== null && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const vaults = asStringList(typeof map['write-vaults'] === 'string' ? [map['write-vaults']] : map['write-vaults']);
-  return { spendAboveAllowance: map['spend-above-allowance'] === true, ...(vaults.length > 0 ? { writeVaults: [...new Set(vaults)] } : {}) };
+  const commands = asString(map['run-commands']);
+  return {
+    spendAboveAllowance: map['spend-above-allowance'] === true,
+    ...(commands !== null && (PERSONA_RUN_COMMANDS as readonly string[]).includes(commands) ? { runCommands: commands as PersonaRunCommands } : {}),
+    ...(map['network'] === true ? { network: true } : {}),
+    ...(vaults.length > 0 ? { writeVaults: [...new Set(vaults)] } : {}),
+  };
 }
 
 /** The `allowed:` block's lines, written only for what is set. */
 function allowedLines(allowed: PersonaAllowed): string[] {
   const vaults = allowed.writeVaults ?? [];
-  const lines = [...(allowed.spendAboveAllowance ? ['  spend-above-allowance: true'] : []), ...(vaults.length > 0 ? [`  write-vaults: [${vaults.join(', ')}]`] : [])];
+  const lines = [
+    ...(allowed.spendAboveAllowance ? ['  spend-above-allowance: true'] : []),
+    ...(allowed.runCommands !== undefined ? [`  run-commands: ${allowed.runCommands}`] : []),
+    ...(allowed.network === true ? ['  network: true'] : []),
+    ...(vaults.length > 0 ? [`  write-vaults: [${vaults.join(', ')}]`] : []),
+  ];
   return lines.length > 0 ? ['allowed:', ...lines] : [];
+}
+
+/** The one line is a double-quoted YAML scalar (JSON's escapes are YAML's), so a colon or a quote in it never breaks the fence. */
+function summaryLines(summary: string): string[] {
+  const text = summary.replace(/\s+/g, ' ').trim();
+  return text === '' ? [] : [`summary: ${JSON.stringify(text)}`];
 }
 
 /** Parse one persona file; tolerant like the ticket reader — what parses
@@ -165,6 +197,7 @@ export function parsePersonaFile(id: string, text: string): Persona {
     worker: asString(get('worker')) ?? 'opencode',
     models: modelsOf(get('models')),
     color: asString(get('color')) ?? '#a78bfa',
+    summary: (asString(get('summary')) ?? '').replace(/\s+/g, ' '),
     skills: asStringList(get('skills')),
     budget: budgetOf(get('budget')),
     allowed: allowedOf(get('allowed')),
@@ -186,29 +219,28 @@ export function humanPersona(title: string, id: string = HUMAN_PERSONA_ID): Pers
     worker: 'opencode',
     models: { default: 'opus', pool: ['opus'] },
     color: '#38bdf8',
+    summary: '',
     skills: [],
     budget: null,
     allowed: { spendAboveAllowance: false },
   };
 }
 
-/** The canonical persona file text (stable key order, byte-stable round trips).
- *  `body` is the owner's prose below the fence ("Who Paul is, tone, limits",
- *  concept §4.1); a patch passes the existing file's body through, a fresh
- *  persona gets the default line. */
+/**
+ * The canonical persona file text (stable key order, byte-stable round
+ * trips): the frontmatter and nothing else — "who Ben is" lives at the top
+ * of `prompt.md` (R11, req-171: one prose, not two). `body` is only the
+ * safety valve of a patch over a file whose prose has not migrated yet
+ * (`PersonaProseMigrator` moves it): it rides along instead of being lost.
+ */
 export function personaFileText(persona: Persona, body?: string): string {
   personaRef(persona.id);
-  const prose =
-    body !== undefined && body.trim() !== ''
-      ? body.trimStart()
-      : persona.kind === 'human'
-        ? `${persona.title} is you: manual steps park the ticket here until you accept or send it back.`
-        : `Who ${persona.title} is: role, tone, limits. Edit freely — the next run reads it.`;
   const lines = [
     '---',
     `title: ${persona.title}`,
     ...(persona.kind === 'human' ? ['kind: human'] : []),
     `role: ${persona.role}`,
+    ...summaryLines(persona.summary),
     `worker: ${persona.worker}`,
     'models:',
     `  default: ${persona.models.default}`,
@@ -219,8 +251,7 @@ export function personaFileText(persona: Persona, body?: string): string {
     ...allowedLines(persona.allowed),
     '---',
     '',
-    prose,
-    '',
+    ...(body !== undefined && body.trim() !== '' ? [body.trimStart().trimEnd(), ''] : []),
   ];
   return lines.join('\n');
 }

@@ -40,6 +40,7 @@ describe('parsePersonaFile', () => {
       worker: 'claude-code',
       models: { default: 'opus', pool: ['opus', 'sonnet', 'glm-5.2'] },
       color: '#a78bfa',
+      summary: '',
       skills: ['repo-recherche', 'fragen-formulieren'],
       budget: null,
       allowed: { spendAboveAllowance: false },
@@ -74,8 +75,26 @@ describe('parsePersonaFile', () => {
     // the frontmatter round-trips byte-for-byte above the prose
     expect(withBody.split('---\n')[1]).toBe(personaFileText(persona).split('---\n')[1]);
     expect(parsePersonaFile('pia', withBody)).toEqual(persona);
-    // a fresh persona keeps the default prose line
-    expect(personaFileText(persona)).toContain(`Who ${persona.title} is: role, tone, limits`);
+    // R11, req-171: a fresh file is the frontmatter alone - the prose lives in prompt.md
+    expect(personaFileText(persona).endsWith('---\n')).toBe(true);
+    expect(personaFileText(persona)).not.toContain('Who ');
+  });
+
+  it('reads and writes the one line for the crew list, quoted so a colon cannot break the fence (req-144)', () => {
+    const persona = { ...parsePersonaFile('pia', PIA), summary: 'Plans: one part at a time, "test first".' };
+    const text = personaFileText(persona);
+    expect(text).toContain('summary: "Plans: one part at a time, \\"test first\\"."');
+    expect(parsePersonaFile('pia', text).summary).toBe('Plans: one part at a time, "test first".');
+    expect(personaFileText({ ...persona, summary: '  ' })).not.toContain('summary');
+    expect(parsePersonaFile('pia', PIA).summary).toBe('');
+  });
+
+  it('round-trips run-commands and network in allowed (req-171)', () => {
+    const open = { ...parsePersonaFile('ben', PIA), allowed: { spendAboveAllowance: false, runCommands: 'bypass' as const, network: true } };
+    expect(personaFileText(open)).toContain('allowed:\n  run-commands: bypass\n  network: true');
+    expect(parsePersonaFile('ben', personaFileText(open))).toEqual(open);
+    const odd = parsePersonaFile('ben', PIA.replace('fragen-formulieren]\n---', 'fragen-formulieren]\nallowed:\n  run-commands: root\n  network: maybe\n---'));
+    expect(odd.allowed).toEqual({ spendAboveAllowance: false });
   });
 });
 
