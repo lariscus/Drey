@@ -18,6 +18,7 @@ import { AGGREGATOR_SYSTEM_PROMPT, createChatBridge } from '../services/chat-llm
 import { FleetClient, type RunnerLocator } from '../services/fleet-client';
 import { RunnerComponent } from '../service/runner-component';
 import { composePersonaSessions } from '../services/compose-persona-sessions';
+import { PersonaProseMigrator } from '../services/persona-prose-migrator';
 import { PersonaRecords } from '../services/persona-records';
 import { SkillService } from '../services/skill-service';
 import { ImprovementsService } from '../services/improvements-service';
@@ -249,6 +250,8 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
   // req-172: skills as Agent Skills; the legacy flat files migrate once into folders.
   const skills = new SkillService({ board, host, git });
   void skills.migrateAll().catch((error: unknown) => log(`skills migration failed: ${error instanceof Error ? error.message : String(error)}`, 'warn'));
+  // req-171 (R11): one prose, not two - the prose below a persona.md fence moves once into prompt.md.
+  void new PersonaProseMigrator({ board, host, git, log }).migrateAll().catch((error: unknown) => log(`persona prose migration failed: ${error instanceof Error ? error.message : String(error)}`, 'warn'));
   const remotePort = new DreyTicketsPort(board, fleet, hub, { allowBypass: () => remoteService.allowBypass() }, chat, personaSessions, personaRecords, skills);
   // req-100: the active vault's notes for paired devices. Drey keeps the key on
   // its active vault; without Drey it is the last one it named, or the hosted vault.

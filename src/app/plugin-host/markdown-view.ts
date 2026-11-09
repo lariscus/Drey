@@ -1,6 +1,17 @@
 import { ApplicationRef, EnvironmentInjector, Injector, createComponent } from '@angular/core';
-import type { MarkdownViewHandle, MarkdownViewOptions } from '../../../shared/plugin-api/renderer';
+import type { ToolbarAction } from '@markdown-surface/toolbar-commands';
+import type { MarkdownFormatAction, MarkdownViewHandle, MarkdownViewOptions } from '../../../shared/plugin-api/renderer';
 import { MarkdownSurface } from '../editor/markdown-surface/markdown-surface';
+
+/** The editor strip's reducer behind each SDK action (SDK 1.57). */
+const FORMAT_ACTIONS: Readonly<Record<MarkdownFormatAction, ToolbarAction>> = {
+  bold: { kind: 'wrap', marker: '**' },
+  italic: { kind: 'wrap', marker: '*' },
+  heading: { kind: 'heading', level: 2 },
+  bullet: { kind: 'list', style: 'bullet' },
+  task: { kind: 'list', style: 'task' },
+  code: { kind: 'fence' },
+};
 
 /**
  * `ui.createMarkdownView` (SDK 1.30): the host's own Markdown surface,
@@ -52,6 +63,17 @@ export function mountMarkdownView(injector: Injector, opts: MarkdownViewOptions)
     setReadOnly: (readOnly) => {
       if (!disposed) {
         surface.setEditable(!readOnly);
+      }
+    },
+    setMode: (mode) => {
+      if (!disposed) {
+        ref.setInput('mode', mode);
+        ref.changeDetectorRef.detectChanges();
+      }
+    },
+    format: (action) => {
+      if (!disposed) {
+        surface.applyToolbarAction(FORMAT_ACTIONS[action]);
       }
     },
     focus: () => surface.focus(),

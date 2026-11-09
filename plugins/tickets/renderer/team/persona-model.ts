@@ -1,13 +1,14 @@
 // i18n: catalog
 /**
- * The Persona page's pure model (board 7k, milestone 201): the tab's key,
- * the persona's files, what the form edits and which keys a Save sends
- * (`personaPatch` writes only the sent keys, one commit). DOM-free, so the
- * page and the spec share it.
+ * The Persona page's pure model (board 7k, milestone 201; page v2, R11,
+ * milestone 231): the tab's key, the persona's files, what the form edits
+ * and which keys a Save sends (`personaPatch` writes only the sent keys, one
+ * commit). DOM-free, so the page, its blocks and the spec share it.
  */
+import type { PersonaAllowedPatch } from '../../../../packages/tickets-engine/src/contracts/persona-allowed';
+import type { PersonaRunCommands } from '../../../../packages/tickets-engine/src/core/persona';
 import type { PersonaView } from '../../shared/remote-protocol';
-import type { PipelinePhase } from '../../shared/tickets';
-import { poolLabelOf, roleLabel } from './team-model';
+import { roleLabel } from './team-model';
 
 export const PERSONA_KIND = 'tickets-persona';
 
@@ -33,36 +34,98 @@ export function personaPathsOf(id: string): { readonly persona: string; readonly
   };
 }
 
+/** The roles the record knows, in crew order (`PERSONA_ROLES`); the Role dropdown offers exactly these. */
+export const ROLE_OPTIONS = ['planner', 'builder', 'reviewer', 'tester', 'custom'] as const;
+
+/** The `Allowed to` block as the form edits it; `runCommands` '' = the crew setting decides. */
+export interface AllowedDraft {
+  readonly writeVaults: readonly string[];
+  readonly runCommands: '' | PersonaRunCommands;
+  readonly network: boolean;
+  readonly spend: boolean;
+}
+
 /** What the form edits; the role as the field shows it (`Builder`). */
 export interface PersonaDraft {
   readonly title: string;
   readonly role: string;
+  readonly summary: string;
+  /** The harness (`worker`): `claude-code`, `opencode`, `kimi`, `copilot`. */
+  readonly worker: string;
+  /** The daily budget as typed, dollars; '' = none. */
+  readonly budget: string;
   readonly prompt: string;
   readonly pool: readonly string[];
   readonly skills: readonly string[];
+  readonly allowed: AllowedDraft;
 }
 
 /** The keys a Save sends. */
 export interface PersonaPatchKeys {
   title?: string;
   role?: string;
+  summary?: string;
+  worker?: string;
+  budget?: number | null;
   prompt?: string;
   pool?: readonly string[];
   skills?: readonly string[];
+  allowed?: PersonaAllowedPatch;
+}
+
+function allowedOf(view: PersonaView): AllowedDraft {
+  return {
+    writeVaults: view.allowed?.writeVaults ?? [],
+    runCommands: view.allowed?.runCommands ?? '',
+    network: view.allowed?.network === true,
+    spend: view.allowed?.spendAboveAllowance === true,
+  };
 }
 
 export function draftOf(view: PersonaView, prompt: string, skills: readonly string[]): PersonaDraft {
   return {
     title: view.title,
     role: roleLabel(view.role),
+    summary: view.summary ?? '',
+    worker: view.worker,
+    budget: view.budget === null ? '' : String(view.budget),
     prompt,
     pool: view.pool.length > 0 ? view.pool : view.model === '' ? [] : [view.model],
     skills,
+    allowed: allowedOf(view),
   };
 }
 
 function sameList(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+/** Only the `allowed:` keys that differ: the engine replaces what it is sent. */
+function allowedPatchOf(base: AllowedDraft, draft: AllowedDraft): PersonaAllowedPatch | null {
+  const patch: { -readonly [K in keyof PersonaAllowedPatch]: PersonaAllowedPatch[K] } = {};
+  if (!sameList(draft.writeVaults, base.writeVaults)) {
+    patch.writeVaults = draft.writeVaults;
+  }
+  if (draft.runCommands !== base.runCommands) {
+    patch.runCommands = draft.runCommands === '' ? null : draft.runCommands;
+  }
+  if (draft.network !== base.network) {
+    patch.network = draft.network;
+  }
+  if (draft.spend !== base.spend) {
+    patch.spendAboveAllowance = draft.spend;
+  }
+  return Object.keys(patch).length === 0 ? null : patch;
+}
+
+/** The typed budget as the record holds it: dollars, null for none, undefined for text that is no amount (it sends nothing). */
+export function budgetOf(text: string): number | null | undefined {
+  const trimmed = text.trim().replace(/^\$/, '');
+  if (trimmed === '') {
+    return null;
+  }
+  const amount = Number(trimmed);
+  return Number.isFinite(amount) && amount >= 0 ? amount : undefined;
 }
 
 /** Only what differs from the record: the engine writes the sent keys and one commit. The role goes as the engine's word. */
@@ -75,6 +138,16 @@ export function patchOf(base: PersonaDraft, draft: PersonaDraft): PersonaPatchKe
   if (role !== base.role.trim().toLowerCase()) {
     patch.role = role;
   }
+  if (draft.summary.trim() !== base.summary.trim()) {
+    patch.summary = draft.summary.trim();
+  }
+  if (draft.worker !== base.worker && draft.worker.trim() !== '') {
+    patch.worker = draft.worker.trim();
+  }
+  const budget = budgetOf(draft.budget);
+  if (budget !== undefined && budget !== budgetOf(base.budget)) {
+    patch.budget = budget;
+  }
   if (draft.prompt !== base.prompt) {
     patch.prompt = draft.prompt;
   }
@@ -84,6 +157,10 @@ export function patchOf(base: PersonaDraft, draft: PersonaDraft): PersonaPatchKe
   if (!sameList(draft.skills, base.skills)) {
     patch.skills = draft.skills;
   }
+  const allowed = allowedPatchOf(base.allowed, draft.allowed);
+  if (allowed !== null) {
+    patch.allowed = allowed;
+  }
   return patch;
 }
 
@@ -91,7 +168,12 @@ export function isDirty(base: PersonaDraft, draft: PersonaDraft): boolean {
   return Object.keys(patchOf(base, draft)).length > 0;
 }
 
-/** One step chip: what the persona works, read from the pipeline's `persona:` keys. */
+/** The base after a Save of `draft`: what the form now shows is what the record holds. */
+export function savedBaseOf(draft: PersonaDraft): PersonaDraft {
+  return { ...draft, title: draft.title.trim(), role: roleLabel(draft.role.trim().toLowerCase()), summary: draft.summary.trim(), worker: draft.worker.trim(), budget: draft.budget.trim().replace(/^\$/, '') };
+}
+
+/** One step chip: what the persona works, read from the flows' `persona:` keys (`_meta/pipeline.md`). */
 export interface StepChip {
   readonly id: string;
   readonly title: string;
@@ -99,31 +181,10 @@ export interface StepChip {
 }
 
 /** The agent steps of the flow, and any other step this persona is pinned on. A human step is never offered: Accept is always the owner's. */
-export function stepsOf(pipeline: readonly PipelinePhase[], phases: readonly string[]): readonly StepChip[] {
+export function stepsOf(pipeline: readonly { readonly id: string; readonly title: string; readonly handover: string }[], phases: readonly string[]): readonly StepChip[] {
   return pipeline
     .filter((phase) => phase.handover.startsWith('agent') || phases.includes(phase.id))
     .map((phase) => ({ id: phase.id, title: phase.title, on: phases.includes(phase.id) }));
-}
-
-/** One row of the model pool. */
-export interface PoolRow {
-  readonly index: number;
-  readonly label: string;
-  readonly model: string;
-  /** The row's overflow line; false for the first choice. */
-  readonly overflow: boolean;
-}
-
-/** The persona has one worker: every row names it, the order is the fallback order. */
-export function poolRowsOf(worker: string, pool: readonly string[]): readonly PoolRow[] {
-  const label = poolLabelOf(worker);
-  return pool.map((model, index) => ({ index: index + 1, label, model, overflow: index > 0 }));
-}
-
-/** A skill's file name as a row's name: `go-conventions` -> `Go conventions`. */
-export function skillTitleOf(id: string): string {
-  const words = id.replace(/[-_]+/g, ' ').trim();
-  return words === '' ? id : words[0]!.toUpperCase() + words.slice(1);
 }
 
 /** The instructions' length as the status bar shows it. */

@@ -259,6 +259,8 @@ export interface PersonaView {
   readonly pool: readonly string[];
   /** `#rrggbb`; the avatar ring's colour. */
   readonly color: string;
+  /** The persona's one line for the crew list (`summary:`, req-144); absent = none, the card then draws the role. */
+  readonly summary?: string;
   /** The newest live run this persona dispatched, if any. */
   readonly currentRun: PersonaRun | null;
   /** Every live run of this persona (a builder may carry several); absent = none known. */
@@ -1207,6 +1209,7 @@ function personaOf(raw: unknown): PersonaView | null {
   const phases = strArray(persona['phases']);
   const skills = strArray(persona['skills']);
   const paused = personasPausedOf(persona['paused']);
+  const summary = str(persona['summary']).trim();
   return {
     id,
     ...(persona['kind'] === 'human' ? { kind: 'human' as const } : {}),
@@ -1216,6 +1219,7 @@ function personaOf(raw: unknown): PersonaView | null {
     model: str(persona['model']),
     pool: strArray(persona['pool']),
     color: str(persona['color'], '#7aa2f7'),
+    ...(summary !== '' ? { summary } : {}),
     budget: moneyOf(persona['budget']),
     // A lone directory entry carries no fleet context; parseTeam folds the run in.
     currentRun: null,

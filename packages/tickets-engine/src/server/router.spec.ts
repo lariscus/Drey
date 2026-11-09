@@ -543,7 +543,7 @@ describe('route', () => {
 
     // a body with none of the writable keys, a non-list pool and a
     // non-string title refuse; a PATCH on any other path is a 405
-    expect((await route(req({ method: 'PATCH', path: '/api/personas/pia', origin, authorization: auth, body: { budget: 25 } }), deps)).body).toMatchObject({ ok: false });
+    expect((await route(req({ method: 'PATCH', path: '/api/personas/pia', origin, authorization: auth, body: { kind: 'human' } }), deps)).body).toMatchObject({ ok: false });
     expect((await route(req({ method: 'PATCH', path: '/api/personas/pia', origin, authorization: auth, body: { pool: 'sonnet' } }), deps)).body).toMatchObject({ ok: false });
     expect((await route(req({ method: 'PATCH', path: '/api/personas/pia', origin, authorization: auth, body: { title: 5 } }), deps)).body).toMatchObject({ ok: false });
     expect((await route(req({ method: 'PATCH', path: '/api/tickets/T-0001', origin, authorization: auth, body: { title: 'x' } }), deps)).status).toBe(405);

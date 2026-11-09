@@ -5470,6 +5470,63 @@ sequenceDiagram
 A runner that boots with a vault in `chain-vault.json` resolves that vault's `crew.md` itself (`ChainConfigRestorer`) so a handover keeps the chain running before the board's next config; a switch to another vault writes the current state away and loads the other vault's file under the boot rule.
 
 
+## 6.115 The Persona page — open → blocks read → edit in the editor → Save → one commit → the next run reads it (req-171, milestone 231, R11, ADR-0044 later change)
+
+The page opens from *Edit persona* on the Crew tab (`tickets-persona` doc kind). It reads the record the Crew store already holds and, beside it, what its blocks need; the owner edits the form and Drey's own Markdown editor; **Save** sends only what changed as one `personaPatch`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner
+    participant Page as Persona page (renderer)
+    participant Host as Host (ui.createMarkdownView, SDK 1.57)
+    participant IPC as Plugin IPC (tickets)
+    participant Eng as Engine (BoardService)
+    participant Git as Tickets repo (personas/<id>/)
+    participant Run as Next run (instruction composer)
+    Owner->>Page: Edit persona (Crew tab)
+    par the record and what lies beside it
+        Page->>IPC: personaImprovements (skills, open proposal)
+        Page->>Host: vault.readFile prompt.md (a missing file = empty prompt)
+        Page->>IPC: poolModels, slots (class, factor, busy), personaMemory, personaJournal (counts)
+        Page->>Host: vault.listVaults, the skills seam (D-46 reading)
+    end
+    Page->>Host: createMarkdownView({content: prompt.md, mode: live})
+    Owner->>Host: types, formats (format), flips Live / Source (setMode)
+    Host-->>Page: onChange(text) — the draft, the token estimate
+    Owner->>Page: edits the form (name, one line, models, allowed, skill switches)
+    Owner->>Page: Save
+    Page->>Host: vault.readFile prompt.md again — refuse if it moved since the load
+    Page->>IPC: personaPatch {only the changed keys, prompt, allowed: {...}}
+    IPC->>Eng: personaPatch
+    Eng->>Git: persona.md (frontmatter only) + prompt.md — one commit "personas: <id> updated"
+    Eng-->>Page: ok (+ a git warning, shown in the head)
+    Page->>Page: the saved draft becomes the base; the tab follows the new name
+    Note over Run,Git: a new run reads prompt.md and the persona record at its start; a running one keeps the prompt it began with
+    Run->>Git: personas/<id>/persona.md + prompt.md (+ skills, memory)
+```
+
+At every engine start the persona files are first made one-prose: a `persona.md` that still has text below its fence loses it to the top of `prompt.md`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Eng as Engine start
+    participant Mig as PersonaProseMigrator
+    participant Pure as core/persona-prose (proseMigrationOf)
+    participant Git as Tickets repo
+    Eng->>Mig: migrateAll()
+    loop every persona
+        Mig->>Pure: proseMigrationOf(persona.md, prompt.md)
+        alt a body below the fence
+            Pure-->>Mig: persona.md without its body; prompt.md with "## Who <title> is" on top (a placeholder sentence is dropped)
+            Mig->>Git: write both, one commit "personas: <id> prose moves from persona.md into prompt.md (req-171)", log it
+        else none, or the prose is already in prompt.md
+            Pure-->>Mig: null — nothing written (idempotent)
+        end
+    end
+```
+
 ## 6.116 A skill — upload → folder → `skills:` toggle → the run's prompt with `## Skills` → token count (req-172, milestone 232, [ADR-0088](09_architecture_decisions/0088-tickets-engine-package-cut.md) later change)
 
 A skill reaches the crew as a folder, is switched on in the persona's `skills:` list, and every session of that persona then loads its body in full behind the prompt. The same service answers what that costs.

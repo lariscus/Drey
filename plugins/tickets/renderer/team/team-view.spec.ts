@@ -9,6 +9,7 @@ import type { DeskDeps } from '../desk-deps';
 import { mountBoard } from '../board/board-view';
 import { bandHeaderStatusOf, bandStatusOf } from './capacity-model';
 import { bandShownFor, mountCapacity, personaLineOf, trancheNodes } from './capacity-view';
+import { focusCrew, resetCrewFocus } from './team-focus';
 import { personaCardOf } from './team-model';
 import type { TeamStore } from './team-store';
 import { mountTeam } from './team-view';
@@ -148,6 +149,31 @@ describe('the Crew tab', () => {
     expect(tessa.querySelector('.desk-persona-role')!.textContent).toBe('Tester · $0.36 today');
     expect([...tessa.querySelectorAll('.desk-persona-controls button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Nudge the worker', 'Hand to Claude Code', 'Stop']);
     expect(host.querySelector('[data-persona="ben"] .desk-persona-role')!.textContent).toBe('Builder · $2.67 today');
+  });
+
+  it("draws the persona's one line as the card's line 3 where the record has one (req-144), the role where it has not", () => {
+    const host = document.body.appendChild(document.createElement('div'));
+    mountTeam(deps(), store([persona({ summary: 'Builds one part, test first.' }), persona({ id: 'tessa', title: 'Tessa', role: 'Tester', dailyCost: 0.36, budget: null })]), host);
+    expect(host.querySelector('[data-persona="ben"] .desk-persona-role')!.textContent).toBe('Builds one part, test first. · $2.67 today');
+    expect(host.querySelector('[data-persona="tessa"] .desk-persona-role')!.textContent).toBe('Tester · $0.36 today');
+  });
+
+  it("opens on the persona and tab the Persona page's link asked for, waiting or while open", () => {
+    resetCrewFocus();
+    const host = document.body.appendChild(document.createElement('div'));
+    focusCrew({ persona: 'tessa', tab: '1:1' });
+    mountTeam(deps(), store(personas), host);
+    expect(host.querySelector('[data-persona="tessa"]')!.classList.contains('desk-persona-selected')).toBe(true);
+    expect(host.querySelector('.desk-tab-on')!.textContent).toBe('1:1');
+    focusCrew({ persona: 'ben', tab: 'Memory' });
+    return new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => {
+        expect(host.querySelector('[data-persona="ben"]')!.classList.contains('desk-persona-selected')).toBe(true);
+        expect(host.querySelector('.desk-tab-on')!.textContent).toBe('Memory');
+        resetCrewFocus();
+        resolve();
+      });
+    });
   });
 
   it('draws the Autopilot chip between the budget and Pause all, and a click opens the popover (board 7f)', () => {

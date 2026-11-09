@@ -20,6 +20,7 @@ import { newTicketFileText, parseTicketFile, patchTicketFile, patchBlockedBy, pa
 import { withPlanSection } from '../core/plan-section';
 import { applyFlowOp, type FlowOp } from '../core/flow-edit';
 import type { FlowReply, FlowSaveReply, FlowStepView, FlowTarget, FlowScope } from '../contracts/flow';
+import { allowedAfter, type PersonaAllowedPatch } from '../contracts/persona-allowed';
 import { BUILDING_STATE, COMMIT_STEP_PROMPT, DEFAULT_PIPELINE_TEXT, READY_STATE } from '../core/pipeline-states';
 import { isManualPhase, MANUAL_PHASE, MANUAL_TITLE, mergeChain, parseChainEntry, renderChainEntries, validateChain } from '../core/chain-delta';
 import { deletePlanPart, movePlanPart, parsePlanParts, partChainEntries, withPlanParts, type PlanPart } from '../core/plan-parts';
@@ -3975,6 +3976,9 @@ export class EngineBoardService {
     color?: string;
     skills?: readonly string[];
     prompt?: string;
+    summary?: string;
+    budget?: number | null;
+    allowed?: PersonaAllowedPatch;
   }): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
       let id: string;
@@ -3995,8 +3999,8 @@ export class EngineBoardService {
         return { ok: false, error: refusal };
       }
       const sent = (key: string): boolean =>
-        input[key as 'title' | 'role' | 'worker' | 'model' | 'pool' | 'color' | 'skills' | 'prompt'] !== undefined;
-      if (!['title', 'role', 'worker', 'model', 'pool', 'color', 'skills', 'prompt'].some(sent)) {
+        input[key as 'title' | 'role' | 'worker' | 'model' | 'pool' | 'color' | 'skills' | 'prompt' | 'summary' | 'budget' | 'allowed'] !== undefined;
+      if (!['title', 'role', 'worker', 'model', 'pool', 'color', 'skills', 'prompt', 'summary', 'budget', 'allowed'].some(sent)) {
         return { ok: true }; // nothing to change
       }
       const personaPath = `${PERSONAS_DIR}/${id}/persona.md`;
@@ -4018,6 +4022,9 @@ export class EngineBoardService {
           : {}),
         ...(input.color !== undefined ? { color: input.color.trim() } : {}),
         ...(input.skills !== undefined ? { skills: input.skills.map((s) => s.trim()) } : {}),
+        ...(input.summary !== undefined ? { summary: input.summary.replace(/\s+/g, ' ').trim() } : {}),
+        ...(input.budget !== undefined ? { budget: input.budget } : {}),
+        ...(input.allowed !== undefined ? { allowed: allowedAfter(persona.allowed, input.allowed) } : {}),
       };
       const patched = personaFileText(next, hadFence ? body : undefined);
       const touched = [personaPath];
@@ -4145,6 +4152,7 @@ export class EngineBoardService {
             worker: migration.worker,
             models: { default: migration.model ?? 'opus', pool: [migration.model ?? 'opus'] },
             color: '#a78bfa',
+            summary: '',
             skills: [],
             budget: null,
             allowed: { spendAboveAllowance: false },

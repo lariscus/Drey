@@ -19,6 +19,7 @@ import type {
   TransitionCommand,
 } from '../core/commands';
 import { chainResult } from '../core/commands';
+import type { PersonaAllowedPatch } from '../contracts/persona-allowed';
 import type { FleetSnapshot } from '../services/fleet-client';
 import type {
   AutopilotRecord,
@@ -142,6 +143,9 @@ export interface RemoteBoard {
     color?: string;
     skills?: readonly string[];
     prompt?: string;
+    summary?: string;
+    budget?: number | null;
+    allowed?: PersonaAllowedPatch;
   }): Promise<MutationResult>;
 }
 
@@ -554,6 +558,8 @@ export class DreyTicketsPort implements TicketsRemotePort {
       model: p.kind === 'human' ? '' : p.models.default,
       pool: p.kind === 'human' ? [] : p.models.pool,
       color: p.color,
+      ...(p.summary !== '' ? { summary: p.summary } : {}),
+      ...(p.kind === 'human' ? {} : { allowed: p.allowed }),
       budget: p.budget,
       ...(daily[p.id] !== undefined ? { dailyCost: daily[p.id] } : {}),
       ...(phases[p.id] !== undefined ? { phases: phases[p.id] } : {}),

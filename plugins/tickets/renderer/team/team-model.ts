@@ -86,6 +86,8 @@ export interface PersonaCardModel {
   readonly initials: string;
   readonly color: string;
   readonly role: string;
+  /** The persona's one line for the crew list (`summary:`, req-144); '' = none. */
+  readonly summary: string;
   /** Pipeline phases the persona serves, in chain order. */
   readonly phases: readonly string[];
   readonly state: PersonaState;
@@ -235,6 +237,7 @@ export function personaCardOf(
     initials: initialsOf(persona.title),
     color: /^#[0-9a-fA-F]{6}$/.test(persona.color) ? persona.color : '#888888',
     role: roleLabel(persona.role),
+    summary: persona.summary ?? '',
     phases: persona.phases ?? [],
     state,
     stateWord: stateWordOf(state, rows.length),

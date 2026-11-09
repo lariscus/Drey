@@ -64,9 +64,27 @@ describe('mountMarkdownView (ui.createMarkdownView)', () => {
     handle.dispose();
   });
 
+  it('applies a formatting action to the selection and switches the mode (SDK 1.57)', () => {
+    const handle = mountMarkdownView(TestBed.inject(Injector), { mode: 'source', content: 'bold me' });
+    document.body.append(handle.element);
+    const view = EditorView.findFromDOM(handle.element.querySelector('.cm-editor') as HTMLElement)!;
+    view.dispatch({ selection: { anchor: 0, head: 4 } });
+    handle.format('bold');
+    expect(handle.getContent()).toBe('**bold** me');
+    view.dispatch({ selection: { anchor: 0 } });
+    handle.format('task');
+    expect(handle.getContent()).toBe('- [ ] **bold** me');
+    handle.setMode('live');
+    handle.setMode('source');
+    expect(handle.getContent()).toBe('- [ ] **bold** me');
+    handle.dispose();
+  });
+
   it('ignores calls after dispose', () => {
     const handle = mountMarkdownView(TestBed.inject(Injector), { content: 'a' });
     handle.dispose();
+    expect(() => handle.format('bold')).not.toThrow();
+    expect(() => handle.setMode('live')).not.toThrow();
     expect(() => handle.setContent('b')).not.toThrow();
     expect(() => handle.dispose()).not.toThrow();
   });

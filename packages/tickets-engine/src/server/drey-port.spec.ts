@@ -25,6 +25,7 @@ function fakePersona(id: string, title: string): import('../core/persona').Perso
     worker: 'claude-code',
     models: { default: 'opus', pool: ['opus'] },
     color: '#a78bfa',
+    summary: '',
     skills: [],
     budget: null,
     allowed: { spendAboveAllowance: false },

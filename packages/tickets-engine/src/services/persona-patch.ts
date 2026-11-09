@@ -1,4 +1,5 @@
-import { PERSONA_ROLES } from '../core/persona';
+import type { PersonaAllowedPatch } from '../contracts/persona-allowed';
+import { PERSONA_ROLES, PERSONA_RUN_COMMANDS } from '../core/persona';
 
 /** The PATCH body's shape (U4). */
 export interface PersonaPatchFields {
@@ -10,6 +11,26 @@ export interface PersonaPatchFields {
   color?: string;
   skills?: readonly string[];
   prompt?: string;
+  summary?: string;
+  /** The daily budget in USD; null clears it (req-171). */
+  budget?: number | null;
+  allowed?: PersonaAllowedPatch;
+}
+
+const isBool = (value: unknown): boolean => value === undefined || typeof value === 'boolean';
+
+function allowedBroken(allowed: PersonaAllowedPatch): boolean {
+  if (typeof allowed !== 'object' || allowed === null) {
+    return true;
+  }
+  const commands = allowed.runCommands;
+  const vaults = allowed.writeVaults;
+  return (
+    !isBool(allowed.spendAboveAllowance) ||
+    !isBool(allowed.network) ||
+    !(commands === undefined || commands === null || (PERSONA_RUN_COMMANDS as readonly string[]).includes(commands)) ||
+    !(vaults === undefined || (Array.isArray(vaults) && vaults.every((v) => typeof v === 'string' && v.trim() !== '')))
+  );
 }
 
 /** One rule: the field is sent and broken → the reason. */
@@ -26,6 +47,9 @@ const RULES: readonly Rule[] = [
   [(i) => i.color !== undefined && !/^#[0-9a-f]{6}$/i.test(i.color.trim()), 'the color is a #rrggbb hex value'],
   [(i) => i.skills !== undefined && i.skills.some((s) => typeof s !== 'string'), 'the skills are a list of skill names'],
   [(i) => i.prompt !== undefined && typeof i.prompt !== 'string', 'the prompt is markdown text'],
+  [(i) => i.summary !== undefined && (typeof i.summary !== 'string' || i.summary.length > 200), 'the one line for the crew list is text of at most 200 characters'],
+  [(i) => i.budget !== undefined && i.budget !== null && !(typeof i.budget === 'number' && Number.isFinite(i.budget) && i.budget >= 0), 'the daily budget is a number of dollars, zero or more, or null'],
+  [(i) => i.allowed !== undefined && allowedBroken(i.allowed), 'allowed is { spendAboveAllowance?, runCommands?, network?, writeVaults? } with run-commands accept-edits or bypass'],
 ];
 
 /** The PATCH body's validation (U4): only the listed rules reject; null = the patch is writable. */

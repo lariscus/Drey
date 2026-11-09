@@ -88,11 +88,12 @@ test('reads and writes prompt.md in the checkout vault', async ({ page, vaultDir
   await page.locator('.desk-team [data-persona="ben"]').first().click();
   await page.locator('.desk-detail-head .persona-edit-btn').click();
   const body = page.locator('.persona-page').filter({ visible: true });
-  await expect(body.locator('.persona-text')).toHaveValue('You are Ben, on a store.\n', { timeout: 15_000 });
-  await body.locator('.persona-text').fill('Changed on a store.\n');
+  const editor = body.locator('.persona-ed-view .cm-content');
+  await expect(editor).toContainText('You are Ben, on a store.', { timeout: 15_000 });
+  await editor.fill('Changed on a store.');
   await body.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(body.locator('.persona-head > .persona-muted')).toHaveText('Saved', { timeout: 15_000 });
-  expect(fs.readFileSync(path.join(vaultDir, 'tickets', '_meta', 'personas', 'ben', 'prompt.md'), 'utf8')).toBe('Changed on a store.\n');
+  await expect(body.locator('.persona-head .persona-state')).toHaveText('Saved', { timeout: 15_000 });
+  expect(fs.readFileSync(path.join(vaultDir, 'tickets', '_meta', 'personas', 'ben', 'prompt.md'), 'utf8')).toBe('Changed on a store.');
   // Nothing of the persona landed in the store.
   expect(execFileSync('git', ['log', '--all', '--name-only', '--format='], { cwd: storeDir, encoding: 'utf8', windowsHide: true })).not.toContain('prompt.md');
 });

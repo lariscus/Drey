@@ -439,7 +439,7 @@ Every phase's instruction is composed in one stable order — repo agent
 instructions (verbatim: the file `repos.md`'s `instructions:` names,
 req-79 — Drey's is `docs/agents/fleet-worker.md`; unset, missing or
 blank falls back to `CLAUDE.md`, then `AGENTS.md`) → phase
-template (a persona's prompt, then its `## Skills`, D-46 / req-172: the folders the names in `persona.skills`
+template (a persona's prompt — `prompt.md`, the persona's one prose since R11 / req-171, whose top is its "who it is" section and which the Persona page edits in Drey's Markdown editor; `persona.md` is frontmatter only — then its `## Skills`, D-46 / req-172: the folders the names in `persona.skills`
 point at, nearest first `personas/<id>/skills/<name>/SKILL.md`, then `_meta/skills/<name>/SKILL.md`, body only,
 in full — "Skills" below; a name with no text is
 a log line) → the ticket's `## Plan` verbatim → the variable parts

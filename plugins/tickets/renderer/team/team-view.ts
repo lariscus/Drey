@@ -28,6 +28,7 @@ import { mountMemoryPane } from './memory-pane';
 import { mountNewSessionForm, type NewSessionFormHandle } from './new-session-form';
 import { mountOneOnOnePane } from './one-on-one-pane';
 import { personaPictureNode } from './persona-picture';
+import { onCrewFocus, takeCrewFocus } from './team-focus';
 import type { TeamStore } from './team-store';
 
 /** How long "Stop all" stays armed after the first press. */
@@ -120,10 +121,10 @@ function headlineNode(card: PersonaCardModel): HTMLElement {
   return node;
 }
 
-/** `Planner · $0.61 today`: the role, then the day's cost when one is known. */
+/** `Planner · $0.61 today`: the persona's one line (req-144) or else the role, then the day's cost when one is known. */
 function subLineOf(card: PersonaCardModel): string {
   const cost = card.dailyCost === null ? '' : `${usd(card.dailyCost)} today`;
-  return [card.role, cost].filter((part) => part !== '').join(' · ');
+  return [card.summary === '' ? card.role : card.summary, cost].filter((part) => part !== '').join(' · ');
 }
 
 /** The inline "Stop <name>?" ask under a stuck card's buttons. */
@@ -342,6 +343,19 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
   let detailKey = '';
   let detail: HTMLElement | null = null;
   let newSession: NewSessionFormHandle | null = null;
+  // The Persona page's links (req-171) open this tab on a persona's Memory or 1:1: waiting at mount, or while it is open.
+  const asked = takeCrewFocus();
+  if (asked !== null) {
+    selected = asked.persona;
+    tab = asked.tab;
+  }
+  const offFocus = onCrewFocus((focus) => {
+    takeCrewFocus();
+    selected = focus.persona;
+    tab = focus.tab;
+    detailKey = '';
+    schedule();
+  });
 
   const render = (): void => {
     frame = 0;
@@ -471,6 +485,7 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
   return () => {
     offStore();
     offDeps();
+    offFocus();
     clearInterval(tick);
     if (armTimer !== null) {
       clearTimeout(armTimer);

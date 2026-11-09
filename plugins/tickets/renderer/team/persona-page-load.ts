@@ -1,0 +1,71 @@
+// i18n: catalog
+/**
+ * What the Persona page reads when it opens, apart from the record the Crew
+ * store already holds: the prompt file, the model table with the slots, the
+ * registered vaults, the skills, the counts of memory and journal. Each read
+ * may fail on its own (an engine without a runner, no vault) and then leaves
+ * its part empty; only the prompt file and the proposals are load-critical.
+ */
+import type { ModelsReply } from '../../../../packages/tickets-engine/src/fleet/protocol';
+import type { SlotView } from '../../../../packages/tickets-engine/src/fleet/protocol-slots';
+import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
+import type { DeskDeps } from '../desk-deps';
+import type { PageExtras } from './persona-block-context';
+import { isMissingFileError } from './persona-model';
+import type { PersonaSkillsSeam } from './persona-seams';
+
+export type PromptRead = { readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string };
+
+/** The editor holds LF; the file may not: the page compares and saves in LF. */
+export const lf = (text: string): string => text.replace(/\r\n/g, '\n');
+
+export async function readPromptFile(api: DreyPluginApi, vaultId: string | null, path: string, noVault: string): Promise<PromptRead> {
+  if (vaultId === null) {
+    return { ok: false, error: noVault };
+  }
+  try {
+    return { ok: true, text: lf((await api.vault.readFile(path, { vaultId })).content) };
+  } catch (error) {
+    return isMissingFileError(error) ? { ok: true, text: '' } : { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+const quiet = async <T>(read: () => Promise<T>): Promise<T | null> => {
+  try {
+    return await read();
+  } catch {
+    return null;
+  }
+};
+
+const countOf = (reply: unknown): number | null => {
+  const entries = (reply as { ok?: boolean; entries?: readonly unknown[] } | null)?.entries;
+  return (reply as { ok?: boolean } | null)?.ok === true && Array.isArray(entries) ? entries.length : null;
+};
+
+export interface PersonaReads {
+  readonly extras: PageExtras;
+  readonly memory: number | null;
+  readonly journal: number | null;
+}
+
+export async function readBeside(deps: DeskDeps, id: string, skills: PersonaSkillsSeam, names: readonly string[]): Promise<PersonaReads> {
+  const [table, slotReply, vaults, found, memory, journal] = await Promise.all([
+    quiet(async () => (await deps.invoke('poolModels')) as ModelsReply | null),
+    quiet(async () => (await deps.invoke('slots')) as { readonly slots?: readonly SlotView[] } | null),
+    quiet(() => deps.api.vault.listVaults()),
+    quiet(() => skills.list(id, names)),
+    quiet(() => deps.invoke('personaMemory', { persona: id })),
+    quiet(() => deps.invoke('personaJournal', { persona: id })),
+  ]);
+  return {
+    extras: {
+      table: table?.ok === true ? table : null,
+      slots: slotReply?.slots ?? [],
+      vaults: (vaults ?? []).map((vault) => ({ id: vault.id, name: vault.name })),
+      skills: found ?? [],
+    },
+    memory: countOf(memory),
+    journal: countOf(journal),
+  };
+}
