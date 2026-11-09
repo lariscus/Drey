@@ -6,7 +6,7 @@ import { normalizeChainStore, normalizeFleetCaps, normalizeFleetHandover, normal
 import type { RunnerExit } from '../runner-exit';
 import type { RouteContext, RouteGroup } from './route-context';
 
-/** The chain's controls: its config, the master and the Autopilot, a column, the Notaus, a persona pause, leftover claims. */
+/** The chain's controls: its config, the master and the Autopilot, a column, the Notaus, a persona pause, the burn rate's lift, leftover claims. */
 export class ChainRoutes implements RouteGroup {
   constructor(
     private readonly orchestrator: Orchestrator,
@@ -38,6 +38,9 @@ export class ChainRoutes implements RouteGroup {
         return true;
       case 'POST /chain/persona-pause':
         return this.personaPause(ctx);
+      case 'POST /chain/hold/lift':
+        ctx.respond(200, await this.orchestrator.liftHold()); // req-181: "Allow today once"
+        return true;
       default:
         return false;
     }

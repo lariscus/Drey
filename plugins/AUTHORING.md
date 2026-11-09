@@ -131,6 +131,8 @@ leaves the app on the previous build. Verify with
   `ui.refreshStatus()` re-reads every dock panel's `status` now — the shell does it on document and vault
   events only, so a panel whose status changes otherwise (an async search result) calls it after the change.
   The sample plugin registers a tiny third find mode.
+  1.56 (req-181, the burn rate's card) adds `ConversationCard.chips` — small framed figures in one row under
+  the body (`spent 21 %`, `resumes 00:00`, board 10u's chips); a card with chips wears the 1.55 look.
   1.55 (req-179, the Mission Control checkpoint card) adds optional, content-agnostic fields to
   `ConversationCard`, all drawn by the Assistant and none required, so an old card renders as before:
   `title` with a status `dot` (`attention` | `negative`), `metrics` (a 2 x 2 grid of `{ label, value, sub?,

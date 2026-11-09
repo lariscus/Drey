@@ -8,6 +8,7 @@
  */
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
 import type { AutopilotView } from '../../../../shared/autopilot';
+import type { BurnRateHoldView } from '../../../../shared/burn-rate';
 import type { TrancheView } from '../../../../shared/tranche';
 import type { ChainStatus } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { AUTOPILOT_CHORD } from '../status-slot';
@@ -24,6 +25,8 @@ export interface AutopilotCommandDeps {
   readonly costText: () => string | null;
   /** The chain's tranche as the plugin last heard it (req-179); null = none. */
   readonly tranche: () => TrancheView | null;
+  /** req-181: the burn rate's hold as the plugin last heard it; null = nothing holds. */
+  readonly hold?: () => BurnRateHoldView | null;
   /** "Adjust…" at a checkpoint: opens Settings → Tickets. */
   readonly adjust: () => void;
   /** The status item the popover sits above. */
@@ -69,6 +72,7 @@ export function createAutopilotCommand(deps: AutopilotCommandDeps): AutopilotCom
           chord: AUTOPILOT_CHORD,
           costText: deps.costText,
           tranche: deps.tranche,
+          ...(deps.hold !== undefined ? { hold: deps.hold } : {}),
           adjust: deps.adjust,
           anchor: deps.anchor,
         },

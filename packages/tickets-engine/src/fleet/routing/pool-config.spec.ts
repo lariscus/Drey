@@ -85,16 +85,21 @@ describe('parsePoolSettings — the capability columns and the routing (req-178)
     ]);
   });
 
-  it.each<[string, unknown, { upgradeAboveQ: number | null; reservePerWindow: number }, string[]]>([
-    ['absent: board 7l defaults', undefined, { upgradeAboveQ: 1.3, reservePerWindow: 0.1 }, []],
-    ['set', { upgradeAboveQ: 1.5, reservePerWindow: 0.2 }, { upgradeAboveQ: 1.5, reservePerWindow: 0.2 }, []],
-    ['null switches the step up off; 0 the reserve', { upgradeAboveQ: null, reservePerWindow: 0 }, { upgradeAboveQ: null, reservePerWindow: 0 }, []],
+  it.each<[string, unknown, { upgradeAboveQ: number | null; reservePerWindow: number; burnRate: number }, string[]]>([
+    ['absent: board 7l defaults', undefined, { upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 0.2 }, []],
+    ['set', { upgradeAboveQ: 1.5, reservePerWindow: 0.2, burnRate: 0.3 }, { upgradeAboveQ: 1.5, reservePerWindow: 0.2, burnRate: 0.3 }, []],
+    ['null switches the step up off; 0 the reserve and the burn rate', { upgradeAboveQ: null, reservePerWindow: 0, burnRate: 0 }, { upgradeAboveQ: null, reservePerWindow: 0, burnRate: 0 }, []],
     [
       'out of range: the default, said once each',
-      { upgradeAboveQ: -1, reservePerWindow: 10 },
-      { upgradeAboveQ: 1.3, reservePerWindow: 0.1 },
-      ['routing.upgradeAboveQ must be a surplus above 0, or null to never step up', 'routing.reservePerWindow must be a share from 0 to below 1 (0.1 = 10 %)'],
+      { upgradeAboveQ: -1, reservePerWindow: 10, burnRate: 1 },
+      { upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 0.2 },
+      [
+        'routing.upgradeAboveQ must be a surplus above 0, or null to never step up',
+        'routing.reservePerWindow must be a share from 0 to below 1 (0.1 = 10 %)',
+        'routing.burnRate must be a share from 0 to below 1 (0.2 = 20 % of the weekly quota per day; 0 = off)',
+      ],
     ],
+    ['a burn rate that is not a number', { burnRate: '20 %' }, { upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 0.2 }, ['routing.burnRate must be a share from 0 to below 1 (0.2 = 20 % of the weekly quota per day; 0 = off)']],
   ])('routing — %s', (_name, routing, expected, errors) => {
     const parsed = parsePoolSettings(routing === undefined ? {} : { routing }, SLOTS);
     expect(parsed.settings.routing).toEqual(expected);

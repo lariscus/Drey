@@ -173,6 +173,8 @@ export interface TicketsRemotePort {
   chainColumn(phase: string, mode: ColumnMode): Promise<ChainReply>;
   chainColumnStop(phase: string): Promise<ChainReply>;
   chainAbort(): Promise<ChainReply>;
+  /** req-181: the burn rate's "Allow today once" (`POST /chain/hold/lift`). */
+  chainHoldLift(): Promise<ChainReply>;
 
   /** The team: every persona, read-only (the Team tab's cards). */
   personas(): Promise<readonly PersonaView[]>;

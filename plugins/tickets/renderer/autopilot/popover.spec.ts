@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AutopilotView } from '../../../../shared/autopilot';
+import type { BurnRateHoldView } from '../../../../shared/burn-rate';
 import type { TrancheView } from '../../../../shared/tranche';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- the spec stands in for the host, which owns the catalog at runtime
 import { i18n } from '../../../../shared/i18n';
@@ -20,6 +21,7 @@ interface MountOptions {
   readonly cost?: string | null;
   readonly anchor?: HTMLElement;
   readonly tranche?: TrancheView | null;
+  readonly hold?: BurnRateHoldView | null;
 }
 
 function mount(initial: AutopilotView, options: MountOptions = {}) {
@@ -44,6 +46,7 @@ function mount(initial: AutopilotView, options: MountOptions = {}) {
       chord: 'Mod+Alt+P',
       costText: () => (options.cost === undefined ? '$4.10 of $15 today' : options.cost),
       tranche: () => options.tranche ?? null,
+      hold: () => options.hold ?? null,
       adjust,
       ...(options.anchor === undefined ? {} : { anchor: () => options.anchor! }),
       now: () => new Date(2026, 10, 6, 10, 0),
@@ -352,5 +355,28 @@ describe('the Autopilot writes', () => {
       ok: false,
       words: 'The runner could not be started: the fleet runner did not come up within 10 s',
     });
+  });
+});
+
+describe('the burn rate hold in the popover (req-181)', () => {
+  const hold: BurnRateHoldView = { spent: 0.21, limit: 0.2, resumesAt: new Date(2026, 10, 7, 0, 0).toISOString(), basis: 'measured', since: null };
+  const sentence = (): string | null => document.querySelector('.tickets-autopilot-sentence')!.textContent;
+
+  it('On and Paused say the hold in place of the state sentence', () => {
+    mount({ state: 'on' }, { hold });
+    expect(sentence()).toBe('Burn rate reached · resumes at 00:00');
+    open?.close();
+    mount({ state: 'paused' }, { hold });
+    expect(sentence()).toBe('Burn rate reached · resumes at 00:00');
+  });
+
+  it('Off keeps its own sentence', () => {
+    mount({ state: 'off' }, { hold });
+    expect(sentence()).toBe('You start every step yourself.');
+  });
+
+  it('without a hold the sentence is the state', () => {
+    mount({ state: 'on' }, { hold: null });
+    expect(sentence()).toBe('Workers pick up and run tickets by themselves.');
   });
 });

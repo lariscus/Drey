@@ -200,3 +200,57 @@ at runtime (`architecture.spec.ts`).
 **Deviations and gaps:** the burn rate stays req-181; the class request's own `contextTokens` is still null (only a
 `needs: context-<n>` filters on context); a step up refused by the cap or the reserve is not logged; the screens
 (capability columns, Routing group, the import action, the route on the card) are req-186's.
+
+## As built (req-181, milestone 224, 2026-11-09 — the burn rate, and the Routing group of Settings → Models writable)
+
+**The fourth routing rule.** Beside the hard filter, the surplus choice and the step up, the **burn rate** bounds the
+day: at most `routing.burnRate` (a share, default 0.2 = board 7l's `20`; `0` = off) of the **weekly quota per day over
+all slots**. Reached, no new run starts until the day turns; running steps finish; the Autopilot stays in its state and
+shows the reason.
+
+**Where it lives.** `fleet/routing/`: `BurnRateDayBook` (the day's book, `burn-rate.json` in the service home, writes
+one after another), `BurnRateMeter` (today's share), `BurnRateGuard` (the decision, beside `ReserveGuard`),
+`BurnRateHoldSource` (the decision as the chain asks it, the runner-log line once each way), `RouteRecorder.burnRateLine`;
+wired in `compose-pool.ts` (`Pool.burnMeter`, `burnBook`, `burnRate`), the meter fed by every slot change in
+`compose-routing.ts`, the book loaded at the routing's start. The chain asks through a consumer port,
+`orchestrate/start-hold.ts` (`StartHold {current(), lift()}`; `PublishedHold` tells the `hold` event), handed over on
+the `DispatchPool` (`hold`) — the orchestration still imports no `routing/` class.
+
+**Decisions taken while building (routine, recorded here):**
+
+- **The day is the UTC date**, as the ledgers and the tranche count it — one "today" in the service. The owner's
+  local midnight differs by the zone (01:00 in Berlin's winter); every client writes the resume time in the reader's
+  zone, so the card says `resumes 01:00` there. A local day for all three is a roadmap follow-up.
+- **Measured where a weekly window is read, estimated elsewhere.** A slot with a `7d` window and a remaining share
+  counts every drop since the day's first reading (a rise — a rolling window letting old use go — is not spending; a
+  window past its reset starts again from its new reading, so a weekly reset mid-day lowers the figure and can clear
+  the hold); a slot without one counts its runs started today at `RunShareTracker`'s share of its week (the ticket's
+  runs, the persona's, else 5 %). The status says which (`basis: measured | estimated | mixed`).
+- **Over all slots = the mean of the counted slots**, each slot's week weighing the same (slots have no common unit;
+  prices and sizes are display data). An implied slot counts only once it ran today, so the three stand-in slots of a
+  fresh `service.json` do not dilute the figure.
+- **Reached = at or above the limit.** The hold's `resumesAt` is the next UTC midnight; its `since` is when it rose
+  (the card's meta line; a restart takes the restart's time).
+- **Only the chain is held.** The dispatcher asks once per pass, before any start; the owner's own starts (Start on a
+  ticket, a 1:1) are not held — the owner decides those.
+- **The lift is its own route**, `POST /chain/hold/lift` (paired devices `POST /api/chain/hold/lift`), not a flag on the
+  Autopilot write: On releases a tranche (req-179), and allowing the day is not switching the Autopilot. It lifts for
+  the rest of the UTC day and is stored in the day's book, so a restart keeps it.
+- **The day's book is persisted** (unlike `RunShareTracker`'s samples): a restart mid-day — a Drey update restarts the
+  service — would otherwise forget the morning's spend and hand out the day again.
+- **The card is a chain-status fact** like the checkpoint (req-179): `ChainStatus.hold`, drawn by every client from
+  `shared/burn-rate.ts` with board 10u's chrome laid out like part 4 (the quota stop): peach dot, `Burn rate reached ·
+  20 % of the week today`, `Nothing new starts until 00:00. Running steps finish.`, chips `spent 21 %` / `resumes
+  00:00` (+ `estimated` / `partly estimated`), *Wait* (primary; dismisses that device's card for the day) and *Allow
+  today once*. The chips needed SDK 1.56 (`ConversationCard.chips`).
+
+**The Routing group is writable.** `Upgrade above q`, `Reserve per window` and `Burn rate` on Settings → Tickets →
+Models read `GET /models` `routing` (the renderer's `RESERVE_SHARE` / `UPGRADE_Q` left the page; the slot cards' reserve
+colour and upgrade mark read the engine's values too), are checked like the engine (q above 0, empty = never; the
+shares 0 to below 100 %), saved when the field is left or on Enter through `poolModelsConfig` →
+`POST /models/config {routing}` (the whole key, the other two as the engine has them), and a refusal — the field's own
+words or the engine's 422 text — shows under the group. The look is board 7l's.
+
+**Deviations and gaps:** the Capacity band's upgrade mark (board 7e) still reads the fixed 1.3 (the chain status carries
+no routing); a slot without a weekly window has no weekly samples, so its estimate stays the 5 % default per run (a
+monthly window could be scaled instead); the day is UTC.

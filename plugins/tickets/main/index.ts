@@ -770,6 +770,7 @@ const plugin: MainPluginModule = {
     });
 
     ctx.ipc.handle('chainAbort', async () => chainResult(await fleet.abortAll()));
+    ctx.ipc.handle('chainHoldLift', async () => chainResult(await fleet.liftHold())); // req-181: "Allow today once"
 
     // E14-5b: the owner's "release leftover claims" - agent claims a killed runner left on a dricket store.
     ctx.ipc.handle('chainReleaseLeftovers', async () => board.releaseLeftoverClaims());

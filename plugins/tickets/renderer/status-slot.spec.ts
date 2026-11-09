@@ -44,6 +44,15 @@ describe('the Autopilot item', () => {
     });
     expect(autopilotSlotOf('on', t, { done: 4, total: null }).tooltip).toBe('Autopilot: On (Mod+Alt+P)');
   });
+
+  it('says the burn rate hold in the tooltip while one holds (req-181), the text and dot unchanged', () => {
+    expect(autopilotSlotOf('on', t, { done: 4, total: 10 }, '00:00')).toEqual({
+      text: 'Autopilot · On',
+      tooltip: 'Autopilot: On · Burn rate reached · resumes at 00:00 (Mod+Alt+P)',
+      dot: 'positive',
+    });
+    expect(autopilotSlotOf('off', t, null, '00:00').tooltip).toBe('Autopilot: Off (Mod+Alt+P)');
+  });
 });
 
 describe('createStatusSlots', () => {

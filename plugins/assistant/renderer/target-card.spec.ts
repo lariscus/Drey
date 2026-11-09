@@ -61,4 +61,21 @@ describe('the proposal card', () => {
     const node = proposalNode(targets(), { id: 'c3', kind: 'card', title: 'Stopped early', dot: 'negative', text: '3 of 6 gates were red.', rows: [{ text: 'T-0124', dot: 'negative' }] });
     expect([...node.children].map((child) => child.className)).toEqual(['target-card-title', 'target-card-text', 'target-card-rows']);
   });
+
+  it('draws the 1.56 chips under the body, before the buttons (board 10u: the quota stop, the burn rate)', () => {
+    const card: ConversationCard = {
+      id: 'c4',
+      kind: 'card',
+      title: 'Burn rate reached · 20 % of the week today',
+      dot: 'attention',
+      text: 'Nothing new starts until 00:00. Running steps finish.',
+      chips: ['spent 21 %', 'resumes 00:00'],
+      actions: [{ id: 'wait', label: 'Wait', tone: 'primary' }, { id: 'allow_once', label: 'Allow today once' }],
+      meta: 'Mission Control · 22:40',
+    };
+    const node = proposalNode(targets(), card);
+    expect(isRichCard({ id: 'x', kind: 'card', text: 'x', chips: ['a'] })).toBe(true);
+    expect([...node.children].map((child) => child.className)).toEqual(['target-card-title', 'target-card-text', 'target-card-chips', 'target-card-actions', 'target-card-meta']);
+    expect([...node.querySelectorAll('.target-card-chip')].map((chip) => chip.textContent)).toEqual(['spent 21 %', 'resumes 00:00']);
+  });
 });

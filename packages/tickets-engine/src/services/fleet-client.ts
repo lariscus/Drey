@@ -277,6 +277,18 @@ export class FleetClient {
     }
   }
 
+  /** req-181: "Allow today once" — the burn rate holds nothing more until the day turns. */
+  async liftHold(): Promise<ChainStatus | null> {
+    if (!(await this.conn.ensure())) {
+      return null;
+    }
+    try {
+      return await this.conn.post<ChainStatus>('/chain/hold/lift', {});
+    } catch {
+      return null;
+    }
+  }
+
   /** Notaus: halt the chain and abort every live run. */
   async abortAll(): Promise<ChainStatus | null> {
     if (!(await this.conn.ensure())) {

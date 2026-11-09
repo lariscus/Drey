@@ -1,6 +1,7 @@
 import type { FleetCaps, FleetHandoverConfig, FleetPools } from './protocol-fleet-config';
 import type { PermissionMode } from './protocol';
 import type { PoolLoad, QueueEntry } from './protocol-pool';
+import type { BurnRateBasis } from './protocol-routing';
 import type { SlotSummary } from './protocol-slots';
 import type { TrancheConfig, TrancheStatus } from './protocol-tranche';
 
@@ -148,7 +149,28 @@ export interface ChainStatus {
   readonly queue?: readonly QueueEntry[];
   /** req-179: the current tranche — runs, spend, end, a waiting checkpoint and its report; absent on older runners or with tranches off. */
   readonly tranche?: TrancheStatus;
+  /** req-181: why no new run starts although the Autopilot is On (the burn rate); null = nothing holds. Absent on older runners. */
+  readonly hold?: ChainHold | null;
 }
+
+/**
+ * The burn rate's hold (req-181): today's share of the weekly quota over all
+ * slots reached `routing.burnRate` — no new run starts until `resumesAt`
+ * (the next UTC midnight); running steps finish. `spent` and `limit` are
+ * shares 0–1; `basis` says whether the figure was read or estimated.
+ */
+export interface BurnRateHold {
+  readonly reason: 'burn-rate';
+  readonly spent: number;
+  readonly limit: number;
+  readonly resumesAt: string;
+  readonly basis: BurnRateBasis;
+  /** When the hold rose (ISO): the card's time. */
+  readonly since: string;
+}
+
+/** What can hold every new start while the Autopilot stays in its state (one reason today). */
+export type ChainHold = BurnRateHold;
 
 /** One circuit-breaker trip (the chain alerts fix). */
 export interface ChainTrip {

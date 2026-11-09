@@ -156,6 +156,7 @@ async function pushChain(
   app: ElectronApplication,
   autopilot: { state: string; resumeAt?: string; reason?: string },
   trancheBlock?: Record<string, unknown>,
+  hold?: Record<string, unknown>,
 ): Promise<void> {
   await app.evaluate(
     ({ BrowserWindow }, data) => {
@@ -177,6 +178,7 @@ async function pushChain(
           cooldownUntil: {},
           poolSize: { opencode: 2, 'claude-code': 3 },
           ...(trancheBlock === undefined ? {} : { tranche: trancheBlock }),
+          ...(hold === undefined ? {} : { hold }),
         },
       },
     },
@@ -276,6 +278,29 @@ test('boards 7g and 10t desktop: Settings, the Autopilot item', async ({ page, e
     return o;
   });
   fs.writeFileSync(path.join(OUT, 'MCCards.desktop-rects.json'), JSON.stringify(cardRects));
+
+  // req-181: the burn rate's hold — the card (board 10u's chrome, part 4's layout) and the popover's line.
+  const midnight = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + 1)).toISOString();
+  const HOLD = { reason: 'burn-rate', spent: 0.21, limit: 0.2, resumesAt: midnight, basis: 'measured', since: new Date().toISOString() };
+  await pushChain(electronApp, { state: 'on' }, undefined, HOLD);
+  await expect(card.locator('.target-card-chip').first()).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(400);
+  await card.screenshot({ path: path.join(OUT, 'MCCards.desktop-burn-rate.png') });
+  const holdRects = await card.evaluate((root) => {
+    const base = root.getBoundingClientRect();
+    const rel = (e: Element): number[] => {
+      const x = e.getBoundingClientRect();
+      return [x.left - base.left, x.top - base.top, x.width, x.height].map((v) => Math.round(v * 10) / 10);
+    };
+    const o: Record<string, number[]> = { card: [base.width, base.height] };
+    [...root.querySelectorAll('.target-card-title, .target-card-text, .target-card-chip, .target-card-btn, .target-card-meta')].forEach((c, i) => (o[`${i}_${c.className}`] = rel(c)));
+    return o;
+  });
+  fs.writeFileSync(path.join(OUT, 'MCCards.desktop-burn-rate-rects.json'), JSON.stringify(holdRects));
+  await item.click();
+  await expect(page.getByRole('dialog', { name: 'Autopilot' })).toBeVisible();
+  await shoot(page, 'Autopilot.desktop-burn-rate');
+  await page.keyboard.press('Escape');
   await pushChain(electronApp, { state: 'on' });
 
   // 7g: the Work view with both docks folded, the ticket's tab, then the Settings tab (Tickets, All devices).

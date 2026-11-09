@@ -1195,6 +1195,30 @@ with it. The sizes and the early-stop limits are the tickets plugin's settings
 `autopilot.earlyStop.*`; `0` switches one off, and with all three sizes off
 the Autopilot runs without tranches.
 
+### The burn rate
+
+The **burn rate** keeps the crew from using up a week's quota in a day: at
+most a share of the **weekly quota per day, over all accounts** — 20 % unless
+you change *Burn rate* on Settings → Tickets → Models (0 switches it off).
+Drey measures it from each account's weekly window since the day began; for
+an account whose provider shows no weekly figure it estimates it from the
+day's runs there.
+
+When the share is reached, **nothing new starts until the day turns**;
+running steps finish. The Autopilot stays as it is but says why: the popover
+reads *Burn rate reached · resumes at 01:00* in place of its sentence (the
+status item's tooltip says the same), and Mission Control shows a card —
+*Burn rate reached · 20 % of the week today*, *Nothing new starts until
+01:00. Running steps finish.*, with *spent 21 %* and *resumes 01:00* beneath
+(and *estimated* when some of it was estimated). **Wait** puts the card
+away on that device; the crew goes on by itself after midnight. **Allow
+today once** lets new runs start again for the rest of the day.
+
+The day turns at midnight UTC — the resume time is written in your own
+time, so in Berlin it reads *01:00* in winter and *02:00* in summer. The
+hold also clears earlier when an account's week resets and the share drops
+below the limit. Steps you start yourself are never held.
+
 ### Running agents on tickets (the fleet)
 
 A ticket can be worked by an **external agent CLI** — OpenCode, Claude Code or Kimi Code — while you watch from the Work panel. Running agents needs the board on a ticket store (the dricket checkout the Work panel's foot names); on a plain folder board, *Run agent* is refused and says so. Open the menu of a row
@@ -1353,10 +1377,13 @@ weekday and time within the week, else the date), and whether the reading is *me
 class upgrade onto it (*upgrade allowed*) or only serves its own classes
 (*class B only*). **Add slot…** opens the folder of `service.json`, where the
 accounts are listed — the slots are edited there for now. **Routing:**
-*Upgrade above q*, *Reserve per window* and *Burn rate* are shown with the
-values the crew works with today and cannot be changed yet; the sentence
-under them is the rule: a session gets exactly its class or waits, never a
-smaller class. **Ledgers:** the three defaults for what may be spent —
+*Upgrade above q* (empty: never upgrade), *Reserve per window* and *Burn
+rate* (both in percent; 0 switches them off) show the values the crew works
+with; change one and leave the field (or press Enter) and it is saved —
+there is no Save button. A value the crew cannot use (*0* for q, *100* or
+more for a share) is not saved and the reason shows under the group, red,
+until you correct it. The sentence under them is the rule: a session gets
+exactly its class or waits, never a smaller class. **Ledgers:** the three defaults for what may be spent —
 *Ticket allowance*, *Persona per day* and *Provider per day*, in dollars;
 empty means no limit. A ticket's own class is set from its row's ⋯ menu in
 the Work panel, **Class ›**: *From the persona* (no pin) or A, B or C.

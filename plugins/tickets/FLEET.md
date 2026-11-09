@@ -106,14 +106,14 @@ Invoke-RestMethod "http://127.0.0.1:$($d.port)/health" -Headers $h
 | `GET /status` | all runs (newest info per run) |
 | `GET /status/<runId>` | one run: `{run, streamPath}` |
 | `GET /stream/<runId>` | the run's stream.jsonl tail (last ~200 KB, ndjson) |
-| `GET /events` | the runner's events as server-sent events (req-176): `event: run` with a run's record each time it is persisted, `event: line` with `{runId, event}` for each line of a run's stream, `event: slot` with a slot's view when its state, windows or busy count changed (req-177), `event: pool` with the pool's live load when it changed (req-170); a `: ping` comment every 15 s, `retry: 3000` at the start. A read: it never keeps the runner awake, and it ends when the runner goes to sleep — reconnect then. `curl.exe -N -H "Authorization: Bearer …" http://127.0.0.1:<port>/events` |
+| `GET /events` | the runner's events as server-sent events (req-176): `event: run` with a run's record each time it is persisted, `event: line` with `{runId, event}` for each line of a run's stream, `event: slot` with a slot's view when its state, windows or busy count changed (req-177), `event: pool` with the pool's live load when it changed (req-170), `event: tranche` with the tranche's status (req-179), `event: hold` with the burn rate's hold when it rose, changed its percent or cleared (`null`, req-181); a `: ping` comment every 15 s, `retry: 3000` at the start. A read: it never keeps the runner awake, and it ends when the runner goes to sleep — reconnect then. `curl.exe -N -H "Authorization: Bearer …" http://127.0.0.1:<port>/events` |
 | `GET /log?tail=N` | daemon log tail, plain text (default 300 lines, max 2000; daemon builds) |
 | `GET /chain` | chain state + config (daemon builds); `slots` carries the 7e summary per slot (req-177); `pool` the live load (`{used, global, slots: [{id, label, used, cap, derived}]}`) and `queue` the tasks waiting for the pool (req-170) |
 | `GET /slots` | every slot (req-177): `{ok, slots: [{id, label, provider, profile, billing, quota, state, busy, total, windows: [{name, spanMs, remaining, resetsAt, reliability, fetchedAt, used?, limit?, unit?, rejected?}], q, reason, lastFetch, lastFetchError, implied}], configPath}` — see "Slots" below |
 | `POST /slots/refresh` `{id?}` | read the quotas now (one slot, or all), the config reloaded first |
 | `POST /slots/login-done` `{id}` | the owner signed the slot's account in again: `needs-login` clears, its quota is read |
 | `POST /slots/config` `{slots: [...]}` | write the `slots` of `service.json` (every other key kept) and reload; a broken entry refuses the whole list (422), a file that does not parse refuses the write (409) |
-| `GET /models` | the capacity pool (req-170): `{ok, models: [{model, slot, provider, category, class, cost, sessions, input?, tools?, context?, output?}], capacity: {global, perSlot}, ledgers: {ticketAllowance, personaPerDay, providerPerDay}, routing: {upgradeAboveQ, reservePerWindow}, now: <the live load>, queue: [...], providerDay: [{id, spent, limit}], errors, configPath}` — see "The capacity pool" below |
+| `GET /models` | the capacity pool (req-170): `{ok, models: [{model, slot, provider, category, class, cost, sessions, input?, tools?, context?, output?}], capacity: {global, perSlot}, ledgers: {ticketAllowance, personaPerDay, providerPerDay}, routing: {upgradeAboveQ, reservePerWindow, burnRate}, now: <the live load>, queue: [...], providerDay: [{id, spent, limit}], errors, configPath}` — see "The capacity pool" below |
 | `POST /models/config` `{models?, capacity?, ledgers?, routing?}` | replace the pool keys it sends in `service.json` (the others, and every other key, kept) and reload; a broken row refuses the whole write (422), a file that does not parse refuses it (409) |
 | `POST /models/import` | req-178: fill the model table's **undeclared** capability columns from `https://models.dev/api.json` — the one network call of the routes, only when the owner asks; what a row declares stays (the local override). The `GET /models` reply plus `imported: {filled: [{model, where, fields}], unmatched: [model]}`; 502 when the registry does not answer (nothing written) |
 | `GET /report` | token telemetry grouped by ticket, phase and model, sorted by total desc: `{ok, groups: [{ticket, phase, model, runs, total, input, cacheRead, cacheCreation, output, beforeFirstWrite, beforeFirstWriteShare}]}` — a counter the provider never reports counts 0 into the sums; pre-T-0048 records fall back to their cumulative `tokensIn`+`tokensOut` (T-0048) |
@@ -125,6 +125,7 @@ Invoke-RestMethod "http://127.0.0.1:$($d.port)/health" -Headers $h
 | `POST /chain/autopilot` `{state: "on"\|"paused"\|"off", resumeAt?}` | the Autopilot (req-95a): `resumeAt` a zoned ISO instant in the future, only on `paused`; answers the chain status, or 422 `{ok: false, error, code}`. Paired devices reach it as `POST /api/chain/autopilot` (a refusal there is a 200; a read-only device gets 403 with `code: "read_only"`, on every `/api/chain/` write) |
 | `POST /chain/column` `{phase, mode: "playing"\|"held"}` or `{phase, stop: true}` | column control |
 | `POST /chain/abort` | stop every live run |
+| `POST /chain/hold/lift` | the burn rate's *Allow today once* (req-181): nothing holds new starts until the day turns; stored in `burn-rate.json`, answers the chain status. Paired devices: `POST /api/chain/hold/lift` (refused on a read-only device) |
 | `POST /shutdown` | graceful retire: stops live runs (bounded), the runner goes to sleep. With `{handover: true}` (what the service passes on when a newer build asks it, req-51) no run ends: live runs are left to the successor (OpenCode re-attached; a worker it cannot bind to is stopped and its session resumed in place under the same run id); 409 while a run is gating/starting/stopping |
 | `POST /retire-if-idle` | sleep if nothing needs the runner (req-110; what the engine sends once Drey is gone): `{ok, exiting: true}` and the runner goes to sleep, or `{ok, exiting: false, reason: "live runs" \| "autopilot"}` and it stays — the decision is the runner's, so no run that starts in between dies. No body. A runner from before req-110 answers 404 |
 | `POST /start` | starts a run — **do not hand-craft**: the `RunRequest` (see `packages/tickets-engine/src/fleet/protocol.ts`) carries the composed instruction, worktree, gate commands, phase plumbing; runs are started by the board's "Run agent" or the chain dispatcher. A start without an `origin` is refused (D-41) |
@@ -442,7 +443,9 @@ slot: busy/total, the longest window's remaining share, its reliability,
 `q` and reset — req-177), `pool` (the live load), `queue` (the tasks
 waiting for the pool — req-170) and `tranche` (`index`, `of`, `done`,
 `total`, `spent`, `budget`, `startedAt`, `endsAt`, `checkpoint: waiting |
-null`, `report` — req-179). The Work panel
+null`, `report` — req-179) and `hold` (req-181: `{reason: "burn-rate", spent,
+limit, resumesAt, basis: measured | estimated | mixed, since}` while the
+burn rate holds new starts, else `null`). The Work panel
 draws both as alerts with a Resume button (chain alerts fix); a runner
 that predates them omits the fields and the panel reads a hold with a
 full red streak as a trip.
@@ -566,7 +569,7 @@ wired in `fleet/compose-routing.ts` and `fleet/compose-pool.ts`; the chain asks 
   ],
   "capacity": { "global": 6, "perSlot": {} },
   "ledgers": { "ticketAllowance": 2.5, "personaPerDay": 5, "providerPerDay": 15 },
-  "routing": { "upgradeAboveQ": 1.3, "reservePerWindow": 0.1 },
+  "routing": { "upgradeAboveQ": 1.3, "reservePerWindow": 0.1, "burnRate": 0.2 },
   "migrations": ["fleet.pool.size"]
 }
 ```
@@ -585,6 +588,7 @@ wired in `fleet/compose-routing.ts` and `fleet/compose-pool.ts`; the chain asks 
 | `ledgers.*` | USD defaults: a ticket's allowance when its frontmatter sets none, a persona's day when its `persona.md` sets no `budget:`, every slot's day |
 | `routing.upgradeAboveQ` | req-178, board 7l's `Upgrade above q` (default `1.3`): above this surplus the chosen slot runs the next stronger model of the persona's pool it serves; `null` = never step up |
 | `routing.reservePerWindow` | req-178, board 7l's `Reserve per window` as a share (default `0.1` = 10 %): a start whose estimated share would take any window of the slot below it waits; `0` = no reserve |
+| `routing.burnRate` | req-181, board 7l's `Burn rate` as a share (default `0.2` = 20 %): at most this much of the weekly quota per day over all slots; reached = no new run starts until the day turns (see *The burn rate* below); `0` = off. A value outside 0 to below 1 is refused (422) and read as the default |
 | `migrations` | `fleet.pool.size` once req-63's sizes moved into the slots (below) |
 
 Only **active sessions** count: runs and held 1:1 sessions from their
@@ -665,6 +669,55 @@ and `GET /status/<run>`. The chain's dispatch routes first; the start's gate
 (`PoolGate`) keeps that slot and class (a step up stays one), filters the
 needs again and records the dispatch's route when the start landed where
 it routed.
+
+### The burn rate (req-181)
+
+At most `routing.burnRate` of the **weekly quota per day over all
+slots**. `BurnRateMeter` measures today's share (the UTC day, as the
+ledgers and the tranche count it):
+
+- a slot that reads its **weekly window** (`7d` with a remaining share)
+  counts every drop of that share since the day's first reading; a rise
+  (a rolling window letting go of old use) is not spending; a window past
+  its reset time starts again from its new reading. `measured` when the
+  window is measured, `estimated` when it is counted;
+- a slot that reads no weekly window (Kimi's 5 h and monthly windows, a
+  counted window without a limit) counts **today's runs on it** at the
+  share a run takes of its week (`RunShareTracker`'s estimate — the
+  ticket's runs, the persona's, else 5 %): `estimated`;
+- the figure is the **mean over the counted slots** (each slot's week
+  weighs the same); an implied slot (a provider `service.json` names no
+  slot for) counts only once it ran today. `basis` is `measured` when
+  every counted slot was measured, `estimated` when none was, else
+  `mixed`.
+
+The day's book (per slot: the last reading, the drop so far, the reset;
+and whether the owner lifted the day) is `burn-rate.json` in the service
+home, so a restart mid-day keeps the morning's spend; a new day starts it
+empty.
+
+`BurnRateGuard`: today's share at or above the limit → the **hold**: the
+dispatcher asks it once per pass before any start (the chain's
+`StartHold` port) and starts nothing new; running steps finish; the
+Autopilot stays in its state. The owner's own starts (a ticket's Start,
+the 1:1) are not held. The hold clears when the day turns (the next UTC
+midnight), when the windows reset and the meter drops below the limit,
+or when the owner presses **Allow today once** (`POST /chain/hold/lift`;
+the rest of the day). The runner log says it once each way:
+
+```
+route refused · burn rate 21 % of 20 % today · resumes 01:00
+route refused · burn rate 25 % of 20 % today · resumes 01:00 · estimated
+burn rate: the hold cleared — new runs start again
+burn rate: allowed for the rest of today by the owner
+```
+
+(`resumes` is the machine's local time of the next UTC midnight.) The
+chain status carries `hold`, `GET /events` a `hold` event; every client
+draws the same Needs-you card from it (`shared/burn-rate.ts`): `Burn rate
+reached · 20 % of the week today`, `Nothing new starts until 01:00.
+Running steps finish.`, chips `spent 21 %` / `resumes 01:00`, *Wait*
+(dismisses the card on that device for the day) and *Allow today once*.
 
 ### Waiting
 

@@ -17,7 +17,7 @@
             <span class="ph-ic" [attr.data-tone]="tone(kind)"><mc-ph-icon [name]="glyph(kind)" /></span>
             <span class="ph-body">
               <span>{{ 'autopilot.state.' + kind | t }}</span>
-              <span class="ph-sentence">{{ 'autopilot.sentence.' + kind | t }}</span>
+              <span class="ph-sentence">{{ current.state === kind && holdLine() !== null ? holdLine() : ('autopilot.sentence.' + kind | t) }}</span>
             </span>
             @if (current.state === kind) {
               <mc-ph-icon name="check" [size]="20" [stroke]="2.5" />
@@ -52,7 +52,7 @@
         </button>
       }
     </div>
-    <span class="pd-sentence">{{ sentenceKey() | t }}</span>
+    <span class="pd-sentence">{{ holdLine() ?? (sentenceKey() | t) }}</span>
     <div class="pd-chips">
       @if (waiting()) {
         <span class="pd-chip pd-attention">{{ 'autopilot.checkpoint_waiting' | t }}</span>

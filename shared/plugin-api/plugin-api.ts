@@ -454,6 +454,8 @@ export interface ConversationCard {
   readonly metrics?: readonly ConversationCardMetric[];
   /** A short list of lines under the figures (SDK 1.55). */
   readonly rows?: readonly ConversationCardRow[];
+  /** Small framed figures in one row under the body (SDK 1.56): `spent 21 %`, `resumes 00:00`. */
+  readonly chips?: readonly string[];
   /** A quiet line at the card's bottom, under the buttons (SDK 1.55): who or when. */
   readonly meta?: string;
   /** Free small line under the text (a state, an outcome). */

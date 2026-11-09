@@ -1,4 +1,4 @@
-import type { ClassRequest, FilteredSlot, RouteRecord } from '../protocol';
+import type { BurnRateHold, ClassRequest, FilteredSlot, RouteRecord } from '../protocol';
 import type { CostEstimate } from './cost-estimate';
 import type { RouteCandidate } from './route-candidate';
 
@@ -43,6 +43,18 @@ export class RouteRecorder {
     const stepUp = stepped !== null && chosen.row !== null ? { from: chosen.row.model, fromClass: chosen.row.class } : null;
     const record = { slot: chosen.view.id, model, class: final.row?.class ?? null, requested: request.class, q, estimatedUsd, stepUp, filtered };
     return { ...record, line: this.lineOf(request.ticket, record) };
+  }
+
+  /**
+   * req-181: the burn rate refuses new starts — `route refused · burn rate
+   * 21 % of 20 % today · resumes 00:00`, with ` · estimated` / ` · mixed`
+   * when not every slot read its weekly window. `resumes` is the resume time
+   * as the machine's clock writes it.
+   */
+  burnRateLine(hold: BurnRateHold, resumes: string): string {
+    const percent = (share: number): string => `${Math.round(share * 100)} %`;
+    const basis = hold.basis === 'measured' ? '' : ` · ${hold.basis}`;
+    return `route refused · burn rate ${percent(hold.spent)} of ${percent(hold.limit)} today · resumes ${resumes}${basis}`;
   }
 
   private lineOf(ticket: string, record: Omit<RouteRecord, 'line'>): string {

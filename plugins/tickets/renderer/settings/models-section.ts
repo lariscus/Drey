@@ -4,14 +4,13 @@
  * capacity caps, the slots with their quota windows, the routing group and
  * the ledger defaults. The page reads what the engine answers (`poolModels`,
  * `slots`, the chain status's live load) and writes only what the engine
- * accepts — the whole model table, the global cap and the three ledger
- * defaults through `poolModelsConfig`. The Routing group is drawn as the
- * board draws it and stores nothing: no engine reads `routing.*` yet
- * (req-178, req-181). The pure half is `models-model.ts`.
+ * accepts — the whole model table, the global cap, the routing (req-178's
+ * `Upgrade above q` and `Reserve per window`, req-181's `Burn rate`) and the
+ * three ledger defaults through `poolModelsConfig`; a refusal shows where it
+ * was typed. The pure half is `models-model.ts`.
  */
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
-import type { CapabilityClass, ChainStatus, ModelRow, ModelsReply, SlotView } from '../../../../packages/tickets-engine/src/fleet/protocol';
-import { UPGRADE_Q } from '../team/capacity-model';
+import { DEFAULT_ROUTING, type CapabilityClass, type ChainStatus, type ModelRow, type ModelsReply, type SlotView } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { el } from '../settings-dom';
 import {
   blankRowOf,
@@ -24,16 +23,19 @@ import {
   parseCap,
   parseCostFactor,
   parseMoney,
+  parseRouting,
   parseSessions,
   placeChoiceOf,
   placeOptionsOf,
   rowPlaced,
+  routingPayload,
+  routingViewOf,
   slotCardsOf,
-  RESERVE_SHARE,
   type LedgerKey,
   type ModelRowView,
   type Parsed,
   type PlaceChoice,
+  type RoutingKey,
   type SlotCardView,
 } from './models-model';
 
@@ -57,6 +59,8 @@ export function createModelsSection(api: DreyPluginApi): ModelsSection {
   let slots: readonly SlotView[] = [];
   let draft: ModelRow | null = null;
   let error = '';
+  /** A refused routing write: the engine's words (or the field's own), shown under the group. */
+  let routingError = '';
   let disposed = false;
   let lastSlotRead = 0;
 
@@ -99,17 +103,20 @@ export function createModelsSection(api: DreyPluginApi): ModelsSection {
   addSlot.title = t('tickets.settings.models.add_slot_title');
   addSlot.addEventListener('click', () => void api.backend.invoke('serviceOpenLogFolder').catch(() => undefined));
 
-  // --- Routing: drawn, not built (req-178 / req-181) ----------------------------
-  const fixed = (label: string, value: string, unit: string | null): HTMLElement => {
+  // --- Routing (req-178 / req-181): the engine's values, written as they are made --
+  const routingInputs = new Map<RoutingKey, HTMLInputElement>();
+  const routingField = (key: RoutingKey, label: string, unit: string | null): HTMLElement => {
     const input = el('input', 'tset-models-field tset-models-field-cap');
     input.type = 'text';
-    input.value = value;
-    input.readOnly = true;
-    input.title = t('tickets.settings.models.routing.fixed_title');
+    input.spellcheck = false;
     input.setAttribute('aria-label', label);
+    input.addEventListener('change', () => void writeRouting(key, input));
+    routingInputs.set(key, input);
     return field(label, [input, ...(unit === null ? [] : [el('span', 'tset-models-unit', unit)])]);
   };
   const rule = el('div', 'tset-models-rule', t('tickets.settings.models.routing.rule'));
+  const routingNote = el('div', 'tset-models-error tset-error');
+  routingNote.setAttribute('role', 'alert');
 
   // --- Ledgers ------------------------------------------------------------------
   const ledgerInputs = new Map<LedgerKey, HTMLInputElement>();
@@ -135,9 +142,10 @@ export function createModelsSection(api: DreyPluginApi): ModelsSection {
     slotCards,
     el('div', 'tset-models-addslot'),
     group('tickets.settings.models.group.routing'),
-    fixed(t('tickets.settings.models.routing.upgrade'), api.i18n.formatNumber(UPGRADE_Q), null),
-    fixed(t('tickets.settings.models.routing.reserve'), api.i18n.formatNumber(RESERVE_SHARE * 100), t('tickets.settings.models.routing.reserve_unit')),
-    fixed(t('tickets.settings.models.routing.burn'), api.i18n.formatNumber(20), t('tickets.settings.models.routing.burn_unit')),
+    routingField('upgradeAboveQ', t('tickets.settings.models.routing.upgrade'), null),
+    routingField('reservePerWindow', t('tickets.settings.models.routing.reserve'), t('tickets.settings.models.routing.reserve_unit')),
+    routingField('burnRate', t('tickets.settings.models.routing.burn'), t('tickets.settings.models.routing.burn_unit')),
+    routingNote,
     rule,
     group('tickets.settings.models.group.ledgers'),
     ledger('ticketAllowance', t('tickets.settings.models.ledgers.ticket'), t('tickets.settings.models.ledgers.ticket_unit')),
@@ -147,25 +155,50 @@ export function createModelsSection(api: DreyPluginApi): ModelsSection {
   root.querySelector('.tset-models-addslot')!.append(addSlot);
 
   // --- writing ------------------------------------------------------------------
-  async function write(payload: Record<string, unknown>): Promise<boolean> {
+  /** One write; its refusal lands under the table, or (`routing`) under the Routing group. */
+  async function write(payload: Record<string, unknown>, where: 'table' | 'routing' = 'table'): Promise<boolean> {
+    const said = (words: string): void => {
+      if (where === 'routing') {
+        routingError = words;
+      } else {
+        error = words;
+      }
+    };
     try {
       const answer = (await api.backend.invoke('poolModelsConfig', payload)) as ModelsReply | Refusal | null;
       if (answer === null || answer === undefined) {
-        error = t('tickets.settings.models.offline');
+        said(t('tickets.settings.models.offline'));
         return false;
       }
       if (answer.ok === false) {
-        error = answer.error;
+        said(answer.error);
         return false;
       }
       reply = answer;
-      error = '';
+      said('');
       return true;
     } catch (failure) {
-      error = failure instanceof Error ? failure.message : String(failure);
+      said(failure instanceof Error ? failure.message : String(failure));
       return false;
     } finally {
       paintAll();
+    }
+  }
+
+  async function writeRouting(key: RoutingKey, input: HTMLInputElement): Promise<void> {
+    if (reply === null) {
+      return;
+    }
+    const parsed = parseRouting(key, input.value);
+    if (!parsed.ok) {
+      input.setAttribute('aria-invalid', 'true');
+      routingError = t(key === 'upgradeAboveQ' ? 'tickets.settings.models.routing.invalid_q' : 'tickets.settings.models.routing.invalid_share');
+      paintRouting();
+      return;
+    }
+    input.removeAttribute('aria-invalid');
+    if (!(await write(routingPayload(reply.routing, key, parsed.value), 'routing'))) {
+      input.setAttribute('aria-invalid', 'true');
     }
   }
 
@@ -448,7 +481,20 @@ export function createModelsSection(api: DreyPluginApi): ModelsSection {
   }
 
   function paintSlots(): void {
-    slotCards.replaceChildren(...slotCardsOf(slots, reply?.models ?? [], new Date(), api.i18n).map(cardOf));
+    const pool = reply === null ? { rows: [], routing: DEFAULT_ROUTING } : { rows: reply.models, routing: reply.routing };
+    slotCards.replaceChildren(...slotCardsOf(slots, pool, new Date(), api.i18n).map(cardOf));
+  }
+
+  function paintRouting(): void {
+    const view = reply === null ? null : routingViewOf(reply.routing, api.i18n);
+    for (const [key, input] of routingInputs) {
+      if (document.activeElement !== input && input.getAttribute('aria-invalid') !== 'true') {
+        input.value = view === null ? '' : view[key];
+      }
+      input.disabled = reply === null;
+    }
+    routingNote.textContent = routingError;
+    routingNote.hidden = routingError === '';
   }
 
   function paintLedgers(): void {
@@ -467,6 +513,7 @@ export function createModelsSection(api: DreyPluginApi): ModelsSection {
     paintTable();
     paintCapacity();
     paintSlots();
+    paintRouting();
     paintLedgers();
   }
 

@@ -190,3 +190,31 @@ test.describe('req-179 phone: the checkpoint', () => {
     }
   });
 });
+
+test.describe('req-181 phone: the burn rate', () => {
+  test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true, locale: 'en-GB' });
+
+  test('the card sits in the chat, the sheet says the hold, Allow today once lifts it on the desk', async ({ page }) => {
+    const desk = await startFakeDesk({ boards: true, hold: true });
+    try {
+      await openAt(page, desk);
+      await page.locator('mc-menu .chats .sess').first().click();
+      const card = page.locator('mc-chat mc-burn-rate-card .card');
+      await expect(card.locator('.title')).toContainText('Burn rate reached · 20 % of the week today');
+      await expect(card.locator('.chip')).toHaveText(['spent 21 %', /^resumes \d\d:\d\d$/]);
+      await card.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${FID_OUT}/MCCards-phone-burn-rate.png` });
+      await page.locator('mc-chat mc-app-bar mc-autopilot-button button').first().click();
+      const sheet = page.getByRole('dialog', { name: 'Autopilot' });
+      await expect(sheet.locator('[data-state=on] .ph-sentence')).toHaveText(/^Burn rate reached · resumes at \d\d:\d\d$/);
+      await page.keyboard.press('Escape');
+      await expect(sheet).toBeHidden();
+      await card.getByRole('button', { name: 'Allow today once' }).click();
+      await expect(card).toBeHidden();
+      expect(desk.holdLifts()).toHaveLength(1);
+    } finally {
+      await desk.stop();
+    }
+  });
+});

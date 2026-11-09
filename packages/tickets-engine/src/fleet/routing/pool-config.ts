@@ -1,7 +1,8 @@
 /**
  * The pool keys of `service.json` (req-170; machine scope, R13): `models`
  * (the model table, req-178 adds its capability columns), `capacity` (the
- * cap), `ledgers` (the defaults) and `routing` (req-178, board 7l). A
+ * cap), `ledgers` (the defaults) and `routing` (req-178, board 7l; req-181
+ * adds its `burnRate`). A
  * row is checked on its own — a broken one is left out with its reason,
  * the others stand — against the slots of req-177: a row names a slot, or
  * a harness provider whose every slot serves it.
@@ -140,9 +141,25 @@ function reserveOf(raw: unknown, errors: string[]): number {
   return DEFAULT_ROUTING.reservePerWindow;
 }
 
+/** req-181: `routing.burnRate`, a share 0–1 of the weekly quota per day over all slots; 0 = off. */
+function burnRateOf(raw: unknown, errors: string[]): number {
+  if (raw === undefined) {
+    return DEFAULT_ROUTING.burnRate;
+  }
+  if (typeof raw === 'number' && raw >= 0 && raw < 1) {
+    return raw;
+  }
+  errors.push('routing.burnRate must be a share from 0 to below 1 (0.2 = 20 % of the weekly quota per day; 0 = off)');
+  return DEFAULT_ROUTING.burnRate;
+}
+
 function routingOf(raw: unknown, errors: string[]): RoutingSettings {
   const entry = (raw !== null && typeof raw === 'object' ? raw : {}) as Entry;
-  return { upgradeAboveQ: upgradeOf(entry['upgradeAboveQ'], errors), reservePerWindow: reserveOf(entry['reservePerWindow'], errors) };
+  return {
+    upgradeAboveQ: upgradeOf(entry['upgradeAboveQ'], errors),
+    reservePerWindow: reserveOf(entry['reservePerWindow'], errors),
+    burnRate: burnRateOf(entry['burnRate'], errors),
+  };
 }
 
 /** `service.json`'s parsed root as the pool's settings. */

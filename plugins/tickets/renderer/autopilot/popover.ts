@@ -2,7 +2,8 @@
 /**
  * The desktop Autopilot popover (req-95b, D-36, board Autopilot "Desktop ·
  * status bar"): anchored above the status item, a title row with the chord,
- * a segmented On | Paused | Off, the state's one sentence, chips for the
+ * a segmented On | Paused | Off, the state's one sentence (the burn rate's
+ * hold in its place while one holds, req-181), chips for the
  * resume time and today's cost, and "Stop all running steps now…" below a
  * divider. Opened from the status item or `Mod+Alt+P`. Plain DOM over the
  * plugin's own classes, built once: `refresh()` only updates it from `view()`,
@@ -16,6 +17,7 @@ import {
   type AutopilotKind,
   type AutopilotView,
 } from '../../../../shared/autopilot';
+import { burnRateLineOf, type BurnRateHoldView } from '../../../../shared/burn-rate';
 import { trancheChipsOf, trancheProgressOf, type TrancheView } from '../../../../shared/tranche';
 import type { Translate } from '../status-slot';
 import type { AutopilotOutcome } from './controller';
@@ -35,6 +37,8 @@ export interface AutopilotPopoverDeps {
   readonly tranche?: () => TrancheView | null;
   /** "Adjust…" at a checkpoint: Settings → Tickets. */
   readonly adjust?: () => void;
+  /** req-181: the burn rate's hold; while one holds, the On / Paused line says so. */
+  readonly hold?: () => BurnRateHoldView | null;
   /** The status item the popover sits above; null keeps the stylesheet's corner. */
   readonly anchor?: () => HTMLElement | null;
   readonly now?: () => Date;
@@ -332,7 +336,12 @@ export function openAutopilotPopover(deps: AutopilotPopoverDeps, onClosed: () =>
       radio.setAttribute('aria-checked', String(checked));
       radio.tabIndex = checked ? 0 : -1;
     });
-    sentence.textContent = t(trancheShown(view)?.checkpoint === true ? 'autopilot.sentence.checkpoint' : `autopilot.sentence.${view.state}`);
+    const checkpoint = trancheShown(view)?.checkpoint === true;
+    const hold = view.state === 'off' || checkpoint ? null : (deps.hold?.() ?? null);
+    sentence.textContent =
+      hold !== null
+        ? burnRateLineOf(hold, { t, time: deps.formatTime })
+        : t(checkpoint ? 'autopilot.sentence.checkpoint' : `autopilot.sentence.${view.state}`);
     paintChips(view);
     stop.classList.toggle('tickets-autopilot-armed', armed);
     stopLabel.textContent = t(armed ? 'autopilot.stop_all.confirm' : 'autopilot.stop_all');

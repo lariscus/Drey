@@ -7,6 +7,7 @@
  * never white-screen the phone.
  */
 import { autopilotSwitchViewOf, autopilotViewOf, type AutopilotView } from '../../../../shared/autopilot';
+import { burnRateHoldOf, type BurnRateHoldView } from '../../../../shared/burn-rate';
 import { trancheViewOf, type TrancheView } from '../../../../shared/tranche';
 import { maskFences } from '../../../../shared/markdown/fences';
 
@@ -293,6 +294,8 @@ export interface TeamView {
   readonly autopilot?: AutopilotView;
   /** The chain block's tranche (req-179): chips, progress and the waiting checkpoint's report; absent without one. */
   readonly tranche?: TrancheView;
+  /** The chain block's burn-rate hold (req-181): nothing new starts until the day turns; absent while nothing holds. */
+  readonly hold?: BurnRateHoldView;
   /** The persona ids the owner paused in the chain; `[]` when the desk sends none. */
   readonly pausedPersonas?: readonly string[];
   /** Per provider pool: running against effective size; absent when the desk sends no pool sizes. */
@@ -1108,6 +1111,7 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
   // field at all leaves the Autopilot unknown.
   const autopilot = chain === null ? (fleet['chain'] === null ? autopilotSwitchViewOf(true, null) : null) : autopilotViewOf(chain);
   const tranche = trancheViewOf(chain);
+  const hold = burnRateHoldOf(chain);
   const pausedPersonas = strArray(fleet['pausedPersonas']);
   const capacity = capacityOf(chain, runs);
   const personas: PersonaView[] = [];
@@ -1151,6 +1155,7 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
     ...(chainMaster !== null ? { chainMaster } : {}),
     ...(autopilot !== null ? { autopilot } : {}),
     ...(tranche !== null ? { tranche } : {}),
+    ...(hold !== null ? { hold } : {}),
     ...(pausedPersonas.length > 0 ? { pausedPersonas } : {}),
     ...(capacity.length > 0 ? { capacity } : {}),
   };

@@ -583,7 +583,7 @@ extraction, ADR-0088):
   the slots per account with their quota windows and the profile rule
   (req-177) and the capacity pool — model table, cap, class grant, the
   three ledgers (req-170) — and the routing within the class: filter,
-  surplus choice, step up, reserve per window (req-178); configured in the service home's
+  surplus choice, step up, reserve per window (req-178), and the burn rate over all slots (req-181); configured in the service home's
   `service.json`, `api/` the
   HTTP routes and the `GET /events` stream, `ports/` (clock, file
   system, process table and spawner, event sink — the core imports no

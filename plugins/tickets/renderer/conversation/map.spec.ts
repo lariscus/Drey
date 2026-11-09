@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatSession } from '../../../../packages/tickets-engine/src/contracts/chat';
-import { errorMessageOf, threadOfPersona, threadOfSession, trancheMessageOf, VIA_MISSION_CONTROL, withTrancheMessage } from './map';
+import { burnRateMessageOf, errorMessageOf, threadOfPersona, threadOfSession, trancheMessageOf, VIA_MISSION_CONTROL, withTrancheMessage } from './map';
 
 const base: ChatSession = {
   file: 'tickets/_meta/chat/20261104-100000-demo.md',
@@ -182,5 +182,44 @@ describe('trancheMessageOf (board 10u parts 1 and 6, SDK 1.55)', () => {
     const thread = { id: 'x', title: 'Demo', messages: [] };
     expect(withTrancheMessage(thread, null)).toBe(thread);
     expect(withTrancheMessage(thread, trancheMessageOf(card, 'm')).messages).toHaveLength(1);
+  });
+});
+
+describe('burnRateMessageOf (req-181, board 10u chrome, SDK 1.56 chips)', () => {
+  const card = {
+    id: 'burn-rate-2026-11-10T00:00:00.000Z',
+    tone: 'attention' as const,
+    title: 'Burn rate reached · 20 % of the week today',
+    body: 'Nothing new starts until 00:00. Running steps finish.',
+    chips: ['spent 21 %', 'resumes 00:00'],
+    at: '2026-11-09T22:40:00.000Z',
+    actions: [
+      { id: 'wait' as const, label: 'Wait', primary: true },
+      { id: 'allow_once' as const, label: 'Allow today once', primary: false },
+    ],
+  };
+
+  it('maps the shared card onto the SDK card: dot, body, chips, buttons, meta', () => {
+    expect(burnRateMessageOf(card, 'Mission Control · 22:40')).toEqual({
+      id: card.id,
+      role: 'agent',
+      text: '',
+      cards: [
+        {
+          id: card.id,
+          kind: 'card',
+          title: 'Burn rate reached · 20 % of the week today',
+          dot: 'attention',
+          text: 'Nothing new starts until 00:00. Running steps finish.',
+          chips: ['spent 21 %', 'resumes 00:00'],
+          actions: [
+            { id: 'wait', label: 'Wait', tone: 'primary' },
+            { id: 'allow_once', label: 'Allow today once', tone: 'quiet' },
+          ],
+          meta: 'Mission Control · 22:40',
+        },
+      ],
+    });
+    expect(burnRateMessageOf(card, '').cards![0]).not.toHaveProperty('meta');
   });
 });

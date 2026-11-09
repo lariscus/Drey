@@ -15,6 +15,7 @@ import type { MessageKey } from '../../../../shared/i18n';
 import { MC_AUTOPILOT, type McAutopilotReply } from './autopilot-state';
 import { todayCostTextOf } from '../work/phone-rows';
 import { MC_WORK_STATE } from '../work/work.model';
+import { McBurnRate } from './burn-rate-model';
 import { McTranche } from './tranche-model';
 
 /**
@@ -43,6 +44,7 @@ export class AutopilotPanel {
   readonly done = output<void>();
 
   private readonly tranche = inject(McTranche);
+  private readonly burnRate = inject(McBurnRate);
   private readonly work = inject(MC_WORK_STATE, { optional: true });
   /** The popover's spend chip (board 10t); null hides it. */
   protected readonly todayText = computed(() => todayCostTextOf(this.work?.today ?? null, (key, params) => this.i18n.t(key, params)));
@@ -52,6 +54,11 @@ export class AutopilotPanel {
   /** The On readout: the tranche's chips and bar; null without a tranche or while paused/off. */
   protected readonly readout = computed(() => (this.view()?.state === 'on' ? this.tranche.readout(this.now()()) : null));
   protected readonly sentenceKey = computed(() => (this.waiting() ? 'autopilot.sentence.checkpoint' : `autopilot.sentence.${this.view()?.state ?? 'off'}`) as MessageKey);
+  /** req-181: `Burn rate reached · resumes at 00:00` in place of the On / Paused sentence while the hold stands; null otherwise. */
+  protected readonly holdLine = computed((): string | null => {
+    const state = this.view()?.state ?? 'off';
+    return state === 'off' || this.waiting() ? null : this.burnRate.line();
+  });
   /** The sheet's header, right of the title: `Checkpoint · resume at 18:00`, else the resume time. */
   protected readonly headText = computed((): string | null => {
     if (!this.waiting()) {

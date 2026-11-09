@@ -83,6 +83,7 @@ function fakes(): { board: RemoteBoard; fleet: RemoteFleet } {
     setColumn: vi.fn(async () => null),
     stopColumn: vi.fn(async () => null),
     abortAll: vi.fn(async () => null),
+    liftHold: vi.fn(async () => null),
     setPersonaPaused: vi.fn(async () => null),
   };
   return { board, fleet };
@@ -263,6 +264,7 @@ describe('DreyTicketsPort', () => {
     const port = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false });
     expect(await port.chainMaster('halted')).toEqual({ ok: false, error: 'the fleet runner is not running' });
     expect(await port.chainAbort()).toEqual({ ok: false, error: 'the fleet runner is not running' });
+    expect(await port.chainHoldLift()).toEqual({ ok: false, error: 'the fleet runner is not running' });
     expect(await port.stream('r1')).toBe('');
     expect(await port.needs()).toEqual([]);
   });

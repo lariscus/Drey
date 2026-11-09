@@ -23,6 +23,8 @@ function frameData(event: RunnerEvent): unknown {
       return event.tranche;
     case 'governor':
       return event.governor;
+    case 'hold':
+      return event.hold;
     case 'line':
       return { runId: event.runId, event: event.event };
   }
@@ -34,7 +36,7 @@ function frameData(event: RunnerEvent): unknown {
  * each line of a run's stream, `slot` with a slot's view when it changed
  * (req-177), `pool` with the pool's load (req-170), `tranche` with the
  * tranche's status (req-179), `governor` with the resource governor's
- * status (req-180) — instead of polling `/status` and tailing
+ * status (req-180), `hold` with the burn rate's hold (req-181) — instead of polling `/status` and tailing
  * stream files. Bearer-authenticated like every route; a read, so it never
  * keeps the runner awake. Every stream closes when the runner goes.
  */
