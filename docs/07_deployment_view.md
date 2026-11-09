@@ -233,8 +233,34 @@ Background service, or `service-main.js --autostart on`): the per-user
 `ELECTRON_RUN_AS_NODE` and starts the entry with no window. The service
 rewrites the launcher at every start and whenever the setting changes, so
 after an update that moves the install the first service of the new build
-points it at the new path. An uninstall should remove the `Run` value (not
-yet in the installer).
+points it at the new path. The uninstaller removes the `Run` value
+(`build/installer.nsh`, `nsis.include`, milestone 221); a service still
+running from the old install is not ended yet (req-192).
+
+### The service window process (req-165/166, milestone 221)
+
+Drey Service's tray icon and window are a third kind of process from the
+same binary: the service starts `Drey.exe --drey-service-window --home
+~/.drey-engine --service-pid <pid> --tray` (in a dev checkout
+`electron.exe <repo> --drey-service-window …`) **without**
+`ELECTRON_RUN_AS_NODE`, so it is Electron again; `electron/boot.ts` (the
+`package.json` `main`) branches on the flag before Drey loads. The process
+is a child of the service, not detached: the service ends it when it leaves,
+and it leaves by itself when its service has gone. Its page is
+`dist/service-window/browser/` (the `apps/service-window` build,
+`npm run build:service-window`, part of `npm run build`), shipped by
+`electron-builder.yml` beside `dist/drey/browser`; its preload is bundled
+like the main window's (`scripts/bundle-preload.mjs`). It keeps its own
+userData under `~/.drey-engine/service-window/` (its single-instance lock),
+and reads Drey's `app-config.json` only for the local model's address.
+
+```mermaid
+flowchart LR
+  D["Drey.exe (Drey)"] -- "spawn, ELECTRON_RUN_AS_NODE=1" --> S["Drey.exe as Node: service-main.js (Drey Service)"]
+  S -- "spawn --drey-service-window --tray" --> W["Drey.exe: service window process (tray, window)"]
+  W -- "HTTP: control port, runner, engine invoke" --> S
+  D -- "HTTP: engine invoke, control port" --> S
+```
 
 ## asar and `asarUnpack`
 

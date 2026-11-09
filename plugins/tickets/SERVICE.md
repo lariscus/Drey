@@ -31,8 +31,39 @@ at once):
 
 Settings → Background service (milestone 216) shows the components and drives
 the runner, the gateway and Drey's MCP server; the tray icon and the service
-window are req-165, the Sessions area req-166. Until then the service is also
-seen through `--status`, its control port and `service.log`.
+window (milestone 221, below) show and drive all of it too. A terminal sees
+the service through `--status`, its control port and the log files.
+
+## The tray icon and the window (req-165/166, milestone 221)
+
+The service starts a **service window process** — Drey's own binary as
+Electron, `Drey.exe --drey-service-window --home ~/.drey-engine
+--service-pid <pid> --tray` (a dev checkout: `electron.exe <repo> …`) — while
+`service.trayIcon` is Shown (Settings → Background service → *Taskbar icon*;
+default Shown), starts it again when it dies (2 s … 60 s; after five crashes it
+waits until the icon is switched off and on), and ends it when the service
+leaves. *Hide* drops the icon; the process leaves unless its window is open.
+`DREY_SERVICE_TRAY=off` in the service's environment starts no tray (the e2e
+fixtures set it). The window process is one per home (its single-instance lock
+lives in `~/.drey-engine/service-window/`), leaves by itself when its service
+is gone, and is only a client: it reads `service.lock` and calls the routes
+below, the runner's and the engine's.
+
+- **Tray menu:** `Drey Service · running`, *Open Drey Service…*, *Open Drey*,
+  *Autopilot: On/Paused/Off ›* (the engine's `chainAutopilot`), *Stop all
+  running steps…* (asks; the runner's `/chain/abort`), *Start with Windows ✓*
+  (`POST /settings {autostart}`), *Quit service* (asks while runs live;
+  `POST /shutdown`). A click on the icon opens the window.
+- **Window:** *Components* (status line, the five rows with restart / stop /
+  start, Slots from the runner's `GET /slots`, the Governor block — Load
+  settings and `—` until req-180 —, the log following `GET /log/stream`),
+  *Sessions* (every live run and today's ended ones raw: the run's stream,
+  instruction, tool calls, process, raw lines; *Send* = the runner's `/send`,
+  logged to the run's stream and the ticket like a steer from Drey; *Interrupt
+  turn* `/interrupt`; *Resume after stop* `/resume`; *Copy attach command*
+  `GET /attach/<run>`), *Logs* (the log, full height, a component filter).
+  Closing the window keeps the service running.
+- Settings' *Open Drey Service…* is `POST /window/open`.
 
 ## Where everything lives
 
@@ -43,10 +74,12 @@ e2e isolation stay where they were (req-173 may move it).
 ```
 ~/.drey-engine/
 ├── service.lock        discovery: pid, build, control port + token, one record per component
-├── service.log         the one log: `<ISO time> <level> <component> <message>`, capped at 1 MB
+├── service.log         the combined log: `<ISO time> <level> <component> <message>`, capped at 1 MB
+├── logs/               one file per component per day (`runner-2026-11-09.log`), kept 14 days (req-165)
+├── service-window/     the tray / window process's own userData (its single-instance lock)
 ├── service-start.log   stdout/stderr of the last start (a start that dies says why here)
 ├── start-service.vbs   the Windows sign-in launcher (only while start with Windows is on)
-├── config.json         the engine's config (keys unchanged; added: `service.enabled`, `service.autostart`, `service.vaultPath`, `service.idleMinutes`)
+├── config.json         the engine's config (keys unchanged; added: `service.enabled`, `service.autostart`, `service.vaultPath`, `service.idleMinutes`; Drey writes every Settings → Background service key here too — `service.trayIcon`, `service.logLevel`, `service.load.*` — and the service applies them each tick)
 └── fleet/              the Crew runner's root (FLEET.md): runs/, chain.json, runner.log
 ```
 
@@ -109,12 +142,18 @@ Invoke-RestMethod "http://127.0.0.1:$($l.port)/status" -Headers $h
 | Route | What |
 |---|---|
 | `GET /health` | `{ok, pid, build}` |
-| `GET /status` | `{pid, build, startedAt, vaultPath, mode, components, sleep, dreyClients}` — `mode` is `background` or `with-drey`; `sleep` (background mode) is `{sleep: true}` or `{sleep: false, reason: "drey" \| "runner" \| "remote gateway"}` |
+| `GET /status` | `{pid, build, startedAt, vaultPath, mode, components, sleep, dreyClients, settings, logFolder, trayRunning}` — `mode` is `background` or `with-drey`; `sleep` (background mode) is `{sleep: true}` or `{sleep: false, reason: "drey" \| "runner" \| "remote gateway"}` |
 | `POST /settings` `{enabled?, autostart?}` | writes `service.enabled` / `service.autostart` into the engine's config and applies them at once (what `--autostart` sends to a running service) |
 | `GET /log?tail=N&component=<name>` | the log tail, plain text, optionally one component |
+| `GET /log/stream` | server-sent events: `event: log` with each new line as a JSON string (the window's log panel) |
 | `POST /components/runner/start` | wake the Crew runner |
 | `POST /components/runner/stop` | put it to sleep — its live runs are stopped first |
-| `POST /components/<engine\|gateway\|mcp>/<start\|stop>` | 409 with the reason: the engine runs as long as the service, the gateway follows Settings → Remote access, the MCP server is Drey's until req-167 |
+| `POST /components/runner/restart` | stop, then wake |
+| `POST /components/gateway/<start\|stop\|restart>` | the remote gateway on / off (the same persisted switch as Settings → Remote access) |
+| `POST /components/engine/restart` | the atomic restart of the whole service (below) |
+| `POST /components/engine/<start\|stop>`, `POST /components/mcp/*` | 409 with the reason: the engine runs as long as the service (restart it, or quit the service), the MCP server is Drey's until req-167 |
+| `POST /restart` | the atomic restart: the runner hands its runs over, the service starts its successor (the same command) once its lock is gone, and leaves; 409 while a run is in its gate |
+| `POST /window/open` | opens the service window (a window process with `--open`; a running tray process takes it over) |
 | `POST /shutdown` | leave: live runs stopped, engine closed, lock removed |
 | `POST /shutdown` `{handover: true}` | what a newer Drey build sends: the runner hands its live runs over (req-51 — workers keep running, the successor takes them back); 409 while a run is in its gate, and the service serves on |
 
@@ -197,8 +236,10 @@ command.
 ## Pointers
 
 Code: `packages/tickets-engine/src/service/` (`service-host.ts`,
-`runner-component.ts`, `sleep.ts`, `service-lock.ts`, `legacy.ts`,
-`launch.ts`, `service-main.ts`); the client `plugins/tickets/main/service-lifecycle.ts`;
+`control/` (the route groups), `service-log.ts` + `daily-log-files.ts`,
+`window-processes.ts`, `service-stay.ts`, `runner-component.ts`, `sleep.ts`,
+`service-lock.ts`, `legacy.ts`, `launch.ts`, `service-main.ts`); the tray and
+window `electron/service-window/` + `apps/service-window/`; the client `plugins/tickets/main/service-lifecycle.ts`;
 the Drey-gone signal `packages/tickets-engine/src/server/drey-presence.ts`.
 Docs: ADR-0092, docs/05 §5.0, docs/06 "Drey Service: start, adopt, hand over",
 docs/07 (the packaged layout).

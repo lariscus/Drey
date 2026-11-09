@@ -4890,3 +4890,73 @@ sequenceDiagram
 The share a run takes is learned after it: `PoolGate` tells `RunShareTracker` the windows at the grant; when the run
 has ended, the first newer reading of the slot (a `slot` event) gives each window's drop, shared among the runs the
 slot carried at once, and becomes a sample for the ticket and the persona on that slot.
+
+## 6.104 Drey Service's tray and window: tray start → window open → component restart (req-165, milestone 221, [ADR-0092](09_architecture_decisions/0092-drey-service-the-shipped-background-process.md))
+
+The service keeps a window process while `service.trayIcon` is shown; Settings' *Open Drey Service…* asks the
+service, which starts a second window process with `--open` — Electron's single-instance lock hands its arguments to
+the running tray process, which opens the window. Every value the window draws is asked for at that moment.
+
+```mermaid
+sequenceDiagram
+    participant S as Drey Service (Node)
+    participant T as Window process (tray)
+    participant O as Window process (--open)
+    participant Dr as Drey (Settings)
+    participant W as Window page
+    S->>S: tick: settings.trayIcon = shown, no tray process
+    S->>T: spawn Drey.exe --drey-service-window --home H --service-pid P --tray
+    T->>T: single-instance lock (H/service-window) held · Tray + menu
+    loop every 3 s
+        T->>S: read service.lock · GET /status (settings, components)
+        T->>T: icon and menu redrawn; Hide → drop the icon, leave if no window
+    end
+    Dr->>S: POST /window/open (plugin serviceControl {target: window})
+    S->>O: spawn … --open
+    O-->>T: second-instance(argv --open)
+    O->>O: exit 3 (handed over)
+    T->>W: BrowserWindow (sandboxed) · window.serviceWindow
+    W->>T: snapshot()
+    T->>S: GET /status · runner GET /status, /slots, /models · probe local model
+    T-->>W: ServiceSnapshot
+    T->>S: GET /log/stream · runner GET /events (while the window is open)
+    W->>T: component('gateway', 'restart')
+    T->>S: POST /components/gateway/restart
+    S->>S: engine.invoke('configure', {enabled: false}) then {enabled: true}
+    S-->>T: 200 · log lines arrive over /log/stream
+    T-->>W: event {kind: log} · next snapshot shows the row running
+```
+
+The engine's restart is the service's atomic restart: `POST /restart` → the runner hands its runs over → the lock is
+removed → the successor is spawned (the same command) → the service exits and kills its window processes; the new
+service starts a fresh tray process; Drey's Settings, which asked, waits for a lock with a new pid and adopts it.
+
+## 6.105 Send from the Sessions tab → steer → stream (req-166, milestone 221, ADR-0075's ladder)
+
+```mermaid
+sequenceDiagram
+    participant W as Window page (Sessions)
+    participant T as Window process main
+    participant R as Crew runner (in Drey Service)
+    participant SS as SteerService
+    participant H as Harness worker
+    participant K as Ticket (thread)
+    W->>T: run(R-…, 'send', text)
+    T->>T: run id and text checked
+    T->>R: POST /send {runId, text} (runner token from service.lock)
+    R->>SS: send(runId, text)
+    alt run ended
+        SS->>R: reopen the session under a new run the owner holds (rung resume)
+    else run live
+        SS->>SS: hold the run (first prompt) · stream "you › text"
+        SS->>H: handle.steer(text) → rung inject | resume | refused
+    end
+    SS->>K: bookkeeper.note("steer (inject): text")
+    R-->>T: {ok, rung}
+    R-->>T: GET /events: line {you › text}, the worker's next lines, run record
+    T-->>W: events {kind: line} / {kind: run}
+```
+
+*Interrupt turn* is `POST /interrupt` (the turn stops, the run reads Paused), *Resume after stop* `POST /resume` (a
+detached or ended run's session is resumed under a new run); *Copy attach command* reads `GET /attach/<run>` and puts
+`cd "<worktree>" && claude --resume <ref>` (OpenCode / Kimi: `--session`) on the clipboard.

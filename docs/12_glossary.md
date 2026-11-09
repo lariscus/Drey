@@ -37,6 +37,9 @@ and [ADR-0002](09_architecture_decisions/0002-quick-capture-opens-daily-note.md)
 | Renderer | The window (`src/app/`). Sandboxed; reaches the main process through the bridge. |
 | Bridge | `window.dreyApi`, the typed interface the preload script exposes to the renderer. Its shape is `shared/ipc-api.ts`. |
 | Drey Service | The one background process that comes with Drey (ADR-0092): it hosts the tickets engine, the Crew runner, the remote gateway and, later, the MCP server as components. Optional (`service.enabled`, off by default): off, it ends with Drey; on, it outlives Drey until nothing holds it. Controlled in Settings → Background service. |
+| Service window process | Drey Service's tray icon and its window: a small Electron process from Drey's binary (`--drey-service-window`) that the service starts and ends (req-165, ADR-0092). A client of the service's HTTP API; it holds nothing. |
+| Service window | The window of Drey Service (boards 8a/8b): **Components** (the components, slots, governor and the log), **Sessions** (every harness session raw: stream, instruction, tool calls, process; send, interrupt, resume) and **Logs**. The workshop; Drey's Thread stays the clean view. |
+| Atomic restart | `POST /restart` of Drey Service: the runner hands its runs over, the service starts its successor and leaves; refused while a run is in its gate (req-165). |
 | Plugin | A feature loaded at startup from `plugins/<id>/`: a main half, a renderer half, a manifest. Trusted, in-process. |
 | SDK | The versioned interface plugins are written against (`shared/plugin-api/`): `DreyPluginApi` for the renderer half, `MainPluginContext` for the main half. |
 | Seam | One kind of thing a plugin can register: a panel, a tab kind, a command, a save hook, … |

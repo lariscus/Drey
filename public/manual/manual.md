@@ -1542,6 +1542,48 @@ quit*, *Keep running (enable the service)* — which switches the background
 service on and lets the runs finish — or *Cancel*. Phones and tablets reach
 the board only while Drey is open.
 
+### Drey Service's tray icon and window
+
+While Drey Service runs, its icon — the blue **D** square — sits in the
+notification area at the right of the taskbar (grey when the service has
+gone). *Taskbar icon: Hide* in Settings → *Background service* removes it.
+Click it to open the service's window; its menu has:
+
+- **Open Drey Service…** — the window.
+- **Open Drey** — brings Drey to the front, or starts it.
+- **Autopilot ›** — On, Paused or Off, like the switch in Drey's status bar.
+- **Stop all running steps…** — asks, then stops every running step.
+- **Start with Windows** — the service starts when you sign in (this also
+  switches the background service on).
+- **Quit service** — asks while runs are live; quitting stops them.
+
+The **window** is the workshop: everything the service does, as it does it.
+Closing it keeps the service running. Three tabs:
+
+- **Components** — the status line (since when, the process, live runs and
+  today's spend against the ledgers), one row per part — tickets engine, Crew
+  runner, MCP server, remote gateway, the local model (does LM Studio, or the
+  local endpoint Drey uses, answer?) — with restart, stop or start on the row you
+  point at (the engine's restart restarts the whole service and hands the live
+  runs over). Below: **Slots** (each account: busy sessions, how much quota is
+  left, *q*, when it resets, and whether that is measured or estimated) and
+  **Governor** (the Load settings; the live numbers come with the resource
+  governor). On the right the **Log**, filtered to warnings or errors if you
+  like; *Follow* keeps the newest line in view.
+- **Sessions** — every agent session as the coding tool itself speaks it: the
+  live runs, and today's ended ones under *Show*. Pick one to see its facts
+  (tool and model, session, tokens and cost, MCP calls, slot) and its
+  **Stream**, the **Instruction** it started with, the **Tool calls**, the
+  **Process** and the **Raw JSON** lines. *Open worktree* shows its folder;
+  *Copy attach command* copies the command that opens the same session in a
+  terminal. The line at the bottom talks to the session directly: **Send**
+  delivers your message to the running agent (or reopens an ended session
+  with it), **Interrupt turn** stops what it is doing now, **Resume after
+  stop** picks a stopped session up again. Everything you send is written
+  into the run's stream and the ticket's thread, exactly like a message from
+  the ticket in Drey — Drey's thread shows the same session cleaned up.
+- **Logs** — the service log at full height, filtered by level and by part.
+
 ### The chain runs itself (milestone 85)
 
 A column with a **worker** runs itself. Settings → *Tickets* shows the
@@ -2110,14 +2152,17 @@ The page holds the controls of **Drey Service**, the background process that com
 (chapter 13 says what it holds). Four groups:
 
 - **Service** — *Status* says when the service started, how many components it
-  has and how many runs are live, with **Restart** and **Stop** (a stopped service
-  shows **Start**). Stopping it ends the live runs first. *Background service*
+  has and how many runs are live, with **Open Drey Service…** (the service's own
+  window, below), **Restart** and **Stop** (a stopped service shows **Start**).
+  Stopping it ends the live runs first; Restart hands the live runs over to the
+  restarted service, so they keep going (it waits while a run checks its
+  acceptance criteria). *Background service*
   switches the optional mode (off by default: everything ends with Drey; on: the
   service keeps working after Drey quits). *Start with Windows* needs the service
   on. *Keep running after Drey quits* is how many minutes the service stays up once
   nothing holds it — no Drey, no live run, no running Autopilot, no paired device;
-  it applies the next time the service starts. *Taskbar icon* is stored, the icon
-  itself comes with the service window.
+  a change applies at once. *Taskbar icon* shows or hides Drey Service's icon in
+  the notification area (below).
 - **Components** — the tickets engine (always on while the service runs), the
   Crew runner, the MCP server and the remote gateway with their state. The runner
   restarts, stops and starts from here; the gateway's buttons switch Settings →
@@ -2125,8 +2170,10 @@ The page holds the controls of **Drey Service**, the background process that com
   category's *Enable* setting (Drey serves it for now).
 - **Load** — heavy seats, reserve, low priority and quiet hours are stored for the
   resource governor; they take effect once it exists.
-- **Logs** — the log level (stored; the service writes one log file for now) and
-  the log folder, which *Open folder* shows in the file manager.
+- **Logs** — the log level (*Quiet* keeps warnings and errors, *Normal* adds the
+  ordinary events, *Detailed* everything; a change applies at once) and the log
+  folder — one file per component per day, kept 14 days — which *Open folder*
+  shows in the file manager.
 
 ### Settings: Daily notes {#settings-daily-notes}
 
