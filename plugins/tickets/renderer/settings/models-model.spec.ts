@@ -19,7 +19,10 @@ import {
   parseSessions,
   placeOptionsOf,
   resetWords,
+  parseRouting,
   rowPlaced,
+  routingPayload,
+  routingViewOf,
   slotCardsOf,
   slotSessionsLine,
 } from './models-model';
@@ -68,7 +71,7 @@ const reply = (extra: Partial<ModelsReply> = {}): ModelsReply => ({
     row({ model: 'gpt-5.4', slot: 'copilot', provider: 'opencode' }),
   ],
   capacity: { global: 6, perSlot: { 'claude-a': 5 } },
-  routing: { upgradeAboveQ: 1.3, reservePerWindow: 0.1 },
+  routing: { upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 0.2 },
   ledgers: { ticketAllowance: 2.5, personaPerDay: 5, providerPerDay: null },
   now: {
     used: 2.4,
@@ -203,7 +206,7 @@ describe('the slot cards', () => {
       windows: [window('5h', 0.78, at(9, 14, 20)), window('7d', 0.62, at(16, 9))],
       q: 1.4,
     });
-    const [card] = slotCardsOf([claude], reply().models, now, i18n);
+    const [card] = slotCardsOf([claude], { rows: reply().models, routing: reply().routing }, now, i18n);
     expect(card).toMatchObject({ name: 'Claude A', profile: 'Private', billing: 'subscription · €90 / month', q: 'q 1.4 · upgrade allowed' });
     expect(card?.windows.map((w) => [w.label, w.text, w.reliability, w.bar?.width, w.bar?.low])).toEqual([
       ['5 h', '78 % left · resets 14:20', 'measured', 93.6, false],
@@ -213,7 +216,7 @@ describe('the slot cards', () => {
 
   it('draws the part below the reserve peach, and says which classes a slot without surplus serves', () => {
     const low = slot({ id: 'zai', label: 'z.ai', provider: 'opencode', windows: [window('5h', 0.05, at(9, 15, 5), 'estimated')], q: 1.2 });
-    const [card] = slotCardsOf([low], reply().models, now, i18n);
+    const [card] = slotCardsOf([low], { rows: reply().models, routing: reply().routing }, now, i18n);
     expect(card?.windows[0]?.bar?.low).toBe(true);
     expect(card?.windows[0]?.reliability).toBe('estimated');
     expect(card?.q).toBe('q 1.2 · class B only');
@@ -230,7 +233,7 @@ describe('the slot cards', () => {
       windows: [{ ...window('month', 0.412, new Date(2026, 11, 1).toISOString(), 'estimated'), used: 588, limit: 1000, unit: 'tokens' as const }],
       q: 0.9,
     });
-    const [card] = slotCardsOf([copilot], reply().models, now, i18n);
+    const [card] = slotCardsOf([copilot], { rows: reply().models, routing: reply().routing }, now, i18n);
     expect(card).toMatchObject({ profile: 'Work', billing: 'credits · €0.04 / credit' });
     expect(card?.windows[0]).toMatchObject({ label: 'month', text: '412 of 1,000 left · resets Dec 1' });
     expect(card?.windows[0]?.bar?.width).toBe(49.44);
@@ -238,7 +241,7 @@ describe('the slot cards', () => {
 
   it('gives a slot nothing measures the one unknown row, and no q', () => {
     const kimi = slot({ id: 'kimi', label: 'Kimi', provider: 'kimi', quota: 'counting', windows: [], q: null });
-    const [card] = slotCardsOf([kimi], reply().models, now, i18n);
+    const [card] = slotCardsOf([kimi], { rows: reply().models, routing: reply().routing }, now, i18n);
     expect(card?.windows).toEqual([]);
     expect(card?.unknownRow).toBe('counted from own usage');
     expect(card?.q).toBe('');
@@ -246,7 +249,7 @@ describe('the slot cards', () => {
 
   it('says a quota unknown when the provider should have measured it, and a login that is needed', () => {
     const lost = slot({ id: 'claude-b', label: 'Claude B', state: 'needs-login', windows: [] });
-    const [card] = slotCardsOf([lost], [], now, i18n);
+    const [card] = slotCardsOf([lost], { rows: [], routing: reply().routing }, now, i18n);
     expect(card?.unknownRow).toBe('quota unknown');
     expect(card?.q).toBe('needs login');
   });
@@ -280,5 +283,43 @@ describe('the desk Runners line', () => {
 
   it('says so when no slot is known', () => {
     expect(slotSessionsLine([], i18n)).toBe('No slots yet');
+  });
+});
+
+describe('the Routing group (req-178 / req-181): the engine values, checked like the engine', () => {
+  const routing = { upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 0.2 };
+
+  it('shows the engine values: q as it is, the shares as percent, a q of null as empty', () => {
+    expect(routingViewOf(routing, i18n)).toEqual({ upgradeAboveQ: '1.3', reservePerWindow: '10', burnRate: '20' });
+    expect(routingViewOf({ upgradeAboveQ: null, reservePerWindow: 0.125, burnRate: 0 }, i18n)).toEqual({ upgradeAboveQ: '', reservePerWindow: '12.5', burnRate: '0' });
+  });
+
+  it.each<[string, string, number | null | 'invalid']>([
+    ['upgradeAboveQ', '1.5', 1.5],
+    ['upgradeAboveQ', '', null],
+    ['upgradeAboveQ', '0', 'invalid'],
+    ['upgradeAboveQ', 'high', 'invalid'],
+    ['burnRate', '25', 0.25],
+    ['burnRate', '12,5 %', 0.125],
+    ['burnRate', '', 0],
+    ['burnRate', '100', 'invalid'],
+    ['reservePerWindow', '-5', 'invalid'],
+    ['reservePerWindow', '0', 0],
+  ])('%s "%s" reads as %s', (key, text, expected) => {
+    const parsed = parseRouting(key as 'upgradeAboveQ' | 'reservePerWindow' | 'burnRate', text);
+    expect(parsed.ok ? parsed.value : 'invalid').toBe(expected);
+  });
+
+  it('sends the whole routing key with the one field changed', () => {
+    expect(routingPayload(routing, 'burnRate', 0.3)).toEqual({ routing: { upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 0.3 } });
+  });
+
+  it('the slot cards read the engine routing: the reserve peach and the upgrade mark move with it', () => {
+    const claude = slot({ id: 'claude-a', label: 'Claude A', windows: [window('7d', 0.15, new Date(2026, 10, 16, 9).toISOString())], q: 1.4 });
+    const [card] = slotCardsOf([claude], { rows: [], routing: { upgradeAboveQ: 1.5, reservePerWindow: 0.2, burnRate: 0.2 } }, new Date(2026, 10, 9, 12), i18n);
+    expect(card?.windows[0]?.bar?.low).toBe(true);
+    expect(card?.q).toBe('q 1.4');
+    const [never] = slotCardsOf([{ ...claude, q: 3 }], { rows: [], routing: { upgradeAboveQ: null, reservePerWindow: 0.1, burnRate: 0.2 } }, new Date(2026, 10, 9, 12), i18n);
+    expect(never?.q).not.toContain('upgrade');
   });
 });

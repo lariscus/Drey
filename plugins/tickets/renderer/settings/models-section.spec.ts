@@ -32,7 +32,7 @@ const models: ModelsReply = {
     { model: 'gpt-5.4', slot: 'w', provider: 'opencode', category: 'everyday', class: 'B', cost: 1, sessions: 2 },
   ],
   capacity: { global: 6, perSlot: {} },
-  routing: { upgradeAboveQ: 1.3, reservePerWindow: 0.1 },
+  routing: { upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 0.2 },
   ledgers: { ticketAllowance: 2.5, personaPerDay: 5, providerPerDay: 15 },
   now: { used: 2.4, global: 6, slots: [{ id: 'a', label: 'Claude A', used: 2, cap: 5, derived: true }] },
   queue: [],
@@ -48,7 +48,7 @@ const settle = async (): Promise<void> => {
 };
 
 function setup(poolReply: ModelsReply | null = models) {
-  const invoke = vi.fn((method: string, payload?: unknown) => {
+  const invoke = vi.fn((method: string, payload?: unknown): Promise<unknown> => {
     if (method === 'poolModels') {
       return Promise.resolve(poolReply);
     }
@@ -104,16 +104,63 @@ describe('Settings → Models page', () => {
     expect(section.root.textContent).toContain('Now: 3 of 6 · Claude A 3 of 5');
   });
 
-  it('draws one card per slot and routing as fixed fields that store nothing', async () => {
-    const { section, invoke } = setup();
+  it('draws one card per slot, and the routing fields with the engine values', async () => {
+    const { section } = setup({ ...models, routing: { upgradeAboveQ: 1.5, reservePerWindow: 0.15, burnRate: 0.25 } });
     await section.refresh();
     expect([...section.root.querySelectorAll('.tset-models-cardname')].map((n) => n.textContent)).toEqual(['Claude A', 'Copilot']);
     expect(section.root.querySelector('.tset-models-card')?.textContent).toContain('78 % left');
     const routing = ['Upgrade above q', 'Reserve per window', 'Burn rate'].map((label) => section.root.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!);
-    expect(routing.map((i) => [i.value, i.readOnly])).toEqual([['1.3', true], ['10', true], ['20', true]]);
-    routing[0]!.dispatchEvent(new Event('change'));
-    expect(writes(invoke)).toEqual([]);
+    expect(routing.map((i) => [i.value, i.readOnly, i.disabled])).toEqual([['1.5', false, false], ['15', false, false], ['25', false, false]]);
     expect(section.root.textContent).toContain('A session gets exactly its class or waits. Never a smaller class.');
+    expect(section.root.querySelectorAll<HTMLElement>('.tset-models-error')[1]?.hidden).toBe(true);
+  });
+
+  it('writes a routing field on change (blur or Enter) as the whole routing key', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    const burn = section.root.querySelector<HTMLInputElement>('input[aria-label="Burn rate"]')!;
+    burn.value = '30';
+    burn.dispatchEvent(new Event('change'));
+    await settle();
+    expect(writes(invoke)).toEqual([{ routing: { upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 0.3 } }]);
+    expect(burn.value).toBe('30');
+    const q = section.root.querySelector<HTMLInputElement>('input[aria-label="Upgrade above q"]')!;
+    q.value = '';
+    q.dispatchEvent(new Event('change'));
+    await settle();
+    expect(writes(invoke)[1]).toEqual({ routing: { upgradeAboveQ: null, reservePerWindow: 0.1, burnRate: 0.3 } });
+  });
+
+  it('refuses a value the engine would refuse, says why under the group and writes nothing', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    const reserve = section.root.querySelector<HTMLInputElement>('input[aria-label="Reserve per window"]')!;
+    reserve.value = '120';
+    reserve.dispatchEvent(new Event('change'));
+    await settle();
+    expect(writes(invoke)).toEqual([]);
+    expect(reserve.getAttribute('aria-invalid')).toBe('true');
+    const note = section.root.querySelectorAll<HTMLElement>('.tset-models-error')[1]!;
+    expect([note.hidden, note.textContent]).toEqual([false, 'A share from 0 to below 100 %.']);
+  });
+
+  it('shows the engine refusal (422) under the Routing group', async () => {
+    const { section, invoke } = setup();
+    invoke.mockImplementation((method: string) => {
+      if (method === 'poolModelsConfig') {
+        return Promise.resolve({ ok: false, error: 'routing.burnRate must be a share from 0 to below 1 (0.2 = 20 % of the weekly quota per day; 0 = off)' });
+      }
+      return method === 'poolModels' ? Promise.resolve(models) : Promise.resolve({ ok: true, slots: [] });
+    });
+    await section.refresh();
+    const burn = section.root.querySelector<HTMLInputElement>('input[aria-label="Burn rate"]')!;
+    burn.value = '50';
+    burn.dispatchEvent(new Event('change'));
+    await settle();
+    const note = section.root.querySelectorAll<HTMLElement>('.tset-models-error')[1]!;
+    expect(note.textContent).toBe('routing.burnRate must be a share from 0 to below 1 (0.2 = 20 % of the weekly quota per day; 0 = off)');
+    expect(burn.getAttribute('aria-invalid')).toBe('true');
+    expect(section.root.querySelector<HTMLElement>('.tset-models-error')?.hidden).toBe(true);
   });
 
   it('writes the global cap, keeping the per-slot caps', async () => {

@@ -13,16 +13,13 @@ import type {
   ModelsReply,
   QuotaReliability,
   QuotaWindow,
+  RoutingSettings,
   SlotBilling,
   SlotView,
   WorkerProviderId,
 } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { I18n } from '../../../../shared/i18n/types';
 import { RUNNER_LABEL } from '../settings-workers';
-import { UPGRADE_Q } from '../team/capacity-model';
-
-/** The share of a window kept back; the part of a bar below it is drawn peach. The routing key `routing.reserve` (req-178) will replace it. */
-export const RESERVE_SHARE = 0.1;
 
 /** Width of the window bar, board 7l. */
 export const BAR_WIDTH = 120;
@@ -191,6 +188,52 @@ export function capacityPayload(reply: ModelsReply, global: number | null): { ca
   return { capacity: { global, perSlot: reply.capacity.perSlot } };
 }
 
+// --- routing (req-178 / req-181) -----------------------------------------------
+
+export type RoutingKey = keyof RoutingSettings;
+
+/** What the Routing group's three fields show: `1.3` (empty = never), the two shares as percent (`10`, `20`). */
+export interface RoutingView {
+  readonly upgradeAboveQ: string;
+  readonly reservePerWindow: string;
+  readonly burnRate: string;
+}
+
+const percentText = (share: number, i18n: I18n): string => i18n.formatNumber(Math.round(share * 1000) / 10, { maximumFractionDigits: 1 });
+
+export function routingViewOf(routing: RoutingSettings, i18n: I18n): RoutingView {
+  return {
+    upgradeAboveQ: routing.upgradeAboveQ === null ? '' : trimmedNumber(i18n, routing.upgradeAboveQ),
+    reservePerWindow: percentText(routing.reservePerWindow, i18n),
+    burnRate: percentText(routing.burnRate, i18n),
+  };
+}
+
+/** `Upgrade above q` as the engine takes it: a surplus above 0; empty = never step up. */
+export function parseUpgrade(text: string): Parsed<number | null> {
+  const value = numberOf(text);
+  return value === null || (typeof value === 'number' && value > 0) ? { ok: true, value } : invalid;
+}
+
+/** A share typed as percent (`10`, `12,5`) as the engine takes it: 0 to below 1; empty = 0 (off). */
+export function parsePercentShare(text: string): Parsed<number> {
+  const value = numberOf(text.replace('%', ''));
+  if (value === null) {
+    return { ok: true, value: 0 };
+  }
+  return typeof value === 'number' && value < 100 ? { ok: true, value: Math.round(value * 10) / 1000 } : invalid;
+}
+
+/** The field's text as the routing key's value. */
+export function parseRouting(key: RoutingKey, text: string): Parsed<number | null> {
+  return key === 'upgradeAboveQ' ? parseUpgrade(text) : parsePercentShare(text);
+}
+
+/** What `poolModelsConfig` takes for one changed field: the whole `routing` key, the others as the engine has them. */
+export function routingPayload(routing: RoutingSettings, key: RoutingKey, value: number | null): { routing: RoutingSettings } {
+  return { routing: { ...routing, [key]: value } };
+}
+
 // --- ledgers -----------------------------------------------------------------
 
 export type LedgerKey = keyof LedgerDefaults;
@@ -256,11 +299,17 @@ function windowText(window: QuotaWindow, now: Date, i18n: I18n): string {
   return i18n.lookup(key, params);
 }
 
-function windowViewOf(window: QuotaWindow, now: Date, i18n: I18n): WindowView {
+/** What the slot cards read of the pool: the table's rows and the engine's routing (the reserve's peach, the upgrade mark). */
+export interface SlotCardPool {
+  readonly rows: readonly ModelRow[];
+  readonly routing: RoutingSettings;
+}
+
+function windowViewOf(window: QuotaWindow, now: Date, i18n: I18n, reserve: number): WindowView {
   const share = window.remaining === null ? null : Math.min(1, Math.max(0, window.remaining));
   return {
     label: windowLabel(window.name, i18n),
-    bar: share === null ? null : { width: Math.round(share * BAR_WIDTH * 100) / 100, low: share < RESERVE_SHARE },
+    bar: share === null ? null : { width: Math.round(share * BAR_WIDTH * 100) / 100, low: share < reserve },
     text: windowText(window, now, i18n),
     reliability: window.reliability,
   };
@@ -284,7 +333,7 @@ export function classesOfSlot(slot: SlotView, rows: readonly ModelRow[]): readon
   return (['A', 'B', 'C'] as const).filter((letter) => served.includes(letter));
 }
 
-function qWords(slot: SlotView, rows: readonly ModelRow[], i18n: I18n): string {
+function qWords(slot: SlotView, pool: SlotCardPool, i18n: I18n): string {
   if (slot.state === 'needs-login') {
     return i18n.t('capacity.slot.needs_login');
   }
@@ -292,17 +341,18 @@ function qWords(slot: SlotView, rows: readonly ModelRow[], i18n: I18n): string {
     return '';
   }
   const q = i18n.formatNumber(slot.q, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  if (Math.round(slot.q * 10) / 10 > UPGRADE_Q) {
+  const upgrade = pool.routing.upgradeAboveQ;
+  if (upgrade !== null && Math.round(slot.q * 10) / 10 > upgrade) {
     return i18n.t('tickets.settings.models.slot.q_upgrade', { q });
   }
-  const classes = classesOfSlot(slot, rows);
+  const classes = classesOfSlot(slot, pool.rows);
   if (classes.length === 0) {
     return i18n.t('tickets.settings.models.slot.q_only', { q });
   }
   return i18n.t('tickets.settings.models.slot.q_class', { q, classes: new Intl.ListFormat(i18n.locale, { type: 'conjunction' }).format(classes) });
 }
 
-export function slotCardsOf(slots: readonly SlotView[], rows: readonly ModelRow[], now: Date, i18n: I18n): readonly SlotCardView[] {
+export function slotCardsOf(slots: readonly SlotView[], pool: SlotCardPool, now: Date, i18n: I18n): readonly SlotCardView[] {
   return slots.map((slot) => {
     const measured = slot.windows.some((window) => window.remaining !== null);
     return {
@@ -310,9 +360,9 @@ export function slotCardsOf(slots: readonly SlotView[], rows: readonly ModelRow[
       name: slot.label,
       profile: i18n.lookup(`tickets.settings.models.profile.${slot.profile}`),
       billing: billingWords(slot.billing, i18n),
-      windows: measured ? slot.windows.map((window) => windowViewOf(window, now, i18n)) : [],
+      windows: measured ? slot.windows.map((window) => windowViewOf(window, now, i18n, pool.routing.reservePerWindow)) : [],
       unknownRow: measured ? null : i18n.t(slot.quota === 'counting' ? 'tickets.settings.models.slot.counted' : 'capacity.slot.quota_unknown'),
-      q: qWords(slot, rows, i18n),
+      q: qWords(slot, pool, i18n),
     };
   });
 }
