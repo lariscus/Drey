@@ -100,7 +100,7 @@ export class RunStarter {
     if (slots === undefined) {
       return null;
     }
-    const bound = slots.bind(request, id, this.preferredSlot(request, ask));
+    const bound = slots.bind(request, id, { prefer: this.preferredSlot(request, ask), persona: ask.persona ?? null });
     if ('refused' in bound) {
       this.deps.log(`run ${id} (${request.ticketId}): refused — ${bound.refused}`);
       return bound.refused;

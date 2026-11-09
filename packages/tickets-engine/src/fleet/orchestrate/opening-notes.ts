@@ -38,8 +38,17 @@ export function openingNotes(opening: RunOpening): readonly NormalizedEvent[] {
     prepared?.links !== undefined ? linkNote(prepared.links) : null,
     decision !== null ? `handover: ${decision.mode} — ${decision.why}` : null,
     opening.slot !== undefined && opening.slot !== null ? `slot: ${opening.slot.label}` : null,
+    opening.slot?.grant !== undefined ? `pool: ${opening.slot.grant.reason}` : null,
   ];
   return lines.filter((text): text is string => text !== null).map((text) => ({ ts: stamp, kind: 'note', text }));
+}
+
+/** The slot (req-177) and the pool's grant (req-170) a run's record carries; nothing without a binding. */
+function slotFields(slot: SlotBinding | null): Pick<RunInfo, 'slot' | 'grant'> {
+  if (slot === null) {
+    return {};
+  }
+  return { slot: { id: slot.id, label: slot.label }, ...(slot.grant !== undefined ? { grant: slot.grant } : {}) };
 }
 
 /** A new run's record, `starting`, with every counter at zero. */
@@ -73,7 +82,7 @@ export function newRunInfo(opening: RunOpening, initial: RunInfo['state']): RunI
     phase: request.phase,
     ...(request.form === 'scout' ? { form: 'scout' as const } : {}), // E8: the board's lanes and the settle hooks read it
     usage: { input: null, cacheRead: null, cacheCreation: null, output: null },
-    ...(opening.slot !== undefined && opening.slot !== null ? { slot: { id: opening.slot.id, label: opening.slot.label } } : {}),
+    ...slotFields(opening.slot ?? null),
     lastTurnContext: null,
     turns: 0,
     readCalls: 0,

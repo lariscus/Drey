@@ -6,7 +6,12 @@ import { CountingQuotaSource } from './counting-quota-source';
 import { MemoryFileSystem } from '../ports/memory-file-system.fake';
 import { FakeClock, FakeQuotaSource, slot, window } from './routing.fake';
 import type { Slot } from './slot';
-import { SlotGate } from './slot-gate';
+import { CapacityCap } from './capacity-cap';
+import { Ledgers } from './ledgers';
+import { PoolGate } from './pool-gate';
+import { PoolGrant } from './pool-grant';
+import { PoolSettingsRegistry } from './pool-settings';
+import { SessionBook } from './session-book';
 import { SlotRegistry } from './slot-registry';
 import { SlotReservations } from './slot-reservations';
 import { SlotRunListener } from './slot-run-listener';
@@ -15,7 +20,7 @@ import { SurplusCalculator } from './surplus-calculator';
 
 const NOW = new Date('2026-11-09T12:00:00Z');
 
-function parts(slots: Slot[], sourceOf?: (s: Slot) => FakeQuotaSource | ClaudeCodeQuotaSource | CountingQuotaSource): { registry: SlotRegistry; gate: SlotGate; reservations: SlotReservations; source: FakeQuotaSource; changes: SlotView[] } {
+function parts(slots: Slot[], sourceOf?: (s: Slot) => FakeQuotaSource | ClaudeCodeQuotaSource | CountingQuotaSource, pool: Record<string, unknown> = {}): { registry: SlotRegistry; gate: PoolGate; reservations: SlotReservations; source: FakeQuotaSource; changes: SlotView[]; book: SessionBook } {
   const source = new FakeQuotaSource();
   const reservations = new SlotReservations();
   const changes: SlotView[] = [];
@@ -28,34 +33,41 @@ function parts(slots: Slot[], sourceOf?: (s: Slot) => FakeQuotaSource | ClaudeCo
     onChange: (view) => changes.push(view),
     log: () => undefined,
   });
-  return { registry, gate: new SlotGate(registry, reservations), reservations, source, changes };
+  const settings = new PoolSettingsRegistry(() => undefined);
+  settings.apply(pool, slots, null);
+  const book = new SessionBook();
+  const cap = new CapacityCap(settings, reservations);
+  const grant = new PoolGrant({ slots: registry, settings, cap, reservations, ledgers: new Ledgers(book, settings, new FakeClock(NOW)) });
+  return { registry, gate: new PoolGate(registry, reservations, grant), reservations, source, changes, book };
 }
 
+const NOBODY = { prefer: null, persona: null };
+const prefer = (id: string): { prefer: string; persona: null } => ({ prefer: id, persona: null });
 const request = (over: Partial<RunRequest> = {}): RunRequest => ({ ticketId: 'T-0001', provider: 'claude-code', ...over }) as RunRequest;
 const claudeA = slot({ id: 'claude-a', label: 'Claude A', sessions: 1, login: { claudeConfigDir: '/c/a' } });
 const claudeB = slot({ id: 'claude-b', label: 'Claude B', sessions: 1, login: { claudeConfigDir: '/c/b' } });
 const claudeWork = slot({ id: 'claude-w', label: 'Claude Work', profile: 'work' });
 
-describe('SlotGate — the profile rule and the free slot', () => {
+describe('PoolGate — the profile rule and the free slot (req-177 under the pool)', () => {
   it('binds the first free slot of the provider and profile, reserves it and tells the change', async () => {
     const { registry, gate, reservations, changes } = parts([claudeA, claudeB, claudeWork]);
     await registry.load();
-    expect(gate.bind(request(), 'R-1', null)).toEqual({ id: 'claude-a', label: 'Claude A' });
+    expect(gate.bind(request(), 'R-1', NOBODY)).toMatchObject({ id: 'claude-a', label: 'Claude A' });
     expect(reservations.busy('claude-a')).toBe(1);
     expect(changes.at(-1)).toMatchObject({ id: 'claude-a', state: 'busy', busy: 1, total: 1 });
-    expect(gate.bind(request(), 'R-2', null)).toEqual({ id: 'claude-b', label: 'Claude B' });
-    expect(gate.bind(request(), 'R-3', null)).toEqual({ refused: 'no private claude-code slot is free — Claude A: 1 of 1 sessions busy; Claude B: 1 of 1 sessions busy' });
+    expect(gate.bind(request(), 'R-2', NOBODY)).toMatchObject({ id: 'claude-b', label: 'Claude B' });
+    expect(gate.bind(request(), 'R-3', NOBODY)).toEqual({ refused: 'waits for a claude-code slot — Claude A: 1 of 1 sessions busy; Claude B: 1 of 1 sessions busy' });
     gate.release('R-1');
-    expect(gate.bind(request(), 'R-3', null)).toEqual({ id: 'claude-a', label: 'Claude A' });
+    expect(gate.bind(request(), 'R-3', NOBODY)).toMatchObject({ id: 'claude-a', label: 'Claude A' });
   });
 
   it('a work repository runs only on a work slot, and a private one never on it — not even as a fallback', async () => {
     const { registry, gate } = parts([claudeA, claudeWork]);
     await registry.load();
-    expect(gate.bind(request({ profile: 'work' }), 'R-1', null)).toEqual({ id: 'claude-w', label: 'Claude Work' });
+    expect(gate.bind(request({ profile: 'work' }), 'R-1', NOBODY)).toMatchObject({ id: 'claude-w', label: 'Claude Work' });
     const onlyPrivate = parts([claudeA]);
     await onlyPrivate.registry.load();
-    expect(onlyPrivate.gate.bind(request({ profile: 'work' }), 'R-2', null)).toEqual({
+    expect(onlyPrivate.gate.bind(request({ profile: 'work' }), 'R-2', NOBODY)).toEqual({
       refused: 'no work slot serves claude-code: the repository is work and never runs on a private slot — add a work slot for claude-code to service.json',
     });
   });
@@ -63,8 +75,8 @@ describe('SlotGate — the profile rule and the free slot', () => {
   it('prefers the slot the resumed session lives on while it is free', async () => {
     const { registry, gate } = parts([claudeA, claudeB]);
     await registry.load();
-    expect(gate.bind(request(), 'R-1', 'claude-b')).toEqual({ id: 'claude-b', label: 'Claude B' });
-    expect(gate.bind(request(), 'R-2', 'claude-b')).toEqual({ id: 'claude-a', label: 'Claude A' });
+    expect(gate.bind(request(), 'R-1', prefer('claude-b'))).toMatchObject({ id: 'claude-b', label: 'Claude B' });
+    expect(gate.bind(request(), 'R-2', prefer('claude-b'))).toMatchObject({ id: 'claude-a', label: 'Claude A' });
   });
 
   it('refuses a slot that needs a login or is exhausted, with the reason', async () => {
@@ -73,7 +85,7 @@ describe('SlotGate — the profile rule and the free slot', () => {
     registry.flagLogin('claude-a', 'authentication_failed');
     source.readings.set('claude-b', { kind: 'windows', windows: [window({ name: '5h', remaining: 0, resetsAt: null })] });
     await registry.refresh();
-    expect(gate.bind(request(), 'R-1', null)).toEqual({ refused: 'no private claude-code slot is free — Claude A needs a login (authentication_failed); Claude B: the 5h window is spent' });
+    expect(gate.bind(request(), 'R-1', NOBODY)).toEqual({ refused: 'waits for a claude-code slot — Claude A needs a login (authentication_failed); Claude B: the 5h window is spent' });
   });
 
   it("hands the worker its account's environment", async () => {
