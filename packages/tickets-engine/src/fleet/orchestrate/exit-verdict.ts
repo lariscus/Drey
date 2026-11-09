@@ -1,3 +1,4 @@
+import { isOneOnOne } from '../protocol-session';
 import { isTerminal } from '../run/run-state';
 import type { LiveRun } from './live-run';
 
@@ -11,6 +12,7 @@ import type { LiveRun } from './live-run';
  *   runs, or the run is detached.
  * - `claim-lost` / `stopped` — the run was stopped; it ends without a gate.
  * - `interactive` — a dialog never gates or moves; the owner moves the ticket.
+ * - `session` — a 1:1 (req-168) holds no ticket: its worker's end ends the session.
  * - `no-result` — the worker ended without finishing its turn: it claimed nothing.
  * - `reopened` — an owner's reopened session ends done, nothing moves.
  * - `blocked` — the worker declared the step incomplete: no gate, the ticket stays put.
@@ -22,6 +24,7 @@ export type ExitVerdict =
   | { readonly kind: 'claim-lost' }
   | { readonly kind: 'stopped' }
   | { readonly kind: 'interactive' }
+  | { readonly kind: 'session' }
   | { readonly kind: 'no-result' }
   | { readonly kind: 'reopened' }
   | { readonly kind: 'blocked'; readonly blocked: string }
@@ -52,6 +55,9 @@ export function exitVerdict(run: LiveRun): ExitVerdict {
   const held = standing(run);
   if (held !== null) {
     return held;
+  }
+  if (isOneOnOne(run.request)) {
+    return { kind: 'session' };
   }
   if (run.request.interactive !== undefined) {
     return { kind: 'interactive' };

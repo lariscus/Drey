@@ -45,8 +45,8 @@ export class Ledgers {
 
   /** The ticket's allowance and the persona's day; null while both have room. */
   fullFor(subject: LedgerSubject): FullLedger | null {
-    const ticketLimit = subject.input.allowance ?? this.settings.ledgers().ticketAllowance;
-    const ticketSpent = this.sum((r) => r.ticketId === subject.ticket);
+    const ticketLimit = subject.input.noTicket === true ? null : (subject.input.allowance ?? this.settings.ledgers().ticketAllowance);
+    const ticketSpent = ticketLimit === null ? 0 : this.sum((r) => r.ticketId === subject.ticket);
     if (ticketLimit !== null && ticketSpent >= ticketLimit && !subject.input.spendAboveAllowance) {
       return { ledger: 'ticket', key: 'ledger-ticket', spent: ticketSpent, limit: ticketLimit, line: `${subject.ticket} has spent ${usd(ticketSpent)} of its ${usd(ticketLimit)} allowance` };
     }

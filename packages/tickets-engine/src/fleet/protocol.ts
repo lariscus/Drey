@@ -18,6 +18,7 @@ import type { ModelNeeds } from '../contracts/ticket-pool-meta';
 import type { SlotProfile } from './protocol-slots';
 import type { ShapedQuestion } from '../contracts/question-shape';
 import type { TicketForm } from '../contracts/tickets';
+import type { SessionKind, SessionSpec } from './protocol-session';
 
 // The fleet settings shapes (T-0048, T-0049, req-63) and the chain protocol (M85) live beside this file.
 export { DEFAULT_FLEET_CAPS, DEFAULT_FLEET_HANDOVER, DEFAULT_FLEET_POOL, normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from './protocol-fleet-config';
@@ -35,6 +36,8 @@ export { DEFAULT_EARLY_STOP, DEFAULT_TRANCHE, normalizeTranche, tranchesOff, tra
 export type { AnomalyRule, CheckpointReport, EarlyStop, EarlyStopConfig, RedTicket, TrancheConfig, TrancheEnd, TrancheStatus } from './protocol-tranche';
 export { DEFAULT_DEV_PORTS, DEFAULT_GOVERNOR_SETTINGS } from './protocol-governor';
 export type { DevServerLease, GovernorSettings, GovernorStatus, GovernorWait, GovernorWaitCause, HeavyTask, PortRange, SeatClass, SeatHolder } from './protocol-governor';
+export { isOneOnOne, ONE_ON_ONE_IDLE_MS, ONE_ON_ONE_TICKET, SESSION_KINDS, sessionKindOf } from './protocol-session';
+export type { SessionKind, SessionSpec } from './protocol-session';
 
 /** The workers of milestone 84, in fleet order (the assignment default). */
 export type WorkerProviderId = 'opencode' | 'claude-code' | 'kimi' | 'copilot';
@@ -252,6 +255,13 @@ export interface RunRequest {
    * every other run, and every older sender.
    */
   readonly reviewCheckout?: string;
+  /**
+   * req-168: not a ticket run — a 1:1 with a persona (R12): no ticket
+   * (`ticketId` is {@link ONE_ON_ONE_TICKET}), no worktree, no claim, no
+   * gate, no move; the worker starts quiet and held in the spec's working
+   * directory. Absent = a ticket run, every older sender.
+   */
+  readonly session?: SessionSpec;
 }
 
 /** req-183: the review checkout a run's worker reads, and the commit it shows. */
@@ -467,6 +477,12 @@ export interface RunInfo {
   readonly grant?: PoolGrantRecord;
   /** req-183: the review run's read-only checkout and the commit it was opened at; absent on every other run. */
   readonly review?: ReviewCheckoutRecord;
+  /** req-168 (R12): the session's kind; absent = `run`, every record written before it. */
+  readonly kind?: SessionKind;
+  /** req-168 (R12): where the worker works when it is not the worktree (a 1:1: the tickets repository); absent = `worktreePath`. */
+  readonly workingDirectory?: string;
+  /** req-168: a 1:1's chat session file (vault-relative); absent on every run. */
+  readonly chatFile?: string;
   /**
    * Why the worker declared the step incomplete (`BLOCKED:` in its final
    * message): no gate ran, nothing moved — the ticket waits for the
