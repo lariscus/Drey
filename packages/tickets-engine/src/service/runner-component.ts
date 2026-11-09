@@ -11,7 +11,7 @@
  * curl, the FLEET/SERVICE routes and the engine's `FleetClient` speak to it
  * unchanged; `service.lock` records them.
  */
-import type { RunnerDescriptor } from '../fleet/protocol';
+import type { GovernorSettings, RunnerDescriptor } from '../fleet/protocol';
 import { startRunner, type Args, type RunnerDeps, type RunnerHandle } from '../fleet/runner';
 import type { RunnerLocator } from '../services/fleet-client';
 import type { ComponentRecord } from './service-lock';
@@ -27,6 +27,8 @@ export interface RunnerComponentOptions {
   readonly log: (line: string) => void;
   /** The component changed state — the service rewrites its lock. */
   readonly onChange: () => void;
+  /** req-180: Settings → Background service's Load group, read live by the runner's resource governor. */
+  readonly governorSettings?: () => GovernorSettings;
   /** Test seam: the in-process start. */
   readonly start?: (args: Args, deps: RunnerDeps) => Promise<RunnerHandle | null>;
 }
@@ -90,6 +92,7 @@ export class RunnerComponent implements RunnerLocator {
           stdout: (line) => this.opts.log(line),
           descriptor: 'none',
           signals: false,
+          ...(this.opts.governorSettings === undefined ? {} : { governorSettings: this.opts.governorSettings }),
         },
       );
       if (handle === null) {

@@ -128,7 +128,7 @@ export class SeatGovernor implements ResourceGovernor, SeatHost {
         this.cancel(waiter);
         continue;
       }
-      const verdict = blocked ?? this.deps.admission.judge(waiter.sinceMs);
+      const verdict: AdmissionVerdict = blocked ?? this.deps.admission.judge(waiter.sinceMs);
       if (verdict.kind === 'grant') {
         this.grant(waiter, verdict.note);
       } else {

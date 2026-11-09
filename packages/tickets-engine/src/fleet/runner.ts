@@ -25,6 +25,7 @@ import * as path from 'node:path';
 import { ChainRoutes } from './api/chain-routes';
 import { EventHub } from './api/event-hub';
 import { EventStream } from './api/event-stream';
+import { GovernorRoutes } from './api/governor-routes';
 import { LifecycleRoutes } from './api/lifecycle-routes';
 import { ModelRoutes } from './api/model-routes';
 import { RunReadRoutes } from './api/run-read-routes';
@@ -32,6 +33,7 @@ import { RunWriteRoutes } from './api/run-write-routes';
 import { RunnerHttpApi } from './api/runner-http-api';
 import { SlotRoutes } from './api/slot-routes';
 import { fleetBuildStamp } from './build-stamp';
+import { governorSeats, type Governor } from './compose-governor';
 import { composeOrchestrator } from './compose-orchestrator';
 import { composeRouting, type Routing } from './compose-routing';
 import { composeRunSupervisor, composeShared } from './compose-supervisor';
@@ -43,11 +45,12 @@ import type { Orchestrator, FleetEvents } from './orchestrator';
 import type { RunSupervisor } from './orchestrate/run-supervisor';
 import { SupervisorSet } from './orchestrate/supervisor-set';
 import { freePort, nodeSpawnFn, scrubInheritedEnv } from './procs';
-import type { PoolLoad, RunnerDescriptor, SlotView, WorkerProviderId } from './protocol';
+import type { GovernorSettings, PoolLoad, RunnerDescriptor, SlotView, WorkerProviderId } from './protocol';
 import { claudeCodeAdapter } from './harness/claude-code';
 import { opencodeAdapter } from './harness/opencode';
 import { peerAlive, readDescriptor, removeDescriptor, writeDescriptor } from './runner-descriptor';
 import { RunnerExit } from './runner-exit';
+import { governorFor, seedsOf } from './runner-governor';
 import { IdleWatch } from './runner-lifecycle';
 import { NodeFileSystem } from './node-file-system';
 import { SYSTEM_CLOCK } from './ports/clock';
@@ -87,6 +90,8 @@ export interface RunnerDeps {
   readonly userHome?: string;
   /** req-177: the remote quota reads; the global `fetch` by default. */
   readonly quotaHttp?: QuotaHttp;
+  /** req-180: Settings → Background service's Load group, read live; the defaults when absent (standalone). */
+  readonly governorSettings?: () => GovernorSettings;
 }
 
 /** What `startRunner` hands back: the spec reads the descriptor and ends the runner through it. */
@@ -143,6 +148,8 @@ interface FleetContext {
   readonly routing: Routing;
   /** The provider pools' throttle (req-63), shared by the pool and the chain. */
   readonly capacity: PoolCapacity;
+  /** req-180: the resource governor every spawn asks for a seat. */
+  readonly governor: Governor;
 }
 
 /** The service home: `--home`, else the parent of a `<home>/fleet` root, else the root itself (a spec's temp root). */
@@ -164,11 +171,18 @@ function routingFor(args: Args, deps: RunnerDeps, ctx: { log: (message: string) 
   return routing;
 }
 
-/** The records a restart found: the slots re-reserve the live ones, the ledgers count them all. */
-function seedRouting(routing: Routing, supervisors: SupervisorSet): void {
+/** The records a restart found: the slots re-reserve the live ones, the ledgers count them all, the governor re-seats them (req-180). */
+function seedRouting(routing: Routing, supervisors: SupervisorSet, governor: Governor): void {
   const found = supervisors.records().map((record) => record.info);
   routing.listener.seed(found);
   routing.pool.book.seed(found);
+  governor.governor.seed(seedsOf(found));
+}
+
+/** req-180: the resource governor over the service's Load settings (the defaults standalone). */
+function governorOf(args: Args, deps: RunnerDeps, ctx: { log: (message: string) => void; hub: EventHub; routing: Routing }): Promise<Governor> {
+  const settings = deps.governorSettings !== undefined ? { settings: deps.governorSettings } : {};
+  return governorFor({ root: args.root, home: serviceHome(args), log: ctx.log, sink: ctx.hub, slots: () => ctx.routing.registry.views(), ...settings });
 }
 
 /** The capacity pool as the chain's dispatch asks it (req-170). */
@@ -190,6 +204,7 @@ function dayBudgetOf(routing: Routing): { limitUsd(): number | null } {
 /** The supervisors, one per provider, and the chain over them; the settle hook closes the loop back to the chain. */
 function composeFleet(ctx: FleetContext): { supervisors: SupervisorSet; orchestrator: Orchestrator } {
   const { root, log, events, hub, routing, capacity } = ctx;
+  const seats = governorSeats(ctx.governor.governor);
   const stores = new DkTicketStores();
   const shared = composeShared(stores.storeFor, log, undefined, { sink: hub });
   const adapters = [opencodeAdapter(nodeSpawnFn()), claudeCodeAdapter(nodeSpawnFn()), kimiAdapter(nodeSpawnFn(), nodeKimiUsageReader())];
@@ -203,9 +218,13 @@ function composeFleet(ctx: FleetContext): { supervisors: SupervisorSet; orchestr
         log,
         storeFor: stores.storeFor,
         shared,
-        onRunSettled: (info) => void orchestrator.onRunSettled(info),
+        onRunSettled: (info) => {
+          ctx.governor.governor.runSettled(info.id);
+          void orchestrator.onRunSettled(info);
+        },
         secondOpinion: (request) => orchestrator.secondOpinion(request),
         slots: routing.gate,
+        seats,
       }),
     ]),
   );
@@ -221,6 +240,7 @@ function composeFleet(ctx: FleetContext): { supervisors: SupervisorSet; orchestr
     migratePools: (config) => routing.pool.migrate(config.pools),
     dayBudget: dayBudgetOf(routing),
     sink: hub,
+    seats,
     supervisorOf: (provider) => supervisors.forProvider(provider),
     // E14-5b: a killed runner's claims on a dricket store are released before the chain's first dispatch there.
     releaseLeftovers: async (store, pipeline) => {
@@ -264,6 +284,16 @@ async function openLog(args: Args, deps: RunnerDeps): Promise<{ log: RunnerLog; 
   return { log, build };
 }
 
+/** Binds the API to the loopback port; `up` runs once it listens. */
+function listen(server: ReturnType<RunnerHttpApi['server']>, port: number, up: () => void): Promise<void> {
+  return new Promise<void>((resolve) => {
+    server.listen(port, '127.0.0.1', () => {
+      up();
+      resolve();
+    });
+  });
+}
+
 export async function startRunner(args: Args, deps: RunnerDeps = {}): Promise<RunnerHandle | null> {
   const exitProcess = deps.exit ?? ((code: number): void => process.exit(code));
   await fsp.mkdir(path.join(args.root, 'runs'), { recursive: true });
@@ -279,9 +309,10 @@ export async function startRunner(args: Args, deps: RunnerDeps = {}): Promise<Ru
   const stream = new EventStream(hub);
   const capacity = new PoolCapacity(fetchTotalSlots, SYSTEM_CLOCK, log.line);
   const routing = routingFor(args, deps, { log: log.line, hub, capacity });
-  const { supervisors, orchestrator } = composeFleet({ root: args.root, log: log.line, events: ledger.events, hub, routing, capacity });
+  const governor = await governorOf(args, deps, { log: log.line, hub, routing });
+  const { supervisors, orchestrator } = composeFleet({ root: args.root, log: log.line, events: ledger.events, hub, routing, capacity, governor });
   await supervisors.adoptAll();
-  seedRouting(routing, supervisors);
+  seedRouting(routing, supervisors, governor);
   await routing.start();
   await orchestrator.load();
   const descriptor: RunnerDescriptor = { port: await freePort(), token: crypto.randomBytes(24).toString('hex'), pid: process.pid, startedAt: new Date().toISOString(), version: VERSION, build };
@@ -289,24 +320,23 @@ export async function startRunner(args: Args, deps: RunnerDeps = {}): Promise<Ru
   const closeStreams = (): void => {
     stream.closeAll();
     routing.stop();
+    governor.ticker.stop();
   };
   const exit = new RunnerExit({ exit: exitProcess, log, orchestrator, supervisors, idle, idleMs: args.idleMs, descriptorPath: writesDescriptor ? descriptorPath : null, closeStreams });
   const api = new RunnerHttpApi(
     descriptor.token,
-    [new LifecycleRoutes(exit, supervisors, log, { version: VERSION, build }), new ChainRoutes(orchestrator, supervisors, exit, ledger.setVault), new RunReadRoutes(supervisors), new RunWriteRoutes(supervisors), new SlotRoutes(routing.registry, routing.config, routing.check), new ModelRoutes(routing.poolDesk, routing.config), stream],
+    [new LifecycleRoutes(exit, supervisors, log, { version: VERSION, build }), new ChainRoutes(orchestrator, supervisors, exit, ledger.setVault), new RunReadRoutes(supervisors), new RunWriteRoutes(supervisors), new SlotRoutes(routing.registry, routing.config, routing.check), new ModelRoutes(routing.poolDesk, routing.config), new GovernorRoutes(governor.governor), stream],
     { exit, idle },
   );
   const server = api.server();
-  await new Promise<void>((resolve) => {
-    server.listen(descriptor.port, '127.0.0.1', () => {
-      if (writesDescriptor) {
-        writeDescriptor(descriptorPath, descriptor);
-      }
-      log.line(`listening on 127.0.0.1:${descriptor.port} (pid ${process.pid})`);
-      resolve();
-    });
+  await listen(server, descriptor.port, () => {
+    if (writesDescriptor) {
+      writeDescriptor(descriptorPath, descriptor);
+    }
+    log.line(`listening on 127.0.0.1:${descriptor.port} (pid ${process.pid})`);
   });
   exit.start(server);
+  governor.ticker.start(governor.governor);
   if (deps.signals ?? true) {
     installSignals(exit, writesDescriptor ? descriptorPath : null);
   }

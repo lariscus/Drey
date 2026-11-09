@@ -20,7 +20,7 @@ import { ChainStateStore } from './orchestrate/chain-state-store';
 import { CiSweep } from './orchestrate/ci-sweep';
 import type { DispatchPool } from './orchestrate/dispatch-pool';
 import { Dispatcher } from './orchestrate/dispatcher';
-import type { GateShell } from './orchestrate/gate-runner';
+import type { GateSeats, GateShell } from './orchestrate/gate-runner';
 import { HumanGates } from './orchestrate/human-gates';
 import { LedgerCards } from './orchestrate/ledger-cards';
 import { PoolCapacity, type SlotProbe } from './orchestrate/pool-capacity';
@@ -53,6 +53,8 @@ export interface OrchestratorDeps {
   readonly scanIntervalMs?: number;
   /** The ci handover's shell exec (cwd = the work repo). */
   readonly execShell?: GateShell;
+  /** req-180: the governor's heavy seat a ci check takes; absent = none. */
+  readonly seats?: GateSeats;
   /** The shipped default prompt's text for a ref (version comparison); absent = no check. */
   readonly shippedPrompt?: (ref: string) => Promise<string | null>;
   /** The pool probe: a llama.cpp server's `total_slots`, or null. */
@@ -145,7 +147,7 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
     pools,
     settled: new SettledRuns({ state, directory, pools, breaker, clock, persist, ...events }),
     dispatcher: new Dispatcher({ state, board, directory, pools, personas, humanGates, dispatch, notes, clock, log, pipelineRead, persist, tranches, ...pool }),
-    ci: new CiSweep({ state, board, bookkeeper, shell: deps.execShell ?? execShell, clock, log, pipelineRead, persist }),
+    ci: new CiSweep({ state, board, bookkeeper, shell: deps.execShell ?? execShell, clock, log, pipelineRead, persist, ...(deps.seats !== undefined ? { seats: deps.seats } : {}) }),
     clock,
     log,
     scanIntervalMs: deps.scanIntervalMs ?? 15_000,

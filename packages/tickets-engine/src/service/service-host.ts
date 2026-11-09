@@ -92,6 +92,8 @@ export class ServiceHost {
       storeBacked: async () => (await (this.engine?.config ?? ownConfig).get<string>('backend')) === 'dricket',
       log: (line) => this.log('runner', line.replace(/^\[fleet [^\]]+\] /, '')),
       onChange: () => void this.refreshLock(),
+      // req-180: the governor reads the Load group from the settings the tick refreshes.
+      governorSettings: () => ({ heavySeats: this.prefs.heavySeats, reserve: this.prefs.reserve, lowPriority: this.prefs.lowPriority, quietHours: this.prefs.quietHours }),
       ...(opts.startRunner === undefined ? {} : { start: opts.startRunner }),
     });
     this.lockWriter = new LockWriter(opts.home, (message) => this.log('service', message, 'error'));

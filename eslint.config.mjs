@@ -119,6 +119,27 @@ const NOT_ROUTING = {
   group: ['../routing', '../routing/**'],
   message: 'The orchestration and the API never import fleet/routing (req-170): they ask the pool through the consumer interface the composition root satisfies.',
 };
+/**
+ * `fleet/governor` (req-180): the resource governor. It takes its own wire
+ * types (`../protocol-governor`) and the ports' types, nothing else — no
+ * Node module, no orchestration, no routing; the orchestration asks it
+ * through its own `WorkerSeats` / `GateSeats`, the composition root wires it.
+ */
+const GOVERNOR_ONLY = [
+  {
+    group: ['../**', '!../protocol-governor', '!../ports', '!../ports/*'],
+    message: 'fleet/governor takes ../protocol-governor and the types of ../ports only (ADR-0096, req-180).',
+  },
+  {
+    group: ['../ports/*'],
+    allowTypeImports: true,
+    message: 'fleet/governor takes only types from ../ports (ADR-0096).',
+  },
+];
+const NOT_GOVERNOR = {
+  group: ['../governor', '../governor/**'],
+  message: 'The orchestration and the API never import fleet/governor (req-180): they ask it through the consumer interface (WorkerSeats, GateSeats, GovernorDesk) the composition root satisfies.',
+};
 const HARNESS_NOT_ORCHESTRATE = {
   group: ['../orchestrate', '../orchestrate/**', '../api', '../api/**', '../store', '../store/**', '../runner', '../../**/orchestrate/**'],
   message: 'An adapter never imports the orchestration (ADR-0096): it reports normalized events, the orchestrator decides.',
@@ -359,14 +380,21 @@ export default tseslint.config(
     files: [`${FLEET}/orchestrate/**/*.ts`],
     ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`, `${FLEET}/**/*spec-support.ts`],
     rules: {
-      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS, NODE_BUILTINS, NOT_ROUTING] }],
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS, NODE_BUILTINS, NOT_ROUTING, NOT_GOVERNOR] }],
     },
   },
   {
     files: [`${FLEET}/api/**/*.ts`],
     ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`],
     rules: {
-      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS, NOT_ROUTING] }],
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS, NOT_ROUTING, NOT_GOVERNOR] }],
+    },
+  },
+  {
+    files: [`${FLEET}/governor/**/*.ts`],
+    ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, NODE_BUILTINS, ...GOVERNOR_ONLY] }],
     },
   },
   {
