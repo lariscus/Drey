@@ -334,9 +334,22 @@ describe('the Capacity band: Slots row and queue row (board 7e)', () => {
   });
 
   it('draws the tranche part as board 7e does once the chain carries a tranche', () => {
-    const nodes = trancheNodes({ runs: 4, size: 10, cost: 4.1, budget: 15, runsLeft: 6, msLeft: 2 * 3_600_000 + 10 * 60_000 }, i18n);
-    expect(nodes[0]!.textContent).toBe('Tranche 4 of 10 runs · $4.10 of $15 · checkpoint in 6 runs or 2 hr 10 min');
+    const full = { index: 1, runs: 4, size: 10, cost: 4.1, budget: 15, runsLeft: 6, msLeft: 2 * 3_600_000 + 10 * 60_000, progress: 0.4 };
+    const nodes = trancheNodes(full, i18n);
+    expect(nodes[0]!.textContent).toBe('Tranche 4 of 10 runs · $4.10 of $15 · checkpoint in 6 runs or 2 h 10 min');
     expect(nodes[1]!.querySelector<HTMLElement>('.desk-tranche-fill')!.style.width).toBe('40%');
+  });
+
+  it('says the shorter forms when the tranche lacks a limit', () => {
+    const base = { index: 2, runs: 3, size: 10, cost: 4.1, budget: 15, runsLeft: 7, msLeft: 45 * 60_000, progress: 0.3 };
+    const line = (patch: object): string | null => trancheNodes({ ...base, ...patch }, i18n)[0]!.textContent;
+    expect(line({ msLeft: null })).toBe('Tranche 3 of 10 runs · $4.10 of $15 · checkpoint in 7 runs');
+    expect(line({ budget: null })).toBe('Tranche 3 of 10 runs · $4.10 · checkpoint in 7 runs or 45 min');
+    expect(line({ budget: null, msLeft: null })).toBe('Tranche 3 of 10 runs · $4.10 · checkpoint in 7 runs');
+    expect(line({ size: null, runsLeft: null })).toBe('Tranche 2 · 3 runs · $4.10 of $15 · checkpoint in 45 min');
+    expect(line({ size: null, runsLeft: null, msLeft: null })).toBe('Tranche 2 · 3 runs · $4.10 of $15');
+    expect(line({ size: null, runsLeft: null, budget: null })).toBe('Tranche 2 · 3 runs · $4.10 · checkpoint in 45 min');
+    expect(line({ size: null, runsLeft: null, budget: null, msLeft: null })).toBe('Tranche 2 · 3 runs · $4.10');
   });
 
   it('draws no queue part while nothing is queued', () => {

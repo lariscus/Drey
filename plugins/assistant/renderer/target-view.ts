@@ -5,10 +5,11 @@
  * history list. Plain DOM over the controller; nothing here knows what a
  * target is (ADR-0044 rule 2).
  */
-import type { ConversationCard, ConversationMessage, DreyPluginApi } from '../../../shared/plugin-api/renderer';
+import type { ConversationMessage, DreyPluginApi } from '../../../shared/plugin-api/renderer';
 import { createDecisionCard } from './decision-card.js';
 import { el, icon, isIconName } from './dom.js';
 import { renderRichBody } from './rich-text.js';
+import { proposalNode } from './target-card.js';
 import type { TargetController } from './targets.js';
 import { MODEL_TARGET, type TargetSegment } from './targets-model.js';
 
@@ -101,26 +102,6 @@ export interface TargetThreadView {
   /** The answer cards above the composer. */
   readonly tray: HTMLElement;
   render(): void;
-}
-
-function proposalNode(targets: TargetController, card: ConversationCard): HTMLElement {
-  const box = el('div', 'target-card');
-  box.appendChild(el('p', 'target-card-text', card.text));
-  if (card.note !== undefined) {
-    box.appendChild(el('p', 'target-card-note', card.note));
-  }
-  if ((card.actions ?? []).length > 0) {
-    const row = el('div', 'target-card-actions');
-    for (const action of card.actions ?? []) {
-      const button = el('button', 'target-card-btn' + (action.tone === 'primary' ? ' primary' : ''), action.label) as HTMLButtonElement;
-      button.type = 'button';
-      button.disabled = targets.busy();
-      button.addEventListener('click', () => void targets.act(card.id, action.id));
-      row.appendChild(button);
-    }
-    box.appendChild(row);
-  }
-  return box;
 }
 
 function messageNode(api: DreyPluginApi, targets: TargetController, message: ConversationMessage): HTMLElement | null {

@@ -3,6 +3,7 @@ import type { Clock } from '../ports/clock';
 import type { FileSystem } from '../ports/file-system';
 import type { ChainTrip, ColumnMode } from '../protocol';
 import type { ChainFile, ChainState, OwnerHold, TicketFailure } from './chain-state';
+import { restoreTranche } from './tranche/tranche-record';
 
 const CHAIN_FILE = 'chain.json';
 
@@ -73,6 +74,7 @@ export class ChainStateStore {
       state.config = parsed.config;
       const moving = this.restoreAutopilot(state, parsed);
       restoreMaps(state, parsed);
+      state.tranche = restoreTranche(parsed.tranche); // req-179: a restart continues the same tranche
       return moving;
     } catch {
       return false; // a torn chain.json is noise; the plugin re-configures on the next board round

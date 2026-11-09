@@ -92,3 +92,101 @@ test.describe('phone: the app-bar button and its sheet', () => {
     }
   });
 });
+
+/**
+ * req-179 (boards 10t and 10u): the tranche on the iPad popover, the phone
+ * sheet and the checkpoint card in the chat. The shots land in
+ * test-results/fidelity/ beside the fidelity specs'; the clock stands at the
+ * boards' 14:10.
+ */
+const FID_OUT = process.env['FID_OUT'] ?? 'test-results/fidelity';
+
+async function openAt(page: Page, desk: Desk): Promise<void> {
+  await page.clock.setFixedTime(new Date(2026, 10, 7, 14, 10));
+  await openApp(page, desk);
+  await page.waitForTimeout(350);
+}
+
+test.describe('req-179 iPad: the tranche in the popover', () => {
+  test.use({ viewport: { width: 1194, height: 834 }, deviceScaleFactor: 1, hasTouch: true, locale: 'en-GB' });
+
+  test('On shows the tranche chips, bar and note', async ({ page }) => {
+    const desk = await startFakeDesk({ boards: true, pad: true, tranche: 'running' });
+    try {
+      await openAt(page, desk);
+      await page.locator('mc-autopilot-chip button').first().click();
+      const pop = page.locator('mc-autopilot-panel');
+      await expect(pop.locator('.pd-chip')).toHaveText(['Tranche 4 of 10 runs', '$4.10 of $15 today', '2 h 10 min left']);
+      await expect(pop.locator('.pd-note')).toHaveText('Pauses with a checkpoint report after the tranche.');
+      await page.screenshot({ path: `${FID_OUT}/Autopilot-ipad-on.png` });
+    } finally {
+      await desk.stop();
+    }
+  });
+
+  test('Paused at a checkpoint releases with Autopilot On', async ({ page }) => {
+    const desk = await startFakeDesk({ boards: true, pad: true, tranche: 'checkpoint' });
+    try {
+      await openAt(page, desk);
+      const chip = page.locator('mc-autopilot-chip button').first();
+      await expect(chip).toContainText('Autopilot · Paused');
+      await chip.click();
+      const pop = page.locator('mc-autopilot-panel');
+      await expect(pop.locator('.pd-chip')).toHaveText(['Checkpoint report waiting', 'Resume at 18:00', '$4.10 of $15 today']);
+      await page.screenshot({ path: `${FID_OUT}/Autopilot-ipad-checkpoint.png` });
+      await pop.getByRole('button', { name: 'Release next tranche' }).click();
+      await expect(chip).toContainText('Autopilot · On');
+      expect(desk.autopilotWrites()).toEqual([{ state: 'on' }]);
+    } finally {
+      await desk.stop();
+    }
+  });
+});
+
+test.describe('req-179 phone: the checkpoint', () => {
+  test.use({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true, locale: 'en-GB' });
+
+  test('the sheet carries the checkpoint header and a Release button; the card sits in the chat', async ({ page }) => {
+    const desk = await startFakeDesk({ boards: true, tranche: 'checkpoint' });
+    try {
+      await openAt(page, desk);
+      await page.locator('mc-menu .chats .sess').first().click();
+      const card = page.locator('mc-chat mc-tranche-card .card');
+      await expect(card.locator('.title')).toContainText('Checkpoint · tranche 1 of 3 done');
+      await card.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${FID_OUT}/MCCards-phone-checkpoint.png` });
+      await page.locator('mc-chat mc-app-bar mc-autopilot-button button').first().click();
+      const sheet = page.getByRole('dialog', { name: 'Autopilot' });
+      await expect(sheet.locator('.ph-resume span')).toHaveText('Checkpoint · resume at 18:00');
+      expect((await sheet.locator('.ph-release').boundingBox())!.height).toBe(48);
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${FID_OUT}/Autopilot-phone-checkpoint.png` });
+      await sheet.getByRole('button', { name: 'Release next tranche' }).click();
+      await expect(sheet).toBeHidden();
+      expect(desk.autopilotWrites()).toEqual([{ state: 'on' }]);
+      await expect(card).toBeHidden();
+    } finally {
+      await desk.stop();
+    }
+  });
+
+  test('an early stop draws the red tickets and Open report adds the grid', async ({ page }, testInfo) => {
+    const desk = await startFakeDesk({ boards: true, tranche: 'early' });
+    try {
+      await openAt(page, desk);
+      await page.locator('mc-menu .chats .sess').first().click();
+      const card = page.locator('mc-chat mc-tranche-card .card');
+      await expect(card.locator('.title')).toContainText('Stopped early · gate rate fell');
+      await expect(card.locator('.red-row')).toHaveCount(3);
+      await card.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${FID_OUT}/MCCards-phone-early.png` });
+      await card.getByRole('button', { name: 'Open report' }).click();
+      await expect(card.locator('.metric')).toHaveCount(4);
+      await page.screenshot({ path: testInfo.outputPath('early-report.png') });
+    } finally {
+      await desk.stop();
+    }
+  });
+});

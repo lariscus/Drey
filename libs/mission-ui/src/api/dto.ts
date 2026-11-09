@@ -7,6 +7,7 @@
  * never white-screen the phone.
  */
 import { autopilotSwitchViewOf, autopilotViewOf, type AutopilotView } from '../../../../shared/autopilot';
+import { trancheViewOf, type TrancheView } from '../../../../shared/tranche';
 import { maskFences } from '../../../../shared/markdown/fences';
 
 // --- Work ------------------------------------------------------------------
@@ -290,6 +291,8 @@ export interface TeamView {
   readonly chainMaster?: 'run' | 'halted' | null;
   /** The Autopilot off the chain block (req-95b); absent while the desk reports no chain. */
   readonly autopilot?: AutopilotView;
+  /** The chain block's tranche (req-179): chips, progress and the waiting checkpoint's report; absent without one. */
+  readonly tranche?: TrancheView;
   /** The persona ids the owner paused in the chain; `[]` when the desk sends none. */
   readonly pausedPersonas?: readonly string[];
   /** Per provider pool: running against effective size; absent when the desk sends no pool sizes. */
@@ -1104,6 +1107,7 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
   // req-110) reads as Off, so the switch stays usable; a snapshot without the
   // field at all leaves the Autopilot unknown.
   const autopilot = chain === null ? (fleet['chain'] === null ? autopilotSwitchViewOf(true, null) : null) : autopilotViewOf(chain);
+  const tranche = trancheViewOf(chain);
   const pausedPersonas = strArray(fleet['pausedPersonas']);
   const capacity = capacityOf(chain, runs);
   const personas: PersonaView[] = [];
@@ -1146,6 +1150,7 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
       })),
     ...(chainMaster !== null ? { chainMaster } : {}),
     ...(autopilot !== null ? { autopilot } : {}),
+    ...(tranche !== null ? { tranche } : {}),
     ...(pausedPersonas.length > 0 ? { pausedPersonas } : {}),
     ...(capacity.length > 0 ? { capacity } : {}),
   };

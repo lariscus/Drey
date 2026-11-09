@@ -11,9 +11,11 @@ import {
 import { PhoneIcon, type PhoneIconName } from '../phone/icon';
 import { McI18nPipe } from '../i18n/i18n.pipe';
 import { McI18n } from '../i18n/i18n.service';
+import type { MessageKey } from '../../../../shared/i18n';
 import { MC_AUTOPILOT, type McAutopilotReply } from './autopilot-state';
 import { todayCostTextOf } from '../work/phone-rows';
 import { MC_WORK_STATE } from '../work/work.model';
+import { McTranche } from './tranche-model';
 
 /**
  * The three Autopilot states as rows (On / Paused / Off), the resume time
@@ -40,9 +42,26 @@ export class AutopilotPanel {
   /** A state was taken (On or Off): the host closes its popover or sheet. */
   readonly done = output<void>();
 
+  private readonly tranche = inject(McTranche);
   private readonly work = inject(MC_WORK_STATE, { optional: true });
   /** The popover's spend chip (board 10t); null hides it. */
   protected readonly todayText = computed(() => todayCostTextOf(this.work?.today ?? null, (key, params) => this.i18n.t(key, params)));
+
+  /** A checkpoint waits (board 10t): the sentence, chips and the release button change. */
+  protected readonly waiting = computed(() => this.tranche.waiting() && this.view()?.state === 'paused');
+  /** The On readout: the tranche's chips and bar; null without a tranche or while paused/off. */
+  protected readonly readout = computed(() => (this.view()?.state === 'on' ? this.tranche.readout(this.now()()) : null));
+  protected readonly sentenceKey = computed(() => (this.waiting() ? 'autopilot.sentence.checkpoint' : `autopilot.sentence.${this.view()?.state ?? 'off'}`) as MessageKey);
+  /** The sheet's header, right of the title: `Checkpoint · resume at 18:00`, else the resume time. */
+  protected readonly headText = computed((): string | null => {
+    if (!this.waiting()) {
+      return this.resumeText();
+    }
+    const at = this.view()?.resumeAt;
+    return at === undefined
+      ? this.i18n.t('autopilot.sheet.checkpoint')
+      : this.i18n.t('autopilot.sheet.checkpoint_at', { time: this.i18n.formatTime(new Date(at)) });
+  });
 
   protected readonly kinds = AUTOPILOT_KINDS;
   protected readonly view = computed(() => this.state?.autopilot() ?? null);
@@ -73,6 +92,24 @@ export class AutopilotPanel {
     if (taken && kind !== 'paused') {
       this.done.emit();
     }
+  }
+
+  protected async release(): Promise<void> {
+    if (this.disabled()) {
+      return;
+    }
+    this.error.set(null);
+    const reply = await this.tranche.release();
+    if (!reply.ok) {
+      this.error.set(this.wordsOf(reply));
+      return;
+    }
+    this.done.emit();
+  }
+
+  protected adjust(): void {
+    this.tranche.adjust();
+    this.done.emit();
   }
 
   protected async onTime(event: Event): Promise<void> {

@@ -1155,6 +1155,46 @@ Talking to the crew does not need it: Mission Control, *Shape with Paul* and a
 run starts the runner when it is not running. If the runner cannot be started,
 the switch says why (*The runner could not be started: …*).
 
+### Tranches and the checkpoint report
+
+**On** never lets the crew run open-ended: it releases one **tranche** — up to
+a number of runs (10 by default), a share of the day's budget (a third) or a
+time span (4 hours), whichever ends first. While On, the popover shows where
+the tranche stands: *Tranche 4 of 10 runs*, today's cost, *2 h 10 min left*, a
+thin bar, and *Pauses with a checkpoint report after the tranche.* The status
+item's tooltip says the same (*Autopilot: On · tranche 4 of 10*), and the
+Capacity band under the Board tab has a line for it (*Tranche 4 of 10 runs ·
+$4.10 of $15 · checkpoint in 6 runs or 2 h 10 min*).
+
+When the tranche is used up, the Autopilot **pauses itself**: running steps
+finish, nothing new starts. The popover then reads *Paused at a checkpoint.*
+with a peach chip *Checkpoint report waiting*, and Mission Control (the
+Assistant's Mission Control conversation on the desktop, the chat on the phone
+and iPad) shows the **checkpoint report**: *Checkpoint · tranche 1 of 3 done*
+with four numbers — **Gate rate** (*7 of 8* green), **Change size** (the median
+lines added and removed per run), **Cost per run** (median and the most
+expensive) and **Repeated** (a ticket that ran twice or more) — and a line such
+as *Autopilot paused · 10 runs · $4.10 · 2 h 10 min*. The numbers are counted,
+not written by a model. **Release next tranche** (on the card, in the popover
+or on the phone's Autopilot sheet) starts the next tranche; **Adjust…** opens
+Settings → Tickets (on the phone and iPad: the Settings tab). A resume time set on the pause releases the next
+tranche when it comes.
+
+A tranche can also **stop early**, with a red card: *Stopped early · gate rate
+fell* (three of the last six gates red), *the same ticket failed again* (one
+ticket red twice), *changes grew* (a run changed far more lines than the
+tranche's median) or *a run cost far more* (three times the median). The card
+says what happened and lists the red tickets (*T-0119 · build · Ben · red
+twice*). **Open report** shows the tranche's four numbers; **Release anyway**
+goes on with the same tranche.
+
+The counts survive a restart: after one, the Autopilot is Off as always, the
+popover still shows the tranche (and a waiting report), and the next On goes on
+with it. The sizes and the early-stop limits are the tickets plugin's settings
+`autopilot.tranche.runs`, `.budgetShare`, `.minutes` and
+`autopilot.earlyStop.*`; `0` switches one off, and with all three sizes off
+the Autopilot runs without tranches.
+
 ### Running agents on tickets (the fleet)
 
 A ticket can be worked by an **external agent CLI** — OpenCode, Claude Code or Kimi Code — while you watch from the Work panel. Running agents needs the board on a ticket store (the dricket checkout the Work panel's foot names); on a plain folder board, *Run agent* is refused and says so. Open the menu of a row

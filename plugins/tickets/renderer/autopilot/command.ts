@@ -8,6 +8,7 @@
  */
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
 import type { AutopilotView } from '../../../../shared/autopilot';
+import type { TrancheView } from '../../../../shared/tranche';
 import type { ChainStatus } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { AUTOPILOT_CHORD } from '../status-slot';
 import { stopAllNow, writeAutopilot, type AutopilotOutcome } from './controller';
@@ -21,6 +22,10 @@ export interface AutopilotCommandDeps {
   readonly applyStatus: (status: ChainStatus) => void;
   /** The status item's today's-cost text; null = nothing known. */
   readonly costText: () => string | null;
+  /** The chain's tranche as the plugin last heard it (req-179); null = none. */
+  readonly tranche: () => TrancheView | null;
+  /** "Adjust…" at a checkpoint: opens Settings → Tickets. */
+  readonly adjust: () => void;
   /** The status item the popover sits above. */
   readonly anchor: () => HTMLElement | null;
   /** Told when the popover opens and closes: the status item shows it. */
@@ -63,6 +68,8 @@ export function createAutopilotCommand(deps: AutopilotCommandDeps): AutopilotCom
           formatTime: (date) => api.i18n.formatTime(date),
           chord: AUTOPILOT_CHORD,
           costText: deps.costText,
+          tranche: deps.tranche,
+          adjust: deps.adjust,
           anchor: deps.anchor,
         },
         () => {

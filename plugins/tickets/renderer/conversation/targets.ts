@@ -18,11 +18,14 @@ import type {
   ChatTurnResult,
 } from '../../../../packages/tickets-engine/src/contracts/chat';
 import type { PersonaView } from '../../shared/remote-protocol';
+import { trancheCardOf, type TrancheCard, type TrancheFormat, type TrancheView } from '../../../../shared/tranche';
 import type { ShapeTarget } from '../ticket-document/shape';
 import {
   EMPTY_THREAD,
   PLANNER_NAME,
   errorMessageOf,
+  trancheMessageOf,
+  withTrancheMessage,
   historyOfSessions,
   threadOfPersona,
   threadOfSession,
@@ -45,7 +48,26 @@ export interface ConversationDeps {
   subscribePersonas(listener: () => void): () => void;
   /** The ticket document in focus, when there is one to shape (E13-9); absent = Mission Control never shapes. */
   shape?: ShapeBinding;
+  /** The waiting checkpoint (req-179); absent = Mission Control carries no checkpoint card. */
+  tranche?: TrancheBinding;
 }
+
+/** What Mission Control needs of the tranche: the chain's block, the words, and the two things its card can do. */
+export interface TrancheBinding {
+  view(): TrancheView | null;
+  format(): TrancheFormat;
+  /** The locale's time of day (`api.i18n.formatTime`). */
+  formatTime(date: Date): string;
+  /** Autopilot On; resolves the words of a refusal, or null when it went through. */
+  release(): Promise<string | null>;
+  /** Settings → Tickets. */
+  adjust(): void;
+  /** Fires on every chain status; returns the unsubscribe. */
+  subscribe(listener: () => void): () => void;
+}
+
+/** The id prefix of the checkpoint card (`tranche-<index>-<at>`): its buttons are the plugin's, not the engine chat's. */
+const TRANCHE_CARD_PREFIX = 'tranche-';
 
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -75,6 +97,27 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
   let fileTicket: string | null = null;
   /** A failed turn is not part of the session file; it hangs on the thread until the next send. */
   let lastError: ReturnType<typeof errorMessageOf> | null = null;
+  /** The checkpoint whose "Open report" was pressed (an early stop shows its figures then). */
+  let reportOpenFor: string | null = null;
+
+  const trancheCard = (): TrancheCard | null => {
+    const binding = deps.tranche;
+    const view = binding?.view() ?? null;
+    if (binding === undefined || view === null) {
+      return null;
+    }
+    const first = trancheCardOf(view, binding.format());
+    return first !== null && reportOpenFor === first.id ? trancheCardOf(view, binding.format(), true) : first;
+  };
+  const decorated = (thread: ConversationThread): ConversationThread => {
+    const binding = deps.tranche;
+    const card = trancheCard();
+    if (binding === undefined || card === null) {
+      return thread;
+    }
+    const time = binding.formatTime(new Date(card.at));
+    return withTrancheMessage(thread, trancheMessageOf(card, binding.format().t('checkpoint.meta', { time })));
+  };
 
   const attachedTo = (thread: ConversationThread, shape: ShapeTarget | null): ConversationThread =>
     shape === null ? thread : { ...thread, attached: [`${shape.label} attached`] };
@@ -143,12 +186,31 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
     }
   };
 
+  /** A button of the checkpoint card: Release (and "Release anyway") writes the Autopilot On, Adjust opens Settings, Open report adds the figures. */
+  const actOnCheckpoint = async (cardId: string, actionId: string): Promise<ConversationThread> => {
+    const binding = deps.tranche;
+    if (binding === undefined) {
+      return read();
+    }
+    if (actionId === 'adjust') {
+      binding.adjust();
+    } else if (actionId === 'open_report') {
+      reportOpenFor = cardId;
+    } else if (actionId === 'release' || actionId === 'release_anyway') {
+      const words = await binding.release();
+      if (words !== null) {
+        lastError = errorMessageOf(undefined, words);
+      }
+    }
+    return read();
+  };
+
   return {
     id: MISSION_CONTROL_TARGET,
     label: 'Mission Control',
     icon: 'rocket',
     description: 'Talk to Mission Control: it knows the board and proposes changes you confirm',
-    thread: read,
+    thread: async () => decorated(await read()),
     send: async (text, options) => {
       lastError = null;
       const reference = options?.context === undefined || options.context === '' ? {} : { context: options.context };
@@ -158,7 +220,7 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
         const problem = await deps.shape.flush(shape);
         if (problem !== null) {
           lastError = errorMessageOf(undefined, problem);
-          return read();
+          return decorated(await read());
         }
         deps.shape.lock(shape, true);
       }
@@ -174,7 +236,7 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
             : deps.invoke('mcSend', { file, text, ...reference }))) as ChatTurnResult;
         } catch (error) {
           lastError = errorMessageOf(undefined, messageOf(error));
-          return read();
+          return decorated(await read());
         }
         if (typeof result.file === 'string') {
           file = result.file;
@@ -183,7 +245,7 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
         if (result.ok !== true) {
           lastError = errorMessageOf(result.failure, result.error);
         }
-        return read();
+        return decorated(await read());
       } finally {
         if (shape !== null) {
           deps.shape?.lock(shape, false);
@@ -193,6 +255,9 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
     },
     act: async (cardId, actionId) => {
       lastError = null;
+      if (cardId.startsWith(TRANCHE_CARD_PREFIX)) {
+        return decorated(await actOnCheckpoint(cardId, actionId));
+      }
       if (file === null) {
         return EMPTY_THREAD;
       }
@@ -214,7 +279,7 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
         // "Keep as one" moves the ticket into the build queue: the board and the marks look again.
         await deps.shape?.settled(shape);
       }
-      return read();
+      return decorated(await read());
     },
     newThread: async () => {
       file = null;
@@ -233,19 +298,31 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
       lastError = null;
       return open(id, null);
     },
-    ...(deps.shape === undefined
+    ...(deps.shape === undefined && deps.tranche === undefined
       ? {}
       : {
+          // The thread changes with the ticket in focus and with the checkpoint that waits.
           onThreadChange: (listener: () => void) => {
-            const shape = deps.shape!;
-            let seen = shape.current()?.id ?? null;
-            return shape.subscribe(() => {
-              const now = shape.current()?.id ?? null;
-              if (now !== seen) {
-                seen = now;
-                listener();
-              }
-            });
+            const { shape, tranche } = deps;
+            let seenShape = shape?.current()?.id ?? null;
+            let seenCard = trancheCard()?.id ?? null;
+            const offs = [
+              shape?.subscribe(() => {
+                const now = shape.current()?.id ?? null;
+                if (now !== seenShape) {
+                  seenShape = now;
+                  listener();
+                }
+              }),
+              tranche?.subscribe(() => {
+                const now = trancheCard()?.id ?? null;
+                if (now !== seenCard) {
+                  seenCard = now;
+                  listener();
+                }
+              }),
+            ];
+            return () => offs.forEach((off) => off?.());
           },
         }),
   };

@@ -177,6 +177,16 @@ function dispatchPoolOf(routing: Routing): DispatchPool {
   return { classes: pool.grant, queue: pool.queue, load: () => pool.load(), sessionsOf: (provider) => pool.sessionsOf(provider) };
 }
 
+/** req-179: the day's budget a tranche takes its share of — the provider ledger over every slot; null while none is set. */
+function dayBudgetOf(routing: Routing): { limitUsd(): number | null } {
+  return {
+    limitUsd: () => {
+      const perSlot = routing.pool.settings.ledgers().providerPerDay;
+      return perSlot === null ? null : perSlot * routing.registry.list().length;
+    },
+  };
+}
+
 /** The supervisors, one per provider, and the chain over them; the settle hook closes the loop back to the chain. */
 function composeFleet(ctx: FleetContext): { supervisors: SupervisorSet; orchestrator: Orchestrator } {
   const { root, log, events, hub, routing, capacity } = ctx;
@@ -209,6 +219,8 @@ function composeFleet(ctx: FleetContext): { supervisors: SupervisorSet; orchestr
     pool: dispatchPoolOf(routing),
     capacity,
     migratePools: (config) => routing.pool.migrate(config.pools),
+    dayBudget: dayBudgetOf(routing),
+    sink: hub,
     supervisorOf: (provider) => supervisors.forProvider(provider),
     // E14-5b: a killed runner's claims on a dricket store are released before the chain's first dispatch there.
     releaseLeftovers: async (store, pipeline) => {

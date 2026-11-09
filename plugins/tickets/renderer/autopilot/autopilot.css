@@ -207,3 +207,70 @@
 .desk-autopilot-dot-neutral {
   background: var(--text-4);
 }
+
+/* The tranche (req-179, board 10t): a 4 px progress bar and its note under the chips; at a checkpoint the button row. */
+.tickets-autopilot-bar[hidden],
+.tickets-autopilot-tranche-note[hidden],
+.tickets-autopilot-actions[hidden] {
+  display: none;
+}
+
+.tickets-autopilot-bar {
+  width: 100%;
+  height: 4px;
+  border-radius: var(--radius-chip);
+  background: var(--bg-input);
+}
+
+.tickets-autopilot-bar-fill {
+  display: block;
+  height: 4px;
+  border-radius: var(--radius-chip);
+  background: var(--accent);
+}
+
+.tickets-autopilot-tranche-note {
+  color: var(--text-4);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.tickets-autopilot-chip-attention {
+  color: var(--accent-peach);
+}
+
+.tickets-autopilot-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.tickets-autopilot-release,
+.tickets-autopilot-adjust {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tickets-autopilot-release {
+  flex: 1 1 0;
+  background: var(--accent);
+  border: 0;
+  color: var(--accent-contrast);
+  font-weight: 600;
+}
+
+.tickets-autopilot-release:hover {
+  background: var(--accent-hover);
+}
+
+.tickets-autopilot-adjust {
+  background: transparent;
+  border: 1px solid var(--field-border);
+  color: var(--text-primary);
+}
+
+.tickets-autopilot-adjust:hover {
+  background: var(--hover-bg);
+}

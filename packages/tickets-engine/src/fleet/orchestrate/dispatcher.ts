@@ -36,6 +36,15 @@ export interface DispatcherDeps {
   readonly pool?: DispatchPool;
   /** req-170: the Needs-you card of a full ledger. */
   readonly ledgerCards?: LedgerCards;
+  /** req-179: the tranche's release gate; absent = every start is released. */
+  readonly tranches?: TrancheGate;
+}
+
+/** The tranche as the dispatch sees it (req-179): may a start go, count one, raise a checkpoint the clock reached. */
+export interface TrancheGate {
+  mayStart(): boolean;
+  started(ticket: string): void;
+  review(): boolean;
 }
 
 /** What a pass found occupied: the live runs per pool and the tickets the plan must leave alone. */
@@ -97,6 +106,9 @@ export class Dispatcher {
     this.holdFailingAndStopped(snap.columns, occupied.busy);
     const modes = this.modesWithBudget(snap.pipeline);
     await this.deps.pools.refreshProbes(config.pools ?? normalizeFleetPools(undefined));
+    if (this.deps.tranches?.review() === true) {
+      await this.deps.persist(); // req-179: the time span ran out — the checkpoint pauses the Autopilot before planning
+    }
     const running = state.master === 'run';
     const personas = running ? await this.deps.personas.resolve(config, snap) : new Map<string, TicketPersona>();
     const paused = [...personas].filter(([, entry]) => entry.resolution.persona !== null && state.pausedPersonas.has(entry.resolution.persona));
@@ -148,8 +160,22 @@ export class Dispatcher {
     return refusedByColumn;
   }
 
-  /** One plan item: the class request first (a wait queues it), then the start; a granted ticket's ledger cards resolve. */
+  /** One plan item through the tranche's release gate (req-179); a start counts against the tranche. */
   private async dispatchOne(config: ChainConfig, snap: BoardSnapshot, item: PlanItem, pass: Pass): Promise<DispatchOutcome | 'queued'> {
+    const tranches = this.deps.tranches;
+    if (tranches !== undefined && !tranches.mayStart()) {
+      return 'skipped'; // req-179: the tranche is spent or a checkpoint waits — nothing new starts
+    }
+    const outcome = await this.askAndStart(config, snap, item, pass);
+    if (outcome === 'dispatched' && tranches !== undefined) {
+      tranches.started(item.card.id);
+      await this.deps.persist();
+    }
+    return outcome;
+  }
+
+  /** The class request first (a wait queues it), then the start; a granted ticket's ledger cards resolve. */
+  private async askAndStart(config: ChainConfig, snap: BoardSnapshot, item: PlanItem, pass: Pass): Promise<DispatchOutcome | 'queued'> {
     const persona = pass.personas.get(item.card.id) ?? null;
     const asked = pass.pools.asksPool(item.card) ? this.ask(snap, item, persona) : null;
     if (asked !== null && asked.wait !== null) {

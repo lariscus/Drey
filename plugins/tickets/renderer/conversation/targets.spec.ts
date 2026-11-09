@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports -- the spec stands in for the host, which owns the catalog at runtime
+import { i18n } from '../../../../shared/i18n';
+import { trancheViewOf } from '../../../../shared/tranche';
 import type { PersonaView } from '../../shared/remote-protocol';
 import {
   createConversationProvider,
@@ -6,6 +9,7 @@ import {
   PERSONA_GROUP,
   personaTargetId,
   type ConversationDeps,
+  type TrancheBinding,
 } from './targets';
 
 const persona = (id: string, title: string, kind?: 'human'): PersonaView =>
@@ -116,5 +120,111 @@ describe('a persona target', () => {
       ['personaThreadAppend', { persona: 'ben', text: 'Prefer small commits' }],
     ]);
     expect(thread.notice).toBe('Ben reads this thread before the next run.');
+  });
+});
+
+describe('the checkpoint card in Mission Control (req-179, board 10u)', () => {
+  const REPORT = {
+    kind: 'end',
+    at: '2026-11-09T14:02:00.000Z',
+    runs: 10,
+    spent: 4.1,
+    minutes: 130,
+    gates: { green: 7, total: 8 },
+    change: { added: 212, removed: 40 },
+    cost: { median: 0.41, max: 1.2 },
+    repeated: { ticket: 'T-0119', runs: 2 },
+    earlyStop: null,
+  };
+  const EARLY = {
+    ...REPORT,
+    kind: 'early',
+    earlyStop: { rule: 'gate_rate', red: 3, window: 6, runsLeft: 6, ticket: null, value: null, median: null, tickets: [{ ticket: 'T-0119', phase: 'build', persona: 'ben', red: 2 }] },
+  };
+  const block = (report: object | null) => ({
+    index: 1,
+    of: 3,
+    done: 10,
+    total: 10,
+    spent: 4.1,
+    budget: 15,
+    startedAt: '2026-11-09T12:00:00.000Z',
+    endsAt: null,
+    checkpoint: report === null ? null : 'waiting',
+    report,
+  });
+
+  function withTranche(initial: object | null) {
+    let current = trancheViewOf({ tranche: initial });
+    const listeners = new Set<() => void>();
+    const released: string[] = [];
+    const binding: TrancheBinding = {
+      view: () => current,
+      format: () => ({ t: (key, params) => i18n.t(key, params), money: (usd) => `$${usd.toFixed(2)}`, personaName: (id) => (id === 'ben' ? 'Ben' : id) }),
+      formatTime: () => '14:02',
+      release: () => {
+        released.push('on');
+        return Promise.resolve(null);
+      },
+      adjust: () => released.push('adjust'),
+      subscribe: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    };
+    const mission = createConversationProvider({ ...deps().deps, tranche: binding }).targets()[0]!;
+    return {
+      mission,
+      released,
+      set: (next: object | null) => {
+        current = trancheViewOf({ tranche: next });
+        listeners.forEach((listener) => listener());
+      },
+    };
+  }
+
+  it('ends the thread with the card while a checkpoint waits, and not before', async () => {
+    const { mission, set } = withTranche(block(null));
+    expect((await mission.thread()).messages).toHaveLength(0);
+    set(block(REPORT));
+    const messages = (await mission.thread()).messages;
+    expect(messages).toHaveLength(1);
+    const card = messages[0]!.cards![0]!;
+    expect(card).toMatchObject({ title: 'Checkpoint · tranche 1 of 3 done', dot: 'attention', meta: 'Mission Control · 14:02' });
+    expect(card.actions!.map((a) => a.label)).toEqual(['Release next tranche', 'Adjust…']);
+  });
+
+  it('Release next tranche writes the Autopilot On; Adjust opens the settings', async () => {
+    const { mission, released } = withTranche(block(REPORT));
+    const id = (await mission.thread()).messages[0]!.cards![0]!.id;
+    await mission.act(id, 'release');
+    await mission.act(id, 'adjust');
+    expect(released).toEqual(['on', 'adjust']);
+  });
+
+  it('an early stop shows the figures after Open report, and Release anyway writes On', async () => {
+    const { mission, released } = withTranche(block(EARLY));
+    const first = (await mission.thread()).messages[0]!.cards![0]!;
+    expect(first).toMatchObject({ dot: 'negative', rows: [{ text: 'T-0119 · build · Ben · red twice', dot: 'negative' }] });
+    expect(first.metrics).toBeUndefined();
+    const reopened = await mission.act(first.id, 'open_report');
+    expect(reopened.messages.at(-1)!.cards![0]!.metrics).toHaveLength(4);
+    await mission.act(first.id, 'release_anyway');
+    expect(released).toEqual(['on']);
+  });
+
+  it('tells the Assistant when the waiting checkpoint appears or goes, not on every chain status', () => {
+    const { mission, set } = withTranche(block(null));
+    const listener = vi.fn();
+    const off = mission.onThreadChange!(listener);
+    set(block(null));
+    expect(listener).not.toHaveBeenCalled();
+    set(block(REPORT));
+    expect(listener).toHaveBeenCalledTimes(1);
+    set(block(REPORT));
+    expect(listener).toHaveBeenCalledTimes(1);
+    set(block(null));
+    expect(listener).toHaveBeenCalledTimes(2);
+    off();
   });
 });

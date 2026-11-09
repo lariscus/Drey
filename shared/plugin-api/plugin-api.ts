@@ -421,6 +421,20 @@ export interface ConversationCardAction {
   readonly tone?: 'primary' | 'quiet';
 }
 
+/** One figure of a card's metric grid (SDK 1.55): a label, a lead value and a small sub that sits after the value (`inline`) or under it. */
+export interface ConversationCardMetric {
+  readonly label: string;
+  readonly value: string;
+  readonly sub?: string;
+  readonly inline?: boolean;
+}
+
+/** One line of a card's list (SDK 1.55); `dot` draws a small status dot before the text. */
+export interface ConversationCardRow {
+  readonly text: string;
+  readonly dot?: 'attention' | 'negative';
+}
+
 /**
  * A card under a conversation message (SDK 1.41): a proposal with buttons
  * (`kind: 'card'`), or an answer card whose `choices` the Assistant shows
@@ -430,7 +444,18 @@ export interface ConversationCardAction {
 export interface ConversationCard {
   readonly id: string;
   readonly kind: 'card' | 'choices';
+  /** The card's body; may be empty when the card has a `title` and figures instead. */
   readonly text: string;
+  /** A bold heading above the body (SDK 1.55). */
+  readonly title?: string;
+  /** A status dot before the `title` (SDK 1.55): peach `attention`, red `negative`. */
+  readonly dot?: 'attention' | 'negative';
+  /** A 2 x 2 grid of figures under the body (SDK 1.55). */
+  readonly metrics?: readonly ConversationCardMetric[];
+  /** A short list of lines under the figures (SDK 1.55). */
+  readonly rows?: readonly ConversationCardRow[];
+  /** A quiet line at the card's bottom, under the buttons (SDK 1.55): who or when. */
+  readonly meta?: string;
   /** Free small line under the text (a state, an outcome). */
   readonly note?: string;
   /** Buttons of a `card`; empty once it is decided. */

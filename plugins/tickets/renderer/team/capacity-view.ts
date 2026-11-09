@@ -20,6 +20,7 @@ import {
 import { teamModelOf, usd, usdBudget, type PersonaCardModel } from './team-model';
 import type { TeamStore } from './team-store';
 import type { I18n } from '../../../../shared/i18n/types';
+import { spanText } from '../../../../shared/tranche';
 
 const TICK_MS = 15_000;
 
@@ -167,21 +168,25 @@ export function slotChipNode(chip: SlotChipModel, i18n: I18n, now: Date): HTMLEl
 
 /** The tranche's one line and its progress bar (the row's left part). */
 export function trancheNodes(tranche: TrancheModel, i18n: I18n): readonly HTMLElement[] {
+  const t = i18n.t as (key: string, params?: Record<string, string | number>) => string;
+  const params = {
+    index: tranche.index,
+    n: tranche.runs,
+    total: tranche.size ?? 0,
+    cost: usd(tranche.cost),
+    budget: usdBudget(tranche.budget ?? 0),
+    runs: tranche.runsLeft ?? 0,
+    time: tranche.msLeft === null ? '' : spanText(tranche.msLeft, (key, p) => i18n.t(key, p)),
+  };
+  const shape = (tranche.size === null ? '' : 'r') + (tranche.budget === null ? '' : 'b') + (tranche.msLeft === null ? '' : 't');
   const text = h(
     'span',
     'desk-tranche-text',
-    i18n.t('capacity.tranche.line', {
-      n: tranche.runs,
-      total: tranche.size,
-      cost: usd(tranche.cost),
-      budget: usdBudget(tranche.budget),
-      runs: tranche.runsLeft,
-      time: i18n.formatDuration(tranche.msLeft),
-    }),
+    shape === 'rbt' ? t('capacity.tranche.line', params) : t('capacity.tranche.line_short', { ...params, shape }),
   );
   const bar = h('span', 'desk-tranche-bar');
   const fill = h('span', 'desk-tranche-fill');
-  fill.style.width = `${Math.round(Math.min(1, tranche.runs / Math.max(1, tranche.size)) * 100)}%`;
+  fill.style.width = `${Math.round(tranche.progress * 100)}%`;
   bar.append(fill);
   return [text, bar];
 }
@@ -264,7 +269,7 @@ export function mountCapacity(deps: DeskDeps, store: TeamStore, host: HTMLElemen
     slotRow.append(...slotChipsOf(chain?.slots).map((chip) => slotChipNode(chip, i18n, now)));
 
     const queueRow = h('div', 'desk-cap-queuerow');
-    const tranche = trancheOf(chain);
+    const tranche = trancheOf(chain, now);
     if (tranche !== null) {
       queueRow.append(...trancheNodes(tranche, i18n));
     }

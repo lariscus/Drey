@@ -422,7 +422,11 @@ export class App {
       label: 'Open settings',
       keybinding: 'Mod+,',
       // One tab: opening it again focuses it (board 7g, ADR-0010 later change).
-      run: () => this.settingsTab.open(),
+      // A caller may name the page (`{ category }`, a plugin's checkpoint "Adjust…").
+      run: (payload) => {
+        const category = (payload as { category?: unknown } | undefined)?.category;
+        this.settingsTab.open(typeof category === 'string' ? category : undefined);
+      },
     });
     keys.register({
       id: 'layout.reset',

@@ -13,7 +13,7 @@
  */
 import { AUTOPILOT_OFF, autopilotOfMaster, resumeDue } from './autopilot';
 import type { Clock } from './ports/clock';
-import { WORKER_PROVIDERS, type AutopilotRecord, type ChainConfig, type ChainMaster, type ChainStatus, type ColumnMode, type RunInfo, type RunRequest, type SlotSummary } from './protocol';
+import { WORKER_PROVIDERS, type AutopilotRecord, type ChainConfig, type ChainMaster, type ChainStatus, type ColumnMode, type RunInfo, type RunRequest, type SlotSummary, type TrancheStatus } from './protocol';
 import type { DispatchPool } from './orchestrate/dispatch-pool';
 import { LIVE_RUN_STATES } from './run/run-state';
 import type { ChainState } from './orchestrate/chain-state';
@@ -57,11 +57,32 @@ export interface OrchestratorParts {
   readonly pool?: DispatchPool;
   /** req-170: the one-time move of the old pool sizes into `service.json`. */
   readonly migratePools?: (config: ChainConfig) => Promise<void>;
+  /** req-179: the tranche — its status, the owner's release, the settled runs' facts. */
+  readonly tranches?: TrancheSource;
+  /** The write of `chain.json` with what follows it (the tranche's event); absent = the store's write alone. */
+  readonly persist?: () => Promise<void>;
+}
+
+/** The tranche as the orchestrator asks it (`orchestrate/tranche`'s `Tranches` satisfies it). */
+export interface TrancheSource {
+  status(): TrancheStatus | null;
+  onAutopilot(next: AutopilotRecord): AutopilotRecord;
+  settled(info: RunInfo): Promise<boolean>;
 }
 
 /** Where the chain status reads the slots from (`fleet/routing`'s registry satisfies it). */
 export interface SlotSummarySource {
   summary(): readonly SlotSummary[];
+}
+
+/** Whether a config changes nothing `chain.json` keeps. */
+function sameChainConfig(was: ChainConfig | null, config: ChainConfig): boolean {
+  const json = (value: unknown): string => JSON.stringify(value ?? null);
+  return (
+    was !== null &&
+    (['ticketsVaultPath', 'git', 'defaultWorker', 'permissionMode'] as const).every((key) => was[key] === config[key]) &&
+    (['store', 'pools', 'tranche'] as const).every((key) => json(was[key]) === json(config[key]))
+  );
 }
 
 export class Orchestrator {
@@ -81,7 +102,9 @@ export class Orchestrator {
     const status = this.parts.state.status({ quotaPausedUntil: this.parts.pools.quotaPausedUntil(), poolSize: this.poolSizes() });
     const pool = this.parts.pool;
     const withSlots = this.parts.slots === undefined ? status : { ...status, slots: this.parts.slots.summary() };
-    return pool === undefined ? withSlots : { ...withSlots, pool: pool.load(), queue: pool.queue.list() };
+    const tranche = this.parts.tranches?.status() ?? null;
+    const withTranche = tranche === null ? withSlots : { ...withSlots, tranche };
+    return pool === undefined ? withTranche : { ...withTranche, pool: pool.load(), queue: pool.queue.list() };
   }
 
   /** The effective parallel runs per provider; a provider without a bound of its own is left out. */
@@ -93,12 +116,7 @@ export class Orchestrator {
 
   /** Points the chain at a board (idempotent) and scans. */
   async configure(config: ChainConfig): Promise<ChainStatus> {
-    const was = this.parts.state.config;
-    const same =
-      was !== null &&
-      (['ticketsVaultPath', 'git', 'defaultWorker', 'permissionMode'] as const).every((key) => was[key] === config[key]) &&
-      JSON.stringify(was.store ?? null) === JSON.stringify(config.store ?? null) &&
-      JSON.stringify(was.pools ?? null) === JSON.stringify(config.pools ?? null);
+    const same = sameChainConfig(this.parts.state.config, config);
     this.parts.state.config = config;
     if (!same) {
       await this.persist();
@@ -110,8 +128,9 @@ export class Orchestrator {
   }
 
   /** The Autopilot switch (req-95): On dispatches at once, Paused and Off start nothing new and leave running work alone. */
-  async setAutopilot(record: AutopilotRecord): Promise<ChainStatus> {
+  async setAutopilot(asked: AutopilotRecord): Promise<ChainStatus> {
     const was = this.parts.state.autopilot;
+    const record = this.parts.tranches?.onAutopilot(asked) ?? asked; // req-179: On releases a tranche
     if (record.state !== was.state || record.resumeAt !== was.resumeAt) {
       this.parts.log(`autopilot: ${record.state}${record.resumeAt === undefined ? '' : ` until ${record.resumeAt}`}`);
     }
@@ -197,6 +216,9 @@ export class Orchestrator {
   /** The supervisors' run-settled hook (M85): the books, then a fresh pass — the slot is free. */
   async onRunSettled(info: RunInfo): Promise<void> {
     await this.parts.settled.onSettled(info);
+    if ((await this.parts.tranches?.settled(info)) === true) {
+      await this.persist(); // req-179: the run's fact, maybe a checkpoint
+    }
     await this.parts.dispatcher.pass();
   }
 
@@ -249,7 +271,7 @@ export class Orchestrator {
   }
 
   persist(): Promise<void> {
-    return this.parts.store.persist(this.parts.state);
+    return this.parts.persist?.() ?? this.parts.store.persist(this.parts.state);
   }
 
   private startTimer(): void {

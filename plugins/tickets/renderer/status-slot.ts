@@ -25,6 +25,8 @@ export interface StatusSlotInput {
   readonly autopilot: AutopilotState | null;
   /** True while the Notes view is active: the needs-you item then says where. */
   readonly inNotesView: boolean;
+  /** The tranche's run count (req-179); its tooltip names it when the tranche has a run limit. */
+  readonly tranche?: { readonly done: number; readonly total: number | null } | null;
 }
 
 /** The part of a status item this file decides; empty text = hidden. */
@@ -69,14 +71,21 @@ export const AUTOPILOT_CHORD = 'Mod+Alt+P';
 export const AUTOPILOT_COMMAND_ID = 'tickets.autopilot';
 
 /** The Autopilot item (concept 6.1, board 10t): green dot On, orange Paused, grey (no dot) Off. */
-export function autopilotSlotOf(autopilot: AutopilotState | null, t: Translate): StatusSlotPatch {
+export function autopilotSlotOf(
+  autopilot: AutopilotState | null,
+  t: Translate,
+  tranche: StatusSlotInput['tranche'] = null,
+): StatusSlotPatch {
   if (autopilot === null) {
     return HIDDEN;
   }
   const state = t(`autopilot.state.${autopilot}`);
   return {
     text: t('status.autopilot', { state }),
-    tooltip: t('status.autopilot.tooltip', { state, chord: AUTOPILOT_CHORD }),
+    tooltip:
+      tranche?.total == null
+        ? t('status.autopilot.tooltip', { state, chord: AUTOPILOT_CHORD })
+        : t('status.autopilot.tooltip_tranche', { state, done: tranche.done, total: tranche.total, chord: AUTOPILOT_CHORD }),
     ...(autopilot === 'on' ? { dot: 'positive' as const } : autopilot === 'paused' ? { dot: 'attention' as const } : {}),
   };
 }
@@ -85,7 +94,7 @@ export function statusSlotsOf(input: StatusSlotInput, t: Translate): StatusSlots
   return {
     cost: costSlotOf(input.cost, input.budget, t),
     needs: needsSlotOf(input.needsYou, input.inNotesView, t),
-    autopilot: autopilotSlotOf(input.autopilot, t),
+    autopilot: autopilotSlotOf(input.autopilot, t, input.tranche),
   };
 }
 

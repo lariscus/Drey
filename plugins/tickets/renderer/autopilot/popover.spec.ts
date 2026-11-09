@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AutopilotView } from '../../../../shared/autopilot';
+import type { TrancheView } from '../../../../shared/tranche';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- the spec stands in for the host, which owns the catalog at runtime
 import { i18n } from '../../../../shared/i18n';
 import { stopAllNow, writeAutopilot, type AutopilotOutcome } from './controller';
@@ -18,6 +19,7 @@ interface MountOptions {
   readonly reply?: AutopilotOutcome;
   readonly cost?: string | null;
   readonly anchor?: HTMLElement;
+  readonly tranche?: TrancheView | null;
 }
 
 function mount(initial: AutopilotView, options: MountOptions = {}) {
@@ -31,6 +33,7 @@ function mount(initial: AutopilotView, options: MountOptions = {}) {
   });
   const stopAll = vi.fn(async () => reply);
   const onClosed = vi.fn();
+  const adjust = vi.fn();
   open = openAutopilotPopover(
     {
       t,
@@ -40,12 +43,14 @@ function mount(initial: AutopilotView, options: MountOptions = {}) {
       formatTime: (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
       chord: 'Mod+Alt+P',
       costText: () => (options.cost === undefined ? '$4.10 of $15 today' : options.cost),
+      tranche: () => options.tranche ?? null,
+      adjust,
       ...(options.anchor === undefined ? {} : { anchor: () => options.anchor! }),
       now: () => new Date(2026, 10, 6, 10, 0),
     },
     onClosed,
   );
-  return { set, stopAll, onClosed, popover: open, setView: (next: AutopilotView) => (view = next) };
+  return { set, stopAll, onClosed, adjust, popover: open, setView: (next: AutopilotView) => (view = next) };
 }
 
 const pop = (): HTMLElement | null => document.querySelector<HTMLElement>('.tickets-autopilot-pop');
@@ -68,6 +73,9 @@ describe('the desktop popover', () => {
       'tickets-autopilot-seg',
       'tickets-autopilot-sentence',
       'tickets-autopilot-chips',
+      'tickets-autopilot-bar',
+      'tickets-autopilot-tranche-note',
+      'tickets-autopilot-actions',
       'tickets-autopilot-divider',
       'tickets-autopilot-stop',
       'tickets-autopilot-note',
@@ -100,6 +108,70 @@ describe('the desktop popover', () => {
     setView({ state: 'paused' });
     popover.refresh();
     expect(chips()).toEqual(['Resume time', '$4.10 of $15 today']);
+  });
+
+  describe('the tranche (req-179, board 10t)', () => {
+    const NOW = new Date(2026, 10, 6, 10, 0);
+    const tranche = (patch: Partial<TrancheView> = {}): TrancheView => ({
+      index: 1,
+      of: 3,
+      done: 4,
+      total: 10,
+      spent: 4.1,
+      budget: 15,
+      startedAt: new Date(NOW.getTime() - 87 * 60_000).toISOString(),
+      endsAt: new Date(NOW.getTime() + 130 * 60_000).toISOString(),
+      checkpoint: null,
+      report: null,
+      ...patch,
+    });
+    const shown = (selector: string): boolean => !document.querySelector<HTMLElement>(selector)!.hidden;
+
+    it('On: the tranche, the cost and the time left as chips, the 4 px bar and the note', () => {
+      mount({ state: 'on' }, { tranche: tranche() });
+      expect(chips()).toEqual(['Tranche 4 of 10 runs', '$4.10 of $15 today', '2 h 10 min left']);
+      expect(document.querySelector<HTMLElement>('.tickets-autopilot-bar-fill')!.style.width).toBe('40%');
+      expect(document.querySelector('.tickets-autopilot-tranche-note')!.textContent).toBe('Pauses with a checkpoint report after the tranche.');
+      expect(shown('.tickets-autopilot-bar')).toBe(true);
+      expect(shown('.tickets-autopilot-actions')).toBe(false);
+    });
+
+    it('without a tranche in the status the popover stays as before', () => {
+      mount({ state: 'on' });
+      expect(chips()).toEqual(['$4.10 of $15 today']);
+      expect(shown('.tickets-autopilot-bar')).toBe(false);
+      expect(shown('.tickets-autopilot-tranche-note')).toBe(false);
+      expect(shown('.tickets-autopilot-actions')).toBe(false);
+    });
+
+    it('Paused at a checkpoint: its sentence, the waiting chip, the buttons; no bar', () => {
+      mount({ state: 'paused' }, { tranche: tranche({ checkpoint: 'waiting' }) });
+      expect(document.querySelector('.tickets-autopilot-sentence')!.textContent).toBe('Paused at a checkpoint. Running steps finished, nothing new starts.');
+      expect(chips()).toEqual(['Checkpoint report waiting', 'Resume time', '$4.10 of $15 today']);
+      expect(Array.from(document.querySelectorAll('.tickets-autopilot-actions button')).map((b) => b.textContent)).toEqual(['Release next tranche', 'Adjust…']);
+      expect(shown('.tickets-autopilot-actions')).toBe(true);
+      expect(shown('.tickets-autopilot-bar')).toBe(false);
+    });
+
+    it('Release next tranche writes the Autopilot On', async () => {
+      const { set } = mount({ state: 'paused' }, { tranche: tranche({ checkpoint: 'waiting' }) });
+      document.querySelector<HTMLButtonElement>('.tickets-autopilot-release')!.click();
+      await flush();
+      expect(set).toHaveBeenCalledWith({ state: 'on' });
+    });
+
+    it('Adjust… closes the popover and opens the settings', () => {
+      const { adjust, onClosed } = mount({ state: 'paused' }, { tranche: tranche({ checkpoint: 'waiting' }) });
+      document.querySelector<HTMLButtonElement>('.tickets-autopilot-adjust')!.click();
+      expect(adjust).toHaveBeenCalledOnce();
+      expect(onClosed).toHaveBeenCalledOnce();
+    });
+
+    it('a paused chain without a waiting checkpoint shows no tranche part', () => {
+      mount({ state: 'paused' }, { tranche: tranche() });
+      expect(chips()).toEqual(['Resume time', '$4.10 of $15 today']);
+      expect(shown('.tickets-autopilot-bar')).toBe(false);
+    });
   });
 
   it('hides the chip row with nothing to show', () => {

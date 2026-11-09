@@ -10,6 +10,7 @@ import type {
   ConversationThread,
   ConversationThreadMeta,
 } from '../../../../shared/plugin-api/renderer';
+import type { TrancheCard } from '../../../../shared/tranche';
 import type { ChatModelFailure, ChatProposal, ChatSession, ChatSessionMeta } from '../../../../packages/tickets-engine/src/contracts/chat';
 
 /** The chip on a persona's words: the persona speaks, Mission Control relays. */
@@ -104,6 +105,41 @@ export function threadOfSession(session: ChatSession): ConversationThread {
     };
   });
   return { id: session.file, title: session.title, messages };
+}
+
+/**
+ * The checkpoint card (board 10u parts 1 and 6) as the agent message that closes
+ * the Mission Control thread while a checkpoint waits: the shared card model
+ * mapped onto the SDK's content-agnostic card fields (SDK 1.55). `meta` is the
+ * catalog's "Mission Control · 14:02" with the locale time of the checkpoint.
+ */
+export function trancheMessageOf(card: TrancheCard, meta: string): ConversationMessage {
+  return {
+    id: card.id,
+    role: 'agent',
+    text: '',
+    cards: [
+      {
+        id: card.id,
+        kind: 'card',
+        title: card.title,
+        dot: card.tone,
+        text: card.body ?? '',
+        ...(card.metrics.length > 0
+          ? { metrics: card.metrics.map((m) => ({ label: m.label, value: m.value, ...(m.sub === '' ? {} : { sub: m.sub, inline: m.inline }) })) }
+          : {}),
+        ...(card.rows.length > 0 ? { rows: card.rows.map((text) => ({ text, dot: 'negative' as const })) } : {}),
+        ...(card.summary === null ? {} : { note: card.summary }),
+        actions: card.actions.map((action) => ({ id: action.id, label: action.label, tone: action.primary ? ('primary' as const) : ('quiet' as const) })),
+        meta,
+      },
+    ],
+  };
+}
+
+/** The thread with the checkpoint card at its end; the thread itself when none waits. */
+export function withTrancheMessage(thread: ConversationThread, message: ConversationMessage | null): ConversationThread {
+  return message === null ? thread : { ...thread, messages: [...thread.messages, message] };
 }
 
 /** The history rows of the engine's session list. */
