@@ -3,9 +3,9 @@ import type { ClassRequest, RunInfo, RunRequest } from '../protocol';
 import { CapacityCap } from './capacity-cap';
 import { Ledgers } from './ledgers';
 import { PoolGate } from './pool-gate';
-import { PoolGrant, type ProviderThrottle } from './pool-grant';
+import type { PoolGrant, ProviderThrottle } from './pool-grant';
 import { PoolSettingsRegistry } from './pool-settings';
-import { FakeClock, FakeQuotaSource, slot } from './routing.fake';
+import { FakeClock, FakeQuotaSource, grantOf, slot } from './routing.fake';
 import { SessionBook } from './session-book';
 import type { Slot } from './slot';
 import { SlotRegistry } from './slot-registry';
@@ -52,7 +52,7 @@ async function rig(config: Record<string, unknown> = { models: TABLE }, throttle
   settings.apply(config, SLOTS, null);
   const book = new SessionBook();
   const cap = new CapacityCap(settings, reservations);
-  const pool = new PoolGrant({ slots: registry, settings, cap, reservations, ledgers: new Ledgers(book, settings, new FakeClock(NOW)), ...(throttle !== undefined ? { throttle } : {}) });
+  const pool = grantOf({ slots: registry, settings, cap, reservations, ledgers: new Ledgers(book, settings, new FakeClock(NOW)), records: book, ...(throttle !== undefined ? { throttle } : {}) });
   return { pool, gate: new PoolGate(registry, reservations, pool), cap, book, registry, settings };
 }
 
@@ -76,9 +76,10 @@ const ctx = { prefer: null, persona: 'ben' };
 const run = (over: Partial<RunInfo>): RunInfo => ({ id: 'R-old', ticketId: 'T-0001', persona: 'ben', costUsd: 1, startedAt: NOW.toISOString(), slot: { id: 'claude-a', label: 'Claude A' }, ...over }) as RunInfo;
 
 describe('PoolGrant — exactly the class asked for, or wait (req-170, R10)', () => {
-  it('grants the first model of the class in the pool order — never a stronger or a lighter one', async () => {
+  it('grants a model of exactly the class — never a stronger or a lighter one; same surplus → the cheaper (req-178)', async () => {
     const { pool } = await rig();
-    expect(pool.choose(ask())).toMatchObject({ kind: 'grant', model: 'sonnet', class: 'B', cost: 1, slot: { id: 'claude-a' }, reason: 'sonnet, class B, cost 1 on Claude A — part M' });
+    expect(pool.choose(ask())).toMatchObject({ kind: 'grant', model: 'glm', class: 'B', cost: 0.4, slot: { id: 'zai' }, reason: 'glm, class B, cost 0.4 on z.ai — part M' });
+    expect(pool.choose(ask({ pool: [{ provider: null, model: 'sonnet' }] }))).toMatchObject({ kind: 'grant', model: 'sonnet', class: 'B', cost: 1, slot: { id: 'claude-a' }, reason: 'sonnet, class B, cost 1 on Claude A — part M' });
     expect(pool.choose(ask({ class: 'C' }))).toMatchObject({ kind: 'grant', model: 'kimi-k2', class: 'C', slot: { id: 'kimi' } });
     expect(pool.choose(ask({ class: 'A' }))).toMatchObject({ kind: 'grant', model: 'opus', class: 'A' });
   });

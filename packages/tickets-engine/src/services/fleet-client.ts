@@ -370,9 +370,14 @@ export class FleetClient {
     }
   }
 
-  /** Replaces the pool keys it is sent (`models`, `capacity`, `ledgers`) in `service.json`; a broken row refuses the write. */
-  writeModels(keys: { readonly models?: readonly unknown[]; readonly capacity?: unknown; readonly ledgers?: unknown }): Promise<ModelsReply | { readonly ok: false; readonly error: string }> {
+  /** Replaces the pool keys it is sent (`models`, `capacity`, `ledgers`, req-178's `routing`) in `service.json`; a broken row refuses the write. */
+  writeModels(keys: { readonly models?: readonly unknown[]; readonly capacity?: unknown; readonly ledgers?: unknown; readonly routing?: unknown }): Promise<ModelsReply | { readonly ok: false; readonly error: string }> {
     return this.slotWrite<ModelsReply>('/models/config', keys);
+  }
+
+  /** req-178: fills the model table's undeclared capability columns from models.dev — one network call, only on the owner's ask; the reply's `imported` says what. */
+  importModelCapabilities(): Promise<ModelsReply | { readonly ok: false; readonly error: string }> {
+    return this.slotWrite<ModelsReply>('/models/import', {});
   }
 
   private async slotWrite<T>(pathname: string, body: unknown): Promise<T | { readonly ok: false; readonly error: string }> {

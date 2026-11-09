@@ -1,5 +1,7 @@
 import type { SlotProfile } from './protocol-slots';
 import type { WorkerProviderId } from './protocol';
+import type { CapabilityImportReport, ModelCapabilities, RouteRecord, RoutingSettings } from './protocol-routing';
+import type { ModelNeeds } from '../contracts/ticket-pool-meta';
 
 // ---------------------------------------------------------------------------
 // The capacity pool (req-170, ADR-0095): the model table, the capacity cap,
@@ -26,8 +28,8 @@ export function isPartSize(value: unknown): value is PartSize {
   return value === 'S' || value === 'M' || value === 'L';
 }
 
-/** One row of the model table in `service.json` (board 7l's Model table). */
-export interface ModelRow {
+/** One row of the model table in `service.json` (board 7l's Model table); req-178 adds the declared capabilities. */
+export interface ModelRow extends ModelCapabilities {
   /** The model id the harness is started with (`claude-opus-4-1`, `glm-5.3`). */
   readonly model: string;
   /** The slot (account, req-177) that serves it; absent = every slot of `provider`. */
@@ -66,6 +68,8 @@ export interface PoolSettings {
   readonly models: readonly ModelRow[];
   readonly capacity: CapacityConfig;
   readonly ledgers: LedgerDefaults;
+  /** req-178: board 7l's Routing group. */
+  readonly routing: RoutingSettings;
 }
 
 /** One slot's load against its cap. */
@@ -123,6 +127,8 @@ export interface ModelsReply extends PoolSettings {
   /** Entries `service.json` holds that the parse left out, one line each. */
   readonly errors: readonly string[];
   readonly configPath: string;
+  /** req-178: on the answer of `POST /models/import` only. */
+  readonly imported?: CapabilityImportReport;
 }
 
 /** The pool's decision on a run record and in the stream: the class asked for, the model that ran, why. */
@@ -132,6 +138,8 @@ export interface PoolGrantRecord {
   readonly model: string;
   readonly cost: number;
   readonly reason: string;
+  /** req-178: the routing's decision — slot, model, surplus, estimated cost, step up, the filtered slots; absent before req-178. */
+  readonly route?: RouteRecord;
 }
 
 /** What a start carries for the ledgers (the runner reads no ticket or persona file itself). */
@@ -179,8 +187,12 @@ export interface ClassRequest {
   /** The harness an entry without a provider runs on when the table does not hold it. */
   readonly provider: WorkerProviderId;
   readonly profile: SlotProfile;
-  /** The context the session expects to need; carried to the record (the filter is req-178's). */
+  /** The context the session expects to need; the filter takes no model with a smaller declared window (req-178). */
   readonly contextTokens: number | null;
+  /** req-178: the capabilities its model must have (the phase's and the ticket's `needs:`); absent = none. */
+  readonly needs?: ModelNeeds | null;
+  /** req-178: the choice may step up within the slot above `Upgrade above q`; false on a pin and at a start's gate. */
+  readonly stepUp?: boolean;
   readonly ledger: RunLedgerInput;
   /** The slot to prefer (where a resumed session lives). */
   readonly prefer: string | null;
@@ -197,6 +209,8 @@ export interface PoolGrantDecision {
   readonly class: CapabilityClass | null;
   readonly cost: number;
   readonly reason: string;
+  /** req-178: the routing's decision behind the grant. */
+  readonly route?: RouteRecord;
 }
 
 /** No grant: the session waits, no process is spawned. */

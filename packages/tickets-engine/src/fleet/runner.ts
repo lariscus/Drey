@@ -159,6 +159,7 @@ function routingFor(args: Args, deps: RunnerDeps, ctx: { log: (message: string) 
   hub.subscribe((event) => {
     routing.listener.publish(event);
     routing.pool.book.publish(event);
+    routing.pool.shares.publish(event);
   });
   return routing;
 }

@@ -4,12 +4,12 @@ import type { RunInfo, RunRequest, SlotView } from '../protocol';
 import { ClaudeCodeQuotaSource } from './claude-code-quota-source';
 import { CountingQuotaSource } from './counting-quota-source';
 import { MemoryFileSystem } from '../ports/memory-file-system.fake';
-import { FakeClock, FakeQuotaSource, slot, window } from './routing.fake';
+import { FakeClock, FakeQuotaSource, grantOf, slot, window } from './routing.fake';
 import type { Slot } from './slot';
 import { CapacityCap } from './capacity-cap';
 import { Ledgers } from './ledgers';
 import { PoolGate } from './pool-gate';
-import { PoolGrant } from './pool-grant';
+
 import { PoolSettingsRegistry } from './pool-settings';
 import { SessionBook } from './session-book';
 import { SlotRegistry } from './slot-registry';
@@ -37,7 +37,7 @@ function parts(slots: Slot[], sourceOf?: (s: Slot) => FakeQuotaSource | ClaudeCo
   settings.apply(pool, slots, null);
   const book = new SessionBook();
   const cap = new CapacityCap(settings, reservations);
-  const grant = new PoolGrant({ slots: registry, settings, cap, reservations, ledgers: new Ledgers(book, settings, new FakeClock(NOW)) });
+  const grant = grantOf({ slots: registry, settings, cap, reservations, ledgers: new Ledgers(book, settings, new FakeClock(NOW)), records: book });
   return { registry, gate: new PoolGate(registry, reservations, grant), reservations, source, changes, book };
 }
 

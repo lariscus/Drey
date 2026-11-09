@@ -51,13 +51,19 @@ function harnessOf(persona: { readonly worker: string; readonly models: { readon
   return { worker: granted.provider, model: granted.model ?? fallback.model };
 }
 
-/** The request's pool fields: the class asked for, why, and what the ledgers need. */
-function poolParts(grant: PoolGrantFor | null): Pick<RunRequest, 'poolClass' | 'poolWhy' | 'ledger'> {
+/** The request's pool fields: the class asked for, why, what the ledgers need, and (req-178) the needs and the routing's decision. */
+function poolParts(grant: PoolGrantFor | null): Pick<RunRequest, 'poolClass' | 'poolWhy' | 'ledger' | 'poolNeeds' | 'poolRoute'> {
   if (grant === null) {
     return {};
   }
-  const { request } = grant;
-  return { ...(request.class !== null ? { poolClass: request.class } : {}), poolWhy: request.why, ledger: request.ledger };
+  const { request, decision } = grant;
+  return {
+    ...(request.class !== null ? { poolClass: request.class } : {}),
+    poolWhy: request.why,
+    ledger: request.ledger,
+    ...(request.needs !== undefined && request.needs !== null ? { poolNeeds: request.needs } : {}),
+    ...(decision.route !== undefined ? { poolRoute: decision.route } : {}),
+  };
 }
 
 /** What the repo side of a dispatch resolved to. */

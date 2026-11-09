@@ -1,4 +1,4 @@
-import type { CapacityConfig, LedgerDefaults, PoolSettings } from '../protocol';
+import { DEFAULT_ROUTING, type CapacityConfig, type LedgerDefaults, type PoolSettings, type RoutingSettings } from '../protocol';
 import { ModelTable } from './model-table';
 import { NO_CAPACITY, NO_LEDGERS, parsePoolSettings } from './pool-config';
 import type { Slot } from './slot';
@@ -8,15 +8,17 @@ export interface PoolSettingsView {
   table(): ModelTable;
   capacity(): CapacityConfig;
   ledgers(): LedgerDefaults;
+  /** req-178: `Upgrade above q` and `Reserve per window`. */
+  routing(): RoutingSettings;
 }
 
 /**
- * The pool's settings as last read (req-170): the model table, the cap and
- * the ledger defaults. Taken again whenever the slots are read (a config
+ * The pool's settings as last read (req-170): the model table, the cap,
+ * the ledger defaults and (req-178) the routing. Taken again whenever the slots are read (a config
  * write, the refresh loop); a broken row is left out and said once.
  */
 export class PoolSettingsRegistry implements PoolSettingsView {
-  private current: PoolSettings = { models: [], capacity: NO_CAPACITY, ledgers: NO_LEDGERS };
+  private current: PoolSettings = { models: [], capacity: NO_CAPACITY, ledgers: NO_LEDGERS, routing: DEFAULT_ROUTING };
   private model = new ModelTable([]);
   private problems: readonly string[] = [];
 
@@ -52,5 +54,9 @@ export class PoolSettingsRegistry implements PoolSettingsView {
 
   ledgers(): LedgerDefaults {
     return this.current.ledgers;
+  }
+
+  routing(): RoutingSettings {
+    return this.current.routing;
   }
 }

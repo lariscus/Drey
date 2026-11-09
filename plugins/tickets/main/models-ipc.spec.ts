@@ -8,6 +8,7 @@ describe('registerModelsIpc', () => {
     const fleet = {
       models: vi.fn(async () => null),
       writeModels: vi.fn(async () => ({ ok: false as const, error: 'x' })),
+      importModelCapabilities: vi.fn(async () => ({ ok: false as const, error: 'v' })),
       slots: vi.fn(async () => null),
       writeSlots: vi.fn(async () => ({ ok: false as const, error: 'y' })),
       refreshSlots: vi.fn(async () => ({ ok: false as const, error: 'z' })),
@@ -18,13 +19,15 @@ describe('registerModelsIpc', () => {
   }
 
   it('registers the pool and the slot channels', () => {
-    expect([...wired().handlers.keys()]).toEqual(['poolModels', 'poolModelsConfig', 'slots', 'slotsConfig', 'slotsRefresh', 'slotLoginDone']);
+    expect([...wired().handlers.keys()]).toEqual(['poolModels', 'poolModelsConfig', 'poolModelsImport', 'slots', 'slotsConfig', 'slotsRefresh', 'slotLoginDone']);
   });
 
   it('passes only the pool keys on; a models value that is no list never travels', async () => {
     const { handlers, fleet } = wired();
-    await handlers.get('poolModelsConfig')!({ capacity: { global: 6 }, other: 1 });
-    expect(fleet.writeModels).toHaveBeenCalledWith({ capacity: { global: 6 } });
+    await handlers.get('poolModelsConfig')!({ capacity: { global: 6 }, routing: { upgradeAboveQ: 1.5 }, other: 1 });
+    expect(fleet.writeModels).toHaveBeenCalledWith({ capacity: { global: 6 }, routing: { upgradeAboveQ: 1.5 } });
+    await handlers.get('poolModelsImport')!(undefined);
+    expect(fleet.importModelCapabilities).toHaveBeenCalledOnce();
     expect(handlers.get('poolModelsConfig')!({ models: 'opus' })).toEqual({ ok: false, error: 'models is a list of rows' });
     expect(handlers.get('slotsConfig')!({})).toEqual({ ok: false, error: 'the slot config needs a slots list' });
     await handlers.get('slotsRefresh')!({ id: 'claude-a' });

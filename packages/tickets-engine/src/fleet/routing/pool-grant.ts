@@ -1,56 +1,48 @@
-import type { CapabilityClass, ClassRequest, FullLedger, ModelRow, PoolDecision, PoolEntry, PoolGrantDecision, PoolWaitDecision, QueueReason, SlotView, WorkerProviderId } from '../protocol';
-import type { CapacityCap } from './capacity-cap';
+import type { CapabilityClass, ClassRequest, FilteredSlot, PoolDecision, PoolEntry, PoolGrantDecision, PoolWaitDecision, RouteRecord, SlotView } from '../protocol';
 import type { Ledgers } from './ledgers';
 import { UNTABLED_COST } from './model-table';
 import { Refusals } from './pool-refusals';
 import type { PoolSettingsView } from './pool-settings';
-import type { SlotReservations } from './slot-reservations';
+import type { RouteCandidate, RouteOption } from './route-candidate';
+import type { RouteRecorder } from './route-recorder';
+import type { SlotFit } from './slot-fit';
+import type { StepUp } from './step-up';
+import type { SurplusChoice } from './surplus-choice';
+
+export type { ProviderThrottle } from './slot-fit';
 
 /** What the pool needs of the slot registry. */
 export interface PoolSlots {
   views(): readonly SlotView[];
 }
 
-/**
- * A provider's own throttle (req-63's rule stands): a spent quota pauses it,
- * a rate limit or a local server's slot count lowers its ceiling. `base` is
- * the sessions its slots serve in all (null = unbounded).
- */
-export interface ProviderThrottle {
-  refusal(provider: WorkerProviderId, live: number, base: number | null): string | null;
-}
-
 export interface PoolGrantDeps {
   readonly slots: PoolSlots;
   readonly settings: PoolSettingsView;
-  readonly cap: CapacityCap;
-  readonly reservations: SlotReservations;
   readonly ledgers: Ledgers;
-  readonly throttle?: ProviderThrottle;
+  /** req-178's stages: the hard filter per slot, the soft choice, the step up, the decision's record. */
+  readonly fit: SlotFit;
+  readonly choice: SurplusChoice;
+  readonly stepUp: StepUp;
+  readonly recorder: RouteRecorder;
 }
 
-/** One way a session could run: a row (or an untabled model) on a provider. */
-interface Option {
-  readonly row: ModelRow | null;
-  readonly entry: PoolEntry;
-  readonly provider: WorkerProviderId;
+/** What one pass over the options found: the candidates that passed, the refusals, the filtered slots. */
+interface Sweep {
+  readonly candidates: RouteCandidate[];
+  readonly refusals: Refusals;
+  readonly filtered: FilteredSlot[];
 }
-
-const blocked = (view: SlotView): string | null =>
-  view.state === 'needs-login'
-    ? `${view.label} needs a login (${view.reason ?? 'refused'})`
-    : view.state === 'exhausted'
-      ? `${view.label}: ${view.reason ?? 'quota spent'}`
-      : view.total !== null && view.busy >= view.total
-        ? `${view.label}: ${view.busy} of ${view.total} sessions busy`
-        : null;
 
 /**
- * The pool's one decision (req-170, R10): a session gets a model of exactly
- * the class it asked for, from its pool, on a free slot of the repository's
- * profile, while the caps and the ledgers have room — or it waits. Never a
- * smaller class; a model the table does not hold runs only on a request
- * without a class (a pinned model) or while the table is empty.
+ * The pool's one decision (req-170, R10, with req-178's routing): a session
+ * gets a model of exactly the class it asked for, from its pool, on a free
+ * slot of the repository's profile, while the caps, the ledgers and the
+ * reserve have room — or it waits. Among the slots that pass the filter the
+ * largest surplus wins (same surplus → cheaper), and above `Upgrade above q`
+ * the slot runs the next stronger model of the pool. Never a smaller class;
+ * a model the table does not hold runs only on a request without a class (a
+ * pinned model) or while the table is empty.
  */
 export class PoolGrant {
   constructor(private readonly deps: PoolGrantDeps) {}
@@ -66,14 +58,14 @@ export class PoolGrant {
       const detail = `${request.persona ?? request.ticket}'s pool holds ${what} — add one in Settings → Models`;
       return { kind: 'wait', reason: 'config', line: `waits: ${detail}`, detail };
     }
-    const refusals = new Refusals();
-    for (const option of options) {
-      const grant = this.place(option, request, refusals);
-      if (grant !== null) {
-        return grant;
-      }
+    const sweep = this.sweep(options, request);
+    const chosen = this.deps.choice.pick(sweep.candidates, request.prefer);
+    if (chosen === null) {
+      return this.waitOf(request, sweep.refusals);
     }
-    return this.waitOf(request, refusals);
+    const stepped = this.deps.stepUp.consider(chosen, request, this.viewsOf(chosen.provider));
+    const route = this.deps.recorder.record({ request, chosen, stepped, filtered: sweep.filtered });
+    return this.grantOf(stepped ?? chosen, request, route);
   }
 
   /** The class the model table gives a pool entry (its first row); null when the table does not hold it. */
@@ -82,9 +74,9 @@ export class PoolGrant {
   }
 
   /** The rows of the pool's entries that match the class, strongest entry first. */
-  private optionsOf(request: ClassRequest): Option[] {
+  private optionsOf(request: ClassRequest): RouteOption[] {
     const table = this.deps.settings.table();
-    return request.pool.flatMap((entry): Option[] => {
+    return request.pool.flatMap((entry): RouteOption[] => {
       const rows = entry.model === null ? [] : table.rowsOf(entry.model, entry.provider);
       if (rows.length > 0) {
         return rows.filter((row) => request.class === null || row.class === request.class).map((row) => ({ row, entry, provider: row.provider }));
@@ -94,78 +86,57 @@ export class PoolGrant {
     });
   }
 
-  /** The first slot this option fits on, or null with the reasons gathered. */
-  private place(option: Option, request: ClassRequest, refusals: Refusals): PoolGrantDecision | null {
-    const views = this.deps.slots.views().filter((view) => view.provider === option.provider);
-    const serving = this.servingSlots(option, request, views, refusals);
-    const ordered = [...serving.filter((v) => v.id === request.prefer), ...serving.filter((v) => v.id !== request.prefer)];
-    for (const view of ordered) {
-      const refusal = this.refusalOn(view, option, views);
-      if (refusal === null) {
-        return this.grantOf(option, view, request);
+  /** Every option on every slot that serves it: the filter's verdict for each. */
+  private sweep(options: readonly RouteOption[], request: ClassRequest): Sweep {
+    const sweep: Sweep = { candidates: [], refusals: new Refusals(), filtered: [] };
+    options.forEach((option, order) => {
+      const views = this.viewsOf(option.provider);
+      for (const view of this.servingSlots(option, request, views, sweep)) {
+        const refusal = this.deps.fit.refusal(option, view, request, views);
+        if (refusal === null) {
+          sweep.candidates.push({ ...option, view, order });
+          continue;
+        }
+        sweep.refusals.add(refusal.reason, refusal.text);
+        if (refusal.ledger !== undefined) {
+          sweep.refusals.ledger = refusal.ledger;
+        }
+        sweep.filtered.push({ slot: view.id, model: option.row?.model ?? option.entry.model, reason: refusal.short ?? refusal.text });
       }
-      refusals.add(refusal.reason, refusal.text);
-      if (refusal.ledger !== undefined) {
-        refusals.ledger = refusal.ledger;
-      }
-    }
-    return null;
+    });
+    return sweep;
   }
 
   /** The slots of the repository's profile that serve the option's row — never one of the other profile. */
-  private servingSlots(option: Option, request: ClassRequest, views: readonly SlotView[], refusals: Refusals): readonly SlotView[] {
+  private servingSlots(option: RouteOption, request: ClassRequest, views: readonly SlotView[], sweep: Sweep): readonly SlotView[] {
+    const model = option.row?.model ?? option.entry.model;
+    for (const other of views.filter((view) => view.profile !== request.profile)) {
+      sweep.filtered.push({ slot: other.id, model, reason: `${other.profile} profile` });
+    }
     const ofProfile = views.filter((view) => view.profile === request.profile);
     if (ofProfile.length === 0) {
       const other = request.profile === 'work' ? 'private' : 'work';
-      refusals.add('config', `no ${request.profile} slot serves ${option.provider}: the repository is ${request.profile} and never runs on a ${other} slot — add a ${request.profile} slot for ${option.provider} to service.json`);
+      sweep.refusals.add('config', `no ${request.profile} slot serves ${option.provider}: the repository is ${request.profile} and never runs on a ${other} slot — add a ${request.profile} slot for ${option.provider} to service.json`);
       return [];
     }
     const serving = ofProfile.filter((view) => option.row === null || option.row.slot === null || option.row.slot === view.id);
     if (serving.length === 0) {
-      refusals.add('config', `${option.row?.model ?? option.provider} is served on no ${request.profile} slot`);
+      sweep.refusals.add('config', `${model ?? option.provider} is served on no ${request.profile} slot`);
     }
     return serving;
   }
 
-  private refusalOn(view: SlotView, option: Option, providerViews: readonly SlotView[]): { reason: QueueReason; text: string; ledger?: FullLedger } | null {
-    const cost = option.row?.cost ?? UNTABLED_COST;
-    const slotBlock = blocked(view);
-    if (slotBlock !== null) {
-      return { reason: view.state === 'needs-login' ? 'config' : 'capacity', text: slotBlock };
-    }
-    if (option.row !== null && this.deps.reservations.sessionsOf(view.id, option.row.model) >= option.row.sessions) {
-      return { reason: 'capacity', text: `${view.label}: ${option.row.sessions} of ${option.row.sessions} ${option.row.model} sessions busy` };
-    }
-    const throttled = this.throttled(option.provider, providerViews);
-    if (throttled !== null) {
-      return { reason: 'capacity', text: throttled };
-    }
-    if (this.deps.cap.neverFits(view, cost)) {
-      return { reason: 'config', text: `${option.entry.model ?? option.provider} costs ${cost}, above the cap of ${view.label} or the global cap — raise it in Settings → Models` };
-    }
-    const capped = this.deps.cap.refusal(view, cost);
-    if (capped !== null) {
-      return { reason: 'capacity', text: capped };
-    }
-    const full = this.deps.ledgers.fullOn(view);
-    return full === null ? null : { reason: 'ledger', text: full.line, ledger: full };
+  private viewsOf(provider: RouteOption['provider']): readonly SlotView[] {
+    return this.deps.slots.views().filter((view) => view.provider === provider);
   }
 
-  private throttled(provider: WorkerProviderId, views: readonly SlotView[]): string | null {
-    if (this.deps.throttle === undefined) {
-      return null;
-    }
-    const live = views.reduce((sum, view) => sum + view.busy, 0);
-    const base = views.every((view) => view.total !== null) ? views.reduce((sum, view) => sum + (view.total ?? 0), 0) : null;
-    return this.deps.throttle.refusal(provider, live, base);
-  }
-
-  private grantOf(option: Option, view: SlotView, request: ClassRequest): PoolGrantDecision {
-    const row = option.row;
-    const model = row?.model ?? option.entry.model;
+  private grantOf(candidate: RouteCandidate, request: ClassRequest, route: RouteRecord): PoolGrantDecision {
+    const { row, view } = candidate;
+    const model = row?.model ?? candidate.entry.model;
     const what = row === null ? `${model ?? 'the default model'} (not in the model table)` : `${row.model}, class ${row.class}, cost ${row.cost}`;
-    const reason = `${what} on ${view.label} — ${request.why}`;
-    return { kind: 'grant', slot: { id: view.id, label: view.label }, provider: option.provider, model, class: row?.class ?? null, cost: row?.cost ?? UNTABLED_COST, reason };
+    const step = route.stepUp !== null ? `, a step up from ${route.stepUp.from} (q ${String(route.q)})` : '';
+    const reason = `${what} on ${view.label}${step} — ${request.why}`;
+    return { kind: 'grant', slot: { id: view.id, label: view.label }, provider: candidate.provider, model, class: row?.class ?? null, cost: row?.cost ?? UNTABLED_COST, reason, route };
   }
 
   private waitOf(request: ClassRequest, refusals: Refusals): PoolWaitDecision {

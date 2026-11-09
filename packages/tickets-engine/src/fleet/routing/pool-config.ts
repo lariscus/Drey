@@ -1,11 +1,13 @@
 /**
  * The pool keys of `service.json` (req-170; machine scope, R13): `models`
- * (the model table), `capacity` (the cap) and `ledgers` (the defaults). A
+ * (the model table, req-178 adds its capability columns), `capacity` (the
+ * cap), `ledgers` (the defaults) and `routing` (req-178, board 7l). A
  * row is checked on its own — a broken one is left out with its reason,
  * the others stand — against the slots of req-177: a row names a slot, or
  * a harness provider whose every slot serves it.
  */
-import { isWorkerProvider, WORKER_PROVIDERS, isCapabilityClass, type CapacityConfig, type LedgerDefaults, type ModelRow, type PoolSettings } from '../protocol';
+import { DEFAULT_ROUTING, isWorkerProvider, WORKER_PROVIDERS, isCapabilityClass, type CapacityConfig, type LedgerDefaults, type ModelRow, type PoolSettings, type RoutingSettings } from '../protocol';
+import { capabilitiesOf, capabilityKeysOf } from './model-capabilities';
 import type { Slot } from './slot';
 
 export interface PoolConfigParse {
@@ -67,7 +69,11 @@ export function modelRowOf(raw: unknown, slots: readonly Slot[], seen: readonly 
   if (seen.some((row) => row.model === model && row.slot === place.slot && row.provider === place.provider)) {
     return `model "${model}" is named twice for ${place.slot ?? place.provider}`;
   }
-  return { model, ...place, category: text(entry['category']) ?? '', class: rowClass, ...weight };
+  const capabilities = capabilitiesOf(entry, model);
+  if (typeof capabilities === 'string') {
+    return capabilities;
+  }
+  return { model, ...place, category: text(entry['category']) ?? '', class: rowClass, ...weight, ...capabilities };
 }
 
 function rowsOf(raw: unknown, slots: readonly Slot[], errors: string[]): ModelRow[] {
@@ -111,12 +117,41 @@ function ledgersOf(raw: unknown): LedgerDefaults {
   return { ticketAllowance: amount(entry['ticketAllowance']), personaPerDay: amount(entry['personaPerDay']), providerPerDay: amount(entry['providerPerDay']) };
 }
 
+/** req-178: `routing.upgradeAboveQ` (a surplus above 0, or null = never step up) and `routing.reservePerWindow` (a share 0–1). */
+function upgradeOf(raw: unknown, errors: string[]): number | null {
+  if (raw === undefined) {
+    return DEFAULT_ROUTING.upgradeAboveQ;
+  }
+  if (raw === null || (typeof raw === 'number' && Number.isFinite(raw) && raw > 0)) {
+    return raw;
+  }
+  errors.push('routing.upgradeAboveQ must be a surplus above 0, or null to never step up');
+  return DEFAULT_ROUTING.upgradeAboveQ;
+}
+
+function reserveOf(raw: unknown, errors: string[]): number {
+  if (raw === undefined) {
+    return DEFAULT_ROUTING.reservePerWindow;
+  }
+  if (typeof raw === 'number' && raw >= 0 && raw < 1) {
+    return raw;
+  }
+  errors.push('routing.reservePerWindow must be a share from 0 to below 1 (0.1 = 10 %)');
+  return DEFAULT_ROUTING.reservePerWindow;
+}
+
+function routingOf(raw: unknown, errors: string[]): RoutingSettings {
+  const entry = (raw !== null && typeof raw === 'object' ? raw : {}) as Entry;
+  return { upgradeAboveQ: upgradeOf(entry['upgradeAboveQ'], errors), reservePerWindow: reserveOf(entry['reservePerWindow'], errors) };
+}
+
 /** `service.json`'s parsed root as the pool's settings. */
 export function parsePoolSettings(root: unknown, slots: readonly Slot[]): PoolConfigParse {
   const config = (root !== null && typeof root === 'object' && !Array.isArray(root) ? root : {}) as Entry;
   const errors: string[] = [];
   const models = rowsOf(config['models'], slots, errors);
-  return { settings: { models, capacity: capacityOf(config['capacity'], errors), ledgers: ledgersOf(config['ledgers']) }, errors };
+  const settings = { models, capacity: capacityOf(config['capacity'], errors), ledgers: ledgersOf(config['ledgers']), routing: routingOf(config['routing'], errors) };
+  return { settings, errors };
 }
 
 /** The pool keys as `service.json` stores them: a row keeps only what it names. */
@@ -128,6 +163,7 @@ export function poolKeysOf(settings: PoolSettings): Record<string, unknown> {
     class: row.class,
     cost: row.cost,
     sessions: row.sessions,
+    ...capabilityKeysOf(row),
   }));
-  return { models, capacity: settings.capacity, ledgers: settings.ledgers };
+  return { models, capacity: settings.capacity, ledgers: settings.ledgers, routing: settings.routing };
 }

@@ -41,6 +41,15 @@ describe('ClassRequestBuilder — who asks for which class (req-170)', () => {
     expect(builder.build({ card: card({ class: 'C' }), phase: phase('B'), persona: persona('sonnet'), repo: null })).toMatchObject({ class: 'C', why: 'T-0001 pins class C' });
   });
 
+  it("req-178: the phase's and the ticket's needs ride merged; the step up is allowed unless a pin decides; the last slot is preferred", () => {
+    const needy = { ...phase(), needs: { image: true, contextTokens: 100_000 } } as PipelinePhase;
+    const request = builder.build({ card: card({ needs: { contextTokens: 200_000 } }), phase: needy, persona: persona('sonnet'), repo: null, prefer: 'claude-b' });
+    expect(request).toMatchObject({ needs: { image: true, contextTokens: 200_000 }, stepUp: true, prefer: 'claude-b' });
+    expect(builder.build({ card: card(), phase: phase(), persona: persona('sonnet'), repo: null })).not.toHaveProperty('needs');
+    expect(builder.build({ card: card({ class: 'B' }), phase: phase(), persona: persona('sonnet'), repo: null }).stepUp).toBeUndefined();
+    expect(builder.build({ card: card({ model: 'opus' }), phase: phase(), persona: persona('sonnet'), repo: null }).stepUp).toBeUndefined();
+  });
+
   it("the repository's profile rides the request", () => {
     expect(builder.build({ card: card(), phase: phase(), persona: persona('sonnet'), repo: { name: 'w', profile: 'work' } as never }).profile).toBe('work');
   });

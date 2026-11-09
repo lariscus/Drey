@@ -105,6 +105,9 @@ export class RunStarter {
       this.deps.log(`run ${id} (${request.ticketId}): refused — ${bound.refused}`);
       return bound.refused;
     }
+    if (bound.grant?.route !== undefined) {
+      this.deps.log(bound.grant.route.line); // req-178: every routing decision, once, in the runner log
+    }
     return bound;
   }
 
