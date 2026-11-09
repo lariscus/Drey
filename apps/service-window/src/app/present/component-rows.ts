@@ -156,7 +156,7 @@ export function componentRows(
   return [
     row('engine', i18n.t('service_window.component.engine'), engine.state, engineDetail(i18n, snapshot)),
     row('runner', i18n.t('service_window.component.runner'), runner.state, runnerDetail(i18n, snapshot, runs, nowMs)),
-    row('mcp', i18n.t('service_window.component.mcp'), mcp.state, mcp.detail ?? i18n.t('service_window.component.mcp_served')),
+    row('mcp', i18n.t('service_window.component.mcp'), mcp.state, mcp.detail ?? ''),
     row('gateway', i18n.t('service_window.component.gateway'), gateway.state, gatewayDetail(i18n, snapshot)),
     row('model', modelName, modelState, modelDetail(i18n, snapshot)),
   ];

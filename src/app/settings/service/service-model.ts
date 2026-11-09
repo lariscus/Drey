@@ -101,7 +101,7 @@ function runnerRow(status: ServiceStatusReply): ComponentRow {
   }
 }
 
-/** Drey's own MCP server (served by Drey until req-167): running while the HTTP endpoint listens. */
+/** Drey's own MCP server for other programs (the workers' vault MCP is Drey Service's since req-167): running while the HTTP endpoint listens. */
 function mcpRow(mcp: McpStatus | null): ComponentRow {
   const base = { id: 'mcp', nameKey: 'settings.service.mcp.name', descKey: null, route: 'mcp' } as const;
   return mcp !== null && mcp.enabled && mcp.httpListening && mcp.httpPort !== null

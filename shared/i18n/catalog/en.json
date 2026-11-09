@@ -1228,7 +1228,6 @@
   "service_window.component.starting": "starting",
   "service_window.component.stopped": "stopped",
   "service_window.component.failed": "failed",
-  "service_window.component.mcp_served": "served by Drey",
   "service_window.component.gateway_off": "off · phones and iPad",
   "service_window.component.devices": "{count, plural, one {# paired device} other {# paired devices}}",
   "service_window.component.reachable": "reachable",

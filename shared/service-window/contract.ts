@@ -57,7 +57,7 @@ export interface RunnerFacts {
 }
 
 export interface McpFacts {
-  /** `external` while Drey serves it (until req-167). */
+  /** The workers' vault MCP (req-167): `running` with its address and live workers once the service listens. */
   readonly state: ComponentState;
   readonly detail: string | null;
 }
