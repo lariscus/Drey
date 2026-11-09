@@ -5024,3 +5024,55 @@ sequenceDiagram
 *Interrupt turn* is `POST /interrupt` (the turn stops, the run reads Paused), *Resume after stop* `POST /resume` (a
 detached or ended run's session is resumed under a new run); *Copy attach command* reads `GET /attach/<run>` and puts
 `cd "<worktree>" && claude --resume <ref>` (OpenCode / Kimi: `--session`) on the clipboard.
+
+## 6.107 Start asks the burn-rate guard → hold → card → day turns / lift (req-181, milestone 223, [ADR-0095](09_architecture_decisions/0095-model-table-and-capacity-pool.md) as built)
+
+Every slot change goes into the burn rate's day book; every dispatch pass asks the hold once before any start. Reached
+(today's share of the weekly quota over all slots at or above `routing.burnRate`), nothing new starts; the status
+carries the hold and every client draws the same card. The day turning, a weekly reset that drops the figure, or the
+owner's *Allow today once* clears it.
+
+```mermaid
+sequenceDiagram
+    actor O as Owner
+    participant C as Client (popover / status item / Mission Control card)
+    participant SR as SlotRegistry
+    participant M as BurnRateMeter
+    participant DB as BurnRateDayBook (burn-rate.json)
+    participant G as BurnRateGuard
+    participant HS as BurnRateHoldSource
+    participant D as Dispatcher
+    participant OR as Orchestrator
+    SR->>M: observe(view) — a slot's windows changed
+    M->>DB: roll(UTC day); the day's first 7d reading, then each drop (a rise is not spending; past its reset → start again)
+    loop each pass (On)
+        D->>HS: current() (StartHold, through PublishedHold)
+        HS->>G: hold()
+        G->>M: reading() — mean over the counted slots: measured drops, else today's runs × RunShareTracker's share
+        alt below the limit, lifted today, or burnRate 0
+            G-->>HS: null
+            D->>D: start the plan items (tranche gate, class request …)
+        else at or above the limit
+            G-->>HS: {spent, limit, resumesAt: next UTC midnight, basis}
+            HS->>HS: log once "route refused · burn rate 21 % of 20 % today · resumes 01:00"
+            HS-->>D: hold {…, since}
+            D->>D: skip every start — running steps finish, the Autopilot stays On
+        end
+    end
+    OR-->>C: GET /chain · hold (and the hold event on GET /events)
+    C->>C: burnRateLineOf() "Burn rate reached · resumes at 01:00"; burnRateCardOf() chips spent 21 % · resumes 01:00
+    alt Wait
+        O->>C: Wait — the card goes away on this device for the day
+    else Allow today once
+        O->>C: Allow today once
+        C->>OR: POST /chain/hold/lift (desktop: chainHoldLift IPC; phone: POST /api/chain/hold/lift)
+        OR->>HS: lift() → G.lift() → DB.lift() (stored before the answer)
+        OR->>D: pass — starts go again
+        OR-->>C: chain status, hold null
+    else the day turns (or a weekly reset drops the figure)
+        D->>HS: current() — null; log "burn rate: the hold cleared — new runs start again"
+    end
+```
+
+A restart keeps the morning's spend and a lift (the day's book is read at the routing's start); `since` takes the
+restart's time.

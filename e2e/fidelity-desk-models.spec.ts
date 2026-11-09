@@ -14,7 +14,9 @@ import { test, expect, type ElectronApplication, type Page } from './fixtures/dr
  *   $env:DREY_FIDELITY_SHOTS = '1'
  *   npm run e2e:run -- fidelity-desk-models
  *
- * Output: `test-results/fidelity/DeskModels.png` (+ `.below`, `.rects.json`; 1440x900, scale factor 1).
+ * Output: `test-results/fidelity/DeskModels.png` (+ `.below`, `.rects.json`; 1440x900, scale factor 1);
+ * req-181: `DeskModels.routing-edit.png` (a Routing field while typed into), `.routing-saved.png` (after Tab:
+ * stored through `poolModelsConfig`), `.routing-refused.png` (a share of 100 % or more, refused under the group).
  */
 
 const RUN = !!process.env['DREY_FIDELITY_SHOTS'];
@@ -195,6 +197,7 @@ const POOL = {
     row('gpt-5.4', 'copilot', 'opencode', 'everyday', 'B', 1, 2),
   ],
   capacity: { global: 6, perSlot: {} },
+  routing: { upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 0.2 },
   ledgers: { ticketAllowance: 2.5, personaPerDay: 5, providerPerDay: 15 },
   now: {
     used: 2.4,
@@ -213,19 +216,28 @@ const POOL = {
   configPath: 'service.json',
 };
 
-/** Puts the sample answers in front of the tickets plugin's two read handlers; everything else goes on to the real ones. */
+/** Puts the sample answers in front of the tickets plugin's two read handlers (and req-181's routing write); everything else goes on to the real ones. */
 async function mockPool(app: ElectronApplication): Promise<void> {
   await app.evaluate(
     ({ ipcMain }, data) => {
-      const registry = ipcMain as unknown as { _invokeHandlers: Map<string, (event: unknown, payload: { pluginId: string; method: string }) => unknown> };
+      const registry = ipcMain as unknown as { _invokeHandlers: Map<string, (event: unknown, payload: { pluginId: string; method: string; payload?: unknown }) => unknown> };
       const original = registry._invokeHandlers.get('plugin:invoke');
       if (original === undefined) {
         throw new Error('no plugin:invoke handler to wrap');
       }
       ipcMain.removeHandler('plugin:invoke');
-      ipcMain.handle('plugin:invoke', (event, payload: { pluginId: string; method: string }) => {
+      let pool: Record<string, unknown> = data.pool;
+      ipcMain.handle('plugin:invoke', (event, payload: { pluginId: string; method: string; payload?: unknown }) => {
         if (payload.pluginId === 'tickets' && payload.method === 'poolModels') {
-          return data.pool;
+          return pool;
+        }
+        if (payload.pluginId === 'tickets' && payload.method === 'poolModelsConfig') {
+          const routing = (payload.payload as { routing?: { burnRate?: number } } | undefined)?.routing;
+          if (routing !== undefined && typeof routing.burnRate === 'number' && routing.burnRate >= 1) {
+            return { ok: false, error: 'routing.burnRate must be a share from 0 to below 1 (0.2 = 20 % of the weekly quota per day; 0 = off)' };
+          }
+          pool = { ...pool, ...(routing !== undefined ? { routing } : {}) };
+          return pool;
         }
         if (payload.pluginId === 'tickets' && payload.method === 'slots') {
           return { ok: true, slots: data.slots, configPath: 'service.json' };
@@ -321,4 +333,33 @@ test('board 7l: Settings → Tickets → Models', async ({ page, electronApp }) 
   await shoot(page, 'DeskModels.below');
   await page.locator('app-settings .detail').evaluate((node) => node.scrollBy({ top: 600 }));
   await shoot(page, 'DeskModels.below2');
+
+  // req-181: the Routing group stores what it shows — typed into, saved on Tab, a refusal under the group.
+  const burn = page.locator('input[aria-label="Burn rate"]');
+  await page.locator('.tset-models-group', { hasText: 'Routing' }).evaluate((node) => node.scrollIntoView({ block: 'center' }));
+  await expect(burn).toHaveValue('20');
+  await burn.click();
+  await burn.fill('25');
+  await shoot(page, 'DeskModels.routing-edit');
+  await page.keyboard.press('Tab');
+  await expect(burn).toHaveValue('25');
+  await shoot(page, 'DeskModels.routing-saved');
+  const routingRects = await page.evaluate(() => {
+    const rel = (e: Element | null): number[] | null => {
+      if (e === null) {
+        return null;
+      }
+      const x = e.getBoundingClientRect();
+      return [x.left, x.top, x.width, x.height].map((v) => Math.round(v * 10) / 10);
+    };
+    return {
+      fields: ['Upgrade above q', 'Reserve per window', 'Burn rate'].map((label) => rel(document.querySelector(`input[aria-label="${label}"]`))),
+      rule: rel(document.querySelector('.tset-models-rule')),
+    };
+  });
+  fs.writeFileSync(path.join(OUT, 'DeskModels.routing-rects.json'), JSON.stringify(routingRects));
+  await burn.fill('120');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.tset-models-error', { hasText: 'A share from 0 to below 100 %.' })).toBeVisible();
+  await shoot(page, 'DeskModels.routing-refused');
 });

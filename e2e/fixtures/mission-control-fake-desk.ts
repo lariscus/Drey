@@ -159,6 +159,8 @@ function trancheBlock(kind: FakeTranche): Record<string, unknown> {
 export interface FakeDeskOptions {
   /** Carries a tranche on the chain block (req-179); a waiting checkpoint or early stop starts the Autopilot Paused, resume 18:00. */
   readonly tranche?: FakeTranche;
+  /** Carries the burn rate's hold on the chain block (req-181): 21 % of 20 % today, resumes at the next UTC midnight. */
+  readonly hold?: boolean;
   /** The device `/api/me` describes (default: writable). */
   readonly readOnly?: boolean;
   /** `POST /api/chain/autopilot` answers with this refusal code instead of taking the change (req-95b). */
@@ -226,7 +228,7 @@ function boardsRoute(pathname: string, pad: boolean): unknown {
 /** Starts the fake desk on a free port; resolves to its origin and a stop function. */
 export async function startFakeDesk(
   options: FakeDeskOptions = {},
-): Promise<{ origin: string; stop: () => Promise<void>; autopilotWrites: () => readonly unknown[] }> {
+): Promise<{ origin: string; stop: () => Promise<void>; autopilotWrites: () => readonly unknown[]; holdLifts: () => readonly unknown[] }> {
   if (options.boards === true) {
     NOTES_FIXTURE.files.clear();
     for (const [path, file] of BOARDS.NOTES) {
@@ -239,12 +241,28 @@ export async function startFakeDesk(
   }
   const autopilotWrites: unknown[] = [];
   const waiting = options.tranche === 'checkpoint' || options.tranche === 'early';
-  const trancheExtras = (): Record<string, unknown> => (options.tranche === undefined ? {} : { tranche: chain['tranche'] });
+  const trancheExtras = (): Record<string, unknown> => ({
+    ...(options.tranche === undefined ? {} : { tranche: chain['tranche'] }),
+    ...(options.hold === true ? { hold: chain['hold'] ?? null } : {}),
+  });
+  const holdLifts: unknown[] = [];
   const chain: Record<string, unknown> = {
     ...fleet.chain,
     autopilot: waiting ? { state: 'paused', resumeAt: minutesFrom(230) } : { state: 'on' },
     ...(options.tranche === undefined ? {} : { tranche: trancheBlock(options.tranche) }),
     ...(waiting ? { autopilotSet: true } : {}),
+    ...(options.hold === true
+      ? {
+          hold: {
+            reason: 'burn-rate',
+            spent: 0.21,
+            limit: 0.2,
+            resumesAt: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + 1)).toISOString(),
+            basis: 'measured',
+            since: minutesFrom(-20),
+          },
+        }
+      : {}),
   };
   if (!fs.existsSync(path.join(APP_DIR, 'index.html'))) {
     throw new Error(`Mission Control is not built: ${APP_DIR} — run npm run build:mission-control first`);
@@ -266,6 +284,16 @@ export async function startFakeDesk(
         res.end(JSON.stringify(answer));
         return;
       }
+    }
+    if (url.pathname === '/api/chain/hold/lift' && req.method === 'POST') {
+      req.resume();
+      req.on('end', () => {
+        holdLifts.push({});
+        chain['hold'] = null;
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, status: chain }));
+      });
+      return;
     }
     if (url.pathname === '/api/chain/autopilot' && req.method === 'POST') {
       let raw = '';
@@ -338,6 +366,7 @@ export async function startFakeDesk(
   return {
     origin: `http://127.0.0.1:${port}`,
     autopilotWrites: () => autopilotWrites,
+    holdLifts: () => holdLifts,
     stop: () =>
       new Promise<void>((resolve) => {
         for (const stream of streams) {
