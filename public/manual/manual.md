@@ -1400,11 +1400,27 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   pin the ones that must always ride along, remove any, a line to teach
   it — and its journal of noteworthy runs, [Memory and journal](#memory-journal)) and **Setup** (worker,
   model, pool, phases, cost; **Pause** or **Resume** the persona).
-  **Edit persona** on that head opens the persona's own page: its name,
-  role, model pool and instructions (the persona's `prompt.md`), its skills
-  and a suggested change from the frictions in its journal. **Save** writes
-  everything you changed as one commit; new runs get it, running ones keep
-  the prompt they started with. **Discard** goes back to what is saved. If
+  **Edit persona** on that head opens the persona's own page. On the left,
+  **Profile** (the circle with the initials, the name, the role and **the one
+  line for the crew list** — the line under the name on the crew cards, in
+  Mission Control too), **Work** (the steps of your flows the persona takes,
+  shown as chips — change them in the flow —; the harness; the models,
+  strongest first, each with its class, its factor and how busy its accounts
+  are; **Add a model…** picks from the model table and the **⋮** menu moves or
+  removes a row; the daily budget) and **Allowed to** (which vaults the persona
+  may change, whether its runs ask before running commands, whether it may
+  reach the network, whether it may spend past a ticket's allowance — hover a
+  row for what it means; the vault and allowance choices apply to runs now,
+  the commands and network choices are recorded for the runner). On the right,
+  **Instructions** is the persona's `prompt.md` in the same editor your notes
+  use — Live Preview or **Source**, with the formatting buttons above it — and
+  the line above it counts the tokens; **Skills** lists the persona's skills
+  with a switch each (a skill that is on is part of every run's brief);
+  **Proposals** shows a change the persona's journal or your 1:1 suggested to
+  its instructions, with **Show diff**, **Dismiss** and **Apply**, and under it
+  the links to its **Memory**, its **Journal** and its **1:1**. **Save**
+  writes everything you changed as one commit; new runs get it, running ones
+  keep the prompt they started with. **Discard** goes back to what is saved. If
   the instructions cannot be read, the editor and Save stay off, so nothing
   can overwrite them unread.
 - **Capacity** (a panel for the bottom dock) — its header reads `2 of 5

@@ -312,3 +312,24 @@ imports — they are part of its bundle. Copies that remain are of code
 outside `shared/` (the templates plugin's frontmatter strip from `src/`,
 the tags plugin's `isAbortError` from `electron/`) and are named in
 `docs/11`.
+
+## Later change — SDK 1.57: a mounted Markdown view takes a mode and a formatting action (2026-11-09)
+
+**Context.** The Persona page (R11, req-171) puts Drey's Markdown editor in the Instructions block: Live Preview ⇄ Source and
+a formatting strip beside the plugin's own controls. `ui.createMarkdownView` (SDK 1.30) already mounts the host's surface into
+a plain element, but its handle could only read and replace text; the mode was fixed at mount and the strip's reducer was
+the host's alone.
+
+**Decision.** The handle gains two methods and nothing else (additive, minor 1.57):
+`setMode('live' | 'source' | 'view')` — the same mode switch the document editor has — and
+`format('bold' | 'italic' | 'heading' | 'bullet' | 'task' | 'code')`, which applies the editor strip's own reducer
+(`libs/markdown-surface/src/toolbar-commands.ts`, one change plus the selection to land in, a toggle where it makes sense)
+to the selection. A plugin draws its strip and mode buttons itself, as icon controls with `title` and `aria-label`; it carries no CodeMirror
+and no reducer of its own (rule 1 stands). The action names are a closed union in the SDK, not the library's `ToolbarAction`
+type, so a plugin imports nothing from `libs/`.
+
+**Considered and rejected.** A second mount (`createMarkdownEditor`) beside `createMarkdownView`; a toolbar drawn inside the
+host's view (it could not sit beside the plugin's own controls); handing the plugin the `EditorView`.
+
+**Consequences.** `PLUGIN_API_VERSION` is 1.57; `plugins/AUTHORING.md` lists it; an older host without 1.57 lacks the two methods, so a
+plugin that needs them gates on `minor >= 57`. The mounted view still belongs to no document: no save, no tab.
