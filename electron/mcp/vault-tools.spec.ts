@@ -4,7 +4,7 @@ import { isLocalHost, isLocalOrigin } from './http-transport';
 import { createVaultMcpServer } from './server';
 import { VaultTools } from './vault-tools';
 import type { VaultCallOptions, VaultToolDeps } from './vault-tools';
-import type { OpenDocs } from './tools/types';
+import type { OpenDocs } from './vault-tools';
 import type { AppConfig } from '../../shared/app-config';
 import type { RenameLinksRequest, VaultFileEntry } from '../../shared/ipc-api';
 import type {

@@ -3,8 +3,8 @@
  * with each note's headings. A listing too long to be useful comes back
  * as folders with file counts, so the next call can narrow.
  */
-import type { VaultFileEntry } from '../../../shared/ipc-api';
-import { splitSections } from '../../../shared/note-sections';
+import type { VaultFileEntry } from '../ipc-api';
+import { splitSections } from '../note-sections';
 import { cleanPath, isUnder, ResolvedVaults, ScopedVault, ToolScope } from './scope';
 import { fail, McpToolResult, ok, plural, ToolVault } from './types';
 

@@ -3,7 +3,7 @@
  * scope is enforced here, where the tool runs — what the model was told
  * about it in the prompt is only a courtesy.
  */
-import { isChatNotePath, isDraftPath } from '../../../shared/structural-folders';
+import { isChatNotePath, isDraftPath } from '../structural-folders';
 import { NO_VAULT, type ScopeFile, type ToolVault, type VaultCallOptions } from './types';
 
 export interface ScopedVault {

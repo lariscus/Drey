@@ -8,7 +8,7 @@
  * call one at all, what an `Error:` result means) is in the assistant's
  * system prompt, not here.
  */
-import { TASKS_LIST_SPEC } from '../../../shared/tasks-list-tool';
+import { TASKS_LIST_SPEC } from '../tasks-list-tool';
 import type { McpToolDef } from './types';
 
 const VAULT_ONE = {
