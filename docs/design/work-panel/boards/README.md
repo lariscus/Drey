@@ -90,12 +90,12 @@ above.
 | 10q · Ready to try, three panes: tickets, ticket with cost by phase, Mission Control | `MPadReady` | 1194×834 | iPad |
 | 10r · editing a note: files, Markdown editor, Assistant | `MPadNotesEdit` | 1194×834 | iPad |
 | 10s · iPad portrait — list and ticket, right sidebar closed | `MPadPortrait` | 834×1194 | iPad |
-| 10t · Autopilot switch: on, paused, off — desktop status bar, iPad header, phone app bar  — **revised 2026-11-08**: tranche chips and bar, checkpoint pause, Release next tranche | `Autopilot` | 1440×900 | all |
+| 10t · Autopilot switch: on, paused, off — desktop status bar, iPad header, phone app bar  — **revised 2026-11-08**: tranche chips and bar, checkpoint pause, Release next tranche — **built** milestone 221 (req-179) | `Autopilot` | 1440×900 | all |
 | 7l · Settings → Models: model table, capacity cap, slots and quota windows, routing, ledgers (concept 2026-11-08, ADR-0095, req-170) | `DeskModels` | 1440×900 | desktop |
 | 8a · Drey Service window: components, slots, governor, log; the tray menu (req-165) | `ServiceWindow` | 1100×720 | desktop |
 | 8b · Drey Service window, Sessions: every harness session raw — stream, instruction, tool calls, process (req-166) | `ServiceSessions` | 1100×720 | desktop |
 | 8c · Settings → Background service: status, start with Windows, keep running, components, load, logs (req-165) | `DeskServiceSettings` | 1440×900 | desktop |
-| 10u · Mission Control cards of the Lead: checkpoint report, merge conflict, budget and quota stop, queued, early stop — desktop and phone | `MCCards` | 1480×1160 | parts |
+| 10u · Mission Control cards of the Lead: checkpoint report, merge conflict, budget and quota stop, queued, early stop — desktop and phone — parts 1, 6 and 7 **built** milestone 221 (req-179); 2–5, 8, 9 open | `MCCards` | 1480×1160 | parts |
 
 The older boards one folder up (`Home`, `Ticket`, `Workers`, `Ready`,
 `Shaping`, `Orchestrator`, `Phone*` of 2026-10-31) are superseded by the

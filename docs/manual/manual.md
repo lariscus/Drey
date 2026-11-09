@@ -1177,7 +1177,7 @@ expensive) and **Repeated** (a ticket that ran twice or more) — and a line suc
 as *Autopilot paused · 10 runs · $4.10 · 2 h 10 min*. The numbers are counted,
 not written by a model. **Release next tranche** (on the card, in the popover
 or on the phone's Autopilot sheet) starts the next tranche; **Adjust…** opens
-the Autopilot settings. A resume time set on the pause releases the next
+Settings → Tickets (on the phone and iPad: the Settings tab). A resume time set on the pause releases the next
 tranche when it comes.
 
 A tranche can also **stop early**, with a red card: *Stopped early · gate rate
