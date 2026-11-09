@@ -1,4 +1,4 @@
-import { isOneOnOne } from '../protocol-session';
+import { isHeldSession } from '../protocol-session';
 import { isTerminal } from '../run/run-state';
 import type { LiveRun } from './live-run';
 
@@ -56,7 +56,7 @@ export function exitVerdict(run: LiveRun): ExitVerdict {
   if (held !== null) {
     return held;
   }
-  if (isOneOnOne(run.request)) {
+  if (isHeldSession(run.request)) {
     return { kind: 'session' };
   }
   if (run.request.interactive !== undefined) {

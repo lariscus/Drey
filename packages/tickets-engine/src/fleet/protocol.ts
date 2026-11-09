@@ -36,8 +36,8 @@ export { DEFAULT_EARLY_STOP, DEFAULT_TRANCHE, normalizeTranche, tranchesOff, tra
 export type { AnomalyRule, CheckpointReport, EarlyStop, EarlyStopConfig, RedTicket, TrancheConfig, TrancheEnd, TrancheStatus } from './protocol-tranche';
 export { DEFAULT_DEV_PORTS, DEFAULT_GOVERNOR_SETTINGS } from './protocol-governor';
 export type { DevServerLease, GovernorSettings, GovernorStatus, GovernorWait, GovernorWaitCause, HeavyTask, PortRange, SeatClass, SeatHolder } from './protocol-governor';
-export { isOneOnOne, ONE_ON_ONE_IDLE_MS, ONE_ON_ONE_TICKET, SESSION_KINDS, sessionKindOf } from './protocol-session';
-export type { SessionKind, SessionSpec } from './protocol-session';
+export { FREE_SESSION_TICKET, HELD_SESSION_IDLE_MS, isFreeSession, isHeldSession, isOneOnOne, isTicketRun, ONE_ON_ONE_IDLE_MS, ONE_ON_ONE_TICKET, SESSION_KINDS, sessionKindOf, sessionStateOf } from './protocol-session';
+export type { SessionKind, SessionSpec, SessionState } from './protocol-session';
 
 /** The workers of milestone 84, in fleet order (the assignment default). */
 export type WorkerProviderId = 'opencode' | 'claude-code' | 'kimi' | 'copilot';
@@ -483,6 +483,12 @@ export interface RunInfo {
   readonly workingDirectory?: string;
   /** req-168: a 1:1's chat session file (vault-relative); absent on every run. */
   readonly chatFile?: string;
+  /**
+   * req-173 (R12): the worker holds a vault-MCP token of Drey Service
+   * (req-167). The token itself lives only in the service's memory, keyed
+   * by this record's id — the record links it, never carries it.
+   */
+  readonly vaultMcp?: true;
   /**
    * Why the worker declared the step incomplete (`BLOCKED:` in its final
    * message): no gate ran, nothing moved — the ticket waits for the

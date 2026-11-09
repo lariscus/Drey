@@ -1,4 +1,4 @@
-import { isOneOnOne } from '../protocol-session';
+import { isHeldSession, sessionKindOf } from '../protocol-session';
 import type { WorkerProviderId } from '../protocol';
 import type { StartOutcome } from '../run/run-record';
 import { isTerminal } from '../run/run-state';
@@ -56,9 +56,9 @@ export class RunReopener {
 
   /** The worker answers the opening line (or the owner's prompt) and stands, waiting for the takeover tab. */
   async reopen(old: LiveRun, prompt: string | null = null): Promise<StartOutcome> {
-    // req-168: a released 1:1 has no ticket and no worktree to reopen in — the persona's next line starts a fresh session.
-    if (isOneOnOne(old.request)) {
-      return { ok: false, error: `run ${old.info.id} was a 1:1 — it does not reopen; the next line on the 1:1 starts a fresh session` };
+    // req-168/173: a released 1:1 or free session has no ticket and no worktree to reopen in — a fresh session starts instead.
+    if (isHeldSession(old.request)) {
+      return { ok: false, error: `run ${old.info.id} was a ${sessionKindOf(old.request) === 'free' ? 'free session' : '1:1'} — it does not reopen; the next line starts a fresh session` };
     }
     if (old.info.sessionRef === null) {
       return { ok: false, error: `run ${old.info.id} never reported a session — nothing to resume` };

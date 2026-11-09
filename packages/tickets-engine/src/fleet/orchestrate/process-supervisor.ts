@@ -100,6 +100,7 @@ export class ProcessSupervisor {
     });
     this.own(run, handle);
     if (vault !== null) {
+      run.info = { ...run.info, vaultMcp: true }; // req-173: the record links the token by its run id, never holds it
       void handle.exited.then(() => vault.close());
     }
     return handle;

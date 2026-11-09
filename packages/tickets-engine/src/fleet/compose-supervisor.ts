@@ -41,7 +41,7 @@ import { RunBookkeeper } from './orchestrate/run-bookkeeper';
 import { RunClaims, type LeaseTimers } from './orchestrate/run-claims';
 import { RunCompletion } from './orchestrate/run-completion';
 import { IdleRelease } from './orchestrate/idle-release';
-import { OneOnOneStarter } from './orchestrate/one-on-one-starter';
+import { HeldSessionStarter } from './orchestrate/held-session-starter';
 import { RunReaper } from './orchestrate/run-reaper';
 import { RunReopener } from './orchestrate/run-reopener';
 import { RunRepository } from './orchestrate/run-repository';
@@ -198,7 +198,7 @@ function prepareOf(rt: Runtime, git: TicketsGitSeam): PrepareWorktree {
 }
 
 /** The two starts over one launcher: a ticket run's and a 1:1's (req-168). */
-function startersOf(rt: Runtime, handover: RunnerHandover, git: TicketsGitSeam): { starter: RunStarter; oneOnOne: OneOnOneStarter } {
+function startersOf(rt: Runtime, handover: RunnerHandover, git: TicketsGitSeam): { starter: RunStarter; heldSessions: HeldSessionStarter } {
   const { machine, repo, streams, stores, claims, bookkeeper, processes, background, clock } = rt;
   const log = rt.deps.log;
   const launcher = new WorkerLauncher({ machine, repo, processes, claims, background, streams, log, ...(rt.deps.seats !== undefined ? { seats: rt.deps.seats } : {}) });
@@ -207,11 +207,11 @@ function startersOf(rt: Runtime, handover: RunnerHandover, git: TicketsGitSeam):
   const retiring = (): boolean => handover.retiring;
   return {
     starter: new RunStarter({ machine, repo, streams, stores, claims, bookkeeper, sessions, launcher, prepareWorktree: prepareOf(rt, git), review: rt.review, clock, log, retiring, ...slots }),
-    oneOnOne: new OneOnOneStarter({ machine, repo, streams, bookkeeper, launcher, clock, log, retiring, ...slots }),
+    heldSessions: new HeldSessionStarter({ machine, repo, streams, bookkeeper, launcher, clock, log, retiring, ...slots }),
   };
 }
 
-/** req-168: the idle release of held 1:1 sessions, the reaper's first look at a live run. */
+/** req-168/173: the idle release of held sessions (1:1s, free sessions), the reaper's first look at a live run. */
 function idleOf(rt: Runtime): IdleRelease {
   const idleMs = rt.deps.oneOnOneIdleMs !== undefined ? { idleMs: rt.deps.oneOnOneIdleMs } : {};
   return new IdleRelease({ settler: rt.settler, bookkeeper: rt.bookkeeper, clock: rt.clock, log: rt.deps.log, ...idleMs });
@@ -224,7 +224,7 @@ export function composeRunSupervisor(deps: RunSupervisorDeps): RunSupervisor {
   const log = deps.log;
   const git = rt.git;
   const handover = new RunnerHandover(repo, processes, table, { clock, line: log });
-  const { starter, oneOnOne } = startersOf(rt, handover, git);
+  const { starter, heldSessions } = startersOf(rt, handover, git);
   const reopener = new RunReopener(repo, starter, settler, { processes, provider: deps.adapter.id });
   const answers = new OwnerAnswers(repo, bookkeeper, streams);
   const limits = deps.limits !== undefined ? { limits: deps.limits } : {};
@@ -235,7 +235,7 @@ export function composeRunSupervisor(deps: RunSupervisorDeps): RunSupervisor {
     adoption: new RunAdoption({ machine, repo, streams, processes, claims, bookkeeper, table, clock, log }),
     handover,
     starter,
-    oneOnOne,
+    heldSessions,
     stopper: rt.stopper,
     steer: new SteerService(repo, bookkeeper, { answers, reopener, hold: (run, why) => rt.takeover.hold(run, why) }, streams),
     takeover: rt.takeover,

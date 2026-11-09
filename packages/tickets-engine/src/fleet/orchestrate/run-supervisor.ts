@@ -1,12 +1,12 @@
 import type { FleetHandoverConfig, PermissionDecision, QuestionAnswers, RunDkTarget, RunInfo, RunRequest, SteerRung } from '../protocol';
-import { isOneOnOne } from '../protocol-session';
+import { isHeldSession } from '../protocol-session';
 import type { StartOutcome, StopOutcome, SupervisorRecord, TakeoverOutcome } from '../run/run-record';
 import { isTerminal } from '../run/run-state';
 import type { AttachOutcome, AttachmentStore } from './attachment-store';
 import type { BackgroundWork } from './background-work';
 import type { HandoverSettings } from './handover-settings';
 import type { LeftoverClaims, LeftoverClaimsReport } from './leftover-claims';
-import type { OneOnOneStarter } from './one-on-one-starter';
+import type { HeldSessionStarter } from './held-session-starter';
 import type { OwnerAnswers } from './owner-answers';
 import type { RunAdoption } from './run-adoption';
 import type { RunReaper } from './run-reaper';
@@ -26,8 +26,8 @@ export interface RunSupervisorParts {
   readonly adoption: RunAdoption;
   readonly handover: RunnerHandover;
   readonly starter: RunStarter;
-  /** req-168: a 1:1's start — no claim, no worktree, quiet and held. */
-  readonly oneOnOne: OneOnOneStarter;
+  /** req-168/173: a held session's start (a 1:1, a free session) — no claim, no worktree, quiet and held. */
+  readonly heldSessions: HeldSessionStarter;
   readonly stopper: RunStopper;
   readonly steer: SteerService;
   readonly takeover: RunTakeover;
@@ -85,8 +85,8 @@ export class RunSupervisor {
   }
 
   start(request: RunRequest, options: StartOptions = {}): Promise<StartOutcome> {
-    if (isOneOnOne(request)) {
-      return this.parts.oneOnOne.start(request);
+    if (isHeldSession(request)) {
+      return this.parts.heldSessions.start(request);
     }
     return this.parts.starter.start(request, { persona: options.persona ?? null });
   }

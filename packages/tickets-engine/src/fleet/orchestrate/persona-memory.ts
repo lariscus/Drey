@@ -1,7 +1,7 @@
 import { PERSONAS_DIR } from '../../core/persona';
 import type { Clock } from '../ports/clock';
 import type { FileSystem } from '../ports/file-system';
-import { isOneOnOne } from '../protocol-session';
+import { isTicketRun } from '../protocol-session';
 import type { TerminalRunState } from '../run/run-state';
 import { messageOf, type LiveRun } from './live-run';
 
@@ -30,7 +30,7 @@ export class PersonaMemory {
 
   async append(run: LiveRun, state: TerminalRunState): Promise<void> {
     const persona = run.info.persona ?? null;
-    if (persona === null || persona.trim() === '' || isOneOnOne(run.request)) {
+    if (persona === null || persona.trim() === '' || !isTicketRun(run.request)) {
       return;
     }
     const outcome = state === 'done' ? 'handed-over' : state;

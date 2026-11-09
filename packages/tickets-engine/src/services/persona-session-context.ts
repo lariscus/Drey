@@ -3,7 +3,7 @@ import { loadPersonaSkills, type Persona } from '../core/persona';
 import { BRIEF_RUNS, composeOneOnOneBrief, type BriefRun } from '../fleet/one-on-one-brief';
 import { NO_TOOLS, type OneOnOneToolSeam } from '../fleet/one-on-one-toolset';
 import type { RunInfo } from '../fleet/protocol';
-import { isOneOnOne } from '../fleet/protocol-session';
+import { isTicketRun } from '../fleet/protocol-session';
 import type { EngineHost, EngineVault } from './host';
 
 export interface PersonaSessionContextDeps {
@@ -13,10 +13,10 @@ export interface PersonaSessionContextDeps {
   readonly tools?: OneOnOneToolSeam;
 }
 
-/** The persona's latest ticket runs, newest first — never its 1:1s. */
+/** The persona's latest ticket runs, newest first — never its 1:1s or free sessions. */
 export function latestRunsOf(runs: readonly RunInfo[], persona: string): readonly BriefRun[] {
   return runs
-    .filter((r) => r.persona === persona && !isOneOnOne(r))
+    .filter((r) => r.persona === persona && isTicketRun(r))
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
     .slice(0, BRIEF_RUNS)
     .map((r) => ({ ticketId: r.ticketId, state: r.state, costUsd: r.costUsd, gateFailure: r.gateFailure, model: r.grant?.model ?? r.model ?? null }));
