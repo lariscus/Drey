@@ -7,7 +7,6 @@ import { usageSummary } from '../run/run-summary';
 import type { ChainCardPatch } from '../store-chain-board';
 import type { ClaimRelease, WriteResult } from './claim-release';
 import type { LiveRun } from './live-run';
-import type { PersonaMemory } from './persona-memory';
 import type { RunStreams } from './run-streams';
 import type { TicketCopy } from './ticket-copy';
 import type { WaitClaim } from './wait-claim';
@@ -23,7 +22,6 @@ export interface RunBookkeeperParts {
   readonly release: ClaimRelease;
   readonly wait: WaitClaim;
   readonly copy: TicketCopy;
-  readonly memory: PersonaMemory;
   readonly clock: Clock;
   /** The machine's identity on the chain's own writes (`agent@<host>`). */
   readonly actor: string;
@@ -32,7 +30,7 @@ export interface RunBookkeeperParts {
 
 /**
  * The one ticket writer of the Crew runner (ADR-0096): every write to a
- * ticket, its status comments, the Verlauf line and the persona memory —
+ * ticket, its status comments and the Verlauf line —
  * the supervisor's and the orchestrator's alike — goes through here, over
  * the `TicketStore` port (a run's claim) or the chain's store door (a free
  * ticket). The legacy file writer is gone (req-176): a run record from
@@ -106,10 +104,9 @@ export class RunBookkeeper {
     return this.parts.copy.syncedText(run);
   }
 
-  /** The run's end: its copy goes and its lesson lands in the persona's memory. */
-  async closeRun(run: LiveRun, state: TerminalRunState): Promise<void> {
+  /** The run's end: its copy goes. The persona's lesson is the closing round's (req-169), never a per-run line. */
+  async closeRun(run: LiveRun): Promise<void> {
     await this.parts.copy.drop(run);
-    await this.parts.memory.append(run, state);
   }
 
   verlaufLine(run: LiveRun, state: TerminalRunState): string | null {

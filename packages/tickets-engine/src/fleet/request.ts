@@ -8,6 +8,7 @@
  * prompt text, the ticket text) stay with the caller.
  */
 import type { PipelinePhase, RepoRef, TicketCard } from '../contracts/tickets';
+import type { ClosingSignal } from '../core/closing-signals';
 import { acceptanceCommands } from '../core/ticket-files';
 import type { Truncation } from './assignment';
 import type { FleetCaps, HandoverMode, InteractiveMode, PermissionMode, RunDkTarget, RunRequest } from './protocol';
@@ -100,6 +101,8 @@ export interface ComposeRunInput {
    * ring decides everything, exactly as before personas.
    */
   readonly persona?: PersonaDispatch | null;
+  /** req-169: the vault's closing-round signals (pipeline.md `closing-signals:`); absent = all five. */
+  readonly closingSignals?: readonly ClosingSignal[];
 }
 
 /**

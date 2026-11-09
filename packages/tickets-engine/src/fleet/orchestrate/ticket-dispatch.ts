@@ -174,6 +174,7 @@ export class TicketDispatch {
       nextPhaseId,
       nextPhaseDir: nextPhaseId, // a store has no phase folders: the stage is the phase id
       pushRemote: snap.pushRemote,
+      ...(snap.closingSignals !== undefined ? { closingSignals: snap.closingSignals } : {}),
       nextPhaseClaims: nextPhaseId !== null && snap.pipeline.find((p) => p.id === nextPhaseId)?.claim === true,
       repo: target.repo,
       extraRepos: [...target.extraRepos],

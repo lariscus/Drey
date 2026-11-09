@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import { hostname } from 'node:os';
 import type { PipelinePhase, RepoRef } from '../contracts/tickets';
 import type { ComposedInstruction } from './instruction-parts';
-import type { RunRequest } from './protocol';
+import type { ClosingSignal } from '../core/closing-signals';
+import { DEFAULT_CLOSING_SPEC, type RunRequest } from './protocol';
 import type { RunPlan } from './request-plan';
 import type { RunWorkerPin } from './request-worker';
 
@@ -26,7 +27,7 @@ type WorkParts = Pick<
   'provider' | 'model' | 'permissionMode' | 'instruction' | 'continuationInstruction' | 'briefDigest' | 'acceptance' | 'gate' | 'git'
 >;
 type MoveParts = Pick<RunRequest, 'nextPhase' | 'nextPhaseDir' | 'pushRemote' | 'claimIdentity'>;
-type OptionalParts = Pick<RunRequest, 'limits' | 'recordWorker' | 'column' | 'handover' | 'interactive' | 'dk' | 'parkFor' | 'profile' | 'reviewCheckout'>;
+type OptionalParts = Pick<RunRequest, 'limits' | 'recordWorker' | 'column' | 'handover' | 'interactive' | 'dk' | 'parkFor' | 'profile' | 'reviewCheckout' | 'closing'>;
 
 /** The wire request, its keys in the order the runner's log and record have always shown them. */
 export function assembleRunRequest(plan: RunPlan, worker: RunWorkerPin, instruction: ComposedInstruction): RunRequest {
@@ -96,7 +97,16 @@ function optionalParts(plan: RunPlan): OptionalParts {
     ...(moves && input.parkFor ? { parkFor: input.parkFor } : {}),
     ...profileParts(input.repo),
     ...(plan.reviewCheckout !== null ? { reviewCheckout: plan.reviewCheckout } : {}),
+    ...closingParts(input.closingSignals, input.gateFailure),
   };
+}
+
+/** req-169: the closing round's signals and the retry flag — carried only when they differ from the default (all five, no retry). */
+function closingParts(signals: readonly ClosingSignal[] | undefined, gateFailure: string | null): Pick<RunRequest, 'closing'> {
+  if (signals === undefined && gateFailure === null) {
+    return {};
+  }
+  return { closing: { signals: signals ?? DEFAULT_CLOSING_SPEC.signals, retry: gateFailure !== null } };
 }
 
 /** req-177: the repository's slot profile, when `repos.md` sets one (absent reads as `private`). */

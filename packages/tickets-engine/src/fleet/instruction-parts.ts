@@ -96,7 +96,6 @@ export function personaLine(personaId: string | null | undefined, role: string |
   }
   const roleText = role?.trim() ?? '';
   return (
-    `Your persona: ${id}${roleText !== '' ? ` (${roleText})` : ''} — its folder is ${PERSONAS_DIR}/${id}/ in the tickets repo; ` +
-    'the persona-bound files the prompt names (the friction file) live there.'
+    `Your persona: ${id}${roleText !== '' ? ` (${roleText})` : ''} — its folder is ${PERSONAS_DIR}/${id}/ in the tickets repo.`
   );
 }

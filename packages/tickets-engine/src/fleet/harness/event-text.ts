@@ -4,7 +4,7 @@
  * markers a turn ends with (`QUESTION:`, `BLOCKED:`) and the lead-ins of
  * thinking and tool results.
  */
-import { BLOCKED_MARKER, QUESTION_MARKER } from '../protocol';
+import { BLOCKED_MARKER, FRICTION_MARKER, FRICTION_MAX, QUESTION_MARKER } from '../protocol';
 
 /** The stream lead-in of a worker's thinking (the takeover transcript shows it quoted). */
 export const THINK_PREFIX = 'thinking › ';
@@ -95,6 +95,24 @@ export function questionOf(text: string): string | null {
 /** Why the worker declared the step incomplete (`BLOCKED:`), parsed like `questionOf`. A question wins over it. */
 export function blockedOf(text: string): string | null {
   return lastMarkerText(text, BLOCKED_MARKER);
+}
+
+/**
+ * The friction the worker reported (req-169): the LAST line-start
+ * `FRICTION:` line's own text — one line, bounded — or null. Unlike
+ * `BLOCKED:` it never swallows the lines below it.
+ */
+export function frictionOf(text: string): string | null {
+  const lines = text.split('\n').filter((line) => line.trimStart().toUpperCase().startsWith(FRICTION_MARKER));
+  const last = lines[lines.length - 1];
+  if (last === undefined) {
+    return null;
+  }
+  const said = last.trimStart().slice(FRICTION_MARKER.length).replace(/\s+/g, ' ').trim();
+  if (said === '' || /^(none|n\/a|-)\.?$/i.test(said)) {
+    return null;
+  }
+  return said.length <= FRICTION_MAX ? said : `${said.slice(0, FRICTION_MAX - 1).trimEnd()}…`;
 }
 
 /** One line for a permission request: what the tool wants to do, on what. */
