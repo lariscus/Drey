@@ -152,10 +152,23 @@ failed, `ms`) — the service window's Sessions tab and Mission Control show it
 as a tool line; a refusal also goes to the service log (`mcp`).
 
 **Not built here** (roadmap follow-ups): Drey's own server for other
-programs stays in the Drey process (req-212); a worker's write does not reach
-Drey's open tabs and indexes over the paths channel (req-213 — the service
-host cannot reach the engine's hub without touching a baselined file); the
+programs stays in the Drey process (req-212); the
 `tags` filter of `vault_search` has no section index in the service
 (req-214); a worker's write leaves no local history entry (req-215, the price
 this ADR states); a model-driven tool call on every harness end to end
 (req-216). The 1:1 session's token is req-168's: it opens the same gate.
+
+**Later change (milestone 234, req-213 and req-217).** A worker's write is
+now **announced**: `Engine.emitPaths` (the hub's paths channel a phone's
+note save already uses) was exposed when `server/engine.ts` was split, and
+the service host wires `VaultMcpCalls`' `changed` to it — every successful
+`vault_write`, `vault_edit` and `vault_move` reports the vault's folder
+with the paths that changed or went away (a move: the new path changed, the
+old deleted; one report per vault and call, `ChangeCollector`), so Drey's
+vault round reloads clean open tabs and refreshes the tag index at once,
+watcher on or off. With Drey closed nobody listens; its next start reads
+the files as they are. The local history price (req-215) stands. A **1:1's
+token** is read-only in the grant and carries a tool cut
+(`VaultGrant.tools`: `vault_list`, `vault_search`, `vault_read`); the
+spawn path sets it for `kind: '1:1'` only, a free session keeps its
+persona's rights.

@@ -108,9 +108,17 @@ better".
   under its read-only mode; of the MCP tools exactly the read-only cut
   (`fleet_status`, `fleet_watch`, `vault_list`, `vault_search`,
   `vault_read` — `fleet/one-on-one-toolset.ts`), attached through one
-  named seam, `OneOnOneToolSeam`. req-167's harness MCP configuration was
-  not on this base, so nothing is attached yet and the brief names no tool
-  (follow-up req-217).
+  named seam, `OneOnOneToolSeam`. **Later change (milestone 234, req-217):**
+  the seam is implemented by Drey Service's vault MCP component
+  (`OneOnOneVaultTools`): a 1:1 gets the vault MCP with a read-only token
+  (the grant refuses every change; the token also carries a tool cut, so
+  only `vault_list`, `vault_search`, `vault_read` are offered or
+  callable) and the brief's `## Tools` names exactly those three — none
+  for an `api` persona or while the endpoint does not listen.
+  `fleet_status` / `fleet_watch` are Drey's own server's tools and not
+  served by the service, so they stay unattached (req-252). A free session
+  shares the starter but keeps its persona's rights, not this cut (R12:
+  a free session is not read-only).
 - **Where it lives.** The chat session file with `persona:`, multi-line
   messages, the `migrated` line and persona proposal cards (`prompt` |
   `skill`, adopted on Accept through the persona patch) —
@@ -136,9 +144,9 @@ better".
    watcher reads the run's stream on the fleet's change push and the
    clients re-read the session file. Live deltas over ACP are req-204;
    for the 1:1 they are req-218.
-2. *"The vault read tools over the service's MCP"* — not attached yet
-   (req-167's capability was not on this base); the seam is named, the
-   brief names nothing (req-217).
+2. *"The vault read tools over the service's MCP"* — not attached when the
+   1:1 shipped (req-167's capability was not on this base); attached since
+   milestone 234 (req-217), the fleet's two read tools excepted (req-252).
 3. *"Requested from the pool like any task"* — the class asked is the
    model table's class of the persona's own default model on its harness;
    there is no class pick over the persona's pool and no step up (req-220).
