@@ -533,3 +533,35 @@ the persona's own harness — and `TEAM_METHODS` gains
 `personaProposalDecide` for the persona's proposal cards. A thread's lines
 migrate once into the persona's first 1:1 session; `board-service.ts` lost
 the thread writer, the persona loader its thread read.
+
+## Later change — skills are Agent Skills folders (req-172, milestone 232)
+
+A persona's skills (D-46: files named by `persona.skills`) become **Agent
+Skills** (R8): a folder `<name>/SKILL.md` — Anthropic's open format,
+frontmatter `name` and `description` (optional `license`, `allowed-tools`,
+`metadata`) over a Markdown body, files beside it carried untouched — in the
+shared home `tickets/_meta/skills/` or the persona's own `skills/`, the own
+one overriding a shared skill of the same name. The owner's Claude skills drop
+in unchanged. The persona's `skills:` list stays its selection; a skill in a
+folder but not in the list is available, off. The cut stays as ADR-0088
+drew it: the format and the loader are pure (`core/skill.ts`,
+`core/skill-load.ts`, `core/skill-bundle.ts`, `core/token-count.ts`), the
+brief's one `## Skills` renderer is a pure fleet file
+(`fleet/skills-section.ts`, shared by the run's composer, the 1:1 and the free
+session — three renderers before), and everything that touches a disk or git
+is a service behind a small port (`services/skill-file-system.ts`): the
+folder reader, the lister, the uploader, the migrator, the committer, the
+prompt preview, composed by `SkillService`, which implements the new
+`SkillsPort` (`contracts/skills.ts`) that `TicketsRemotePort` now extends.
+The loader **reads and never writes**: a legacy flat `<name>.md` is migrated
+once by `SkillMigrator` (one logged commit), not by a read. A run loads the
+**body** of the selection in full; progressive loading is req-240. The
+prompt preview builds the brief with `composeInstruction` itself (no copy)
+and counts it with an **estimate per tokenizer family**
+(`core/token-count.ts`): no tokenizer ships and the provider's own count
+needs a key and a network call; an exact count is req-241. The upload reads
+a zip with a dependency-free reader (`services/skill-zip.ts`) because the
+engine package has no zip dependency and Drey Service runs without the app.
+The routes are on the engine HTTP API, the remote port, the invoke allowlist
+(`TEAM_METHODS`) and the tickets plugin's IPC; a failure is `{ok: false,
+code, error}`, the catalog (`skills.error.<code>`) carries the client text.

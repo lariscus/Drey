@@ -61,6 +61,7 @@ Top-level rules, once, up front:
       repos.md        # work-repo name -> clone URL/path mapping
       crew.md         # the crew's defaults and limits — the vault layer (req-173), see below
       prompts/        # the handover prompts (`agent <prompt-ref>` names one file)
+      skills/         # the shared skills: <name>/SKILL.md, Agent Skills folders (req-172) — see Skills below
       personas/       # the agent personas (E3, the improvement loop E6):
                       #   <id>/persona.md + prompt.md + memory.md + reviews.md +
                       #   improvements.md (+ avatar.png) — see Personas below
@@ -1052,6 +1053,7 @@ tickets/_meta/personas/
     reviews.md        # the journal: one entry per noteworthy run (req-169 — format below)
     friction.md       # retired (req-169): migrated once into reviews.md, then removed
     improvements.md   # the aggregation's proposals (E6 — format below)
+    skills/           # the persona's own skills: <name>/SKILL.md (req-172, `_meta/skills/` below)
     avatar.png        # optional
 ```
 
@@ -1070,7 +1072,7 @@ tickets/_meta/personas/
   | `models.pool` | the models the persona may run, **strongest first**; every entry must be a row of the model table (Settings → Models, `service.json`). An entry is `<model>` or `<worker provider>/<model>` (`kimi/k2`; a slash after anything else is part of the model id, `zai/glm-5.3`). At dispatch the capacity pool grants the first entry of the requested class with room (req-170); an entry the table does not hold is never granted to a class request. `models.default`'s class is the class an unsized ticket asks for | `[models.default]` |
   | ~~`models.router`~~ | **removed (req-170).** The router policies `off \| budget \| escalate-on-fail` gave way to the class request; an old `router:` line is ignored and dropped on the next rewrite | — |
   | `color` | `#rrggbb`, the chips and avatars | `#a78bfa` |
-  | `skills` | names of skill files the persona carries: `<name>.md` or `<name>/SKILL.md`, in the persona's own `skills/` folder, else `_meta/skills/`. A run's brief carries their text as `## Skills` (D-46) | `[]` |
+  | `skills` | the persona's **selection**: names of skill folders (`<name>/SKILL.md`, Agent Skills format) in the persona's own `skills/` folder, else the shared `_meta/skills/`, in the order the run's `## Skills` block lists them; a skill in a folder but not here is available, off. A legacy flat `<name>.md` is still read and migrated once (req-172, `_meta/skills/` below) | `[]` |
   | `budget` | USD per day — the Crew card shows the day's costs against it; the capacity pool's persona ledger (req-170): once the persona's runs of the day have spent it, it starts nothing more that day (a Needs-you card says so). Unset = `service.json` `ledgers.personaPerDay` | unset (null) |
   | `allowed` | a map; two keys today. `spend-above-allowance: true` — the persona runs on past a ticket's `allowance:` instead of waiting for the owner (req-170). `write-vaults: [<vault id>, …]` — the registered vaults (Drey's registry ids, ADR-0051) its runs may change through Drey Service's vault MCP (req-167, R5; one id reads as a list, duplicates drop); every registered vault stays readable, a vault not named is read-only for it, and a read-only run (a review) writes none whatever this says — a refusal reaches the model as `Error: <persona> may not write vault "<id>" (allowed: read)` and the run's stream as an audit line. `vault_move` counts as writing. req-142's other permissions (commands, network) are not fields yet. Each key written only when set | nothing beyond: reads every vault, writes none |
 
@@ -1246,6 +1248,111 @@ three legacy keys cleared to null, and closes with exactly one commit
 carrying no legacy key is left alone — and announces like every other
 board write. After the migration the ladder decides; the legacy keys are
 never written again.
+
+## `_meta/skills/` — skills as Agent Skills (req-172, R8)
+
+A skill is a **folder** in Anthropic's open Agent Skills format: `<name>/SKILL.md`
+and anything beside it (scripts, references — carried untouched, never loaded
+into a prompt). The owner's own Claude skills (`~/.claude/skills/<name>/`,
+`.claude/skills/<name>/`) drop in unchanged.
+
+```text
+tickets/_meta/skills/               # the shared home: every persona may select these
+  review/
+    SKILL.md
+    scripts/check.sh                # carried along, not read by Drey
+tickets/_meta/personas/<id>/skills/ # the persona's own home
+  review/SKILL.md                   # overrides the shared skill of the same name
+```
+
+- **`SKILL.md`** is a YAML frontmatter and a Markdown body. Keys: `name` and
+  `description` (both required by the format), optional `license`,
+  `allowed-tools` (a space-separated string; a YAML list is read too) and
+  `metadata` (a map); unknown keys are kept and ignored. A folded
+  `description: >` block, Windows line ends and a BOM read like any other.
+  **The folder name is the skill's name**: when the frontmatter `name`
+  differs, the folder wins, the listing shows the other name
+  (`declaredName`) and a run logs a warning. A folder name is letters,
+  digits, `.`, `-` and `_` (the first a letter or digit), at most 64
+  characters — it is the word the persona's `skills:` list uses, never a path.
+- **The order** (D-46, unchanged): a persona's own folder first, then the
+  shared home; within a home a folder before a legacy flat file. One row per
+  name in the listing: an own skill hides the shared one it overrides
+  (`overridesShared`). The `skills:` list in `persona.md` is the **selection**,
+  and its order is the order of the `## Skills` block; a skill that sits in a
+  folder but is not listed is *available, off*; a listed name no folder holds
+  is *missing* (the listing says so, a run logs it and goes on).
+- **What a run loads**: the **body** of each selected skill, trimmed, in
+  full, as `### <name>` under one `## Skills` block (`specs/classifier-spec.md`,
+  "The Skills block"). The frontmatter is the listing's. A chain run, a 1:1
+  and a free session read the selection through the same loader; the closing
+  round resumes the run's own session and needs no load. Progressive loading
+  (name and description in the prompt, the body on demand) is req-240.
+- **The legacy flat file** `<name>.md` (D-46's first form) still reads for one
+  release and is **migrated once**: at the engine's start and on the first
+  skill call per vault, every flat file in the shared home and in each
+  persona's own home becomes `<name>/SKILL.md` — a generated frontmatter
+  (`name` from the file name, `description` from the first heading or line)
+  over the old text, byte for byte — and the flat file is removed. **One
+  commit** `skills: migrate flat skill files to Agent Skills folders`, one log
+  line. A folder and a flat file of one name: the folder wins and the flat
+  file is dropped in that commit. A blank flat file, `README.md` and a name
+  that is not a folder name are left alone. A second pass finds nothing flat
+  and writes nothing.
+- **Upload** (`POST /api/skills`): a `SKILL.md` text (`format: markdown`; the
+  folder name is `name`, else the frontmatter's; a text with no frontmatter
+  gets a generated one — it is a flat file) or a zipped skill folder
+  (`format: zip`, base64: `SKILL.md` at the archive root or inside exactly
+  one top folder). Validated before a byte is written: no path leaves the
+  folder (`..`, absolute, drive letter, NUL; backslashes read as `/`), the
+  frontmatter parses and has a `description`, the body is not empty,
+  `SKILL.md` is at most 256 KiB, at most 200 files and 8 MiB in all;
+  `__MACOSX`, `.DS_Store` and `Thumbs.db` are dropped; an existing skill of
+  the name is refused (`exists`) unless `overwrite: true`, which replaces the
+  folder and commits the removals. One commit `skills: <name> added in <the
+  shared pool | persona>` (or `replaced`).
+
+### The routes
+
+All answer `{ok: true, …}` or `{ok: false, code, error}` (a 200 either way,
+like the board's); `code` is one of `no_vault`, `no_persona`, `no_skill`,
+`bad_name`, `bad_scope`, `bad_skill_file`, `bad_archive`, `path_escape`,
+`exists`, `too_large`, `not_own`, `internal`, and a client shows the catalog
+text `skills.error.<code>`. Types: `packages/tickets-engine/src/contracts/skills.ts`.
+
+| Route | Remote port / plugin IPC | Does |
+|---|---|---|
+| `GET /api/skills` | `sharedSkills` | the shared pool: `{list}` |
+| `GET /api/personas/<id>/skills` | `personaSkills(id)` | the persona's reachable skills, `on` per `skills:`: `{list}` |
+| `POST /api/personas/<id>/skills/toggle` `{skill, on}` | `personaSkillToggle` | joins or leaves `skills:` (a `persona.md` patch, one commit `personas: <id> updated`); switching on needs the skill to exist (`no_skill`) |
+| `POST /api/personas/<id>/skills/remove` `{name}` | `personaSkillRemove` | deletes an **own** skill's folder, one commit that records the removals; a shared skill is `not_own` |
+| `POST /api/skills` `{scope, persona?, format, name?, text?, zipBase64?, overwrite?}` | `skillUpload` | uploads (above): `{name, origin, files, replaced, list}` |
+| `GET /api/personas/<id>/prompt?step=&model=` | `personaPromptPreview` | the brief a run would start with: `{persona, step, text, tokens, tokenizer, parts, skills}` |
+
+`list` is `{persona, skills[], missing[], selectedTokens, tokenizer}`; a skill
+is `{name, description, origin: own|shared, on, overridesShared, legacy, size,
+tokens, files, allowedTools[], license, declaredName}` (`size` = bytes of
+`SKILL.md`; `files` = files beside it; `tokens` = the estimate of what a run
+loads of it, `### <name>` and the body). `selectedTokens` is the estimate of
+the whole `## Skills` block of the selection. `POST /api/skills` is the one
+body the HTTP gateway lets grow to 12 MiB (a zip as base64).
+
+**The prompt preview** builds the instruction with the composer a run uses
+(`composeInstruction`, fed the persona's real prompt, skills and memory slice)
+and a marked placeholder for the ticket's parts (`T-0000`, `<ticket title>`,
+`<worktree>`, `<what and why of the ticket>`); `step` is the pipeline phase id
+the brief names (default `build`), `model` the model whose family counts (the
+persona's own by default). `parts` is `instructions` (the persona's prompt),
+`skills`, `memory` and `rest`, always in that order, and adds up to `tokens`.
+
+**The token count is an estimate** (`core/token-count.ts`): no tokenizer ships
+with Drey. The persona's worker and model choose the family — the **Claude
+Code worker, or a model id that names Claude (`claude`, `opus`, `sonnet`,
+`haiku`, `fable`), counts with `claude-estimate`** (3.5 ASCII characters per
+token); **every other worker and model counts with `openai-estimate`** (4.0).
+A character outside ASCII counts three quarters of a token. `tokenizer` is
+`{id, family: anthropic | openai-compatible, exact: false, model}`; a client
+must not present the figure as exact (req-241).
 
 ## `_meta/order.md` — retired (req-75 W1)
 

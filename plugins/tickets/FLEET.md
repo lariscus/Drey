@@ -439,8 +439,9 @@ Every phase's instruction is composed in one stable order — repo agent
 instructions (verbatim: the file `repos.md`'s `instructions:` names,
 req-79 — Drey's is `docs/agents/fleet-worker.md`; unset, missing or
 blank falls back to `CLAUDE.md`, then `AGENTS.md`) → phase
-template (a persona's prompt, then its `## Skills`, D-46: the names in `persona.skills`,
-nearest first `personas/<id>/skills/<name>.md` or `<name>/SKILL.md`, then `_meta/skills/`; a name with no text is
+template (a persona's prompt, then its `## Skills`, D-46 / req-172: the folders the names in `persona.skills`
+point at, nearest first `personas/<id>/skills/<name>/SKILL.md`, then `_meta/skills/<name>/SKILL.md`, body only,
+in full — "Skills" below; a name with no text is
 a log line) → the ticket's `## Plan` verbatim → the variable parts
 (who/where, description, the worktree's diff stat (commits since the branch left the base — `base...HEAD`, then `git status --short`) head-capped, the earlier step's `## Handover` section,
 and on a retry the previous run's gate failure tail-capped). The prefix
@@ -1079,6 +1080,43 @@ looks at the run once:
   `memory.md` any more.
 - **`GET /report`** adds `byModel`: every persona journal of the vaults
   the records name, grouped by harness/model (`core/journal-report.ts`).
+
+## Skills (req-172, R8)
+
+A skill is an **Agent Skills folder**, `<name>/SKILL.md` (frontmatter `name`,
+`description`, optional `license`, `allowed-tools`, `metadata`; the body is
+Markdown), in `tickets/_meta/skills/` (shared) or
+`tickets/_meta/personas/<id>/skills/` (the persona's own, which wins on the
+same name). The owner's Claude skills drop in unchanged. What a persona
+carries is its `skills:` list in `persona.md`; a skill in a folder but not in
+the list is available, off. `specs/ticket-schema.md` ("`_meta/skills/`") has
+the format, the order, the upload rules and the migration.
+
+- **Every session kind loads the selection the same way.** A chain run, a 1:1
+  and a free session read the list through `loadPersonaSkills` (the body only,
+  trimmed, nearest first) and render it through `skillsSection`: one
+  `## Skills` block, `### <name>` and the body for each, in the list's order,
+  behind the persona's prompt. A **closing round** resumes the run's own
+  session, which already holds the block — it loads nothing. A name no folder
+  holds, or whose frontmatter names another skill, is one log line
+  (`persona <id>: …`); the run goes on.
+- **A skill change needs no restart**: the next run reads the folders again.
+  A *running* run keeps the brief it started with; a changed skill changes the
+  stable head of the next brief and so its `briefDigest`.
+- **The legacy flat file** `<name>.md` is still read and is migrated once, by
+  the engine at its start (log line `skills: migrated shared/<name>, …`, one
+  commit `skills: migrate flat skill files to Agent Skills folders`).
+- **The routes** (engine HTTP, remote port, the tickets plugin's IPC; table in
+  `specs/ticket-schema.md`): `GET /api/skills`, `GET /api/personas/<id>/skills`,
+  `POST …/skills/toggle`, `POST …/skills/remove`, `POST /api/skills` (the
+  upload), `GET /api/personas/<id>/prompt?step=&model=` (the preview: the
+  brief a run would start with and its token count). **The count is an
+  estimate** — `claude-estimate` (3.5 characters per token) for the Claude Code
+  worker or a Claude model id, `openai-estimate` (4.0) for everything else;
+  `exact` is false. No tokenizer ships.
+- **Checking one by hand**, against a service you started with your own home
+  (never the owner's): `curl -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/api/personas/<id>/skills`.
+  A `code` in the answer is what failed (`no_skill`, `exists`, `path_escape`, …).
 
 ## Free sessions (req-173, R12)
 
