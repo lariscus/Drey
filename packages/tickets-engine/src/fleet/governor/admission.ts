@@ -1,5 +1,5 @@
 import type { Clock } from '../ports/clock';
-import type { GovernorSettings } from '../protocol-governor';
+import type { GovernorSettings, GovernorWaitCause } from '../protocol-governor';
 import type { LoadGuard } from './load-guard';
 import { QuietHours } from './quiet-hours';
 import type { SeatTable } from './seat-table';
@@ -7,8 +7,8 @@ import type { SeatTable } from './seat-table';
 /** May a heavy task start now: yes (with a note), it waits for a seat, or the rules refuse it for now. */
 export type AdmissionVerdict =
   | { readonly kind: 'grant'; readonly note: string | null }
-  | { readonly kind: 'waits'; readonly reason: string }
-  | { readonly kind: 'refused'; readonly reason: string };
+  | { readonly kind: 'waits'; readonly cause: GovernorWaitCause; readonly reason: string }
+  | { readonly kind: 'refused'; readonly cause: GovernorWaitCause; readonly reason: string };
 
 export interface AdmissionDeps {
   readonly settings: () => GovernorSettings;
@@ -33,11 +33,11 @@ export class Admission {
     const now = this.deps.clock.now();
     const quiet = QuietHours.parse(settings.quietHours);
     if (quiet !== null && quiet.holds(now)) {
-      return { kind: 'refused', reason: `quiet hours until ${quiet.until}` };
+      return { kind: 'refused', cause: 'quiet', reason: `quiet hours until ${quiet.until}` };
     }
     const busy = this.deps.table.busy('heavy');
     if (busy >= settings.heavySeats) {
-      return { kind: 'waits', reason: `${busy} of ${settings.heavySeats} heavy seats busy` };
+      return { kind: 'waits', cause: 'seats', reason: `${busy} of ${settings.heavySeats} heavy seats busy` };
     }
     const load = this.deps.guard.verdict(settings.reserve);
     if (load.ok) {
@@ -47,6 +47,6 @@ export class Admission {
     if (busy === 0 && waited >= this.deps.maxLoadWaitMs) {
       return { kind: 'grant', note: `after ${Math.round(waited / 60_000)} min above the reserve` };
     }
-    return { kind: 'refused', reason: `load ${load.load} % above the reserve` };
+    return { kind: 'refused', cause: 'load', reason: `load ${load.load} % above the reserve` };
   }
 }

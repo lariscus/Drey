@@ -40,6 +40,15 @@ export function demoSnapshot(): ServiceSnapshot {
       { id: 'kimi', label: 'Kimi', busy: 0, total: 2, left: null, q: null, resetsAt: null, reliability: 'unknown' },
     ],
     load: { heavySeats: 2, reserve: 25, lowPriority: true, quietHours: '22:00 - 07:00' },
+    governor: {
+      heavy: { busy: 1, total: 2, holders: [{ ticket: 'T-0126', task: 'tests' }] },
+      light: { busy: 2, total: 6 },
+      load: 41,
+      reserve: 25,
+      quietUntil: null,
+      waiting: [{ ticket: 'T-0121', task: 'build', cause: 'seats' }],
+      devServers: [{ port: 4302, ticket: 'T-0126' }],
+    },
     autostart: true,
   };
 }

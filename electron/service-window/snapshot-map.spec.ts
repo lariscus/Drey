@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { componentsOf, loadOf, sessionsOf, slotFactsOf, spendOf, streamEventsOf } from './snapshot-map';
+import { componentsOf, governorFactsOf, loadOf, sessionsOf, slotFactsOf, spendOf, streamEventsOf } from './snapshot-map';
 
 /** The service's, the runner's and the engine's answers in the window's shapes (req-165/166). */
 describe('snapshot mapping', () => {
@@ -12,6 +12,33 @@ describe('snapshot mapping', () => {
       mcp: { state: 'external', detail: 'served by Drey (until req-167)' },
     },
   };
+
+  it('the governor (req-180): seats with holders, the higher of CPU and memory, the waits with their cause, only listening dev servers', () => {
+    expect(
+      governorFactsOf({
+        heavy: { busy: 1, total: 2, holders: [{ runId: 'R-1', ticket: 'T-0126', task: 'tests', since: 'x', pid: 4 }] },
+        light: { busy: 2, total: 6 },
+        load: { cpu: 41, memory: 37, reserve: 25 },
+        lowPriority: true,
+        quietHours: '',
+        quietUntil: null,
+        waiting: [{ runId: 'R-2', ticket: 'T-0121', task: 'build', cause: 'seats', reason: '2 of 2 heavy seats busy', since: 'x' }],
+        devServers: [
+          { port: 4302, ticket: 'T-0126', runId: 'R-1', listening: true },
+          { port: 4303, ticket: 'T-0121', runId: 'R-2', listening: false },
+        ],
+      }),
+    ).toEqual({
+      heavy: { busy: 1, total: 2, holders: [{ ticket: 'T-0126', task: 'tests' }] },
+      light: { busy: 2, total: 6 },
+      load: 41,
+      reserve: 25,
+      quietUntil: null,
+      waiting: [{ ticket: 'T-0121', task: 'build', cause: 'seats' }],
+      devServers: [{ port: 4302, ticket: 'T-0126' }],
+    });
+    expect(governorFactsOf({}).load).toBeNull();
+  });
 
   it('the component rows: the engine address and vault name, the runner reason, the gateway address and devices; the MCP detail from the catalog', () => {
     expect(componentsOf(status, 2)).toEqual({

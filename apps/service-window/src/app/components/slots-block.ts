@@ -2,7 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { McI18n } from '@mission-ui/i18n/i18n.service';
 import { McI18nPipe } from '@mission-ui/i18n/i18n.pipe';
 import { ServiceStore } from '../api/service-store';
-import { governorRows, slotRows } from '../present/slot-rows';
+import { governorRows } from '../present/governor-rows';
+import { slotRows } from '../present/slot-rows';
 
 /** The Slots block (per account: seats, quota bar, reliability chip) and the Governor block of board 8a. */
 @Component({
@@ -18,7 +19,7 @@ export class SlotsBlock {
 
   readonly slots = computed(() => slotRows(this.i18n, this.store.snapshot()?.slots ?? null));
   readonly governor = computed(() => {
-    const load = this.store.snapshot()?.load;
-    return load === undefined ? [] : governorRows(this.i18n, load);
+    const snapshot = this.store.snapshot();
+    return snapshot === null || snapshot === undefined ? [] : governorRows(this.i18n, snapshot.load, snapshot.governor);
   });
 }

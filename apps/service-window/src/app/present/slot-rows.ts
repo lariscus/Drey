@@ -1,6 +1,6 @@
-/** The Slots and Governor blocks of board 8a. */
+/** The Slots block of board 8a (the Governor block: governor-rows.ts). */
 import type { I18n } from '../../../../../shared/i18n';
-import type { LoadFacts, SlotFacts } from '../../../../../shared/service-window/contract';
+import type { SlotFacts } from '../../../../../shared/service-window/contract';
 import { joinParts, weekdayTime } from './format';
 
 export interface SlotRowVm {
@@ -14,11 +14,6 @@ export interface SlotRowVm {
   readonly text: string;
   readonly reliability: SlotFacts['reliability'];
   readonly reliabilityLabel: string;
-}
-
-export interface GovernorRowVm {
-  readonly label: string;
-  readonly value: string;
 }
 
 function quotaText(i18n: I18n, slot: SlotFacts, percent: number | null): string {
@@ -48,24 +43,4 @@ export function slotRows(i18n: I18n, slots: readonly SlotFacts[] | null): readon
       reliabilityLabel: i18n.t(`service_window.slots.${slot.reliability}`),
     };
   });
-}
-
-/** The governor is req-180 and measures nothing yet: the labels stand, the values are dashes. */
-export function governorRows(i18n: I18n, load: LoadFacts): readonly GovernorRowVm[] {
-  return [
-    {
-      label: i18n.t('service_window.governor.heavy_seats'),
-      value: i18n.t('service_window.governor.heavy_value', { count: load.heavySeats }),
-    },
-    {
-      label: i18n.t('service_window.governor.light_seats'),
-      value: i18n.t('service_window.governor.light_value'),
-    },
-    {
-      label: i18n.t('service_window.governor.reserve'),
-      value: i18n.t('service_window.governor.reserve_value', { percent: load.reserve }),
-    },
-    { label: i18n.t('service_window.governor.waiting'), value: i18n.t('service_window.governor.waiting_value') },
-    { label: i18n.t('service_window.governor.dev_servers'), value: i18n.t('service_window.governor.dev_value') },
-  ];
 }

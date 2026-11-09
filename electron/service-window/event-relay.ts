@@ -30,7 +30,7 @@ export function windowEventOf(source: 'runner' | 'log', sse: SseEvent): ServiceW
       const { runId, event } = data as { runId?: unknown; event?: StreamEvent };
       return typeof runId === 'string' && event !== undefined ? { kind: 'line', runId, event } : null;
     }
-    return sse.event === 'slot' || sse.event === 'pool' ? { kind: 'status' } : null;
+    return sse.event === 'slot' || sse.event === 'pool' || sse.event === 'governor' ? { kind: 'status' } : null;
   } catch {
     return null;
   }

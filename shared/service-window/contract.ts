@@ -95,12 +95,29 @@ export interface SlotFacts {
   readonly reliability: 'measured' | 'estimated' | 'unknown';
 }
 
-/** Settings → Background service's Load group (req-180's governor reads it; nothing measures yet). */
+/** Settings → Background service's Load group (the governor reads it live, req-180). */
 export interface LoadFacts {
   readonly heavySeats: number;
   readonly reserve: number;
   readonly lowPriority: boolean;
   readonly quietHours: string;
+}
+
+/** Why a heavy task waits (req-180): a seat, the quiet hours, the load. */
+export type GovernorWaitCause = 'seats' | 'quiet' | 'load';
+
+/** The runner's resource governor as the Governor block draws it (`GET /governor`, req-180). */
+export interface GovernorFacts {
+  readonly heavy: { readonly busy: number; readonly total: number; readonly holders: readonly { readonly ticket: string; readonly task: string }[] };
+  readonly light: { readonly busy: number; readonly total: number | null };
+  /** The higher of CPU and memory in percent; null before the first sample. */
+  readonly load: number | null;
+  readonly reserve: number;
+  /** The quiet span's end (`07:00`) while it holds. */
+  readonly quietUntil: string | null;
+  readonly waiting: readonly { readonly ticket: string; readonly task: string; readonly cause: GovernorWaitCause }[];
+  /** The dev servers listening on a leased port. */
+  readonly devServers: readonly { readonly port: number; readonly ticket: string }[];
 }
 
 export interface ServiceSnapshot {
@@ -120,6 +137,8 @@ export interface ServiceSnapshot {
   /** Null while the runner sleeps (no `GET /slots` to ask). */
   readonly slots: readonly SlotFacts[] | null;
   readonly load: LoadFacts;
+  /** The governor's live seats and waits; null while the runner sleeps (nothing runs then). */
+  readonly governor: GovernorFacts | null;
   /** Start with Windows (`service.autostart` while the service is enabled). */
   readonly autostart: boolean;
 }

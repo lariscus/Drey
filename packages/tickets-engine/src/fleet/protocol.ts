@@ -34,7 +34,7 @@ export type { AutopilotRecord, AutopilotReason, AutopilotRefusal, AutopilotState
 export { DEFAULT_EARLY_STOP, DEFAULT_TRANCHE, normalizeTranche, tranchesOff, tranchesPerDay } from './protocol-tranche';
 export type { AnomalyRule, CheckpointReport, EarlyStop, EarlyStopConfig, RedTicket, TrancheConfig, TrancheEnd, TrancheStatus } from './protocol-tranche';
 export { DEFAULT_DEV_PORTS, DEFAULT_GOVERNOR_SETTINGS } from './protocol-governor';
-export type { DevServerLease, GovernorSettings, GovernorStatus, GovernorWait, HeavyTask, PortRange, SeatClass, SeatHolder } from './protocol-governor';
+export type { DevServerLease, GovernorSettings, GovernorStatus, GovernorWait, GovernorWaitCause, HeavyTask, PortRange, SeatClass, SeatHolder } from './protocol-governor';
 
 /** The workers of milestone 84, in fleet order (the assignment default). */
 export type WorkerProviderId = 'opencode' | 'claude-code' | 'kimi';

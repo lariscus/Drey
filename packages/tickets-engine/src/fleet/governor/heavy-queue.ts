@@ -1,4 +1,4 @@
-import type { GovernorWait } from '../protocol-governor';
+import type { GovernorWait, GovernorWaitCause } from '../protocol-governor';
 import type { HeavyAsk, SeatLease } from './resource-governor';
 
 /** A heavy task waiting for its seat. */
@@ -7,6 +7,8 @@ export interface Waiter {
   readonly sinceMs: number;
   /** The reason last logged and shown; null before the first refusal. */
   reason: string | null;
+  /** Why, in one word; set with the reason. */
+  cause: GovernorWaitCause;
   readonly resolve: (lease: SeatLease) => void;
   readonly reject: (error: Error) => void;
 }
@@ -39,6 +41,7 @@ export class HeavyQueue {
         runId: waiter.ask.runId,
         ticket: waiter.ask.ticket,
         task: waiter.ask.task,
+        cause: waiter.cause,
         reason: waiter.reason ?? '',
         since: new Date(waiter.sinceMs).toISOString(),
       }));

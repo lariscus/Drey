@@ -44,11 +44,15 @@ export interface SeatHolder {
   readonly pid: number | null;
 }
 
+/** Why a heavy task waits: every heavy seat is busy, the quiet hours hold, the load eats into the reserve. */
+export type GovernorWaitCause = 'seats' | 'quiet' | 'load';
+
 /** A heavy task the governor holds back, and why. */
 export interface GovernorWait {
   readonly runId: string;
   readonly ticket: string;
   readonly task: HeavyTask;
+  readonly cause: GovernorWaitCause;
   /** `2 of 2 heavy seats busy`, `quiet hours until 07:00`, `load 91 % above the reserve`. */
   readonly reason: string;
   /** ISO. */

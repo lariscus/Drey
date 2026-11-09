@@ -89,6 +89,12 @@ export class ServiceCalls {
     return ep === null ? null : ((await this.http.get<{ slots?: readonly Record<string, unknown>[] }>(ep, '/slots'))?.slots ?? null);
   }
 
+  /** The resource governor's status (req-180); null while the runner sleeps. */
+  async governor(): Promise<Record<string, unknown> | null> {
+    const ep = await this.runner();
+    return ep === null ? null : ((await this.http.get<{ governor?: Record<string, unknown> }>(ep, '/governor'))?.governor ?? null);
+  }
+
   async models(): Promise<Record<string, unknown> | null> {
     const ep = await this.runner();
     return ep === null ? null : this.http.get<Record<string, unknown>>(ep, '/models');

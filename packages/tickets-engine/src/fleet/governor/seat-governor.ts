@@ -47,7 +47,7 @@ export class SeatGovernor implements ResourceGovernor, SeatHost {
 
   heavy(ask: HeavyAsk): Promise<SeatLease> {
     return new Promise<SeatLease>((resolve, reject) => {
-      this.queue.push({ ask, sinceMs: this.deps.clock.now().getTime(), reason: null, resolve, reject });
+      this.queue.push({ ask, sinceMs: this.deps.clock.now().getTime(), reason: null, cause: 'seats', resolve, reject });
       this.pump();
     });
   }
@@ -133,7 +133,7 @@ export class SeatGovernor implements ResourceGovernor, SeatHost {
         this.grant(waiter, verdict.note);
       } else {
         blocked = verdict;
-        this.noteWait(waiter, verdict.kind, verdict.reason);
+        this.noteWait(waiter, verdict);
       }
     }
     this.publish();
@@ -150,13 +150,14 @@ export class SeatGovernor implements ResourceGovernor, SeatHost {
     waiter.resolve(new HeldSeat(id, this, this.parallelism(), null));
   }
 
-  private noteWait(waiter: Waiter, kind: 'waits' | 'refused', reason: string): void {
-    if (waiter.reason === reason) {
+  private noteWait(waiter: Waiter, verdict: Exclude<AdmissionVerdict, { kind: 'grant' }>): void {
+    if (waiter.reason === verdict.reason) {
       return;
     }
-    waiter.reason = reason;
-    this.deps.publisher.line(`${waiter.ask.ticket} ${waiter.ask.task} ${kind} · ${reason}`);
-    waiter.ask.onWait?.(reason);
+    waiter.reason = verdict.reason;
+    waiter.cause = verdict.cause;
+    this.deps.publisher.line(`${waiter.ask.ticket} ${waiter.ask.task} ${verdict.kind} · ${verdict.reason}`);
+    waiter.ask.onWait?.(verdict.reason);
   }
 
   private cancel(waiter: Waiter): void {
