@@ -30,6 +30,9 @@
 .slot-name {
   width: 64px;
   flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .seats {
   width: 40px;

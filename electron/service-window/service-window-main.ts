@@ -39,6 +39,8 @@ const home = args.home ?? path.join(os.homedir(), '.drey-engine');
 // Drey's own userData (its app-config.json names the local model), read before this process takes its own.
 const dreyUserData = app.getPath('userData');
 app.setPath('userData', path.join(home, 'service-window'));
+// A tray and a plain text window need no GPU: no GPU process, less memory (the owner watches it).
+app.disableHardwareAcceleration();
 
 class ServiceWindowProcess {
   private trayMode: boolean;

@@ -36,7 +36,7 @@ describe('statusLine', () => {
   it('reads the board 8a line', () => {
     const line = statusLine(i18n, demoSnapshot());
     expect(line.running).toBe(true);
-    expect(line.text).toBe('Running since 08:12 · pid 18240 · 3 components · 2 runs live · $4.10 of $15 today');
+    expect(line.text).toBe('Running since 08:12 · pid 18240 · 4 components · 2 runs live · $4.10 of $15 today');
   });
   it('omits the money, and the limit, when unknown', () => {
     expect(statusLine(i18n, { ...demoSnapshot(), spend: null }).text).not.toContain('today');

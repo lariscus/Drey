@@ -1,6 +1,6 @@
 /** The Components tab's status line (board 8a): one line of what the service is doing. */
 import type { I18n } from '../../../../../shared/i18n';
-import type { ComponentState, ServiceSnapshot } from '../../../../../shared/service-window/contract';
+import type { ServiceSnapshot } from '../../../../../shared/service-window/contract';
 import { clock, joinParts, money } from './format';
 
 export interface StatusLineVm {
@@ -8,15 +8,8 @@ export interface StatusLineVm {
   readonly text: string;
 }
 
-function countRunning(snapshot: ServiceSnapshot): number {
-  const states: readonly ComponentState[] = [
-    snapshot.components.engine.state,
-    snapshot.components.runner.state,
-    snapshot.components.mcp.state,
-    snapshot.components.gateway.state,
-  ];
-  return states.filter((state) => state === 'running').length;
-}
+/** The service's four components (engine, runner, MCP server, gateway), whatever their state — as Settings → Background service counts them (board 8c). */
+const SERVICE_COMPONENTS = 4;
 
 function spendPart(i18n: I18n, spend: ServiceSnapshot['spend']): string | null {
   if (spend === null) {
@@ -38,7 +31,7 @@ export function statusLine(i18n: I18n, snapshot: ServiceSnapshot | null): Status
     text: joinParts([
       snapshot.startedAt === null ? null : i18n.t('service_window.status.since', { time: clock(snapshot.startedAt) }),
       snapshot.pid === null ? null : i18n.t('service_window.status.pid', { pid: snapshot.pid }),
-      i18n.t('service_window.status.components', { count: countRunning(snapshot) }),
+      i18n.t('service_window.status.components', { count: SERVICE_COMPONENTS }),
       i18n.t('service_window.status.runs_live', { count: snapshot.components.runner.liveRuns }),
       spendPart(i18n, snapshot.spend),
     ]),
