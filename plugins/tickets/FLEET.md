@@ -446,8 +446,9 @@ A persona run names its persona right after the ticket line (milestone
 212, D-60: `Your persona: <id> (<role>) — its folder is
 tickets/_meta/personas/<id>/ …`, ship and scout brief alike), which is
 what lets the step prompts' Friction paragraph run; the persona's
-`## Memory` slice rides the variable parts, its `thread.md` does not
-(D-61 — nothing is adopted unreviewed; req-168/169).
+`## Memory` slice rides the variable parts; the retired `thread.md` never
+did (D-61 — nothing is adopted unreviewed; req-168 made the 1:1 a session,
+"The 1:1 session" below).
 
 **Which model a persona run gets (milestone 212, D-62).** The dispatch
 pass resolves the model through `personaModelFor(persona, context)`:
@@ -952,10 +953,11 @@ by themselves** (On), only finish what runs (Paused), or wait for the owner
 (Off). It does not decide whether anyone may talk to an agent:
 
 - **Chats need the chat bridge, not the chain.** Mission Control (desktop
-  Assistant target, iPad, phone), Shape with Paul and a Crew 1:1 run
-  through the engine's `ChatService` and the `chat.*` config (the LLM over
-  HTTP) or write the persona thread file — none of them reads the
-  Autopilot, the chain status or whether the runner is up.
+  Assistant target, iPad, phone) and Shape with Paul run through the
+  engine's `ChatService` and the `chat.*` config (the LLM over HTTP) — none
+  of them reads the Autopilot, the chain status or whether the runner is
+  up. A persona's 1:1 is a runner session (req-168, below), started on
+  demand like a run; an `api` persona's 1:1 takes the chat bridge.
 - **What genuinely needs the runner starts it on demand, Autopilot or not.**
   A run start (`FleetClient.start`), a message to a run (`send` — a
   reopenable ended run resumes under a fresh runner) and the Autopilot
@@ -976,8 +978,47 @@ by themselves** (On), only finish what runs (Paused), or wait for the owner
   the fleet snapshot; every client shows that as Off and the switch turns
   it On from there. A start that fails is refused with its cause
   (`runner_down` + the error), never a bare "not running".
-- The 1:1 that routes into a runner session (the coaching thread) is
-  req-152's design and not covered here yet.
+- **A 1:1 is a session, not a chain matter** (req-168). It starts on the
+  owner's line whatever the Autopilot says, holds a slot while held
+  (a live record, so the runner does not sleep under it) and is released
+  after 15 idle minutes; then the runner's idle exit applies again.
+
+## The 1:1 session (req-168, ADR-0093)
+
+A persona's 1:1 is a run record with `kind: '1:1'` (`fleet/protocol-session.ts`):
+
+- **The start** — `POST /start` with a request whose `session` is
+  `{kind: '1:1', persona, workingDirectory, chatFile}` goes to
+  `OneOnOneStarter` instead of the ticket starter: `ticketId` is the marker
+  `1:1`, no `dk` (no claim), no worktree, `gate: 'none'`, no move,
+  `permissionMode: 'read-only'`, `column: null`. The pool binds it like a
+  run (slot, class of the persona's default model, the persona's and the
+  provider's ledgers; `ledger.noTicket` — no ticket allowance). The worker
+  spawns **quiet and held** in the tickets repository; one live 1:1 per
+  persona (a second start is refused). The engine composes the request
+  (`OneOnOneRequestBuilder`) and the brief (`composeOneOnOneBrief`,
+  `specs/classifier-spec.md` "The 1:1 brief").
+- **The lines** — `POST /send`: the first wraps the brief once (req-75),
+  later ones go alone. The answer is the stream's `text` events after the
+  `you › <line>` note, read by the engine once a `result` follows.
+- **The release** — `IdleRelease`, on the reaper's round: a held 1:1 that
+  is not mid-turn and waits on nothing is stopped after 15 minutes of
+  silence (`shared/session-lifecycle.ts`), noted `released after 15 min idle`
+  in its stream, settled `done`; the slot listener frees its reservation.
+  The worker's own end settles it `done` too (exit verdict `session`). An
+  ended 1:1 never reopens (`POST /send` to it is refused) — the next line
+  starts a fresh one, whose brief carries the conversation so far.
+- **What it never does** — claim, prepare or remove a worktree, gate, move,
+  write a ticket, write `memory.md`, or count toward a ticket's allowance;
+  its `run_settled` ledger line carries `ticket: "1:1"` and the persona,
+  so the persona's day counts it.
+- **The toolset** — the harness's own read tools in the tickets repo under
+  the read-only mode; the MCP read tools (`fleet_status`, `fleet_watch`,
+  `vault_list`, `vault_search`, `vault_read`) once req-167's harness MCP
+  configuration implements `OneOnOneToolSeam` (req-217).
+- **Seeing it** — `GET /status` lists it with `kind`, `persona`,
+  `workingDirectory`, `chatFile`, `held`, `turn`, `costUsd`; the service
+  window's Sessions tab draws `1:1 · <Name>` — `held · releases in <span>`.
 
 ## Lifecycle gotchas
 

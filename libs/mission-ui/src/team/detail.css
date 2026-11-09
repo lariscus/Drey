@@ -154,7 +154,7 @@ mc-app-bar {
 
 .session-line {
   margin: 0;
-  font-size: calc(12px * var(--mc-text, 1));
+  font-size: calc(13px * var(--mc-text, 1));
   color: var(--text-3);
 }
 

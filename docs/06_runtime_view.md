@@ -5240,3 +5240,54 @@ harness reported for the session minus what it had spent before (a resumed sessi
 table), or the price table when the harness reports none or 0. A worker of an ACP harness is a stdio child of its
 runner: a runner handover resumes it in place (`session/resume` / `session/load`), an unplanned runner death detaches
 the run — nothing re-attaches (req-205).
+
+## 6.112 The owner's 1:1 line → held session → answer → idle release (req-168, milestone 228, [ADR-0093](09_architecture_decisions/0093-persona-sessions-the-1on1.md) as built)
+
+The Crew tab's 1:1 pane, the Assistant's 1:1 target and Mission Control's *Talk to <name> 1:1* all send through
+`personaThreadAppend` to `PersonaSessionService` in the engine. The line lands in the persona's chat session file at once
+(one commit); the answer arrives later, when the session's turn ends. A persona with `worker: api` takes the chat bridge
+instead of a session (one call per line, the same brief as its system prompt).
+
+```mermaid
+sequenceDiagram
+    participant O as Owner (Crew 1:1 · Assistant · Mission Control)
+    participant S as PersonaSessionService (engine)
+    participant F as PersonaSessionFiles (_meta/chat/, git)
+    participant R as Crew runner (OneOnOneStarter, SteerService)
+    participant P as Pool (SlotBinder: slot, ledgers)
+    participant W as Persona's harness (read-only, tickets repo)
+    participant X as IdleRelease (the reaper's round)
+    O->>S: personaThreadAppend(ben, line)
+    S->>F: open the 1:1 (the first one: thread.md migrated, removed — one commit)
+    S->>F: owner line — one commit
+    S-->>O: reply {messages, session: starting | answering}
+    alt no live 1:1 of ben
+        S->>S: brief = persona.md, prompt.md, skills, memory.md, latest runs, conversation so far
+        S->>R: start {session: 1:1 ben, workingDirectory: tickets repo, permissionMode: read-only, gate: none}
+        R->>P: bind (class of ben's default model; persona + provider ledgers, no ticket allowance)
+        P-->>R: slot + grant (or a refusal → the failure on the 1:1)
+        R->>W: spawn quiet (holdAtSpawn), held — no prompt yet
+    end
+    S->>R: send(runId, line)
+    R->>W: first line: brief + "The owner starts the dialog:" + line · later: the line alone
+    W-->>R: text events … result (turn idle) — stream.jsonl
+    R-->>S: fleet change (the record's turn moved)
+    S->>R: stream(runId) — the text after "you › line" up to the result
+    S->>F: persona answer + its proposal cards — one commit
+    F-->>O: board / chat change → the clients read the 1:1 again
+    opt the owner accepts a card
+        O->>S: personaProposalDecide(ben, p-1, confirm)
+        S->>S: personaPatch (prompt.md or skills:) — the only way a proposal is adopted
+        S->>F: confirmed line — one commit
+    end
+    loop the runner's reaper round
+        X->>X: held 1:1, no turn running, nothing waiting, silent ≥ 15 min?
+    end
+    X->>W: stop
+    X->>R: settle done — the slot is freed, no memory line, no ticket touched
+    Note over O,S: the next line starts a fresh session whose brief carries the conversation so far
+```
+
+The session record carries `kind: '1:1'`, the persona, the working directory and the chat file; the service window's
+Sessions tab lists it as `1:1 · Ben` with `held · releases in <span>` and a Directory row. An ended 1:1 never reopens
+in place, and the worker's own end ends it `done` (exit verdict `session`).

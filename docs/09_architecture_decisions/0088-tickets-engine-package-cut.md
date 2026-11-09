@@ -521,3 +521,15 @@ with the Crew runner and the remote gateway in the same process.
 `service/service-main.js`, discovery is `~/.drey-engine/service.lock`, and
 the plugin's `service-lifecycle.ts` adopts, hands over or starts the
 service. The invoke channel, its token and the home are unchanged.
+
+## Later change — the persona thread becomes the 1:1 session (req-168, milestone 228)
+
+E3's coaching thread (`tickets/_meta/personas/<id>/thread.md`, U4's
+`personaThread` / `personaThreadAppend`) is retired
+([ADR-0093](0093-persona-sessions-the-1on1.md) as built): the same two
+team methods now read and write the persona's 1:1 — a chat session file
+under `_meta/chat/` with a `persona:` key, answered by a held session of
+the persona's own harness — and `TEAM_METHODS` gains
+`personaProposalDecide` for the persona's proposal cards. A thread's lines
+migrate once into the persona's first 1:1 session; `board-service.ts` lost
+the thread writer, the persona loader its thread read.

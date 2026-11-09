@@ -366,6 +366,98 @@ Kimi's AskUserQuestion) are a different path and keep their own rendering.
 
 ---
 
+## The 1:1 brief (req-168, ADR-0093)
+
+A persona's 1:1 is a session of its own harness (or, for `worker: api`,
+one chat-bridge call per line). What the session is told is composed once,
+in `packages/tickets-engine/src/fleet/one-on-one-brief.ts`
+(`composeOneOnOneBrief`), from `persona.md`, `prompt.md`, the skills,
+`memory.md` (read, never written by the 1:1), the run records and the chat
+session file (`services/persona-session-context.ts`). A runner session is
+started quiet (req-75): the brief rides the owner's **first** line once,
+wrapped by the steer path as
+`<brief>\n\n---\n\nThe owner starts the dialog:\n<line>`; every later
+line goes alone into the held session. After an idle release the next
+line starts a fresh session whose brief carries the conversation so far.
+The sections, in this order (an empty one is left out):
+
+````markdown
+# 1:1 with <Title>
+
+You are <Title>, the <role> of this crew. The owner talks with you 1:1: there is no ticket and nothing to build. Answer as yourself, from your instructions, your memory and your runs — short and plain.
+
+You work in the tickets repository (<absolute path>), read-only: read what you need, never edit a file, never run a command that changes anything. Your own folder is tickets/_meta/personas/<id>/.
+
+## Your instructions
+
+<prompt.md>
+
+## Skills
+
+### <name>
+
+<the skill's text>
+
+## Your memory
+
+<memory.md, or: Nothing yet.>
+
+## Your latest runs
+
+- <ticket> · <state> · <model> · $<cost> · gate: <the gate failure, first 160 characters>
+(up to 5, newest first, the persona's ticket runs only; or: No runs yet.)
+
+## Tools
+
+Read the board, the tickets and the vault with: <the attached tool names>. They only read.
+
+## The conversation so far
+
+Owner: <line>
+
+You: <answer>
+(up to the last 30 messages, each cut at 2,000 characters)
+
+## Proposals
+
+When you think your instructions or your skills should change, say why in your answer and add one block per change:
+
+```proposal
+{"kind": "prompt", "summary": "<one line>", "text": "<your whole new instructions>"}
+```
+
+or `{"kind": "skill", "summary": "<one line>", "skill": "<the name of a skill to add>"}`. The owner accepts or dismisses each one; nothing changes before that.
+````
+
+- **The board is not embedded** (R2): the persona reads it — and its
+  memory — with its harness's own read tools in the tickets repository,
+  under the harness's read-only mode (`PermissionMode 'read-only'`).
+- **`## Tools` names a tool only when it is attached** (ADR-0071's rule).
+  The 1:1 may be given exactly the read-only MCP tools `fleet_status`,
+  `fleet_watch`, `vault_list`, `vault_search`, `vault_read`
+  (`fleet/one-on-one-toolset.ts`); they reach the harness through
+  req-167's harness MCP configuration, which is not on this base — no
+  tool is attached yet and the section is absent (follow-up req-217).
+- **The answer** is the `text` events of the run's stream after the
+  owner's `you › <line>` note, joined by a blank line, once a `result`
+  follows (`services/persona-turn-watcher.ts`, `answerAfterLastPrompt`).
+  Its ```` ```proposal ```` blocks are cut out and become proposal cards
+  (`core/persona-session-parse.ts`, `extractProposals`); an unreadable
+  block stays in the text where the owner sees it. A summary-less card
+  reads `Change my instructions` / `Add the skill <name>`.
+- **An `api` persona** (`services/api-persona-turn.ts`): the chat bridge
+  (the Drey assistant's model settings) gets the same brief, with no
+  conversation section (the history rides as messages) and this rule
+  appended — the bridge reads one JSON envelope per reply:
+
+  > ## Reply format
+  >
+  > Reply with exactly one JSON object and nothing else: {"say": "<your answer as Markdown, proposal blocks included>"}.
+
+  The bridge's board-digest slot reads `Not embedded in a 1:1.`
+
+---
+
 ## The assistant's system prompt (milestones 76–78, ADR-0071)
 
 `buildSystemPrompt` (`plugins/assistant/main/system-prompt.ts`) builds it
