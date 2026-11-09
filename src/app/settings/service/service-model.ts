@@ -3,6 +3,7 @@ import type { McpStatus } from '../../../../shared/ipc-api';
 import {
   SERVICE_LOG_LEVELS,
   type ServiceAction,
+  type StatusAction,
   type ServiceComponentId,
   type ServiceLogLevel,
   type ServiceStatusReply,
@@ -56,8 +57,8 @@ export function statusLineOf(status: ServiceStatusReply): StatusLine | null {
 }
 
 /** The status item's buttons: a running service restarts or stops, a stopped one starts. */
-export function statusActionsOf(status: ServiceStatusReply): readonly ServiceAction[] {
-  return status.running ? ['restart', 'stop'] : ['start'];
+export function statusActionsOf(status: ServiceStatusReply): readonly StatusAction[] {
+  return status.running ? ['open', 'restart', 'stop'] : ['start'];
 }
 
 const OFF: StateWords = { key: 'settings.service.state.off' };
@@ -137,7 +138,8 @@ export function componentRowsOf(status: ServiceStatusReply, mcp: McpStatus | nul
   return [engineRow(status), runnerRow(status), mcpRow(mcp), gatewayRow(status)];
 }
 
-export const SERVICE_ACTION_KEYS: Readonly<Record<ServiceAction, MessageKey>> = {
+export const SERVICE_ACTION_KEYS: Readonly<Record<StatusAction, MessageKey>> = {
+  open: 'settings.service.action.open',
   restart: 'settings.service.action.restart',
   stop: 'settings.service.action.stop',
   start: 'settings.service.action.start',

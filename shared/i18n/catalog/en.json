@@ -700,6 +700,7 @@
   "settings.service.status.name": "Status",
   "settings.service.status.running": "Running since {time} · {components, plural, one {# component} other {# components}} · {runs, plural, one {# run live} other {# runs live}}",
   "settings.service.status.stopped": "Not running",
+  "settings.service.action.open": "Open Drey Service…",
   "settings.service.action.restart": "Restart",
   "settings.service.action.stop": "Stop",
   "settings.service.action.start": "Start",

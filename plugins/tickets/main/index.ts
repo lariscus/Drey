@@ -174,6 +174,7 @@ const plugin: MainPluginModule = {
     const serviceSettings = new ServiceSettingsHandlers({
       config: ctx.config,
       engineConfigSet: (key, value) => client.invoke('configSet', { key, value }),
+      engineConfigGet: (key) => client.invoke('configGet', { key }),
       control: serviceControl,
       start: async () => client.rebind(await ensureService(ctx, ctx.log)),
       openFolder: async (dir) => {

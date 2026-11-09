@@ -77,6 +77,7 @@ describe('ServiceControl.status', () => {
     expect(await control(probe, 3).status()).toEqual({
       running: true,
       home,
+      logFolder: path.join(home, 'logs'),
       startedAt: '2026-11-08T08:12:00.000Z',
       liveRuns: 3,
       gateway: { enabled: true, listening: true, devices: 2, failed: false },

@@ -243,6 +243,9 @@ export const test = base.extend<DreyFixtures>({
     // Force the production `app://` renderer even if the caller's shell
     // still has DREY_RENDERER_URL exported from `npm run dev`.
     env['DREY_RENDERER_URL'] = '';
+    // Drey Service starts no tray icon process for a test (req-165): one
+    // Electron window process per test would be noise and could outlive it.
+    env['DREY_SERVICE_TRAY'] = 'off';
     // The seeded vault sits under `test-results/` INSIDE this repo's
     // checkout (so a failure uploads it), which makes git's upward
     // discovery find the repo itself: every test vault would pose as a Git

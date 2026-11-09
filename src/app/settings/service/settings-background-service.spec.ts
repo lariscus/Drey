@@ -12,6 +12,7 @@ import { SettingsBackgroundService } from './settings-background-service';
 const LIVE: ServiceStatusReply = {
   running: true,
   home: 'C:\\Users\\x\\.drey-engine',
+  logFolder: 'C:\\Users\\x\\.drey-engine\\logs',
   startedAt: '2026-11-08T08:12:00',
   liveRuns: 2,
   gateway: { enabled: false, listening: false, devices: 0, failed: false },
@@ -76,10 +77,10 @@ describe('Settings → Background service (board 8c)', () => {
   it('writes the status line from the service: since, four components, the live runs', async () => {
     const { root, settle } = setup();
     await settle();
-    expect(text(item(root, 'service.status'))).toMatch(/^Status Running since .+ · 4 components · 2 runs live Restart Stop$/);
+    expect(text(item(root, 'service.status'))).toMatch(/^Status Running since .+ · 4 components · 2 runs live Open Drey Service… Restart Stop$/);
   });
 
-  it('draws the rows the board has, with its strings, and not the one whose window is not built', async () => {
+  it('draws the rows the board has, with its strings, Open Drey Service… among them (req-165)', async () => {
     const { root, settle } = setup();
     await settle();
     expect(text(item(root, 'service.idle'))).toBe('Keep running after Drey quits Live runs and a running Autopilot always keep it alive. minutes');
@@ -88,7 +89,7 @@ describe('Settings → Background service (board 8c)', () => {
     expect(text(item(root, 'service.component.runner'))).toBe('Crew runner running · 2 live Restart Stop');
     expect(text(item(root, 'service.component.engine'))).toBe('Tickets engine Always on while the service runs. running');
     expect(text(item(root, 'service.component.gateway'))).toBe('Remote gateway Phones and the iPad. Pairing under Tickets → Devices. off Start');
-    expect(buttons(root, 'Open Drey Service…')).toEqual([]);
+    expect(buttons(root, 'Open Drey Service…')).toHaveLength(1);
   });
 
   it('draws the Load and Logs items with the stored values', async () => {
@@ -99,7 +100,7 @@ describe('Settings → Background service (board 8c)', () => {
     expect(item(root, 'service.load.quiet').querySelector<HTMLInputElement>('input')!.value).toBe('22:00 – 07:00');
     expect(text(item(root, 'service.logs.level'))).toBe('Log level Normal Change…');
     expect(text(item(root, 'service.logs.folder'))).toBe(
-      'Log folder One file per component, rotated daily, kept 14 days. C:\\Users\\x\\.drey-engine Open folder',
+      'Log folder One file per component, rotated daily, kept 14 days. C:\\Users\\x\\.drey-engine\\logs Open folder',
     );
   });
 
@@ -166,6 +167,13 @@ describe('Settings → Background service (board 8c)', () => {
     await settle();
     buttons(item(root, 'service.status'), 'Stop')[0].click();
     expect(client.control).toHaveBeenLastCalledWith({ target: 'service', action: 'stop' });
+  });
+
+  it('Open Drey Service… asks the service to open its window (req-165)', async () => {
+    const { root, client, settle } = setup();
+    await settle();
+    buttons(item(root, 'service.status'), 'Open Drey Service…')[0].click();
+    expect(client.control).toHaveBeenCalledWith({ target: 'window', action: 'open' });
   });
 
   it('the Crew runner\'s buttons go to the runner, the gateway\'s to Settings → Remote access', async () => {

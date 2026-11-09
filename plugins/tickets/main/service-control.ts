@@ -57,6 +57,7 @@ export class ServiceControl {
     return {
       running: true,
       home: this.deps.home(),
+      logFolder: path.join(this.deps.home(), 'logs'),
       startedAt: lock.startedAt,
       liveRuns,
       gateway: {
@@ -84,6 +85,41 @@ export class ServiceControl {
       await new Promise((resolve) => setTimeout(resolve, 150));
     }
     return false;
+  }
+
+  /**
+   * The atomic restart (req-165): the service hands its runs over, starts
+   * its successor and leaves; resolves once the successor's lock is up
+   * (a new pid, alive), or with the reason it refused (a run in its gate).
+   */
+  async restart(): Promise<{ ok: boolean; error?: string }> {
+    const lock = await this.lock();
+    if (lock === null) {
+      return { ok: false, error: 'the service is not running' };
+    }
+    const reply = await this.post(lock, '/restart', {});
+    if (!reply.ok) {
+      return reply;
+    }
+    const deadline = Date.now() + 60_000;
+    while (Date.now() < deadline) {
+      const next = await readServiceLock(this.deps.home());
+      if (next !== null && next.pid !== lock.pid && (await serviceAlive(next, 500))) {
+        return { ok: true };
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    return { ok: false, error: 'the restarted service did not come up in time' };
+  }
+
+  /** *Open Drey Service…* (req-165): the service opens its window. */
+  async openWindow(): Promise<{ ok: boolean; error?: string }> {
+    const lock = await this.lock();
+    if (lock === null) {
+      return { ok: false, error: 'the service is not running' };
+    }
+    const reply = await this.post(lock, '/window/open', {});
+    return reply.ok ? { ok: true } : { ok: false, error: reply.error };
   }
 
   /** `start` wakes the Crew runner, `stop` stops it and its live runs. */

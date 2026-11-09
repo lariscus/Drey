@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { ServiceControl } from './service-control';
 import { ServiceSettingsHandlers, parseControlRequest } from './service-settings';
@@ -11,6 +12,8 @@ function harness() {
   const engine = new Map<string, unknown>();
   const control = {
     shutdown: vi.fn(async () => true),
+    restart: vi.fn(async () => ({ ok: true }) as { ok: boolean; error?: string }),
+    openWindow: vi.fn(async () => ({ ok: true })),
     runner: vi.fn(async (_action: 'start' | 'stop') => ({ ok: true })),
     status: vi.fn(),
   };
@@ -22,6 +25,7 @@ function harness() {
       set: async (key, value) => void config.set(key, value),
     },
     engineConfigSet: async (key, value) => void engine.set(key, value),
+    engineConfigGet: async (key) => engine.get(key),
     control: control as unknown as ServiceControl,
     start,
     openFolder,
@@ -77,10 +81,27 @@ describe('the control calls', () => {
     expect(start).not.toHaveBeenCalled();
   });
 
-  it('Restart of the service waits for it to leave, then starts it again', async () => {
+  it("Restart of the service is the service's atomic restart, then Drey adopts the successor", async () => {
     const { handlers, control, start } = harness();
     await handlers.control({ target: 'service', action: 'restart' });
-    expect(control.shutdown.mock.invocationCallOrder[0]).toBeLessThan(start.mock.invocationCallOrder[0]);
+    expect(control.shutdown).not.toHaveBeenCalled();
+    expect(control.restart.mock.invocationCallOrder[0]).toBeLessThan(start.mock.invocationCallOrder[0]);
+  });
+
+  it('Open Drey Service… asks the service to open its window', async () => {
+    const { handlers, control } = harness();
+    expect(await handlers.control({ target: 'window', action: 'open' })).toEqual({ ok: true });
+    expect(control.openWindow).toHaveBeenCalledOnce();
+    expect(parseControlRequest({ target: 'window', action: 'stop' })).toBeNull();
+  });
+
+  it('the tray changed start with Windows in the engine: the page reads the engine and stores it', async () => {
+    const { handlers, config, engine } = harness();
+    config.set('service.enabled', false);
+    engine.set('service.enabled', true);
+    engine.set('service.autostart', true);
+    expect(await handlers.prefs()).toMatchObject({ enabled: true, autostart: true });
+    expect(config.get('service.autostart')).toBe(true);
   });
 
   it('Start of the service stops nothing', async () => {
@@ -90,9 +111,9 @@ describe('the control calls', () => {
     expect(start).toHaveBeenCalledOnce();
   });
 
-  it('a service that does not leave in time is not started a second time', async () => {
+  it('a restart the service refuses (a run in its gate) starts nothing', async () => {
     const { handlers, control, start } = harness();
-    control.shutdown.mockResolvedValueOnce(false);
+    control.restart.mockResolvedValueOnce({ ok: false, error: 'T-0001 is in its gate' });
     const reply = await handlers.control({ target: 'service', action: 'restart' });
     expect(reply.ok).toBe(false);
     expect(start).not.toHaveBeenCalled();
@@ -120,9 +141,9 @@ describe('the control calls', () => {
     expect((await handlers.control({ target: 'engine', action: 'stop' })).ok).toBe(false);
   });
 
-  it('opens the service home as the log folder', async () => {
+  it('opens the folder of the per-component log files', async () => {
     const { handlers, openFolder } = harness();
     await handlers.openLogFolder();
-    expect(openFolder).toHaveBeenCalledWith('C:\\home\\.drey-engine');
+    expect(openFolder).toHaveBeenCalledWith(path.join('C:\\home\\.drey-engine', 'logs'));
   });
 });
