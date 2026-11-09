@@ -292,6 +292,8 @@ export interface PersonaView {
   readonly summary?: string;
   /** `allowed:` (req-171): what the persona may do beyond its runs; absent on older servers and for the human. */
   readonly allowed?: PersonaAllowed;
+  /** When `personas/<id>/` was last committed (ISO committer date, req-239); absent = no git or no commit yet. */
+  readonly committedAt?: string;
   /**
    * The persona's daily budget in USD (frontmatter `budget:`, concept
    * §4.3 — the Team card shows the day's costs against it); null = none.

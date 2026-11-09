@@ -231,6 +231,8 @@ export interface PersonaRecordsPort {
   journal(personaId: string): Promise<PersonaJournalReply>;
   journalRemove(cmd: PersonaJournalRemove): Promise<PersonaJournalReply>;
   memoryRemove(cmd: PersonaMemoryRemove): Promise<PersonaMemoryReply>;
+  /** req-239: when each persona's folder was last committed (ISO); optional so a fake without git still fits. */
+  commitAges?(personaIds: readonly string[]): Promise<Readonly<Record<string, string>>>;
 }
 
 export class DreyTicketsPort implements TicketsRemotePort {
@@ -549,6 +551,8 @@ export class DreyTicketsPort implements TicketsRemotePort {
       }
     }
     const paused = chain?.pausedPersonas;
+    // req-239: the commit age of each persona's folder; a failing git leaves the field out.
+    const committed: Readonly<Record<string, string>> = (await this.records?.commitAges?.(personas.map((p) => p.id)).catch(() => ({}))) ?? {};
     return personas.map((p) => ({
       id: p.id,
       ...(p.kind === 'human' ? { kind: 'human' as const } : {}),
@@ -560,6 +564,7 @@ export class DreyTicketsPort implements TicketsRemotePort {
       color: p.color,
       ...(p.summary !== '' ? { summary: p.summary } : {}),
       ...(p.kind === 'human' ? {} : { allowed: p.allowed }),
+      ...(committed[p.id] !== undefined ? { committedAt: committed[p.id] } : {}),
       budget: p.budget,
       ...(daily[p.id] !== undefined ? { dailyCost: daily[p.id] } : {}),
       ...(phases[p.id] !== undefined ? { phases: phases[p.id] } : {}),

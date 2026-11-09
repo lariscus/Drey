@@ -147,6 +147,24 @@ describe('DreyTicketsPort', () => {
     expect(ben?.dailyCost).toBeUndefined();
   });
 
+  it('carries the commit age of the persona’s folder; a failing or absent source leaves the field out (req-239)', async () => {
+    const { board, fleet } = fakes();
+    vi.mocked(board.listPersonas).mockResolvedValue([fakePersona('pia', 'Pia'), fakePersona('ben', 'Ben')]);
+    const records = {
+      journal: vi.fn(),
+      journalRemove: vi.fn(),
+      memoryRemove: vi.fn(),
+      commitAges: vi.fn(async () => ({ ben: '2026-11-07T10:00:00+01:00' })),
+    };
+    const port = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false }, null, null, records);
+    const views = await port.personas();
+    expect(views.find((v) => v.id === 'ben')?.committedAt).toBe('2026-11-07T10:00:00+01:00');
+    expect(views.find((v) => v.id === 'pia')?.committedAt).toBeUndefined();
+    expect(records.commitAges).toHaveBeenCalledWith(['pia', 'ben']);
+    records.commitAges.mockRejectedValue(new Error('git is gone'));
+    expect((await port.personas()).every((v) => v.committedAt === undefined)).toBe(true);
+  });
+
   it('carries the persona’s phase assignment and the chain’s pause state (U4)', async () => {
     const { board, fleet } = fakes();
     vi.mocked(board.listPersonas).mockResolvedValue([fakePersona('pia', 'Pia'), fakePersona('ben', 'Ben')]);

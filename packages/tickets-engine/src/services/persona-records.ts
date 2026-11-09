@@ -5,6 +5,7 @@ import { JOURNAL_FILE } from '../core/persona-journal';
 import { journalFromFriction, parseJournal, withJournalEntries, withoutJournalEntry } from '../core/persona-journal-file';
 import { TicketsGit } from '../core/tickets-git';
 import type { EngineHost, EngineVault } from './host';
+import { PersonaCommitAges } from './persona-commit-age';
 import { describeMemoryEntries, memoryPathFor, removeMemoryEntry } from './persona-store';
 
 /** The board as the records need it: the vault and the personas. */
@@ -45,9 +46,16 @@ function frictionPathFor(id: string): string {
  */
 export class PersonaRecords {
   private readonly git: TicketsGit;
+  private readonly ages: PersonaCommitAges;
 
   constructor(private readonly deps: PersonaRecordsDeps) {
     this.git = deps.git ?? new TicketsGit(() => 'git');
+    this.ages = new PersonaCommitAges(deps.board, this.git);
+  }
+
+  /** When each persona's folder was last committed (req-239); the Persona page's `committed 2 days ago`. */
+  commitAges(personaIds: readonly string[]): Promise<Readonly<Record<string, string>>> {
+    return this.ages.of(personaIds);
   }
 
   /** The journal, oldest first; a left-over friction.md is migrated first. */
