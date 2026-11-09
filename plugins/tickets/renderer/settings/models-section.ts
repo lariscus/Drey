@@ -249,7 +249,8 @@ export function createModelsSection(api: DreyPluginApi): ModelsSection {
     if (view.work) {
       const chip = el('span', 'tset-models-chipwrap');
       chip.append(el('span', 'tset-models-chip', t('tickets.settings.models.profile.work')));
-      provider.append(chip);
+      // The board's markup has a space before the chip, then its 6 px margin.
+      provider.append(document.createTextNode(' '), chip);
     }
     const remove = el('button', 'tset-models-remove icon-btn');
     remove.type = 'button';

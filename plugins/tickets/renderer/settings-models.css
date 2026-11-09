@@ -51,7 +51,6 @@
 
 .tset-models-table th,
 .tset-models-table td {
-  box-sizing: border-box;
   height: 32px;
   padding: 0 10px;
   text-align: left;
@@ -59,9 +58,15 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* The board's header cell is border-box (32 high with its rule), a body cell content-box (32 + its 1 px rule). */
 .tset-models-table th {
+  box-sizing: border-box;
   font-weight: 400;
   color: var(--text-4);
+}
+
+.tset-models-table td {
+  box-sizing: content-box;
 }
 
 .tset-models-table td {
@@ -278,6 +283,7 @@
 
 .tset-models-unit {
   font-size: 13px;
+  line-height: 18px;
   color: var(--text-4);
 }
 
@@ -293,6 +299,7 @@
 
 .tset-models-pp {
   font-size: 13px;
+  line-height: 18px;
 }
 
 .tset-models-ppname {
@@ -328,6 +335,7 @@
 }
 
 .tset-models-cardname {
+  line-height: 18px;
   font-size: 14px;
   font-weight: 700;
 }
@@ -335,6 +343,7 @@
 .tset-models-billing {
   margin-left: auto;
   font-size: 13px;
+  line-height: 18px;
   color: var(--text-4);
 }
 
@@ -356,6 +365,7 @@
 }
 
 .tset-models-wlabel {
+  line-height: 18px;
   width: 36px;
   flex-shrink: 0;
   font-size: 13px;
@@ -386,6 +396,7 @@
 }
 
 .tset-models-wtext {
+  line-height: 18px;
   width: 220px;
   flex-shrink: 0;
   font-size: 13px;
@@ -418,6 +429,7 @@
 }
 
 .tset-models-q {
+  line-height: 18px;
   display: flex;
   align-items: center;
   height: 22px;
