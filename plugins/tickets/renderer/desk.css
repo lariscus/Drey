@@ -625,14 +625,14 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   flex: none;
   width: 48px;
   height: 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   background: var(--bg-input);
 }
 
 .desk-slot-fill {
   display: block;
   height: 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   background: var(--accent);
 }
 
@@ -695,14 +695,14 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   flex: none;
   width: 120px;
   height: 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   background: var(--bg-input);
 }
 
 .desk-tranche-fill {
   display: block;
   height: 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   background: var(--accent);
 }
 
