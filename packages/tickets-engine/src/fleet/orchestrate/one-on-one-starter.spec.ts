@@ -135,5 +135,8 @@ describe('OneOnOneStarter — a 1:1 is a quiet, held session of the persona (req
     await settled(h.sup, id, 'done');
     expect(h.gate).toEqual([]);
     expect(await runnerNotes(dirs.fleet, id)).toContainEqual(expect.stringContaining('1:1 session ended'));
+    // An ended 1:1 never reopens in place: no ticket, no worktree — the next line starts a fresh session.
+    expect(await h.sup.send(id, 'still there?')).toMatchObject({ ok: false, error: expect.stringContaining('does not reopen') });
+    expect(h.adapter.starts).toHaveLength(1);
   });
 });
