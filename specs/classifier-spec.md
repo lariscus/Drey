@@ -296,14 +296,13 @@ create as a `raw capture:` Log line (ticket-schema).
   (`packages/tickets-engine/prompts/*.md`, `fleet/assignment.ts`; milestone
   212, D-60 / D-61). The shipped step prompts (`build-default` v6,
   `qa-default` v2, `review-default` v3, `scout-default` v2) ask the worker,
-  in their "How to work" list, to append one friction line to
-  `tickets/_meta/personas/<your persona>/friction.md` and end the
-  paragraph with: *"Your brief names your persona in its "Your persona:"
-  line; a brief without that line has no persona: skip it."* The brief —
-  ship and scout alike — names the persona right after the ticket line:
+  in their "How to work" list, to report friction as one `FRICTION:` line
+  of the final message (req-169, milestone 229 — the step prompts are
+  `build-default` v7, `qa-default` v3, `review-default` v4, `scout-default`
+  v3; the wording is under *The closing round*). The brief — ship and
+  scout alike — names the persona right after the ticket line:
   `Your persona: <id> (<role>) — its folder is
-  tickets/_meta/personas/<id>/ in the tickets repo; the persona-bound files
-  the prompt names (the friction file) live there.` (no line on a ring
+  tickets/_meta/personas/<id>/ in the tickets repo.` (no line on a ring
   run). The brief's variable parts carry the persona's `## Memory` slice
   and no longer a `## Coaching` slice of `thread.md` (D-61: nothing is
   adopted unreviewed; req-168/169). The rest of the brief's order is
@@ -457,6 +456,62 @@ or `{"kind": "skill", "summary": "<one line>", "skill": "<the name of a skill to
   The bridge's board-digest slot reads `Not embedded in a 1:1.`
 
 ---
+
+## The closing round (req-169, ADR-0093, R14)
+
+A run that raised a signal (red gate, retry, owner steer, cost outlier,
+reported friction — the vault's `closing-signals:` list, all five by
+default) is asked **once** after its gate verdict, before its ticket goes
+back: the harness resumes the run's own session (`sessionRef`) read-only
+with this prompt (`packages/tickets-engine/src/fleet/closing-round-prompt.ts`,
+`closingRoundPrompt`; one line per raised signal, in this order):
+
+````text
+The step on <ticket> is over: the machine gate is <green|red>. This is a short closing round — do not run tools, do not edit files; nothing changes any more.
+
+Why this run is looked at:
+- the machine gate failed: <the gate failure's first line, 200 characters>
+- this run repeated a step whose previous run failed its gate
+- the owner stepped in <n> time(s) while you worked
+- it cost $<cost>; this persona's typical run costs $<median>
+- you reported friction: "<the FRICTION: line>"
+
+Answer with exactly one JSON object and nothing outside it — no prose, no markdown fences:
+{"finding":{"cause":"model|prompt|task|environment","text":"..."},"friction":"...","lesson":"...","proposal":null}
+- finding: where the run stumbled and why. cause "model" when a stronger or different model would have avoided it, "prompt" when the brief, the prompt or the skills lacked something, "task" when the ticket itself was unclear or wrong, "environment" for the repo, the tools or the machine. At most 400 characters; null when nothing stumbled.
+- friction: what you lacked, guessed or hit twice — one line, at most 200 characters; null when nothing.
+- lesson: one line the NEXT run of this persona should know — a concrete, reusable rule, not a story of this run; at most 200 characters. A wrong lesson misleads every later run: when in doubt, null.
+- proposal: null, or {"target":"prompt.md|models.default","title":"...","content":"..."} when the persona's prompt or model should change — the owner decides; content is the whole new prompt text, or the model id.
+````
+
+- **The parser** (`parseClosingAnswer`): the first `{` to the last `}` of
+  the turn's `result` text, fences and prose around it tolerated; nothing
+  parses → the entry notes *the answer did not parse* and no lesson is
+  written. Each field is checked on its own: a `finding` needs a known
+  `cause` and a non-empty `text`; `friction` / `lesson` are flattened to
+  one line and capped (200), `none` / `null` / `n/a` read as null; a
+  `proposal` needs the target `prompt.md` or `models.default`, a title
+  (120) and content (≤ 8 KiB; a model id is one line). What fails a check
+  is dropped, never guessed.
+- **What it writes:** one journal entry (`reviews.md`) with the runner's
+  facts and the finding; at most one memory line
+  `- <date> · <ticket> · <persona>/<model> · <lesson>`; a proposal as an
+  **open** `improvements.md` proposal (the owner's 1:1 card) — never
+  adopted. The journal entry's `friction:` is the worker's own
+  `FRICTION:` line, else the round's `friction`.
+- **No round:** a run without a session ref, a harness that cannot resume
+  it, a round past its 10-minute bound — the entry is written from the
+  runner's facts with `note: round skipped — <why>`, no lesson. A 1:1, a
+  dialog, a blocked, scout or no-result run gets none.
+- **The worker's friction line:** the shipped step prompts
+  (`build-default` v7, `qa-default` v3, `review-default` v4,
+  `scout-default` v3) ask, in their "How to work" list: *"when you lacked
+  context, had to guess a convention, or hit the same obstacle twice, say
+  so in ONE line of your final message, on its own line —
+  `FRICTION: <what was missing>`, plain words, before a `BLOCKED:` line if
+  you send the step back. Nothing to report: no line."* The runner reads
+  the last line-start `FRICTION:` line (`harness/event-text.ts`
+  `frictionOf`, 300 characters).
 
 ## The assistant's system prompt (milestones 76–78, ADR-0071)
 
