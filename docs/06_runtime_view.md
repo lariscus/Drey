@@ -5173,3 +5173,70 @@ sequenceDiagram
 A blocked verdict (`BLOCKED:` in the reviewer's last message) and a stop take the same settle, so the checkout goes
 with every end. A removal that fails is a log line; the next review's start clears the leftover, and *Clean up
 worktrees* unlocks a leftover before `git worktree remove`.
+
+## 6.110 A worker's life over ACP — new / resume, prompt, cancel, permission, question, verdict (req-182, milestone 226, [ADR-0096](09_architecture_decisions/0096-crew-runner-refactor-state-machine-ports-and-file-size-rule.md) later change)
+
+Every harness that speaks the Agent Client Protocol — opencode, Kimi, Copilot CLI — runs through the one `AcpAdapter`.
+The harness's launch description says what differs (the command and environment, the advertised client capabilities,
+the resume order, the model settings, the read-only mode, the usage source). Claude Code stays on stream-json and is not
+in this flow.
+
+```mermaid
+sequenceDiagram
+    participant PS as ProcessSupervisor
+    participant AD as AcpAdapter + AcpHarness
+    participant W as AcpWorker / AcpSessionOpener
+    participant T as AcpTurns + AcpRequests
+    participant A as ACP agent (opencode acp · kimi acp · copilot --acp --stdio)
+    participant O as Owner (Work panel, Mission Control)
+    PS->>AD: spawn(start) — cwd, model, permission mode, resumeRef, slot env
+    AD->>A: launch (harness command, env; opencode's context cap as inline config)
+    W->>A: initialize {clientCapabilities: elicitation.form (opencode, Copilot) | {} (Kimi)}
+    A-->>W: agentCapabilities (loadSession, sessionCapabilities.resume)
+    alt fresh
+        W->>A: session/new {cwd}
+    else resume, advertised
+        W->>A: session/resume {sessionId}
+    else resume
+        W->>A: session/load {sessionId} — the history replays, ignored for 300 ms
+    end
+    A-->>W: sessionId, offer (modes / config options, the model in use)
+    opt read-only (a review, req-183)
+        W->>A: session/set_mode plan (opencode, Kimi; Copilot: none offered → a stream note, nothing allowed at launch)
+    end
+    opt a model pin set per session (opencode, Kimi)
+        W->>A: session/set_config_option model (+ effort for opencode's #variant)
+    end
+    T->>A: session/prompt [the brief]
+    A-->>T: session/update — chunks, thoughts, tool calls, usage_update (context, cost)
+    opt the agent asks for an approval
+        A->>T: session/request_permission (options once / always / reject)
+        T-->>O: waiting {kind: permission, requestId}
+        O->>T: answerPermission(requestId, once)
+        T->>A: {outcome: selected, optionId}
+    end
+    opt the agent's question tool
+        A->>T: elicitation/create {mode: form, requestedSchema q0 (+ q0_custom)} — Kimi: AskUserQuestion as a permission request
+        T-->>O: waiting {kind: question, questions}
+        O->>T: answerQuestion(requestId, {q0: Blue}) — or types: the text answers in the form's own words
+        T->>A: {action: accept, content}
+    end
+    opt the owner interrupts, or steers while the turn runs
+        T->>A: session/cancel
+        A-->>T: prompt reply {stopReason: cancelled} — the session stays; a steer runs next
+    end
+    A-->>T: prompt reply {stopReason: end_turn, usage}
+    alt no message, no tool, no tokens (prompt-reply harnesses, T-0061)
+        T-->>PS: error "the provider answered the prompt with nothing" → the run fails, no gate
+    else the last message asks QUESTION:
+        T-->>O: waiting {kind: question} — the worker stands
+    else
+        T-->>PS: result {text, blocked: BLOCKED: …, tokens, cost} → the gate; the worker ends unless held
+    end
+```
+
+The run's tokens are the sum of the turns' usage (opencode's prompt reply; Kimi's wire log), its cost the cost the
+harness reported for the session minus what it had spent before (a resumed session's first turn priced from the
+table), or the price table when the harness reports none or 0. A worker of an ACP harness is a stdio child of its
+runner: a runner handover resumes it in place (`session/resume` / `session/load`), an unplanned runner death detaches
+the run — nothing re-attaches (req-205).

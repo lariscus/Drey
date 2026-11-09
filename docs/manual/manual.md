@@ -1221,7 +1221,7 @@ below the limit. Steps you start yourself are never held.
 
 ### Running agents on tickets (the fleet)
 
-A ticket can be worked by an **external agent CLI** — OpenCode, Claude Code or Kimi Code — while you watch from the Work panel. Running agents needs the board on a ticket store (the dricket checkout the Work panel's foot names); on a plain folder board, *Run agent* is refused and says so. Open the menu of a row
+A ticket can be worked by an **external agent CLI** — OpenCode, Claude Code, Kimi Code or Copilot CLI — while you watch from the Work panel. Running agents needs the board on a ticket store (the dricket checkout the Work panel's foot names); on a plain folder board, *Run agent* is refused and says so. Open the menu of a row
 in an agent column (Inbox, Shaping and Prioritized are yours: move the ticket
 to Building first) and choose **Run agent**: the dialog lets you pick the worker (the menu
 shows the one your pins resolve to: the ticket's `worker:` field wins,
@@ -1471,12 +1471,11 @@ thoughts is a folded **Thinking** line that previews it; click it to
 read the whole thought, and again to fold it — an unfolded thought
 stays unfolded while the transcript updates. Code in replies and
 thoughts is coloured like code in your notes, with its language on top
-and a **Copy** button that shows when you point at the block. The transcript streams
-live on OpenCode workers: a tool step appears as the worker calls it
-and reply text grows while it is written. The view follows new output
+and a **Copy** button that shows when you point at the block. A tool step appears as the worker calls it; a worker's reply text
+appears when it reaches a tool call or the end of its turn (it no longer
+grows while it is written on OpenCode workers). The view follows new output
 while you are at the bottom; scrolled up, it stays put and a
-**↓ New output** button brings you back. Only OpenCode workers can be
-taken over for now. When a run ends, its step line in the thread and the Crew card record the tokens it used — how much of the input came from the provider's cache — and the cost, when the provider reports one (flat coding plans report none); on the ticket store the run's release comment carries the outcome. The runner writes no lines into the ticket's own Log any more. A run that continues an earlier session counts only its own tokens. When the worker finishes, the runner executes the ticket's
+**↓ New output** button brings you back. When a run ends, its step line in the thread and the Crew card record the tokens it used — how much of the input came from the provider's cache — and the cost, when the provider reports one (flat coding plans report none); on the ticket store the run's release comment carries the outcome. The runner writes no lines into the ticket's own Log any more. A run that continues an earlier session counts only its own tokens. When the worker finishes, the runner executes the ticket's
 **acceptance criteria** (the backticked commands under Plan): all green
 means the ticket moves to the next phase on its own; a failure keeps the reason on the run (the thread's step line shows it) and leaves the ticket where it is — the next run
 of that ticket carries the failed gate's output (its tail) so the
@@ -1507,7 +1506,7 @@ description or gate changed in the meantime, the full brief goes again.
 
 Every model call of a run re-reads the run's whole context, so a long
 run gets expensive fast. **Context cap** (Settings → Tickets → Fleet,
-160,000 tokens by default) makes OpenCode compact a worker's context
+160,000 tokens by default) makes an OpenCode worker compact its context
 once it reaches that size, instead of letting it grow toward the
 model's full window (a million tokens for GLM). 0 turns the cap off.
 A terminal can read the cost overview the same way the board does:
@@ -1517,7 +1516,7 @@ run's input was spent before its first write — the exploration cost.
 
 **When a worker needs you.** A worker that cannot go on without a
 decision of yours asks: its run stops at the question instead of ending,
-and keeps its session. The same happens when an OpenCode worker wants to
+and keeps its session. The same happens when an OpenCode, Kimi Code or Copilot CLI worker wants to
 run a tool that needs approval. Drey then shows a Windows notification
 (*T-0042 asks you*); clicking it opens the ticket page. The ticket moves
 to **Needs you** with a *Question* chip and the question as its line,
@@ -1532,7 +1531,7 @@ Its options sit as pills with a leading dot in the thread's wait card
 and on the phone — **one tap on an option is the answer** (the
 recommended one's dot is filled and rings); the free-answer field stays
 beside them wherever you are. When the worker offers choices through
-OpenCode's question forms, they appear as buttons instead: with one
+its own question tool (OpenCode's and Kimi Code's, and Copilot CLI's where it sends one), they appear as buttons instead: with one
 question a click is the answer; with several, pick one per question and
 press **Send answer**. You can always type your own answer instead —
 for several questions one line each, a choice by its number or its name.
@@ -1569,7 +1568,7 @@ first message — the worker starts when you send". From there the
 runner runs no gate and moves nothing; you keep talking
 until you are both done. Where no run is live yet, writing your first
 message in the thread starts the phase's dialog too, quiet the same
-way. (A Claude Code worker starts as today, running its first turn.)
+way. (A Claude Code worker starts as today, running its first turn; OpenCode, Kimi Code and Copilot CLI workers wait for your first word.)
 Ending the dialog
 is a move, right in the thread: a plan dialog offers **Finish → Plan
 review** and **Accept → Build** (when you settled the open points
@@ -1587,18 +1586,16 @@ re-added by "Add Drey's prompts").
 With the **background service** switched on (Settings → *Background service*,
 off by default), runs survive closing Drey — the runner
 then lives in **Drey Service**, the background process that comes with Drey
-(it also holds the tickets board and the phone gateway) — and,
-for OpenCode workers, even a restart of the runner: the new runner takes the
-still-running worker back. (A Claude Code worker cannot be taken back; its run
+(it also holds the tickets board and the phone gateway). A worker cannot be taken back after the runner itself
+stopped unexpectedly (until milestone 226 OpenCode workers could); its run
 reads *Running* with a *not connected* note and can be stopped — or its
-session resumed — from its ticket's thread.)
+session resumed — from its ticket's thread.
 
 Rebuilding Drey doesn't interrupt the fleet either, so you can work on Drey
 tickets from the Drey you're changing. A rebuild that leaves the runner's code
 unchanged keeps the runner as it is. When that code did change, the old runner
-hands its runs over to the new one instead of stopping them: OpenCode workers are
-taken back, and a Claude Code worker's session continues in a fresh worker under
-the same run. Its last turn may be cut short, but the work in its folder stays.
+hands its runs over to the new one instead of stopping them: each worker's
+session continues in a fresh worker under the same run. Its last turn may be cut short, but the work in its folder stays.
 Open ticket threads come back after the restart and pick their run up
 again. A run
 that is checking its acceptance criteria finishes first; the handover waits for
@@ -1702,12 +1699,12 @@ A column with a **worker** runs itself. Settings → *Tickets* shows the
 tickets repository's folder at the top (the folder button opens it) and
 the **Pipeline** as one table, a row per column in pipeline order: its
 folder number (`10`, `20`, …), name, a *Runs itself* or *Checkpoint*
-chip with the folder, then the **worker** (OpenCode, Claude Code or Kimi Code;
+chip with the folder, then the **worker** (OpenCode, Claude Code, Kimi Code or Copilot CLI;
 *Manual* means a column only you move tickets through), the **model**
 and the **prompt**. A manual column shows dashes there. The model field is a
 picker: click it to see what the worker offers (OpenCode lists its own
 `provider/model` ids, Claude Code its aliases, Kimi Code the models of its
-configuration), type to filter, or type
+configuration; Copilot CLI lists none — type the model id), type to filter, or type
 an id the list does not know. The prompt is chosen from the files in
 `tickets/_meta/prompts/`. Every change is one commit; the Work panel follows.
 
@@ -1808,7 +1805,7 @@ by `blocked-by` never enters a pool while a blocker is open — the
 chain log line names it and its blockers.
 
 **Each worker has its own settings.** Settings → *Tickets* → *Workers*
-has a switch between **OpenCode**, **Claude Code** and **Kimi Code**. It opens on your
+has a switch between **OpenCode**, **Claude Code**, **Kimi Code** and **Copilot CLI**. It opens on your
 default worker and shows only the settings of the selected worker:
 - **Resume compact threshold**: the worker's own value for the shared
   setting in *Fleet*. Leave it empty to use the shared value.
@@ -1819,6 +1816,13 @@ default worker and shows only the settings of the selected worker:
   with its own installer and run `kimi login` once in a terminal. Its models
   are hosted (`api.kimi.ai`, `api.z.ai`), so it is opt-in: the default worker
   stays OpenCode. Its cost is estimated from a price table, not reported.
+  OpenCode needs `opencode auth login` once in a terminal for a hosted
+  provider (its free models need none). **Copilot CLI** (GitHub's `copilot`)
+  needs `copilot login` once; it takes the model and its tool permission
+  when it starts, allows its tools on its own in a normal run, and has no
+  read-only mode for a review — the review's files are read-only on disk
+  instead, and the run's transcript says so. Copilot CLI reports no quota,
+  so Drey counts its runs.
 
 **How many runs go at once** is set per account, not per column: the
 sessions each account serves (Settings → Tickets → Models) and the capacity

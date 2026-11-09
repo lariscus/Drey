@@ -2,6 +2,7 @@ import type { PermissionDecision, QuestionAnswers, SteerRung } from '../protocol
 import type { RunnerProcess } from '../ports/process-spawner';
 import type { NormalizedEvent, WorkerHandle } from './contract';
 import type { AcpRequests } from './acp-requests';
+import type { AcpSessionOffer } from './acp-session-offer';
 import type { AcpSessionOpener } from './acp-session-open';
 import { acpEmit, type AcpContext } from './acp-state';
 import type { AcpTurns } from './acp-turns';
@@ -106,7 +107,7 @@ export class AcpWorker implements WorkerHandle {
   }
 
   private async setUp(): Promise<void> {
-    const { state, acp, start, harness } = this.ctx;
+    const { state, start } = this.ctx;
     const offer = await this.parts.opener.open();
     if (offer === null) {
       return;
@@ -114,6 +115,21 @@ export class AcpWorker implements WorkerHandle {
     state.initDone = true;
     state.model = start.model ?? offer.model;
     start.onSessionRef(state.sessionId!);
+    await this.applySettings(offer);
+    if (start.compactFirst === true && start.resumeRef !== null) {
+      await this.parts.turns.run('/compact');
+    }
+    if (start.holdAtSpawn === true || start.instruction === '') {
+      // A quiet start (req-75): no prompt — the session stands for the owner, who sends the first word.
+      this.emit({ kind: 'usage', turn: 'idle' });
+      return;
+    }
+    await this.parts.turns.settle(await this.parts.turns.run(start.instruction));
+  }
+
+  /** The session mode the harness picks for the permission mode, and the model pin's config options. */
+  private async applySettings(offer: AcpSessionOffer): Promise<void> {
+    const { state, acp, start, harness } = this.ctx;
     const mode = harness.modeFor(start.permissionMode, offer.modes);
     if (mode.note !== null) {
       this.emit({ kind: 'note', text: mode.note });
@@ -126,14 +142,5 @@ export class AcpWorker implements WorkerHandle {
         await acp.result('session/set_config_option', { sessionId: state.sessionId, ...setting });
       }
     }
-    if (start.compactFirst === true && start.resumeRef !== null) {
-      await this.parts.turns.run('/compact');
-    }
-    if (start.holdAtSpawn === true || start.instruction === '') {
-      // A quiet start (req-75): no prompt — the session stands for the owner, who sends the first word.
-      this.emit({ kind: 'usage', turn: 'idle' });
-      return;
-    }
-    await this.parts.turns.settle(await this.parts.turns.run(start.instruction));
   }
 }

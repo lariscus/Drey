@@ -360,8 +360,9 @@ question renders as the plain text of req-64 with a free answer.
 **Answering**: an option tap sends `<n>. <label>`
 (`answerText`) through the run's ordinary `send` — one tap, the same
 path a typed answer takes; the free-answer field stays beside it
-everywhere. OpenCode's `question`-tool forms (`waiting.questions`) are
-a different path and keep their own rendering.
+everywhere. A harness's own question-tool forms (`waiting.questions` —
+opencode's `question` tool over an ACP `elicitation/create` since req-182,
+Kimi's AskUserQuestion) are a different path and keep their own rendering.
 
 ---
 

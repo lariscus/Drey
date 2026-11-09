@@ -133,3 +133,66 @@ and questions are proven over ACP per harness (req-182).
 - Risk: splitting a 3000-line class with 2500 lines of coupled specs takes
   discipline; the step order and the "specs stay green" gate are the
   protection, and a step that needs a spec rewrite says so in its ticket.
+
+## Later change — ACP is the one adapter protocol, Claude Code the exception (req-182, milestone 226, as built 2026-11-09)
+
+The owner ruled on 2026-11-09: every harness that speaks the Agent Client
+Protocol natively runs over it, the old adapters go; Claude Code stays on
+headless stream-json. As built:
+
+- **One adapter, one client.** `harness/acp-adapter.ts` (`AcpAdapter`) and
+  `harness/acp-client.ts` (`AcpClient`) serve **Kimi Code** (`kimi acp`),
+  **opencode** (`opencode acp`, replacing the `opencode serve` HTTP/SSE
+  adapter) and **Copilot CLI** (`copilot --acp --stdio`, a new
+  `WorkerProviderId` `copilot`). What sets a harness apart is a thin
+  launch description, `AcpHarness` (`harness/acp-harness.ts`): the command
+  and its environment, what `initialize` advertises (`elicitation.form`
+  for opencode and Copilot), the resume order (`session/resume` when the
+  agent advertises it, else `session/load`), the config options a model
+  pin sets (`model`, opencode's `effort` for a `#variant`; none for Copilot,
+  whose model rides `--model` at launch), the session mode for a
+  permission mode, the usage source, and whether an empty turn is a
+  refusal. Composition, not a subclass per harness: the worker's parts
+  (`AcpSessionOpener`, `AcpTurns`, `AcpRequests` + `AcpForms`,
+  `AcpUpdateFold`, `AcpCost`) are one set, wired in the adapter.
+- **The four capabilities per harness**, asserted by the contract suite
+  (`harness/contract.spec.ts`, one driver each): interrupt =
+  `session/cancel`; resume = `session/resume` / `session/load`;
+  permissions = `session/request_permission`; questions = Kimi's
+  AskUserQuestion (a permission request in disguise) or an
+  `elicitation/create` form (opencode's question tool — opencode sends it
+  only to a client that advertises `elicitation.form`; without it the tool
+  fails with "the question couldn't be shown"). Usage: opencode's prompt
+  reply carries the turn's tokens and its `usage_update` the context window
+  and the session's cost; Kimi's tokens stay in its wire log
+  (`KimiWireMeter`). opencode was measured live (2.0.32, all four plus
+  usage, `harness/acp-live.spec.ts`); Copilot CLI was not installed on the
+  build machine and is proven with fakes only (roadmap req-208).
+- **Claude Code stays on stream-json — the one documented exception.**
+  Claude Code has no native ACP (anthropics/claude-code#6686 is open); the
+  only route is the third-party bridge over the Agent SDK, Anthropic forbids
+  subscription OAuth in third-party harnesses since February 2026, the
+  owner's Claude slots are subscription accounts, and the quota windows the
+  slots route by (`rate_limit_event`, req-177) exist only in stream-json.
+  Revisit when #6686 ships.
+- **The opencode server adapter is removed** (server launch, poller, SSE
+  fold, message walk, attach, catalog, ~2.9k lines with specs). What it had
+  and ACP does not carry is on the roadmap: re-attaching a worker that
+  outlived its runner (the `attach` seam stays in the contract with no
+  implementer — every ACP harness is a stdio child of its runner; req-205),
+  live text deltas (req-204), a steer queued behind the running turn instead
+  of cancelling it (req-206), per-model-call telemetry (req-207). The
+  context cap (req-80) still rides opencode's launch as inline config.
+- **Copilot's isolation from outside** (Spike 7). Copilot fixes its settings
+  at launch; an unattended start allows its tools (`--allow-all-tools`), a
+  read-only start allows nothing up front so a permission request — if the
+  installed version sends one (github/copilot-cli#845) — reaches the owner.
+  No read-only session mode is documented: then read-only is not enforced in
+  the session, the run's stream says so once, and the review checkout's
+  read-only files (req-183) plus the worktree and the governor are the
+  boundary.
+
+Trade-off accepted: one protocol and one set of worker parts against the
+features a harness's own richer API offered (opencode's server outliving its
+runner, its queued prompt delivery, its per-message usage). The owner chose
+one protocol (`specs/decisions.md`, 2026-11-09).

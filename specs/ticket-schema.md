@@ -352,7 +352,7 @@ of the Plan and removes it for fewer than two parts.
 | `title` | string | Required. One line, quoted when it contains `:`. |
 | `repo` | string | Name from `_meta/repos.md`: the ticket's **primary** work repo (req-72) — where the fleet's gate runs and whose worktree is the run's home. May be empty until the ticket leaves inbox for a work phase; entering one without a known repo is an issue. |
 | `repos` | list of names | Optional (req-72). Every work repo the ticket touches, **primary first** — `repos: [drey, lariscus]`. When set, the list is the truth and `repo:` repeats its first entry (a mismatch is a noise finding, the list wins). One worktree per named repo, all on the ticket's branch; a run refuses while any named repo lacks a local `path:` in `_meta/repos.md`. One or zero names write no `repos:` line. |
-| `worker` | string | Optional pin for the fleet worker (M84): `opencode`, `claude-code`, or `<provider>/<model>`. Wins over the column's `worker:` key, the phase handover's `@worker` pin, the repo's `worker:` and the configured default (M85's assignment ring). An unknown value badges the card; a run start with it refuses. |
+| `worker` | string | Optional pin for the fleet worker (M84): `opencode`, `claude-code`, `kimi`, `copilot` (req-182), or `<provider>/<model>`. Wins over the column's `worker:` key, the phase handover's `@worker` pin, the repo's `worker:` and the configured default (M85's assignment ring). An unknown value badges the card; a run start with it refuses. |
 | `persona` | string | Optional persona pin (ADR-0088 E3): `persona: paul` — the top of the persona ladder, winning over the phase's `persona:` key and the engine default (`personas.default`). The persona's worker/model/prompt drive the dispatch; when nothing resolves or the persona file is missing the legacy assignment ring runs unchanged. See `_meta/personas/` below. |
 | `awaiting` | persona id | Optional (E10-6). The ticket is **parked at a manual step** for that human persona (`awaiting: you`): the dispatcher never takes it (no run, no worktree) and it shows in Needs you as a `manual` card. Machine-written when a manual gate parks the ticket; **any transition clears it** (Accept or Send back are ordinary board moves, so is a hand move). See "The manual step" under the chain delta. |
 | `priority` | one id of the board's configured vocabulary | Required. The vocabulary is the vault's own — `_meta/pipeline.md`'s `priorities:` list (default `urgent \| high \| normal \| low`); the list's order IS the weight, first = highest. An omitted or unknown id reads as the vocabulary's default (its middle entry) with a warning badge; machine writers always write a vocabulary word. See [Priorities](#priorities-priorities-in-pipelinemd). |
@@ -946,7 +946,7 @@ the old phase stays in `x-legacy-phase`. `migrate-tickets --pipeline-out` writes
 commit per change; hand edits win on refresh):
 
 - `worker:` — the column's worker pin (`opencode`,
-  `claude-code`, `<provider>/<model>`), the assignment ladder's column
+  `claude-code`, `kimi`, `copilot`, `<provider>/<model>`), the assignment ladder's column
   level (ticket pin > column > handover `@worker` > repo default >
   configured default). Unset on a manual column. **Deprecated with
   personas (E3):** stays readable until the board service migrates the
@@ -1058,7 +1058,7 @@ tickets/_meta/personas/
   | `title` | string | the id |
   | `kind` | `agent \| human` | `agent` (an absent key). `human` is the owner as a crew member (E10-6): `personas/you`, created once by the board service (title = config `personas.humanName`, default `You`; editable like any title, and Settings → Tickets → Crew → *Your name* retitles it; "Initialize board" writes it with the default pipeline, whose manual columns pin it). Inert for `role`/`worker`/`models`/`skills`/`budget` — the human is never dispatched, counted toward capacity or budgeted. Written only when `human` |
   | `role` | `planner \| builder \| reviewer \| tester \| custom` | `custom` |
-  | `worker` | the CLI harness (`claude-code`, `opencode`, `api`) | `opencode` |
+  | `worker` | the CLI harness (`claude-code`, `opencode`, `kimi`, `copilot`, `api`) | `opencode` |
   | `models.default` | the model nothing else decides | `opus` |
   | `models.pool` | the models the persona may run, **strongest first**; every entry must be a row of the model table (Settings → Models, `service.json`). An entry is `<model>` or `<worker provider>/<model>` (`kimi/k2`; a slash after anything else is part of the model id, `zai/glm-5.3`). At dispatch the capacity pool grants the first entry of the requested class with room (req-170); an entry the table does not hold is never granted to a class request. `models.default`'s class is the class an unsized ticket asks for | `[models.default]` |
   | ~~`models.router`~~ | **removed (req-170).** The router policies `off \| budget \| escalate-on-fail` gave way to the class request; an old `router:` line is ignored and dropped on the next rewrite | — |
