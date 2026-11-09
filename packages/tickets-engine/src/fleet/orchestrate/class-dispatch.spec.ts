@@ -83,6 +83,26 @@ describe('the class request at dispatch (req-170)', () => {
     expect(built.logs.find((line) => line.startsWith('dispatched T-0004'))).toContain('sonnet, class B, cost 1 on Claude A — size M → B');
   });
 
+  it("req-178: the ticket's needs ride the start with the dispatch's route; a model without the capability is never taken", async () => {
+    h.io.seed('T-0004', 'plan', { extensions: { size: 'M', needs: 'image' } });
+    const vision = { models: [TABLE.models[0], { ...TABLE.models[1], input: ['text', 'image'] }] };
+    const { built } = await setUp(vision);
+    await built.orch.configure(h.config());
+    await built.orch.setMaster('run');
+    const started = built.fleet.records[0]?.request;
+    expect(started).toMatchObject({ model: 'sonnet', poolNeeds: { image: true }, poolRoute: { slot: 'claude-a', model: 'sonnet', class: 'B', requested: 'B' } });
+    expect(built.fleet.records[0]?.info.grant?.route?.line).toBe('route T-0004 → claude-a/sonnet: class B, q ?, est ?');
+  });
+
+  it('req-178: no model of the class reads images — the ticket waits on the configuration, named', async () => {
+    h.io.seed('T-0004', 'plan', { extensions: { size: 'M', needs: 'image' } });
+    const { built } = await setUp();
+    await built.orch.configure(h.config());
+    await built.orch.setMaster('run');
+    expect(built.fleet.records).toEqual([]);
+    expect(built.logs.find((line) => line.startsWith('dispatch waits T-0004'))).toContain('sonnet on Claude A: image input not declared');
+  });
+
   it('a full ledger grants nothing and raises one Needs-you card; the grant resolves it', async () => {
     h.io.seed('T-0005', 'plan', { extensions: { allowance: '2' } });
     const { rig, built } = await setUp();

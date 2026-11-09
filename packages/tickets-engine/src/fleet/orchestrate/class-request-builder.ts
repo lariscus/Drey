@@ -1,4 +1,5 @@
 import type { PipelinePhase, RepoRef, TicketCard } from '../../contracts/tickets';
+import { mergeNeeds } from '../../core/model-needs';
 import { splitPoolEntry, type Persona } from '../../core/persona';
 import { CAPABILITY_CLASSES, isWorkerProvider, PART_SIZE_CLASS, type CapabilityClass, type ClassRequest, type PoolEntry, type WorkerProviderId } from '../protocol';
 
@@ -13,6 +14,8 @@ export interface ClassRequestInput {
   readonly phase: PipelinePhase;
   readonly persona: Persona;
   readonly repo: RepoRef | null;
+  /** req-178: the slot the ticket's last run lived on (its session can only continue there); null = none. */
+  readonly prefer?: string | null;
 }
 
 const rank = (c: CapabilityClass): number => CAPABILITY_CLASSES.indexOf(c);
@@ -30,7 +33,8 @@ function lightestAbove(held: ReadonlySet<CapabilityClass>, than: CapabilityClass
  * L → A) or — unsized — the class of the persona's default model, raised to
  * the phase's `min-class:` floor. A size or floor the persona's pool holds
  * no model of is raised to the nearest stronger class it does hold —
- * raised, never lowered.
+ * raised, never lowered. req-178: the phase's and the ticket's `needs:` ride
+ * along for the routing's filter; a pin forbids the step up.
  */
 export class ClassRequestBuilder {
   constructor(private readonly lookup: ClassLookup) {}
@@ -39,14 +43,16 @@ export class ClassRequestBuilder {
     const { card, persona } = input;
     const provider = this.providerOf(persona);
     const pool = persona.models.pool.map((entry) => this.entryOf(entry));
+    const needs = mergeNeeds(input.phase.needs, card.meta.needs);
     const base = {
       ticket: card.id,
       persona: persona.id,
       provider,
       profile: input.repo?.profile ?? 'private',
       contextTokens: null,
+      ...(needs !== null ? { needs } : {}),
       ledger: { allowance: card.meta.allowance ?? null, personaBudget: persona.budget, spendAboveAllowance: persona.allowed.spendAboveAllowance },
-      prefer: null,
+      prefer: input.prefer ?? null,
     } as const;
     const pinnedModel = card.meta.model ?? null;
     if (pinnedModel !== null) {
@@ -57,7 +63,7 @@ export class ClassRequestBuilder {
       return { ...base, class: pinnedClass, pool, why: `${card.id} pins class ${pinnedClass}` };
     }
     const asked = this.asked(input, pool);
-    return { ...base, class: asked.class, pool, why: asked.why };
+    return { ...base, class: asked.class, pool, why: asked.why, stepUp: true };
   }
 
   /** The size or the persona's default, the floor over it, the pool's own classes after. */

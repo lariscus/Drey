@@ -12,7 +12,8 @@ import type { SlotListCheck } from './api/slot-routes';
 import { FetchQuotaHttp } from './fetch-quota-http';
 import type { Clock } from './ports/clock';
 import type { FileSystem } from './ports/file-system';
-import { WORKER_PROVIDERS, type FleetPools, type PoolLoad, type SlotView, type WorkerProviderId } from './protocol';
+import { composePool, poolDeskOf, type Pool } from './compose-pool';
+import type { PoolLoad, SlotView } from './protocol';
 import { ClaudeCodeQuotaSource } from './routing/claude-code-quota-source';
 import { CountingQuotaSource } from './routing/counting-quota-source';
 import { FallbackQuotaSource } from './routing/fallback-quota-source';
@@ -23,14 +24,9 @@ import { ServiceConfigFile } from './routing/service-config-file';
 import type { Slot } from './routing/slot';
 import { parseServiceSlots, type SlotConfigParse } from './routing/slot-config';
 import { CapacityCap } from './routing/capacity-cap';
-import { Ledgers } from './routing/ledgers';
 import { PoolGate } from './routing/pool-gate';
-import { PoolGrant, type ProviderThrottle } from './routing/pool-grant';
-import { parsePoolSettings, poolKeysOf } from './routing/pool-config';
-import { PoolMigration } from './routing/pool-migration';
+import type { ProviderThrottle } from './routing/pool-grant';
 import { PoolSettingsRegistry } from './routing/pool-settings';
-import { RequestQueue } from './routing/request-queue';
-import { SessionBook } from './routing/session-book';
 import { SlotRegistry } from './routing/slot-registry';
 import { SlotReservations } from './routing/slot-reservations';
 import { SlotRunListener } from './routing/slot-run-listener';
@@ -57,23 +53,6 @@ export interface RoutingDeps {
   readonly schedule?: Schedule;
 }
 
-/** The capacity pool's parts (req-170). */
-export interface Pool {
-  readonly settings: PoolSettingsRegistry;
-  readonly grant: PoolGrant;
-  readonly cap: CapacityCap;
-  readonly ledgers: Ledgers;
-  readonly queue: RequestQueue;
-  readonly book: SessionBook;
-  readonly migration: PoolMigration;
-  /** The live load per slot and in all. */
-  load(): PoolLoad;
-  /** The sessions a provider's slots serve in all; null when one of them names none (unbounded). */
-  sessionsOf(provider: WorkerProviderId): number | null;
-  /** req-63's pool sizes into the slots' sessions, once; the slots are read again when it wrote. */
-  migrate(pools: FleetPools | undefined): Promise<void>;
-}
-
 export interface Routing {
   readonly registry: SlotRegistry;
   readonly gate: PoolGate;
@@ -87,6 +66,8 @@ export interface Routing {
   start(): Promise<void>;
   stop(): void;
 }
+
+export type { Pool } from './compose-pool';
 
 const nodeSchedule: Schedule = (fn, ms) => {
   const timer = setTimeout(fn, ms);
@@ -105,38 +86,12 @@ function kimiHomeOf(deps: RoutingDeps): string {
 }
 
 /** One source per slot: its provider's readout, with the runner's counting behind it. */
-function sourcesOf(deps: RoutingDeps, claude: ClaudeCodeQuotaSource, counting: CountingQuotaSource): (slot: Slot) => QuotaSource {
-  const http = deps.http ?? new FetchQuotaHttp();
+function sourcesOf(deps: RoutingDeps, http: QuotaHttp, claude: ClaudeCodeQuotaSource, counting: CountingQuotaSource): (slot: Slot) => QuotaSource {
   const zai = new FallbackQuotaSource(new ZaiQuotaSource({ http, fs: deps.fs, authFile: opencodeAuthFile(deps), clock: deps.clock }), counting);
   const kimi = new FallbackQuotaSource(new KimiQuotaSource({ http, fs: deps.fs, home: kimiHomeOf(deps), clock: deps.clock }), counting);
   const claudeCode = new FallbackQuotaSource(claude, counting);
   const byKind: Readonly<Record<Slot['quota'], QuotaSource>> = { zai, kimi, 'claude-code': claudeCode, counting };
   return (slot) => byKind[slot.quota];
-}
-
-/** The sessions a provider's slots serve in all; null when one of them is unbounded. */
-function sessionsOf(views: readonly SlotView[], provider: WorkerProviderId): number | null {
-  const ofProvider = views.filter((view) => view.provider === provider);
-  return ofProvider.length === 0 || ofProvider.some((view) => view.total === null) ? null : ofProvider.reduce((sum, view) => sum + (view.total ?? 0), 0);
-}
-
-/** The plugin's pool sizes, per provider. */
-function sizesOf(pools: FleetPools): Partial<Record<WorkerProviderId, number>> {
-  return Object.fromEntries(WORKER_PROVIDERS.map((provider) => [provider, pools[provider].size]));
-}
-
-/** The pool as the `/models` routes see it. */
-function deskOf(pool: Pool, registry: SlotRegistry): PoolDesk {
-  return {
-    settings: () => pool.settings.settings(),
-    errors: () => pool.settings.errors(),
-    load: () => pool.load(),
-    queue: () => pool.queue.list(),
-    providerDay: () => pool.ledgers.providerDay(registry.list().map((slot) => slot.id)),
-    check: (keys) => parsePoolSettings(keys, registry.list()).errors,
-    stored: poolKeysOf,
-    reload: () => registry.load(),
-  };
 }
 
 /** Publishes the pool's load when it changed. */
@@ -152,36 +107,12 @@ function loadAnnouncer(pool: () => PoolLoad, publish: ((load: PoolLoad) => void)
   };
 }
 
-/** The capacity pool's parts over the slots (req-170). */
-function composePool(parts: { deps: RoutingDeps; registry: SlotRegistry; settings: PoolSettingsRegistry; cap: CapacityCap; reservations: SlotReservations; config: ServiceConfigFile }): Pool {
-  const { deps, registry, settings, cap, reservations, config } = parts;
-  const book = new SessionBook();
-  const ledgers = new Ledgers(book, settings, deps.clock);
-  const grant = new PoolGrant({ slots: registry, settings, cap, reservations, ledgers, ...(deps.throttle !== undefined ? { throttle: deps.throttle } : {}) });
-  const migration = new PoolMigration(config, deps.log);
-  return {
-    settings,
-    grant,
-    cap,
-    ledgers,
-    queue: new RequestQueue(deps.clock),
-    book,
-    migration,
-    load: () => cap.load(registry.views()),
-    sessionsOf: (provider) => sessionsOf(registry.views(), provider),
-    migrate: async (pools) => {
-      if (pools !== undefined && (await migration.run(sizesOf(pools)))) {
-        await registry.load();
-      }
-    },
-  };
-}
-
 export function composeRouting(deps: RoutingDeps): Routing {
   const config = new ServiceConfigFile(deps.fs, path.join(deps.home, 'service.json'));
   const claude = new ClaudeCodeQuotaSource(deps.fs, deps.userHome);
   const counting = new CountingQuotaSource(deps.clock);
   const reservations = new SlotReservations();
+  const http = deps.http ?? new FetchQuotaHttp();
   const settings = new PoolSettingsRegistry(deps.log);
   const cap = new CapacityCap(settings, reservations);
   // The announcer reads the registry only once the registry exists (its first change).
@@ -194,7 +125,7 @@ export function composeRouting(deps: RoutingDeps): Routing {
   };
   const registry: SlotRegistry = new SlotRegistry({
     config: { load },
-    sourceOf: sourcesOf(deps, claude, counting),
+    sourceOf: sourcesOf(deps, http, claude, counting),
     reservations,
     resolver: new SlotStateResolver(new SurplusCalculator()),
     clock: deps.clock,
@@ -204,16 +135,16 @@ export function composeRouting(deps: RoutingDeps): Routing {
     },
     log: deps.log,
   });
-  const pool = composePool({ deps, registry, settings, cap, reservations, config });
+  const pool = composePool({ clock: deps.clock, log: deps.log, ...(deps.throttle !== undefined ? { throttle: deps.throttle } : {}), registry, settings, cap, reservations, config });
   const loop = new QuotaRefreshLoop(registry, deps.schedule ?? nodeSchedule, deps.log);
   return {
     registry,
-    gate: new PoolGate(registry, reservations, pool.grant),
+    gate: new PoolGate(registry, reservations, pool.grant, pool.shares),
     listener: new SlotRunListener({ registry, reservations, claude, counting }),
     config,
     check: (slots) => parseServiceSlots({ slots }).errors,
     pool,
-    poolDesk: deskOf(pool, registry),
+    poolDesk: poolDeskOf(pool, registry, http),
     start: async () => {
       await config.ensure().catch((error: unknown) => deps.log(`service.json could not be created: ${error instanceof Error ? error.message : String(error)}`));
       await loop.tick();

@@ -578,7 +578,8 @@ extraction, ADR-0088):
   OpenCode and Kimi adapters, `store/` the ticket store port, `routing/`
   the slots per account with their quota windows and the profile rule
   (req-177) and the capacity pool — model table, cap, class grant, the
-  three ledgers (req-170); both configured in the service home's
+  three ledgers (req-170) — and the routing within the class: filter,
+  surplus choice, step up, reserve per window (req-178); configured in the service home's
   `service.json`, `api/` the
   HTTP routes and the `GET /events` stream, `ports/` (clock, file
   system, process table and spawner, event sink — the core imports no

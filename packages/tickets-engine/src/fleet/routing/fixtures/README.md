@@ -12,3 +12,4 @@ taken. The specs never call the real endpoints.
 | `kimi-401.json` | the same endpoint with an expired token (HTTP 401) |
 | `claude-rate-limit-event.json` | Claude Code 2.1.318 `-p` stream-json `rate_limit_event` |
 | `claude-cached-usage.json` | `cachedUsageUtilization` of a `.claude.json` (whole percent, a stale September sample) |
+| `models-dev-api.json` | req-178: four models of `GET https://models.dev/api.json` as it answered on 2026-11-09 (the registry's own fields, trimmed to id, name, attachment, tool_call, modalities, limit, cost) |

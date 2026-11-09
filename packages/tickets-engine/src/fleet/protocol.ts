@@ -13,6 +13,8 @@
  */
 import type { HandoverMode } from './protocol-fleet-config';
 import type { CapabilityClass, PoolGrantRecord, RunLedgerInput } from './protocol-pool';
+import type { RouteRecord } from './protocol-routing';
+import type { ModelNeeds } from '../contracts/ticket-pool-meta';
 import type { SlotProfile } from './protocol-slots';
 import type { ShapedQuestion } from '../contracts/question-shape';
 import type { TicketForm } from '../contracts/tickets';
@@ -23,6 +25,9 @@ export type { FleetCaps, FleetHandoverConfig, FleetPool, FleetPools, HandoverMod
 export { normalizeChainStore } from './protocol-chain';
 export { CAPABILITY_CLASSES, isCapabilityClass, isPartSize, PART_SIZE_CLASS } from './protocol-pool';
 export type { CapabilityClass, CapacityConfig, ClassRequest, FullLedger, LedgerDefaults, LedgerFigure, LedgerName, ModelRow, ModelsReply, PartSize, PoolDecision, PoolEntry, PoolGrantDecision, PoolGrantRecord, PoolLoad, PoolSettings, PoolWaitDecision, QueueEntry, QueueReason, RunLedgerInput, SlotLoad } from './protocol-pool';
+export { DEFAULT_ROUTING, INPUT_MODALITIES } from './protocol-routing';
+export type { CapabilityImportReport, FilteredSlot, InputModality, ModelCapabilities, RouteRecord, RouteStepUp, RoutingSettings } from './protocol-routing';
+export type { ModelNeeds } from '../contracts/ticket-pool-meta';
 export { SLOT_PROFILES } from './protocol-slots';
 export type { QuotaKind, QuotaReliability, QuotaWindow, SlotBilling, SlotProfile, SlotStateName, SlotSummary, SlotView } from './protocol-slots';
 export type { AutopilotRecord, AutopilotRefusal, AutopilotState, ChainConfig, ChainMaster, ChainStatus, ChainStoreConfig, ChainTrip, ColumnMode } from './protocol-chain';
@@ -226,6 +231,10 @@ export interface RunRequest {
   readonly poolWhy?: string;
   /** req-170: what the ledgers need (the ticket's allowance, the persona's budget and permission); absent = the Settings defaults. */
   readonly ledger?: RunLedgerInput;
+  /** req-178: the capabilities the run's model must have (the phase's and the ticket's `needs:`); the start's gate filters on them again. */
+  readonly poolNeeds?: ModelNeeds;
+  /** req-178: the dispatch's routing decision — the start's gate prefers its slot and keeps its class (a step up stays one); lands on the run record. */
+  readonly poolRoute?: RouteRecord;
 }
 
 /** How the run's worktree was obtained — `prepareWorktree` (T-0047) is

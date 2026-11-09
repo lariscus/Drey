@@ -3,7 +3,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ModelsReply } from './protocol';
-import { FakeQuotaHttp } from './routing/routing.fake';
+import { MODELS_DEV_URL } from './routing/models-dev-import';
+import { FakeQuotaHttp, fixture } from './routing/routing.fake';
 import { startRunner, type RunnerHandle } from './runner';
 
 /**
@@ -15,7 +16,7 @@ import { startRunner, type RunnerHandle } from './runner';
 describe('the runner serves the capacity pool (req-170)', () => {
   let tmp = '';
   let runner: RunnerHandle | null = null;
-  const http = new FakeQuotaHttp(() => ({ status: 500, body: {} }));
+  const http = new FakeQuotaHttp((url) => (url === MODELS_DEV_URL ? { status: 200, body: fixture('models-dev-api.json') } : { status: 500, body: {} }));
   const serviceJson = async (): Promise<Record<string, unknown>> => JSON.parse(await fsp.readFile(path.join(tmp, 'service.json'), 'utf8')) as Record<string, unknown>;
 
   beforeEach(async () => {
@@ -56,6 +57,16 @@ describe('the runner serves the capacity pool (req-170)', () => {
     const chain = (await call('GET', '/chain')).body;
     expect(chain['pool']).toMatchObject({ used: 0, global: 6 });
     expect(chain['queue']).toEqual([]);
+  });
+
+  it('req-178: reads and writes the routing; fills the capability columns from models.dev only when asked', async () => {
+    expect((await call('GET', '/models')).body['routing']).toEqual({ upgradeAboveQ: 1.3, reservePerWindow: 0.1 });
+    await call('POST', '/models/config', { routing: { upgradeAboveQ: 1.5, reservePerWindow: 0.2 }, models: [{ model: 'claude-sonnet-4-5', provider: 'claude-code', class: 'B', context: 100_000 }] });
+    expect((await serviceJson())['routing']).toEqual({ upgradeAboveQ: 1.5, reservePerWindow: 0.2 });
+    expect(http.calls.some((c) => c.url === MODELS_DEV_URL)).toBe(false);
+    const imported = await call('POST', '/models/import', {});
+    expect(imported.body['imported']).toEqual({ filled: [{ model: 'claude-sonnet-4-5', where: 'claude-code', fields: ['input', 'tools', 'output'] }], unmatched: [] });
+    expect((await serviceJson())['models']).toEqual([{ model: 'claude-sonnet-4-5', provider: 'claude-code', category: '', class: 'B', cost: 1, sessions: 1, input: ['text', 'image'], tools: true, context: 100_000, output: 64_000 }]);
   });
 
   it('refuses a broken row before anything is written', async () => {

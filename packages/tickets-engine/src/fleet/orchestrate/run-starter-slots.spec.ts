@@ -54,6 +54,18 @@ describe('RunStarter — the slot a run starts on (req-177)', () => {
     expect(await streamText(dirs.fleet, outcome.ok ? outcome.run.id : '')).toContain('pool: claude-sonnet-4-5, class B, cost 1 on Claude B — part M');
   });
 
+  it('req-178: the routing decision lands on the record, in the runner log and in the stream, one line each', async () => {
+    const slots = new FakeSlots();
+    const line = 'route T-0001 → claude-b/claude-sonnet-4-5: class B, q 1.4, est $0.40 · filtered: kimi (no image input)';
+    const route = { slot: 'claude-b', model: 'claude-sonnet-4-5', class: 'B', requested: 'B', q: 1.4, estimatedUsd: 0.4, stepUp: null, filtered: [{ slot: 'kimi', model: 'k2', reason: 'no image input' }], line } as const;
+    slots.grant = { requested: 'B', class: 'B', model: 'claude-sonnet-4-5', cost: 1, reason: 'r', route };
+    const { sup, logs } = harness(dirs.fleet, { slots });
+    const outcome = await sup.start(request(), { persona: 'ben' });
+    expect(outcome.ok && outcome.run.grant?.route).toEqual(route);
+    expect(logs.filter((l) => l.includes(line))).toHaveLength(1);
+    expect(await streamText(dirs.fleet, outcome.ok ? outcome.run.id : '')).toContain(line);
+  });
+
   it('a refused slot refuses the start: nothing is claimed, nothing spawns', async () => {
     const slots = new FakeSlots();
     slots.refuse = 'no work slot serves claude-code';

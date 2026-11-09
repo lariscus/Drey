@@ -56,6 +56,53 @@ describe('parsePoolSettings — the pool keys of service.json (req-170)', () => 
   });
 });
 
+describe('parsePoolSettings — the capability columns and the routing (req-178)', () => {
+  it('reads the declared columns; an input the routing does not ask about is dropped, a wrong kind leaves the row out', () => {
+    const parsed = parsePoolSettings(
+      {
+        models: [
+          { model: 'opus', slot: 'claude-a', class: 'A', input: ['text', 'image', 'pdf'], tools: true, context: 1_000_000, output: 128_000 },
+          { model: 'glm', provider: 'opencode', class: 'B' },
+          { model: 'bad-input', provider: 'opencode', class: 'B', input: 'image' },
+          { model: 'bad-tools', provider: 'opencode', class: 'B', tools: 'yes' },
+          { model: 'bad-context', provider: 'opencode', class: 'B', context: 12.5 },
+        ],
+      },
+      SLOTS,
+    );
+    expect(parsed.settings.models.map((r) => [r.model, r.input, r.tools, r.context, r.output])).toEqual([
+      ['opus', ['text', 'image'], true, 1_000_000, 128_000],
+      ['glm', undefined, undefined, undefined, undefined],
+    ]);
+    expect(parsed.errors).toEqual([
+      'model "bad-input": input must be a list such as ["text", "image"]',
+      'model "bad-tools": tools must be true or false',
+      'model "bad-context": context must be a whole number of tokens',
+    ]);
+    expect(poolKeysOf(parsed.settings)['models']).toEqual([
+      { model: 'opus', slot: 'claude-a', category: '', class: 'A', cost: 1, sessions: 1, input: ['text', 'image'], tools: true, context: 1_000_000, output: 128_000 },
+      { model: 'glm', provider: 'opencode', category: '', class: 'B', cost: 1, sessions: 1 },
+    ]);
+  });
+
+  it.each<[string, unknown, { upgradeAboveQ: number | null; reservePerWindow: number }, string[]]>([
+    ['absent: board 7l defaults', undefined, { upgradeAboveQ: 1.3, reservePerWindow: 0.1 }, []],
+    ['set', { upgradeAboveQ: 1.5, reservePerWindow: 0.2 }, { upgradeAboveQ: 1.5, reservePerWindow: 0.2 }, []],
+    ['null switches the step up off; 0 the reserve', { upgradeAboveQ: null, reservePerWindow: 0 }, { upgradeAboveQ: null, reservePerWindow: 0 }, []],
+    [
+      'out of range: the default, said once each',
+      { upgradeAboveQ: -1, reservePerWindow: 10 },
+      { upgradeAboveQ: 1.3, reservePerWindow: 0.1 },
+      ['routing.upgradeAboveQ must be a surplus above 0, or null to never step up', 'routing.reservePerWindow must be a share from 0 to below 1 (0.1 = 10 %)'],
+    ],
+  ])('routing — %s', (_name, routing, expected, errors) => {
+    const parsed = parsePoolSettings(routing === undefined ? {} : { routing }, SLOTS);
+    expect(parsed.settings.routing).toEqual(expected);
+    expect(parsed.errors).toEqual(errors);
+    expect(poolKeysOf(parsed.settings)['routing']).toEqual(expected);
+  });
+});
+
 describe('PoolMigration — req-63 pool sizes into the slots, once', () => {
   it("sets the sessions of the slots that name none, writes the implied slots out, and never runs twice", async () => {
     const fs = new MemoryFileSystem();

@@ -37,10 +37,18 @@ export function openingNotes(opening: RunOpening): readonly NormalizedEvent[] {
     prepared?.outcome === 'moved-aside' ? `stale dirty worktree moved aside to ${prepared.movedTo} — kept, not deleted; earlier session context is invalid` : null,
     prepared?.links !== undefined ? linkNote(prepared.links) : null,
     decision !== null ? `handover: ${decision.mode} — ${decision.why}` : null,
-    opening.slot !== undefined && opening.slot !== null ? `slot: ${opening.slot.label}` : null,
-    opening.slot?.grant !== undefined ? `pool: ${opening.slot.grant.reason}` : null,
+    ...slotNotes(opening.slot ?? null),
   ];
   return lines.filter((text): text is string => text !== null).map((text) => ({ ts: stamp, kind: 'note', text }));
+}
+
+/** The slot (req-177), the pool's grant (req-170) and the routing's line (req-178). */
+function slotNotes(slot: SlotBinding | null): readonly string[] {
+  if (slot === null) {
+    return [];
+  }
+  const grant = slot.grant;
+  return [`slot: ${slot.label}`, ...(grant !== undefined ? [`pool: ${grant.reason}`] : []), ...(grant?.route !== undefined ? [grant.route.line] : [])];
 }
 
 /** The slot (req-177) and the pool's grant (req-170) a run's record carries; nothing without a binding. */

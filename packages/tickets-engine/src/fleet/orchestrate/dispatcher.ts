@@ -171,9 +171,20 @@ export class Dispatcher {
       return null;
     }
     const repo = item.card.meta.repo === null ? null : (snap.repos.find((r) => r.name === item.card.meta.repo) ?? null);
-    const request = this.classes.build({ card: item.card, phase, persona, repo });
+    const request = this.classes.build({ card: item.card, phase, persona, repo, prefer: this.lastSlotOf(item.card.id) });
     const decision = this.deps.pool.classes.choose(request);
     return decision.kind === 'grant' ? { request, grant: { request, decision }, wait: null } : { request, grant: null, wait: decision };
+  }
+
+  /** req-178: the slot of the ticket's latest run — the start's gate prefers it too, so a resumable session stays on its account. */
+  private lastSlotOf(ticket: string): string | null {
+    let latest: { readonly startedAt: string; readonly slot?: { readonly id: string } } | null = null;
+    for (const { info } of this.deps.directory.all()) {
+      if (info.ticketId === ticket && info.slot !== undefined && (latest === null || info.startedAt > latest.startedAt)) {
+        latest = info;
+      }
+    }
+    return latest?.slot?.id ?? null;
   }
 
   /** No room for the class: the task queues — the card's line, the log once, a ledger's Needs-you card. */

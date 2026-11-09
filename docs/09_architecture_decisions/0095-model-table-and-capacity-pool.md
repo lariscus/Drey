@@ -159,3 +159,44 @@ import `routing/` (ESLint + `architecture.spec.ts`).
 `queued · waits for a B slot` line and the class on the card are data on the chain status — the Work panel and board
 do not draw them yet; the queue does not survive a runner restart (the next pass rebuilds it). Surplus routing,
 reserve and burn rate stay req-178/181.
+
+## As built (req-178, milestone 219, 2026-11-09 — the surplus routing of the later change)
+
+**Where it lives.** `fleet/routing/` beside the pool: `SlotFit` (the hard filter per slot — req-170's checks plus the
+capabilities and the reserve), `CapabilityFilter`, `ReserveGuard` over `RunShareTracker`, `SurplusChoice`, `StepUp`,
+`RouteRecorder` over `CostEstimate`, `ModelsDevImport`; `PoolGrant` runs them in that order, `fleet/compose-pool.ts`
+wires them (split out of `compose-routing.ts`). The decision stages import no port, quota source, registry or network
+at runtime (`architecture.spec.ts`).
+
+**As decided above, with these precisions:**
+
+- **Capabilities** are optional columns of the model table — `input` (`text`, `image`), `tools`, `context`, `output`
+  (tokens). What a row declares is the local override; `POST /models/import` fills only the columns a row leaves out
+  from models.dev's `api.json` (the harness's providers first: `anthropic` for Claude Code, `zai-coding-plan` / `zai` for
+  opencode, `kimi-code-plan-global` / `moonshotai` for Kimi; a `provider/model` id looks in its prefix first). Opt-in,
+  one call, never automatic.
+- **Required capabilities** come from the step: one key, `needs:` (`image`, `tools`, `context-<n>`, `output-<n>`), on a
+  ticket, a plan part (released onto its ticket) and a pipeline phase, merged. A need the row does not declare filters
+  as `… not declared`, so the owner sees which column to fill. A row with `tools: false` never runs an agent session.
+- **Provider rules** in the filter are the ones that exist: the repository's profile, a row bound to one slot, the
+  provider's pause and throttle (req-63), the caps and the slot's day ledger. No further per-provider rule was invented.
+- **The choice** puts the slot of the ticket's last run first when it passes the filter (a resumed session lives on its
+  account — a Claude session cannot continue under another `CLAUDE_CONFIG_DIR`), then the largest `q` (no reading =
+  `q` 1, an even pace), then the cheaper cost factor, the slot's price, the pool's order. So surplus decides a ticket's
+  first run and every run whose last slot no longer passes.
+- **The step up** is one step to the lightest stronger class among the persona's pool's rows on the **same slot**,
+  above `routing.upgradeAboveQ` (default 1.3, `null` = off), when that row passes the filter there; never on a
+  `model:` / `class:` pin, never onto another slot. R10 stands: nothing of the class passes → the session waits.
+- **The reserve** (`routing.reservePerWindow`, a share, default 0.1): a start whose estimated share would take any
+  window of the slot below it waits (`capacity`). The estimate is learned per slot and window from the readings around
+  each run's end (the drop, shared among the runs the slot carried at once): the median of the ticket's runs, else the
+  persona's, else 5 % — kept in memory (a restart starts at 5 % again; a roadmap follow-up).
+- **The record**: `RouteRecord` `{slot, model, class, requested, q, estimatedUsd, stepUp, filtered, line}` on
+  `RunInfo.grant.route`; the line `route T-0121 → claude-a/sonnet: class B, q 1.4, est $0.40 · filtered: kimi (no
+  image input)` once in the runner log (the run start) and in the run's stream. `est` is the median of the most
+  similar ended runs (ticket and model, ticket, persona and model, model), `?` without history. The chain's dispatch
+  routes; the start's gate keeps the routed slot and class (a step up stays one) and filters the needs again.
+
+**Deviations and gaps:** the burn rate stays req-181; the class request's own `contextTokens` is still null (only a
+`needs: context-<n>` filters on context); a step up refused by the cap or the reserve is not logged; the screens
+(capability columns, Routing group, the import action, the route on the card) are req-186's.

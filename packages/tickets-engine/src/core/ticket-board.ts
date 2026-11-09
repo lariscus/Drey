@@ -32,11 +32,9 @@ import { READY_STATE } from './pipeline-states';
 import { runDependencyPass } from './blocked';
 import { parseRepos } from './repos-file';
 import { parseTicketFile, ticketPathParts } from './ticket-files';
-import { phaseMinClassOf } from './phase-min-class';
+import { pipelinePhaseOf } from './pipeline-phase';
 
 const PHASE_ID = /^[a-z][a-z0-9-]*$/;
-/** `color:` in pipeline.md — a `#rrggbb` hex value (T-0084). */
-const COLOR_HEX = /^#[0-9a-f]{6}$/i;
 
 // --- pipeline.md -----------------------------------------------------------
 
@@ -99,78 +97,7 @@ export function parsePipeline(text: string): PipelineParse {
       return { phases: [], pushRemote: null, priorities: DEFAULT_PRIORITY_CONFIG, error: `duplicate phase id "${id}"`, issues };
     }
     seen.add(id);
-    const wipRaw = map['wip'];
-    const wip = typeof wipRaw === 'number' && Number.isInteger(wipRaw) && wipRaw > 0 ? wipRaw : null;
-    const workerRaw = map['worker'];
-    const worker = typeof workerRaw === 'string' && workerRaw.trim() !== '' ? workerRaw.trim() : null;
-    const modelRaw = map['model'];
-    const model = typeof modelRaw === 'string' && modelRaw.trim() !== '' ? modelRaw.trim() : null;
-    if (map['workers'] !== undefined) {
-      // req-63: the pools belong to the providers now — the old column key is forgiven visibly.
-      issues.push({
-        level: 'noise',
-        message: `pipeline.md: ${id}'s workers: is no longer read — set the pool size in Settings → Tickets → Workers`,
-      });
-    }
-    const promptRaw = map['prompt'];
-    const prompt = typeof promptRaw === 'string' && promptRaw.trim() !== '' ? promptRaw.trim() : null;
-    const interactiveRaw = map['interactive'];
-    const interactive =
-      typeof interactiveRaw === 'string' && interactiveRaw.trim() !== '' ? interactiveRaw.trim() : null;
-    const personaRaw = map['persona'];
-    const persona = typeof personaRaw === 'string' && personaRaw.trim() !== '' ? personaRaw.trim() : null;
-    const maxRedRaw = map['max-red'];
-    const maxRed = typeof maxRedRaw === 'number' && Number.isInteger(maxRedRaw) && maxRedRaw > 0 ? maxRedRaw : null;
-    const tokenBudgetRaw = map['token-budget'];
-    const tokenBudget =
-      typeof tokenBudgetRaw === 'number' && Number.isFinite(tokenBudgetRaw) && tokenBudgetRaw > 0
-        ? tokenBudgetRaw
-        : null;
-    const positiveInt = (raw: unknown): number | null =>
-      typeof raw === 'number' && Number.isInteger(raw) && raw > 0 ? raw : null;
-    const maxTurns = positiveInt(map['max-turns']);
-    const maxWorkMin = positiveInt(map['max-work']);
-    const ciRaw = map['ci'];
-    const ci = typeof ciRaw === 'string' && ciRaw.trim() !== '' ? ciRaw.trim() : null;
-    const auditRaw = map['audit'];
-    const audit =
-      typeof auditRaw === 'number' && Number.isFinite(auditRaw) && auditRaw > 0 && auditRaw <= 1
-        ? auditRaw
-        : null;
-    const semantic = map['semantic'] === true;
-    const minClass = phaseMinClassOf(map['min-class'], id, issues);
-    const colorRaw = map['color'];
-    let color: string | null = null;
-    if (typeof colorRaw === 'string' && colorRaw.trim() !== '') {
-      if (COLOR_HEX.test(colorRaw.trim())) {
-        color = colorRaw.trim();
-      } else {
-        // A present-but-invalid colour degrades to the palette, visibly —
-        // never a board error (asymmetric tolerance, like `push:`).
-        issues.push({ level: 'noise', message: `pipeline.md: ${id}'s color must be #rrggbb — ignored` });
-      }
-    }
-    phases.push({
-      id,
-      title: typeof map['title'] === 'string' && map['title'].trim() !== '' ? map['title'] : id,
-      wip,
-      claim: map['claim'] === true,
-      handover: typeof map['handover'] === 'string' && map['handover'].trim() !== '' ? map['handover'] : 'manual',
-      worker,
-      model,
-      prompt,
-      interactive,
-      persona,
-      maxRed,
-      tokenBudget,
-      maxTurns,
-      maxWorkMin,
-      ci,
-      audit,
-      semantic,
-      color,
-      ...(minClass !== null ? { minClass } : {}),
-    });
+    phases.push(pipelinePhaseOf(map, id, issues));
   }
   return { phases, pushRemote, priorities, error: null, issues };
 }

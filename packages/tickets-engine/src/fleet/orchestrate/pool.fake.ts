@@ -4,10 +4,10 @@ import type { StartOutcome } from '../run/run-record';
 import { CapacityCap } from '../routing/capacity-cap';
 import { Ledgers } from '../routing/ledgers';
 import { PoolGate } from '../routing/pool-gate';
-import { PoolGrant } from '../routing/pool-grant';
+import type { PoolGrant } from '../routing/pool-grant';
 import { PoolSettingsRegistry } from '../routing/pool-settings';
 import { RequestQueue } from '../routing/request-queue';
-import { FakeClock, FakeQuotaSource } from '../routing/routing.fake';
+import { FakeClock, FakeQuotaSource, grantOf } from '../routing/routing.fake';
 import { SessionBook } from '../routing/session-book';
 import type { Slot } from '../routing/slot';
 import { SlotRegistry } from '../routing/slot-registry';
@@ -49,7 +49,7 @@ export class PoolRig {
       log: () => undefined,
     });
     const cap = new CapacityCap(this.settings, this.reservations);
-    this.grant = new PoolGrant({ slots: this.registry, settings: this.settings, cap, reservations: this.reservations, ledgers: new Ledgers(this.book, this.settings, clock) });
+    this.grant = grantOf({ slots: this.registry, settings: this.settings, cap, reservations: this.reservations, ledgers: new Ledgers(this.book, this.settings, clock), records: this.book });
     this.gate = new PoolGate(this.registry, this.reservations, this.grant);
   }
 

@@ -9,6 +9,11 @@ export interface SessionCost {
   readonly costUsd: number | null;
   readonly startedAt: string;
   readonly slot?: { readonly id: string } | undefined;
+  /** req-178 (the cost estimate): the model that ran — the grant's, else the start's pin. */
+  readonly grant?: { readonly model: string } | undefined;
+  readonly model?: string | null;
+  /** Set once the session ended: only ended sessions tell what a run costs. */
+  readonly endedAt?: string | null;
 }
 
 /** The session records the ledgers sum over. */

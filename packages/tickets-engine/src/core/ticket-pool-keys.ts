@@ -1,13 +1,16 @@
+import type { ModelNeeds } from '../contracts/ticket-pool-meta';
 import type { TicketIssue, TicketMeta } from '../contracts/tickets';
+import { parseNeeds } from './model-needs';
 
 /**
  * The ticket keys the capacity pool reads (req-170, specs/ticket-schema.md):
  * `class:` (A | B | C) and `model:` pin what the run asks for, `size:`
  * (S | M | L — a plan part's size) asks for its class, `allowance:` is the
- * ticket's ledger in USD. Tolerant like the rest of the reader: a value
- * outside the grammar warns and reads as unset, never as a guess.
+ * ticket's ledger in USD, `needs:` (req-178) the capabilities its model
+ * must have. Tolerant like the rest of the reader: a value outside the
+ * grammar warns and reads as unset, never as a guess.
  */
-export type TicketPoolKeys = Pick<TicketMeta, 'class' | 'model' | 'size' | 'allowance'>;
+export type TicketPoolKeys = Pick<TicketMeta, 'class' | 'model' | 'size' | 'allowance' | 'needs'>;
 
 const text = (value: unknown): string | null => {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -50,16 +53,27 @@ function allowanceOf(raw: string | null, issues: TicketIssue[]): number | null {
   return null;
 }
 
+/** req-178: what the run's model must be able to do; an unknown token warns and drops. */
+function needsOf(raw: unknown, issues: TicketIssue[]): ModelNeeds | null {
+  const parsed = parseNeeds(raw);
+  if (parsed.unknown.length > 0) {
+    issues.push({ level: 'warning', message: `needs: ${parsed.unknown.join(', ')} is not image, tools, context-<n> or output-<n> — left out` });
+  }
+  return parsed.needs;
+}
+
 /** The pool keys of one frontmatter object; only the set ones land on the meta. */
 export function parseTicketPoolKeys(obj: Readonly<Record<string, unknown>>, issues: TicketIssue[]): Partial<TicketPoolKeys> {
   const pinClass = classOf(text(obj['class']), issues);
   const model = text(obj['model']);
   const size = sizeOf(text(obj['size']), issues);
   const allowance = allowanceOf(text(obj['allowance']), issues);
+  const needs = needsOf(obj['needs'], issues);
   return {
     ...(pinClass !== null ? { class: pinClass } : {}),
     ...(model !== null ? { model } : {}),
     ...(size !== null ? { size } : {}),
     ...(allowance !== null ? { allowance } : {}),
+    ...(needs !== null ? { needs } : {}),
   };
 }

@@ -1,4 +1,4 @@
-import type { LedgerFigure, ModelsReply, PoolLoad, PoolSettings, QueueEntry } from '../protocol';
+import type { CapabilityImportReport, LedgerFigure, ModelRow, ModelsReply, PoolLoad, PoolSettings, QueueEntry } from '../protocol';
 import type { RouteContext, RouteGroup } from './route-context';
 
 /** What the routes need of the pool. */
@@ -15,6 +15,8 @@ export interface PoolDesk {
   stored(settings: PoolSettings): Record<string, unknown>;
   /** Reads `service.json` again (the slots and the pool). */
   reload(): Promise<void>;
+  /** req-178: the model table with the columns models.dev declares filled in (only those a row leaves out); one network call. */
+  importCapabilities(): Promise<({ readonly ok: true; readonly rows: readonly ModelRow[] } & CapabilityImportReport) | { readonly ok: false; readonly error: string }>;
 }
 
 /** What the routes need of `service.json`. */
@@ -23,14 +25,16 @@ export interface PoolConfigStore {
   writePool(keys: Readonly<Record<string, unknown>>): Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
 }
 
-const POOL_KEYS = ['models', 'capacity', 'ledgers'] as const;
+const POOL_KEYS = ['models', 'capacity', 'ledgers', 'routing'] as const;
 
 /**
  * The capacity pool's settings (req-170, board 7l): `GET /models` reads the
- * model table, the cap, the ledger defaults, the live load, the queue and
- * today's spend per slot; `POST /models/config` replaces the keys it sends
- * (`models`, `capacity`, `ledgers` — the ones it leaves out stay), checked
- * row by row before anything is written, then reloads.
+ * model table, the cap, the ledger defaults, the routing (req-178), the live
+ * load, the queue and today's spend per slot; `POST /models/config` replaces
+ * the keys it sends (`models`, `capacity`, `ledgers`, `routing` — the ones it
+ * leaves out stay), checked row by row before anything is written, then
+ * reloads. `POST /models/import` (req-178) fills the capability columns from
+ * models.dev — the one network call here, only when the owner asks.
  */
 export class ModelRoutes implements RouteGroup {
   constructor(
@@ -45,6 +49,8 @@ export class ModelRoutes implements RouteGroup {
         return true;
       case 'POST /models/config':
         return this.configure(ctx);
+      case 'POST /models/import':
+        return this.importCapabilities(ctx);
       default:
         return false;
     }
@@ -52,6 +58,22 @@ export class ModelRoutes implements RouteGroup {
 
   private reply(): ModelsReply {
     return { ok: true, ...this.desk.settings(), now: this.desk.load(), queue: this.desk.queue(), providerDay: this.desk.providerDay(), errors: this.desk.errors(), configPath: this.config.path };
+  }
+
+  private async importCapabilities(ctx: RouteContext): Promise<boolean> {
+    const outcome = await this.desk.importCapabilities();
+    if (!outcome.ok) {
+      ctx.respond(502, outcome);
+      return true;
+    }
+    const written = outcome.filled.length === 0 ? ({ ok: true } as const) : await this.config.writePool(this.desk.stored({ ...this.desk.settings(), models: outcome.rows }));
+    if (!written.ok) {
+      ctx.respond(409, written);
+      return true;
+    }
+    await this.desk.reload();
+    ctx.respond(200, { ...this.reply(), imported: { filled: outcome.filled, unmatched: outcome.unmatched } });
+    return true;
   }
 
   private async configure(ctx: RouteContext): Promise<boolean> {

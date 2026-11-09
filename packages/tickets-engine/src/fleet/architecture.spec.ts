@@ -95,6 +95,14 @@ const CONCRETE = [/^harness\/claude-code$/, /^harness\/opencode$/, /^harness\/ki
 /** What `fleet/routing` may import (req-177): the wire types, the ports, the adapter contract and the run core. */
 const ROUTING_TARGETS = [/^routing\//, /^protocol(-[a-z-]+)?$/, /^ports\//, /^harness\/contract$/, /^run\//];
 
+/**
+ * The routing's decision (req-178): the filter, the choice, the step up, the
+ * reserve, the estimates and the record are pure over what they are handed —
+ * no port of the machine, no quota source, no registry, no network at runtime.
+ */
+const ROUTING_DECISION = /^routing\/(pool-grant|slot-fit|capability-filter|surplus-choice|step-up|reserve-guard|route-recorder|cost-estimate)\.ts$/;
+const IMPURE_FOR_DECISION = /^(ports\/|routing\/(quota-source|[a-z-]+-quota-source|slot-registry|service-config-file|models-dev-import|run-share-tracker)$)/;
+
 /** The violations of the rules over a set of edges; empty = the layering holds. */
 function violations(edges: readonly ImportEdge[]): readonly string[] {
   const found: string[] = [];
@@ -115,6 +123,9 @@ function violations(edges: readonly ImportEdge[]): readonly string[] {
     }
     if ((inFolder(edge.from, 'orchestrate') || inFolder(edge.from, 'api')) && edge.target !== null && inFolder(edge.target, 'routing')) {
       found.push(`${where}: the orchestration and the API ask the slots and the pool through their own interfaces (slot-binder, dispatch-pool, model-routes), never fleet/routing`);
+    }
+    if (ROUTING_DECISION.test(edge.from) && edge.target !== null && !edge.typeOnly && IMPURE_FOR_DECISION.test(edge.target)) {
+      found.push(`${where}: the routing's decision is pure — no port, quota source, registry or network at runtime (req-178)`);
     }
     if (inFolder(edge.from, 'routing') && edge.target !== null && !ROUTING_TARGETS.some((re) => re.test(edge.target!))) {
       found.push(`${where}: fleet/routing takes the protocol, the ports, the adapter contract and the run core only`);
@@ -170,6 +181,14 @@ describe('the Crew runner import graph (ADR-0096)', () => {
       "import { y } from './y';",
     ];
     expect(violations(importsOf('routing/x.ts', allowed.join('\n')))).toEqual([]);
+  });
+
+  it("keeps the routing's decision pure: types of the machine at most (req-178)", () => {
+    expect(violations(importsOf('routing/surplus-choice.ts', "import { SlotRegistry } from './slot-registry';"))).toHaveLength(1);
+    expect(violations(importsOf('routing/slot-fit.ts', "import { ModelsDevImport } from './models-dev-import';"))).toHaveLength(1);
+    expect(violations(importsOf('routing/step-up.ts', "import { SYSTEM_CLOCK } from '../ports/clock';"))).toHaveLength(1);
+    const allowed = ["import type { ShareEstimates } from './reserve-guard';", "import type { Clock } from '../ports/clock';", "import { UNTABLED_COST } from './model-table';"];
+    expect(violations(importsOf('routing/slot-fit.ts', allowed.join('\n')))).toEqual([]);
   });
 
   it('keeps the orchestration and the API off fleet/routing: the pool is asked through their own interfaces (req-170)', () => {
