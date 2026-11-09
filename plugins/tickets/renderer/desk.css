@@ -406,6 +406,18 @@
   white-space: nowrap;
 }
 
+/* The pool holds the ticket back (req-186, board 7e's `queued`): right-aligned where the cost sits. */
+.desk-card-queued {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-4);
+  white-space: nowrap;
+}
+
+.desk-card-queued + .desk-card-cost {
+  margin-left: 8px;
+}
+
 .desk-card-cost {
   margin-left: auto;
   color: var(--text-4);

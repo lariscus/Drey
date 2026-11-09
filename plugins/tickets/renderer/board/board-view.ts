@@ -11,6 +11,7 @@
 import type { PlanPartCard } from '../../../../packages/tickets-engine/src/contracts/plan-approval';
 import type { PlanPartsReply } from '../../../../packages/tickets-engine/src/contracts/plan-approval';
 import { h, textButton, type DeskDeps } from '../desk-deps';
+import { queueWordsOf } from '../queue-line';
 import type { TeamStore } from '../team/team-store';
 import { usd } from '../team/team-model';
 import {
@@ -88,6 +89,13 @@ function cardNode(deps: DeskDeps, store: TeamStore, card: BoardCardModel): HTMLE
   const whoNode = h('span', 'desk-card-who', `${who}${doing}`);
   whoNode.title = assigned ? `Persona: ${who}` : 'No persona works this ticket yet';
   foot.append(whoNode);
+  if (card.queue !== null) {
+    // The pool holds the ticket back (req-186, board 7e's `queued`): its reason right-aligned, the place on hover.
+    const words = queueWordsOf(card.queue, deps.api.i18n);
+    const waiting = h('span', 'desk-card-queued', words.short);
+    waiting.title = words.title;
+    foot.append(waiting);
+  }
   if (card.cost !== null) {
     foot.append(h('span', 'desk-card-cost', usd(card.cost)));
   }
@@ -192,7 +200,7 @@ export function mountBoard(deps: DeskDeps, store: TeamStore, host: HTMLElement):
       return;
     }
     head.append(textButton('New idea', 'desk-btn desk-btn-primary', 'Capture a new idea', () => deps.newIdea()));
-    const model = boardModelOf(snap, deps.runs(), parts);
+    const model = boardModelOf(snap, deps.runs(), parts, deps.chain()?.queue ?? []);
     const cols = h('div', 'desk-cols');
     for (const column of model.columns) {
       // The last column is done: board 7e has one Done column, "Done this week", below.

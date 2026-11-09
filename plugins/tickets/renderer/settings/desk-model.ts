@@ -58,11 +58,6 @@ export function budgetLineOf(personas: readonly PersonaView[]): string {
   return `${usd(total)} across ${budgeted.length} ${budgeted.length === 1 ? 'persona' : 'personas'} · ${usd(spent)} spent today`;
 }
 
-/** `Claude Code 3 · OpenCode 1`: the pool size per runner. */
-export function runnersLineOf(pools: ReadonlyArray<{ readonly label: string; readonly size: number }>): string {
-  return pools.map((pool) => `${pool.label} ${pool.size}`).join(' · ');
-}
-
 export interface DeskDevice {
   readonly id: string;
   readonly name: string;

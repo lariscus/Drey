@@ -10,9 +10,9 @@ describe('RUNNER_FIELDS (req-71)', () => {
     expect(Object.keys(RUNNER_LABEL).sort()).toEqual([...WORKER_PROVIDERS].sort());
   });
 
-  it('writes the pool and compact-override keys the main side reads per provider', () => {
+  it('writes the compact-override key the main side reads per provider, and no pool size (the slots hold it, req-186)', () => {
     for (const provider of WORKER_PROVIDERS) {
-      expect(keysOf(provider)).toContain(`fleet.pool.${provider}.size`);
+      expect(keysOf(provider).some((key) => key.endsWith('.size'))).toBe(false);
       expect(keysOf(provider)).toContain(`fleet.compactAboveTokens.${provider}`);
     }
   });
@@ -30,9 +30,9 @@ describe('RUNNER_FIELDS (req-71)', () => {
     expect(field?.fallback).toBe('accept-edits');
   });
 
-  it('gives Kimi Code a pool and a compact override, and no probe or permission flag of its own', () => {
+  it('gives Kimi Code a compact override, and no probe or permission flag of its own', () => {
     expect(RUNNER_LABEL.kimi).toBe('Kimi Code');
-    expect(keysOf('kimi')).toEqual(['fleet.pool.kimi.size', 'fleet.compactAboveTokens.kimi']);
+    expect(keysOf('kimi')).toEqual(['fleet.compactAboveTokens.kimi']);
   });
 
   it('keeps control ids unique across all runners', () => {

@@ -6,6 +6,7 @@ import {
   parseChainColumn,
   parseChainMaster,
   parseClaim,
+  parseSetClass,
   parseCreate,
   parsePermission,
   parsePlanPartsEdit,
@@ -225,5 +226,16 @@ describe('the plan to accept commands (E10-4)', () => {
     expect(parsePlanRelease({ id: 'T-0130', scope: 'first' })).toEqual({ ok: true, value: { id: 'T-0130', scope: 'first' } });
     expect(parsePlanRelease({ id: 'T-0130', scope: 'two' })).toEqual({ ok: false, error: 'release scope must be all or first' });
     expect(parsePlanRelease(null)).toEqual({ ok: false, error: 'bad release payload' });
+  });
+});
+
+describe('parseSetClass (req-186)', () => {
+  it('takes a ticket id and A, B, C or null', () => {
+    expect(parseSetClass({ id: 'T-0001', class: 'B' })).toEqual({ ok: true, value: { id: 'T-0001', class: 'B' } });
+    expect(parseSetClass({ id: 'T-0001', class: null })).toEqual({ ok: true, value: { id: 'T-0001', class: null } });
+  });
+  it('refuses an unknown class or a missing id', () => {
+    expect(parseSetClass({ id: 'T-0001', class: 'D' }).ok).toBe(false);
+    expect(parseSetClass({ class: 'A' }).ok).toBe(false);
   });
 });

@@ -9,6 +9,8 @@ import {
   type PipelinePhase,
   type TicketCard,
 } from '../shared/tickets';
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports -- the spec stands in for the host, which owns the catalog at runtime
+import { i18n } from '../../../shared/i18n';
 import { createGroupFoldStore, workListLivePaint, workListNode } from './work-panel';
 
 /** req-75 W1b: the Work list's DOM over the default eight-phase pipeline —
@@ -65,6 +67,7 @@ const deps = () => ({
   openTicket: vi.fn(),
   setPriority: vi.fn(),
   setTrack: vi.fn(),
+  setClass: vi.fn(),
   openMenu: vi.fn(),
   clearFilter: vi.fn(),
 });
@@ -292,6 +295,32 @@ describe('workListNode', () => {
     expect(row.querySelector('.work-run-step')?.textContent).toBe('Building');
     expect(row.querySelector('.work-row-id')?.textContent).toBe('T-0009');
     expect(row.querySelector('.work-run-line')).toBeNull();
+  });
+
+  it('words the pool holding a ticket back on its Running row and turns the cost orange near the allowance (req-186)', () => {
+    const queued = { ...card('T-0011', 'build'), usage: { cost: 2.05 } } as unknown as TicketCard;
+    const d = {
+      ...deps(),
+      api: { ui: { icon: () => document.createElement('span') }, i18n } as unknown as DreyPluginApi,
+      queueWords: (id: string) => (id === 'T-0011' ? 'queued · waits for a B slot · 2nd' : null),
+      allowanceOf: () => 2.5,
+    };
+    const list = workListNode(d, board({ build: [queued] }), [], createGroupFoldStore(null), () => undefined);
+    const row = list.querySelector<HTMLElement>('.work-group-running .work-row')!;
+    expect(row.querySelector('.work-run-step')?.textContent).toBe('queued · waits for a B slot · 2nd');
+    const cost = row.querySelector<HTMLElement>('.work-row-cost')!;
+    expect(cost.classList.contains('work-row-cost-near')).toBe(true);
+    expect(cost.title).toBe('82 % of the $2.50 allowance for this ticket');
+  });
+
+  it('keeps the cost grey below 70 % and draws it red once the allowance is used up (req-186)', () => {
+    const paint = (cost: number): HTMLElement => {
+      const d = { ...deps(), api: { ui: { icon: () => document.createElement('span') }, i18n } as unknown as DreyPluginApi, allowanceOf: () => 2.5 };
+      const list = workListNode(d, board({ build: [{ ...card('T-0012', 'build'), usage: { cost } } as unknown as TicketCard] }), [], createGroupFoldStore(null), () => undefined);
+      return list.querySelector<HTMLElement>('.work-group-running .work-row-cost')!;
+    };
+    expect(paint(1).className).toBe('work-row-cost');
+    expect(paint(2.61).classList.contains('work-row-cost-over')).toBe(true);
   });
 
   it('opens the ticket on a row click and the menu on the ⋯ button', () => {

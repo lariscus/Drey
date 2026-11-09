@@ -642,6 +642,31 @@ describe('EngineBoardService setBlockedBy (T-0050)', () => {
   });
 });
 
+describe('EngineBoardService setClass (req-186)', () => {
+  it('pins the class in the ticket file, drops it again with null, and says so in the Log', async () => {
+    await writeTicket('T-0001', 'inbox');
+    const file = path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md');
+    const service = serviceOf();
+
+    expect(await service.setClass({ id: 'T-0001', class: 'B' })).toMatchObject({ ok: true });
+    expect(await fsp.readFile(file, 'utf8')).toMatch(/^class: B$/m);
+    expect(await fsp.readFile(file, 'utf8')).toContain('— class B');
+
+    expect(await service.setClass({ id: 'T-0001', class: null })).toMatchObject({ ok: true });
+    expect(await fsp.readFile(file, 'utf8')).not.toMatch(/^class:/m);
+  });
+
+  it('refuses a ticket that is not on the board and leaves an unchanged pin alone', async () => {
+    await writeTicket('T-0001', 'inbox');
+    const service = serviceOf();
+    expect(await service.setClass({ id: 'T-0099', class: 'A' })).toEqual({ ok: false, error: 'T-0099 is not on the board' });
+    const file = path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md');
+    const before = await fsp.readFile(file, 'utf8');
+    expect(await service.setClass({ id: 'T-0001', class: null })).toEqual({ ok: true });
+    expect(await fsp.readFile(file, 'utf8')).toBe(before);
+  });
+});
+
 describe('EngineBoardService configurable priorities (T0)', () => {
   const VOCAB_PIPELINE = `---
 priorities: [p0, p1, p2]

@@ -1,0 +1,451 @@
+/*
+ * Settings → Tickets → Models (board 7l, req-186): the model table, the
+ * capacity group, the slot cards, routing and ledgers. The setting rows
+ * themselves are the page's `.tset-set` (settings.css); only what the
+ * board adds is here. Measures are the board's markup, colours are
+ * tokens: #b3b7bc --text-4, #3b3d42 --border, #747980 --field-border,
+ * #2c2d31 --bg-input, #222326 --bg-dock, #8ecbef --accent,
+ * #f2cfae --accent-peach, #bfe3cd --accent-mint, #e0bb6e --status-modified.
+ */
+
+/* The page title of the part (the board's h1) and its five group headings (h2). */
+.tset-models {
+  margin-top: 34px;
+}
+
+.tset-models-head {
+  padding-top: 6px;
+}
+
+.tset-models-title {
+  margin: 0 0 4px;
+  font-family: var(--font-sans);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 34px;
+  color: var(--text-heading);
+}
+
+.tset-models-group {
+  margin: 22px 0 4px;
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 26px;
+  color: var(--text-primary);
+}
+
+/* --- model table ------------------------------------------------------------ */
+
+.tset-models-tablebox {
+  position: relative;
+}
+
+.tset-models-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.tset-models-table th,
+.tset-models-table td {
+  height: 32px;
+  padding: 0 10px;
+  text-align: left;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* The board's header cell is border-box (32 high with its rule), a body cell content-box (32 + its 1 px rule). */
+.tset-models-table th {
+  box-sizing: border-box;
+  font-weight: 400;
+  color: var(--text-4);
+}
+
+.tset-models-table td {
+  box-sizing: content-box;
+}
+
+.tset-models-table td {
+  color: var(--text-primary);
+}
+
+.tset-models-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tset-models-c-model {
+  width: 200px;
+}
+
+.tset-models-c-provider {
+  width: 190px;
+}
+
+.tset-models-c-category {
+  width: 110px;
+}
+
+.tset-models-c-class {
+  width: 70px;
+}
+
+.tset-models-c-cost {
+  width: 100px;
+  text-align: right !important;
+}
+
+.tset-models-c-sessions {
+  width: 90px;
+  text-align: right !important;
+}
+
+.tset-models-mono {
+  position: relative;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px !important;
+}
+
+.tset-models-work td {
+  color: var(--text-4);
+}
+
+.tset-models-table td:focus-visible {
+  outline: 1px solid var(--field-border);
+  outline-offset: -1px;
+}
+
+/* The chip keeps the row at 32 px through negative margins, as the board's does. */
+.tset-models-chipwrap {
+  display: inline-flex;
+  vertical-align: middle;
+  margin: -4px 0 -4px 6px;
+}
+
+.tset-models-chip {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: content-box;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  color: var(--text-4);
+}
+
+/* In-place editing: the cell's own field, same type, no extra height. */
+.tset-models-cellfield {
+  box-sizing: border-box;
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  padding: 0 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-chip);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.tset-models-cellfield[aria-invalid='true'] {
+  border-color: var(--status-deleted);
+}
+
+.tset-models-mono .tset-models-cellfield {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}
+
+.tset-models-c-cost .tset-models-cellfield,
+.tset-models-c-sessions .tset-models-cellfield {
+  text-align: right;
+}
+
+/* A row's remove control: only on hover or focus, outside the table. */
+.tset-models-remove {
+  position: absolute;
+  right: -34px;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  margin-top: -12px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.tset-models-table tr:hover .tset-models-remove,
+.tset-models-table tr:focus-within .tset-models-remove {
+  opacity: 1;
+}
+
+.tset-models-table tbody tr {
+  position: relative;
+}
+
+/* --- add rows --------------------------------------------------------------- */
+
+.tset-models-addrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.tset-models-btn {
+  box-sizing: border-box;
+  height: 30px;
+  padding: 0 12px;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-chip);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.tset-models-btn:hover {
+  background: var(--hover-bg);
+}
+
+.tset-models-note {
+  font-size: 14px;
+  line-height: 21px;
+  color: var(--text-4);
+}
+
+.tset-models-error {
+  font-size: 14px;
+  line-height: 21px;
+  padding: 0 0 6px;
+}
+
+.tset-models-error[hidden] {
+  display: none;
+}
+
+.tset-models-addslot {
+  padding: 8px 0 0;
+}
+
+/* --- capacity ----------------------------------------------------------------- */
+
+.tset-models-cols {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+}
+
+.tset-models-cols > .tset-set {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.tset-models-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The board's inputs: 80 or 100 wide content box, 32 high, 10 side padding. */
+.tset-models-field {
+  box-sizing: content-box;
+  height: 32px;
+  padding: 0 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-chip);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+}
+
+.tset-models-field-cap {
+  width: 80px;
+}
+
+.tset-models-field-money {
+  width: 100px;
+}
+
+.tset-models-field[aria-invalid='true'] {
+  border-color: var(--status-deleted);
+}
+
+.tset-models-unit {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-4);
+}
+
+.tset-models-perprovider {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(3, auto);
+  grid-template-columns: auto auto;
+  column-gap: 24px;
+  row-gap: 2px;
+  width: max-content;
+}
+
+.tset-models-pp {
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.tset-models-ppname {
+  display: inline-block;
+  width: 64px;
+  color: var(--text-4);
+}
+
+/* --- slots ---------------------------------------------------------------------- */
+
+.tset-models-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.tset-models-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-dock);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.tset-models-cardhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 22px;
+}
+
+.tset-models-cardname {
+  line-height: 18px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.tset-models-billing {
+  margin-left: auto;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-4);
+}
+
+.tset-models-cardbody {
+  display: flex;
+  align-items: flex-start;
+}
+
+.tset-models-windows {
+  display: flex;
+  flex-direction: column;
+}
+
+.tset-models-window {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 22px;
+}
+
+.tset-models-wlabel {
+  line-height: 18px;
+  width: 36px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--text-4);
+}
+
+.tset-models-bar {
+  display: flex;
+  width: 120px;
+  height: 6px;
+  flex-shrink: 0;
+  overflow: hidden;
+  /* The board draws radius 3; a 4 px token on a 6 px bar is clamped to 3 by the browser. */
+  border-radius: var(--radius-chip);
+  background: var(--bg-input);
+}
+
+.tset-models-bar-none {
+  background: transparent;
+}
+
+.tset-models-fill {
+  height: 6px;
+  background: var(--accent);
+}
+
+.tset-models-fill-low {
+  background: var(--accent-peach);
+}
+
+.tset-models-wtext {
+  line-height: 18px;
+  width: 220px;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.tset-models-chip-small {
+  height: 20px;
+}
+
+.tset-models-rel-measured {
+  color: var(--accent-mint);
+}
+
+.tset-models-rel-estimated {
+  color: var(--status-modified);
+}
+
+.tset-models-rel-unknown {
+  color: var(--text-4);
+}
+
+.tset-models-unknownrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 22px;
+  margin: -1px 0;
+  font-size: 13px;
+  color: var(--text-4);
+}
+
+.tset-models-q {
+  line-height: 18px;
+  display: flex;
+  align-items: center;
+  height: 22px;
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-4);
+}
+
+/* --- routing -------------------------------------------------------------------- */
+
+.tset-models-rule {
+  padding: 12px 0 12px 14px;
+  margin-left: -14px;
+  border-left: 2px solid transparent;
+  font-size: 14px;
+  line-height: 21px;
+  color: var(--text-primary);
+}

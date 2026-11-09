@@ -28,6 +28,7 @@ import {
   parsePermission,
   parseSend,
   parseSendBack,
+  parseSetClass,
   parseSetTrack,
   parseStartRun,
   parseStopRun,
@@ -403,6 +404,12 @@ const plugin: MainPluginModule = {
     ctx.ipc.handle('setTrack', async (payload) => {
       const cmd = parseSetTrack(payload);
       return cmd.ok ? board.setTrack(cmd.value) : cmd;
+    });
+
+    // The card's class control (req-186): the ticket's `class:` pin.
+    ctx.ipc.handle('setClass', async (payload) => {
+      const cmd = parseSetClass(payload);
+      return cmd.ok ? board.setClass(cmd.value) : cmd;
     });
 
     // The settings dialog's writer: one phase's pool keys, one commit (M85).

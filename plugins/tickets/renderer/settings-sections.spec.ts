@@ -1,4 +1,6 @@
-import { TICKETS_ENTRIES, TICKETS_SECTIONS } from './settings-sections';
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports -- the spec stands in for the host, which owns the catalog at runtime
+import { i18n } from '../../../shared/i18n';
+import { TICKETS_ENTRIES, TICKETS_SECTIONS, ticketsEntries, ticketsSections } from './settings-sections';
 
 describe('Settings -> Tickets sections (E13-22)', () => {
   it('has unique section ids and every entry points at a declared section', () => {
@@ -33,5 +35,20 @@ describe('Settings -> Tickets, the board 7g sections and rows', () => {
   });
   it('gives every entry a scope', () => {
     expect(TICKETS_ENTRIES.every((e) => e.scope !== undefined)).toBe(true);
+  });
+});
+
+describe('Settings -> Tickets, board 7l (req-186)', () => {
+  it('puts Models right after Autopilot, as the board 7l nav has it', () => {
+    expect(ticketsSections(i18n).map((s) => s.label).slice(0, 5)).toEqual(['Crew', 'Flow', 'Autopilot', 'Models', 'Budget and runners']);
+  });
+  it('points every entry at a section of the page, the Models ones included', () => {
+    const ids = ticketsSections(i18n).map((s) => s.id);
+    const entries = ticketsEntries(i18n);
+    for (const entry of entries) {
+      expect(ids, entry.key).toContain(entry.section);
+    }
+    expect(new Set(entries.map((e) => e.key)).size).toBe(entries.length);
+    expect(entries.filter((e) => e.section === 'models').length).toBeGreaterThan(0);
   });
 });

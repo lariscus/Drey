@@ -623,6 +623,8 @@ export interface HeaderPatch {
    */
   readonly repos?: readonly string[];
   readonly worker?: string;
+  /** The class pin (req-186, `class: B`); null removes the key (the persona's class decides). */
+  readonly class?: 'A' | 'B' | 'C' | null;
 }
 
 /** Rewrites the header's keys in a frontmatter block; every other key, comment and style survives. */
@@ -719,6 +721,13 @@ export function patchHeaderFields(block: string, patch: HeaderPatch, priorities:
       removeKey(doc, 'repos');
     }
   }
+  if (patch.class !== undefined) {
+    if (patch.class === null) {
+      removeKey(doc, 'class');
+    } else {
+      doc.set('class', patch.class);
+    }
+  }
   if (patch.worker !== undefined) {
     if (patch.worker.trim() === '') {
       removeKey(doc, 'worker');
@@ -742,6 +751,23 @@ export function patchTrack(text: string, track: TicketTrack | null, now: Date, a
   const block = patchHeaderFields(`---\n${yamlText}\n---`, { track });
   const value = track ?? 'none';
   return `${block}\n${appendLogLine(body, formatUtcStamp(now), actor, `track ${value}`)}`;
+}
+
+/**
+ * Sets (or, with null, removes) the ticket's `class` pin in a whole ticket
+ * file and appends one Log line (req-186, the card's class control) — the
+ * header patch of `patchTrack` with the class's own audit line.
+ */
+export function patchClass(text: string, value: 'A' | 'B' | 'C' | null, now: Date, actor: string): string {
+  const { yamlText, body, hadFence } = splitFrontmatter(text);
+  if (!hadFence || yamlText === null) {
+    throw new Error('ticket has no frontmatter fence');
+  }
+  const block = patchHeaderFields(`---
+${yamlText}
+---`, { class: value });
+  return `${block}
+${appendLogLine(body, formatUtcStamp(now), actor, `class ${value ?? 'none'}`)}`;
 }
 
 /**

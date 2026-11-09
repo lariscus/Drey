@@ -64,6 +64,13 @@ describe('the board model', () => {
     expect(model.columns[0]!.cards[0]!.personaId).toBeNull();
   });
 
+  it('hangs the pool queue entry on its card (req-186)', () => {
+    const entry = { ticket: 'T-0011', persona: 'ben', class: 'B', reason: 'capacity', line: 'waits for a B slot', detail: '', position: 1, since: '2026-11-09T09:00:00Z' } as const;
+    const model = boardModelOf(board({ build: [card('T-0010', 'build'), card('T-0011', 'build')] }), [], new Map(), [entry]);
+    const build = model.columns.find((c) => c.id === 'build')!;
+    expect(build.cards.map((c) => c.queue?.ticket ?? null)).toEqual([null, 'T-0011']);
+  });
+
   it('marks running and waiting cards and shows blockers', () => {
     const waiting = run({ ticketId: 'T-0011', waiting: { kind: 'question' } } as unknown as Partial<RunInfo>);
     const model = boardModelOf(

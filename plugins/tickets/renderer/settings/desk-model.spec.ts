@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PipelinePhase } from '../../../../packages/tickets-engine/src/contracts/tickets';
 import type { PersonaView } from '../../shared/remote-protocol';
-import { autopilotStateOf, budgetLineOf, maxMbOf, missingShippedPrompts, parseDeskVideos, runnersLineOf, standardFlowOf, usd } from './desk-model';
+import { autopilotStateOf, budgetLineOf, maxMbOf, missingShippedPrompts, parseDeskVideos, standardFlowOf, usd } from './desk-model';
 
 const persona = (id: string, extra: Partial<PersonaView> = {}): PersonaView => ({
   id,
@@ -40,9 +40,6 @@ describe('desk settings model', () => {
     expect(usd(7)).toBe('$7');
   });
 
-  it('words the runners', () => {
-    expect(runnersLineOf([{ label: 'Claude Code', size: 3 }, { label: 'OpenCode', size: 1 }])).toBe('Claude Code 3 · OpenCode 1');
-  });
 
   it('reads the engine settings answer tolerantly', () => {
     expect(parseDeskVideos({ ok: true, devices: [], engine: { videos: { inGit: true, maxMb: 25, existing: 3, notice: 'x' } } })).toEqual({

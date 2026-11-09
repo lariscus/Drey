@@ -1262,8 +1262,8 @@ time left in its window; above 1.3 the account has more than the week will
 use, and an up-chevron marks it.
 
 **Models, classes and the capacity pool.** Every model you let the crew
-use has a row in the model table (`service.json` in the background
-service's folder; the Settings → Models page comes later): its account,
+use has a row in the model table (Settings → Tickets → **Models**, below;
+it lives in `service.json` in the background service's folder): its account,
 a **class** — **A** strongest, then **B**, then **C** — and a **cost
 factor**, what one running session of it weighs. A cap says how much may
 run at once, summed over the running sessions only: one for all accounts
@@ -1275,7 +1275,9 @@ and a ticket's own `class:` or `model:` decides outright. The ticket gets
 a model of exactly that class from its persona's list — **never a weaker
 one**. When nothing of that class has room, no worker starts: the
 ticket waits in the pool's queue and the background service's log says
-why (*queued · waits for a B slot*), the next ticket whose class has
+why (*queued · waits for a B slot*), the ticket's card on the Board and
+its Running row in the Work panel say so too (*queued · waits for a B slot ·
+2nd*, the place in the queue), the next ticket whose class has
 room goes ahead, and as soon as a run ends the waiting tickets go in
 order of importance. The worker's thread names the model it got and why
 (*pool: claude-sonnet-4-5, class B, cost 1 on Claude A — size M → B*).
@@ -1291,6 +1293,33 @@ same account runs the next stronger model of the persona's list. The
 worker's thread and the background service's log say where it went and
 why in one line (*route T-0121 → claude-a/sonnet: class B, q 1.4, est
 $0.40 · filtered: kimi (no image input)*).
+
+**Settings → Tickets → Models.** One page for everything the pool uses,
+five groups. **Model table:** a row per model — its model id, the account
+that serves it (or the runner, when it runs on any account of that
+runner), a free *category* word, its class, its cost factor and the sessions
+it may run at once on one account; click a cell to change it, **Add model…**
+starts a new row (Enter saves, Esc drops it), the cross at the row's end
+removes it. A row that only runs on work accounts is dimmed and carries a
+*Work* chip. **Capacity:** the *Global cap* in cost factors, a read-only
+list of each account's cap (the largest of its rows times its sessions, unless
+`service.json` sets one), and a live line (*Now: 2.4 of 6 · Claude A 2 of 5*)
+of what the running sessions weigh. **Slots:** one card per account — its
+profile (*Private* or *Work*), what it costs, and one row per quota window
+(*5 h*, *7 d*, *month*) with a bar for the share left (peach once it is
+below the share kept in reserve), when the window resets (a time today, a
+weekday and time within the week, else the date), and whether the reading is *measured*, *estimated* or *unknown*;
+`q` on the right says whether the account has surplus to let a lighter
+class upgrade onto it (*upgrade allowed*) or only serves its own classes
+(*class B only*). **Add slot…** opens the folder of `service.json`, where the
+accounts are listed — the slots are edited there for now. **Routing:**
+*Upgrade above q*, *Reserve per window* and *Burn rate* are shown with the
+values the crew works with today and cannot be changed yet; the sentence
+under them is the rule: a session gets exactly its class or waits, never a
+smaller class. **Ledgers:** the three defaults for what may be spent —
+*Ticket allowance*, *Persona per day* and *Provider per day*, in dollars;
+empty means no limit. A ticket's own class is set from its row's ⋯ menu in
+the Work panel, **Class ›**: *From the persona* (no pin) or A, B or C.
 
 **What a ticket, a persona and an account may spend.** Three limits,
 each counted from the runs themselves: a ticket's **allowance**
@@ -1627,7 +1656,6 @@ chain log line names it and its blockers.
 **Each worker has its own settings.** Settings → *Tickets* → *Workers*
 has a switch between **OpenCode**, **Claude Code** and **Kimi Code**. It opens on your
 default worker and shows only the settings of the selected worker:
-- **Pool size**: how many of its runs go at once.
 - **Resume compact threshold**: the worker's own value for the shared
   setting in *Fleet*. Leave it empty to use the shared value.
 - **Pool probe** (OpenCode only).
@@ -1639,8 +1667,9 @@ default worker and shows only the settings of the selected worker:
   stays OpenCode. Its cost is estimated from a price table, not reported.
 
 **How many runs go at once** is set per account, not per column: the
-sessions each account serves and the capacity pool above. The worker's old
-**Pool size** was copied into its accounts once and no longer applies.
+sessions each account serves (Settings → Tickets → Models) and the capacity
+pool above. The worker's old **Pool size** field was copied into its accounts
+once and is gone from the settings.
 Every run takes a seat on its account, wherever its column is. When a slot frees up, the next ticket is
 chosen like this: tickets marked **urgent** or **high** first, then the
 column furthest to the right (finishing work beats starting new work),
@@ -1678,9 +1707,11 @@ Settings → Tickets starts with the things you decide about the crew:
 Crew tab. **Default flow** shows the standard flow, the columns an agent
 works with who does each; a flow is changed per ticket, so pick a ticket
 next to *Open flow editor* to open its Flow tab (the standard flow itself is
-set below, in the pipeline table). **Budget and runners** starts with the **Autopilot** state (*On*, *Paused*, *Off*) and *Resume paused autopilot at*, then shows the daily
-budgets of the personas added up with today's spending, and how many runs
-each runner takes at once; *Manage* jumps to the runner settings.
+set below, in the pipeline table). **Autopilot** is the state (*On*, *Paused*, *Off*) and *Resume paused autopilot at*;
+**Models** is the capacity pool (see *Models, classes and the capacity pool*);
+**Budget and runners** shows the daily
+budgets of the personas added up with today's spending, and the sessions each
+account serves; *Manage* jumps to the runner settings.
 **Walkthrough videos** has *Keep in Git* (off: videos are large and stay in
 the history once committed — switching it on asks first and can include the
 videos already there) and *Largest video* in MB. Under **Mission Control on

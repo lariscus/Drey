@@ -85,6 +85,7 @@ import { mountTeam } from './team/team-view';
 import { PERSONA_KIND, personaIdOfKey, personaKeyOf } from './team/persona-model';
 import { mountPersonaPage, personaWordCountOf } from './team/persona-page';
 import { bandHeaderStatusOf, bandStatusOf, queuedIdsOf } from './team/capacity-model';
+import { queueWordsFor } from './queue-line';
 import { bandShownFor, mountCapacity } from './team/capacity-view';
 import { mountBoard } from './board/board-view';
 
@@ -702,8 +703,30 @@ function workPanelDeps(api: DreyPluginApi): WorkPanelDeps {
       notifyViews();
     },
     personaName: (id) => teamStore(api).nameOf(id),
+    queueWords: (ticketId) => queueWordsFor(chain?.queue, ticketId, api.i18n)?.full ?? null,
+    allowanceOf: (card) => card.meta.allowance ?? ticketAllowanceDefault(),
+    setClass: (card, value) => void runMutation(api.i18n.t('tickets.menu.class'), () => invokeBoard('setClass', { id: card.id, class: value })),
   };
   return deps;
+}
+
+/** The default ticket allowance of Settings → Models (the Running row's cost reads it); fetched lazily and kept a minute. */
+let allowanceDefault: number | null = null;
+let allowanceFetchedAt = 0;
+function ticketAllowanceDefault(): number | null {
+  if (Date.now() - allowanceFetchedAt > 60_000 && backend !== null) {
+    allowanceFetchedAt = Date.now();
+    void invokeBoard('poolModels')
+      .then((reply) => {
+        const next = (reply as { ledgers?: { ticketAllowance?: number | null } } | null)?.ledgers?.ticketAllowance ?? null;
+        if (next !== allowanceDefault) {
+          allowanceDefault = next;
+          notifyViews();
+        }
+      })
+      .catch(() => undefined);
+  }
+  return allowanceDefault;
 }
 
 /** What stops the fleet right now, over the current snapshot and chain. */
@@ -2784,7 +2807,7 @@ function openCardMenu(
   card: TicketCard,
   at: { readonly x: number; readonly y: number },
   run: (label: string, invoke: () => Promise<unknown>) => Promise<MutationResult>,
-  actions: { setPriority(card: TicketCard, priority: TicketPriority): void; setTrack(card: TicketCard, track: TicketTrack | null): void },
+  actions: { setPriority(card: TicketCard, priority: TicketPriority): void; setTrack(card: TicketCard, track: TicketTrack | null): void; setClass(card: TicketCard, value: 'A' | 'B' | 'C' | null): void },
 ): void {
   for (const other of document.querySelectorAll('.tickets-menu')) {
     other.remove();
@@ -2868,6 +2891,19 @@ function openCardMenu(
         title,
         onClick: () => actions.setTrack(card, value),
       })),
+      close,
+    ),
+    appendSubmenu(
+      menu,
+      api.i18n.t('tickets.menu.class'),
+      [
+        { content: menuRadioRow(api.i18n.t('tickets.menu.class_auto'), (card.meta.class ?? null) === null), title: api.i18n.t('tickets.menu.class_auto_hint'), onClick: () => actions.setClass(card, null) },
+        ...(['A', 'B', 'C'] as const).map((value) => ({
+          content: menuRadioRow(value, card.meta.class === value),
+          title: api.i18n.t('tickets.menu.class_pin', { class: value }),
+          onClick: () => actions.setClass(card, value),
+        })),
+      ],
       close,
     ),
     appendSubmenu(

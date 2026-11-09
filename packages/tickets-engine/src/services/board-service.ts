@@ -16,7 +16,7 @@ import { type RefineReply, TicketReply, AttachmentReply, type DocumentSaveReply,
 import { documentRelPath, idOfDocumentPath } from '../store/document-paths';
 import { detailFromContent } from '../store/dricket-ticket-store';
 import { assembleBoard, parseRepos, addPipelinePhase, patchPipelinePhase, removePipelinePhase, renamePipelinePhase, parsePipeline, reorderPipelinePhases, reposFileText, reposProse } from '../core/ticket-board';
-import { newTicketFileText, parseTicketFile, patchTicketFile, patchBlockedBy, patchChain, patchForm, patchTrack, ticketPathParts, withLogLine } from '../core/ticket-files';
+import { newTicketFileText, parseTicketFile, patchTicketFile, patchBlockedBy, patchChain, patchClass, patchForm, patchTrack, ticketPathParts, withLogLine } from '../core/ticket-files';
 import { withPlanSection } from '../core/plan-section';
 import { applyFlowOp, type FlowOp } from '../core/flow-edit';
 import type { FlowReply, FlowSaveReply, FlowStepView, FlowTarget, FlowScope } from '../contracts/flow';
@@ -980,6 +980,36 @@ export class EngineBoardService {
         return { ok: false, error: messageOf(error) };
       }
       const warning = await this.commitCard(vault, card, `tickets: ${input.id} track ${input.track ?? 'none'}`);
+      this.announceCard(vault, card);
+      this.announceChanged();
+      return { ok: true, ...(warning === null ? {} : { warning }) };
+    });
+  }
+
+  /**
+   * The card's class control (req-186): one header rewrite of the ticket's
+   * `class:` pin (`patchClass`), one Log line, one commit
+   * `tickets: <id> class <value>`. A live run refuses like every header edit.
+   */
+  setClass(input: { id: string; class: 'A' | 'B' | 'C' | null; actor?: string }): Promise<BoardMutationResult> {
+    return this.enqueue(async () => {
+      const found = await this.findCard(input.id);
+      if (found === null) {
+        return { ok: false, error: `${input.id} is not on the board` };
+      }
+      const { vault, card, text } = found;
+      if ((card.meta.class ?? null) === input.class) {
+        return { ok: true };
+      }
+      if (card.meta.run !== null) {
+        return { ok: false, error: 'A run is live on this ticket. Change the class when the run has ended.' };
+      }
+      try {
+        await this.writeCardText(vault, card, patchClass(text, input.class, new Date(), input.actor ?? this.owner));
+      } catch (error) {
+        return { ok: false, error: messageOf(error) };
+      }
+      const warning = await this.commitCard(vault, card, `tickets: ${input.id} class ${input.class ?? 'none'}`);
       this.announceCard(vault, card);
       this.announceChanged();
       return { ok: true, ...(warning === null ? {} : { warning }) };

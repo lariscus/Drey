@@ -416,7 +416,8 @@ export interface RunningStep {
   readonly live: boolean;
 }
 
-export function runningStepOf(row: WorkRow, board: BoardSnapshot): RunningStep {
+/** `queueWords`: the pool's own words for a ticket it holds back (`queued · waits for a B slot · 2nd`, req-186); null = the plain `queued`. */
+export function runningStepOf(row: WorkRow, board: BoardSnapshot, queueWords: string | null = null): RunningStep {
   const run = row.run;
   if (run !== null) {
     const title = board.columns.find((c) => c.phase.id === row.phase.id)?.phase.title ?? row.phase.title;
@@ -432,7 +433,7 @@ export function runningStepOf(row: WorkRow, board: BoardSnapshot): RunningStep {
   }
   const blocker = row.card.blocked[0];
   if (blocker === undefined) {
-    return { step: 'queued', line: 'waits for a free worker', live: false };
+    return { step: queueWords ?? 'queued', line: 'waits for a free worker', live: false };
   }
   const title =
     board.columns.flatMap((column) => column.tickets).find((card) => card.id === blocker)?.meta.title ?? blocker;

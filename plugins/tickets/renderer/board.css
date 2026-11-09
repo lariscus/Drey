@@ -3712,6 +3712,15 @@ details[open] > summary > .tickets-tx-think-preview {
   font-variant-numeric: tabular-nums;
 }
 
+/* A Running row near its ticket's allowance (req-186, board 7e): orange from 70 %, red when used up. */
+.work-row-cost-near {
+  color: var(--needs-you);
+}
+
+.work-row-cost-over {
+  color: var(--status-deleted);
+}
+
 /* The one grey meta line of a row (E12-11, boards 7a–7c): phase, kind, step or
    state and the persona as plain words with a dot between; ellipsized. */
 .work-row-meta {

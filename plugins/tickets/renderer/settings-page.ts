@@ -1,4 +1,5 @@
 import type { DreyPluginApi, PluginSettingsPageContrib } from '../../../shared/plugin-api/renderer';
+import type { ChainStatus } from '../../../packages/tickets-engine/src/fleet/protocol';
 import { parseHandover, type BoardSnapshot, type FolderStatus, type PromptListing, type ReposListing } from '../shared/tickets';
 import { createColumnsSection, effectivePrompt } from './settings-columns';
 import { parseWorkerValue } from '../../../packages/tickets-engine/src/fleet/assignment';
@@ -8,7 +9,8 @@ import { createRemoteSection } from './settings-remote';
 import { createReposSection } from './settings-repos';
 import { missingShippedPrompts } from './settings/desk-model';
 import { createDeskSettings, type DeskSettingsHooks } from './settings/desk-settings';
-import { TICKETS_ENTRIES, TICKETS_SECTIONS, type TicketsSectionId } from './settings-sections';
+import { ticketsEntries, ticketsSections, type TicketsSectionId } from './settings-sections';
+import { createModelsSection } from './settings/models-section';
 import { createWorkersSection } from './settings-workers';
 
 /** Marks the first element of a part of the page (`data-settings-section`). */
@@ -33,8 +35,8 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
     id: 'tickets',
     label: 'Tickets',
     hint: 'Crew, flow, budget, devices',
-    sections: TICKETS_SECTIONS,
-    entries: TICKETS_ENTRIES,
+    sections: ticketsSections(api.i18n),
+    entries: ticketsEntries(api.i18n),
     mount: (body) => {
       body.classList.add('tset');
 
@@ -82,6 +84,7 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
           defaultWorker: (configured ?? '') || 'opencode',
         });
         prompts.update(listing, usage);
+        void models.refresh();
         repos.update(reposListing);
         if (!workersOpened) {
           workersOpened = true;
@@ -97,8 +100,10 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
       const workers = createWorkersSection(api, 'opencode');
       let workersOpened = false;
       const remote = createRemoteSection(api);
+      const models = createModelsSection(api);
       const desk = createDeskSettings(api, {
         ...hooks,
+        afterAutopilot: models.root,
         manageRunners: () => {
           workers.root.scrollIntoView({ block: 'start', behavior: 'smooth' });
         },
@@ -131,7 +136,10 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
         }, 250);
       });
       // The Autopilot row follows the fleet: the popover's switch and the runner's own exit (D-51).
-      const offFleet = api.backend.on('fleet-changed', () => desk.repaintAutopilot());
+      const offFleet = api.backend.on('fleet-changed', (payload) => {
+        desk.repaintAutopilot();
+        models.update(((payload ?? {}) as { chain?: ChainStatus | null }).chain ?? null);
+      });
       void reload();
       return () => {
         disposed = true;
@@ -142,6 +150,7 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
         }
         prompts.dispose();
         remote.dispose();
+        models.dispose();
       };
     },
   };
