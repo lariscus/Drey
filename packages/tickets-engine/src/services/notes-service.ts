@@ -8,7 +8,6 @@
  * What Drey's save does and this one cannot: plugin save hooks and the
  * local version history both live in the Drey process.
  */
-import { randomBytes } from 'node:crypto';
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import { readFrontmatter, splitFrontmatter, touchUpdated } from '../../../../shared/frontmatter';
@@ -31,7 +30,9 @@ import type {
   NotesRecentReply,
   NotesSearchReply,
 } from '../contracts/notes';
-import { isNoteFileName, isServedChild, isServedPath, parseNoteFolder, parseNotePath } from '../core/note-path';
+import { isNoteFileName, isServedChild, parseNoteFolder, parseNotePath } from '../core/note-path';
+import { atomicWrite } from './atomic-note-write';
+import { allNotesNewestFirst, noteEntryOf, noteNameOf, staysServed } from './served-files';
 
 /** Same slack as `note:save`: two reads of one mtime may differ this much. */
 const MTIME_TOLERANCE_MS = 2;
@@ -40,8 +41,6 @@ const SCAN_MAX_FILES = 2000;
 const SCAN_MAX_CHARS_PER_FILE = 512 * 1024;
 const LINES_PER_NOTE = 5;
 const LINE_MAX_CHARS = 240;
-const RENAME_RETRY_DELAYS_MS = [10, 40, 120];
-const TRANSIENT_RENAME_CODES = new Set(['EPERM', 'EBUSY', 'EACCES']);
 
 export interface NotesServiceDeps {
   /** The vault's absolute root right now. */
@@ -65,8 +64,29 @@ const isMissing = (error: unknown): boolean => {
 };
 
 const toLf = (text: string): string => text.replace(/\r\n/g, '\n');
-const nameOf = (rel: string): string => rel.slice(rel.lastIndexOf('/') + 1).replace(/\.md$/i, '');
 const byName = (a: { name: string }, b: { name: string }): number => a.name.localeCompare(b.name);
+
+/** One folder's served subfolders and notes. */
+async function listingOf(
+  root: string,
+  folder: string,
+  entries: readonly { readonly name: string; isDirectory(): boolean; isFile(): boolean }[],
+): Promise<{ folders: NoteFolderEntry[]; notes: NoteEntry[] }> {
+  const folders: NoteFolderEntry[] = [];
+  const notes: NoteEntry[] = [];
+  for (const entry of entries.filter((e) => isServedChild(folder, e.name))) {
+    const rel = folder === '' ? entry.name : `${folder}/${entry.name}`;
+    if (entry.isDirectory()) {
+      folders.push({ path: rel, name: entry.name });
+    } else if (entry.isFile() && isNoteFileName(entry.name)) {
+      const note = await noteEntryOf(root, rel);
+      if (note !== null) {
+        notes.push(note);
+      }
+    }
+  }
+  return { folders, notes };
+}
 
 export class NotesService implements NotesAccess {
   private readonly listeners = new Set<(change: NotesChange) => void>();
@@ -89,7 +109,7 @@ export class NotesService implements NotesAccess {
     if (root === null) {
       return noVault();
     }
-    if (!(await this.staysServed(root, folder))) {
+    if (!(await staysServed(root, folder))) {
       return badPath();
     }
     let entries;
@@ -101,22 +121,7 @@ export class NotesService implements NotesAccess {
       }
       throw error;
     }
-    const folders: NoteFolderEntry[] = [];
-    const notes: NoteEntry[] = [];
-    for (const entry of entries) {
-      const rel = folder === '' ? entry.name : `${folder}/${entry.name}`;
-      if (!isServedChild(folder, entry.name)) {
-        continue;
-      }
-      if (entry.isDirectory()) {
-        folders.push({ path: rel, name: entry.name });
-      } else if (entry.isFile() && isNoteFileName(entry.name)) {
-        const note = await this.entryOf(root, rel);
-        if (note !== null) {
-          notes.push(note);
-        }
-      }
-    }
+    const { folders, notes } = await listingOf(root, folder, entries);
     return { ok: true, vault: path.basename(root), folder, folders: folders.sort(byName), notes: notes.sort(byName) };
   }
 
@@ -125,7 +130,7 @@ export class NotesService implements NotesAccess {
     if (root === null) {
       return noVault();
     }
-    const notes = await this.allNotesNewestFirst(root);
+    const notes = await allNotesNewestFirst(root);
     return { ok: true, vault: path.basename(root), notes: notes.slice(0, limit) };
   }
 
@@ -138,7 +143,7 @@ export class NotesService implements NotesAccess {
     if (root === null) {
       return noVault();
     }
-    const notes = await this.allNotesNewestFirst(root);
+    const notes = await allNotesNewestFirst(root);
     const hits: NoteSearchHit[] = [];
     let truncated = notes.length > SCAN_MAX_FILES;
     for (const note of notes.slice(0, SCAN_MAX_FILES)) {
@@ -177,7 +182,7 @@ export class NotesService implements NotesAccess {
     if (root === null) {
       return noVault();
     }
-    if (!(await this.staysServed(root, rel))) {
+    if (!(await staysServed(root, rel))) {
       return badPath();
     }
     const disk = await this.readDisk(root, rel);
@@ -187,7 +192,7 @@ export class NotesService implements NotesAccess {
     return {
       ok: true,
       path: rel,
-      name: nameOf(rel),
+      name: noteNameOf(rel),
       text: disk.text,
       frontmatter: readFrontmatter(disk.text),
       body: splitFrontmatter(disk.text).body,
@@ -213,7 +218,7 @@ export class NotesService implements NotesAccess {
     if (root === null) {
       return noVault();
     }
-    if (!(await this.staysServed(root, rel))) {
+    if (!(await staysServed(root, rel))) {
       return badPath();
     }
     const abs = path.join(root, rel);
@@ -237,7 +242,7 @@ export class NotesService implements NotesAccess {
     }
     const written = touchUpdated(toLf(request.text), this.now());
     await atomicWrite(abs, raw.includes('\r\n') ? written.replace(/\n/g, '\r\n') : written);
-    return this.finish(root, rel, written, device, 'saved');
+    return this.finish(root, rel, written, { device, what: 'saved' });
   }
 
   private async createNow(request: NoteCreateRequest, device: string): Promise<NoteCreateReply> {
@@ -249,7 +254,7 @@ export class NotesService implements NotesAccess {
     if (root === null) {
       return noVault();
     }
-    if (!(await this.staysServed(root, rel))) {
+    if (!(await staysServed(root, rel))) {
       return badPath();
     }
     const abs = path.join(root, rel);
@@ -267,10 +272,11 @@ export class NotesService implements NotesAccess {
       throw error;
     }
     await atomicWrite(abs, text);
-    return this.finish(root, rel, text, device, 'created');
+    return this.finish(root, rel, text, { device, what: 'created' });
   }
 
-  private async finish(root: string, rel: string, text: string, device: string, what: string): Promise<{ ok: true; path: string; text: string; mtime: number }> {
+  private async finish(root: string, rel: string, text: string, by: { readonly device: string; readonly what: string }): Promise<{ ok: true; path: string; text: string; mtime: number }> {
+    const { device, what } = by;
     const mtime = await this.mtimeOf(path.join(root, rel));
     this.deps.log(`notes: ${device} ${what} ${rel}`);
     const change: NotesChange = { vaultPath: root, changed: [rel] };
@@ -296,34 +302,6 @@ export class NotesService implements NotesAccess {
     return isFolder ? root : null;
   }
 
-  /**
-   * The grammar judged the words the client sent; this judges where they
-   * lead. A link inside the vault could point outside it or into `.drafts/`,
-   * and the platform may read a name differently (`DRAFTS~1` on Windows), so
-   * the deepest part that exists is resolved and judged again.
-   */
-  private async staysServed(root: string, rel: string): Promise<boolean> {
-    const realRoot = await fsp.realpath(root);
-    const missing: string[] = [];
-    let probe = path.join(root, rel);
-    for (;;) {
-      try {
-        const real = path.relative(realRoot, await fsp.realpath(probe));
-        if (real === '..' || real.startsWith(`..${path.sep}`) || path.isAbsolute(real)) {
-          return false;
-        }
-        const segments = real === '' ? [] : real.split(path.sep);
-        return isServedPath([...segments, ...missing].join('/'));
-      } catch (error) {
-        if (!isMissing(error) || probe === root) {
-          throw error;
-        }
-        missing.unshift(path.basename(probe));
-        probe = path.dirname(probe);
-      }
-    }
-  }
-
   private async readDisk(root: string, rel: string): Promise<{ text: string; mtime: number } | null> {
     const abs = path.join(root, rel);
     try {
@@ -341,69 +319,4 @@ export class NotesService implements NotesAccess {
     return Math.round((await fsp.stat(abs)).mtimeMs);
   }
 
-  private async entryOf(root: string, rel: string): Promise<NoteEntry | null> {
-    const stat = await fsp.stat(path.join(root, rel)).catch(() => null);
-    return stat === null ? null : { path: rel, name: nameOf(rel), mtime: Math.round(stat.mtimeMs), size: stat.size };
-  }
-
-  /** Links are not followed: a link in a listing could lead out of the vault. */
-  private async allNotesNewestFirst(root: string): Promise<NoteEntry[]> {
-    const notes: NoteEntry[] = [];
-    const walk = async (folder: string): Promise<void> => {
-      const entries = await fsp.readdir(path.join(root, folder), { withFileTypes: true }).catch(() => []);
-      for (const entry of entries) {
-        if (!isServedChild(folder, entry.name)) {
-          continue;
-        }
-        const rel = folder === '' ? entry.name : `${folder}/${entry.name}`;
-        if (entry.isDirectory()) {
-          await walk(rel);
-        } else if (entry.isFile() && isNoteFileName(entry.name)) {
-          const note = await this.entryOf(root, rel);
-          if (note !== null) {
-            notes.push(note);
-          }
-        }
-      }
-    };
-    await walk('');
-    return notes.sort((a, b) => b.mtime - a.mtime);
-  }
-}
-
-/**
- * Temp file beside the target, flushed, renamed over it: a sync client or a
- * crash sees the old note or the new one, never half of it. The same steps
- * as Drey's `electron/safe-file.ts`, which the engine may not import. The
- * temp name starts with a dot, so nothing that lists notes sees it.
- */
-async function atomicWrite(target: string, text: string): Promise<void> {
-  const real = await fsp.realpath(target).catch(() => target);
-  const existing = await fsp.stat(real).catch(() => null);
-  const tmp = path.join(path.dirname(real), `.${path.basename(real)}.${randomBytes(4).toString('hex')}.tmp`);
-  try {
-    const handle = await fsp.open(tmp, 'wx', existing === null ? undefined : existing.mode & 0o777);
-    try {
-      await handle.writeFile(text, 'utf8');
-      await handle.sync();
-    } finally {
-      await handle.close();
-    }
-    for (let attempt = 0; ; attempt++) {
-      try {
-        await fsp.rename(tmp, real);
-        return;
-      } catch (error) {
-        const delay = RENAME_RETRY_DELAYS_MS[attempt];
-        if (delay === undefined || !TRANSIENT_RENAME_CODES.has(errorCode(error) ?? '')) {
-          throw error;
-        }
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-  } catch {
-    // A target another program keeps locked: a plain write still succeeds or reports why.
-    await fsp.rm(tmp, { force: true }).catch(() => undefined);
-    await fsp.writeFile(real, text, 'utf8');
-  }
 }
