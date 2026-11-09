@@ -4,6 +4,8 @@ Diese Datei ist auf Wunsch des Owners (2026-11-08) bewusst auf Deutsch geschrieb
 
 Stand: Branch `desktop-integration`, aus dem Code gelesen. Wo Code und Dokumentation auseinanderlaufen, steht dabei, was gilt; gefolgt bin ich immer dem Code.
 
+Nachtrag Milestone 226 (2026-11-09): ACP ist das eine Adapter-Protokoll — opencode (`opencode acp`), Kimi und neu Copilot CLI (`copilot --acp --stdio`) laufen über einen `AcpAdapter` in `fleet/harness/`; der `opencode serve`-Adapter ist entfernt; Claude Code bleibt auf stream-json (Owner-Entscheid 2026-11-09).
+
 Nachtrag Milestone 212 (2026-11-08): Die vier Befunde D-60 bis D-63, die beim Schreiben dieser Datei auffielen, sind behoben; die betroffenen Stellen tragen den Vermerk „(behoben in 212)“ und beschreiben den neuen Stand.
 
 ---
@@ -19,7 +21,7 @@ Der **Fleet-/Crew-Runner** ist ein zweiter, losgelöster Prozess. Er besitzt die
 Für die **Worker-Harnesse** gibt es kein `adapters/`-Verzeichnis. Die drei Adapter stehen in `fleet/providers.ts` und `fleet/kimi.ts`:
 
 - `claude-code` startet `claude -p --input-format stream-json --output-format stream-json`.
-- `opencode` startet `opencode serve` auf Loopback und spricht dessen HTTP- und SSE-API.
+- `opencode` startet `opencode serve` auf Loopback und spricht dessen HTTP- und SSE-API. (Seit Milestone 226: `opencode acp` über ACP; der Server-Adapter ist entfernt.)
 - `kimi` startet `kimi acp` und spricht JSON-RPC über stdio.
 
 (Datei: `packages/tickets-engine/src/fleet/providers.ts`, `packages/tickets-engine/src/fleet/kimi.ts`)
@@ -40,7 +42,7 @@ flowchart LR
   G["Remote-Gateway<br/>Port 47811"]
   RU["Fleet-Runner<br/>~/.drey-engine/fleet/runner.json"]
   W1["claude -p stream-json"]
-  W2["opencode serve"]
+  W2["opencode acp (bis 225: opencode serve)"]
   W3["kimi acp"]
   DK["dk CLI / dricket-Store"]
   TV["Tickets-Vault<br/>tickets/_meta/..."]

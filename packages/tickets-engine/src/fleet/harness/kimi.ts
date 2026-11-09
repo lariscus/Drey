@@ -1,64 +1,37 @@
 /**
- * The `kimi` adapter (E10-8, docs/design/kimi-worker.md): Moonshot's Kimi
- * Code CLI over ACP — `kimi acp`, newline-delimited JSON-RPC 2.0 on stdio,
- * pinned against kimi 2.4.1. Print mode (`kimi -p`) is not used: it
- * auto-approves everything and reports no usage. ACP gives live tool calls
- * and thoughts, approvals and questions held open for the owner,
- * `session/cancel` (the interrupt and the steer's cancel), `session/load`
- * (resume) and `/compact`; tokens and cost come from the session's wire log.
+ * The `kimi` harness (E10-8, docs/design/kimi-worker.md): Moonshot's Kimi
+ * Code CLI over ACP — `kimi acp`, pinned against kimi 2.4.1, probed on
+ * 2.5.2. Print mode (`kimi -p`) is not used: it auto-approves everything
+ * and reports no usage. Approvals and the AskUserQuestion tool arrive as
+ * `session/request_permission`; a resume is `session/load`; the modes are
+ * `default`, `plan`, `auto`, `yolo`; the model is a session config option;
+ * tokens come from the session's wire log (ACP reports none), the cost from
+ * the price table.
  */
 import type { SpawnFn } from '../ports/process-spawner';
-import { AcpClient } from './acp-client';
-import type { NowFn, ProviderAdapter, ProviderStart, WorkerHandle } from './contract';
-import { KimiRequests } from './kimi-requests';
-import { newKimiState, kimiEmit, type KimiContext } from './kimi-state';
-import { KimiTurns } from './kimi-turns';
-import { KimiUpdateFold } from './kimi-update-fold';
+import { AcpAdapter } from './acp-adapter';
+import type { AcpHarness } from './acp-harness';
+import type { NowFn, ProviderAdapter } from './contract';
+import { kimiModeFor } from './kimi-modes';
 import type { KimiUsageReader } from './kimi-usage';
-import { KimiWorker } from './kimi-worker';
+import { KimiWireMeter } from './kimi-wire-meter';
 
-export class KimiAcpAdapter implements ProviderAdapter {
-  readonly id = 'kimi' as const;
-  readonly label = 'Kimi Code';
-  readonly liveInject = true;
-
-  constructor(
-    private readonly spawnFn: SpawnFn,
-    private readonly readUsage: KimiUsageReader,
-    private readonly now: NowFn,
-  ) {}
-
-  /** One worker's parts, wired; the client's handlers and the finish reach them through late-bound arrows. */
-  spawn(start: ProviderStart): WorkerHandle {
-    // req-177: a second Kimi account is its own KIMI_HOME, handed in through the environment.
-    const proc = this.spawnFn('kimi', ['acp'], start.env !== undefined ? { cwd: start.cwd, env: start.env } : { cwd: start.cwd });
-    const state = newKimiState();
-    const emit = kimiEmit({ start, now: this.now });
-    const fold = new KimiUpdateFold({ start, now: this.now });
-    const acp = new AcpClient(proc, {
-      onRequest: (message) => requests.onRequest(message),
-      onNotification: (message) => {
-        if (message.method === 'session/update' && !state.replaying) {
-          fold.onUpdate((message.params?.['update'] ?? {}) as Record<string, unknown>);
-        }
-      },
-      onNoise: (line) => emit({ kind: 'note', detail: 'stderr', text: line }),
-    });
-    const finish = (): void => {
-      if (!state.ended) {
-        state.ended = true;
-        proc.endInput();
-        void proc.killTree();
-      }
-    };
-    const ctx: KimiContext = { start, state, acp, now: this.now, finish };
-    const requests: KimiRequests = new KimiRequests(ctx, fold);
-    const worker = new KimiWorker(ctx, proc, { turns: new KimiTurns(ctx, fold, this.readUsage), requests });
-    worker.begin();
-    return worker;
-  }
+export function kimiHarness(readUsage: KimiUsageReader): AcpHarness {
+  return {
+    id: 'kimi',
+    label: 'Kimi Code',
+    agent: 'kimi',
+    // req-177: a second Kimi account is its own KIMI_HOME, handed in through the slot's environment.
+    launch: () => ({ command: 'kimi', args: ['acp'] }),
+    clientCapabilities: {},
+    resume: ['load'],
+    modelSettings: (model) => [{ configId: 'model', value: model }],
+    modeFor: kimiModeFor,
+    meter: () => new KimiWireMeter(readUsage),
+    emptyTurnIsRefusal: false,
+  };
 }
 
 export function kimiAdapter(spawnFn: SpawnFn, readUsage: KimiUsageReader = async () => [], now: NowFn = (): Date => new Date()): ProviderAdapter {
-  return new KimiAcpAdapter(spawnFn, readUsage, now);
+  return new AcpAdapter(kimiHarness(readUsage), spawnFn, now);
 }

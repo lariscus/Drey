@@ -18,10 +18,11 @@ export interface AcpHandlers {
 }
 
 /**
- * The Agent Client Protocol over an agent's stdio (ADR-0096: ACP is the
- * target adapter protocol): newline-delimited JSON-RPC 2.0 — calls that
- * resolve with the reply, notifications, replies to the agent's own
- * requests. A process exit answers every open call with an error.
+ * The Agent Client Protocol over an agent's stdio (ADR-0096 later change,
+ * req-182: ACP is the one adapter protocol — Kimi, Copilot CLI, opencode):
+ * newline-delimited JSON-RPC 2.0 — calls that resolve with the reply,
+ * notifications, replies to the agent's own requests. A process exit
+ * answers every open call with an error.
  */
 export class AcpClient {
   private readonly lines = new LineBuffer();
@@ -31,12 +32,14 @@ export class AcpClient {
   constructor(
     private readonly proc: RunnerProcess,
     private readonly handlers: AcpHandlers,
+    /** The agent's command name, for the error an exit answers open calls with. */
+    agent = 'the agent',
   ) {
     proc.onStdout((chunk) => this.lines.feed(chunk).forEach((line) => this.read(line)));
     proc.onStderr((chunk) => stderrLines(chunk).forEach((line) => handlers.onNoise(line, 'stderr')));
     proc.onExit((code) => {
       for (const resolve of this.calls.values()) {
-        resolve({ error: { message: `kimi exited (${code ?? 'signal'})` } });
+        resolve({ error: { message: `${agent} exited (${code ?? 'signal'})` } });
       }
       this.calls.clear();
     });

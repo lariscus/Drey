@@ -17,6 +17,7 @@ export const RUNNER_LABEL: Readonly<Record<WorkerProviderId, string>> = {
   opencode: 'OpenCode',
   'claude-code': 'Claude Code',
   kimi: 'Kimi Code',
+  copilot: 'Copilot CLI',
 };
 
 const compactField = (provider: WorkerProviderId): RunnerField => ({
@@ -62,6 +63,8 @@ export const RUNNER_FIELDS: Readonly<Record<WorkerProviderId, readonly RunnerFie
   ],
   // Kimi's approvals ride the card like OpenCode's (ACP permission requests), so no permission flag of its own beyond the dispatched-run mode.
   kimi: [compactField('kimi')],
+  // req-182: Copilot CLI fixes its settings at launch (model, tools); past the threshold its resume starts fresh (no verified compact over ACP).
+  copilot: [compactField('copilot')],
 };
 
 /**

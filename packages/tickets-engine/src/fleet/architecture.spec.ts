@@ -90,7 +90,7 @@ const NODE_FREE: readonly string[] = ['run', 'ports', 'orchestrate', 'routing', 
 const NODE_FREE_FILES: readonly string[] = ['harness/contract.ts'];
 
 /** A module that wires a concrete adapter: only the composition root may import it at runtime. */
-const CONCRETE = [/^harness\/claude-code$/, /^harness\/opencode$/, /^harness\/kimi(-.*)?$/, /^store\/dk-ticket-store$/];
+const CONCRETE = [/^harness\/claude-code$/, /^harness\/opencode$/, /^harness\/kimi(-.*)?$/, /^harness\/copilot$/, /^harness\/acp-adapter$/, /^store\/dk-ticket-store$/];
 
 /** What `fleet/routing` may import (req-177): the wire types, the ports, the adapter contract and the run core. */
 const ROUTING_TARGETS = [/^routing\//, /^protocol(-[a-z-]+)?$/, /^ports\//, /^harness\/contract$/, /^run\//];

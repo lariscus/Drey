@@ -11,8 +11,8 @@ export interface UsageBase {
 /**
  * How a retiring runner left a live run for its successor (req-51):
  * `reattach` — the worker lives on and the successor binds to it
- * (OpenCode's server); `resume` — the worker was stopped (its pipes die
- * with the runner, Claude Code) and the successor resumes the provider
+ * (an adapter with `attach` — none since req-182); `resume` — the worker was
+ * stopped (its pipes die with the runner: Claude Code, every ACP harness) and the successor resumes the provider
  * session in place, under the same run id. `pidStartedMs` is the worker's
  * creation time, the pid-reuse guard of the successor's kill.
  */

@@ -10,8 +10,8 @@ shim pointing here; this file is the single source of truth.
 
 The fleet runner (ADR-0075, M84) runs inside Drey Service (req-164,
 ADR-0092), the one background process that outlives the app; before
-milestone 209 it was a detached process of its own. It owns the worker process table (OpenCode / Claude
-Code CLIs), the per-run stream files, the ticket worktrees and the
+milestone 209 it was a detached process of its own. It owns the worker process table (the harness CLIs — Claude
+Code over stream-json; opencode, Kimi Code and Copilot CLI over ACP, req-182), the per-run stream files, the ticket worktrees and the
 machine gate. Drey talks to it over a loopback HTTP endpoint with a
 bearer token — and so can a terminal, which the owner explicitly wanted.
 
@@ -125,14 +125,14 @@ Invoke-RestMethod "http://127.0.0.1:$($d.port)/health" -Headers $h
 | `GET /report` | token telemetry grouped by ticket, phase and model, sorted by total desc: `{ok, groups: [{ticket, phase, model, runs, total, input, cacheRead, cacheCreation, output, beforeFirstWrite, beforeFirstWriteShare}]}` — a counter the provider never reports counts 0 into the sums; pre-T-0048 records fall back to their cumulative `tokensIn`+`tokensOut` (T-0048) |
 | `POST /stop` `{runId, reason}` | stop one run |
 | `POST /send` `{runId, text}` | steer a live run (rung: inject/resume/refused); while the run waits on a question it is the answer, not a takeover. To an ended run (done/stopped/failed) with a session it reopens that session under a new held run, the text as its first prompt — the reply carries the new `runId` |
-| `POST /permission` `{runId, decision: "once"\|"always"\|"reject"}` | answer the worker's pending approval (req-64; OpenCode) |
-| `POST /answer` `{runId, answers: {q0: "label", …}}` | answer the worker's question form — a choice, free text, or a list for a multiple choice per question key (req-64; OpenCode's `question` tool) |
+| `POST /permission` `{runId, decision: "once"\|"always"\|"reject"}` | answer the worker's pending approval (req-64; the ACP harnesses — opencode, Kimi, Copilot CLI) |
+| `POST /answer` `{runId, answers: {q0: "label", …}}` | answer the worker's question form — a choice, free text, or a list for a multiple choice per question key (req-64; opencode's `question` tool over an ACP form, Kimi's AskUserQuestion) |
 | `POST /chain/master` `{mode: "run"\|"halted"}` | master switch (daemon builds): `run` sets the Autopilot On, `halted` sets it Off |
 | `POST /chain/autopilot` `{state: "on"\|"paused"\|"off", resumeAt?}` | the Autopilot (req-95a): `resumeAt` a zoned ISO instant in the future, only on `paused`; answers the chain status, or 422 `{ok: false, error, code}`. Paired devices reach it as `POST /api/chain/autopilot` (a refusal there is a 200; a read-only device gets 403 with `code: "read_only"`, on every `/api/chain/` write) |
 | `POST /chain/column` `{phase, mode: "playing"\|"held"}` or `{phase, stop: true}` | column control |
 | `POST /chain/abort` | stop every live run |
 | `POST /chain/hold/lift` | the burn rate's *Allow today once* (req-181): nothing holds new starts until the day turns; stored in `burn-rate.json`, answers the chain status. Paired devices: `POST /api/chain/hold/lift` (refused on a read-only device) |
-| `POST /shutdown` | graceful retire: stops live runs (bounded), the runner goes to sleep. With `{handover: true}` (what the service passes on when a newer build asks it, req-51) no run ends: live runs are left to the successor (OpenCode re-attached; a worker it cannot bind to is stopped and its session resumed in place under the same run id); 409 while a run is gating/starting/stopping |
+| `POST /shutdown` | graceful retire: stops live runs (bounded), the runner goes to sleep. With `{handover: true}` (what the service passes on when a newer build asks it, req-51) no run ends: live runs are left to the successor (no harness can be re-attached since req-182: each worker is stopped and its session resumed in place under the same run id); 409 while a run is gating/starting/stopping |
 | `POST /retire-if-idle` | sleep if nothing needs the runner (req-110; what the engine sends once Drey is gone): `{ok, exiting: true}` and the runner goes to sleep, or `{ok, exiting: false, reason: "live runs" \| "autopilot"}` and it stays — the decision is the runner's, so no run that starts in between dies. No body. A runner from before req-110 answers 404 |
 | `POST /start` | starts a run — **do not hand-craft**: the `RunRequest` (see `packages/tickets-engine/src/fleet/protocol.ts`) carries the composed instruction, worktree, gate commands, phase plumbing; runs are started by the board's "Run agent" or the chain dispatcher. A start without an `origin` is refused (D-41) |
 
@@ -183,10 +183,10 @@ may sit at the message start or at any line start, the last one wins,
 one in prose does not count (the run stands,
 its session kept, until the owner answers via `/send`); the same kind with
 `requestId` and `questions` (each `{key, header?, question, options,
-multiple}`) while OpenCode's `question` tool waits on its form (answer via
+multiple}`) while a harness's question tool waits on its form (opencode's `question` tool as an ACP `elicitation/create`, Kimi's AskUserQuestion) (answer via
 `/answer`, or `/send` — one line per question, a choice by number or
-label); or `{kind: "permission", text, since, requestId}` while OpenCode
-holds a tool call for approval (answer via `/permission`). A waiting run is not stalled,
+label); or `{kind: "permission", text, since, requestId}` while an ACP
+harness holds a tool call for approval (answer via `/permission`). A waiting run is not stalled,
 however long it waits; the ticket's Log carries the question, and Drey
 shows a Windows notification.
 
@@ -248,9 +248,10 @@ checkout takes the worker's light seat like any run (req-180) — no seat kind o
 
 The second layer is the harness session's own: a review's request carries `permissionMode: 'read-only'`
 (set by `composeRunRequest`, never offered to an owner), and each adapter maps it — Claude Code
-`--permission-mode plan`, opencode's built-in `plan` agent on every prompt, Kimi `session/set_mode plan` when
+`--permission-mode plan`, opencode `session/set_mode plan` (its built-in `plan` agent), Kimi `session/set_mode plan` when
 the session advertises it (Kimi Code 2.5.2 does; an older CLI keeps `auto` and the run's stream says the disk
-is the only guard). A read-only session cannot edit the ticket's working copy either, so the brief asks for the
+is the only guard). Copilot CLI documents no read-only session mode: a read-only start allows no tool up front
+(no `--allow-all-tools`), and the run's stream says once that read-only is not enforced in the session (req-182). A read-only session cannot edit the ticket's working copy either, so the brief asks for the
 verdict in the final message (`BLOCKED: <why>` sends the step back); what a reviewer used to write into
 `## Handover` is not written now (roadmap req-199). opencode's `plan` agent asks before shell commands, so a
 reviewer's `git diff` there becomes a wait for the owner.
@@ -367,7 +368,7 @@ sends `auto`, an older sender's absence means `fresh`. One resolver —
 - A **warm pause** (within the TTL) or a **known context below the
   compact threshold** → `resume`; a cold pause with a context at/above
   the threshold → `resume-compact` when the provider compacts natively
-  (opencode: measured; claude-code: not yet), else fresh. An unknown
+  (opencode and Kimi: native `/compact`; claude-code and Copilot CLI: not yet), else fresh. An unknown
   context (pre-T-0048 records) never auto-compacts.
 - An explicit dialog choice is honoured when structurally legal; the
   dialog disables the options that are not (same rules, client-side).
@@ -375,8 +376,8 @@ sends `auto`, an older sender's absence means `fresh`. One resolver —
 The decision lands on the record (`handoverMode`, `resumedFrom`), the
 stream (`handover: <mode> — <why>`) and the ticket's start line.
 
-**Fallback:** a resume the adapter cannot establish — opencode pre-flights
-the session with a GET before prompting; claude-code treats an exit
+**Fallback:** a resume the adapter cannot establish — an ACP harness answers
+`session/resume` / `session/load` with an error; claude-code treats an exit
 before any init event as one — never fails the run. The supervisor stops
 that worker and respawns **fresh under the same run id** with the same
 instruction (`handoverMode: 'fresh'`, `resumedFrom: null`, one stream
@@ -401,8 +402,8 @@ per-model keys have no UI.
 
 - **Context cap.** `fleet.contextCapTokens` (default 160000, 0 = off;
   per provider/model `fleet.contextCapTokens.<key>` like the compact
-  threshold) rides the chain config. An OpenCode worker's server starts
-  with `OPENCODE_CONFIG_CONTENT` setting the pinned model's
+  threshold) rides the chain config. An opencode worker starts
+  (`opencode acp`) with `OPENCODE_CONFIG_CONTENT` setting the pinned model's
   `limit.context` (and `output`, since an override naming `context` alone
   is dropped), so OpenCode's own auto-compaction fires there. The stream
   opens with `context cap: <n> tokens`, and the run's `contextWindow`
@@ -413,14 +414,14 @@ per-model keys have no UI.
   `briefDigest` (sha256 of the stable parts) equals the digest of the run
   whose session resumes. The stream says `brief: continuation …`. The
   fresh fallback still sends the full instruction.
-- **No replay on resume.** A session resumed in a fresh adapter marks every
-  message settled before its first prompt as seen, as re-attach does.
-  Its old turns no longer land in this run's `turnUsage`, so `/report`
+- **No replay on resume.** A resumed session's history is not this run's:
+  `session/resume` replays nothing, a `session/load` replay is ignored, and
+  Kimi's wire-log records before the run are skipped. Its old turns no longer land in this run's `turnUsage`, so `/report`
   and the chips stay honest. Before req-80, T-0061 showed 400 turns
   where 240 were real.
 - **Held and idle handover.** A held worker that stood idle when the
-  runner retired is resumed without a prompt (`handover.turnIdle`, on
-  adapters with `promptless`: OpenCode). Without this, an "I'm back" turn
+  runner retired is resumed without a prompt (`handover.turnIdle`; a quiet
+  start, which every ACP harness honours since req-182). Without this, an "I'm back" turn
   re-read the whole context.
 - **Empty answer = refusal.** An idle marker after the newest prompt with
   no assistant message in between fails the run with an `error` and no
@@ -545,20 +546,20 @@ then works with the implied slots and logs why.
 |---|---|
 | `id` | letters, digits, `.`, `_`, `-`; unique |
 | `label` | what the boards show; default the id |
-| `provider` | `claude-code`, `opencode` or `kimi` — the harness the slot's runs use |
+| `provider` | `claude-code`, `opencode`, `kimi` or `copilot` — the harness the slot's runs use |
 | `profile` | `private` (default) or `work`: a repository runs only on slots of its own `profile:` (`_meta/repos.md`) |
 | `sessions` | concurrent runs the account serves; absent = no cap of its own. Req-63's `fleet.pool.<provider>.size` moved here once (req-170): see "The capacity pool" |
 | `billing` | `{kind: "subscription", pricePerMonth}` or `{kind: "credits", pricePerCredit}`, optional `currency` — display data |
-| `login` | the harness login, **never a key**: `claudeConfigDir` (spawned as `CLAUDE_CONFIG_DIR`; absent = the default login), `opencodeAuthEntry` / `opencodeAuthFile` (the entry of opencode's `auth.json` the z.ai quota is read with), `kimiCredentials` / `kimiHome` (the Kimi CLI's credentials file; `kimiHome` is spawned as `KIMI_HOME`) |
+| `login` | the harness login, **never a key**: `claudeConfigDir` (spawned as `CLAUDE_CONFIG_DIR`; absent = the default login), `opencodeAuthEntry` / `opencodeAuthFile` (the entry of opencode's `auth.json` the z.ai quota is read with), `kimiCredentials` / `kimiHome` (the Kimi CLI's credentials file; `kimiHome` is spawned as `KIMI_HOME`), `copilotHome` (a Copilot CLI account's config folder, spawned as `COPILOT_HOME`; req-182) |
 | `quota` | where the windows come from — `claude-code`, `zai`, `kimi` or `counting`; absent = by provider (`opencode` with a `zai…` auth entry → `zai`, other `opencode` → `counting`) |
 | `limits` | budgets the counting measures against: `{window: "5h" \| "7d" \| "month", budget, unit: "tokens" \| "runs"}` |
 | `quota.refreshMinutes` | the refresh round (default 10); a remote quota is read at most once a minute per slot, whatever asks |
 
 A provider no slot names runs on an **implied** `private` slot on its
-default login (ids `claude-code`, `opencode`, `kimi`; `implied: true`) —
+default login (ids `claude-code`, `opencode`, `kimi`, `copilot`; `implied: true`) —
 a machine without slots runs as before. An implied slot makes no network
-call: Claude Code's windows come from its runs and cache, Kimi and
-OpenCode are counted. The z.ai and Kimi endpoints are read only for a
+call: Claude Code's windows come from its runs and cache, Kimi,
+OpenCode and Copilot CLI are counted. The z.ai and Kimi endpoints are read only for a
 slot `service.json` names.
 
 ### Where the windows come from
@@ -1081,7 +1082,7 @@ by themselves** (On), only finish what runs (Paused), or wait for the owner
   (`runner.ts` — the composition root, `runner-lifecycle.ts` — when the runner may sleep, req-110;
   `run/` — the run state machine; `orchestrate/` — the supervisor's and the chain's parts, the one
   ticket writer `RunBookkeeper`; `api/` — the HTTP routes; `store/` — the ticket store port;
-  `harness/` — the adapter contract and the Claude Code, OpenCode and Kimi adapters; `orchestrator.ts`, `chain.ts`, `protocol.ts`; ADR-0096), client side
+  `harness/` — the adapter contract, the Claude Code adapter and the one ACP adapter with its opencode, Kimi and Copilot CLI launch descriptions; `orchestrator.ts`, `chain.ts`, `protocol.ts`; ADR-0096), client side
   `packages/tickets-engine/src/services/fleet-client.ts`; the Drey-gone
   signal `packages/tickets-engine/src/server/drey-presence.ts`
 - Specs: `specs/ticket-schema.md` (tickets, gates, agent lane rules),
@@ -1099,6 +1100,49 @@ Tickets → Prompts › *Reset to the shipped version* brings the fixes in.
 The marker line never reaches the model. Bump the number when a shipped
 prompt changes in substance.
 
-## Kimi Code (E10-8)
+## The harnesses (req-182)
 
-`kimi` is the third adapter (`packages/tickets-engine/src/fleet/harness/kimi.ts`): `kimi acp` over stdio, approvals and questions held for the owner, `/compact` native, resume by `session/load`. Tokens come from Kimi's wire log, cost from the price table. See `docs/design/kimi-worker.md`.
+Claude Code runs over headless stream-json (`claude -p`); every other
+harness runs over the **Agent Client Protocol** through one adapter
+(`harness/acp-adapter.ts`, `acp-client.ts`) and a thin launch description
+per harness. Claude Code is the one exception until Anthropic ships native
+ACP (anthropics/claude-code#6686): the only ACP route is a third-party
+bridge, subscription OAuth is not allowed there, and the slots' quota
+windows exist only in stream-json.
+
+| Harness | Launch | Setup (once per account) | Interrupt | Resume | Permissions | Questions | Usage | Read-only |
+|---|---|---|---|---|---|---|---|---|
+| Claude Code | `claude -p --input-format stream-json …` | `claude` login (a slot: `CLAUDE_CONFIG_DIR`) | control interrupt | `--resume` | — (headless permission mode) | `QUESTION:` marker | per call, cost, quota windows | `--permission-mode plan` |
+| opencode | `opencode acp` | `opencode auth login` (an ACP start without a login answers `auth_required`; the free `opencode/*` models need none) | `session/cancel` | `session/resume`, else `session/load` | `session/request_permission` when opencode's own `permission` config says `ask` | `question` tool → `elicitation/create` form | per turn (prompt reply); context window and session cost (`usage_update`) | `plan` mode |
+| Kimi Code | `kimi acp` | `kimi` login (a slot: `KIMI_HOME`) | `session/cancel` | `session/load` | `session/request_permission` | AskUserQuestion (a permission request) | per call (wire log); cost from the price table | `plan` mode (2.5.2) |
+| Copilot CLI | `copilot --acp --stdio [--model <id>] [--allow-all-tools]` | `copilot login` (a slot: `COPILOT_HOME`) | `session/cancel` (github/copilot-cli#4555: a prompt may abort its background sub-agents) | `session/resume`, else `session/load` | `session/request_permission` if the installed version sends it (#845); an unattended start allows all tools at launch | `elicitation/create` if it sends one | the prompt reply's `usage` if present; slots counted | none documented — nothing allowed up front, a stream note |
+
+Copilot CLI fixes its settings at startup, not per session: the model rides
+`--model` (Settings lists no Copilot models; the id is typed), the tool
+permission rides `--allow-all-tools` (left out for a read-only start). It
+reports no quota windows, so its slots are counted (`counting`). Spike 7:
+when Copilot approves its own tools, isolation is from outside — the
+worktree, the review checkout's read-only files and the governor are the
+boundary. Copilot CLI was not installed on the machine milestone 226 was
+built on: its row is proven with fakes (`contract.spec.ts`) and
+`acp-live.spec.ts` skips; roadmap req-208 is the live check.
+
+**opencode with the owner's Copilot login (Spike 5, answered 2026-11-09):**
+not without one interactive step. opencode 2.0.32's GitHub Copilot provider
+signs in only through its own OAuth device flow (`opencode auth login` →
+GitHub Copilot, a code entered in the browser) and stores the token in
+`<XDG_DATA_HOME>/opencode/auth.json`; it reads no existing gh or Copilot CLI
+login (no `hosts.json` / `apps.json`, no `GH_TOKEN` / `COPILOT_GITHUB_TOKEN`).
+After that one step every `opencode acp` start uses the stored token without
+asking. A work-profile slot of its own needs its own opencode data home —
+roadmap req-211.
+
+What the removed `opencode serve` adapter had and ACP does not carry:
+re-attaching a worker that outlived its runner (req-205), live text deltas
+(req-204), a steer queued behind the running turn instead of cancelling it
+(req-206), per-model-call telemetry (req-207).
+
+`acp-live.spec.ts` runs the protocol cases against the installed CLIs in a
+temporary data home; set `DREY_LIVE_ACP_MODEL` (e.g. `opencode/big-pickle`)
+for the cases that need the model to call tools. Kimi: see
+`docs/design/kimi-worker.md`.

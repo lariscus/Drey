@@ -578,8 +578,8 @@ extraction, ADR-0088):
   machine, drift, status log, ledger, git plumbing · `src/fleet` the
   Crew runner (ADR-0096): `run/` the pure run state machine, `orchestrate/`
   the supervisor's and the chain's parts with the one ticket writer
-  `RunBookkeeper`, `harness/` the adapter contract and the Claude Code,
-  OpenCode and Kimi adapters, `store/` the ticket store port, `routing/`
+  `RunBookkeeper`, `harness/` the adapter contract, the Claude Code adapter (stream-json)
+  and the one ACP adapter serving opencode, Kimi and Copilot CLI (req-182), `store/` the ticket store port, `routing/`
   the slots per account with their quota windows and the profile rule
   (req-177) and the capacity pool — model table, cap, class grant, the
   three ledgers (req-170) — and the routing within the class: filter,

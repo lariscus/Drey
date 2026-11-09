@@ -15,13 +15,14 @@ describe('provider pools (req-63)', () => {
       opencode: { size: 1, probeUrl: null },
       'claude-code': { size: 1, probeUrl: null },
       kimi: { size: 1, probeUrl: null },
+      copilot: { size: 1, probeUrl: null },
     });
     expect(normalizeFleetPools({ opencode: { size: 0, probeUrl: 'ftp://x' } }).opencode).toEqual({ size: 1, probeUrl: null });
     expect(normalizeFleetPools({ opencode: { size: 3, probeUrl: ' http://h:8080 ' } }).opencode).toEqual({ size: 3, probeUrl: 'http://h:8080' });
   });
 
   it('the effective size is capped by a probe and shrunk by a rate limit, never below one', () => {
-    expect(effectivePoolSizes(reading())).toEqual({ opencode: 4, 'claude-code': 2, kimi: 1 });
+    expect(effectivePoolSizes(reading())).toEqual({ opencode: 4, 'claude-code': 2, kimi: 1, copilot: 1 });
     expect(effectivePoolSizes(reading({ probed: { opencode: 2 } })).opencode).toBe(2);
     expect(effectivePoolSizes(reading({ probed: { opencode: 8 } })).opencode).toBe(4);
     const shrink = { 'claude-code': { count: 5, untilMs: RATE_LIMIT_SHRINK_MS } };

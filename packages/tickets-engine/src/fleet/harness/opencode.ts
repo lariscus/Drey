@@ -1,67 +1,40 @@
 /**
- * The `opencode` adapter (ADR-0075): drives `opencode serve` (v2, pinned
- * against v2.0.32) bound to loopback. Progress is SUBSCRIBED (the SSE
- * `/api/event` stream: text parts while they generate, every tool call)
- * with polling as the fallback that owns the turn's end, the usage totals
- * and the waits. A worker that outlived its runner is taken back by
- * `attach`. The node seams (spawn, fetch, port pick) come through the
- * constructor; the specs run it against fakes.
+ * The `opencode` harness over ACP (req-182; replaces the `opencode serve`
+ * adapter of ADR-0075): `opencode acp`, newline-delimited JSON-RPC on
+ * stdio, measured against opencode 2.0.32. It advertises `loadSession` and
+ * `session/resume`; approvals arrive as `session/request_permission` (when
+ * opencode's own permission config says `ask`), its question tool as an
+ * `elicitation/create` form (the client advertises `elicitation.form`); the
+ * prompt reply carries the turn's tokens, `usage_update` the context window
+ * and the session's cost. Login is opencode's own (`opencode auth login`).
  */
-import { freePort, type SpawnFn } from '../procs';
-import type { AttachInfo, FetchFn, NowFn, ProviderAdapter, ProviderStart, WorkerHandle } from './contract';
-import { OpencodeCatalog } from './opencode-catalog';
-import { OpencodeClient } from './opencode-client';
-import { OpencodeEventStream } from './opencode-event-stream';
-import { OpencodeLaunch } from './opencode-launch';
-import { OpencodeMessageWalk } from './opencode-message-walk';
-import { OpencodePoller } from './opencode-poller';
-import { OpencodeServer } from './opencode-server';
-import { OpencodeSessionSetup } from './opencode-session-setup';
-import { OpencodeSseFold } from './opencode-sse-fold';
-import { newOpencodeState, type OpencodeContext } from './opencode-state';
-import { OpencodeUsage } from './opencode-usage';
-import { OpencodeWorker } from './opencode-worker';
+import type { SpawnFn } from '../ports/process-spawner';
+import { AcpAdapter } from './acp-adapter';
+import type { AcpHarness } from './acp-harness';
+import { PromptUsageMeter } from './acp-usage';
+import type { NowFn, ProviderAdapter } from './contract';
+import { opencodeCapConfig, opencodeModeFor, opencodeModelSettings } from './opencode-settings';
 
-export class OpencodeAdapter implements ProviderAdapter {
-  readonly id = 'opencode' as const;
-  readonly label = 'OpenCode';
-  readonly liveInject = true;
-  readonly promptless = true;
-
-  constructor(
-    private readonly spawnFn: SpawnFn,
-    private readonly fetchFn: FetchFn,
-    private readonly pickPort: () => Promise<number>,
-    private readonly now: NowFn,
-  ) {}
-
-  spawn(start: ProviderStart): WorkerHandle {
-    const { worker, launch } = this.build(start, null);
-    launch.boot();
-    return worker;
-  }
-
-  attach(start: ProviderStart, info: AttachInfo): WorkerHandle {
-    const { worker, launch } = this.build(start, info);
-    launch.attach(info);
-    return worker;
-  }
-
-  /** One worker's parts, wired; the kill reaches the worker through a late-bound arrow. */
-  private build(start: ProviderStart, attached: AttachInfo | null): { worker: OpencodeWorker; launch: OpencodeLaunch } {
-    const ctx: OpencodeContext = { start, state: newOpencodeState(start, attached), client: new OpencodeClient(this.fetchFn), now: this.now, kill: () => worker.kill() };
-    const usage = new OpencodeUsage(ctx);
-    const fold = new OpencodeSseFold(ctx, usage);
-    const events = new OpencodeEventStream(ctx, (raw) => fold.onEvent(raw));
-    const poller: OpencodePoller = new OpencodePoller(ctx, { usage, walk: new OpencodeMessageWalk(ctx, fold.sealed), attached: attached !== null, gone: () => worker.finish(null) });
-    const server = new OpencodeServer(ctx, this.spawnFn);
-    const catalog = new OpencodeCatalog(ctx);
-    const worker: OpencodeWorker = new OpencodeWorker(ctx, { server, events, poller, catalog, attached });
-    const launch = new OpencodeLaunch(ctx, { worker, server, setup: new OpencodeSessionSetup(ctx), usage, catalog, events, poller, pickPort: this.pickPort });
-    return { worker, launch };
-  }
+export function opencodeHarness(): AcpHarness {
+  return {
+    id: 'opencode',
+    label: 'OpenCode',
+    agent: 'opencode',
+    launch: (start) => {
+      const cap = opencodeCapConfig(start.model, start.contextCap ?? 0);
+      return cap === null
+        ? { command: 'opencode', args: ['acp'] }
+        : { command: 'opencode', args: ['acp'], env: { OPENCODE_CONFIG_CONTENT: cap }, note: `context cap: ${Math.floor(start.contextCap!)} tokens — OpenCode compacts the session there` };
+    },
+    clientCapabilities: { elicitation: { form: {} } },
+    resume: ['resume', 'load'],
+    modelSettings: opencodeModelSettings,
+    modeFor: opencodeModeFor,
+    meter: () => new PromptUsageMeter(),
+    emptyTurnIsRefusal: true,
+  };
 }
 
-export function opencodeAdapter(spawnFn: SpawnFn, fetchFn: FetchFn = fetch, pickPort: () => Promise<number> = freePort, now: NowFn = (): Date => new Date()): ProviderAdapter {
-  return new OpencodeAdapter(spawnFn, fetchFn, pickPort, now);
+export function opencodeAdapter(spawnFn: SpawnFn, now: NowFn = (): Date => new Date()): ProviderAdapter {
+  return new AcpAdapter(opencodeHarness(), spawnFn, now);
 }

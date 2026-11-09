@@ -1,6 +1,7 @@
 /**
  * The harness contract (ADR-0075, ADR-0096): what every coding-agent adapter
- * — Claude Code, OpenCode, Kimi — gives the runner. A worker is started
+ * — Claude Code over stream-json; opencode, Kimi and Copilot CLI over the one
+ * ACP adapter (req-182) — gives the runner. A worker is started
  * from a `ProviderStart`, reports `NormalizedEvent`s, and is driven through
  * one `WorkerHandle`. Optional capabilities are optional methods, never
  * flags. Types only: no Node, no adapter, nothing of the orchestration.
@@ -58,7 +59,7 @@ export interface NormalizedEvent {
   readonly rateLimit?: RateLimitReading;
 }
 
-/** A session's cumulative usage (OpenCode keeps it per session, across runs). */
+/** A session's cumulative usage (a harness that keeps it per session, across runs). */
 export interface UsageTotals {
   readonly tokensIn: number;
   readonly tokensOut: number;
@@ -94,14 +95,14 @@ export interface ProviderStart {
   readonly resumeRef: string | null;
   /** Compact the resumed session before the first prompt (T-0049); only with a `resumeRef`. */
   readonly compactFirst?: boolean;
-  /** The context window the worker compacts at (req-80); OpenCode only. */
+  /** The context window the worker compacts at (req-80); opencode only (its launch config). */
   readonly contextCap?: number;
   /** The resume could not be established — at most once, before the first prompt; the supervisor respawns fresh. */
   readonly onResumeFailed?: (reason: string) => void;
   /** Deliver NO first prompt — a quiet start (req-75); claude-code ignores it. */
   readonly holdAtSpawn?: boolean;
   readonly ticketId: string;
-  /** req-177: the worker's extra environment — its slot's login folder (`CLAUDE_CONFIG_DIR`, `KIMI_HOME`). */
+  /** req-177: the worker's extra environment — its slot's login folder (`CLAUDE_CONFIG_DIR`, `KIMI_HOME`, `COPILOT_HOME`). */
   readonly env?: Readonly<Record<string, string>>;
   /** Events land here; the run's stream file keeps them. */
   readonly onEvent: (event: NormalizedEvent) => void;
@@ -114,7 +115,12 @@ export interface ProviderStart {
   readonly onUsageBase?: (base: UsageTotals) => void;
 }
 
-/** What re-attaching to a worker that outlived its runner takes (OpenCode). */
+/**
+ * What re-attaching to a worker that outlived its runner takes (req-51).
+ * No adapter implements `attach` since req-182 (milestone 226): every ACP
+ * harness is a stdio child of its runner; the seam stays for a harness that
+ * can outlive it (roadmap follow-up req-205).
+ */
 export interface AttachInfo {
   readonly address: string;
   readonly password: string;
@@ -151,12 +157,9 @@ export interface ProviderAdapter {
   readonly label: string;
   /** True when steer reaches a live worker without ending it. */
   readonly liveInject: boolean;
-  /** True when a resumed session can stand without a first prompt (req-80; OpenCode's server). */
-  readonly promptless?: boolean;
   spawn(start: ProviderStart): WorkerHandle;
   /** A handle on a worker that outlived its runner (absent when the provider cannot). */
   attach?(start: ProviderStart, info: AttachInfo): WorkerHandle;
 }
 
-export type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 export type NowFn = () => Date;

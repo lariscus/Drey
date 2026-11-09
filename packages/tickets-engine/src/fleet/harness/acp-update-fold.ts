@@ -1,15 +1,26 @@
 import type { NormalizedEvent } from './contract';
 import { activityLine, editChanges, RESULT_PREFIX, THINK_MAX, THINK_PREFIX, toolActivity } from './event-text';
-import { kimiEmit, kimiText, type KimiContext } from './kimi-state';
+import { acpEmit, acpText, type AcpContext } from './acp-state';
+
+/** A tool's output: Kimi's `rawOutput` text, else the first text content (opencode). */
+function outputOf(update: Record<string, unknown>): string {
+  const raw = update['rawOutput'];
+  if (typeof raw === 'string') {
+    return raw;
+  }
+  const content = update['content'] as ReadonlyArray<{ content?: { text?: unknown } }> | undefined;
+  return acpText(content?.[0]?.content?.text);
+}
 
 /**
- * Kimi's `session/update` notifications as the run's transcript (E10-8):
- * message and thought chunks gathered until a tool call or the turn's end,
- * each tool call noted once its arguments are known (they stream in after
- * the first `tool_call`), its result under it, the context size and the
- * slash commands.
+ * An ACP agent's `session/update` notifications as the run's transcript
+ * (E10-8, req-182): message and thought chunks gathered until a tool call or
+ * the turn's end, each tool call noted once its arguments are known (they
+ * stream in after the first `tool_call`), its result under it, the context
+ * size, the session's cumulative cost when the agent reports one (opencode's
+ * `usage_update`) and the slash commands.
  */
-export class KimiUpdateFold {
+export class AcpUpdateFold {
   private text = '';
   private thought = '';
   private toolNames = new Map<string, string>();
@@ -17,14 +28,19 @@ export class KimiUpdateFold {
   private readonly noted = new Set<string>();
   private readonly emit: (event: Omit<NormalizedEvent, 'ts'>) => void;
 
-  constructor(ctx: Pick<KimiContext, 'start' | 'now'>) {
-    this.emit = kimiEmit(ctx);
+  constructor(private readonly ctx: Pick<AcpContext, 'start' | 'now' | 'state'>) {
+    this.emit = acpEmit(ctx);
   }
 
   /** A new turn: its own text, its own tool names. */
   resetTurn(): void {
     this.text = '';
     this.toolNames = new Map();
+  }
+
+  /** The tool calls the turn made so far. */
+  get toolCalls(): number {
+    return this.toolNames.size;
   }
 
   /** The turn's answer so far: the message text after its last tool call. */
@@ -38,12 +54,12 @@ export class KimiUpdateFold {
 
   onUpdate(update: Record<string, unknown>): void {
     const content = update['content'] as { type?: string; text?: string } | undefined;
-    switch (kimiText(update['sessionUpdate'])) {
+    switch (acpText(update['sessionUpdate'])) {
       case 'agent_message_chunk':
-        this.text += kimiText(content?.text);
+        this.text += acpText(content?.text);
         return;
       case 'agent_thought_chunk':
-        this.thought += kimiText(content?.text);
+        this.thought += acpText(content?.text);
         return;
       case 'tool_call':
         this.flushThought();
@@ -78,7 +94,7 @@ export class KimiUpdateFold {
   }
 
   private toolCall(update: Record<string, unknown>): void {
-    const id = kimiText(update['toolCallId']);
+    const id = acpText(update['toolCallId']);
     const content = update['content'] as ReadonlyArray<{ content?: { text?: string } }> | undefined;
     this.keepRawInput(id, update);
     // The first call's content wins over its raw input: it carries the arguments as the agent sent them.
@@ -88,19 +104,19 @@ export class KimiUpdateFold {
     } catch {
       this.toolArgs.set(id, {});
     }
-    this.toolNames.set(id, kimiText(update['title']));
+    this.toolNames.set(id, acpText(update['title']));
   }
 
   private toolUpdate(update: Record<string, unknown>): void {
-    const id = kimiText(update['toolCallId']);
+    const id = acpText(update['toolCallId']);
     this.keepRawInput(id, update);
-    const status = kimiText(update['status']);
+    const status = acpText(update['status']);
     if (status === 'in_progress' && Object.keys(this.toolArgs.get(id) ?? {}).length > 0) {
       this.note(id);
     }
     if (status === 'completed' || status === 'failed') {
       this.note(id);
-      const out = activityLine(kimiText(update['rawOutput']));
+      const out = activityLine(outputOf(update));
       if (out !== '' || status === 'failed') {
         this.emit({ kind: 'note', text: `${RESULT_PREFIX}${status === 'failed' ? 'failed: ' : ''}${out}` });
       }
@@ -131,6 +147,10 @@ export class KimiUpdateFold {
   private usage(update: Record<string, unknown>): void {
     const used = update['used'];
     const size = update['size'];
+    const cost = (update['cost'] as { amount?: unknown } | undefined)?.amount;
+    if (typeof cost === 'number') {
+      this.ctx.state.reportedCost = cost;
+    }
     if (typeof used === 'number') {
       this.emit({ kind: 'usage', contextTokens: used, ...(typeof size === 'number' ? { contextWindow: size } : {}) });
     }
@@ -139,7 +159,7 @@ export class KimiUpdateFold {
   private commands(update: Record<string, unknown>): void {
     const cmds = update['availableCommands'];
     if (Array.isArray(cmds)) {
-      this.emit({ kind: 'usage', commands: cmds.map((c: { name?: unknown }) => kimiText(c.name)).filter((n) => n !== '') });
+      this.emit({ kind: 'usage', commands: cmds.map((c: { name?: unknown }) => acpText(c.name)).filter((n) => n !== '') });
     }
   }
 }

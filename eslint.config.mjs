@@ -71,7 +71,7 @@ const NODE_BUILTINS = {
   message: 'This part of the Crew runner reaches the machine through a port in fleet/ports (ADR-0096), never a Node module.',
 };
 const CONCRETE_ADAPTERS = {
-  group: ['**/harness/claude-code', '**/harness/opencode', '**/harness/kimi', '**/harness/kimi-*', '**/store/dk-ticket-store'],
+  group: ['**/harness/claude-code', '**/harness/opencode', '**/harness/kimi', '**/harness/kimi-*', '**/harness/copilot', '**/harness/acp-adapter', '**/store/dk-ticket-store'],
   message: 'Only fleet/runner.ts (the composition root) imports a concrete adapter (ADR-0096); depend on the port it satisfies instead.',
 };
 const RUN_CORE_ONLY = [

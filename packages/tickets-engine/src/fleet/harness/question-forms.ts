@@ -1,40 +1,10 @@
 /**
  * A worker's question form and the owner's answer to it (req-64):
- * OpenCode's `question` tool asks through a form, Kimi through a held
- * request; the runner shows one wait shape and reads the owner's typed text
- * back into answers.
+ * opencode's `question` tool asks through an ACP form (`elicitation/create`,
+ * read in `acp-elicitation.ts`), Kimi through a held request; the runner
+ * shows one wait shape and reads the owner's typed text back into answers.
  */
 import type { QuestionAnswers, WaitQuestion } from '../protocol';
-
-/** One field of an OpenCode form (v2 `Form.Field`, the parts the fleet reads). */
-interface OcFormField {
-  readonly key?: string;
-  readonly title?: string;
-  readonly description?: string;
-  readonly type?: string;
-  readonly options?: ReadonlyArray<{ readonly value?: string; readonly label?: string; readonly description?: string }>;
-}
-
-/** A pending OpenCode form (v2 `Form.Info`). */
-export interface OcForm {
-  readonly id?: string;
-  readonly title?: string;
-  readonly metadata?: { readonly kind?: string };
-  readonly fields?: readonly OcFormField[];
-}
-
-/** The form's questions: `title` = the short header, `description` = the question, option `value` = its label. */
-export function formQuestions(form: OcForm): WaitQuestion[] {
-  return (form.fields ?? [])
-    .filter((f): f is OcFormField & { key: string } => typeof f.key === 'string')
-    .map((f) => ({
-      key: f.key,
-      ...(f.title !== undefined && f.title.trim() !== '' ? { header: f.title.trim() } : {}),
-      question: (f.description ?? f.title ?? '').trim() || (form.title ?? 'Question'),
-      options: (f.options ?? []).map((o) => ({ label: o.value ?? o.label ?? '', ...(o.description !== undefined ? { description: o.description } : {}) })).filter((o) => o.label !== ''),
-      multiple: f.type === 'multiselect',
-    }));
-}
 
 /** One line for a question form: the first question, and how many more follow. */
 export function formText(questions: readonly WaitQuestion[]): string {

@@ -184,7 +184,7 @@ describe('RunnerHandover — a retiring runner leaves its runs to the successor'
   });
 
   it('a held worker that stood idle is resumed fully silent, like any held run (req-80 idle case via req-75 holdAtSpawn)', async () => {
-    const promptless = (): Harness => harnessWith(dirs.fleet, { id: 'claude-code', attach: undefined, promptless: true }, { exec: noProbe });
+    const promptless = (): Harness => harnessWith(dirs.fleet, { id: 'claude-code', attach: undefined }, { exec: noProbe });
     const first = promptless();
     const id = await startedClaudeRun(first.sup, first.adapter);
     expect((await first.sup.takeover(id)).ok).toBe(true);

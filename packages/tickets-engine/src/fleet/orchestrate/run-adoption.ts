@@ -32,7 +32,7 @@ export interface RunAdoptionDeps {
 /**
  * The runs a restarted runner finds (ADR-0075, req-51): terminal records
  * come back as history; a live record whose worker still answers is taken
- * back (re-attach, OpenCode's server); one a retiring runner handed over is
+ * back (re-attach, for an adapter that can — none since req-182); one a retiring runner handed over is
  * resumed in place under the same run id; any other is detached — its
  * ticket freed, the owner can watch, stop or resume it.
  */

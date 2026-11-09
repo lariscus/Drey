@@ -27,6 +27,7 @@ describe('parseServiceSlots — the slots of service.json', () => {
       ['zai', 'opencode', 'private', 'zai', false],
       ['copilot', 'opencode', 'work', 'counting', false],
       ['kimi', 'kimi', 'private', 'counting', true],
+      ['copilot-default', 'copilot', 'private', 'counting', true],
     ]);
     expect(parsed.slots[0]).toMatchObject({ label: 'Claude A', sessions: 2, billing: { kind: 'subscription', pricePerMonth: 90, currency: 'EUR' } });
     expect(parsed.slots[3]).toMatchObject({ billing: { kind: 'credits', pricePerCredit: 0.04 }, limits: [{ window: 'month', budget: 1000, unit: 'runs' }] });
@@ -39,6 +40,7 @@ describe('parseServiceSlots — the slots of service.json', () => {
       ['opencode', 'OpenCode', 'private', 'counting', null],
       ['claude-code', 'Claude Code', 'private', 'claude-code', null],
       ['kimi', 'Kimi', 'private', 'counting', null],
+      ['copilot', 'Copilot CLI', 'private', 'counting', null],
     ]);
   });
 
@@ -48,7 +50,7 @@ describe('parseServiceSlots — the slots of service.json', () => {
   });
 
   it('leaves out a broken entry with its reason; the others stand', () => {
-    const parsed = parseServiceSlots({ slots: [{ id: 'a', provider: 'claude-code' }, { id: 'a', provider: 'kimi' }, { id: 'b', provider: 'copilot' }, { id: 'c', provider: 'kimi', profile: 'home' }, { provider: 'kimi' }] });
+    const parsed = parseServiceSlots({ slots: [{ id: 'a', provider: 'claude-code' }, { id: 'a', provider: 'kimi' }, { id: 'b', provider: 'gemini' }, { id: 'c', provider: 'kimi', profile: 'home' }, { provider: 'kimi' }] });
     expect(parsed.slots.filter((s) => !s.implied).map((s) => s.id)).toEqual(['a']);
     expect(parsed.errors).toHaveLength(4);
     expect(parsed.errors[0]).toBe('slot "a" is named twice');
@@ -61,7 +63,7 @@ describe('parseServiceSlots — the slots of service.json', () => {
 
   it("an implied slot never takes a configured slot's id", () => {
     const parsed = parseServiceSlots({ slots: [{ id: 'kimi', provider: 'claude-code' }] });
-    expect(parsed.slots.map((s) => s.id)).toEqual(['kimi', 'opencode', 'kimi-default']);
+    expect(parsed.slots.map((s) => s.id)).toEqual(['kimi', 'opencode', 'kimi-default', 'copilot']);
   });
 });
 
@@ -71,6 +73,12 @@ describe("slotEnv — the account a worker is spawned as", () => {
     expect(slotEnv(claudeA!)).toEqual({ CLAUDE_CONFIG_DIR: 'C:/Users/o/.claude-a' });
     expect(slotEnv(zai!)).toBeUndefined();
     expect(slotEnv(parseServiceSlots({ slots: [{ id: 'k2', provider: 'kimi', login: { kimiHome: '/k2' } }] }).slots[0]!)).toEqual({ KIMI_HOME: '/k2' });
+  });
+
+  it('a second Copilot CLI account is its COPILOT_HOME, counted by the runner (req-182)', () => {
+    const copilot = parseServiceSlots({ slots: [{ id: 'cp-work', provider: 'copilot', profile: 'work', login: { copilotHome: 'C:/Users/o/.copilot-work' } }] }).slots[0]!;
+    expect(slotEnv(copilot)).toEqual({ COPILOT_HOME: 'C:/Users/o/.copilot-work' });
+    expect(copilot.quota).toBe('counting');
   });
 });
 

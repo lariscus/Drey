@@ -21,6 +21,7 @@ const WORKER_CHOICES: ReadonlyArray<readonly [string, string]> = [
   ['opencode', 'OpenCode'],
   ['claude-code', 'Claude Code'],
   ['kimi', 'Kimi Code'],
+  ['copilot', 'Copilot CLI'],
 ];
 
 export interface ColumnsState {

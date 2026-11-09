@@ -183,7 +183,7 @@ export async function streamText(fleetRoot: string, runId: string): Promise<stri
   return fsp.readFile(path.join(fleetRoot, 'runs', runId, 'stream.jsonl'), 'utf8').catch(() => '');
 }
 
-/** A harness whose fake adapter is patched (another provider id, no attach, promptless). */
+/** A harness whose fake adapter is patched (another provider id, no attach). */
 export function harnessWith(fleetRoot: string, patch: Partial<ProviderAdapter>, deps: Partial<RunSupervisorDeps> = {}, store: FakeTicketStore = planStore()): Harness {
   const fake = fakeAdapter(patch.id);
   const adapter: ProviderAdapter = { ...fake.adapter, ...patch };

@@ -37,19 +37,19 @@ describe('FleetClient — the slots', () => {
   it('reads every slot, and the chain status carries the summary', async () => {
     const fleet = client();
     const reply = await fleet.slots();
-    expect(reply?.slots.map((s) => s.id)).toEqual(['opencode', 'claude-code', 'kimi']);
+    expect(reply?.slots.map((s) => s.id)).toEqual(['opencode', 'claude-code', 'kimi', 'copilot']);
     expect(reply?.configPath).toBe(path.join(tmp, 'service.json'));
-    expect((await fleet.chainStatus())?.slots?.map((s) => s.id)).toEqual(['opencode', 'claude-code', 'kimi']);
+    expect((await fleet.chainStatus())?.slots?.map((s) => s.id)).toEqual(['opencode', 'claude-code', 'kimi', 'copilot']);
     fleet.dispose();
   });
 
   it('writes the slots and clears a needs login through the runner', async () => {
     const fleet = client();
     const written = await fleet.writeSlots([{ id: 'claude-a', label: 'Claude A', provider: 'claude-code', login: { claudeConfigDir: path.join(tmp, 'a') } }]);
-    expect(written.ok && written.slots.map((s) => s.id)).toEqual(['claude-a', 'opencode', 'kimi']);
+    expect(written.ok && written.slots.map((s) => s.id)).toEqual(['claude-a', 'opencode', 'kimi', 'copilot']);
     expect(await fleet.slotLoginDone('claude-a')).toMatchObject({ ok: true, slot: { id: 'claude-a' } });
     expect((await fleet.refreshSlots('claude-a')).ok).toBe(true);
-    expect(await fleet.writeSlots([{ id: 'x', provider: 'copilot' }])).toMatchObject({ ok: false });
+    expect(await fleet.writeSlots([{ id: 'x', provider: 'gemini' }])).toMatchObject({ ok: false });
     fleet.dispose();
   });
 

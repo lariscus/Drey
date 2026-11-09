@@ -1161,7 +1161,7 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
   };
 }
 
-const PROVIDER_LABEL: Readonly<Record<string, string>> = { opencode: 'Local', 'claude-code': 'Claude Code', kimi: 'Kimi Code' };
+const PROVIDER_LABEL: Readonly<Record<string, string>> = { opencode: 'Local', 'claude-code': 'Claude Code', kimi: 'Kimi Code', copilot: 'Copilot CLI' };
 
 /** One live run, tolerantly mapped (the caller checked the state). */
 function liveRunOf(run: Record<string, unknown>, state: RunStateView): LiveRunView {

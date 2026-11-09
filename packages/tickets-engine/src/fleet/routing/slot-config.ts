@@ -18,8 +18,8 @@ export interface SlotConfigParse {
 
 export const DEFAULT_REFRESH_MS = 10 * 60_000;
 const QUOTA_KINDS: readonly QuotaKind[] = ['claude-code', 'zai', 'kimi', 'counting'];
-const LOGIN_KEYS: readonly (keyof SlotLogin)[] = ['claudeConfigDir', 'opencodeAuthEntry', 'opencodeAuthFile', 'kimiCredentials', 'kimiHome'];
-const IMPLIED_LABEL: Readonly<Record<WorkerProviderId, string>> = { 'claude-code': 'Claude Code', opencode: 'OpenCode', kimi: 'Kimi' };
+const LOGIN_KEYS: readonly (keyof SlotLogin)[] = ['claudeConfigDir', 'opencodeAuthEntry', 'opencodeAuthFile', 'kimiCredentials', 'kimiHome', 'copilotHome'];
+const IMPLIED_LABEL: Readonly<Record<WorkerProviderId, string>> = { 'claude-code': 'Claude Code', opencode: 'OpenCode', kimi: 'Kimi', copilot: 'Copilot CLI' };
 
 type Entry = Record<string, unknown>;
 const text = (value: unknown): string | null => (typeof value === 'string' && value.trim() !== '' ? value.trim() : null);

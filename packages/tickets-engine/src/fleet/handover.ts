@@ -32,6 +32,8 @@ export const COMPACT_CAPABILITY: Readonly<Record<WorkerProviderId, 'native' | 'n
   opencode: 'native',
   'claude-code': 'none',
   kimi: 'native',
+  // req-182: Copilot CLI lists /compact, but its effect over ACP is unverified — the cap ends the run instead.
+  copilot: 'none',
 };
 
 /** The run a handover could resume — the newest terminal record of the
