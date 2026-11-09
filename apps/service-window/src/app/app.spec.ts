@@ -45,7 +45,7 @@ describe('Drey Service window', () => {
     await settle(fixture);
     root.querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click();
     await settle(fixture);
-    expect(root.textContent).toContain('3 sessions · 2 runs · 1 held');
+    expect(root.textContent).toContain('4 sessions · 2 runs · 2 held');
     const rows = Array.from(root.querySelectorAll<HTMLButtonElement>('.main'));
     rows.find((row) => row.textContent?.includes('T-0121'))?.click();
     await settle(fixture);
@@ -60,6 +60,21 @@ describe('Drey Service window', () => {
     await settle(fixture);
     expect(api.calls).toContain('run:R-20261107T0833-c02e:send:hello');
     expect(input.value).toBe('');
+  });
+
+  it('starts a free session from the New session form and selects it (req-173)', async () => {
+    const { api, fixture, root } = setup();
+    await settle(fixture);
+    root.querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click();
+    await settle(fixture);
+    root.querySelector<HTMLButtonElement>('button[aria-label="New session…"]')?.click();
+    await settle(fixture);
+    expect(root.querySelector('sw-new-session')).not.toBeNull();
+    Array.from(root.querySelectorAll<HTMLButtonElement>('sw-new-session button')).find((b) => b.textContent?.trim() === 'Start')?.click();
+    await settle(fixture);
+    expect(api.calls).toContain('sessionStart:ben:E:\\projects\\drey-tickets');
+    expect(root.querySelector('sw-new-session')).toBeNull();
+    expect(root.querySelector('.sx.selected')?.textContent).toContain('free · Ben');
   });
 
   it('draws the Logs tab with the component filter', async () => {

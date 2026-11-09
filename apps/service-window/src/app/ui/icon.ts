@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
-export type IconName = 'restart' | 'stop' | 'start' | 'release' | 'minimize' | 'maximize' | 'close' | 'chevron-down';
+export type IconName = 'restart' | 'stop' | 'start' | 'release' | 'minimize' | 'maximize' | 'close' | 'chevron-down' | 'plus';
 
 /** The window's inline glyphs: 24-unit grid, 1.75 stroke, as the boards draw them. */
 @Component({

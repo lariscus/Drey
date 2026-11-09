@@ -24,6 +24,9 @@ export const SERVICE_WINDOW_CHANNELS = {
   copyAttach: 'service-window:copy-attach',
   openWorktree: 'service-window:open-worktree',
   openDrey: 'service-window:open-drey',
+  sessionOptions: 'service-window:session-options',
+  sessionStart: 'service-window:session-start',
+  pickFolder: 'service-window:pick-folder',
   quitService: 'service-window:quit-service',
   windowControl: 'service-window:window-control',
   /** main → renderer: one {@link ServiceWindowEvent}. */
@@ -31,6 +34,8 @@ export const SERVICE_WINDOW_CHANNELS = {
   /** main → renderer: show a tab (the tray's entries). */
   showTab: 'service-window:show-tab',
 } as const;
+
+import type { SessionKind, SessionState } from '../session-lifecycle';
 
 export type ServiceWindowTab = 'components' | 'sessions' | 'logs';
 
@@ -170,7 +175,9 @@ export interface SessionRun {
   /** An interactive dialog run (req-65). */
   readonly interactive: boolean;
   /** req-168 (R12): the session's kind — a ticket `run` or a persona's `1:1` (`shape`, `free`: req-173). */
-  readonly kind: 'run' | '1:1' | 'shape' | 'free';
+  readonly kind: SessionKind;
+  /** R12: the session's state, read from the record by `sessionStateOf`. */
+  readonly sessionState: SessionState;
   /** req-168: where the worker works — the worktree, or a 1:1's tickets repository. */
   readonly workingDirectory: string;
   /** req-168: when a live 1:1 is released if no line follows (ISO); null for every other session. */
@@ -227,6 +234,42 @@ export type ServiceWindowEvent =
 
 export type ActionReply = { readonly ok: true } | { readonly ok: false; readonly error: string };
 
+/** One persona of the New session form. */
+export interface NewSessionPersona {
+  readonly id: string;
+  readonly title: string;
+  readonly worker: string;
+}
+
+export type NewSessionPermission = 'read-only' | 'accept-edits' | 'bypass';
+
+export type NewSessionClass = 'A' | 'B' | 'C';
+
+/** What the New session form offers (the engine's `sessionOptions`). */
+export type NewSessionOptionsReply =
+  | {
+      readonly ok: true;
+      readonly personas: readonly NewSessionPersona[];
+      readonly classes: readonly NewSessionClass[];
+      /** The tickets repository, offered first. */
+      readonly ticketsVault: string;
+      readonly repos: readonly { readonly name: string; readonly path: string }[];
+      readonly permissionMode: NewSessionPermission;
+      readonly defaultPersona: string | null;
+    }
+  | { readonly ok: false; readonly error: string };
+
+/** One free session asked for. */
+export interface NewSessionAsk {
+  readonly persona: string;
+  readonly directory: string;
+  readonly poolClass: NewSessionClass | null;
+  readonly permissionMode: NewSessionPermission;
+  readonly firstLine?: string;
+}
+
+export type NewSessionReply = { readonly ok: true; readonly runId: string } | { readonly ok: false; readonly error: string };
+
 export type RunAction = 'send' | 'interrupt' | 'resume' | 'stop';
 
 /** `window.serviceWindow` — the preload's whole surface. */
@@ -244,6 +287,12 @@ export interface ServiceWindowApi {
   copyAttachCommand(runId: string): Promise<ActionReply>;
   openWorktree(runId: string): Promise<ActionReply>;
   openDrey(): Promise<void>;
+  /** The New session form's personas, folders, classes and the default permission. */
+  sessionOptions(): Promise<NewSessionOptionsReply>;
+  /** Starts a free session (req-173) through the engine. */
+  sessionStart(ask: NewSessionAsk): Promise<NewSessionReply>;
+  /** The native folder picker; null when cancelled. */
+  pickFolder(): Promise<string | null>;
   /** Asks natively first while runs live; then `POST /shutdown`. */
   quitService(): Promise<ActionReply>;
   windowControl(action: 'minimize' | 'maximize' | 'close'): void;

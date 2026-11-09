@@ -4,7 +4,15 @@
  * each reached through the endpoints of `service.lock` as it stands now.
  * The window owns no state — this class only asks.
  */
-import type { ActionReply, ComponentAction, ComponentId, RunAction } from '../../shared/service-window/contract';
+import type {
+  ActionReply,
+  ComponentAction,
+  ComponentId,
+  NewSessionAsk,
+  NewSessionOptionsReply,
+  NewSessionReply,
+  RunAction,
+} from '../../shared/service-window/contract';
 import { i18n } from '../../shared/i18n';
 import type { JsonHttp } from './json-http';
 import type { Endpoint, ServiceEndpoints } from './service-endpoints';
@@ -120,6 +128,30 @@ export class ServiceCalls {
       return { ok: false, error: typeof value.error === 'string' ? value.error : 'refused' };
     }
     return reply.ok ? { ok: true } : reply;
+  }
+
+  /** The New session form's options, from the engine (req-173). */
+  async sessionOptions(): Promise<NewSessionOptionsReply> {
+    const value = await this.invokeEngine('sessionOptions', {});
+    return value !== null && typeof value === 'object' && 'ok' in value ? (value as NewSessionOptionsReply) : { ok: false, error: i18n.t('service_tray.error.not_running') };
+  }
+
+  /** Starts a free session through the engine; the origin names this window. */
+  async sessionStart(ask: NewSessionAsk): Promise<NewSessionReply> {
+    const value = await this.invokeEngine('sessionStart', { ...ask, origin: 'service-window' });
+    return value !== null && typeof value === 'object' && 'ok' in value ? (value as NewSessionReply) : { ok: false, error: i18n.t('service_tray.error.not_running') };
+  }
+
+  private async invokeEngine(method: string, payload: unknown): Promise<unknown> {
+    const engine = (await this.endpoints.read())?.engine ?? null;
+    if (engine === null) {
+      return null;
+    }
+    const reply = await this.http.post(engine, '/api/invoke', { method, payload });
+    if (!reply.ok) {
+      return { ok: false, error: reply.error };
+    }
+    return (reply.json as { value?: unknown }).value ?? null;
   }
 
   /** Stop all running steps (the Notaus). */

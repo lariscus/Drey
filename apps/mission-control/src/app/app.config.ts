@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { McState } from './api/state';
 import { bootHintsFromLocation } from './api/client';
-import { parsePriorities } from '@mission-ui/api/dto';
+import { parsePriorities, type LiveSessionView } from '@mission-ui/api/dto';
 import { MC_AUTOPILOT, type McAutopilotState } from '@mission-ui/autopilot/autopilot-state';
 import { MC_CHAT_STATE } from '@mission-ui/chat/chat.model';
 import { MC_TEAM_DETAIL, type PersonaFacts, type TeamDetailVm } from '@mission-ui/team/detail';
@@ -256,6 +256,7 @@ export const appConfig: ApplicationConfig = {
               model?: string;
               pool?: readonly string[];
               skills?: readonly string[];
+              liveSessions?: readonly LiveSessionView[];
             }[]
           ).find((p) => p.id === open.id);
           return found ?? { id: open.id, title: open.id, role: '', color: '' };

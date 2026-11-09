@@ -95,6 +95,14 @@ describe('snapshot mapping', () => {
     expect(sessionRunOf({ id: 'R-1', state: 'running', worktreePath: 'W:/T-0001' })).toMatchObject({ kind: 'run', workingDirectory: 'W:/T-0001', releaseAt: null });
   });
 
+  it('a free session (req-173): its kind, state, directory and release time', () => {
+    const free = { id: 'R-7', state: 'running', kind: 'free', persona: 'ben', held: true, turn: 'idle', startedAt: '2026-11-09T10:00:00.000Z', lastActivity: '2026-11-09T10:04:00.000Z', worktreePath: '', workingDirectory: 'E:/notes' };
+    expect(sessionRunOf(free)).toMatchObject({ kind: 'free', sessionState: 'held', workingDirectory: 'E:/notes', releaseAt: '2026-11-09T10:19:00.000Z' });
+    expect(sessionRunOf({ ...free, turn: 'busy' }).sessionState).toBe('running');
+    expect(sessionRunOf({ ...free, state: 'starting' }).sessionState).toBe('queued');
+    expect(sessionRunOf({ ...free, state: 'stopped' })).toMatchObject({ sessionState: 'released', releaseAt: null });
+  });
+
   it("a stream file's lines, a cut first line skipped", () => {
     expect(streamEventsOf('"kind":"cut"}\n{"ts":"t","kind":"note","text":"x"}\n')).toEqual([{ ts: 't', kind: 'note', text: 'x' }]);
   });

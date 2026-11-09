@@ -11,6 +11,7 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import type {
   ImprovementProposalView,
+  LiveSessionView,
   PersonaImprovementsView,
   PersonaMemoryView,
   PersonaPatch,
@@ -113,6 +114,17 @@ export function snippetOf(text: string): string {
   return text.length > CARD_SNIPPET_CAP ? `${text.slice(0, CARD_SNIPPET_CAP)}…` : text;
 }
 
+/** req-173: one line per live session of the persona — its kind and the folder it works in. */
+export function sessionRowsOf(
+  sessions: readonly LiveSessionView[],
+  t: (key: string, params?: Record<string, string>) => string,
+): readonly { readonly id: string; readonly text: string }[] {
+  return sessions.map((session) => ({
+    id: session.runId,
+    text: t('mission.session.line', { kind: t(`mission.session.kind.${session.kind === '1:1' ? 'one_on_one' : session.kind}`), directory: session.directory }),
+  }));
+}
+
 /** The ` · HH:MM` stamp a message's who-line shows; '' when the stamp is unusable. */
 /** req-168: the key and params of the 1:1's session line; null while no session starts, answers or stands held. */
 export function oneOnOneLineOf(thread: PersonaThreadView | null, name: string, time: (date: Date) => string): { readonly key: string; readonly params: Record<string, string> } | null {
@@ -184,6 +196,8 @@ export interface PersonaFacts {
   readonly pool?: readonly string[];
   /** The carried skill files; absent when the adapter omits them. */
   readonly skills?: readonly string[];
+  /** req-173: the live sessions that are not ticket runs; absent when the adapter omits them. */
+  readonly liveSessions?: readonly LiveSessionView[];
 }
 
 /** The persona detail's tabs — the conversation (`chat`, labelled 1:1) carries the improvement drafts, the thread and the composer in one place (D8). */
@@ -427,6 +441,11 @@ export class PersonaDetail {
 
   /** req-168: the session behind the 1:1 as one quiet line; null while none runs or waits. */
   protected readonly sessionLine = computed(() => oneOnOneLineOf(this.thread(), this.title(), (date) => this.i18n.formatTime(date)));
+
+  /** req-173: the live sessions of the persona, each with its kind and directory. */
+  protected readonly sessionRows = computed(() =>
+    sessionRowsOf(this.persona()?.liveSessions ?? [], (key, params) => this.i18n.t(key as never, params as never)),
+  );
 
   /** req-168: the persona's own proposal cards (instructions, a skill), adopted only on Accept. */
   protected readonly threadProposals = computed(() => this.thread()?.proposals ?? []);

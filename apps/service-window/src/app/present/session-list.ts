@@ -32,17 +32,29 @@ export function isOneToOne(run: SessionRun): boolean {
   return run.kind === '1:1' || run.interactive;
 }
 
-/** `T-0121 · build · Ben`, or `1:1 · Ben` for a persona's 1:1 (and an interactive dialog). */
+/** A session in the owner's sense (R12): a 1:1, a free session, a shape session — anything that is not a ticket run. */
+export function isSession(run: SessionRun): boolean {
+  return run.kind !== 'run' || run.interactive;
+}
+
+/** `T-0121 · build · Ben`; `1:1 · Ben` / `free · Ben` for the sessions (an interactive dialog draws as a 1:1). */
 export function sessionTitle(i18n: I18n, run: SessionRun): string {
   const persona = run.persona === null ? null : capitalize(run.persona);
   if (isOneToOne(run)) {
     return persona === null ? run.ticketId : i18n.t('service_window.sessions.one_to_one', { persona });
   }
+  if (run.kind === 'free' || run.kind === 'shape') {
+    const key = run.kind === 'free' ? 'service_window.sessions.free' : 'service_window.sessions.shape';
+    return persona === null ? run.ticketId : i18n.t(key, { persona });
+  }
   return joinParts([run.ticketId, run.phase, persona]);
 }
 
 function activityPart(i18n: I18n, run: SessionRun, nowMs: number): string {
-  // Board 8b: a held 1:1 says when its idle release falls.
+  if (run.sessionState === 'queued') {
+    return i18n.t('service_window.sessions.state.queued');
+  }
+  // Board 8b: a held session says when its idle release falls.
   if (run.held && run.releaseAt !== null && run.turn !== 'busy') {
     return i18n.t('service_window.sessions.releases_in', { span: spanUntil(i18n, run.releaseAt, nowMs) });
   }
@@ -86,7 +98,7 @@ export function sessionList(i18n: I18n, runs: readonly SessionRun[], nowMs: numb
   return {
     summary: joinParts([
       i18n.t('service_window.sessions.count', { count: live.length }),
-      i18n.t('service_window.sessions.runs', { count: live.filter((run) => !isOneToOne(run)).length }),
+      i18n.t('service_window.sessions.runs', { count: live.filter((run) => !isSession(run)).length }),
       i18n.t('service_window.sessions.held', { count: live.filter((run) => run.held).length }),
     ]),
     live: live.map((run) => rowOf(i18n, run, nowMs)),

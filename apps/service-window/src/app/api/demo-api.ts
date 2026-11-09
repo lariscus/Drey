@@ -3,6 +3,9 @@ import type {
   ComponentAction,
   ComponentId,
   LogLine,
+  NewSessionAsk,
+  NewSessionOptionsReply,
+  NewSessionReply,
   RunAction,
   ServiceSnapshot,
   ServiceWindowApi,
@@ -11,7 +14,7 @@ import type {
   SessionRun,
   StreamEvent,
 } from '../../../../../shared/service-window/contract';
-import { DEMO_INSTRUCTION, demoLog, demoRuns, demoSnapshot, demoStream } from './demo-data';
+import { DEMO_INSTRUCTION, demoLog, demoRuns, demoSessionOptions, demoSnapshot, demoStream } from './demo-data';
 
 const OK: ActionReply = { ok: true };
 
@@ -62,6 +65,20 @@ export class DemoServiceWindowApi implements ServiceWindowApi {
   openDrey(): Promise<void> {
     this.calls.push('openDrey');
     return Promise.resolve();
+  }
+
+  sessionOptions(): Promise<NewSessionOptionsReply> {
+    return Promise.resolve(demoSessionOptions());
+  }
+
+  sessionStart(ask: NewSessionAsk): Promise<NewSessionReply> {
+    this.calls.push(`sessionStart:${ask.persona}:${ask.directory}`);
+    return Promise.resolve({ ok: true, runId: 'S-ben-free' });
+  }
+
+  pickFolder(): Promise<string | null> {
+    this.calls.push('pickFolder');
+    return Promise.resolve('E:\\projects\\notes');
   }
 
   quitService(): Promise<ActionReply> {

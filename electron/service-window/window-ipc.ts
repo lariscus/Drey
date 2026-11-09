@@ -15,6 +15,7 @@ import { i18n } from '../../shared/i18n';
 import type { Confirmations } from './confirmations';
 import type { DreyLauncher } from './drey-launcher';
 import type { ServiceCalls } from './service-calls';
+import { newSessionAskOf } from './new-session-ask';
 import { isLive, logLineOf, sessionsOf, streamEventsOf } from './snapshot-map';
 import type { SnapshotSource } from './snapshot-source';
 import type { ServiceWindowController } from './window-controller';
@@ -58,6 +59,12 @@ export class WindowIpc {
     this.handle(CH.copyAttach, (runId) => this.copyAttach(runId));
     this.handle(CH.openWorktree, (runId) => this.openWorktree(runId));
     this.handle(CH.openDrey, async () => this.deps.drey.open());
+    this.handle(CH.sessionOptions, () => calls.sessionOptions());
+    this.handle(CH.sessionStart, async (ask) => {
+      const checked = newSessionAskOf(ask);
+      return checked === null ? { ok: false, error: i18n.t('service_tray.error.bad_request') } : calls.sessionStart(checked);
+    });
+    this.handle(CH.pickFolder, () => this.deps.confirmations.pickFolder());
     this.handle(CH.quitService, () => this.quitService());
     ipcMain.on(CH.windowControl, (event, action: unknown) => {
       const win = this.deps.window.current;
@@ -109,7 +116,10 @@ export class WindowIpc {
   private async openWorktree(runId: unknown): Promise<ActionReply> {
     const id = runIdOf(runId);
     const run = id === null ? undefined : (await this.deps.calls.runs()).find((r) => r['id'] === id);
-    const dir = typeof run?.['worktreePath'] === 'string' ? run['worktreePath'] : '';
+    // A 1:1 or a free session has a directory, not a worktree (R12): open the folder it works in.
+    const explicit = run?.['workingDirectory'];
+    const worktree = run?.['worktreePath'];
+    const dir = typeof explicit === 'string' && explicit !== '' ? explicit : typeof worktree === 'string' ? worktree : '';
     if (dir === '') {
       return { ok: false, error: i18n.t('service_tray.error.no_worktree') };
     }

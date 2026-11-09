@@ -5,6 +5,7 @@
  */
 import type {
   LogLine,
+  NewSessionOptionsReply,
   ServiceSnapshot,
   SessionRun,
   StreamEvent,
@@ -73,6 +74,7 @@ function baseRun(): Omit<SessionRun, 'id' | 'ticketId' | 'persona' | 'worktreePa
     held: false,
     interactive: false,
     kind: 'run',
+    sessionState: 'running',
     workingDirectory: '',
     releaseAt: null,
     origin: 'chain',
@@ -98,6 +100,25 @@ function endedRun(index: number): SessionRun {
     pid: null,
     endedAt: today('08:20:00'),
     turns: 4,
+  };
+}
+
+/** The New session form's offer: the tickets repository, two repos, three classes. */
+export function demoSessionOptions(): NewSessionOptionsReply {
+  return {
+    ok: true,
+    personas: [
+      { id: 'ben', title: 'Ben', worker: 'claude-code' },
+      { id: 'tessa', title: 'Tessa', worker: 'opencode' },
+    ],
+    classes: ['A', 'B', 'C'],
+    ticketsVault: 'E:\\projects\\drey-tickets',
+    repos: [
+      { name: 'drey', path: 'E:\\projects\\Drey' },
+      { name: 'notes', path: 'E:\\projects\\notes' },
+    ],
+    permissionMode: 'accept-edits',
+    defaultPersona: 'ben',
   };
 }
 
@@ -149,13 +170,32 @@ export function demoRuns(): readonly SessionRun[] {
     lastActivity: minutesAgo(4),
     held: true,
     kind: '1:1',
+    sessionState: 'held',
     releaseAt: new Date(Date.parse(minutesAgo(4)) + 15 * 60_000).toISOString(),
     origin: 'drey:1:1',
     permission: 'read-only',
     worktreePath: 'E:\\projects\\drey-tickets',
   };
-  // R12: the directory is explicit on every record — a run's worktree, the 1:1's tickets repository.
-  return [tessa, ben, oneToOne, ...Array.from({ length: 7 }, (_, index) => endedRun(index))].map((run) => ({ ...run, workingDirectory: run.worktreePath }));
+  const free: SessionRun = {
+    ...baseRun(),
+    id: 'S-ben-free',
+    ticketId: 'free',
+    persona: 'ben',
+    phase: null,
+    pid: 19340,
+    startedAt: today('08:12:40'),
+    lastActivity: minutesAgo(2),
+    held: true,
+    kind: 'free',
+    sessionState: 'held',
+    releaseAt: new Date(Date.parse(minutesAgo(2)) + 15 * 60_000).toISOString(),
+    origin: 'drey:crew',
+    permission: 'accept-edits',
+    worktreePath: '',
+    workingDirectory: 'E:\\projects\\notes',
+  };
+  // R12: the directory is explicit on every record — a run's worktree, a session's own folder.
+  return [tessa, ben, oneToOne, free, ...Array.from({ length: 7 }, (_, index) => endedRun(index))].map((run) => ({ ...run, workingDirectory: run.workingDirectory === '' ? run.worktreePath : run.workingDirectory }));
 }
 
 export function demoStream(): readonly StreamEvent[] {

@@ -1,0 +1,59 @@
+@if (state.draft(); as draft) {
+  @if (state.options(); as options) {
+    <label class="fl">
+      <span class="k">{{ 'service_window.new_session.persona' | t }}</span>
+      <select class="field" (change)="state.patch({ persona: value($event) })">
+        @for (persona of options.personas; track persona.id) {
+          <option [value]="persona.id" [selected]="persona.id === draft.persona">{{ persona.title }}</option>
+        }
+      </select>
+    </label>
+    <label class="fl">
+      <span class="k">{{ 'service_window.new_session.folder' | t }}</span>
+      <select class="field" (change)="state.patch({ folder: value($event) })">
+        @for (folder of folders(); track folder.value) {
+          <option [value]="folder.value" [selected]="folder.value === draft.folder">{{ folder.label }}</option>
+        }
+      </select>
+    </label>
+    <div class="fl">
+      <span class="k"></span>
+      <input
+        class="field"
+        type="text"
+        [value]="draft.typedFolder"
+        [attr.aria-label]="'service_window.new_session.typed' | t"
+        (input)="state.patch({ typedFolder: value($event) })"
+      />
+      <button type="button" class="sw-btn" (click)="state.browse()">{{ 'service_window.new_session.browse' | t }}</button>
+    </div>
+    <label class="fl">
+      <span class="k">{{ 'service_window.new_session.class' | t }}</span>
+      <select class="field" (change)="setClass(value($event))">
+        <option value="" [selected]="draft.poolClass === ''">{{ 'service_window.new_session.class_auto' | t }}</option>
+        @for (poolClass of options.classes; track poolClass) {
+          <option [value]="poolClass" [selected]="poolClass === draft.poolClass">{{ poolClass }}</option>
+        }
+      </select>
+    </label>
+    <label class="fl">
+      <span class="k">{{ 'service_window.new_session.permission' | t }}</span>
+      <select class="field" (change)="setPermission(value($event))">
+        @for (permission of permissions(); track permission.value) {
+          <option [value]="permission.value" [selected]="permission.value === draft.permission">{{ permission.label }}</option>
+        }
+      </select>
+    </label>
+    <label class="fl top">
+      <span class="k">{{ 'service_window.new_session.first_line' | t }}</span>
+      <textarea class="field area" rows="3" [value]="draft.firstLine" (input)="state.patch({ firstLine: value($event) })"></textarea>
+    </label>
+  }
+}
+@if (state.error(); as message) {
+  <div class="error" role="alert">{{ message }}</div>
+}
+<div class="actions">
+  <button type="button" class="sw-btn" (click)="state.cancel()">{{ 'service_window.new_session.cancel' | t }}</button>
+  <button type="button" class="start" [disabled]="!state.canStart()" (click)="state.start()">{{ 'service_window.new_session.start' | t }}</button>
+</div>

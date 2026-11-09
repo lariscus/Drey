@@ -1,4 +1,12 @@
-<div class="summary">{{ list().summary }}</div>
+<div class="head">
+  <span class="summary">{{ list().summary }}</span>
+  <button type="button" class="sw-icon-btn" [title]="'service_window.new_session.title' | t" [attr.aria-label]="'service_window.new_session.title' | t" (click)="newSession.show()">
+    <sw-icon name="plus" />
+  </button>
+</div>
+@if (newSession.open()) {
+  <sw-new-session />
+}
 @for (row of list().live; track row.id) {
   <div class="sx" [class.selected]="row.id === state.selectedId()">
     <button type="button" class="main" (click)="state.select(row.id)">

@@ -217,6 +217,9 @@
                 @if (sessionLine(); as line) {
                   <p class="session-line">{{ line.key | t: line.params }}</p>
                 }
+                @for (row of sessionRows(); track row.id) {
+                  <p class="session-line">{{ row.text }}</p>
+                }
                 @for (card of cards(); track card.id) {
                   <div class="msg me">
                     @if (card.kind === 'ticket') {

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_LOCALE, createI18n, loadCatalog } from '../../../../../shared/i18n';
 import type { StreamEvent } from '../../../../../shared/service-window/contract';
-import { demoRuns, demoSnapshot, demoStream } from '../api/demo-data';
+import { demoRuns, demoSessionOptions, demoSnapshot, demoStream } from '../api/demo-data';
 import { idLine, processRows, sessionFacts } from './session-facts';
+import { folderChoices } from './new-session-form';
 import { sessionList, sessionTitle } from './session-list';
 import { mcpStats, rawRows, streamRows, toolRows } from './stream-rows';
 
@@ -14,16 +15,17 @@ describe('sessionList', () => {
   const list = sessionList(i18n, runs, Date.now());
 
   it('summarises sessions, runs and held', () => {
-    expect(list.summary).toBe('3 sessions · 2 runs · 1 held');
+    expect(list.summary).toBe('4 sessions · 2 runs · 2 held');
     expect(list.endedCount).toBe(7);
   });
   it('titles and details the live rows', () => {
-    expect(list.live.map((row) => row.title)).toEqual(['T-0126 · test · Tessa', 'T-0121 · build · Ben', '1:1 · Ben']);
+    expect(list.live.map((row) => row.title)).toEqual(['T-0126 · test · Tessa', 'T-0121 · build · Ben', '1:1 · Ben', 'free · Ben']);
     expect(list.live[0]?.detail).toBe('opencode · qwen3-coder · turn 6 · 9 min quiet');
     expect(list.live[1]?.detail).toBe('claude-code · sonnet · turn 3 · writing');
     // Board 8b: a held 1:1 says when its idle release falls.
     expect(list.live[2]?.detail).toMatch(/^claude-code · sonnet · held · releases in 1[01] min$/);
-    expect(list.live.map((row) => row.dot)).toEqual(['running', 'running', 'held']);
+    expect(list.live[3]?.detail).toMatch(/^claude-code · sonnet · held · releases in 1[2-3] min$/);
+    expect(list.live.map((row) => row.dot)).toEqual(['running', 'running', 'held', 'held']);
     expect(list.live[2]?.buttonLabel).toBe('Release 1:1 · Ben');
   });
   it('marks failed ended runs red', () => {
@@ -38,6 +40,23 @@ describe('sessionList', () => {
   it('names the directory of a 1:1 instead of a worktree (R12)', () => {
     const rows = processRows(i18n, runs[2]!);
     expect(rows.find((row) => row.label === 'Directory')?.value).toBe(runs[2]!.workingDirectory);
+    expect(rows.some((row) => row.label === 'Worktree')).toBe(false);
+  });
+  it('titles a free session by its kind and counts it with the 1:1s, not the runs (req-173)', () => {
+    const free = runs[3]!;
+    expect(free.kind).toBe('free');
+    expect(sessionTitle(i18n, free)).toBe('free · Ben');
+    expect(sessionList(i18n, [free], Date.now()).summary).toBe('1 session · 0 runs · 1 held');
+    expect(sessionList(i18n, [free], Date.now()).live[0]?.buttonLabel).toBe('Release free · Ben');
+    expect(sessionTitle(i18n, { ...free, kind: 'shape' })).toBe('shape · Ben');
+  });
+  it('says queued while a session has no worker yet', () => {
+    const queued = { ...runs[3]!, state: 'starting' as const, held: false, sessionState: 'queued' as const, releaseAt: null };
+    expect(sessionList(i18n, [queued], Date.now()).live[0]?.detail).toBe('claude-code · sonnet · queued');
+  });
+  it('names the directory of a free session too', () => {
+    const rows = processRows(i18n, runs[3]!);
+    expect(rows.find((row) => row.label === 'Directory')?.value).toBe('E:\\projects\\notes');
     expect(rows.some((row) => row.label === 'Worktree')).toBe(false);
   });
   it('titles an interactive run without a persona by its ticket', () => {
@@ -111,5 +130,16 @@ describe('stream rows', () => {
   });
   it('counts MCP calls, refusals and servers', () => {
     expect(mcpStats(demoStream())).toEqual({ calls: 2, refused: 1, servers: ['drey'] });
+  });
+});
+
+describe('folderChoices', () => {
+  it('offers the tickets repository first, then the repositories', () => {
+    const options = demoSessionOptions();
+    if (!options.ok) {
+      throw new Error('demo options');
+    }
+    expect(folderChoices(i18n, options).map((choice) => choice.label)).toEqual(['Tickets repository · drey-tickets', 'drey', 'notes']);
+    expect(folderChoices(i18n, options)[0]?.value).toBe(options.ticketsVault);
   });
 });
