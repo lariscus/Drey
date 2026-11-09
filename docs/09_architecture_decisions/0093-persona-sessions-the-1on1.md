@@ -147,3 +147,7 @@ better".
    one envelope per reply).
 5. The idle span is fixed at 15 minutes (`shared/session-lifecycle.ts`);
    its setting is req-219.
+
+## Later change (2026-11-09 — milestone 230, req-173): the 1:1 is one kind of held session
+
+`OneOnOneStarter` became `HeldSessionStarter` with a kind per held session — `OneOnOneKind` (one live 1:1 per persona, the tickets repository, read-only, its chat file) and req-173's `FreeSessionKind`; the 1:1's behaviour is unchanged. Its record is a session record (ADR-0092 later change): kind `1:1`, the tickets repository as its working directory, state `held` while it waits for the owner's next line. The idle span is one constant for every held session (`HELD_SESSION_IDLE_MS` = `ONE_ON_ONE_IDLE_MS`, req-219).

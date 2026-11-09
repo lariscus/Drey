@@ -34,7 +34,9 @@ The runner's port and token are in the service home's `service.lock`, under
 ```
 <fleet root>/                 (machine state; runner owned)
 ├── runner.log      the daemon log (every dispatch decision; ring-capped ~512 KB)
-├── chain.json      persisted chain state (only on daemon builds)
+├── chains/<vault key>/chain.json  the chain's runtime state, one per tickets vault (req-173)
+├── chain-vault.json  which vault the chain served last (the boot reads that vault's file)
+├── chain.legacy.json the machine-wide chain.json of a runner before req-173, kept for the key migration
 ├── runs/<run-id>/
 │   ├── run.json    the full record: {request, info}
 │   ├── stream.jsonl the run's output events (ndjson)
@@ -471,10 +473,25 @@ The caps are the plugin config keys `fleet.cap.gateFailureLines` /
 tail and 50/4096 head). Each application is logged:
 `instruction: <ticket> gateFailure truncated: true, originalSize 9821`.
 
-### chain.json fields (daemon builds)
+### chain.json fields (one per tickets vault, req-173)
 
-`config` (tickets vault path, git, defaultWorker, permissionMode, caps,
-handover thresholds, `tranche` — req-179) · `autopilot` (`{state: on | paused | off, resumeAt?, reason?}`,
+`<fleet root>/chains/<vault key>/chain.json` — the key is the vault
+folder's name and a hash of its normalized path (`drey-tickets-1a2b3c4d`,
+`orchestrate/chain-state-paths.ts`), so two vaults never share a master,
+an Autopilot or a breaker. **Runtime state only — no configuration:** the
+board sends the resolved chain config (`_meta/crew.md` over the defaults,
+the three layers below) and the runner holds it in memory; a runner that
+boots with a vault in `chain-vault.json` resolves that vault's
+`_meta/crew.md` itself (`config/chain-config-restorer.ts`), so a handover
+keeps working with Drey closed. When the board points the chain at another
+vault, the current state is written to its file, the state emptied, and
+the other vault's file loaded under the boot rule (Off unless a fresh
+handover). A machine-wide `chain.json` from before req-173 is moved into
+its vault's file on the first boot (its `config` dropped) and kept as
+`chain.legacy.json`.
+
+`vault` (the locator: tickets vault path, store, git — how this machine
+reaches the vault; not configuration) · `autopilot` (`{state: on | paused | off, resumeAt?, reason?}`,
 the owner's switch; the runner resumes a Paused at its time; `reason:
 checkpoint` when the runner paused it at a tranche's end) · `master`
 (`run` / `halted`, derived from it: On runs, Paused and Off halt) · `columns`
@@ -993,7 +1010,7 @@ A persona's 1:1 is a run record with `kind: '1:1'` (`fleet/protocol-session.ts`)
 
 - **The start** — `POST /start` with a request whose `session` is
   `{kind: '1:1', persona, workingDirectory, chatFile}` goes to
-  `OneOnOneStarter` instead of the ticket starter: `ticketId` is the marker
+  `HeldSessionStarter` (kind `OneOnOneKind`, req-173) instead of the ticket starter: `ticketId` is the marker
   `1:1`, no `dk` (no claim), no worktree, `gate: 'none'`, no move,
   `permissionMode: 'read-only'`, `column: null`. The pool binds it like a
   run (slot, class of the persona's default model, the persona's and the
@@ -1023,6 +1040,54 @@ A persona's 1:1 is a run record with `kind: '1:1'` (`fleet/protocol-session.ts`)
 - **Seeing it** — `GET /status` lists it with `kind`, `persona`,
   `workingDirectory`, `chatFile`, `held`, `turn`, `costUsd`; the service
   window's Sessions tab draws `1:1 · <Name>` — `held · releases in <span>`.
+
+## Free sessions (req-173, R12)
+
+A free session is a run record with `kind: 'free'`: a persona at work in a
+folder the owner named, no ticket. The engine builds it
+(`services/free-session-service.ts`, invoke `sessionStart`; the service
+window, the Crew tab and Pia's confirmed `startSession` card all call it):
+
+- **The directory** — `fleet/session/session-directory-rule.ts`: an
+  existing local absolute folder; **the tickets vault itself is allowed**;
+  refused are a relative path, a network share, a folder inside `.git` and
+  the worktree of a live ticket run.
+- **The request** — `fleet/free-session-request.ts`: the persona's harness;
+  the model and class from the layers (the session's pin and class over the
+  persona's model; no class asked = the model table's class of that
+  model); `permissionMode` the session's override over the vault's
+  `permission-mode` (the 1:1's read-only rule does not apply); `ticketId`
+  the marker `free`, `worktreePath` = `repoPath` = the folder, `gate:
+  'none'`, `ledger.noTicket`; `profile` the profile of the repository the
+  folder lies in (`repos.md`), else `private`. The brief
+  (`fleet/free-session-brief.ts`, `specs/classifier-spec.md` "The free
+  session brief"): who the persona is, the folder, what the mode allows,
+  and — in the tickets vault — that its ticket files are the board's.
+- **The start** — `HeldSessionStarter` (kind `FreeSessionKind`): the pool's
+  grant, the worker **quiet and held** in the folder, several free sessions
+  of one persona may stand at once. The owner's first line (the form's, or
+  the card's `brief`) is sent at once and wraps the brief.
+- **The release** — like a 1:1: `IdleRelease` after 15 idle minutes
+  (`HELD_SESSION_IDLE_MS`), or the worker's own end (`free session ended`);
+  it never reopens in place, writes no memory line and no ticket.
+- **Seeing it** — `GET /status` and `GET /sessions` (the session records:
+  kind, persona, harness, model, class, working directory, state, token
+  reference, ledgers, stream); the service window's Sessions tab draws
+  `free · <Name>` with its directory.
+
+## The three configuration layers (req-173, R13)
+
+| Layer | Where | Holds |
+|---|---|---|
+| Machine | `service.json` in the service home (`fleet/routing/service-config-schema.ts`, read and written only through `ServiceConfigFile`), and for now the engine's `config.json` for Drey's mirrored device settings (`service.*`, `remote.*`, `chat.*`, `gitPath`, `dk.*` — req-231 folds them in) | the model table, the capacity cap, slots, providers and keys, paths, autostart |
+| Vault | `tickets/_meta/crew.md` (`specs/ticket-schema.md`), beside `pipeline.md`, `personas/` and `repos.md` | default persona, default worker, permission mode, caps, handover thresholds, tranche |
+| Session | the session record (`RunRequest` / `RunInfo`) | directory, class, model pin, handover mode, permission override |
+
+Precedence, enforced by `fleet/config/layered-config-resolver.ts`:
+**session > vault > built-in default**; a machine key is set only in the
+machine layer and never overridden. The one-time migration of the vault
+keys from `config.json` and the old `chain.json`: `specs/ticket-schema.md`
+("`_meta/crew.md`").
 
 ## Lifecycle gotchas
 
