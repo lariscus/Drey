@@ -34,6 +34,8 @@ export interface McPersonaView {
   readonly pool: readonly string[];
   /** `#rrggbb`; drives the avatar background. */
   readonly color: string;
+  /** The persona's one line for the crew list (`summary:`, req-144); absent = none. */
+  readonly summary?: string;
   /**
    * The persona's daily budget in dollars (frontmatter `budget:`,
    * concept §4.3); null = none set (or junk on the wire — never a guess).
@@ -513,7 +515,7 @@ export class Team {
 
   protected roleLineOf(persona: McTeamPersona): string {
     const phases = (persona.phases ?? []).join(', ');
-    return [persona.role, phases].filter((bit) => bit !== '').join(' · ');
+    return [persona.summary ?? persona.role, phases].filter((bit) => bit !== '').join(' · ');
   }
 
   /** The card's state: running, waiting, stuck, paused. */

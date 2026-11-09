@@ -528,3 +528,20 @@ describe('the human persona on the Team page (E10-6)', () => {
     expect(owner!.textContent).not.toContain('Pause');
   });
 });
+
+describe('the persona one-liner on the crew card (req-144, R11)', () => {
+  function cardText(persona: McTeamPersona): string {
+    TestBed.resetTestingModule();
+    const state: McTeamState = { team: signal([persona]), openPersona: () => undefined, personaPause: () => undefined };
+    TestBed.configureTestingModule({ providers: [{ provide: MC_TEAM_STATE, useValue: state }] });
+    const fixture = TestBed.createComponent(Team);
+    fixture.detectChanges();
+    return (fixture.nativeElement as HTMLElement).querySelector('.card')!.textContent ?? '';
+  }
+
+  it('draws the one line where the persona has one, the role where it has not', () => {
+    expect(cardText({ ...PIA, summary: 'Plans one part at a time.' })).toContain('Plans one part at a time.');
+    expect(cardText({ ...PIA, summary: 'Plans one part at a time.' })).not.toContain('Planner');
+    expect(cardText(PIA)).toContain('Planner');
+  });
+});

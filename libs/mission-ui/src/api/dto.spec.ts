@@ -557,6 +557,20 @@ describe('parseTeam — live runs and capacity (E12-4)', () => {
   });
 });
 
+describe('parseTeam: the one line (req-144)', () => {
+  it('keeps a persona summary and leaves the key out when there is none', () => {
+    const team = parseTeam(
+      [
+        { id: 'pia', title: 'Pia', role: 'planner', summary: 'Plans one part at a time.' },
+        { id: 'ben', title: 'Ben', role: 'builder', summary: '  ' },
+      ],
+      { runs: [] },
+    );
+    expect(team.personas[0]!.summary).toBe('Plans one part at a time.');
+    expect('summary' in team.personas[1]!).toBe(false);
+  });
+});
+
 describe('parseTeam', () => {
   const personas = [
     {

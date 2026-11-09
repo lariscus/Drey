@@ -295,7 +295,7 @@
               }}</span>
               <span class="pwho">
                 <span class="pname">{{ persona.title }}</span>
-                <span class="prole">{{ persona.role }}{{ phasesFootOf(persona) ? ' · ' + phasesFootOf(persona) : '' }}</span>
+                <span class="prole">{{ persona.summary ?? persona.role }}{{ phasesFootOf(persona) ? ' · ' + phasesFootOf(persona) : '' }}</span>
               </span>
               <span class="pstat">
                 <span class="led" [class]="'led ' + dotClass(persona)" aria-hidden="true"></span>
