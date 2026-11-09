@@ -35,6 +35,15 @@ describe('the Autopilot item', () => {
     expect(autopilotSlotOf('off', t)).toEqual({ text: 'Autopilot · Off', tooltip: 'Autopilot: Off (Mod+Alt+P)' });
     expect(autopilotSlotOf(null, t).text).toBe('');
   });
+
+  it('names the tranche in the tooltip when it has a run limit (board 10t), the text unchanged', () => {
+    expect(autopilotSlotOf('on', t, { done: 4, total: 10 })).toEqual({
+      text: 'Autopilot · On',
+      tooltip: 'Autopilot: On · tranche 4 of 10 (Mod+Alt+P)',
+      dot: 'positive',
+    });
+    expect(autopilotSlotOf('on', t, { done: 4, total: null }).tooltip).toBe('Autopilot: On (Mod+Alt+P)');
+  });
 });
 
 describe('createStatusSlots', () => {

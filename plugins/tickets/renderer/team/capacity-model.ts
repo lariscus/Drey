@@ -3,11 +3,11 @@
  * The Capacity band's pure model (board 7e, milestone 218): the header
  * value, the Slots row's chips and the Tranche-and-queue row. DOM-free, so
  * the band and its spec share it. The chips read the chain status's
- * `slots` (req-177); the queue reads the board; the tranche has no engine
- * source yet (req-179), so its reader is a seam that returns nothing.
+ * `slots` (req-177) and `tranche` (req-179); the queue reads the board.
  */
 import type { ChainStatus, QuotaReliability, RunInfo, SlotStateName, SlotSummary } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { I18n } from '../../../../shared/i18n/types';
+import { trancheMsLeftOf, trancheProgressOf, trancheViewOf } from '../../../../shared/tranche';
 import { DEFAULT_PRIORITY_CONFIG, priorityClass, type BoardSnapshot } from '../../shared/tickets';
 import { workGroups } from '../work-groups';
 import { isLiveRun } from './team-model';
@@ -92,21 +92,37 @@ export function resetTextOf(resetsAt: Date, now: Date, locale: string): string {
   return new Intl.DateTimeFormat(locale, options).format(resetsAt);
 }
 
-/** A tranche as the row's left part draws it (req-179, board 10t's counters). */
+/** A tranche as the row's left part draws it (req-179, board 10t's counters); a null limit is one the tranche does not have. */
 export interface TrancheModel {
-  /** Runs released so far in this tranche, and the tranche's size. */
+  readonly index: number;
+  /** Runs finished in this tranche, and the tranche's run limit. */
   readonly runs: number;
-  readonly size: number;
+  readonly size: number | null;
   readonly cost: number;
-  readonly budget: number;
-  /** What is left until the checkpoint: whichever of runs, share or time comes first. */
-  readonly runsLeft: number;
-  readonly msLeft: number;
+  readonly budget: number | null;
+  /** What is left until the checkpoint, per limit. */
+  readonly runsLeft: number | null;
+  readonly msLeft: number | null;
+  /** The bar: how far the limit nearest its end is (0-1). */
+  readonly progress: number;
 }
 
-/** The tranche part of the row. The chain status carries none until req-179, so the part stays empty. */
-export function trancheOf(_chain: ChainStatus | null): TrancheModel | null {
-  return null;
+/** The tranche part of the row; null without a tranche, and while its checkpoint waits (the card carries that). */
+export function trancheOf(chain: ChainStatus | null, now: Date = new Date()): TrancheModel | null {
+  const view = trancheViewOf(chain);
+  if (view === null || view.checkpoint === 'waiting') {
+    return null;
+  }
+  return {
+    index: view.index,
+    runs: view.done,
+    size: view.total,
+    cost: view.spent,
+    budget: view.budget,
+    runsLeft: view.total === null ? null : Math.max(0, view.total - view.done),
+    msLeft: trancheMsLeftOf(view, now),
+    progress: trancheProgressOf(view, now),
+  };
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatSession } from '../../../../packages/tickets-engine/src/contracts/chat';
-import { errorMessageOf, threadOfPersona, threadOfSession, VIA_MISSION_CONTROL } from './map';
+import { errorMessageOf, threadOfPersona, threadOfSession, trancheMessageOf, VIA_MISSION_CONTROL, withTrancheMessage } from './map';
 
 const base: ChatSession = {
   file: 'tickets/_meta/chat/20261104-100000-demo.md',
@@ -122,5 +122,65 @@ describe('threadOfPersona', () => {
   it('turns a failed read into an error message', () => {
     const thread = threadOfPersona('ben', 'Ben', { ok: false, error: 'no such persona' });
     expect(thread.messages[0]?.error?.lines).toEqual(['no such persona']);
+  });
+});
+
+describe('trancheMessageOf (board 10u parts 1 and 6, SDK 1.55)', () => {
+  const card = {
+    id: 'tranche-1-2026-11-09T14:02:00.000Z',
+    kind: 'checkpoint' as const,
+    tone: 'attention' as const,
+    title: 'Checkpoint · tranche 1 of 3 done',
+    body: null,
+    metrics: [
+      { label: 'Gate rate', value: '7 of 8', sub: 'green', inline: true },
+      { label: 'Cost per run', value: '$0.41', sub: 'median · $1.20 max', inline: false },
+      { label: 'Cost', value: 'Not known', sub: '', inline: false },
+    ],
+    rows: [],
+    summary: 'Autopilot paused · 10 runs · $4.10 · 2 h 10 min',
+    at: '2026-11-09T14:02:00.000Z',
+    actions: [
+      { id: 'release' as const, label: 'Release next tranche', primary: true },
+      { id: 'adjust' as const, label: 'Adjust…', primary: false },
+    ],
+  };
+
+  it('maps the card model onto the SDK card, the summary as the note and the time as the meta line', () => {
+    const message = trancheMessageOf(card, 'Mission Control · 14:02');
+    expect(message).toMatchObject({ id: card.id, role: 'agent', text: '' });
+    expect(message.cards).toEqual([
+      {
+        id: card.id,
+        kind: 'card',
+        title: 'Checkpoint · tranche 1 of 3 done',
+        dot: 'attention',
+        text: '',
+        metrics: [
+          { label: 'Gate rate', value: '7 of 8', sub: 'green', inline: true },
+          { label: 'Cost per run', value: '$0.41', sub: 'median · $1.20 max', inline: false },
+          { label: 'Cost', value: 'Not known' },
+        ],
+        note: 'Autopilot paused · 10 runs · $4.10 · 2 h 10 min',
+        actions: [
+          { id: 'release', label: 'Release next tranche', tone: 'primary' },
+          { id: 'adjust', label: 'Adjust…', tone: 'quiet' },
+        ],
+        meta: 'Mission Control · 14:02',
+      },
+    ]);
+  });
+
+  it('carries an early stop as body and red rows, without a note', () => {
+    const early = { ...card, kind: 'early' as const, tone: 'negative' as const, body: '3 of the last 6 gates were red.', metrics: [], rows: ['T-0119 · build · Ben · red twice'], summary: null };
+    expect(trancheMessageOf(early, 'm').cards![0]).toMatchObject({ dot: 'negative', text: '3 of the last 6 gates were red.', rows: [{ text: 'T-0119 · build · Ben · red twice', dot: 'negative' }] });
+    expect(trancheMessageOf(early, 'm').cards![0]).not.toHaveProperty('note');
+    expect(trancheMessageOf(early, 'm').cards![0]).not.toHaveProperty('metrics');
+  });
+
+  it('appends the message to the thread, and leaves the thread alone without one', () => {
+    const thread = { id: 'x', title: 'Demo', messages: [] };
+    expect(withTrancheMessage(thread, null)).toBe(thread);
+    expect(withTrancheMessage(thread, trancheMessageOf(card, 'm')).messages).toHaveLength(1);
   });
 });

@@ -1048,6 +1048,7 @@
   "capacity.queue.line": "{ticket} queued · waits for a slot · {position}",
   "capacity.queue.position": "{n, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}",
   "capacity.tranche.line": "Tranche {n} of {total, plural, one {# run} other {# runs}} · {cost} of {budget} · checkpoint in {runs, plural, one {# run} other {# runs}} or {time}",
+  "capacity.tranche.line_short": "{shape, select, rb {Tranche {n} of {total, plural, one {# run} other {# runs}} · {cost} of {budget} · checkpoint in {runs, plural, one {# run} other {# runs}}} rt {Tranche {n} of {total, plural, one {# run} other {# runs}} · {cost} · checkpoint in {runs, plural, one {# run} other {# runs}} or {time}} r {Tranche {n} of {total, plural, one {# run} other {# runs}} · {cost} · checkpoint in {runs, plural, one {# run} other {# runs}}} bt {Tranche {index} · {n, plural, one {# run} other {# runs}} · {cost} of {budget} · checkpoint in {time}} b {Tranche {index} · {n, plural, one {# run} other {# runs}} · {cost} of {budget}} t {Tranche {index} · {n, plural, one {# run} other {# runs}} · {cost} · checkpoint in {time}} other {Tranche {index} · {n, plural, one {# run} other {# runs}} · {cost}}}",
 
   "tickets.queue.line": "queued · {reason}",
   "tickets.queue.line_position": "queued · {reason} · {position}",

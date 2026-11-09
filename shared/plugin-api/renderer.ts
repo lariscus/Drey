@@ -98,6 +98,8 @@ export type {
   ToolbarButtonContrib,
   ConversationCard,
   ConversationCardAction,
+  ConversationCardMetric,
+  ConversationCardRow,
   ConversationMessage,
   ConversationTarget,
   ConversationTargetProvider,

@@ -34,7 +34,9 @@ import { THREAD_KEY } from './ticket-page';
 import { PENDING_HINT, dialogStarter } from './dialog-starters';
 import { AUTOPILOT_COMMAND_ID, costSlotOf, createStatusSlots, type StatusSlotController } from './status-slot';
 import { createAutopilotCommand } from './autopilot/command';
+import { writeAutopilot } from './autopilot/controller';
 import { autopilotSwitchViewOf } from '../../../shared/autopilot';
+import { trancheViewOf } from '../../../shared/tranche';
 import { ageWords, checkpointActionOf, crewLineOf, ideaPhaseIds, needKindLabel, queueTargetOf, workGroups, workListSignature } from './work-groups';
 import { readyBarNode, readyCardNode, storyNode } from './ready-view';
 import { stepCardOf } from '../shared/step-card';
@@ -78,7 +80,7 @@ import {
   workerLabelOf,
 } from './worker-status';
 import type { DeskDeps } from './desk-deps';
-import { teamModelOf } from './team/team-model';
+import { teamModelOf, usd } from './team/team-model';
 import { createTeamStore, type TeamStore } from './team/team-store';
 import { createConversationProvider } from './conversation/targets';
 import { mountTeam } from './team/team-view';
@@ -373,6 +375,8 @@ let statusSlots: StatusSlotController | null = null;
 let statusApi: DreyPluginApi | null = null;
 /** Opens or closes the Autopilot popover: what Settings' "Change…" runs (board 7g). */
 let toggleAutopilotPopover: (() => void) | null = null;
+/** Settings → Tickets (a checkpoint's "Adjust…"): the base `settings.open` command names the page; the Autopilot section is not addressable from a plugin yet. */
+const openTicketsSettings = (): void => statusApi?.commands.run('settings.open', { category: 'tickets' });
 /** Whether a tickets vault is open: the Autopilot switch shows only then; a down runner reads as Off (D-51). */
 const hasTicketsVault = (): boolean => snapshot !== null && snapshot.vaultId !== null;
 
@@ -393,6 +397,7 @@ const refreshStatusItem = (): void => {
     // only without a tickets vault.
     autopilot: autopilotSwitchViewOf(hasTicketsVault(), chain)?.state ?? null,
     inNotesView: statusApi.ui.activeViewId() === 'notes',
+    tranche: trancheViewOf(chain),
   });
   // Board 7h: the dot on the Work view's tab while something needs the owner there (SDK 1.50).
   statusApi.ui.setViewBadge(WORK_VIEW_ID, needs > 0);
@@ -3104,6 +3109,8 @@ const plugin: { activate(api: DreyPluginApi): void } = {
         const { text } = costSlotOf(team.todayCost, team.todayBudget, (key, params) => api.i18n.t(key, params));
         return text === '' ? null : text;
       },
+      tranche: () => trancheViewOf(chain),
+      adjust: openTicketsSettings,
       anchor: () => slots.autopilotElement(),
       onOpenChange: (open) => slots.setAutopilotExpanded(open),
     });
@@ -3145,6 +3152,31 @@ const plugin: { activate(api: DreyPluginApi): void } = {
         invoke: (method, payload) => api.backend.invoke(method, payload),
         personas: () => teamStore(api).personas(),
         subscribePersonas: (listener) => teamStore(api).subscribe(listener),
+        tranche: {
+          view: () => trancheViewOf(chain),
+          format: () => ({
+            t: (key, params) => api.i18n.t(key, params),
+            money: usd,
+            personaName: (id) => teamStore(api).personas().find((persona) => persona.id === id)?.title ?? id,
+          }),
+          formatTime: (date) => api.i18n.formatTime(date),
+          release: async () => {
+            const outcome = await writeAutopilot(
+              { invoke: (method, payload) => api.backend.invoke(method, payload) },
+              (key, params) => api.i18n.t(key as never, params as never),
+              { state: 'on' },
+            );
+            if (outcome.ok && outcome.status !== null) {
+              applyChainStatus(outcome.status);
+            }
+            return outcome.ok ? null : outcome.words;
+          },
+          adjust: openTicketsSettings,
+          subscribe: (listener) => {
+            fleetListeners.add(listener);
+            return () => fleetListeners.delete(listener);
+          },
+        },
         shape: createShapeBinding({
           api,
           snapshot: () => snapshot,

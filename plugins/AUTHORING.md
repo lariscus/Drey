@@ -131,6 +131,11 @@ leaves the app on the previous build. Verify with
   `ui.refreshStatus()` re-reads every dock panel's `status` now — the shell does it on document and vault
   events only, so a panel whose status changes otherwise (an async search result) calls it after the change.
   The sample plugin registers a tiny third find mode.
+  1.55 (req-179, the Mission Control checkpoint card) adds optional, content-agnostic fields to
+  `ConversationCard`, all drawn by the Assistant and none required, so an old card renders as before:
+  `title` with a status `dot` (`attention` | `negative`), `metrics` (a 2 x 2 grid of `{ label, value, sub?,
+  inline? }`), `rows` (`{ text, dot? }` lines) and `meta` (a quiet line under the buttons). `text` may be
+  empty when the card has a `title`; `note` stays the quiet line above the buttons.
   1.52 adds `PluginWidgetContrib.shown?()` (default true, re-read on the `status` tick): `false` means the panel
   draws nothing right now. Only the bottom dock with that one panel reads it -- it then takes no height and
   no splitter until `shown()` is true again; a side dock ignores it (its strip icon and header stay).

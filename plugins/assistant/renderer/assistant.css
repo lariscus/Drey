@@ -1937,3 +1937,120 @@
 .assistant-composer .target-name[hidden] {
   display: none;
 }
+
+/* A richer card (SDK 1.55, board 10u desktop): title with a status dot, 2 x 2 figures, a list, a meta line. */
+.target-card-rich {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-color: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-dock);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.target-card-rich .target-card-note,
+.target-card-metric-label,
+.target-card-metric-sub,
+.target-card-meta {
+  margin: 0;
+  color: var(--text-4);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.target-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.target-card-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-peach);
+}
+
+.target-card-dot[data-tone='negative'] {
+  background: var(--status-deleted);
+}
+
+.target-card-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+
+.target-card-metric {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.target-card-metric-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.target-card-metric-value {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 26px;
+  white-space: nowrap;
+}
+
+.target-card-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.target-card-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-main);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.target-card-row .target-card-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.target-card-row-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.target-card-rich .target-card-actions {
+  margin-top: 0;
+  gap: 8px;
+}
+
+.target-card-rich .target-card-btn {
+  height: 32px;
+  padding: 0 8px;
+  border-color: var(--field-border);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.target-card-rich .target-card-btn.primary {
+  border-color: transparent;
+  color: var(--accent-contrast);
+  font-weight: 600;
+}
