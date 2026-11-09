@@ -67,7 +67,7 @@ describe('POST /components/<name>/<action>', () => {
     const stop = fakeRequest('POST', '/components/engine/stop');
     await routes.handle(stop.ctx);
     expect(stop.answer.status).toBe(409);
-    expect(refusalOf('mcp', 'start')).toContain('req-167');
+    expect(refusalOf('mcp', 'start')).toContain('runs as long as the service runs');
   });
 
   it('an unknown component or action is a 404; other routes pass', async () => {

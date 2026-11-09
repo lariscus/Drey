@@ -8,7 +8,7 @@ import { formatStamp } from '../../../packages/tickets-engine/src/fleet/build-st
 import { ServiceHost } from '../../../packages/tickets-engine/src/service/service-host';
 import { writeServiceLock, type ServiceLock } from '../../../packages/tickets-engine/src/service/service-lock';
 import { EngineClient } from './engine-client';
-import { ensureService, mirrorConfig, syncChatConfig, syncConfig, syncNotesVault } from './service-lifecycle';
+import { ensureService, mirrorConfig, syncChatConfig, syncConfig, syncNotesVault, syncVaultRegistry } from './service-lifecycle';
 
 /**
  * The activation/adoption config sync (E5a): the assistant LLM settings
@@ -162,6 +162,35 @@ describe('syncNotesVault (req-100: the Notes API follows the active vault)', () 
     const calls: RecordedCall[] = [];
     await syncNotesVault(recordingClient(calls), { vault: { listVaults: async () => [vault('E:/a', false), vault('E:/b', true, false)] } });
     expect(calls).toEqual([]);
+  });
+});
+
+describe('syncVaultRegistry (req-167: the workers reach every registered vault)', () => {
+  const registry = [
+    { id: 'notes', name: 'Notes', path: 'E:/notes', active: true, exists: true },
+    { id: 'work', name: 'Work', path: 'E:/work', active: false, exists: false },
+  ];
+
+  it('pushes the registry once, and again only when it changed', async () => {
+    const calls: RecordedCall[] = [];
+    const memo = { pushed: null as string | null };
+    const ctx = { vault: { listVaults: async () => registry } };
+    await syncVaultRegistry(recordingClient(calls), ctx, memo);
+    await syncVaultRegistry(recordingClient(calls), ctx, memo);
+    expect(calls).toEqual([
+      {
+        method: 'configSet',
+        payload: {
+          key: 'vaults.registered',
+          value: [
+            { id: 'notes', name: 'Notes', path: 'E:/notes', active: true },
+            { id: 'work', name: 'Work', path: 'E:/work', active: false },
+          ],
+        },
+      },
+    ]);
+    await syncVaultRegistry(recordingClient(calls), { vault: { listVaults: async () => registry.slice(0, 1) } }, memo);
+    expect(calls).toHaveLength(2);
   });
 });
 

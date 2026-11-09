@@ -199,7 +199,7 @@ export class SettingsBackgroundService {
     return { ok: true };
   }
 
-  /** Drey's MCP server is served by Drey until req-167: its switch is the `mcp` setting. */
+  /** Drey's own MCP server for other programs stays in Drey (req-167 gave the workers the service's): its switch is the `mcp` setting. */
   private async switchMcp(action: ServiceAction): Promise<{ ok: boolean }> {
     if (action !== 'start') {
       this.settings.patchMcp({ enabled: false });

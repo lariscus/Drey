@@ -351,3 +351,27 @@ Four follow-ups of this ADR shipped together (ticket T-0029):
   (ADR-0058's block): the model never made that call, so a follow-up
   must not replay one — the pair is dropped from the tool replay and
   its records ride after the turn's answer as a bracketed note.
+
+## Later change — the set moves house (req-167, milestone 227, as built 2026-11-09)
+
+The one vault toolset is no longer Drey's main process's: `electron/mcp/tools/`
+and `VaultTools` moved into **`shared/vault-tools/`**, over the `ToolVault`
+port they always used (plus `OpenDocs`, the section and task providers, the
+confirm/approve callbacks and the rename). Two hosts build it: Drey's main
+process over `VaultManager` — unchanged for programs on Drey's MCP server and
+for the assistant (`electron/mcp/vault-tools.ts` re-exports, every spec ran
+unchanged) — and **Drey Service**, whose vault MCP serves the workers
+(ADR-0094) over the registered vaults on disk. "A new vault capability goes
+into this set" stands; it now reaches both. Moved with it: the rename that
+keeps links intact (`shared/link-rewriter.ts` over a `RenameVault` port,
+ADR-0059), the cancellation helpers (`shared/abort.ts`, re-exported by
+`electron/llm/llm-tasks.ts`) and the loopback guard of an MCP endpoint
+(`shared/loopback-request.ts`). `write.ts` was split along the way
+(`write-context.ts` the rules every change shares, `move.ts` move and delete).
+
+Two call options were added, set only by the service: **`grant`** — per-vault
+write rights (`{ who, vaults }`; a change elsewhere is `Error: <who> may not
+write vault "<id>" (allowed: read)`, a move included) — and **`exclude`** —
+tools neither listed nor callable (`vault_delete`, `tasks_list`). The tool
+names, descriptions and parameters (the prompt texts of
+`specs/classifier-spec.md`) did not change.

@@ -27,7 +27,7 @@ at once):
 | **engine** | the tickets engine (ADR-0088): board service, chat, verify, the invoke channel Drey talks to | always `running` while the service runs |
 | **runner** | the Crew runner (the fleet runner, ADR-0075), **in the service's own process**; its resource governor (req-180, `FLEET.md` *The resource governor*) seats every spawn within Settings → Background service → *Load* | `sleeping` until something needs it, `running` while awake, `failed` with the reason when it cannot start |
 | **gateway** | the remote gateway for phone and iPad (ADR-0086), inside the engine | `running` (address, paired devices), `stopped` (remote access off) or `failed` (why it does not listen) |
-| **mcp** | Drey's MCP server for other programs | `external` — still served by the Drey process until req-167 moves it |
+| **mcp** | the **vault MCP for the workers** (req-167, [ADR-0094](../../docs/09_architecture_decisions/0094-vault-mcp-served-by-drey-service.md)): the ADR-0071 vault tools without `vault_delete`, Streamable HTTP on a loopback port of its own (`/mcp`), a bearer token per worker, the persona's write rights, every call audited on the run's stream ([FLEET.md](FLEET.md) *The vault over MCP*). Drey's own MCP server for other programs (Claude Desktop, the stdio bridge) still runs in the Drey process — req-212 moves it | `running` (`127.0.0.1:<port> · <n> workers`) as long as the service runs, `failed` with the reason when it cannot listen; no start / stop / restart — live workers hold its address |
 
 Settings → Background service (milestone 216) shows the components and drives
 the runner, the gateway and Drey's MCP server; the tray icon and the service
@@ -104,7 +104,7 @@ Written owner-only and atomically, rewritten whenever a component changes:
     "engine":  { "state": "running",  "detail": "E:\\notes", "port": 51233 },
     "runner":  { "state": "running",  "detail": "127.0.0.1:51240", "port": 51240, "token": "<runner bearer>", "pid": 12345, "build": "…" },
     "gateway": { "state": "running",  "detail": "http://192.168.1.20:47811 · 2 paired devices", "port": 47811 },
-    "mcp":     { "state": "external", "detail": "served by Drey (until req-167)" }
+    "mcp":     { "state": "running",  "detail": "127.0.0.1:51236 · 2 workers", "port": 51236 }
   }
 }
 ```
@@ -153,7 +153,7 @@ Invoke-RestMethod "http://127.0.0.1:$($l.port)/status" -Headers $h
 | `POST /components/runner/restart` | stop, then wake |
 | `POST /components/gateway/<start\|stop\|restart>` | the remote gateway on / off (the same persisted switch as Settings → Remote access) |
 | `POST /components/engine/restart` | the atomic restart of the whole service (below) |
-| `POST /components/engine/<start\|stop>`, `POST /components/mcp/*` | 409 with the reason: the engine runs as long as the service (restart it, or quit the service), the MCP server is Drey's until req-167 |
+| `POST /components/engine/<start\|stop>`, `POST /components/mcp/*` | 409 with the reason: the engine runs as long as the service (restart it, or quit the service), the vault MCP runs as long as the service (live workers hold its address) |
 | `POST /restart` | the atomic restart: the runner hands its runs over, the service starts its successor (the same command) once its lock is gone, and leaves; 409 while a run is in its gate |
 | `POST /window/open` | opens the service window (a window process with `--open`; a running tray process takes it over) |
 | `POST /shutdown` | leave: live runs stopped, engine closed, lock removed |

@@ -8,7 +8,7 @@
  * loser, so a program's tool set never shifts underneath it.
  */
 import type { PluginMcpTool, PluginMcpToolProvider } from '../../shared/plugin-api';
-import { fail, McpToolDef, McpToolResult } from './tools/types';
+import { fail, type McpToolDef, type McpToolResult } from '../../shared/vault-tools';
 
 export class PluginMcpTools {
   private readonly providers = new Map<string, PluginMcpToolProvider>();

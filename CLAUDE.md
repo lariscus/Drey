@@ -314,9 +314,14 @@ toolchain is removable by deleting `.tools/`). Never assume a bare `node`,
   in `specs/classifier-spec.md`.
 - **One vault toolset** (milestone 77, ADR-0071): `vault_list`,
   `vault_search`, `vault_read`, `vault_edit`,
-  `vault_write`, `vault_move`, `vault_delete` in `electron/mcp/tools/`
-  — one implementation for programs on Drey's MCP server and for the
-  assistant. Every call carries what it may do (`VaultCallOptions`):
+  `vault_write`, `vault_move`, `vault_delete` in `shared/vault-tools/`
+  (moved there by milestone 227, ADR-0071 later change) — one
+  implementation over the `ToolVault` port for programs on Drey's MCP
+  server and for the assistant (built in main over `VaultManager`), and
+  for the Crew's workers through **Drey Service's vault MCP** (built over
+  the registered vaults on disk, ADR-0094: a token per worker, reads
+  every vault, writes where the persona's `allowed: write-vaults` says,
+  no `vault_delete`, every call audited on the run's stream). Every call carries what it may do (`VaultCallOptions`):
   **the Vault chip is the scope of reading and writing**, enforced where
   the tool runs (chip off = no vault tools); `tools.vault.write`
   (`off | confirm | auto`) is the permission to change notes; a deletion
@@ -441,8 +446,9 @@ Main process (`electron/`):
   over the pure `shared/link-rewrite.ts`
 - `llm/` — the LLM transport: `LlmClient` + per-call `LlmRouter`,
   `providers/` (ADR-0047), the task registry, `tag-suggest.ts`
-- `mcp/` — the vault MCP server (ADR-0021) and the vault tools both it
-  and the assistant use (`mcp/tools/`, ADR-0071), plus the plugin-tool
+- `mcp/` — the vault MCP server for other programs (ADR-0021), building
+  the shared vault tools (`shared/vault-tools/`, ADR-0071) over
+  `VaultManager` for it and the assistant, plus the plugin-tool
   registry (`plugin-tools.ts`, SDK 1.29: `ctx.mcp.registerTools` lists
   a plugin's tools beside the vault tools); `mcp-client/` — external MCP
   servers, `web_search`, `web_fetch`, the assistant toolbox (ADR-0063)
@@ -593,7 +599,7 @@ extraction, ADR-0088):
   host-agnostic board service behind `EngineHost`/`FleetPort` ·
   `src/service` **Drey Service**, the one shipped background process
   (req-164, ADR-0092): engine, Crew runner (in-process), remote gateway
-  and an MCP row as components, `~/.drey-engine/service.lock`, the
+  and the workers' vault MCP (`service/vault-mcp/`, req-167) as components, `~/.drey-engine/service.lock`, the
   two-level sleep — `plugins/tickets/SERVICE.md`). No
   Drey/Electron/plugin imports (ESLint-enforced); the plugin main tsc
   program compiles it into `dist-electron/packages/tickets-engine/`, and

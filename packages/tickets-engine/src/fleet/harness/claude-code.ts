@@ -3,10 +3,14 @@
  * held open (`--input-format stream-json`), so injection writes a user
  * message in; resume is `--resume <sessionRef>`. Its node seam (spawn)
  * comes through the constructor; the specs run it against a fake process.
+ * The vault MCP (req-167) is a `--mcp-config` file in the run's folder (the
+ * token never on the command line), its tools allowed by server
+ * (`--allowedTools mcp__<name>`): Drey Service enforces the rights itself.
  */
+import * as path from 'node:path';
 import type { SpawnFn } from '../ports/process-spawner';
 import { ClaudeCodeWorker } from './claude-code-worker';
-import type { NowFn, ProviderAdapter, ProviderStart, WorkerHandle } from './contract';
+import type { NowFn, ProviderAdapter, ProviderStart, WorkerHandle, WorkerMcpLaunch, WorkerMcpServer } from './contract';
 
 /** The CLI's `--permission-mode` for a start's mode; `read-only` (req-183, a review) is the CLI's `plan`. */
 export function claudeCodePermission(mode: ProviderStart['permissionMode']): string {
@@ -26,7 +30,19 @@ export function claudeCodeArgs(start: ProviderStart): string[] {
     claudeCodePermission(start.permissionMode),
     ...(start.model !== null ? ['--model', start.model] : []),
     ...(start.resumeRef !== null ? ['--resume', start.resumeRef] : []),
+    ...(start.mcp?.args ?? []),
   ];
+}
+
+/** The vault MCP as Claude Code takes it (req-167): one config file in the run's folder, named on the command line. */
+export function claudeCodeMcpLaunch(server: WorkerMcpServer): WorkerMcpLaunch {
+  const file = path.join(server.runDir, 'mcp.json');
+  const config = { mcpServers: { [server.name]: { type: 'http', url: server.url, headers: { Authorization: `Bearer ${server.token}` } } } };
+  return {
+    files: [{ path: file, text: `${JSON.stringify(config, null, 2)}\n` }],
+    args: ['--mcp-config', file, '--allowedTools', `mcp__${server.name}`],
+    acpServers: [],
+  };
 }
 
 export class ClaudeCodeAdapter implements ProviderAdapter {
@@ -38,6 +54,10 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     private readonly spawnFn: SpawnFn,
     private readonly now: NowFn,
   ) {}
+
+  mcpLaunch(server: WorkerMcpServer): WorkerMcpLaunch {
+    return claudeCodeMcpLaunch(server);
+  }
 
   spawn(start: ProviderStart): WorkerHandle {
     // req-177: a slot's account is its CLAUDE_CONFIG_DIR, handed in through the environment.

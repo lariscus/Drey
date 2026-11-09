@@ -9,7 +9,7 @@
  * the search to one note. Only a `tags` filter goes to the section index,
  * which owns the tag grammar.
  */
-import { findLines, queryTerms, type LineHit } from '../../../shared/note-search';
+import { findLines, queryTerms, type LineHit } from '../note-search';
 import { unsavedKey, unsavedTexts } from './current-text';
 import { cleanPath, isUnder, ResolvedVaults, ScopedVault, ToolScope } from './scope';
 import { fail, McpToolResult, ok, plural, VaultToolDeps } from './types';

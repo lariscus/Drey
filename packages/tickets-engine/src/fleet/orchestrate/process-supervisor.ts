@@ -6,6 +6,7 @@ import type { EventFold } from './event-fold';
 import type { HandoverSettings } from './handover-settings';
 import { messageOf, type LiveRun } from './live-run';
 import type { RunRepository } from './run-repository';
+import type { VaultGrantRequest, WorkerVaultAccess, WorkerVaultGate } from './worker-vault';
 
 /** Where the worker works: a review's read-only checkout (req-183), else the run's worktree. */
 function workFolderOf(info: RunInfo): string {
@@ -54,6 +55,8 @@ export interface ProcessSupervisorDeps {
   readonly slotEnv?: (slotId: string) => Readonly<Record<string, string>> | undefined;
   /** The worker the run owns exited: the completion decides. */
   readonly onExit: (run: LiveRun, code: number | null) => Promise<void>;
+  /** req-167: Drey Service's vault MCP; absent = no worker gets a vault (a standalone runner, a spec). */
+  readonly vault?: WorkerVaultGate;
 }
 
 /**
@@ -75,8 +78,7 @@ export class ProcessSupervisor {
 
   spawn(run: LiveRun, plan: SpawnPlan): WorkerHandle {
     const request = run.request;
-    const slotEnv = run.info.slot === undefined ? undefined : this.deps.slotEnv?.(run.info.slot.id);
-    const env = plan.env === undefined && slotEnv === undefined ? undefined : { ...plan.env, ...slotEnv };
+    const vault = this.openVault(run);
     const handle = this.deps.adapter.spawn({
       cwd: workFolderOf(run.info),
       instruction: plan.instruction,
@@ -88,7 +90,8 @@ export class ProcessSupervisor {
       ...(plan.holdAtSpawn === true ? { holdAtSpawn: true } : {}),
       ...(plan.usageBase !== undefined ? { usageBase: plan.usageBase } : {}),
       ticketId: request.ticketId,
-      ...(env !== undefined ? { env } : {}),
+      ...this.envOf(run, plan),
+      ...(vault !== null ? { mcp: vault.launch } : {}),
       onEvent: (event) => this.deps.events.onEvent(run, event),
       onSessionRef: (ref) => this.keepSession(run, ref),
       ...(plan.recordAttach === true ? { onAttachInfo: (info: ServerInfo) => this.deps.background.track(this.recordAttach(run, info)) } : {}),
@@ -96,7 +99,35 @@ export class ProcessSupervisor {
       ...(plan.onResumeFailed !== undefined ? { onResumeFailed: plan.onResumeFailed } : {}),
     });
     this.own(run, handle);
+    if (vault !== null) {
+      void handle.exited.then(() => vault.close());
+    }
     return handle;
+  }
+
+  /** The worker's environment: the plan's (the light seat's) under the run's slot's login folder. */
+  private envOf(run: LiveRun, plan: SpawnPlan): { env?: Readonly<Record<string, string>> } {
+    const slotEnv = run.info.slot === undefined ? undefined : this.deps.slotEnv?.(run.info.slot.id);
+    return plan.env === undefined && slotEnv === undefined ? {} : { env: { ...plan.env, ...slotEnv } };
+  }
+
+  /** req-167: the worker's vault — its own token, minted now, dead when it exits. */
+  private openVault(run: LiveRun): WorkerVaultAccess | null {
+    const { vault, adapter } = this.deps;
+    if (vault === undefined) {
+      return null;
+    }
+    const describe = adapter.mcpLaunch === undefined ? null : adapter.mcpLaunch.bind(adapter);
+    const request: VaultGrantRequest = {
+      runId: run.info.id,
+      ticketId: run.request.ticketId,
+      persona: run.info.persona ?? null,
+      readOnly: run.request.permissionMode === 'read-only',
+      runDir: run.dir,
+      harness: adapter.label,
+      emit: (event) => this.deps.events.onEvent(run, event),
+    };
+    return vault.open(request, describe);
   }
 
   /** Binds a worker that outlived its runner to the run (no adapter can since req-182); throws when the adapter cannot attach. */

@@ -157,14 +157,15 @@ describe('ServiceHost', () => {
     await fsp.rm(home, { recursive: true, force: true });
   });
 
-  it('writes service.lock with the four components — the engine running, the runner asleep, the MCP server Drey\'s', async () => {
+  it('writes service.lock with the four components — the engine running, the runner asleep, the vault MCP listening (req-167)', async () => {
     await start();
     const lock = await readServiceLock(home);
     expect(lock).toMatchObject({ pid: process.pid, vaultPath: 'V:/vault', token: 'tok', build: '2026-11-08T00:00:00.000Z#abc' });
     expect(lock!.components.engine).toEqual({ state: 'running', detail: 'V:/vault', port: 4100 });
     expect(lock!.components.runner).toEqual({ state: 'sleeping', detail: 'wakes on demand' });
     expect(lock!.components.gateway).toEqual({ state: 'stopped', detail: 'remote access is off' });
-    expect(lock!.components.mcp).toEqual({ state: 'external', detail: 'served by Drey (until req-167)' });
+    expect(lock!.components.mcp).toEqual(expect.objectContaining({ state: 'running', port: expect.any(Number) }));
+    expect(lock!.components.mcp.detail).toMatch(/^127\.0\.0\.1:\d+ · 0 workers$/);
   });
 
   it('answers /health and /status only with the token', async () => {
@@ -190,7 +191,7 @@ describe('ServiceHost', () => {
   it('the engine, the gateway and the MCP server cannot be stopped one by one — the refusal says why', async () => {
     await start();
     expect(await control('POST', '/components/engine/stop')).toMatchObject({ status: 409 });
-    expect((await control('POST', '/components/mcp/start')).json['error']).toContain('req-167');
+    expect((await control('POST', '/components/mcp/start')).json['error']).toContain('runs as long as the service runs');
   });
 
   it('the gateway row: running with its address and the paired devices', async () => {

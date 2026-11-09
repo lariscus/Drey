@@ -3,7 +3,7 @@
  * from here, never from a file inside (enforced by `eslint.config.mjs`).
  */
 export { VaultTools } from './vault-tools';
-export { NO_VAULT } from './tools/types';
+export { NO_VAULT } from './vault-tools';
 export type {
   ApproveAction,
   ConfirmWrite,

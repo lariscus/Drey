@@ -13,6 +13,7 @@
  */
 import type { GovernorSettings, RunnerDescriptor } from '../fleet/protocol';
 import { startRunner, type Args, type RunnerDeps, type RunnerHandle } from '../fleet/runner';
+import type { WorkerVaultGate } from '../fleet/orchestrate/worker-vault';
 import type { RunnerLocator } from '../services/fleet-client';
 import type { ComponentRecord } from './service-lock';
 
@@ -29,6 +30,8 @@ export interface RunnerComponentOptions {
   readonly onChange: () => void;
   /** req-180: Settings → Background service's Load group, read live by the runner's resource governor. */
   readonly governorSettings?: () => GovernorSettings;
+  /** req-167: the vault MCP gate every worker's spawn opens. */
+  readonly vault?: WorkerVaultGate;
   /** Test seam: the in-process start. */
   readonly start?: (args: Args, deps: RunnerDeps) => Promise<RunnerHandle | null>;
 }
@@ -93,6 +96,7 @@ export class RunnerComponent implements RunnerLocator {
           descriptor: 'none',
           signals: false,
           ...(this.opts.governorSettings === undefined ? {} : { governorSettings: this.opts.governorSettings }),
+          ...(this.opts.vault === undefined ? {} : { vault: this.opts.vault }),
         },
       );
       if (handle === null) {

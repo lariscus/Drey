@@ -61,36 +61,5 @@ export class LlmTaskRegistry {
   }
 }
 
-/**
- * Whether an error is "the user pressed Cancel" rather than a failure.
- * `fetch` rejects an aborted request with an `AbortError`; Node also
- * surfaces the signal's reason, so both shapes are checked.
- */
-export function isAbortError(error: unknown): boolean {
-  if (error instanceof Error) {
-    return error.name === 'AbortError' || error.name === 'TimeoutError';
-  }
-  return false;
-}
-
-/** The message a cancelled generation reports. */
-export const CANCELLED_MESSAGE = 'Generation cancelled.';
-
-/**
- * The error a cancelled generation rejects with: fetch's `AbortError`
- * shape, so `isAbortError` recognizes it on every path — including the
- * pre-check of a queued tool call whose ask was cancelled before it ran.
- */
-export function cancelledError(): Error {
-  return Object.assign(new Error(CANCELLED_MESSAGE), { name: 'AbortError' });
-}
-
-/**
- * Whether a signal is aborted. A helper (not an inline `aborted === true`)
- * so a pre-check and a later catch-time re-check of the SAME signal do not
- * fall to TypeScript's control-flow narrowing — the abort can land between
- * them, during the awaited call.
- */
-export function isSignalAborted(signal: AbortSignal | undefined): boolean {
-  return signal?.aborted === true;
-}
+// The cancellation helpers live in shared/ since the vault tool set moved there (req-167).
+export { CANCELLED_MESSAGE, cancelledError, isAbortError, isSignalAborted } from '../../shared/abort';

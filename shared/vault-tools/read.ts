@@ -4,7 +4,7 @@
  * A file that is open in the editor is read as its tab shows it, unsaved
  * changes included.
  */
-import { splitSections } from '../../../shared/note-sections';
+import { splitSections } from '../note-sections';
 import { currentText } from './current-text';
 import { ToolScope } from './scope';
 import { fail, McpToolResult, ok, VaultToolDeps } from './types';

@@ -57,6 +57,52 @@ export interface NormalizedEvent {
   readonly turnUsage?: RunUsage;
   /** On a `usage` event: the provider's quota windows after the turn (Claude Code's `rate_limit_event`). */
   readonly rateLimit?: RateLimitReading;
+  /** On a `tool` event with `detail: 'audit'`: one call of Drey Service's vault MCP, as the service saw it (req-167). */
+  readonly audit?: VaultCallAudit;
+}
+
+/** One vault MCP call on the run's stream (req-167, ADR-0094): who, where, the verdict, how long. */
+export interface VaultCallAudit {
+  readonly persona: string | null;
+  /** The vault the call named or resolved to; null when it named none. */
+  readonly vault: string | null;
+  /** The vault-relative path (`from → to` for a move); null for a listing or search of a whole vault. */
+  readonly path: string | null;
+  /** `allowed` ran and succeeded; `refused` hit a right (R5) or the stale-write guard; `failed` is any other `Error:`. */
+  readonly verdict: 'allowed' | 'refused' | 'failed';
+  readonly ms: number;
+}
+
+/** The vault MCP a worker is handed (req-167): Drey Service's endpoint and the worker's own token. */
+export interface WorkerMcpServer {
+  /** The server's name in the harness (`drey`): the model sees `mcp__drey__vault_read`. */
+  readonly name: string;
+  /** `http://127.0.0.1:<port>/mcp`, Streamable HTTP. */
+  readonly url: string;
+  /** The bearer that identifies this worker; it dies with the worker. */
+  readonly token: string;
+  /** The run's own folder (never the worktree): where a harness that reads a config file finds it. */
+  readonly runDir: string;
+}
+
+/** An MCP server as ACP's `session/new` takes it (`mcpServers`, the HTTP variant). */
+export interface AcpMcpServer {
+  readonly type: 'http';
+  readonly name: string;
+  readonly url: string;
+  readonly headers: readonly { readonly name: string; readonly value: string }[];
+}
+
+/**
+ * How one harness takes the vault MCP (req-167) — the adapter's description,
+ * no IO: the files it reads its configuration from (written owner-only before
+ * the spawn and removed with the worker), the arguments beside its own, and
+ * the servers an ACP session opens with.
+ */
+export interface WorkerMcpLaunch {
+  readonly files: readonly { readonly path: string; readonly text: string }[];
+  readonly args: readonly string[];
+  readonly acpServers: readonly AcpMcpServer[];
 }
 
 /** A session's cumulative usage (a harness that keeps it per session, across runs). */
@@ -104,6 +150,8 @@ export interface ProviderStart {
   readonly ticketId: string;
   /** req-177: the worker's extra environment — its slot's login folder (`CLAUDE_CONFIG_DIR`, `KIMI_HOME`, `COPILOT_HOME`). */
   readonly env?: Readonly<Record<string, string>>;
+  /** req-167: the vault MCP, as this adapter's `mcpLaunch` described it; absent = the worker has no vault. */
+  readonly mcp?: WorkerMcpLaunch;
   /** Events land here; the run's stream file keeps them. */
   readonly onEvent: (event: NormalizedEvent) => void;
   /** The session to steer/resume with, as soon as the provider reports it. */
@@ -158,6 +206,13 @@ export interface ProviderAdapter {
   /** True when steer reaches a live worker without ending it. */
   readonly liveInject: boolean;
   spawn(start: ProviderStart): WorkerHandle;
+  /**
+   * How this harness takes the vault MCP (req-167); absent = it takes none,
+   * the run has no vault and its stream says so once. An ACP harness may
+   * still find at `initialize` that the agent offers no HTTP MCP — it says
+   * so on the stream then.
+   */
+  mcpLaunch?(server: WorkerMcpServer): WorkerMcpLaunch;
   /** A handle on a worker that outlived its runner (absent when the provider cannot). */
   attach?(start: ProviderStart, info: AttachInfo): WorkerHandle;
 }

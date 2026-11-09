@@ -19,9 +19,9 @@ export interface RecordInputs {
   readonly vaultPath: string;
   readonly runner: ComponentRecord;
   readonly gateway: GatewayView | null;
+  /** The vault MCP the workers use (req-167). */
+  readonly mcp: ComponentRecord;
 }
-
-export const MCP_RECORD: ComponentRecord = { state: 'external', detail: 'served by Drey (until req-167)' };
 
 export function gatewayRecord(remote: GatewayView | null): ComponentRecord {
   if (remote === null) {
@@ -49,6 +49,6 @@ export function componentRecords(inputs: RecordInputs): Record<ComponentName, Co
         : { state: 'running', detail: inputs.vaultPath, port: Number(new URL(inputs.engineUrl).port) },
     runner: inputs.runner,
     gateway: gatewayRecord(inputs.gateway),
-    mcp: MCP_RECORD,
+    mcp: inputs.mcp,
   };
 }

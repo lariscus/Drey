@@ -2,9 +2,9 @@
  * What the vault tools share (ADR-0071): the result shape, what a tool
  * needs from the rest of the app, and what one call may do.
  */
-import type { AppConfig } from '../../../shared/app-config';
-import type { RenameLinksRequest, RenameLinksResult, VaultFileEntry, VaultStatus } from '../../../shared/ipc-api';
-import type { SectionSearchProvider, TaskQueryProvider } from '../../../shared/plugin-api';
+import type { AppConfig } from '../app-config';
+import type { RenameLinksRequest, RenameLinksResult, VaultFileEntry, VaultStatus } from '../ipc-api';
+import type { SectionSearchProvider, TaskQueryProvider } from '../plugin-api';
 
 /** JSON-Schema-ish tool descriptor, as MCP `tools/list` returns it. */
 export interface McpToolDef {
@@ -96,7 +96,8 @@ export interface VaultToolDeps {
   getSearchProvider: () => SectionSearchProvider | null;
   /** The task index (the tasks plugin); `null` degrades `tasks_list`. */
   getTaskProvider: () => TaskQueryProvider | null;
-  getConfig: () => AppConfig;
+  /** Only `mcp.yolo` is read: the write rule of a call that names none. */
+  getConfig: () => { readonly mcp: Pick<AppConfig['mcp'], 'yolo'> };
   confirmWrite: ConfirmWrite;
   approve: ApproveAction;
   /** A rename that keeps links intact (ADR-0059). */
@@ -144,6 +145,18 @@ export interface VaultFileChange {
 /** Whether a call may change files, and whether it asks first. */
 export type VaultWriteRule = 'off' | 'confirm' | 'auto';
 
+/**
+ * Per-vault write rights (req-167, the owner's ruling R5): who calls, and
+ * the vaults it may change. Drey Service hands every worker call one, built
+ * from the run's persona; Drey's own callers never do.
+ */
+export interface VaultWriteGrant {
+  /** The caller as the refusal names it — a persona id. */
+  readonly who: string;
+  /** The vault ids it may change; every other vault is read-only for it. */
+  readonly vaults: readonly string[];
+}
+
 /** What one call — or one tool listing — is allowed. */
 export interface VaultCallOptions {
   /**
@@ -153,6 +166,15 @@ export interface VaultCallOptions {
   scope?: readonly string[];
   /** Absent: `mcp.yolo` decides between `auto` and `confirm`. */
   write?: VaultWriteRule;
+  /**
+   * Per-vault write rights (req-167): a change to a vault outside
+   * `grant.vaults` is refused with `Error: <who> may not write vault
+   * "<id>" (allowed: read)`, whatever `write` says. Absent: `write` alone
+   * decides.
+   */
+  grant?: VaultWriteGrant;
+  /** Tools this caller is neither offered nor may call (Drey Service leaves out `vault_delete` and `tasks_list`). */
+  exclude?: readonly string[];
   /** Who writes, for the local note history. Default `mcp`. */
   origin?: 'mcp' | 'assistant';
   /**

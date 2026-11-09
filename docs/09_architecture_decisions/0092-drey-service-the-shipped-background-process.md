@@ -224,3 +224,18 @@ The service gains a **resource governor** (ADR-0096's `ResourceGovernor` port): 
 - **Said once.** Each grant, wait (per reason), refusal, release and stale release is one runner log line (`governor: …`) and a `governor` event on `GET /events` when the status changed; `GET /governor` answers `GovernorStatus`. A waiting gate puts its reason on the run's activity (`waits for a heavy seat · 2 of 2 heavy seats busy`) and in its stream.
 
 **The window.** The Governor block (board 8a) reads `GET /governor` and draws the five rows as the board writes them; while the runner sleeps it draws an idle governor. Settings → Background service needed no screen change.
+
+## Later change (2026-11-09, as built — milestone 227, req-167): the `mcp` component is the workers' vault MCP
+
+The fourth component is real for the workers: `service/vault-mcp/` serves
+the vault MCP of ADR-0094 on a loopback port of its own (`/mcp`, Streamable
+HTTP over the official SDK) for as long as the service runs; its row reads
+`running · 127.0.0.1:<port> · <n> workers` (`failed` with the reason when it
+cannot listen) and refuses start / stop / restart — live workers hold its
+address. It is the in-process Crew runner's `WorkerVaultGate`: every spawn
+gets a token and its harness's configuration, every exit revokes it. Drey's
+own MCP server for other programs (Claude Desktop, the stdio bridge,
+`mcp.enabled` / `mcp.yolo`) stays in the Drey process and Settings →
+Background service keeps driving it; moving it here is roadmap req-212. The
+service window's MCP row shows the service's endpoint (it no longer reads
+"served by Drey").

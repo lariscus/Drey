@@ -46,6 +46,12 @@ export interface PersonaModels {
 export interface PersonaAllowed {
   /** `spend-above-allowance: true` — it runs on past a ticket's allowance instead of waiting for the owner (req-170). */
   readonly spendAboveAllowance: boolean;
+  /**
+   * `write-vaults: [<vault id>, …]` — the registered vaults its runs may
+   * change through Drey Service's vault MCP (req-167, R5); absent or empty =
+   * it reads every vault and writes none.
+   */
+  readonly writeVaults?: readonly string[];
 }
 
 /**
@@ -128,9 +134,18 @@ function budgetOf(raw: unknown): number | null {
   return Number.isFinite(amount) && amount >= 0 ? amount : null;
 }
 
-/** `allowed:` — only `spend-above-allowance: true` reads (req-170); req-142 adds the rest. */
+/** `allowed:` — `spend-above-allowance: true` (req-170) and `write-vaults:` (req-167); req-142 adds the rest. */
 function allowedOf(raw: unknown): PersonaAllowed {
-  return { spendAboveAllowance: raw !== null && typeof raw === 'object' && (raw as Record<string, unknown>)['spend-above-allowance'] === true };
+  const map = raw !== null && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const vaults = asStringList(typeof map['write-vaults'] === 'string' ? [map['write-vaults']] : map['write-vaults']);
+  return { spendAboveAllowance: map['spend-above-allowance'] === true, ...(vaults.length > 0 ? { writeVaults: [...new Set(vaults)] } : {}) };
+}
+
+/** The `allowed:` block's lines, written only for what is set. */
+function allowedLines(allowed: PersonaAllowed): string[] {
+  const vaults = allowed.writeVaults ?? [];
+  const lines = [...(allowed.spendAboveAllowance ? ['  spend-above-allowance: true'] : []), ...(vaults.length > 0 ? [`  write-vaults: [${vaults.join(', ')}]`] : [])];
+  return lines.length > 0 ? ['allowed:', ...lines] : [];
 }
 
 /** Parse one persona file; tolerant like the ticket reader — what parses
@@ -201,7 +216,7 @@ export function personaFileText(persona: Persona, body?: string): string {
     `color: '${persona.color}'`,
     `skills: [${persona.skills.join(', ')}]`,
     ...(persona.budget !== null ? [`budget: ${persona.budget}`] : []),
-    ...(persona.allowed.spendAboveAllowance ? ['allowed:', '  spend-above-allowance: true'] : []),
+    ...allowedLines(persona.allowed),
     '---',
     '',
     prose,
