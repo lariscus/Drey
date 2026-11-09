@@ -114,7 +114,7 @@ describe('POST /api/skills', () => {
     const authorization = await paired(devices);
     for (const body of [{ scope: 'all', format: 'zip' }, { scope: 'shared', format: 'tar' }, { scope: 'shared', format: 'zip', overwrite: 'yes' }, 'text']) {
       const reply = await route(req({ method: 'POST', path: '/api/skills', origin, authorization, body }), deps);
-      expect(reply.body).toMatchObject({ ok: false }, JSON.stringify(body));
+      expect(reply.body).toMatchObject({ ok: false });
     }
     expect(remote.skillUpload).not.toHaveBeenCalled();
   });
