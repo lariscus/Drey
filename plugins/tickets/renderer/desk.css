@@ -781,12 +781,15 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   background: var(--bg-dock);
 }
 
+/* The board's budget bar: 4 high, the editor colour as track, the grey as fill. */
 .desk-cap-budget .desk-bar {
+  height: 4px;
   margin-top: 0;
-  background: var(--active-bg);
+  background: var(--bg-main);
 }
 
 .desk-cap-budget .desk-bar-fill {
+  height: 4px;
   background: var(--text-4);
 }
 

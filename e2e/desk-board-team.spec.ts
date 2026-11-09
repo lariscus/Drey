@@ -259,7 +259,7 @@ test.describe('Board, Team and Capacity (E13-8)', () => {
     await expect(band.locator('.desk-cap-person').filter({ hasText: 'Tessa' })).toContainText('stuck on T-0126');
     await expect(band.locator('.desk-cap-today')).toHaveText('$4.22 of $19 today');
     // Header value (board 7e): live sessions over the pools, what waits for a slot.
-    await expect(page.locator('app-panel-frame', { has: band }).locator('.status')).toHaveText(/^2 of 5 sessions( · d+ queued)?$/);
+    await expect(page.locator('app-panel-frame', { has: band }).locator('.status')).toHaveText(/^2 of 5 sessions( · [0-9]+ queued)?$/);
     // The Slots row: one chip per slot, the share with its bar, q and its upgrade mark, `unknown` without a bar.
     await expect(band.locator('.desk-slot .desk-slot-name')).toHaveText(['Claude A', 'z.ai', 'Kimi']);
     await expect(band.locator('.desk-slot[data-slot="claude-a"] .desk-slot-share')).toHaveText('62 %');
@@ -269,7 +269,7 @@ test.describe('Board, Team and Capacity (E13-8)', () => {
     await expect(band.locator('.desk-slot[data-slot="kimi"] .desk-slot-note')).toHaveText('unknown');
     await expect(band.locator('.desk-slot[data-slot="kimi"] .desk-slot-bar')).toHaveCount(0);
     // The Tranche-and-queue row: the queue part names what waits (the seeded Prioritized column), the tranche part is empty (req-179).
-    await expect(band.locator('.desk-cap-queuerow .desk-queue-text')).toHaveText(/^T-d+ queued · waits for a slot · 1st$/);
+    await expect(band.locator('.desk-cap-queuerow .desk-queue-text')).toHaveText(/^T-[0-9]+ queued · waits for a slot · 1st$/);
     await expect(band.locator('.desk-tranche-text')).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('desk-capacity.png') });
 
