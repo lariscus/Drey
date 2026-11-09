@@ -23,15 +23,25 @@ export function whoAndWhere(input: InstructionInput, context: WhoAndWhereContext
   return [
     `You are working ticket ${input.ticketId} — ${input.title}.`,
     ...optional(context.persona),
-    `Work checkout: ${input.worktreePath} (branch ${input.branch}` +
-      (input.repo !== null ? `, repo ${input.repo}` : '') +
-      `). Stay on that branch; it and the worktree are your only writable places.`,
+    checkoutLine(input),
     ...optional(extraReposPart(input)),
     `The ticket sits in the "${input.phase}" phase of the owner's board.`,
     ...optional(toolchainPart(input.links)),
     ...ticketFileParts(input, context.plan),
     ...(context.description !== '' ? [`What and why:\n${context.description}`] : []),
   ];
+}
+
+/** Where the worker works — or, on a review run (req-183), the read-only checkout it judges. */
+function checkoutLine(input: InstructionInput): string {
+  const repo = input.repo !== null ? `, repo ${input.repo}` : '';
+  if (input.reviewCheckout !== undefined) {
+    return (
+      `Review checkout: ${input.reviewCheckout} (branch ${input.branch} at the commit the builder handed over, detached${repo}). ` +
+      `It is read-only: you judge this tree, you do not change it — no edits, no commits. Your verdict goes into the ticket file.`
+    );
+  }
+  return `Work checkout: ${input.worktreePath} (branch ${input.branch}${repo}). Stay on that branch; it and the worktree are your only writable places.`;
 }
 
 function extraReposPart(input: InstructionInput): string | null {

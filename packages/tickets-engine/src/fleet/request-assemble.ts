@@ -26,7 +26,7 @@ type WorkParts = Pick<
   'provider' | 'model' | 'permissionMode' | 'instruction' | 'continuationInstruction' | 'briefDigest' | 'acceptance' | 'gate' | 'git'
 >;
 type MoveParts = Pick<RunRequest, 'nextPhase' | 'nextPhaseDir' | 'pushRemote' | 'claimIdentity'>;
-type OptionalParts = Pick<RunRequest, 'limits' | 'recordWorker' | 'column' | 'handover' | 'interactive' | 'dk' | 'parkFor' | 'profile'>;
+type OptionalParts = Pick<RunRequest, 'limits' | 'recordWorker' | 'column' | 'handover' | 'interactive' | 'dk' | 'parkFor' | 'profile' | 'reviewCheckout'>;
 
 /** The wire request, its keys in the order the runner's log and record have always shown them. */
 export function assembleRunRequest(plan: RunPlan, worker: RunWorkerPin, instruction: ComposedInstruction): RunRequest {
@@ -94,6 +94,7 @@ function optionalParts(plan: RunPlan): OptionalParts {
     ...(input.dk !== undefined ? { dk: input.dk } : {}),
     ...(moves && input.parkFor ? { parkFor: input.parkFor } : {}),
     ...profileParts(input.repo),
+    ...(plan.reviewCheckout !== null ? { reviewCheckout: plan.reviewCheckout } : {}),
   };
 }
 

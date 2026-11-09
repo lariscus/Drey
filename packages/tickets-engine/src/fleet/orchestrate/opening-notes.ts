@@ -1,5 +1,5 @@
 import type { HandoverDecision } from '../handover';
-import type { RunInfo, RunRequest } from '../protocol';
+import type { ReviewCheckoutRecord, RunInfo, RunRequest } from '../protocol';
 import type { NormalizedEvent } from '../harness/contract';
 import type { LinkReport, PreparedWorktree } from '../worktrees';
 import type { SlotBinding } from './slot-binder';
@@ -25,6 +25,8 @@ export interface RunOpening {
   readonly stamp: string;
   /** req-177: the slot (account) the run starts on; absent without slots. */
   readonly slot?: SlotBinding | null;
+  /** req-183: the review run's read-only checkout; absent on every other run. */
+  readonly review?: ReviewCheckoutRecord | null;
 }
 
 /** The first lines of a run's stream: what runs where, a moved-aside worktree, the links, the handover. */
@@ -36,6 +38,7 @@ export function openingNotes(opening: RunOpening): readonly NormalizedEvent[] {
       : `run ${id} for ${request.ticketId} on ${request.branch} — worktree ${prepared.outcome}`,
     prepared?.outcome === 'moved-aside' ? `stale dirty worktree moved aside to ${prepared.movedTo} — kept, not deleted; earlier session context is invalid` : null,
     prepared?.links !== undefined ? linkNote(prepared.links) : null,
+    opening.review !== undefined && opening.review !== null ? `review checkout ${opening.review.checkout} at ${opening.review.commit.slice(0, 10)} — detached, read-only` : null,
     decision !== null ? `handover: ${decision.mode} — ${decision.why}` : null,
     ...slotNotes(opening.slot ?? null),
   ];
@@ -91,6 +94,7 @@ export function newRunInfo(opening: RunOpening, initial: RunInfo['state']): RunI
     ...(request.form === 'scout' ? { form: 'scout' as const } : {}), // E8: the board's lanes and the settle hooks read it
     usage: { input: null, cacheRead: null, cacheCreation: null, output: null },
     ...slotFields(opening.slot ?? null),
+    ...(opening.review !== undefined && opening.review !== null ? { review: opening.review } : {}),
     lastTurnContext: null,
     turns: 0,
     readCalls: 0,

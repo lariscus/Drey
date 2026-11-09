@@ -42,7 +42,7 @@ describe('composeRunRequest — a store ticket has no file (D-30)', () => {
     if (!result.ok) {
       throw new Error(result.error);
     }
-    expect(result.request.instruction).toMatch(/The ticket file: \S*_worktrees[\\/]T-0001\.ticket\.md — your working copy/);
+    expect(result.request.instruction).toMatch(/The ticket file: \S*_workcopy[\\/]T-0001\.ticket\.md — your working copy/);
     expect(result.request.instruction).toContain('the runner takes your changes back');
     expect(result.request.instruction).not.toMatch(/prioritized[\\/]T-0001\.md/);
     expect(result.request.ticketRelPath).toBe('tickets/prioritized/T-0001.md'); // the card's virtual path stays its identity

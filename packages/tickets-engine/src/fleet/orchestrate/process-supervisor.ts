@@ -1,10 +1,16 @@
 import type { ProcessTable } from '../ports/process-table';
+import type { RunInfo } from '../protocol';
 import type { ProviderAdapter, UsageTotals, WorkerHandle } from '../harness/contract';
 import type { BackgroundWork } from './background-work';
 import type { EventFold } from './event-fold';
 import type { HandoverSettings } from './handover-settings';
 import { messageOf, type LiveRun } from './live-run';
 import type { RunRepository } from './run-repository';
+
+/** Where the worker works: a review's read-only checkout (req-183), else the run's worktree. */
+function workFolderOf(info: RunInfo): string {
+  return info.review?.checkout ?? info.worktreePath;
+}
 
 /** What one worker is started with; the caller composes the instruction. */
 export interface SpawnPlan {
@@ -72,7 +78,7 @@ export class ProcessSupervisor {
     const slotEnv = run.info.slot === undefined ? undefined : this.deps.slotEnv?.(run.info.slot.id);
     const env = plan.env === undefined && slotEnv === undefined ? undefined : { ...plan.env, ...slotEnv };
     const handle = this.deps.adapter.spawn({
-      cwd: run.info.worktreePath,
+      cwd: workFolderOf(run.info),
       instruction: plan.instruction,
       model: request.model,
       permissionMode: request.permissionMode,
@@ -102,7 +108,7 @@ export class ProcessSupervisor {
     const info = run.info;
     const handle = attach(
       {
-        cwd: info.worktreePath,
+        cwd: workFolderOf(info),
         instruction: run.request.instruction,
         model: run.request.model,
         permissionMode: run.request.permissionMode,

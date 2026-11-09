@@ -93,6 +93,11 @@ export interface InstructionInput {
    */
   readonly personaId?: string | null;
   readonly personaRole?: string | null;
+  /**
+   * req-183: a review run reads this read-only checkout of the branch at the
+   * commit the builder handed over, not the worktree. Absent = every other run.
+   */
+  readonly reviewCheckout?: string;
 }
 
 /**
@@ -133,6 +138,7 @@ export function composeInstruction(input: InstructionInput): ComposedInstruction
     input.interactive ?? null,
     input.worktreePath,
     input.branch,
+    ...(input.reviewCheckout !== undefined ? [input.reviewCheckout] : []),
     ...(head.skills !== '' ? [head.skills] : []),
     ...(persona !== null ? [persona] : []),
   ]);
@@ -143,10 +149,11 @@ export function composeInstruction(input: InstructionInput): ComposedInstruction
 function closingParts(input: InstructionInput): string[] {
   const parts: string[] = [];
   if (input.acceptance.length > 0) {
-    parts.push(
-      'The machine gate runs exactly these after you finish — keep them green, and commit your work on the branch before you end:\n' +
-        input.acceptance.map((command) => `- \`${command}\``).join('\n'),
-    );
+    const lead =
+      input.reviewCheckout !== undefined
+        ? 'The machine gate runs exactly these after you finish, in the worktree at the commit you reviewed:\n'
+        : 'The machine gate runs exactly these after you finish — keep them green, and commit your work on the branch before you end:\n';
+    parts.push(lead + input.acceptance.map((command) => `- \`${command}\``).join('\n'));
   }
   if (input.interactive !== undefined) {
     parts.push(INTERACTIVE_DISCIPLINE);

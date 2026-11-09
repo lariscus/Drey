@@ -10,10 +10,12 @@ import { hostname } from 'node:os';
 import { TicketsGit } from '../core/tickets-git';
 import { NodeFileSystem } from './node-file-system';
 import { NodeProcessTable } from './node-process-table';
+import { NodeTreeMode } from './node-tree-mode';
 import { clockOf, type Clock } from './ports/clock';
 import { NULL_SINK, type EventSink } from './ports/event-sink';
 import type { FileSystem } from './ports/file-system';
 import type { ProcessTable } from './ports/process-table';
+import type { TreeMode } from './ports/tree-mode';
 import type { ExecFn } from './procs';
 import type { ProviderAdapter } from './harness/contract';
 import type { RunInfo, RunRequest } from './protocol';
@@ -33,6 +35,7 @@ import { LeftoverClaims } from './orchestrate/leftover-claims';
 import { OwnerAnswers } from './orchestrate/owner-answers';
 import { PersonaMemory } from './orchestrate/persona-memory';
 import { ProcessSupervisor } from './orchestrate/process-supervisor';
+import { ReviewCheckout } from './orchestrate/review-checkout';
 import { RunAdoption } from './orchestrate/run-adoption';
 import { RunBookkeeper } from './orchestrate/run-bookkeeper';
 import { RunClaims, type LeaseTimers } from './orchestrate/run-claims';
@@ -124,6 +127,8 @@ export interface RunSupervisorDeps {
   readonly slots?: SlotBinder;
   /** req-180: the resource governor's seats — light for the worker, heavy per gate command; absent = none. */
   readonly seats?: WorkerSeats & GateSeats;
+  /** req-183: the review checkout's on-disk guard; absent = Node's (`NodeTreeMode`). */
+  readonly treeMode?: TreeMode;
 }
 
 /** The parts that touch the worker, the ticket and the record, with the loops between them closed. */
@@ -140,6 +145,8 @@ interface Runtime extends RunnerShared {
   readonly stopper: RunStopper;
   readonly takeover: RunTakeover;
   readonly completion: RunCompletion;
+  readonly git: TicketsGitSeam;
+  readonly review: ReviewCheckout;
 }
 
 /** The worker environment of a run's slot, when slots are wired. */
@@ -156,17 +163,19 @@ function runtimeOf(deps: RunSupervisorDeps): Runtime {
   const repo = new RunRepository(deps.root, shared.fs, shared.sink);
   const settings = new HandoverSettings(deps.adapter.id);
   const table = new NodeProcessTable(deps.exec ?? probeExec(deps.root));
+  const git = deps.ticketsGit ?? new TicketsGit(() => deps.git);
+  const review = new ReviewCheckout({ git, mode: deps.treeMode ?? new NodeTreeMode(), fs: shared.fs, log });
   const timers = deps.leaseTimers !== undefined ? { leaseTimers: deps.leaseTimers } : {};
   const claims = new RunClaims({ stores: shared.stores, log, clock, background, ...timers, onLost: (run, why): Promise<void> => stopper.claimLost(run, why) });
-  const settler = new RunSettler({ machine, repo, bookkeeper, clock, log, ...(deps.onRunSettled !== undefined ? { onRunSettled: deps.onRunSettled } : {}) });
+  const settler = new RunSettler({ machine, repo, bookkeeper, clock, log, review, ...(deps.onRunSettled !== undefined ? { onRunSettled: deps.onRunSettled } : {}) });
   const takeover = new RunTakeover(repo, bookkeeper);
   const events: EventFold = new EventFold({ repo, streams, bookkeeper, background, log, interrupt: (run) => takeover.interrupt(run.info.id), claimLost: (run, why): Promise<void> => stopper.claimLost(run, why) });
   const processes: ProcessSupervisor = new ProcessSupervisor({ adapter: deps.adapter, repo, events, background, settings, table, log, ...slotEnvOf(deps.slots), onExit: (run, code): Promise<void> => completion.onWorkerExit(run, code) });
   const stopper: RunStopper = new RunStopper(machine, repo, processes, { settler, bookkeeper, log });
-  const gate = new GateRunner({ bookkeeper, shell: deps.execShell ?? execShell, trailers: deps.validateTrailers ?? validateTrailers, repo, ...(deps.seats !== undefined ? { seats: deps.seats } : {}) });
+  const gate = new GateRunner({ bookkeeper, shell: deps.execShell ?? execShell, trailers: deps.validateTrailers ?? validateTrailers, repo, review, ...(deps.seats !== undefined ? { seats: deps.seats } : {}) });
   const opinion = deps.secondOpinion !== undefined ? { secondOpinion: deps.secondOpinion } : {};
   const completion: RunCompletion = new RunCompletion({ machine, repo, gate, bookkeeper, settler, processes, ...opinion });
-  return { ...shared, deps, table, machine, background, repo, settings, claims, settler, processes, stopper, takeover, completion };
+  return { ...shared, deps, table, machine, background, repo, settings, claims, settler, processes, stopper, takeover, completion, git, review };
 }
 
 function prepareOf(rt: Runtime, git: TicketsGitSeam): PrepareWorktree {
@@ -186,7 +195,7 @@ function starterOf(rt: Runtime, handover: RunnerHandover, git: TicketsGitSeam): 
   const log = rt.deps.log;
   const launcher = new WorkerLauncher({ machine, repo, processes, claims, background, streams, log, ...(rt.deps.seats !== undefined ? { seats: rt.deps.seats } : {}) });
   const sessions = new SessionHandover(repo, rt.settings, rt.deps.adapter.id, clock);
-  return new RunStarter({ machine, repo, streams, stores, claims, bookkeeper, sessions, launcher, prepareWorktree: prepareOf(rt, git), clock, log, retiring: () => handover.retiring, ...(rt.deps.slots !== undefined ? { slots: rt.deps.slots } : {}) });
+  return new RunStarter({ machine, repo, streams, stores, claims, bookkeeper, sessions, launcher, prepareWorktree: prepareOf(rt, git), review: rt.review, clock, log, retiring: () => handover.retiring, ...(rt.deps.slots !== undefined ? { slots: rt.deps.slots } : {}) });
 }
 
 /** One provider's supervisor, every part wired. */
@@ -194,7 +203,7 @@ export function composeRunSupervisor(deps: RunSupervisorDeps): RunSupervisor {
   const rt = runtimeOf(deps);
   const { clock, machine, repo, streams, claims, bookkeeper, settler, processes, table, background, settings } = rt;
   const log = deps.log;
-  const git = deps.ticketsGit ?? new TicketsGit(() => deps.git);
+  const git = rt.git;
   const handover = new RunnerHandover(repo, processes, table, { clock, line: log });
   const starter = starterOf(rt, handover, git);
   const reopener = new RunReopener(repo, starter, settler, { processes, provider: deps.adapter.id });

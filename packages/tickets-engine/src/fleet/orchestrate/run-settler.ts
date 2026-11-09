@@ -17,12 +17,20 @@ export interface RunSettlerDeps {
   readonly log: (message: string) => void;
   /** Run settled (terminal): the orchestrator's slot-freed trigger (M85). */
   readonly onRunSettled?: (info: RunInfo) => void;
+  /** req-183: a review's read-only checkout goes with its run; absent = no reviews (a spec). */
+  readonly review?: ReviewCloser;
+}
+
+/** The review checkout as the settle asks it (req-183). */
+export interface ReviewCloser {
+  close(run: LiveRun): Promise<void>;
 }
 
 /**
  * A run's end (ADR-0075): the state machine's `settled`, the clock frozen,
  * the effective cost, the record written, the ticket handed back in one
- * write, the copy dropped, the persona's lesson, and the slot freed.
+ * write, the copy dropped, the persona's lesson, a review's checkout
+ * removed (req-183), and the slot freed.
  */
 export class RunSettler {
   constructor(private readonly deps: RunSettlerDeps) {}
@@ -61,6 +69,7 @@ export class RunSettler {
     await this.deps.repo.persist(run);
     await this.deps.bookkeeper.releaseAtEnd(run, run.stopNote === undefined ? null : `${run.stopNote}${usageSummary(run.info)}`);
     await this.deps.bookkeeper.closeRun(run, state);
+    await this.deps.review?.close(run);
     void this.deps.onRunSettled?.(run.info);
   }
 }
