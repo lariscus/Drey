@@ -1,0 +1,42 @@
+@if (model.card(); as card) {
+  <section class="card" [attr.data-kind]="card.kind" [attr.aria-label]="card.title">
+    <h3 class="title">
+      <span class="dot" [attr.data-tone]="card.tone" aria-hidden="true"></span>
+      {{ card.title }}
+    </h3>
+    @if (card.body; as body) {
+      <p class="body">{{ body }}</p>
+    }
+    @if (card.rows.length > 0) {
+      <ul class="rows">
+        @for (row of card.rows; track $index) {
+          <li class="red-row"><span class="rdot" aria-hidden="true"></span>{{ row }}</li>
+        }
+      </ul>
+    }
+    @if (card.metrics.length > 0) {
+      <dl class="metrics">
+        @for (metric of card.metrics; track metric.label) {
+          <div class="metric">
+            <dt>{{ metric.label }}</dt>
+            <dd>
+              <b class="lead">{{ metric.value }}</b>
+              @if (metric.sub !== '') {
+                <span class="sub" [class.inline]="metric.inline">{{ metric.sub }}</span>
+              }
+            </dd>
+          </div>
+        }
+      </dl>
+    }
+    @if (card.summary; as summary) {
+      <p class="summary">{{ summary }}</p>
+    }
+    <div class="actions">
+      @for (action of card.actions; track action.id) {
+        <button type="button" class="btn" [class.primary]="action.primary" (click)="act(action.id)">{{ action.label }}</button>
+      }
+    </div>
+    <span class="meta">{{ model.meta() }}</span>
+  </section>
+}
