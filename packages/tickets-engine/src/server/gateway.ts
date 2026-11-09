@@ -17,6 +17,8 @@ const MAX_BODY = 64 * 1024;
 const ATTACHMENT_BODY = 12 * 1024 * 1024;
 /** A note save carries the whole file; `/api/notes` may grow to this. */
 const NOTE_BODY = 4 * 1024 * 1024;
+/** `/api/skills` carries a zipped skill as base64: 8 MiB of archive plus its overhead (req-172). */
+const SKILL_BODY = 12 * 1024 * 1024;
 const KEEPALIVE_MS = 25_000;
 
 const SECURITY_HEADERS: Readonly<Record<string, string>> = {
@@ -184,7 +186,7 @@ export class RemoteGateway {
     let body: unknown;
     if (method === 'POST' || method === 'PATCH') {
       const notes = isNotesPath(url.pathname);
-      const cap = url.pathname === '/api/attachments' ? ATTACHMENT_BODY : notes ? NOTE_BODY : MAX_BODY;
+      const cap = url.pathname === '/api/attachments' ? ATTACHMENT_BODY : url.pathname === '/api/skills' ? SKILL_BODY : notes ? NOTE_BODY : MAX_BODY;
       const raw = await readBody(req, cap);
       if (raw === null) {
         const refused = notes ? notesFailure('too_large', 'this note is too large to save from here') : { status: 413, body: { ok: false, error: 'the request is too large' } };

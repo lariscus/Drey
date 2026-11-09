@@ -1,0 +1,68 @@
+import type { PromptPartTokens, TokenizerView } from '../contracts/skills';
+import { PERSONAS_DIR, splitPoolEntry, type Persona } from '../core/persona';
+import { loadPersonaSkills } from '../core/skill-load';
+import { estimateTokens, tokenizerFor } from '../core/token-count';
+import { personaMemorySection } from '../fleet/context-pack';
+import { composeInstruction } from '../fleet/instruction';
+import { previewInstructionInput } from '../fleet/prompt-preview-input';
+import { skillsSection } from '../fleet/skills-section';
+import type { SkillFileSystem } from './skill-file-system';
+
+export interface PromptPreviewData {
+  readonly step: string;
+  readonly text: string;
+  readonly tokens: number;
+  readonly tokenizer: TokenizerView;
+  readonly parts: readonly PromptPartTokens[];
+  readonly skills: readonly PromptPartTokens[];
+  /** Lines for the log: skills that did not load, names the folder overrode. */
+  readonly warnings: readonly string[];
+}
+
+/**
+ * Assembles the brief a run of a persona would start with and counts it
+ * (req-143, req-172): the persona's own files are read, the skills loaded
+ * through `loadPersonaSkills`, and the text is built by `composeInstruction` —
+ * the code a run uses, fed placeholders for the ticket's parts
+ * (`fleet/prompt-preview-input.ts`). The count is the estimate of
+ * `core/token-count.ts` for the family of the persona's model (or the
+ * `model` asked for).
+ */
+export class PromptPreview {
+  constructor(private readonly fs: SkillFileSystem) {}
+
+  async build(persona: Persona, options: { readonly step: string; readonly model: string | null }): Promise<PromptPreviewData> {
+    const dir = `${PERSONAS_DIR}/${persona.id}`;
+    const [prompt, memory, loaded] = await Promise.all([
+      this.fs.readText(`${dir}/prompt.md`),
+      this.fs.readText(`${dir}/memory.md`),
+      loadPersonaSkills((rel) => this.fs.readText(rel), persona.id, persona.skills),
+    ]);
+    const entry = splitPoolEntry(options.model ?? persona.models.default);
+    const tokenizer = tokenizerFor(entry.provider ?? persona.worker, entry.model);
+    const composed = composeInstruction(
+      previewInstructionInput(
+        { id: persona.id, role: persona.role, worker: entry.provider ?? persona.worker, model: entry.model, prompt, memory: memory ?? '', skills: loaded.skills },
+        options.step,
+      ),
+    );
+    const tokens = estimateTokens(composed.text, tokenizer);
+    const instructions = estimateTokens((prompt ?? '').trim(), tokenizer);
+    const skills = estimateTokens(skillsSection(loaded.skills) ?? '', tokenizer);
+    const memoryTokens = estimateTokens(personaMemorySection(memory ?? '') ?? '', tokenizer);
+    return {
+      step: options.step,
+      text: composed.text,
+      tokens,
+      tokenizer,
+      parts: [
+        { name: 'instructions', tokens: instructions },
+        { name: 'skills', tokens: skills },
+        { name: 'memory', tokens: memoryTokens },
+        { name: 'rest', tokens: Math.max(0, tokens - instructions - skills - memoryTokens) },
+      ],
+      skills: loaded.skills.map((skill) => ({ name: skill.name, tokens: estimateTokens(`### ${skill.name}\n\n${skill.text}`, tokenizer) })),
+      warnings: [...loaded.warnings, ...(loaded.missing.length > 0 ? [`no text for skill ${loaded.missing.join(', ')}`] : [])],
+    };
+  }
+}

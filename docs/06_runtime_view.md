@@ -5468,3 +5468,66 @@ sequenceDiagram
 ```
 
 A runner that boots with a vault in `chain-vault.json` resolves that vault's `crew.md` itself (`ChainConfigRestorer`) so a handover keeps the chain running before the board's next config; a switch to another vault writes the current state away and loads the other vault's file under the boot rule.
+
+
+## 6.116 A skill — upload → folder → `skills:` toggle → the run's prompt with `## Skills` → token count (req-172, milestone 232, [ADR-0088](09_architecture_decisions/0088-tickets-engine-package-cut.md) later change)
+
+A skill reaches the crew as a folder, is switched on in the persona's `skills:` list, and every session of that persona then loads its body in full behind the prompt. The same service answers what that costs.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner
+    participant UI as Persona page / phone (routes)
+    participant Svc as SkillService (engine)
+    participant Up as SkillUploader + core/skill-bundle
+    participant Git as SkillCommitter (TicketsGit)
+    participant Board as BoardService.personaPatch
+    participant Pre as PromptPreview
+    participant Comp as composeInstruction (the run's composer)
+    Owner->>UI: Upload a SKILL.md or a zipped skill folder
+    UI->>Svc: POST /api/skills {scope, persona?, format, zipBase64 | text, overwrite?}
+    Svc->>Svc: first call per vault: SkillMigrator turns flat <name>.md into <name>/SKILL.md (one commit)
+    Svc->>Up: upload(home, cmd) — reads the zip, validates the whole bundle first
+    alt a path escapes, frontmatter or name is bad, too large, or the name exists without overwrite
+        Up-->>UI: {ok: false, code} — nothing was written
+    else valid
+        Up->>Up: writes <home>/<name>/… — SKILL.md and the files beside it, byte for byte
+        Svc->>Git: commit exactly those files (removals included) — "skills: <name> added in …"
+        Svc-->>UI: {ok, name, files, list} — the skill is available, off
+    end
+    Owner->>UI: Switch the skill on
+    UI->>Svc: POST /api/personas/<id>/skills/toggle {skill, on: true}
+    Svc->>Board: personaPatch {id, skills: [... , skill]} — persona.md, one commit
+    Svc-->>UI: {list} with on, tokens per skill, selectedTokens
+    Owner->>UI: Show the prompt and its tokens
+    UI->>Svc: GET /api/personas/<id>/prompt?step=build
+    Svc->>Pre: build(persona, step, model)
+    Pre->>Pre: loadPersonaSkills(read, id, skills) — own folder, shared folder, body only
+    Pre->>Comp: composeInstruction(persona prompt, ## Skills, ## Memory, placeholders for the ticket)
+    Comp-->>Pre: the brief — skillsSection(selection) right behind the prompt
+    Pre->>Pre: estimateTokens(text) with the family of the persona's model (claude-estimate | openai-estimate)
+    Pre-->>UI: {text, tokens, tokenizer {exact: false}, parts, skills}
+```
+
+At a run's start the same two functions carry the selection into every session kind — the preview above is the dry run of the first row:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Run as Chain run (board personas)
+    participant One as 1:1 / free session (persona-session-context, free-session-service)
+    participant Load as loadPersonaSkills
+    participant Sec as skillsSection
+    participant Brief as Instruction / 1:1 brief / free brief
+    Run->>Load: read(rel), persona id, persona.skills
+    One->>Load: the same call
+    Load-->>Run: bodies (frontmatter stripped), missing names, name warnings
+    Load-->>One: the same shape
+    Run->>Sec: skills
+    One->>Sec: skills
+    Sec-->>Brief: ## Skills — one lead line, ### name + body each, in the list's order
+    Note over Brief: the closing round resumes the run's own session — the block is already in it
+```
+
+A flat `<name>.md` of the old form reads as a fallback behind the folder until the migration has run; the loader never writes. A selected name no folder holds is a log line and the run goes on without it.

@@ -19,6 +19,7 @@ import { FleetClient, type RunnerLocator } from '../services/fleet-client';
 import { RunnerComponent } from '../service/runner-component';
 import { composePersonaSessions } from '../services/compose-persona-sessions';
 import { PersonaRecords } from '../services/persona-records';
+import { SkillService } from '../services/skill-service';
 import { ImprovementsService } from '../services/improvements-service';
 import { NotesService } from '../services/notes-service';
 import { VerifyService } from '../services/verify-service';
@@ -117,6 +118,8 @@ const TEAM_METHODS = [
   'personaMemory', 'personaMemoryAppend', 'personaMemoryPin', 'personaMemoryRemove', 'personaJournal', 'personaJournalRemove', 'planParts',
   // The Persona page (board 7k): the phone's setup write and improvements card.
   'personaPatch', 'personaImprovements', 'personaImprovementDecide',
+  // req-172: the Skills tab and the prompt preview (the same service the routes call).
+  'sharedSkills', 'personaSkills', 'personaSkillToggle', 'personaSkillRemove', 'skillUpload', 'personaPromptPreview',
 ] as const;
 
 // pair/revoke take primitive args; the invoke channel carries one object
@@ -243,7 +246,10 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
   // req-169: the Memory tab's journal and per-line removals; friction.md migrates once into each persona's journal.
   const personaRecords = new PersonaRecords({ board, host, git, log });
   void personaRecords.migrateAll().catch((error: unknown) => log(`friction.md migration failed: ${error instanceof Error ? error.message : String(error)}`, 'warn'));
-  const remotePort = new DreyTicketsPort(board, fleet, hub, { allowBypass: () => remoteService.allowBypass() }, chat, personaSessions, personaRecords);
+  // req-172: skills as Agent Skills; the legacy flat files migrate once into folders.
+  const skills = new SkillService({ board, host, git });
+  void skills.migrateAll().catch((error: unknown) => log(`skills migration failed: ${error instanceof Error ? error.message : String(error)}`, 'warn'));
+  const remotePort = new DreyTicketsPort(board, fleet, hub, { allowBypass: () => remoteService.allowBypass() }, chat, personaSessions, personaRecords, skills);
   // req-100: the active vault's notes for paired devices. Drey keeps the key on
   // its active vault; without Drey it is the last one it named, or the hosted vault.
   const notes = new NotesService({

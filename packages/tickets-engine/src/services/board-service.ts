@@ -3169,7 +3169,10 @@ export class EngineBoardService {
 
   /** The texts of the skills a persona's record names (D-46); one with no text is a log line, the run goes on. */
   private async personaSkillsFor(vault: EngineVault, persona: Persona): Promise<readonly PersonaSkill[]> {
-    const { skills, missing } = await loadPersonaSkills((rel) => this.readOptional(vault.id, rel), persona.id, persona.skills);
+    const { skills, missing, warnings } = await loadPersonaSkills((rel) => this.readOptional(vault.id, rel), persona.id, persona.skills);
+    for (const warning of warnings) {
+      this.host.log(`persona ${persona.id}: ${warning}`, 'warn');
+    }
     if (missing.length > 0) {
       this.host.log(`persona ${persona.id}: no text for skill ${missing.join(', ')}`, 'warn');
     }

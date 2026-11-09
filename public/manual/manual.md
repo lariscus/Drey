@@ -1185,6 +1185,41 @@ Control (*Talk to <name> 1:1*); all three show the same conversation.
 - The background service's **Sessions** tab lists a held 1:1 as
   *1:1 · Ben* with the time it will be let go.
 
+### Skills {#skills}
+
+A skill is a short set of instructions a persona can be given for a kind of
+work — how you review a diff, how you write a commit. Skills are
+**Agent Skills**, Anthropic's open format: a folder with a `SKILL.md`
+(a few lines at the top that name the skill and say what it is for, then
+the text) and, if you like, scripts or reference files beside it. The
+skills you already use with Claude drop in unchanged.
+
+- **Where they live.** Shared skills sit in the tickets repository under
+  `tickets/_meta/skills/<name>/`; every persona can switch them on. A
+  persona's own skills sit in `tickets/_meta/personas/<id>/skills/<name>/`
+  and win over a shared skill of the same name.
+- **On and off.** A persona carries the skills that are *on*. A skill in a
+  folder that is not switched on is available, nothing more. The switch is
+  the persona's list `skills:` — switching one on or off is one commit.
+- **What a run gets.** Everything that persona starts — a ticket's run, a 1:1,
+  a free session — receives the text of its skills in full, behind its
+  instructions, under the skill's name. The files beside `SKILL.md` stay where
+  they are; they are not put into the prompt.
+- **Upload.** Add a skill by uploading a `SKILL.md`, or a zip of a skill's
+  folder (the `SKILL.md` at the top of the zip or inside one folder). The skill
+  is checked before anything is written: it needs a name and a description at
+  the top and some text, and no file may reach outside its folder. A skill that
+  already exists is not replaced unless you say so. Delete removes a skill from
+  one persona's own folder; a shared skill is not deleted from a persona.
+- **Cost.** The crew works out what a persona's skills add to a run's start,
+  and the whole prompt with its token count. The count is an estimate — Drey has
+  no tokenizer of its own — worked out for the family of the persona's model
+  (Claude models and the Claude Code worker count slightly higher than other
+  models for the same text).
+- **Older skills.** Skills kept as a single file (`<name>.md`) are moved into
+  folders by themselves the first time the crew starts, in one commit of the
+  tickets repository; nothing is lost.
+
 ### Memory and journal {#memory-journal}
 
 Each persona keeps two lists, shown apart on its **Memory** tab (the Crew

@@ -137,14 +137,6 @@ function newestLessons(entries: readonly MemoryEntryText[], budget: Budget): str
   return picked;
 }
 
-/** The instruction's `## Skills` section for a persona's skills (D-46), or null when it carries none. */
-export function personaSkillsSection(skills: readonly { readonly name: string; readonly text: string }[] | undefined): string | null {
-  if (skills === undefined || skills.length === 0) {
-    return null;
-  }
-  return [`## Skills`, `Your persona's skills. Use them where they apply to this step.`, ...skills.map((s) => `### ${s.name}${NL}${NL}${s.text}`)].join(`${NL}${NL}`);
-}
-
 /** The instruction's `## Memory` section for one persona's memory text, or null when empty. */
 export function personaMemorySection(memoryText: string): string | null {
   const slice = personaMemorySlice(memoryText);

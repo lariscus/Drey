@@ -6,6 +6,7 @@
  * tools. A tool is named only when it is attached (ADR-0071's rule). Every
  * text here is in `specs/classifier-spec.md` ("The 1:1 brief").
  */
+import { skillsSection } from './skills-section';
 
 /** One of the persona's latest runs, as the brief lists it. */
 export interface BriefRun {
@@ -98,7 +99,7 @@ export function composeOneOnOneBrief(input: OneOnOneBriefInput): string {
   const parts: (string | null)[] = [
     header(input),
     input.prompt.trim() === '' ? null : section('Your instructions', input.prompt),
-    input.skills.length === 0 ? null : section('Skills', input.skills.map((s) => `### ${s.name}\n\n${s.text.trim()}`).join('\n\n')),
+    skillsSection(input.skills),
     section('Your memory', input.memory === null || input.memory.trim() === '' ? 'Nothing yet.' : input.memory),
     section('Your latest runs', input.runs.length === 0 ? 'No runs yet.' : input.runs.slice(0, BRIEF_RUNS).map(runLine).join('\n')),
     toolsOf(input.tools),

@@ -411,9 +411,11 @@ You work in the tickets repository (<absolute path>), read-only: read what you n
 
 ## Skills
 
+Your persona's skills, loaded in full. Use them where they apply.
+
 ### <name>
 
-<the skill's text>
+<the skill's body>
 
 ## Your memory
 
@@ -551,8 +553,9 @@ This folder is the tickets repository: its ticket files and `_meta/` are the boa
 <prompt.md>
 
 ## Skills
+Your persona's skills, loaded in full. Use them where they apply.
 ### <name>
-<text>
+<the skill's body>
 ```
 
 *What the mode allows*: `read-only` — *"Read-only: read what you need,
@@ -562,6 +565,42 @@ reaches beyond this folder."*; `bypass` — *"You run without permission
 prompts; stay inside this folder and do only what the owner asked."* No
 board, no memory, no runs, no tools section: the owner directs the session
 line by line.
+
+## The Skills block (req-172, R8)
+
+`packages/tickets-engine/src/fleet/skills-section.ts` `skillsSection` — the
+**one** renderer of a persona's selected skills. The chain run's instruction
+(`composeInstruction` and the scout brief, through `skillsSection` in
+`fleet/request-instruction.ts`), the 1:1 brief and the free session brief
+all call it; there is no other `## Skills` text anywhere. The input is the
+persona's `skills:` list read by `loadPersonaSkills` (`core/skill-load.ts`):
+each skill's **body** only — the frontmatter is stripped, the text trimmed —
+in the order of the list; a skill with no body is left out, and the block is
+left out when none is left.
+
+```markdown
+## Skills
+
+Your persona's skills, loaded in full. Use them where they apply.
+
+### <name of the first skill>
+
+<its body>
+
+### <name of the second skill>
+
+<its body>
+```
+
+In a chain run's instruction the block rides right behind the persona's
+prompt (`## Plan` follows it, the variable parts after that) and is part of
+the stable head, so a changed skill changes `briefDigest`. The text used to
+end "…where they apply to this step." (D-46, milestone 204); milestone 232
+made it true for a 1:1 and a free session too, so the digest of an existing
+brief moved once. The prompt preview (`GET /api/personas/<id>/prompt`) shows
+exactly this text inside the composed instruction. Progressive loading — name
+and description in the block, the body read by a `skill_read` tool — is
+req-240 and is **not** in the block today.
 
 ---
 
