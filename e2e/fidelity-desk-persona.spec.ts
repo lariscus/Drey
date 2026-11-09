@@ -5,7 +5,8 @@ import * as path from 'node:path';
 import { test, expect, type ElectronApplication, type Page } from './fixtures/drey';
 
 /**
- * NOT a regression suite: puts the built app in the state of board 7k
+ * NOT a regression suite: puts the built app in the state of the R11 mockup (board 7k v2,
+ * `docs/design/work-panel/crew-internals/persona-page-mockup.html`)
  * (DeskPersona) and takes the screenshot the fidelity checklist asks for.
  * Opt-in, so CI skips it:
  *
@@ -13,7 +14,8 @@ import { test, expect, type ElectronApplication, type Page } from './fixtures/dr
  *   $env:DREY_FIDELITY_SHOTS = '1'
  *   npm run e2e:run -- fidelity-desk-persona
  *
- * Output: `test-results/fidelity/DeskPersona.png` (1440x900, scale factor 1).
+ * Output: `test-results/fidelity/DeskPersona.png` (1440x900, scale factor 1), and the same picture beside
+ * the mockup as `docs/design/work-panel/crew-internals/persona-page-built.png` (milestone 231).
  */
 const RUN = !!process.env['DREY_FIDELITY_SHOTS'];
 test.skip(!RUN, 'set DREY_FIDELITY_SHOTS=1 -- the screenshot of board 7k');
@@ -62,13 +64,35 @@ function ticket(id: string, title: string, phase: string): string {
   return ['---', `id: ${id}`, `title: "${title}"`, 'repo: drey', 'priority: normal', `branch: t/${id}`, "entered-inbox: '2026-10-20T09:00:00Z'", ...(phase === 'inbox' ? [] : [`entered-${phase}: '2026-10-30T09:00:00Z'`]), '---', '', '## Description', '', `${title} - what the owner wants.`, '', '## Log', ''].join('\n');
 }
 
-const BEN = ['---', 'title: Ben', 'role: builder', 'worker: opencode', 'models:', '  default: qwen3-coder', '  pool: [qwen3-coder, sonnet]', '  router: off', "color: '#8ecbef'", 'skills: [go-conventions, tdd]', 'budget: 5', '---', 'Who Ben is.', ''].join('\n');
+// persona.md is frontmatter only since R11 (req-171); "who Ben is" is the top of prompt.md.
+const BEN = [
+  '---',
+  'title: Ben',
+  'role: builder',
+  'summary: "Builds one part of a ticket, test first."',
+  'worker: claude-code',
+  'models:',
+  '  default: opus',
+  '  pool: [opus, sonnet, qwen3-coder]',
+  "color: '#8ecbef'",
+  'skills: [go-conventions, tdd, drey-plugins]',
+  'budget: 5',
+  'allowed:',
+  '  write-vaults: [notes]',
+  '---',
+  '',
+].join('\n');
 
 const other = (title: string, role: string, color: string): string =>
-  ['---', `title: ${title}`, `role: ${role}`, 'worker: opencode', 'models:', '  default: qwen3-coder', '  pool: [qwen3-coder]', '  router: off', `color: '${color}'`, 'skills: []', 'budget: 3', '---', `Who ${title} is.`, ''].join('\n');
+  ['---', `title: ${title}`, `role: ${role}`, 'worker: opencode', 'models:', '  default: qwen3-coder', '  pool: [qwen3-coder]', `color: '${color}'`, 'skills: []', 'budget: 3', '---', ''].join('\n');
+
+/** A skill file of about `tokens` tokens at the page's four-characters-to-a-token estimate. */
+const skillText = (name: string, tokens: number): string => `# ${name}\n\n${'x'.repeat(Math.max(0, tokens * 4 - name.length - 4))}`;
 
 const PROMPT = [
-  'You are Ben, the builder on this crew. You implement exactly one part of a ticket, in its own worktree, and change nothing outside the files the part names.',
+  '## Who Ben is',
+  '',
+  'The builder on this crew. Implements exactly one part of a ticket, in its own worktree, and changes nothing outside the files the part names. Calm, terse, prefers a failing test to a paragraph.',
   '',
   '## How you work',
   '- Write the failing test first.',
@@ -84,7 +108,7 @@ const IMPROVEMENTS = [
   '',
   "- aggregate: '2026-11-02T10:00:00Z'",
   '',
-  '- imp-1 open prompt.md — Add “Read the ADR index before adding a new component.”',
+  '- imp-1 open prompt.md — Add “Read the ADR index before adding a new component.” to How you work',
   "  - proposed: '2026-11-02T10:00:00Z'",
   '  - evidence:',
   '    - 2026-11-01 · T-0007 · guessed a convention',
@@ -104,6 +128,9 @@ const seed: Record<string, string> = {
   'tickets/_meta/personas/ben/persona.md': BEN,
   'tickets/_meta/personas/ben/prompt.md': PROMPT,
   'tickets/_meta/personas/ben/improvements.md': IMPROVEMENTS,
+  'tickets/_meta/skills/go-conventions/SKILL.md': skillText('go-conventions', 310),
+  'tickets/_meta/skills/tdd/SKILL.md': skillText('tdd', 240),
+  'tickets/_meta/personas/ben/skills/drey-plugins/SKILL.md': skillText('drey-plugins', 1120),
   'tickets/_meta/personas/paul/persona.md': other('Paul', 'planner', '#f2d3e2'),
   'tickets/_meta/personas/ralf/persona.md': other('Ralf', 'reviewer', '#bfe3cd'),
   'tickets/_meta/personas/tessa/persona.md': other('Tessa', 'tester', '#f2cfae'),
@@ -141,6 +168,47 @@ async function pushFleet(app: ElectronApplication): Promise<void> {
         ],
         chain: { configured: true, master: 'run', columns: {}, redStreak: {}, cooldownUntil: {}, poolSize: { opencode: 2, 'claude-code': 3 } },
       },
+    },
+  );
+}
+
+const row = (model: string, provider: string, category: string, cls: string, cost: number, sessions: number) => ({ model, slot: null, provider, category, class: cls, cost, sessions });
+
+/**
+ * The page's data beside the record, as board 7k's sample has it: the model table with the slots that carry
+ * the busy figures (a real engine would need live provider quotas), and the counts of memory and journal.
+ */
+async function mockBeside(app: ElectronApplication): Promise<void> {
+  const slot = (id: string, label: string, provider: string, busy: number, total: number) => ({ id, label, provider, busy, total });
+  await app.evaluate(
+    ({ ipcMain }, data) => {
+      const registry = ipcMain as unknown as { _invokeHandlers: Map<string, (event: unknown, payload: { pluginId: string; method: string; payload?: unknown }) => unknown> };
+      const original = registry._invokeHandlers.get('plugin:invoke');
+      if (original === undefined) {
+        throw new Error('no plugin:invoke handler to wrap');
+      }
+      ipcMain.removeHandler('plugin:invoke');
+      ipcMain.handle('plugin:invoke', (event, payload: { pluginId: string; method: string; payload?: unknown }) => {
+        if (payload.pluginId === 'tickets') {
+          if (payload.method === 'poolModels') {
+            return { ok: true, models: data.models, capacity: { global: 6, perSlot: {} }, routing: {}, ledgers: {}, now: { used: 0, global: 6, slots: [] }, queue: [], providerDay: [], errors: [], configPath: 'service.json' };
+          }
+          if (payload.method === 'slots') {
+            return { ok: true, slots: data.slots, configPath: 'service.json' };
+          }
+          if (payload.method === 'personaMemory') {
+            return { ok: true, entries: Array.from({ length: 12 }, (_, i) => ({ text: `lesson ${i}`, pinned: false })) };
+          }
+          if (payload.method === 'personaJournal') {
+            return { ok: true, entries: Array.from({ length: 7 }, (_, i) => ({ at: `2026-11-0${i + 1}T10:00:00Z` })) };
+          }
+        }
+        return original(event, payload);
+      });
+    },
+    {
+      models: [row('opus', 'claude-code', 'frontier', 'A', 3, 2), row('sonnet', 'claude-code', 'everyday', 'B', 1, 3), row('qwen3-coder', 'opencode', 'bulk', 'C', 0.2, 2)],
+      slots: [slot('claude-a', 'Claude A', 'claude-code', 1, 5), slot('local', 'Local', 'opencode', 2, 2)],
     },
   );
 }
@@ -208,6 +276,7 @@ test('board 7k: the Persona page', async ({ page, electronApp }) => {
   const panel = page.locator('.tickets-panel').filter({ visible: true });
   await expect(panel.locator('.work-row[data-id="T-0121"]')).toBeVisible({ timeout: 30_000 });
   await pushFleet(electronApp);
+  await mockBeside(electronApp);
 
   const openFromMenu = async (label: string): Promise<void> => {
     await page.locator('app-panel-frame', { has: page.locator('.tickets-panel') }).filter({ visible: true }).locator('.head').hover();
@@ -220,7 +289,7 @@ test('board 7k: the Persona page', async ({ page, electronApp }) => {
   await openFromMenu('Crew');
   await page.locator('.desk-team [data-persona="ben"]').first().click();
   await page.locator('.desk-detail-head .persona-edit-btn').click();
-  await expect(page.locator('.persona-page .persona-text')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.persona-page .persona-ed-view .cm-content')).toBeVisible({ timeout: 15_000 });
   const crewTab = page.locator('app-tab-bar .tab', { hasText: 'Crew' }).first();
   await crewTab.hover();
   await crewTab.locator('button').last().click();
@@ -231,7 +300,11 @@ test('board 7k: the Persona page', async ({ page, electronApp }) => {
     await strayTab.first().locator('button').last().click();
   }
   await page.locator('app-tab-bar .tab', { hasText: 'persona' }).first().click();
-  await expect(page.locator('.persona-page .persona-friction')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.persona-page [data-proposal]')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.persona-page .persona-pool-row .persona-tag').first()).toBeVisible({ timeout: 15_000 });
+  // The page gets the whole window, as the mockup's frame does.
+  await page.keyboard.press('Control+B');
+  await page.keyboard.press('Control+Alt+B');
   // The layout is the view's saved one: no changed dot on the view tab.
   await page.locator('app-view-switcher .vs-layout').click();
   await page.getByRole('menuitem', { name: /^Save/ }).first().click();
@@ -241,4 +314,6 @@ test('board 7k: the Persona page', async ({ page, electronApp }) => {
   });
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(OUT, 'DeskPersona.png') });
+  const docs = path.resolve(__dirname, '..', 'docs', 'design', 'work-panel', 'crew-internals');
+  fs.copyFileSync(path.join(OUT, 'DeskPersona.png'), path.join(docs, 'persona-page-built.png'));
 });
