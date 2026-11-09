@@ -4890,3 +4890,67 @@ sequenceDiagram
 The share a run takes is learned after it: `PoolGate` tells `RunShareTracker` the windows at the grant; when the run
 has ended, the first newer reading of the slot (a `slot` event) gives each window's drop, shared among the runs the
 slot carried at once, and becomes a sample for the ticket and the persona on that slot.
+
+## 6.104 Tranche end → checkpoint card → release (req-179, milestone 221, [ADR-0077](09_architecture_decisions/0077-continuous-orchestration.md) later change)
+
+The Autopilot's On releases one tranche. Each start passes the dispatcher's release gate and counts; each settled run
+of the tranche becomes a fact; a reached limit (runs, the budget share, the time span) or a fired early-stop rule
+raises the checkpoint: the runner pauses the Autopilot itself and the chain status carries the report. Every client
+draws the same card from it; the owner's *Release next tranche* is the Autopilot's On.
+
+```mermaid
+sequenceDiagram
+    actor O as Owner
+    participant C as Client (popover / Mission Control card)
+    participant OR as Orchestrator
+    participant T as Tranches
+    participant L as TrancheLedger
+    participant D as Dispatcher
+    participant S as Supervisor (run)
+    participant F as RunFacts (git log --numstat)
+    participant A as AnomalyDetector
+    participant B as TrancheBudget
+    participant J as chain.json
+    O->>C: Autopilot On
+    C->>OR: POST /chain/autopilot {state: on}
+    OR->>T: onAutopilot(on)
+    T->>L: open() — tranche n (index per UTC day)
+    OR->>J: persist (+ tranche event on GET /events)
+    loop each pass
+        D->>T: review() — has the span run out?
+        D->>T: mayStart()?
+        alt spent or a checkpoint waits
+            T-->>D: false — nothing new starts
+        else room
+            D->>S: start the plan item
+            D->>T: started(ticket) — counts; the N-th start raises the checkpoint at once
+        end
+    end
+    S-->>OR: onRunSettled(info)
+    OR->>T: settled(info)
+    T->>F: of(info) — gate, cost, +added −removed of the run's own commits
+    T->>L: settled(fact) — only a ticket this tranche released
+    T->>A: check(facts since the last release)
+    alt a rule fires (gate rate, same ticket, change, cost)
+        T->>L: raise(early checkpoint)
+    else
+        T->>B: exhaustedBy() — runs, budget, time
+        B-->>T: runs / budget / time → raise(end checkpoint)
+    end
+    T->>OR: Autopilot := Paused, reason checkpoint (running steps finish)
+    OR->>J: persist (tranche.checkpoint, facts)
+    C->>OR: GET /chain (the fleet snapshot)
+    OR-->>C: tranche {checkpoint: waiting, report}
+    C->>C: trancheCardOf() — Checkpoint · tranche 1 of 3 done, 2×2 metrics
+    O->>C: Release next tranche (or Release anyway after an early stop)
+    C->>OR: POST /chain/autopilot {state: on}
+    OR->>T: onAutopilot(on)
+    alt end checkpoint
+        T->>L: open() — tranche n+1
+    else early stop
+        T->>L: continueAfterEarlyStop() — same tranche, the rules look past it
+    end
+```
+
+A restart boots Off (the boot rule) and restores the tranche from `chain.json`, a waiting checkpoint included; the
+next On continues the same tranche while it has room. The card goes away when the checkpoint clears.

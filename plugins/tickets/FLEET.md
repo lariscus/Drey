@@ -416,8 +416,9 @@ tail and 50/4096 head). Each application is logged:
 ### chain.json fields (daemon builds)
 
 `config` (tickets vault path, git, defaultWorker, permissionMode, caps,
-handover thresholds) · `autopilot` (`{state: on | paused | off, resumeAt?}`,
-the owner's switch; the runner resumes a Paused at its time) · `master`
+handover thresholds, `tranche` — req-179) · `autopilot` (`{state: on | paused | off, resumeAt?, reason?}`,
+the owner's switch; the runner resumes a Paused at its time; `reason:
+checkpoint` when the runner paused it at a tranche's end) · `master`
 (`run` / `halted`, derived from it: On runs, Paused and Off halt) · `columns`
 (per-phase `playing` / `held`) · `redStreak` · `cooldownUntil` (per
 column ISO instant) · `tokensDay` + `tokensUsed` (the per-column token
@@ -428,7 +429,9 @@ owner stopped; the ticket holds until it moves or a newer run starts) ·
 `pausedPersonas` (the personas the owner paused from the Crew view; their
 tickets hold until the persona is played again — U4) · `ledgerCards`
 (per ticket the keys of the ledger cards the pool raised and has not
-resolved yet — req-170) · `handoverAt`
+resolved yet — req-170) · `tranche` (the current tranche's counters:
+`index`, `day`, `startedAt`, `started`, `pending`, `facts`, `anomalyFrom`,
+`checkpoint` — req-179, see *Tranches and the checkpoint report*) · `handoverAt`
 (written by a runner retiring for a newer build; a successor booting
 within five minutes keeps the Autopilot as it stood — any other boot
 ends as Off, also a Paused whose resume time has not passed).
@@ -436,8 +439,10 @@ ends as Off, also a Paused whose resume time has not passed).
 `GET /chain` reports the same plus `quotaPausedUntil` (per provider,
 the ISO instant its quota pause ends — not persisted) and `slots` (per
 slot: busy/total, the longest window's remaining share, its reliability,
-`q` and reset — req-177), `pool` (the live load) and `queue` (the tasks
-waiting for the pool — req-170). The Work panel
+`q` and reset — req-177), `pool` (the live load), `queue` (the tasks
+waiting for the pool — req-170) and `tranche` (`index`, `of`, `done`,
+`total`, `spent`, `budget`, `startedAt`, `endsAt`, `checkpoint: waiting |
+null`, `report` — req-179). The Work panel
 draws both as alerts with a Resume button (chain alerts fix); a runner
 that predates them omits the fields and the panel reads a hold with a
 full red streak as a trip.
@@ -715,6 +720,61 @@ tickets plugin itself (Settings → Tickets → Remote access, default port
 47811). It reaches the runner only through the plugin's `FleetClient`;
 the runner's port and token stay on loopback and are never handed to a
 device. Its own log lines start with `remote:` in the plugin log.
+
+## Tranches and the checkpoint report (req-179)
+
+The Autopilot's **On releases one tranche** (ADR-0077 later change
+2026-11-09): up to `runs` starts, a `budgetShare` of the day's budget or
+`minutes` from the release — whichever ends first. Runs count at the start,
+the spend counts the settled runs' costs, the span runs on the wall clock.
+The day's budget is the provider ledger (`ledgers.providerPerDay` in
+`service.json`) times the number of slots; without one the budget limit is
+not in force. At the end the runner sets the Autopilot to `{state: paused,
+reason: checkpoint}` — running steps finish, nothing new starts — and the
+chain status carries `tranche.checkpoint: "waiting"` with `tranche.report`.
+
+**Config** — the tickets plugin's keys, sent in the chain config
+(`ChainConfig.tranche`, normalized per key; `0` / `off` switches a limit
+or a rule off; all three limits off = no tranches):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `autopilot.tranche.runs` | 10 | runs one tranche releases |
+| `autopilot.tranche.budgetShare` | 0.33 | share (0–1] of the day's budget; `round(1/share)` tranches a day (`tranche 1 of 3`) |
+| `autopilot.tranche.minutes` | 240 | the span from the release |
+| `autopilot.earlyStop.redGates` / `gateWindow` | 3 / 6 | falling gate rate: this many red among the last N gates |
+| `autopilot.earlyStop.sameTicketRed` | 2 | the same ticket red this often in the tranche |
+| `autopilot.earlyStop.changeFactor` | 3 | a run's change above this × the tranche's median |
+| `autopilot.earlyStop.costFactor` | 3 | a run's cost above this × the tranche's median |
+| `autopilot.earlyStop.minRuns` | 3 | runs with a figure before the two median rules apply |
+
+**The report** (`tranche.report`): `kind` (`end` | `early`), `at`,
+`endedBy` (`runs` | `budget` | `time`), `runs`, `spent`, `minutes`, `gates
+{green, total}`, `change {added, removed}` (medians of the runs' own commits:
+`git log --since=<start> --numstat` in the worktree; null when none was
+read), `cost {median, max}`, `repeated {ticket, runs}`, `earlyStop {rule,
+red, window, runsLeft, ticket, value, median, tickets[]}`. Recomputed on
+every read from the facts `chain.json` keeps.
+
+**Release.** No endpoint of its own — `POST /chain/autopilot {state: on}`:
+after an end checkpoint (or with the tranche spent) the next tranche opens;
+after an early stop the same tranche goes on and the rules look past the
+anomaly; after a manual Pause, an Off or a restart the same tranche goes on
+while it has room. A restart boots Off (the boot rule) and keeps the
+tranche, a waiting checkpoint included.
+
+**Log lines** (one per tranche event, in the runner log):
+
+```
+tranche 2 released · up to 10 runs or $5.00 or until 2026-11-09T16:00:00.000Z
+tranche 4 of 10 runs · checkpoint in 6 runs
+checkpoint: tranche 1 of 3 done (runs released) — 10 runs · $4.10 · 130 min · 7 of 8 green — the autopilot pauses until the next tranche is released
+stopped early: 3 of the last 6 gates were red — the tranche had 6 runs left — nothing new starts until the owner releases it
+tranche 1 released again after the early stop — the rules look past it
+```
+
+`GET /events` sends `event: tranche` with the status (or `null`) after every
+change.
 
 ## What the Autopilot governs (req-154)
 
