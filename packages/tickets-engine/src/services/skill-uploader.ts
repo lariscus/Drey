@@ -71,7 +71,7 @@ export class SkillUploader {
     if (parseSkillMarkdown(text).body === '') {
       return refuse('bad_skill_file', `${SKILL_FILE} has no body`);
     }
-    return { ok: true, name, files: [{ path: SKILL_FILE, data: new TextEncoder().encode(migratedSkillText(text, name)) }] };
+    return { ok: true, name, files: [{ path: SKILL_FILE, data: new TextEncoder().encode(migratedSkillText(name, text)) }] };
   }
 
   private fromZip(cmd: SkillUploadCommand): Bundle {

@@ -27,7 +27,9 @@ export class SkillLister {
       skills.push(await this.viewOf(record, on.has(record.name), overriding.has(record.name), tokenizer));
     }
     const present = new Set(records.map((record) => record.name));
-    const bodies = records.filter((record) => on.has(record.name)).map((record) => ({ name: record.name, text: record.parsed.body }));
+    const byName = new Map(records.map((record) => [record.name, record] as const));
+    // the block lists the skills in the order the persona's own list names them
+    const bodies = selected.flatMap((name) => (byName.has(name) ? [{ name, text: byName.get(name)!.parsed.body }] : []));
     const section = skillsSection(bodies);
     return {
       persona: personaId,
