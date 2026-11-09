@@ -19,6 +19,7 @@ import type { SlotProfile } from './protocol-slots';
 import type { ShapedQuestion } from '../contracts/question-shape';
 import type { TicketForm } from '../contracts/tickets';
 import type { SessionKind, SessionSpec } from './protocol-session';
+import type { ClosingRoundSpec } from './protocol-closing';
 
 // The fleet settings shapes (T-0048, T-0049, req-63) and the chain protocol (M85) live beside this file.
 export { DEFAULT_FLEET_CAPS, DEFAULT_FLEET_HANDOVER, DEFAULT_FLEET_POOL, normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from './protocol-fleet-config';
@@ -262,6 +263,8 @@ export interface RunRequest {
    * directory. Absent = a ticket run, every older sender.
    */
   readonly session?: SessionSpec;
+  /** req-169: the closing round's signals and whether the run is a retry; absent = all five signals, no retry. */
+  readonly closing?: ClosingRoundSpec;
 }
 
 /** req-183: the review checkout a run's worker reads, and the commit it shows. */
@@ -359,6 +362,10 @@ export const QUESTION_MARKER = 'QUESTION:';
  * incomplete).
  */
 export const BLOCKED_MARKER = 'BLOCKED:';
+
+// req-169: the closing round's request half and the friction line live beside this file.
+export { DEFAULT_CLOSING_SPEC, FRICTION_MARKER, FRICTION_MAX } from './protocol-closing';
+export type { ClosingRoundSpec } from './protocol-closing';
 
 /** The owner's answer to a permission request (OpenCode's three replies). */
 export type PermissionDecision = 'once' | 'always' | 'reject';

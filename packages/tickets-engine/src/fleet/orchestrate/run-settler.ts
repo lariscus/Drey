@@ -29,7 +29,7 @@ export interface ReviewCloser {
 /**
  * A run's end (ADR-0075): the state machine's `settled`, the clock frozen,
  * the effective cost, the record written, the ticket handed back in one
- * write, the copy dropped, the persona's lesson, a review's checkout
+ * write, the copy dropped, a review's checkout
  * removed (req-183), and the slot freed.
  */
 export class RunSettler {
@@ -68,7 +68,7 @@ export class RunSettler {
     this.deps.log(`run ${run.info.id} → ${state}`);
     await this.deps.repo.persist(run);
     await this.deps.bookkeeper.releaseAtEnd(run, run.stopNote === undefined ? null : `${run.stopNote}${usageSummary(run.info)}`);
-    await this.deps.bookkeeper.closeRun(run, state);
+    await this.deps.bookkeeper.closeRun(run);
     await this.deps.review?.close(run);
     void this.deps.onRunSettled?.(run.info);
   }

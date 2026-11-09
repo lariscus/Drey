@@ -61,7 +61,7 @@ Top-level rules, once, up front:
       repos.md        # work-repo name -> clone URL/path mapping
       prompts/        # the handover prompts (`agent <prompt-ref>` names one file)
       personas/       # the agent personas (E3, the improvement loop E6):
-                      #   <id>/persona.md + prompt.md + memory.md + friction.md +
+                      #   <id>/persona.md + prompt.md + memory.md + reviews.md +
                       #   improvements.md (+ avatar.png) — see Personas below
       chat/           # the Mission Control chat sessions (E5a): one file per
                       #   session — see _meta/chat/ below
@@ -905,6 +905,11 @@ the old phase stays in `x-legacy-phase`. `migrate-tickets --pipeline-out` writes
   Default off; a push failure is a warning (board) / log line
   (runner), never a failed transition. Anything but a remote-name
   string is ignored with a noise badge.
+- `closing-signals`: optional (req-169) — the signals that earn a run its
+  **closing round** (see Personas, *The journal and the closing round*):
+  a list of `red-gate`, `retry`, `steer`, `cost`, `friction`; `none` or
+  `[]` for no rounds; absent = all five. An unknown name is dropped with a
+  noise badge; a value that is neither a list nor `none` keeps all five.
 - `interactive`: optional prompt ref (req-65) — the brief an
   **interactive dialog run** in this column gets
   (`interactive: plan-interview` → `tickets/_meta/prompts/plan-interview.md`).
@@ -1043,7 +1048,8 @@ tickets/_meta/personas/
     prompt.md         # the persona prompt — the run's instruction base when present
     memory.md         # curated memory (format and cap below)
     thread.md         # retired (req-168): migrated once into the persona's first 1:1 session, then removed
-    friction.md       # the worker's findings (E6 — format below)
+    reviews.md        # the journal: one entry per noteworthy run (req-169 — format below)
+    friction.md       # retired (req-169): migrated once into reviews.md, then removed
     improvements.md   # the aggregation's proposals (E6 — format below)
     avatar.png        # optional
 ```
@@ -1070,25 +1076,38 @@ tickets/_meta/personas/
 - `prompt.md` — the longform persona prompt, free Markdown. When a
   persona resolves at dispatch, this file is the run's instruction base,
   replacing the phase handover prompt.
-- `memory.md` — the persona's curated memory. Created on first write with
-  a `# Memory` header; **capped at 200 lines**, the oldest lines drop off.
-  One entry per line:
+- `memory.md` — the persona's curated memory, its **lessons** (R4/R14,
+  req-169). Created on first write with a `# Memory` header; **capped at
+  200 lines**, the oldest lines drop off. One entry per line, every line
+  with its author and evidence:
 
   ```markdown
-  - <YYYY-MM-DD> · <ticketId> · <lesson>
+  - <YYYY-MM-DD> · <ticketId> · <persona>/<model> · <lesson>   # a persona's lesson
+  - <YYYY-MM-DD> · you · <lesson>                               # the owner's line
   ```
 
-  Two writers append (a writer never rewrites existing entries): the
-  fleet settles a persona's ticket run with its outcome line (a 1:1
-  session writes none, req-168) — the outcome word
-  (`handed-over` / `failed` / `stopped`) plus the token count; a memory
-  write failure is logged and never fails the settle. And the board
-  service's confirmed `personaLearn` entry is the owner's hand-confirmed
-  lesson, one line per call, committed once as `personas: <id> memory +1`.
-  The run brief's context pack carries a slice of this file — the last
-  ~20 lines / ~500 tokens, whichever is smaller, under a `## Memory`
-  heading with a one-line explanation; an absent file adds no section at
-  all.
+  (`core/memory-line.ts`; a persona lesson without a ticket writes `—`.)
+  Lines written before req-169 — the old per-run outcome lines
+  (`<date> · <ticket> · handed-over · <n> tokens`), hand-written lessons —
+  stay as they are and read with no author; nothing rewrites them.
+  Writers: the **closing round** (below) appends at most one persona
+  lesson per noteworthy run, directly (no proposal card); a smooth run
+  and a 1:1 write none, and no run writes an outcome line any more. The
+  owner's lines come from the Memory tab (`personaMemoryAppend`), the
+  confirmed `personaLearn` and a decided improvement's lesson, each in
+  the `you` form (a text that already carries its own date keeps it),
+  one commit each. **Every line is removable** — the owner's and the
+  persona's alike: `POST /api/personas/<id>/memory/remove` with
+  `{index, text}` (the entry's position in the GET list and its text as
+  read; refused when the file moved), one commit `personas: <id> memory
+  entry removed`. `GET /api/personas/<id>/memory` returns each entry's
+  `text`, `pinned`, `author` (`you`, the persona id, or null), `model`,
+  `date`, `ticket` and `lesson`.
+  The run brief's context pack carries a slice of this file under a
+  `## Memory` heading with a one-line explanation: the owner's and the
+  pinned lines first, the persona's after, each group in file order, at
+  most ~20 lines / ~500 tokens together (the first group takes the budget
+  first); an absent file adds no section at all.
 
   A pinned entry (U4 — the owner keeps the asset curated) carries a
   trailing ` [pinned]` marker on its line; the pin toggle adds or strips
@@ -1109,26 +1128,65 @@ tickets/_meta/personas/
   after milestone 212 (D-61); nothing a 1:1 says reaches a run unasked —
   only what the owner accepts as a card, or writes into memory.
 
-**The improvement loop (E6).** Two more files may live in the persona
-directory — the worker's findings and the aggregation's proposals (the
-format's grammar lives in the engine's `core/improvements.ts`, the
-trigger and the owner's apply in
-[ADR-0088](../docs/09_architecture_decisions/0088-tickets-engine-package-cut.md)'s
-E6 record):
+**The journal and the closing round (req-169, R14).** A run's *finding*
+is kept apart from its *lesson*:
 
-- `friction.md` — the worker's write path, created on first append; one
-  finding per line, nothing else:
+- `reviews.md` — the persona's **journal**, one entry per noteworthy run
+  (`core/persona-journal.ts`, `core/persona-journal-file.ts`), capped at
+  200 entries (oldest out). Never read into a run's or a 1:1's context.
 
   ```markdown
-  - <YYYY-MM-DD> · <ticketId> · <what was missing>
+  # Reviews
+
+  - 2026-11-09T10:12:03Z · T-0102 · ben · claude-code/sonnet · gate red · $0.42
+    - signals: red-gate, retry
+    - friction: the brief named no test command
+    - finding (prompt): the brief never said how the repo runs its tests
+    - note: round skipped — the worker reported no session to resume
   ```
 
-  The ticket id may stay empty. The reader tolerates the rest — an
-  unparseable line is skipped, never guessed. The build / review / qa
-  prompts ask the worker for one line per finding (lacked context,
-  guessed a convention, the same obstacle twice); no persona in the
-  brief, no line. Lines move out of this file on aggregation — what the
-  aggregator consumed into a proposal's evidence does not stay behind.
+  The head is `- <ISO stamp> · <ticket or —> · <persona> · <harness>/<model>
+  or — · gate <green|red|none> · $<cost> or —`; the fields are optional:
+  `signals:` (of `red-gate, retry, steer, cost, friction`), `friction:`
+  (the worker's own report, one line), `finding (<model|prompt|task|environment>):`
+  (the closing round's verdict), `note:` (why an entry has no finding).
+  A block whose head does not parse is kept verbatim on every rewrite but
+  not listed. `GET /api/personas/<id>/journal` lists the entries oldest
+  first; `POST /api/personas/<id>/journal/remove` `{index, at}` removes one
+  (refused when the stamp at that index differs), one commit
+  `personas: <id> journal entry removed (<at>)`.
+- **The closing round** — after the gate verdict of a ticket run (red:
+  before the settle; green: before the move), **only on a signal**: a red
+  gate, a retry (the run repeats a step whose last run failed its gate),
+  an owner steer (`steerCount` > 0), a cost outlier (more than 3 × the
+  median of the persona's last 20 settled ticket runs with a cost, from at
+  least 5), friction the worker reported (`FRICTION:` in its final
+  message). The list is `_meta/pipeline.md`'s top-level
+  `closing-signals:` — a list of those names, `none` or `[]` for no
+  rounds, absent = all five; an unknown name is a noise finding. The
+  round resumes the run's own session read-only with one prompt
+  (`specs/classifier-spec.md`, *The closing round*) and writes one
+  journal entry, at most one memory lesson, and a prompt or model change
+  only as an **open** proposal in `improvements.md`. Without a session to
+  resume (or past its 10-minute bound) the entry holds the runner's facts
+  and a `note:`. A smooth run writes nothing. The runner's writes are
+  plain file writes in the tickets repository (not committed — req-225).
+- `friction.md` — **retired (req-169).** The worker's former write path
+  (`- <YYYY-MM-DD> · <ticketId> · <what was missing>`) is no longer
+  asked for; a file that still exists migrates **once** into the start of
+  `reviews.md` — each readable line an entry with its date and ticket,
+  `gate none`, `signals: friction`, the line as `friction:` and
+  `note: migrated from friction.md` — and is removed in the same commit
+  (`personas: <id> friction.md migrated into reviews.md (<n> lines)`), at
+  the engine's start and on a journal read; the engine logs it.
+
+**The improvement loop (E6).** The aggregation's proposals live beside
+the journal (the format's grammar in the engine's `core/improvements.ts`,
+the trigger and the owner's apply in
+[ADR-0088](../docs/09_architecture_decisions/0088-tickets-engine-package-cut.md)'s
+E6 record). Its input is the journal's `friction:` fields newer than the
+last `- aggregate:` stamp (all of them when never aggregated); the
+aggregation stamps the file and truncates nothing (req-169):
 - `improvements.md` — the machine's half of the owner's 1:1, strict
   writer / tolerant reader; an absent or broken file reads as empty, the
   caps (`MAX_IMPROVEMENT_EVIDENCE` = 10 items, `MAX_IMPROVEMENT_CONTENT`
@@ -1154,7 +1212,8 @@ E6 record):
   the `- decided:` stamp, never rewrites the block's history; the
   targets are `prompt.md | models.default | memory`, the file the
   owner's Apply rewrites; `evidence:` carries the friction lines the
-  draft was read from; a `- lesson:` line rides only when the proposal
+  draft was read from (a closing round's proposal carries its journal
+  entry's head); a `- lesson:` line rides only when the proposal
   brings one. Ids are minted per persona file and never reused. The
   trigger's constant is `IMPROVEMENTS_THRESHOLD` = 3.
 

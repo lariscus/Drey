@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockedOf, editChanges, permissionText, questionOf, toolActivity } from './event-text';
+import { blockedOf, editChanges, frictionOf, permissionText, questionOf, toolActivity } from './event-text';
 
 describe('questionOf / permissionText — what a worker waits on (req-64)', () => {
   it('reads the marker case-insensitively at the start of the message only', () => {
@@ -71,5 +71,22 @@ describe('editChanges — the lines an edit-like call adds and removes', () => {
   it('is null for other tools and shapes', () => {
     expect(editChanges('Read', { file_path: 'a.ts' })).toBeNull();
     expect(editChanges(undefined, undefined)).toBeNull();
+  });
+});
+
+describe('frictionOf — the worker reports friction in one line (req-169)', () => {
+  it('reads the last line-start FRICTION: line only, never the lines below it', () => {
+    expect(frictionOf('Done.\nFRICTION: lacked the schema\nFRICTION: guessed the test command\nBLOCKED: cannot push')).toBe('guessed the test command');
+  });
+
+  it('a marker in running prose, an empty or a none report is no friction', () => {
+    expect(frictionOf('Done, FRICTION: none')).toBeNull();
+    expect(frictionOf('FRICTION: none')).toBeNull();
+    expect(frictionOf('FRICTION:   ')).toBeNull();
+    expect(frictionOf('all fine')).toBeNull();
+  });
+
+  it('is bounded to one short line', () => {
+    expect(frictionOf(`friction: ${'x'.repeat(400)}`)?.length).toBe(300);
   });
 });

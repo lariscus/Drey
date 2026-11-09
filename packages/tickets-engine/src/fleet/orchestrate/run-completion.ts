@@ -23,6 +23,8 @@ export interface RunCompletionDeps {
    * move — or null to move as normal. Asked once per run.
    */
   readonly secondOpinion?: (request: RunRequest) => Promise<string | null>;
+  /** req-169: the closing round after the gate verdict (a noteworthy run only); absent = none (a spec). */
+  readonly closing?: { afterGate(run: LiveRun): Promise<void> };
 }
 
 /** The exit code as the notes say it. */
@@ -107,12 +109,14 @@ export class RunCompletion {
     if (failure !== null) {
       run.info = { ...run.info, gateFailure: failure, gateResult: 'red' };
       await this.deps.bookkeeper.note(run, `machine gate failed — ${shortGateLine(failure)}`);
+      await this.deps.closing?.afterGate(run);
       return this.deps.settler.finish(run, 'failed');
     }
     run.info = { ...run.info, gateResult: 'green' };
     if (await this.secondOpinion(run)) {
       return;
     }
+    await this.deps.closing?.afterGate(run); // before the move: the round runs while the run still holds its ticket
     const handedOn = await this.handOn(run);
     if (handedOn !== null) {
       await this.deps.bookkeeper.note(run, handedOn);

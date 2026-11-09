@@ -1,105 +1,53 @@
-import { promises as fsp } from 'node:fs';
-import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { RunRequest } from '../protocol';
-import { settled, waitFor } from './run-spec-support';
-import { endTurn, harness, reportUsage, runRequest, startRun, useTempDirs } from './supervisor-harness.fake';
+import { MemoryFileSystem } from '../ports/memory-file-system.fake';
+import type { FileSystem } from '../ports/file-system';
+import { newLiveRun, type LiveRun } from './live-run';
+import { PersonaMemory } from './persona-memory';
+import { runInfo, runRequest } from './supervisor-harness.fake';
 
-describe('PersonaMemory — persona stamping and the lesson of a settled run (E3, ADR-0088)', () => {
-  const dirs = useTempDirs();
-  const request = (over: Partial<RunRequest> = {}): RunRequest => runRequest(dirs.vault, over);
-  const memoryFile = (): string => path.join(dirs.vault, 'tickets', '_meta', 'personas', 'pia', 'memory.md');
+const FILE = 'V:/vault/tickets/_meta/personas/ben/memory.md';
+const clock = { now: () => new Date('2026-11-09T12:00:00Z') };
 
-  it('a dispatched persona stamps RunInfo.persona at start', async () => {
-    const { sup } = harness(dirs.fleet);
-    const started = await sup.start(request(), { persona: 'pia' });
-    expect(started.ok).toBe(true);
-    expect(started.ok && started.run.persona).toBe('pia');
-    // nothing settled yet — no memory file appears
-    await expect(fsp.access(memoryFile())).rejects.toBeDefined();
+function run(persona: string | null = 'ben'): LiveRun {
+  return newLiveRun({ info: runInfo({ id: 'r-1', ticketId: 'T-0102', persona, model: 'sonnet' }), request: runRequest('V:/vault'), dir: 'F:/runs/r-1' });
+}
+
+describe('PersonaMemory — the closing round\'s lesson (req-169)', () => {
+  it('writes one line with ticket and persona/model under a fresh header', async () => {
+    const fs = new MemoryFileSystem();
+    const line = await new PersonaMemory(clock, fs, () => undefined).appendLesson(run(), 'run the verify script');
+    expect(line).toBe('- 2026-11-09 · T-0102 · ben/sonnet · run the verify script');
+    expect(fs.files.get(FILE)).toBe('# Memory\n\n- 2026-11-09 · T-0102 · ben/sonnet · run the verify script\n');
   });
 
-  it('a ring run carries persona null and touches no personas dir', async () => {
-    const { sup } = harness(dirs.fleet);
-    const started = await sup.start(request());
-    expect(started.ok).toBe(true);
-    expect(started.ok ? started.run.persona : 'refused').toBeNull();
-    await expect(fsp.access(path.join(dirs.vault, 'tickets', '_meta', 'personas'))).rejects.toBeDefined();
+  it('a ring run or an empty lesson writes nothing', async () => {
+    const fs = new MemoryFileSystem();
+    const memory = new PersonaMemory(clock, fs, () => undefined);
+    expect(await memory.appendLesson(run(null), 'x')).toBeNull();
+    expect(await memory.appendLesson(run(), '  ')).toBeNull();
+    expect(fs.files.size).toBe(0);
   });
 
-  it('a green persona run appends its one-line lesson (handed-over, token sum)', async () => {
-    const h = harness(dirs.fleet);
-    const id = await startRun(h.sup, request(), 'pia');
-    await reportUsage(h, id, 0, { tokensIn: 12_000, tokensOut: 300 });
-    endTurn(h.adapter.handles[0]!);
-    await settled(h.sup, id, 'done');
-    await waitFor(async () => {
-      const memory = await fsp.readFile(memoryFile(), 'utf8');
-      expect(memory.startsWith('# Memory')).toBe(true);
-      expect(memory).toContain('- 2026-10-17 · T-0001 · handed-over · 12300 tokens');
-    });
+  it('caps the file at 200 lines — the oldest lesson drops first, the header stays', async () => {
+    const fs = new MemoryFileSystem();
+    const lines = ['# Memory', '', ...Array.from({ length: 198 }, (_, i) => `- 2026-10-01 · you · lesson ${i + 1}`)];
+    fs.files.set(FILE, `${lines.join('\n')}\n`);
+    await new PersonaMemory(clock, fs, () => undefined).appendLesson(run(), 'the newest');
+    const text = fs.files.get(FILE) as string;
+    expect(text.split('\n').filter((l) => l !== '')).toHaveLength(199);
+    expect(text).not.toContain('lesson 1\n');
+    expect(text).toContain('lesson 2\n');
+    expect(text.trimEnd().endsWith('the newest')).toBe(true);
   });
 
-  it('a red gate appends a failed lesson; an owner stop appends a stopped one', async () => {
-    const { sup, adapter } = harness(dirs.fleet, {
-      execShell: async () => {
-        throw new Error('exit 1');
+  it('a write failure is a log line, never a thrown error', async () => {
+    const logs: string[] = [];
+    const broken = Object.assign(new MemoryFileSystem(), {
+      writeText: async (): Promise<void> => {
+        throw new Error('disk full');
       },
-    });
-    const id = await startRun(sup, request(), 'pia');
-    adapter.handles[0]!.result();
-    adapter.handles[0]!.fail(1);
-    await settled(sup, id, 'failed');
-    await waitFor(async () => {
-      expect(await fsp.readFile(memoryFile(), 'utf8')).toContain('· failed ·');
-    });
-
-    const id2 = await startRun(sup, request(), 'pia');
-    await sup.stop(id2, 'test');
-    await settled(sup, id2, 'stopped');
-    await waitFor(async () => {
-      const memory = await fsp.readFile(memoryFile(), 'utf8');
-      expect(memory).toContain('· stopped ·');
-      expect(memory.split('\n').filter((line) => line.startsWith('- '))).toHaveLength(2);
-    });
-  });
-
-  it('the memory file caps at 200 lines — the oldest lessons drop first, the header stays', async () => {
-    const dir = path.dirname(memoryFile());
-    await fsp.mkdir(dir, { recursive: true });
-    const lines = ['# Memory', ''];
-    for (let i = 1; i <= 198; i++) {
-      lines.push(`- 2026-10-01 · T-0${String(i).padStart(3, '0')} · handed-over · ${i} tokens`);
-    }
-    await fsp.writeFile(memoryFile(), `${lines.join('\n')}\n`, 'utf8');
-
-    const { sup, adapter } = harness(dirs.fleet);
-    const id = await startRun(sup, request(), 'pia');
-    endTurn(adapter.handles[0]!);
-    await settled(sup, id, 'done');
-    await waitFor(async () => {
-      expect(await fsp.readFile(memoryFile(), 'utf8')).toContain('- 2026-10-17 · T-0001 · handed-over · 0 tokens'); // the new entry landed
-    });
-
-    const memory = await fsp.readFile(memoryFile(), 'utf8');
-    const nonEmpty = memory.split('\n').filter((line) => line !== '');
-    expect(nonEmpty).toHaveLength(199); // the header + 198 entries — the file's 200 lines with the blank
-    expect(nonEmpty[0]).toBe('# Memory');
-    expect(memory).toContain('- 2026-10-01 · T-0002 · handed-over · 2 tokens'); // shifted up, kept
-    expect(memory).not.toContain('- 2026-10-01 · T-0001 · handed-over · 1 tokens'); // the oldest, dropped
-  });
-
-  it('a memory write failure never fails the settle', async () => {
-    // A file where the personas directory belongs: the mkdir of the
-    // persona folder fails, the append must not.
-    await fsp.mkdir(path.join(dirs.vault, 'tickets', '_meta'), { recursive: true });
-    await fsp.writeFile(path.join(dirs.vault, 'tickets', '_meta', 'personas'), 'not a directory', 'utf8');
-    const { sup, adapter, logs } = harness(dirs.fleet);
-    const id = await startRun(sup, request(), 'pia');
-    endTurn(adapter.handles[0]!);
-    await settled(sup, id, 'done');
-    await waitFor(() => {
-      expect(logs.some((line) => line.includes('persona memory append failed'))).toBe(true);
-    });
+    }) as FileSystem;
+    expect(await new PersonaMemory(clock, broken, (m) => logs.push(m)).appendLesson(run(), 'x')).toBeNull();
+    expect(logs).toEqual(['run r-1: persona memory append failed — disk full']);
   });
 });

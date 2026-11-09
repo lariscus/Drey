@@ -145,3 +145,32 @@ describe('readPersonaMemory — the vault-side read', () => {
   });
 });
 
+describe("the memory slice's order (R14, req-169)", () => {
+  it("takes the owner's and pinned lines first, the persona's after, each group in file order", () => {
+    const text = [
+      '# Memory',
+      '',
+      '- 2026-11-01 · T-0001 · ben/sonnet · persona lesson one',
+      '- 2026-11-02 · you · owner rule',
+      '- 2026-11-03 · T-0002 · ben/sonnet · pinned lesson [pinned]',
+      '- 2026-11-04 · T-0003 · ben/sonnet · persona lesson two',
+    ].join('\n');
+    expect(personaMemorySlice(text)).toBe(
+      [
+        '- 2026-11-02 · you · owner rule',
+        '- 2026-11-03 · T-0002 · ben/sonnet · pinned lesson',
+        '- 2026-11-01 · T-0001 · ben/sonnet · persona lesson one',
+        '- 2026-11-04 · T-0003 · ben/sonnet · persona lesson two',
+      ].join('\n'),
+    );
+  });
+
+  it("the cap is spent on the first group first: many persona lessons never push an owner's line out", () => {
+    const persona = Array.from({ length: 30 }, (_, i) => `- 2026-11-05 · T-0${100 + i} · ben/sonnet · lesson ${i}`);
+    const slice = personaMemorySlice(['# Memory', '', '- 2026-11-01 · you · keep this', ...persona].join('\n'))!;
+    const lines = slice.split('\n');
+    expect(lines).toHaveLength(20);
+    expect(lines[0]).toBe('- 2026-11-01 · you · keep this');
+    expect(lines[19]).toBe('- 2026-11-05 · T-0129 · ben/sonnet · lesson 29');
+  });
+});

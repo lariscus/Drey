@@ -1,6 +1,6 @@
 import type { ProcessTable } from '../ports/process-table';
 import type { RunInfo } from '../protocol';
-import type { ProviderAdapter, UsageTotals, WorkerHandle } from '../harness/contract';
+import type { NormalizedEvent, ProviderAdapter, UsageTotals, WorkerHandle } from '../harness/contract';
 import type { BackgroundWork } from './background-work';
 import type { EventFold } from './event-fold';
 import type { HandoverSettings } from './handover-settings';
@@ -30,6 +30,14 @@ export interface SpawnPlan {
   readonly trackUsageBase?: boolean;
   /** req-180: the light seat's environment (`DREY_DEV_PORT`, the parallelism variables), under the slot's. */
   readonly env?: Readonly<Record<string, string>>;
+}
+
+/** req-169: the closing round's spawn — the session to resume, the prompt, where its events go. */
+export interface RoundSpawnPlan {
+  readonly instruction: string;
+  readonly resumeRef: string;
+  readonly onEvent: (event: NormalizedEvent) => void;
+  readonly onResumeFailed: (reason: string) => void;
 }
 
 /** What a booted server reports for a later take-back. */
@@ -103,6 +111,28 @@ export class ProcessSupervisor {
       void handle.exited.then(() => vault.close());
     }
     return handle;
+  }
+
+  /**
+   * req-169: the closing round's one prompt into the run's own session —
+   * resumed read-only, its own event sink, no vault, and NOT the run's
+   * handle: its exit decides nothing about the run.
+   */
+  spawnRound(run: LiveRun, round: RoundSpawnPlan): WorkerHandle {
+    const request = run.request;
+    return this.deps.adapter.spawn({
+      cwd: workFolderOf(run.info),
+      instruction: round.instruction,
+      model: run.info.model ?? request.model,
+      permissionMode: 'read-only',
+      contextCap: this.deps.settings.contextCap(request.model),
+      resumeRef: round.resumeRef,
+      ticketId: request.ticketId,
+      ...this.envOf(run, { instruction: round.instruction, resumeRef: round.resumeRef }),
+      onEvent: round.onEvent,
+      onSessionRef: () => undefined,
+      onResumeFailed: round.onResumeFailed,
+    });
   }
 
   /** The worker's environment: the plan's (the light seat's) under the run's slot's login folder. */

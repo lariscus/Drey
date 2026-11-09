@@ -5350,3 +5350,60 @@ sequenceDiagram
 The session record carries `kind: '1:1'`, the persona, the working directory and the chat file; the service window's
 Sessions tab lists it as `1:1 · Ben` with `held · releases in <span>` and a Directory row. An ended 1:1 never reopens
 in place, and the worker's own end ends it `done` (exit verdict `session`).
+
+## 6.113 Gate verdict → signal → closing round → journal + lesson → Memory tab (req-169, milestone 229, [ADR-0093](09_architecture_decisions/0093-persona-sessions-the-1on1.md) as built, memory half)
+
+A ticket run's worker ends its turn (its final message may carry one `FRICTION:` line) and exits; the machine gate
+decides. Only a run that raised a signal of the vault's `closing-signals:` list is asked once more — in its own
+session, resumed read-only — before the settle (red) or the move (green). A smooth run goes straight on and writes
+nothing.
+
+```mermaid
+sequenceDiagram
+    participant W as Worker (the run's harness)
+    participant C as RunCompletion (gate path)
+    participant G as GateRunner
+    participant R as ClosingSignalRule
+    participant K as ClosingRound
+    participant A as ResumeRoundAsker (spawnRound)
+    participant V as Persona folder (reviews.md · memory.md · improvements.md)
+    participant S as RunSettler / the move
+    participant E as PersonaRecords (engine)
+    participant O as Owner (Memory tab · Mission Control · GET /report)
+    W-->>C: result (FRICTION: line → run.friction) · exit
+    C->>G: run the gate
+    G-->>C: red (failure) | green
+    C->>K: afterGate(run)
+    K->>R: assess: red gate · retry · steerCount > 0 · cost > 3 × median of 20 · friction — ∩ closing-signals
+    alt no signal
+        R-->>K: [] — a smooth run: no round, nothing written
+    else one or more signals
+        K->>A: the round's prompt (one line per signal)
+        alt the run reported a session ref and the harness resumes it
+            A->>W: resume the session read-only, one prompt (bounded at 10 min)
+            W-->>A: result: {"finding":…, "friction":…, "lesson":…, "proposal":…}
+            A-->>K: answered (+ the round's spend → the run's record)
+        else no ref / resume refused / past the bound
+            A-->>K: skipped (why)
+        end
+        K->>V: reviews.md — one entry: facts, signals, friction, finding (or note: round skipped — …)
+        opt a lesson
+            K->>V: memory.md — "- date · ticket · persona/model · lesson"
+        end
+        opt a prompt or model change
+            K->>V: improvements.md — an OPEN proposal for the 1:1 (never adopted)
+        end
+    end
+    C->>S: settle (red) · move then settle (green) — the ticket goes back
+    Note over V: the next run's ## Memory: the owner's and pinned lines first, the persona's after, capped
+    O->>E: GET /api/personas/ben/memory · /journal
+    E-->>O: Memory (author, evidence, pin) and Journal (newest first) — listed apart
+    O->>E: POST …/memory/remove {index, text} · …/journal/remove {index, at}
+    E->>V: the line goes — one commit (refused when the file moved)
+    Note over E,V: at the engine's start and on a journal read: friction.md → the start of reviews.md, removed — one logged commit
+    O->>O: GET /report → byModel: runs, red gates, retries, steers, outliers, mean cost, causes, frictions per harness/model
+```
+
+The round's events land in the run's stream (the service window's Sessions area shows them) but its exit decides
+nothing; a 1:1, a dialog, a blocked, scout or no-result run never reaches it. The runner's writes into the persona
+folder are plain file writes (req-225); the owner's removals and the migration are the engine's, one commit each.

@@ -756,24 +756,25 @@ describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () =>
     if (!appended.ok) {
       throw new Error(appended.error);
     }
-    expect(appended.entries).toEqual([{ text: 'gate red on lint means fix lint first', pinned: false }]);
+    // req-169: the owner's line names its author and date; the read carries both.
+    const day = new Date().toISOString().slice(0, 10);
+    const line = `${day} · you · gate red on lint means fix lint first`;
+    expect(appended.entries).toEqual([{ text: line, pinned: false, author: 'you', model: null, date: day, ticket: null, lesson: 'gate red on lint means fix lint first' }]);
     const file = await fsp.readFile(path.join(vaultDir, ...PERSONA_DIR, 'memory.md'), 'utf8');
-    expect(file).toBe('# Memory\n\ngate red on lint means fix lint first\n');
+    expect(file).toBe(`# Memory\n\n- ${line}\n`);
 
     const pinned = await service.personaMemoryPin({ id: 'pia', index: 0, pinned: true });
     if (!pinned.ok) {
       throw new Error(pinned.error);
     }
-    expect(pinned.entries).toEqual([{ text: 'gate red on lint means fix lint first', pinned: true }]);
-    expect(await fsp.readFile(path.join(vaultDir, ...PERSONA_DIR, 'memory.md'), 'utf8')).toBe(
-      '# Memory\n\n- gate red on lint means fix lint first [pinned]\n',
-    );
+    expect(pinned.entries).toMatchObject([{ text: line, pinned: true }]);
+    expect(await fsp.readFile(path.join(vaultDir, ...PERSONA_DIR, 'memory.md'), 'utf8')).toBe(`# Memory\n\n- ${line} [pinned]\n`);
     const unpinned = await service.personaMemoryPin({ id: 'pia', index: 0, pinned: false });
     if (!unpinned.ok) {
       throw new Error(unpinned.error);
     }
-    expect(unpinned.entries).toEqual([{ text: 'gate red on lint means fix lint first', pinned: false }]);
-    expect(await service.personaMemory('pia')).toMatchObject({ ok: true, entries: [{ text: 'gate red on lint means fix lint first', pinned: false }] });
+    expect(unpinned.entries).toMatchObject([{ text: line, pinned: false }]);
+    expect(await service.personaMemory('pia')).toMatchObject({ ok: true, entries: [{ text: line, pinned: false, author: 'you' }] });
   });
 
   it('the pin toggle refuses out-of-range indexes and memory-less personas with a readable error', async () => {

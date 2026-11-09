@@ -1185,6 +1185,36 @@ Control (*Talk to <name> 1:1*); all three show the same conversation.
 - The background service's **Sessions** tab lists a held 1:1 as
   *1:1 · Ben* with the time it will be let go.
 
+### Memory and journal {#memory-journal}
+
+Each persona keeps two lists, shown apart on its **Memory** tab (the Crew
+tab, and the Memory pane of the persona in Mission Control):
+
+- **Memory** — the lessons its runs read. Each line says who wrote it and
+  where it came from: *you · 2026-11-09* for a line you added,
+  *ben/sonnet · T-0102 · 2026-11-09* for one the persona learned on a
+  ticket. Type a line into the field and press **Add** to teach the
+  persona directly. **Pin** keeps a line always in the runs' view; your
+  lines and the pinned ones come first, the persona's own after them.
+  **Remove** takes any line out — yours or the persona's.
+- **Journal** — one entry per run that was out of the ordinary, newest
+  first: the ticket, the worker and model, whether the gate passed, the
+  cost, *why* the run was looked at (red gate, retry, your steer, a cost
+  far above the persona's usual, friction it reported), what it lacked,
+  and where it stumbled (model, prompt, task or environment). The journal
+  is your evidence — the runs never read it. **Remove** takes an entry
+  out.
+
+A smooth run writes nothing. When a run was noteworthy, the persona is
+asked once more after its gate — in the same session, without changing
+anything — and the answer becomes the journal entry and, at most, one new
+memory line. When it suggests changing its instructions or model, that
+appears as a proposal you accept or dismiss; nothing changes without you.
+Which signals count is the `closing-signals:` line in the tickets
+repository's `_meta/pipeline.md` (all five by default, `none` for none).
+The findings a worker used to write into a separate friction file moved
+into the journal.
+
 ### Tranches and the checkpoint report
 
 **On** never lets the crew run open-ended: it releases one **tranche** — up to
@@ -1334,12 +1364,13 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   finishes, nothing new starts; the button then reads **Resume all**) and
   **Stop all** (press twice — it aborts every live run and halts the
   chain). Click a card to open the persona's **1:1** (a conversation with
-  the persona, [The 1:1](#one-on-one); Ctrl+Enter sends), **Memory** (its entries — pin the ones that must
-  always ride along — and a line to teach it) and **Setup** (worker,
+  the persona, [The 1:1](#one-on-one); Ctrl+Enter sends), **Memory** (its memory lines with who wrote them —
+  pin the ones that must always ride along, remove any, a line to teach
+  it — and its journal of noteworthy runs, [Memory and journal](#memory-journal)) and **Setup** (worker,
   model, pool, phases, cost; **Pause** or **Resume** the persona).
   **Edit persona** on that head opens the persona's own page: its name,
   role, model pool and instructions (the persona's `prompt.md`), its skills
-  and a suggested change from its friction findings. **Save** writes
+  and a suggested change from the frictions in its journal. **Save** writes
   everything you changed as one commit; new runs get it, running ones keep
   the prompt they started with. **Discard** goes back to what is saved. If
   the instructions cannot be read, the editor and Save stay off, so nothing

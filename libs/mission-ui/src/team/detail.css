@@ -493,6 +493,26 @@ mc-app-bar {
   overflow-wrap: anywhere;
 }
 
+/* req-169: Remove sits right after Pin; the journal is its own list below the memory. */
+.mem-entry .pin + .mem-remove {
+  margin-left: 0;
+}
+
+.mem-entry.pinned .mem-remove {
+  color: var(--text-3);
+  border-color: var(--line);
+}
+
+.mem-journal {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.journal-entry .mem-text + .mem-text {
+  color: var(--text-3);
+}
+
 .mem-add {
   display: grid;
   gap: 8px;

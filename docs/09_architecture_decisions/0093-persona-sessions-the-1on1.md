@@ -2,10 +2,10 @@
 
 ## Status
 
-Accepted — the 1:1 half built as milestone 228 (req-168, 2026-11-09;
-"As built" below). The memory and journal half (R4/R14: `memory.md` written
-by model and owner, `reviews.md`, the closing round) stays Proposed until
-req-169. Designed in the session of 2026-11-07/08 (owner rulings R1–R4 in
+Accepted — the 1:1 half built as milestone 228 (req-168, 2026-11-09), the
+memory and journal half (R4/R14: `memory.md` written by model and owner,
+`reviews.md`, the closing round) as milestone 229 (req-169, 2026-11-09);
+both "As built" below. Designed in the session of 2026-11-07/08 (owner rulings R1–R4 in
 `docs/design/work-panel/crew-internals-concept.md`). Amends ADR-0088's E3
 (the coaching thread) and concept v2 §4.5/§4.7 (the persona chat as a direct
 call). Resolves D-52.
@@ -74,7 +74,7 @@ better".
   reasoning (cheap single shot) loses to identity and tools.
 - The context pack loses `personaCoachingSection`; `thread.md` reading goes
   with the migration.
-- Open: the exact 1:1 tool list, the line formats of memory and journal,
+- Open: the exact 1:1 tool list, the line formats of memory and journal (fixed by milestone 229),
   and whether Shape with Paul follows into a session once the numbers of
   req-109 are in. A `memory_write` tool during the run is a later item.
 
@@ -147,3 +147,59 @@ better".
    one envelope per reply).
 5. The idle span is fixed at 15 minutes (`shared/session-lifecycle.ts`);
    its setting is req-219.
+
+## As built (milestone 229, req-169, 2026-11-09) — the memory half
+
+- **The journal** — `reviews.md` in the persona folder, one entry per
+  noteworthy run: the runner's facts (ticket, harness/model, gate, cost,
+  the signals) plus `friction:` and the closing round's
+  `finding (<model|prompt|task|environment>):` (`core/persona-journal.ts`,
+  `core/persona-journal-file.ts`; format in `specs/ticket-schema.md`).
+  `friction.md` goes up in it: migrated once (one logged commit, the file
+  removed — `services/persona-records.ts`), and the improvement loop reads
+  the journal's `friction:` fields after its last aggregation stamp.
+- **The lesson** — at most one line per closing round, written directly
+  into `memory.md` as `- <date> · <ticket> · <persona>/<model> · <lesson>`;
+  the owner's lines `- <date> · you · <lesson>` (`core/memory-line.ts`).
+  Older lines stay readable with no author. The context pack takes the
+  owner's and pinned lines first, the persona's after, under one cap.
+- **The trigger** — `ClosingSignalRule` (`fleet/orchestrate/closing-signal-rule.ts`):
+  red gate, retry, owner steer (`steerCount`), cost outlier (> 3 × the
+  median of the persona's last 20 settled ticket runs with a cost, from at
+  least 5), the worker's `FRICTION:` line; the list is `_meta/pipeline.md`
+  `closing-signals:` (default all five), carried on the request.
+- **The write path** — `ClosingRound` (`fleet/orchestrate/closing-round.ts`),
+  called by `RunCompletion` on the gate path: the prompt
+  (`fleet/closing-round-prompt.ts`, in `specs/classifier-spec.md`) into
+  the run's own session, resumed read-only by `ResumeRoundAsker`; one
+  JSON answer, capped; a prompt or model change only as an open
+  `improvements.md` proposal (R11).
+- **The Memory tab** — Memory and Journal listed apart, every line and
+  entry removable (`POST /api/personas/<id>/memory/remove`,
+  `GET /api/personas/<id>/journal`, `POST …/journal/remove`), pin as
+  before, the owner's line added directly; on the Crew tab
+  (`plugins/tickets/renderer/team/memory-pane.ts`) and in Mission
+  Control's team detail.
+- **The report** — `GET /report`'s `byModel` groups every persona's
+  journal by harness/model (`core/journal-report.ts`).
+
+**Built differently from the decision above:**
+
+1. *"One closing round of the session"* — a run's worker has exited by the
+   time its gate decides, so the round **resumes the same session by its
+   ref** in a fresh process of the same harness, read-only. A harness that
+   cannot resume it, or a run without a session ref, gets **no round**:
+   the entry is written from the runner's facts with a note (a fresh
+   request of the same model was rejected — it never saw the session).
+2. The round is **bounded at 10 minutes** (it holds the run's ticket and
+   slot); the run's own work stays unbounded (ADR-0014).
+3. The round runs only on the gate path; a blocked, scout or no-result
+   run has no gate verdict and gets none.
+4. *"Self-reported friction"* — a `FRICTION:` line of the worker's final
+   message (the step prompts ask for it), not a file.
+5. The runner's journal, lesson and proposal writes are plain file writes
+   in the tickets repository, as the E3 memory line was — the runner does
+   not commit them (req-225).
+6. *"The persona's own memory and journal"* in the 1:1's toolset — the
+   1:1 brief keeps reading `memory.md`; the journal never enters its
+   context (R14: the finding is evidence, not instruction).

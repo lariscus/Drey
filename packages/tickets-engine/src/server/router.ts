@@ -233,6 +233,20 @@ function parseMemoryAppend(body: unknown): Parsed<{ text: string }> {
 }
 
 /** The pin toggle: one entry's index in the GET list, and the wanted state. */
+/** req-169: a removal names the entry's index and what identifies it (`text` for memory, `at` for the journal). */
+function parseRemoval(body: unknown, keyName: 'text' | 'at'): Parsed<{ index: number; key: string }> {
+  const obj = asObject(body);
+  const index = obj?.['index'];
+  const key = obj?.[keyName];
+  if (obj === null || typeof index !== 'number' || !Number.isInteger(index) || index < 0) {
+    return { ok: false, error: 'the removal needs the entry index (a 0-based integer)' };
+  }
+  if (typeof key !== 'string' || key === '') {
+    return { ok: false, error: `the removal needs the entry's ${keyName}` };
+  }
+  return { ok: true, value: { index, key } };
+}
+
 function parseMemoryPin(body: unknown): Parsed<{ index: number; pinned: boolean }> {
   const obj = asObject(body);
   const index = obj?.['index'];
@@ -398,6 +412,11 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
     const memory = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/memory$/.exec(req.path);
     if (memory !== null) {
       return json(await port.personaMemory(memory[1]!));
+    }
+    // req-169: the persona's journal (reviews.md), apart from its memory.
+    const journal = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/journal$/.exec(req.path);
+    if (journal !== null) {
+      return json(await port.personaJournal(journal[1]!));
     }
     const stream = /^\/api\/runs\/([A-Za-z0-9_.-]+)\/stream$/.exec(req.path);
     if (stream !== null) {
@@ -595,6 +614,14 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
   if (card !== null) {
     const [, id, proposal, decision] = card;
     return write(`persona ${id!} proposal ${proposal!}`, { ok: true, value: null }, () => port.personaProposalDecide({ persona: id!, id: proposal!, decision: decision as 'confirm' | 'dismiss' }));
+  }
+  // req-169: one memory line or one journal entry goes — identified by its index AND what the client saw.
+  const removal = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/(memory|journal)\/remove$/.exec(req.path);
+  if (removal !== null) {
+    const id = removal[1]!;
+    return removal[2] === 'memory'
+      ? write(`persona ${id} memory remove`, parseRemoval(body, 'text'), (value) => port.personaMemoryRemove({ persona: id, index: value.index, text: value.key }))
+      : write(`persona ${id} journal remove`, parseRemoval(body, 'at'), (value) => port.personaJournalRemove({ persona: id, index: value.index, at: value.key }));
   }
   const memoryPin = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/memory\/pin$/.exec(req.path);
   if (memoryPin !== null) {

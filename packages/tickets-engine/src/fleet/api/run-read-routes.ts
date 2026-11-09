@@ -1,12 +1,17 @@
 import { promises as fsp } from 'node:fs';
 import type { SupervisorSet } from '../orchestrate/supervisor-set';
+import { journalByModel } from '../../core/journal-report';
+import { JournalReader } from '../journal-reader';
 import { personaCostReport, tokenReport, type ReportRun } from '../report';
 import { attachCommandOf } from './attach-command';
 import type { RouteContext, RouteGroup } from './route-context';
 
 /** The runs, read: every record, the token report (T-0048), one record with its stream path, a stream's tail. */
 export class RunReadRoutes implements RouteGroup {
-  constructor(private readonly supervisors: SupervisorSet) {}
+  constructor(
+    private readonly supervisors: SupervisorSet,
+    private readonly journals: JournalReader = new JournalReader(),
+  ) {}
 
   async handle(ctx: RouteContext): Promise<boolean> {
     if (ctx.method !== 'GET') {
@@ -17,7 +22,7 @@ export class RunReadRoutes implements RouteGroup {
       return true;
     }
     if (ctx.pathname === '/report') {
-      ctx.respond(200, this.report());
+      ctx.respond(200, await this.report());
       return true;
     }
     const [kind, runId] = ctx.parts;
@@ -66,8 +71,11 @@ export class RunReadRoutes implements RouteGroup {
     }
   }
 
-  /** Token telemetry grouped by ticket, phase and model, and the personas' costs — curl-able next to /status. */
-  private report(): unknown {
+  /**
+   * Token telemetry grouped by ticket, phase and model, the personas' costs,
+   * and (req-169) the persona journals grouped by model — curl-able next to /status.
+   */
+  private async report(): Promise<unknown> {
     const runs: ReportRun[] = this.supervisors.records().map((record) => ({
       ticketId: record.info.ticketId,
       persona: record.info.persona ?? null,
@@ -80,6 +88,8 @@ export class RunReadRoutes implements RouteGroup {
       tokensOut: record.info.tokensOut,
       tokensBeforeFirstWrite: record.info.tokensBeforeFirstWrite ?? null,
     }));
-    return { ok: true, groups: tokenReport(runs), byPersona: personaCostReport(runs) };
+    const vaults = this.supervisors.records().map((record) => record.request.ticketsVaultPath);
+    const byModel = journalByModel(await this.journals.entriesOf(vaults));
+    return { ok: true, groups: tokenReport(runs), byPersona: personaCostReport(runs), byModel };
   }
 }

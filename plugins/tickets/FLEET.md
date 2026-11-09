@@ -1024,6 +1024,45 @@ A persona's 1:1 is a run record with `kind: '1:1'` (`fleet/protocol-session.ts`)
   `workingDirectory`, `chatFile`, `held`, `turn`, `costUsd`; the service
   window's Sessions tab draws `1:1 · <Name>` — `held · releases in <span>`.
 
+## The closing round (req-169, ADR-0093)
+
+After the gate verdict of a ticket run — red: before the settle; green:
+before the move — `ClosingRound` (`fleet/orchestrate/closing-round.ts`)
+looks at the run once:
+
+- **The signals** (`ClosingSignalRule`): `red-gate`, `retry`
+  (`RunRequest.closing.retry` — the composer had a previous gate failure),
+  `steer` (`steerCount` > 0), `cost` (> 3 × the median of the persona's
+  last 20 settled ticket runs with a cost in this runner's records, from
+  at least 5; the provider's cost, else the price table's), `friction`
+  (the last line-start `FRICTION:` line of the worker's final message,
+  `run.friction`). Only the ones in `RunRequest.closing.signals` count —
+  `_meta/pipeline.md` `closing-signals:`, all five when absent. **No
+  signal: nothing happens** — no round, no file touched.
+- **The round** (`ResumeRoundAsker`): `ProcessSupervisor.spawnRound`
+  starts the run's harness on the run's `sessionRef`, `permissionMode:
+  'read-only'`, no vault, with the round's prompt
+  (`specs/classifier-spec.md`, *The closing round*); its events go to the
+  run's stream through their own sink, so they never touch the run's
+  fold or decide its exit (the run is `gating`). The `result` text is the
+  answer; the round's tokens and cost are added to the record before the
+  settle. Bounded at 10 minutes; a refused resume or an exit without an
+  answer skips it.
+- **What it writes** (into the tickets repository, plain writes, not
+  committed — req-225): one `reviews.md` entry (`PersonaJournalWriter`),
+  at most one `memory.md` lesson (`PersonaMemory.appendLesson`), an open
+  `improvements.md` proposal when the answer carries one
+  (`RoundProposalWriter`). Two runner notes frame it in the transcript:
+  `closing round — red-gate, retry` and `closing round done — journal
+  entry written, one memory lesson` (or `… skipped — <why>; the journal
+  holds the run's facts`). A failure is a log line; the run settles as
+  it would have.
+- **Never** for a 1:1, an interactive dialog, a blocked, scout or
+  no-result run. No run writes the old per-run outcome line into
+  `memory.md` any more.
+- **`GET /report`** adds `byModel`: every persona journal of the vaults
+  the records name, grouped by harness/model (`core/journal-report.ts`).
+
 ## Lifecycle gotchas
 
 - **Which checkout runs it**: the runner lives in the Drey Service some Drey

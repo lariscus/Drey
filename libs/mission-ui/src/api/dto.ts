@@ -384,10 +384,34 @@ export interface PersonaThreadView {
 export interface PersonaMemoryEntryView {
   readonly text: string;
   readonly pinned: boolean;
+  /** req-169: `you`, the persona id, or null for a line that names no author. */
+  readonly author?: string | null;
+  readonly model?: string | null;
+  readonly date?: string | null;
+  readonly ticket?: string | null;
+  readonly lesson?: string;
 }
 
 export interface PersonaMemoryView {
   readonly entries: readonly PersonaMemoryEntryView[];
+}
+
+/** req-169: one journal entry (`GET /api/personas/<id>/journal`) — one noteworthy run. */
+export interface PersonaJournalEntryView {
+  readonly at: string;
+  readonly ticket: string | null;
+  readonly harness: string | null;
+  readonly model: string | null;
+  readonly gate: 'green' | 'red' | 'none';
+  readonly costUsd: number | null;
+  readonly signals: readonly string[];
+  readonly friction: string | null;
+  readonly finding: { readonly cause: string; readonly text: string } | null;
+  readonly note: string | null;
+}
+
+export interface PersonaJournalView {
+  readonly entries: readonly PersonaJournalEntryView[];
 }
 
 /**
@@ -482,10 +506,52 @@ export function parsePersonaMemory(json: unknown): PersonaMemoryView {
           return null;
         }
         const text = str(entry['text']);
-        return text === '' ? null : { text, pinned: entry['pinned'] === true };
+        return text === '' ? null : { text, pinned: entry['pinned'] === true, ...memoryAuthorOf(entry) };
       })
       .filter((entry): entry is PersonaMemoryEntryView => entry !== null),
   };
+}
+
+/** req-169: a memory line's author and evidence, when the desk sends them. */
+function memoryAuthorOf(entry: Record<string, unknown>): Partial<PersonaMemoryEntryView> {
+  if (!('author' in entry)) {
+    return {};
+  }
+  return {
+    author: strOrNull(entry['author']),
+    model: strOrNull(entry['model']),
+    date: strOrNull(entry['date']),
+    ticket: strOrNull(entry['ticket']),
+    ...(typeof entry['lesson'] === 'string' ? { lesson: entry['lesson'] } : {}),
+  };
+}
+
+function journalEntryOf(raw: unknown): PersonaJournalEntryView | null {
+  const entry = rec(raw);
+  const at = str(entry?.['at']);
+  if (entry === null || at === '') {
+    return null;
+  }
+  const gate = entry['gate'];
+  const finding = rec(entry['finding']);
+  const cost = entry['costUsd'];
+  return {
+    at,
+    ticket: strOrNull(entry['ticket']),
+    harness: strOrNull(entry['harness']),
+    model: strOrNull(entry['model']),
+    gate: gate === 'green' || gate === 'red' ? gate : 'none',
+    costUsd: typeof cost === 'number' && Number.isFinite(cost) ? cost : null,
+    signals: strArray(entry['signals']),
+    friction: strOrNull(entry['friction']),
+    finding: finding === null || str(finding['text']) === '' ? null : { cause: str(finding['cause']), text: str(finding['text']) },
+    note: strOrNull(entry['note']),
+  };
+}
+
+/** req-169: the journal answer (`{entries}`) tolerantly mapped; junk yields no entries. */
+export function parsePersonaJournal(json: unknown): PersonaJournalView {
+  return { entries: arr(rec(json)?.['entries']).map(journalEntryOf).filter((entry): entry is PersonaJournalEntryView => entry !== null) };
 }
 
 // --- Chat ------------------------------------------------------------------

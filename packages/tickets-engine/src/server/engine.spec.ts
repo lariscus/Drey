@@ -392,10 +392,10 @@ describe('personas (ADR-0088, E3)', () => {
       '# Memory\n\n- 2026-11-01 · T-0102 · handed-over\n',
     );
 
-    // One line, always: a multiline dialog entry flattens.
+    // One line, always: a multiline dialog entry flattens — in the owner's line form (req-169).
     await engine.invoke('personaLearn', { id: 'pia', entry: '- second lesson\n  spread over two lines' });
-    expect(await fsp.readFile(path.join(vault, 'tickets/_meta/personas/pia/memory.md'), 'utf8')).toBe(
-      '# Memory\n\n- 2026-11-01 · T-0102 · handed-over\n- second lesson spread over two lines\n',
+    expect(await fsp.readFile(path.join(vault, 'tickets/_meta/personas/pia/memory.md'), 'utf8')).toMatch(
+      /^# Memory\n\n- 2026-11-01 · T-0102 · handed-over\n- \d{4}-\d{2}-\d{2} · you · second lesson spread over two lines\n$/,
     );
 
     const blank = (await engine.invoke('personaLearn', { id: 'pia', entry: '   ' })) as { ok: boolean; error?: string };

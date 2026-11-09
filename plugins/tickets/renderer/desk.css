@@ -1271,8 +1271,36 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   flex: 1;
 }
 
-.desk-memory-pinned .desk-memory-text {
+.desk-memory-pinned .desk-memory-lesson {
   color: var(--accent-peach);
+}
+
+/* req-169: Memory and Journal apart; a line's author and evidence under it, quiet. */
+.desk-memory-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-height: 0;
+}
+
+.desk-memory-section + .desk-memory-section {
+  margin-top: 14px;
+}
+
+.desk-memory-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.desk-memory-meta {
+  font-size: 12px;
+  color: var(--text-4);
+}
+
+.desk-journal-row {
+  align-items: flex-start;
 }
 
 .desk-composer {

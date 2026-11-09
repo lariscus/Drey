@@ -400,6 +400,8 @@ export interface BoardSnapshot {
   readonly pipelineError: string | null;
   /** pipeline.md's optional `push:` remote (T-0041); null = never push. */
   readonly pushRemote: string | null;
+  /** req-169: pipeline.md's `closing-signals:` — the signals that earn a run its closing round; absent = all five. */
+  readonly closingSignals?: readonly ('red-gate' | 'retry' | 'steer' | 'cost' | 'friction')[];
   /**
    * The board's priority vocabulary — the order IS the weight: pipeline.md's
    * `priorities:` on the files backend, the store's `dricket.toml` on dricket (D-11).

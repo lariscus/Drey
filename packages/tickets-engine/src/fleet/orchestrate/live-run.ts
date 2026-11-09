@@ -26,6 +26,8 @@ export interface LiveRun {
   agentDone: boolean;
   /** Why the worker declared the step incomplete (`BLOCKED:`), set with `agentDone`; the exit decides from it. */
   blocked?: string | null;
+  /** The friction the worker reported in its final message (`FRICTION:`, req-169); set with `agentDone`. */
+  friction?: string | null;
   /** The owner interrupted the turn: the `result` that follows is the interrupt's, not a completion. */
   paused?: boolean;
   /** The owner asked for a pause after the current action (`pauseAfterAction`). */

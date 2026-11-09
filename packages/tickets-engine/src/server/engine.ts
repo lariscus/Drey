@@ -18,6 +18,7 @@ import { AGGREGATOR_SYSTEM_PROMPT, createChatBridge } from '../services/chat-llm
 import { FleetClient, type RunnerLocator } from '../services/fleet-client';
 import { RunnerComponent } from '../service/runner-component';
 import { composePersonaSessions } from '../services/compose-persona-sessions';
+import { PersonaRecords } from '../services/persona-records';
 import { ImprovementsService } from '../services/improvements-service';
 import { NotesService } from '../services/notes-service';
 import { VerifyService } from '../services/verify-service';
@@ -111,7 +112,7 @@ const BOARD_METHODS = [
 // None of these names is in the board or fleet tables (a later register() wins).
 const TEAM_METHODS = [
   'personas', 'handoffRun', 'chainPersonaPause', 'chainAutopilot', 'personaThread', 'personaThreadAppend', 'personaProposalDecide',
-  'personaMemory', 'personaMemoryAppend', 'personaMemoryPin', 'planParts',
+  'personaMemory', 'personaMemoryAppend', 'personaMemoryPin', 'personaMemoryRemove', 'personaJournal', 'personaJournalRemove', 'planParts',
   // The Persona page (board 7k): the phone's setup write and improvements card.
   'personaPatch', 'personaImprovements', 'personaImprovementDecide',
 ] as const;
@@ -231,7 +232,10 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
     bridge: (systemPrompt) => opts.chatBridge ?? createChatBridge({ config, systemPrompt }),
     log,
   });
-  const remotePort = new DreyTicketsPort(board, fleet, hub, { allowBypass: () => remoteService.allowBypass() }, chat, personaSessions);
+  // req-169: the Memory tab's journal and per-line removals; friction.md migrates once into each persona's journal.
+  const personaRecords = new PersonaRecords({ board, host, git, log });
+  void personaRecords.migrateAll().catch((error: unknown) => log(`friction.md migration failed: ${error instanceof Error ? error.message : String(error)}`, 'warn'));
+  const remotePort = new DreyTicketsPort(board, fleet, hub, { allowBypass: () => remoteService.allowBypass() }, chat, personaSessions, personaRecords);
   // req-100: the active vault's notes for paired devices. Drey keeps the key on
   // its active vault; without Drey it is the last one it named, or the hosted vault.
   const notes = new NotesService({

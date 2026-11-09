@@ -33,7 +33,13 @@ import { GateRunner, type GateSeats, type GateShell, type TrailerCheck } from '.
 import { HandoverSettings } from './orchestrate/handover-settings';
 import { LeftoverClaims } from './orchestrate/leftover-claims';
 import { OwnerAnswers } from './orchestrate/owner-answers';
+import { ClosingRound } from './orchestrate/closing-round';
+import { ClosingSignalRule } from './orchestrate/closing-signal-rule';
+import { PersonaJournalWriter } from './orchestrate/persona-journal-writer';
 import { PersonaMemory } from './orchestrate/persona-memory';
+import { RecordedRunCosts } from './orchestrate/recorded-run-costs';
+import { ResumeRoundAsker } from './orchestrate/resume-round-asker';
+import { RoundProposalWriter } from './orchestrate/round-proposal-writer';
 import { ProcessSupervisor } from './orchestrate/process-supervisor';
 import { ReviewCheckout } from './orchestrate/review-checkout';
 import { RunAdoption } from './orchestrate/run-adoption';
@@ -92,7 +98,6 @@ export function composeShared(storeFor: StoreForTarget, log: (message: string) =
     release: new ClaimRelease(stores, copy, clock, log),
     wait: new WaitClaim(stores, copy, log),
     copy,
-    memory: new PersonaMemory(clock, fs, log),
     clock,
     actor: `agent@${hostname().toLowerCase()}`,
     log,
@@ -181,8 +186,30 @@ function runtimeOf(deps: RunSupervisorDeps): Runtime {
   const stopper: RunStopper = new RunStopper(machine, repo, processes, { settler, bookkeeper, log });
   const gate = new GateRunner({ bookkeeper, shell: deps.execShell ?? execShell, trailers: deps.validateTrailers ?? validateTrailers, repo, review, ...(deps.seats !== undefined ? { seats: deps.seats } : {}) });
   const opinion = deps.secondOpinion !== undefined ? { secondOpinion: deps.secondOpinion } : {};
-  const completion: RunCompletion = new RunCompletion({ machine, repo, gate, bookkeeper, settler, processes, ...opinion });
+  const closing = closingRoundOf({ shared, repo, processes, log });
+  const completion: RunCompletion = new RunCompletion({ machine, repo, gate, bookkeeper, settler, processes, closing, ...opinion });
   return { ...shared, deps, table, machine, background, repo, settings, claims, settler, processes, stopper, takeover, completion, git, review };
+}
+
+/** req-169: the closing round over the run's own session, its writers and the runner's records as the cost history. */
+function closingRoundOf(parts: { shared: RunnerShared; repo: RunRepository; processes: ProcessSupervisor; log: (message: string) => void }): ClosingRound {
+  const { shared, repo, processes, log } = parts;
+  const { clock, fs, streams, bookkeeper } = shared;
+  return new ClosingRound({
+    rule: new ClosingSignalRule(new RecordedRunCosts(() => repo.list())),
+    asker: new ResumeRoundAsker({ spawner: processes, stream: (run, event) => void streams.append(run, event).catch(() => undefined), delay: unrefDelay }),
+    journal: new PersonaJournalWriter(fs, log),
+    memory: new PersonaMemory(clock, fs, log),
+    proposals: new RoundProposalWriter(clock, fs, log),
+    clock,
+    note: (run, what) => bookkeeper.note(run, what),
+    log,
+  });
+}
+
+/** A wait that never keeps the process alive by itself. */
+function unrefDelay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms).unref());
 }
 
 function prepareOf(rt: Runtime, git: TicketsGitSeam): PrepareWorktree {

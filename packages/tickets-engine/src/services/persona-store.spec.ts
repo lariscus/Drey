@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appendMemory, MEMORY_HEADER, MEMORY_LINE_CAP, memoryPathFor, parseMemoryEntries, toggleMemoryPin } from './persona-store';
+import { appendMemory, describeMemoryEntries, MEMORY_HEADER, MEMORY_LINE_CAP, memoryPathFor, parseMemoryEntries, removeMemoryEntry, toggleMemoryPin } from './persona-store';
 
 /**
  * The persona memory store (ADR-0088, E3): one append = one line, the
@@ -136,5 +136,28 @@ describe('parseMemoryEntries + toggleMemoryPin (U4, concept §4.4)', () => {
     expect(toggleMemoryPin(text, 1, true)).toBeNull();
     expect(toggleMemoryPin(text, -1, true)).toBeNull();
     expect(toggleMemoryPin('', 0, true)).toBeNull();
+  });
+});
+
+describe('describeMemoryEntries + removeMemoryEntry (req-169)', () => {
+  const text = '# Memory\n\n- 2026-11-01 · T-0102 · handed-over · 12 tokens\n- 2026-11-09 · T-0103 · ben/sonnet · run the verify script [pinned]\n- 2026-11-09 · you · ask before renaming\n';
+
+  it('reads author and evidence beside text and pin; an older line names no author', () => {
+    expect(describeMemoryEntries(text).map((e) => [e.author, e.model, e.ticket, e.pinned, e.lesson])).toEqual([
+      [null, null, 'T-0102', false, 'handed-over · 12 tokens'],
+      ['ben', 'sonnet', 'T-0103', true, 'run the verify script'],
+      ['you', null, null, false, 'ask before renaming'],
+    ]);
+  });
+
+  it("removes exactly the entry the caller saw — the owner's and the persona's alike", () => {
+    const removed = removeMemoryEntry(text, 1, '2026-11-09 · T-0103 · ben/sonnet · run the verify script')!;
+    expect(parseMemoryEntries(removed).map((e) => e.text)).toEqual(['2026-11-01 · T-0102 · handed-over · 12 tokens', '2026-11-09 · you · ask before renaming']);
+    expect(removed.startsWith('# Memory\n\n')).toBe(true);
+  });
+
+  it('refuses when the index names no entry or the text moved', () => {
+    expect(removeMemoryEntry(text, 7, 'x')).toBeNull();
+    expect(removeMemoryEntry(text, 0, '2026-11-09 · you · ask before renaming')).toBeNull();
   });
 });

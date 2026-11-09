@@ -1,5 +1,6 @@
 import type { RunInfo } from '../protocol';
 import type { NormalizedEvent } from '../harness/contract';
+import { frictionOf } from '../harness/event-text';
 import { foldExecSpan } from '../run/exec-span';
 import type { RunTelemetry } from '../telemetry';
 import type { BackgroundWork } from './background-work';
@@ -71,6 +72,7 @@ export class EventFold {
     if (event.kind === 'result' && run.paused !== true) {
       run.agentDone = true;
       run.blocked = event.blocked ?? null;
+      run.friction = frictionOf(event.text ?? ''); // req-169: the closing round's `friction` signal
     }
     if (run.softPause === true && isActionBoundary(event)) {
       run.softPause = false; // the action the owner waited for has finished: pause now

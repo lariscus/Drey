@@ -333,7 +333,7 @@
                 @for (entry of view.entries; track $index) {
                   <div class="mem-entry" [class.pinned]="entry.pinned">
                     <div class="mt">
-                      <span>{{ entry.pinned ? 'pinned' : 'entry' }}</span>
+                      <span>{{ memoryMeta(entry) || (entry.pinned ? 'pinned' : 'entry') }}</span>
                       @if (!readOnly()) {
                         <button
                           type="button"
@@ -343,9 +343,17 @@
                         >
                           {{ entry.pinned ? 'Pinned' : 'Pin' }}
                         </button>
+                        <button
+                          type="button"
+                          class="pin mem-remove"
+                          [attr.title]="'persona.memory.remove_title' | t"
+                          (click)="removeMemoryLine($index, entry)"
+                        >
+                          {{ 'persona.memory.remove' | t }}
+                        </button>
                       }
                     </div>
-                    <div class="mem-text">{{ entry.text }}</div>
+                    <div class="mem-text">{{ memoryText(entry) }}</div>
                   </div>
                 }
               </div>
@@ -373,6 +381,43 @@
                 >
                   Add
                 </button>
+              </div>
+            }
+            @if (removeError(); as error) {
+              <p class="pane-error" role="alert">{{ error }}</p>
+            }
+            <!-- req-169: the journal, apart from the memory: one entry per noteworthy run, never in a run's context -->
+            @if (journalLoaded() || journalError() !== null) {
+              <div class="mem-journal">
+                <div class="ck">{{ 'persona.journal.title' | t: { count: journalRows().length } }}</div>
+                @if (journalError(); as error) {
+                  <p class="pane-error" role="alert">{{ error }}</p>
+                }
+                @if (journalLoaded() && journalRows().length === 0) {
+                  <p class="pane-empty">{{ 'persona.journal.empty' | t }}</p>
+                }
+                <div class="mem-list">
+                  @for (row of journalRows(); track row.at) {
+                    <div class="mem-entry journal-entry">
+                      <div class="mt">
+                        <span>{{ row.head }}</span>
+                        @if (!readOnly()) {
+                          <button
+                            type="button"
+                            class="pin mem-remove"
+                            [attr.title]="'persona.journal.remove_title' | t"
+                            (click)="removeJournalEntry(row)"
+                          >
+                            {{ 'persona.memory.remove' | t }}
+                          </button>
+                        }
+                      </div>
+                      @for (line of row.lines; track $index) {
+                        <div class="mem-text">{{ line }}</div>
+                      }
+                    </div>
+                  }
+                </div>
               </div>
             }
           </div>
