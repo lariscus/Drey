@@ -47,6 +47,12 @@ export interface EngineOptions {
    * names none (a standalone engine, a spec).
    */
   readonly oneOnOneTools?: OneOnOneToolSeam;
+  /**
+   * Seed the default crew Paul, Ben, Ralf and Tessa (req-256): at the start for a board that lacks them and
+   * with "Initialize board". On by default; a spec whose vault is not about the crew (and counts commits or
+   * personas) turns it off.
+   */
+  readonly seedDefaultCrew?: boolean;
 }
 
 export interface Engine {
@@ -70,7 +76,7 @@ export interface Engine {
   dreyClients(): number;
   /** The remote gateway's state (the service's gateway row and its sleep verdict). */
   remoteStatus(): RemoteStatus;
-  /** Settles once the startup housekeeping that runs behind `createEngine` (the videos folder, the retired config key) has finished. */
+  /** Settles once the startup housekeeping that runs behind `createEngine` (the videos folder, the retired config key, the default crew's seeding) has finished. */
   readonly ready: Promise<void>;
   /** Stops the engine; resolves only after the startup housekeeping ended, so no file is written after it. */
   close(): Promise<void>;

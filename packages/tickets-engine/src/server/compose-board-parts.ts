@@ -26,8 +26,8 @@ export interface BoardParts {
   readonly presence: DreyPresence;
   readonly events: FleetEventWriter;
   readonly crew: ReturnType<typeof composeCrewConfig>;
-  /** req-256: seeds the default crew — "Initialize board" through the board, the engine's start through the session parts. */
-  readonly crewSeeder: CrewSeeder;
+  /** req-256: seeds the default crew — "Initialize board" through the board, the engine's start through the session parts; null = `seedDefaultCrew: false`. */
+  readonly crewSeeder: CrewSeeder | null;
   readonly board: EngineBoardService;
   readonly freeSessions: FreeSessionService;
 }
@@ -52,7 +52,7 @@ export function composeBoardParts(opts: EngineOptions, config: FileConfigStore, 
   // req-173 (R13): the vault layer of the configuration, `_meta/crew.md` — the board resolves its crew
   // keys from it; the first read of a vault moves the old keys of config.json and chain.json in once.
   const crew = composeCrewConfig({ host, git, config, fleetRoot, log });
-  const crewSeeder = composeCrewSeeder({ host, git, crew, home: opts.home, log });
+  const crewSeeder = opts.seedDefaultCrew === false ? null : composeCrewSeeder({ host, git, crew, home: opts.home, log });
   const board = new EngineBoardService(
     host,
     git,
@@ -65,7 +65,7 @@ export function composeBoardParts(opts: EngineOptions, config: FileConfigStore, 
     normalizeFleetPools({}),
     normalizeFleetHandover({}),
     `engine@${hostname().toLowerCase()}`,
-    { events, crew, crewSeeder },
+    { events, crew, ...(crewSeeder === null ? {} : { crewSeeder }) },
   );
   // req-173 (R12): the free sessions the owner opens (service window, Crew tab) or accepts from Pia's card.
   const freeSessions = composeFreeSessions({ board, fleet, crew, host, log });

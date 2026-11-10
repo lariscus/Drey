@@ -5640,3 +5640,37 @@ sequenceDiagram
 ```
 
 A flat `<name>.md` of the old form reads as a fallback behind the folder until the migration has run; the loader never writes. A selected name no folder holds is a log line and the run goes on without it.
+
+## 6.117 The default crew — "Initialize board" / the engine's start → seeder → marker → one commit (req-256, milestone 235, decision D7)
+
+Paul, Ben, Ralf and Tessa ship as files and reach a board in two ways: with "Initialize board", and — once — at the engine's start for a board that lacks them. Both ways are the same `CrewSeeder` call; the `seeded-crew:` marker in `_meta/crew.md` makes it idempotent and keeps a persona the owner deleted deleted.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Trig as Initialize board / engine start (composeSessionParts)
+    participant Seed as CrewSeeder
+    participant Ship as ShippedCrewFiles (personas/ + prompts/)
+    participant Crew as CrewConfigService (_meta/crew.md)
+    participant Tab as ServiceModelTable (service.json)
+    participant Fold as PersonaFolders
+    participant Git as TicketsGit
+    Trig->>Seed: seed(vault)
+    Seed->>Ship: load() — four personas (persona.md + the who part of prompt.md), the step prompts
+    Seed->>Crew: effective(vault).defaultWorker (the crew.md migration of 6.114 runs first)
+    Seed->>Tab: rows() — the model table; the runner may be asleep, the file is read
+    Note over Seed,Crew: inside the crew.md queue
+    Seed->>Crew: read crew.md; marker = seeded-crew
+    alt crew.md does not parse
+        Seed-->>Trig: refused — nothing written, the log says "seeded once it parses"
+    else
+        Seed->>Fold: has(vault, id) for every id the marker does not list
+        Seed->>Seed: worker and models per CrewSeedModels (provider rows, strongest class first)
+        Seed->>Seed: writes prompt.md (who + the role's step) and persona.md (worker, models) for the ids with no folder
+        Seed->>Crew: put(crew.md with seeded-crew: [paul, ben, ralf, tessa])
+        Seed->>Git: one commit "personas: the default crew (req-256)" — the persona files and crew.md
+        Seed-->>Trig: seeded [ids] — one log line (worker, models, folders that stayed)
+    end
+```
+
+A second run finds every id in the marker and writes nothing. An id whose folder exists is never touched, only marked. A seeding that fails logs and leaves the marker unset, so the next start tries again. The pipeline and the crew's `default-persona` are not changed: a column without a `persona:` pin keeps running the ring until the owner pins Paul, Ben, Ralf or Tessa on it (Flow tab), and the personas are at once on the Crew tab, in Mission Control's team list, in the flow editor's pins, and open to a 1:1 or a free session.

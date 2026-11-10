@@ -32,7 +32,7 @@ export class RunningEngine implements Engine {
     this.invokeUrl = deps.invokeUrl;
     this.token = deps.token;
     this.config = deps.config;
-    this.ready = deps.parts.verify.startupWork;
+    this.ready = Promise.all([deps.parts.verify.startupWork, deps.parts.sessions.startupWork]).then(() => undefined);
   }
 
   invoke(method: string, payload?: unknown): Promise<unknown> {
@@ -73,6 +73,7 @@ export class RunningEngine implements Engine {
     board.board.dispose();
     await remote.remoteService.stop();
     await verify.startupWork;
+    await this.deps.parts.sessions.startupWork;
     await board.board.idle();
     await board.git.idle();
     await this.deps.server.close();
