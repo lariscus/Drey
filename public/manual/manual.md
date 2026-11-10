@@ -1487,7 +1487,17 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   writes everything you changed as one commit; new runs get it, running ones
   keep the prompt they started with. **Discard** goes back to what is saved. If
   the instructions cannot be read, the editor and Save stay off, so nothing
-  can overwrite them unread.
+  can overwrite them unread. **Delete persona…**, at the left end of the
+  footer, deletes the persona: it asks you to type the persona's name — Delete
+  stays off until the text is the name exactly, capital letters and spaces
+  included — and then removes the persona's folder (its prompt, memory, journal
+  and own skills) as one commit. Tickets and their history and the 1:1's chat
+  files stay. It is refused, with the reason in the same window, for *You*, for
+  a persona with a run, a 1:1 or a session open (stop it first) and for a
+  persona a column of the Work panel or the crew's default persona names (the
+  message lists the columns; unpin it first). A crew member from a new board
+  (Paul, Ben, Ralf or Tessa) stays deleted. The persona's tab stays open on a
+  *No persona* note until you close it.
 - **Capacity** (a panel for the bottom dock) — its header reads `2 of 5
   sessions · 1 queued`: the live sessions over what the pools carry, and the
   tickets waiting to be pulled. Below it: what each persona is doing right now,

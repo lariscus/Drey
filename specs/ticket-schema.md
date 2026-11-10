@@ -1106,6 +1106,22 @@ deleted stays deleted; an id whose folder exists is never touched, only listed; 
 lists. One commit (`personas: the default crew (req-256)`: the persona files and `crew.md`), one log line. The seeding changes
 **no** pipeline pin and not `default-persona`: a column without a `persona:` pin still runs the ring until the owner pins a
 persona on it (a ticket's gate on the Flow tab, or `persona: ben` on the column in `pipeline.md`).
+
+**Deleting a persona (req-261).** `POST /api/personas/<id>/remove` `{confirm: <the persona's title>}` (remote port and
+plugin IPC `personaRemove`; answers `{ok: true, persona, files, warning?}` or `{ok: false, code, error, columns?,
+crewDefault?}`; `code` is one of `no_vault`, `no_persona`, `human`, `busy`, `pinned`, `confirm`, `internal`, the client's
+text `persona.delete.error.<code>`; types `contracts/persona-remove.ts`) removes **`_meta/personas/<id>/` whole** —
+`persona.md`, `prompt.md`, `memory.md`, `reviews.md`, `improvements.md` and the persona's own skills — in **one commit**
+`personas: <id> removed`, then the vault's change round. **What stays:** the ticket files and their history, the 1:1 chat
+files under `_meta/chat/` (the conversation is history, not the persona's folder), the shared skills, the fleet ledger and the
+run records (their `persona:` is a name, not a link), and a ticket's own `persona:` pin — a pin to an absent persona degrades to
+the ring like any unreadable persona (`BoardPersonas`). **Refused** (nothing is written), in this order: `human` — the owner's
+persona `you` (`kind: human`); `busy` — a run record of the persona in state `starting`, `running` or `stopping`, whatever
+its kind (a ticket run, a held 1:1 or free session); `pinned` — a `pipeline.md` column with `persona: <id>` or the crew's
+`default-persona`, the reply naming the columns (`columns`, their titles) and `crewDefault`; `confirm` — `confirm` is not the
+persona's `title` **character for character** (case and whitespace; the engine checks it whatever the client did). A runner that
+does not answer counts as no run. A seeded crew persona stays deleted: the `seeded-crew:` marker in `crew.md` was written when
+it was first offered (spec: `persona-remove-seeded.spec.ts`). Removals queue.
 - `memory.md` — the persona's curated memory, its **lessons** (R4/R14,
   req-169). Created on first write with a `# Memory` header; **capped at
   200 lines**, the oldest lines drop off. One entry per line, every line
