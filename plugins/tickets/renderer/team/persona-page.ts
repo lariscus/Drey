@@ -13,13 +13,14 @@ import type { PersonaImprovementsReply, PersonaView } from '../../shared/remote-
 import { h, type DeskDeps } from '../desk-deps';
 import { allowedBlock } from './persona-allowed-block';
 import type { BlockContext } from './persona-block-context';
-import { outlineButton } from './persona-dom';
+import { askPersonaDelete } from './persona-delete-action';
 import { personaHead, savedTextOf } from './persona-head';
 import { createInstructionsBlock } from './persona-instructions-block';
 import { draftOf, isDirty, personaPathsOf, wordsOf, type PersonaDraft } from './persona-model';
 import { decideProposal, openProposalOf, savePersona, type ActionEnv } from './persona-page-actions';
 import { blockContextOf, viewKeyOf } from './persona-page-context';
 import { readBeside, readPromptFile, type PromptRead } from './persona-page-load';
+import { pageFoot, type PageFoot } from './persona-page-foot';
 import { drafts, newSession, wordCounts } from './persona-page-state';
 import { profileBlock } from './persona-profile-block';
 import { proposalsBlock, syncApply } from './persona-proposals-block';
@@ -49,6 +50,8 @@ export interface PersonaPageHost {
   retitle(title: string): void;
   /** Opens the Crew tab on this persona's Memory or 1:1 tab. */
   openCrew(persona: string, tab: CrewLinkTab): void;
+  /** The persona was deleted (req-261): the tab leaves for Crew. */
+  removed(): void;
 }
 
 /** The two engine-backed seams (skills, prompt preview); a spec swaps them. */
@@ -71,8 +74,7 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
   let disposed = false;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let stateNode: HTMLElement | null = null;
-  let saveButton: HTMLButtonElement | null = null;
-  let discardButton: HTMLButtonElement | null = null;
+  let foot: PageFoot | null = null;
 
   const vaultId = (): string | null => deps.snapshot()?.vaultId ?? null;
   const readPrompt = (): Promise<PromptRead> => {
@@ -94,12 +96,7 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
       stateNode.classList.toggle('persona-state-error', session.messageIsError || failed);
     }
     syncApply(root, loaded !== null && loaded.draft.prompt !== loaded.base.prompt, t('persona.proposals.apply_blocked'));
-    if (saveButton !== null) {
-      saveButton.disabled = loaded?.promptRead.ok !== true || session.busy;
-    }
-    if (discardButton !== null) {
-      discardButton.disabled = session.busy;
-    }
+    foot?.sync({ canSave: loaded?.promptRead.ok === true, busy: session.busy });
   };
 
   const fail = (text: string): void => {
@@ -113,7 +110,7 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
       return;
     }
     const scrolls = ['.persona-left', '.persona-right'].map((selector) => root.querySelector(selector)?.scrollTop ?? 0);
-    stateNode = saveButton = discardButton = null;
+    stateNode = foot = null;
     const loaded = session.loaded;
     if (loaded === null) {
       const missing = store.loaded() && store.personas().every((entry) => entry.id !== id);
@@ -140,12 +137,8 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
     );
     const cols = h('div', 'persona-cols');
     cols.append(left, right);
-    discardButton = outlineButton(t('persona.page.discard'), 'persona-btn persona-btn-32', () => discard());
-    saveButton = outlineButton(t('persona.page.save'), 'persona-save', () => void savePersona(env));
-    saveButton.title = t('persona.page.save_title', { path: paths.dirShort });
-    const foot = h('footer', 'persona-foot');
-    foot.append(h('span', 'persona-grow'), discardButton, saveButton);
-    root.replaceChildren(head.element, cols, foot);
+    foot = pageFoot(t, t('persona.page.save_title', { path: paths.dirShort }), { discard, save: () => void savePersona(env), remove: () => askPersonaDelete(env, () => host.removed()) });
+    root.replaceChildren(head.element, cols, foot.element);
     [left, right].forEach((column, at) => (column.scrollTop = scrolls[at] ?? 0));
     syncState();
   };

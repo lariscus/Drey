@@ -3391,6 +3391,7 @@ const plugin: { activate(api: DreyPluginApi): void } = {
       mount: (host, path) =>
         mountPersonaPage(deskDeps(api), teamStore(api), host, personaIdOfKey(path), {
           back: () => openTeamDoc(api),
+          removed: () => openTeamDoc(api),
           openCrew: (persona, tab) => {
             focusCrew({ persona, tab });
             openTeamDoc(api);

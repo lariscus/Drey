@@ -5579,6 +5579,39 @@ sequenceDiagram
     end
 ```
 
+**Delete persona…** (req-261, milestone 236) sits at the footer's far side, opposite Discard and Save. It is not part of Save and not of the draft: it asks, and the engine decides.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner
+    participant Page as Persona page (footer, ask)
+    participant Ask as PersonaDeleteAsk (state)
+    participant IPC as Plugin IPC (tickets)
+    participant Eng as PersonaRemoveService (engine)
+    participant Pins as PersonaPinReader
+    participant Git as Tickets repo (personas/<id>/)
+    Owner->>Page: Delete persona…
+    Page->>Owner: modal "Delete <title>?" — what goes, what stays, a field labelled with the title
+    Owner->>Ask: types — Delete is enabled only while the text is the saved title exactly (Enter submits only then, Escape cancels)
+    Owner->>Ask: Delete
+    Ask->>IPC: personaRemove {persona, confirm: <the typed text>}
+    IPC->>Eng: personaRemove
+    Eng->>Pins: pipeline.md columns with persona: <id>, crew.md default-persona
+    Eng->>Eng: runs() — a live or held run, 1:1 or free session of the persona
+    alt you (human), busy, pinned, or confirm is not the title
+        Eng-->>Ask: {ok: false, code, columns?, crewDefault?} — nothing written
+        Ask-->>Owner: the refusal in the ask (persona.delete.error.<code>), the columns named; typing again clears it
+    else free to go
+        Eng->>Git: remove personas/<id>/ whole — one commit "personas: <id> removed" (chat files, tickets and shared skills stay)
+        Eng-->>Page: {ok: true, files}
+        Page->>Page: close the ask, drop the unsaved draft, TeamStore.refresh()
+        Page->>Owner: the tab hands over to Crew (host.removed); the list no longer shows the persona
+    end
+```
+
+The engine checks the typed title itself, so a client that skipped the guard deletes nothing. The `seeded-crew:` marker written at seeding (§6.117) is why a deleted crew persona is not brought back at the next start. The persona's own tab stays open on the *missing* note until it is closed (the SDK cannot close a tab yet — req-263).
+
 ## 6.116 A skill — upload → folder → `skills:` toggle → the run's prompt with `## Skills` → token count (req-172, milestone 232, [ADR-0088](09_architecture_decisions/0088-tickets-engine-package-cut.md) later change)
 
 A skill reaches the crew as a folder, is switched on in the persona's `skills:` list, and every session of that persona then loads its body in full behind the prompt. The same service answers what that costs.

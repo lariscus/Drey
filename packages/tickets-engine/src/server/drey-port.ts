@@ -64,6 +64,7 @@ import type { BoardSnapshot, CreateResult, MutationResult, RecentDone } from '..
 import type { EstimateKey, RunEstimate } from '../core/estimate';
 import type { PromptPreviewCommand, PromptPreviewReply, SkillListReply, SkillRemoveCommand, SkillsPort, SkillToggleCommand, SkillUploadCommand, SkillUploadReply } from '../contracts/skills';
 import type { PlanPartsEdit, PlanPartsReply, PlanReleaseReply, PlanReleaseScope } from '../contracts/plan-approval';
+import type { PersonaRemoveCommand, PersonaRemovePort, PersonaRemoveReply } from '../contracts/persona-remove';
 import type { FlowDraftReply, FlowOp, FlowReply, FlowSaveReply, FlowTarget } from '../contracts/flow';
 import type { ReviewComment } from '../core/review-feedback';
 import type { TicketDiff, TicketFileReply, WorktreeFile } from '../core/worktree-changes';
@@ -245,7 +246,16 @@ export class DreyTicketsPort implements TicketsRemotePort {
     private readonly personaSessions: PersonaSessionPort | null = null,
     private readonly records: PersonaRecordsPort | null = null,
     private readonly skillService: SkillsPort | null = null,
+    private readonly personaRemoval: PersonaRemovePort | null = null,
   ) {}
+
+  /** req-261: deleting a persona throws a clear line when the engine did not wire the service. */
+  personaRemove(cmd: PersonaRemoveCommand): Promise<PersonaRemoveReply> {
+    if (this.personaRemoval === null) {
+      throw new Error('the persona removal service is not wired on this port');
+    }
+    return this.personaRemoval.personaRemove(cmd);
+  }
 
   /** req-172: the skill routes throw a clear line when the engine did not wire the service. */
   private skills(): SkillsPort {

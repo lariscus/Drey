@@ -78,6 +78,11 @@ export class CrewSeederRig {
     return (await fsp.stat(path.join(this.root, rel)).catch(() => null)) !== null;
   }
 
+  /** A folder with everything in it, as the owner's deletion leaves the vault (req-261). */
+  removeFolder(rel: string): Promise<void> {
+    return fsp.rm(path.join(this.root, rel), { recursive: true, force: true });
+  }
+
   dispose(): Promise<void> {
     return fsp.rm(this.root, { recursive: true, force: true });
   }

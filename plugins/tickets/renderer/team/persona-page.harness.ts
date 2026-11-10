@@ -65,6 +65,9 @@ export const fx = {
   retitled: [] as string[],
   crew: [] as [string, string][],
   backs: 0,
+  removed: 0,
+  refreshes: 0,
+  modal: null as HTMLElement | null,
   host: null as unknown as HTMLElement,
   dispose: null as (() => void) | null,
   failLoads: 0,
@@ -88,6 +91,9 @@ export function resetFixture(): void {
   fx.retitled = [];
   fx.crew = [];
   fx.backs = 0;
+  fx.removed = 0;
+  fx.refreshes = 0;
+  fx.modal = null;
   fx.host = document.createElement('div');
   document.body.append(fx.host);
   fx.dispose = null;
@@ -102,10 +108,24 @@ export function resetFixture(): void {
 }
 
 export function cleanFixture(): void {
+  fx.modal?.remove();
   // A test leaves no draft behind for the next: Discard clears the page's memory of it.
   [...fx.host.querySelectorAll('button')].find((entry) => entry.textContent === 'Discard')?.click();
   fx.dispose?.();
   fx.host.remove();
+}
+
+/** The host's modal overlay: the content mounts in a node on the body; the returned close takes it away again. */
+function fakeModal(mount: (el: HTMLElement) => void): () => void {
+  const el = document.createElement('div');
+  el.className = 'fake-modal';
+  document.body.append(el);
+  fx.modal = el;
+  mount(el);
+  return () => {
+    el.remove();
+    fx.modal = fx.modal === el ? null : fx.modal;
+  };
 }
 
 function fakeView(opts: MarkdownViewOptions): MarkdownViewHandle {
@@ -192,7 +212,7 @@ function depsOf(): DeskDeps {
           { id: 'notes', name: 'notes' },
         ],
       },
-      ui: { icon: () => document.createElementNS('http://www.w3.org/2000/svg', 'svg'), showDiff: fx.showDiff, createMarkdownView: fakeView },
+      ui: { icon: () => document.createElementNS('http://www.w3.org/2000/svg', 'svg'), showDiff: fx.showDiff, createMarkdownView: fakeView, showModal: fakeModal },
     } as unknown as DeskDeps['api'],
     snapshot: () => ({ vaultId: 'v1', pipeline: [{ id: 'plan', title: 'Plan', handover: 'agent plan-default' }, { id: 'build', title: 'Build', handover: 'agent build-default' }] }) as unknown as BoardSnapshot,
     runs: () => fx.runs,
@@ -235,7 +255,7 @@ function depsOf(): DeskDeps {
 }
 
 function storeOf(): TeamStore {
-  return { personas: () => [{ ...view, ...fx.view }], nameOf: () => 'Ben', loaded: () => true, error: () => '', refresh: async () => undefined, subscribe: () => () => undefined };
+  return { personas: () => [{ ...view, ...fx.view }], nameOf: () => 'Ben', loaded: () => true, error: () => '', refresh: async () => void (fx.refreshes += 1), subscribe: () => () => undefined };
 }
 
 export async function settle(): Promise<void> {
@@ -245,7 +265,7 @@ export async function settle(): Promise<void> {
 }
 
 export async function mount(seams: PersonaPageSeams = {}): Promise<void> {
-  const pageHost: PersonaPageHost = { back: () => (fx.backs += 1), retitle: (title) => fx.retitled.push(title), openCrew: (persona, tab) => fx.crew.push([persona, tab]) };
+  const pageHost: PersonaPageHost = { back: () => (fx.backs += 1), retitle: (title) => fx.retitled.push(title), openCrew: (persona, tab) => fx.crew.push([persona, tab]), removed: () => (fx.removed += 1) };
   fx.dispose = mountPersonaPage(depsOf(), storeOf(), fx.host, 'ben', pageHost, seams);
   await settle();
 }

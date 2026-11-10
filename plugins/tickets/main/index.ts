@@ -884,6 +884,12 @@ const plugin: MainPluginModule = {
         ? { ok: false, code: 'bad_name', error: 'bad skill toggle payload' }
         : client.invoke('personaSkillToggle', { persona, skill, on });
     });
+    // req-261: deleting a persona. The typed title may be empty (the engine refuses it with its code), so it is not read through `str`.
+    ctx.ipc.handle('personaRemove', (payload) => {
+      const persona = str(payload, 'persona');
+      const confirm = typeof payload === 'object' && payload !== null ? (payload as Record<string, unknown>)['confirm'] : undefined;
+      return persona === null || typeof confirm !== 'string' ? { ok: false, code: 'confirm', error: 'bad persona removal payload' } : client.invoke('personaRemove', { persona, confirm });
+    });
     ctx.ipc.handle('personaSkillRemove', (payload) => {
       const persona = str(payload, 'persona');
       const name = str(payload, 'name');
