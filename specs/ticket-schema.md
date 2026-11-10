@@ -1087,6 +1087,25 @@ tickets/_meta/personas/
   (`Who <title> is: role, tone, limits. Edit freely — the next run reads it.`, and the human's `… is you: manual steps park the ticket here…`)
   carries nothing and is dropped; prose `prompt.md` already holds is not duplicated; a `persona.md` without a body is skipped. A
   persona patch written over a file whose prose has not migrated yet keeps that prose in place.
+
+**The shipped default crew (req-256, decision D7).** Four personas ship as files in the package,
+`packages/tickets-engine/personas/<id>/persona.md` + `prompt.md`, and are seeded into a board:
+**`paul`** (planner), **`ben`** (builder), **`ralf`** (reviewer), **`tessa`** (tester); Pia is Mission Control, the human
+persona `you` is written by "Initialize board". The shipped `persona.md` carries `title`, `role`, `summary:`, `color`
+(`#f2d3e2`, `#8ecbef`, `#bfe3cd`, `#f2cfae`) and `skills: []` — no `worker:` and no `models:`; the shipped `prompt.md` is the
+"who it is" part (`## Who Paul is`, `## How Paul works`, `## What done means`). **Seeding** (`CrewSeeder`) writes the
+vault's copy: `persona.md` with the worker of `default-worker` in `_meta/crew.md` (else the fleet default `opencode`) and the
+models the machine's model table names for that worker (`service.json` → `models`: the worker's provider rows, strongest
+class first, the first is `models.default`, all of them the `pool`; none → the parser's default, and the log says so), and
+`prompt.md` = the shipped character part **plus the role's shipped step prompt below it**
+(`## The planning|build|review|verify step` + `plan-default` / `build-default` / `review-default` / `qa-default` without its
+version marker), because a persona's prompt replaces the step prompt as the run's instruction base. **When:** "Initialize
+board" after the pipeline and the prompts; and once at the engine's start for a board that lacks them. **Idempotent by id**:
+`seeded-crew: [paul, ben, ralf, tessa]` in `_meta/crew.md` (below) lists the ids already offered, so a persona the owner
+deleted stays deleted; an id whose folder exists is never touched, only listed; the engine never re-seeds an id the marker
+lists. One commit (`personas: the default crew (req-256)`: the persona files and `crew.md`), one log line. The seeding changes
+**no** pipeline pin and not `default-persona`: a column without a `persona:` pin still runs the ring until the owner pins a
+persona on it (a ticket's gate on the Flow tab, or `persona: ben` on the column in `pipeline.md`).
 - `memory.md` — the persona's curated memory, its **lessons** (R4/R14,
   req-169). Created on first write with a `# Memory` header; **capped at
   200 lines**, the oldest lines drop off. One entry per line, every line
@@ -1451,6 +1470,7 @@ every device working this tickets repository shares, versioned with it.
 
 ```markdown
 ---
+seeded-crew: [paul, ben, ralf, tessa]  # the shipped default crew already offered to this board (req-256)
 default-persona: ben          # the persona ladder's floor (was config personas.default)
 default-worker: claude-code   # the assignment ring's floor (was defaultWorker)
 permission-mode: accept-edits # dispatched runs: accept-edits | bypass (was autoPermissionMode)
@@ -1490,7 +1510,11 @@ written over — Settings refuses to save into it. `permission-mode` is a
 crew default only: `read-only` is a session's mode (a review, a 1:1, a
 free session the owner opens read-only), never the crew's. Keys of other
 features may sit beside these and are kept by every write (req-169's
-closing-round signals belong here).
+closing-round signals belong here). `seeded-crew:` is one of them (req-256): not a
+setting, the marker `CrewSeeder` writes — a list of the shipped default crew's persona ids
+(`paul`, `ben`, `ralf`, `tessa`) the board has been offered; a missing key means none
+yet (the next engine start seeds), and an id in it is never seeded again, whether its
+folder exists or the owner deleted it.
 
 **Precedence** (written down once, enforced by `LayeredConfigResolver`):
 **session record > vault (`_meta/crew.md`) > built-in default**. The

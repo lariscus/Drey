@@ -44,7 +44,8 @@ beforeEach(async () => {
   // The pair-status specs read `pairing.deviceName` — the remote must be
   // on (or the status hides the pairing view behind `config.enabled`).
   await fsp.writeFile(path.join(home, 'config.json'), JSON.stringify({ 'remote.enabled': true }), 'utf8');
-  engine = await createEngine({ vaultPath: vault, home, clientDir: path.join(root, 'client'), log: () => undefined });
+  // These specs count commits and personas: the default crew's seeding (req-256) has its own spec, engine-crew-seed.spec.ts.
+  engine = await createEngine({ vaultPath: vault, home, clientDir: path.join(root, 'client'), log: () => undefined, seedDefaultCrew: false });
 });
 
 afterEach(async () => {
@@ -283,7 +284,7 @@ describe('Drey gone → the runner is asked to retire (req-110)', () => {
     const descriptor = { port, token: 'rt', pid: 1, startedAt: '', version: 1 };
     const runnerLocator = { current: async () => descriptor, wake: async () => ({ ok: true as const, descriptor }) };
     await engine.close();
-    engine = await createEngine({ vaultPath: vault, home, clientDir: path.join(root, 'client'), log: () => undefined, dreyGoneGraceMs: 150, runner: runnerLocator });
+    engine = await createEngine({ vaultPath: vault, home, clientDir: path.join(root, 'client'), log: () => undefined, seedDefaultCrew: false, dreyGoneGraceMs: 150, runner: runnerLocator });
   });
 
   afterEach(async () => {
@@ -536,6 +537,7 @@ describe('verify (E4)', () => {
       home,
       clientDir: path.join(root, 'client'),
       log: () => undefined,
+      seedDefaultCrew: false,
       verifyHarness: fakeHarness,
     });
   });
@@ -555,7 +557,7 @@ describe('verify (E4)', () => {
           return { environment: 'Electron test on win32', shots: [{ file, criterion: input.criteria[0] ?? null, atMs: 3000 }], findings: [], video, error: null };
         },
       };
-      engine = await createEngine({ vaultPath: vault, home, clientDir: path.join(root, 'client'), log: () => undefined, verifyHarness: harness });
+      engine = await createEngine({ vaultPath: vault, home, clientDir: path.join(root, 'client'), log: () => undefined, seedDefaultCrew: false, verifyHarness: harness });
       const created = (await engine.invoke('createTicket', {
         title: 'Verify me',
         priority: 'normal',
@@ -592,7 +594,7 @@ describe('verify (E4)', () => {
     it('removes a stored videos.limitMb at startup and ignores it', async () => {
       await engine.close();
       await fsp.writeFile(path.join(home, 'config.json'), JSON.stringify({ 'videos.limitMb': 2000 }), 'utf8');
-      engine = await createEngine({ vaultPath: vault, home, clientDir: path.join(root, 'client'), log: () => undefined });
+      engine = await createEngine({ vaultPath: vault, home, clientDir: path.join(root, 'client'), log: () => undefined, seedDefaultCrew: false });
       await engine.ready;
       expect(await engine.config.get('videos.limitMb')).toBeUndefined();
       expect(JSON.parse(await fsp.readFile(path.join(home, 'config.json'), 'utf8'))).not.toHaveProperty('videos.limitMb');
@@ -718,6 +720,7 @@ describe('chat (E5a)', () => {
       home,
       clientDir: path.join(root, 'client'),
       log: () => undefined,
+      seedDefaultCrew: false,
       chatBridge: fakeBridge,
     });
   });

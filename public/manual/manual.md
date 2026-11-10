@@ -857,6 +857,20 @@ creates the configuration files under `tickets/_meta/`:
   folder…** picks a folder and registers every git repository found
   inside (the folder itself and its subfolders) with clone URL, branch
   and local path prefilled.
+**The crew a new board starts with.** The same step adds four crew members next
+to *You*: **Paul** (plans), **Ben** (builds), **Ralf** (reviews) and **Tessa**
+(tests). They appear on the Crew tab, in Mission Control's team list and in the
+flow editor like any persona, each with a short prompt of its own, your default
+worker and — when the machine's model table names models for that worker — the
+strongest of them first. A board you created earlier gets the four once, the
+next time the service starts; if you delete one of them it stays deleted, and
+nothing you have changed is touched. Seeding does not move any work to them:
+a column that names no persona keeps running as it did. To let Ben build, open
+a ticket's **Flow** tab, click the gate and choose Ben under *who works it*;
+to make him the builder of every ticket, give the column `persona: ben` in
+`tickets/_meta/pipeline.md`. A persona's prompt replaces the step's own prompt
+for the runs it takes — Edit persona opens it (its first lines say who the
+persona is; below them stands the step it works).
 
 **The Work panel** (req-75) shows six groups, each folded or opened by
 its heading (remembered across restarts):
@@ -2703,7 +2717,7 @@ history store is deliberately outside it).
 ---
 
 *Manual for Drey 0.8.1; manual content last changed
-2026-11-09. Screenshots were captured automatically from
+2026-11-10. Screenshots were captured automatically from
 the built app (Anthrazit theme, 1600Ã—1000) by
 `e2e/manual-screenshots.spec.ts` — run
 `$env:DREY_MANUAL_SHOTS='1'; npm run e2e:run -- manual-screenshots`

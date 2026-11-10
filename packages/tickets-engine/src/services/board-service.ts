@@ -227,6 +227,8 @@ export interface BoardServiceOptions {
    * values and the config keys stand.
    */
   readonly crew?: { effective(vault: EngineVault): Promise<EffectiveCrew> };
+  /** req-256: "Initialize board" seeds the default crew through it, after the pipeline and the prompts; absent = no crew is seeded. */
+  readonly crewSeeder?: { seed(vault: EngineVault): Promise<unknown> };
 }
 
 /** A dricket write that met a ticket changed in the meantime (dk exit 12): nothing was written, the caller asks the user. */
@@ -4751,6 +4753,8 @@ export class EngineBoardService {
         'tickets: initialize board',
       );
       this.host.announceChanges(target.id, [PIPELINE_PATH, REPOS_PATH, humanPersonaPath, ...promptPaths]);
+      // req-256: Paul, Ben, Ralf and Tessa follow the pipeline and the prompts, in a commit of their own (never throws).
+      await this.options.crewSeeder?.seed(target);
       this.announceChanged();
       return { ok: true, ...(warning === null ? {} : { warning }) };
     });

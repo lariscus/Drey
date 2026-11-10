@@ -28,7 +28,7 @@ beforeEach(async () => {
   for (const args of [['init', '-b', 'main'], ['config', 'user.name', 'spec'], ['config', 'user.email', 'spec@example.com']]) {
     await promisify(execFile)('git', args, { cwd: vault });
   }
-  engine = await createEngine({ vaultPath: vault, home, clientDir: path.join(root, 'client'), log: () => undefined });
+  engine = await createEngine({ vaultPath: vault, home, clientDir: path.join(root, 'client'), log: () => undefined, seedDefaultCrew: false });
 });
 
 afterEach(async () => {

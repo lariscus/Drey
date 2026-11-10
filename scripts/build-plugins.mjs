@@ -229,6 +229,11 @@ const enginePromptsSrc = path.join(enginePkgDir, 'prompts');
 if (existsSync(enginePromptsSrc)) {
   cpSync(enginePromptsSrc, path.join(mainOut, 'packages', 'tickets-engine', 'prompts'), { recursive: true });
 }
+// The default crew (req-256) ships the same way: personas/<id>/{persona,prompt}.md next to the prompts.
+const enginePersonasSrc = path.join(enginePkgDir, 'personas');
+if (existsSync(enginePersonasSrc)) {
+  cpSync(enginePersonasSrc, path.join(mainOut, 'packages', 'tickets-engine', 'personas'), { recursive: true });
+}
 
 // The main-side tsc config still emits sample (it stays type-checked);
 // without the opt-in flag its loadable output is removed so discovery in

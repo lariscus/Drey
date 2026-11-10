@@ -19,6 +19,8 @@ a roadmap item) · **question** (owner decides; not changed).
 
 > **E12-9c (2026-11-05, milestone 166) supersedes rows 1, 17, 18, 19, 24 and 26 and answers Q1:** the owner decided the default pipeline `Inbox · Plan · Build · Review · Sign Off · Done`, the first column is titled **Inbox** again, and the shipped samples/manual/scratch pipeline follow. See [default-pipeline.md](default-pipeline.md).
 
+> **req-256 (2026-11-10, milestone 235) answers Q2 and Q3 and supersedes rows 10 and 13:** the default crew Paul, Ben, Ralf and Tessa is shipped as files and seeded — with "Initialize board" and once at the engine's start for a board that lacks them (owner decision, first taken 2026-11-05 as E12-9d and confirmed 2026-11-10); the default worker stays the vault's (`crew.md`) or the fleet's setting.
+
 ## Table
 
 | # | Default as shipped (file:line) | Name in the design (file / section) | Verdict | Action |
@@ -32,10 +34,10 @@ a roadmap item) · **question** (owner decides; not changed).
 | 7 | Work panel groups Needs you · Shaping · Running · Prioritized · Ideas · Done this week — `plugins/tickets/renderer/work-panel.ts:36-54` | Same names, same order — `Home.dc.html`, concept §6 | match | none |
 | 8 | Track chips **Auto** / **Shape** / **Triage** — `work-panel.ts:615`; **Auto track** / **Shape track** on the Ready card — `ready-view.ts:75`; menu rows "Auto — runs on its own", "Shape — a plan-mode dialog with you" — `index.ts:3055-3056` | "Triage", "Auto track", "Shape track" — `Main.dc.html` | match (the short chip form is a size deviation, not a naming one) | none |
 | 9 | Ready-to-try buttons **Move to <next column>**, **Archive** — `ready-view.ts` | "Accept and merge" in `Ready.dc.html` | match (README records req-86 as a deliberate deviation) | none |
-| 10 | Default personas: **none are shipped** — "Initialize board" writes `pipeline.md`, `repos.md` and the prompts only (`board-service.ts:4540-4553`); the Crew view starts with only the human persona **You** (`personas.humanName`, `board-service.ts:3893`) | Default crew **Paul, Ben, Ralf, Tessa**, roles planner / builder / reviewer / tester; **Pia is Mission Control itself**; no design persona — concept D7, §4.2 | **question** | Q2 |
+| 10 | Default personas: **none are shipped** — "Initialize board" writes `pipeline.md`, `repos.md` and the prompts only (`board-service.ts:4540-4553`); the Crew view starts with only the human persona **You** (`personas.humanName`, `board-service.ts:3893`) | Default crew **Paul, Ben, Ralf, Tessa**, roles planner / builder / reviewer / tester; **Pia is Mission Control itself**; no design persona — concept D7, §4.2 | **match** (req-256, milestone 235) | Q2 answered **yes**: Paul, Ben, Ralf and Tessa ship as `packages/tickets-engine/personas/<id>/` and are seeded by `CrewSeeder` — "Initialize board" after the pipeline and the prompts, and once at the engine's start for a board without them (`seeded-crew:` marker in `_meta/crew.md`, one commit); the human persona *You* is still written by "Initialize board" itself |
 | 11 | Human persona title **You** — `board-service.ts:3893`, `flow-model.ts:56` | "you" / "You" — concept §5.7, `Orchestrator.dc.html` ("ask me") | match | none |
 | 12 | Persona role enum `planner · builder · reviewer · tester · custom` — `core/persona.ts:36` | same — concept §4.2 | match | none |
-| 13 | Persona and fleet default worker **opencode** (`contracts/fleet-defaults.ts:8`, `core/persona.ts:105` parse default) | `claude-code` in the concept's example persona (§4.2, "Paul") — an example, not a stated default | **question** | Q3 |
+| 13 | Persona and fleet default worker **opencode** (`contracts/fleet-defaults.ts:8`, `core/persona.ts:105` parse default) | `claude-code` in the concept's example persona (§4.2, "Paul") — an example, not a stated default | **match** (Q3 answered, req-256) | none: the default worker stays a setting — `default-worker` in `_meta/crew.md`, else `opencode` (the owner's 2026-11-05 ruling, E12-9b Q3); a seeded persona takes it at seeding |
 | 14 | Persona default model **opus** — `core/persona.ts` parse default | `opus` — concept §4.2 example | match | none |
 | 15 | Mission Control chat voice labels "Paul, via Mission Control", "Paul suggests" — `libs/mission-ui/src/chat/chat.html:56,68,94,108`; the Assistant's Mission Control target is named after Mission Control — `plugins/tickets/renderer/conversation/targets.ts` | D7: Pia = Mission Control, Paul plans | match | none |
 | 16 | Prompt templates `build-default`, `commit-default`, `plan-default`, `plan-interactive-default`, `qa-default`, `review-default`, `scout-default` — `packages/tickets-engine/prompts/` | `qa-default` (verify), `scout`, plan prompts — concept §5.2, §5.6; `refine-interactive-default` is gone (concept §5.8 update) | match | none |
@@ -54,7 +56,7 @@ Counts: **26 rows, covering about 55 individual names** (5 column titles, 6 grou
 titles, 3 track names plus their long forms, 3 flow roles, 7 prompt names, 5 roles, the
 persona defaults, 4 panel/status labels, the capture/hint/manual strings). Deviations:
 **5** fixed (1, 17, 18, 19, 26), **4** owned by an existing roadmap item (20–23),
-**3** questions (6, 10, 13).
+**3** questions (6, 10, 13) — 10 and 13 answered by req-256 (below), 6 by E12-9c.
 
 ## Questions for the owner
 
@@ -78,9 +80,13 @@ the owner adds personas by hand. Seeding needs, per persona, a `persona.md`, a
 resolution ladder. Seed them (with which worker and model), or keep the crew empty
 until the owner builds it?
 
+> **Answered 2026-11-10 — yes (req-256, milestone 235).** The four are shipped files; worker = the vault's `default-worker`, models = the worker's rows of the machine's model table (never a model id of ours); "Initialize board" seeds them, and an existing board gets them once at the engine's start (`seeded-crew:` in `_meta/crew.md` keeps a persona the owner deleted deleted).
+
 **Q3 — Default worker `opencode` or `claude-code`?** The fleet and the persona parser
 default to `opencode`; the concept's example persona uses `claude-code`. Nothing in the
 design names a default worker, so this is a product decision, not a naming one.
+
+> **Answered (owner, 2026-11-05 in E12-9b, kept 2026-11-10):** `opencode` — it supports every provider; `claude-code` and Kimi stay selectable. It is not a persona default: the vault's `default-worker` (else the fleet's `opencode`) is read when a persona is seeded, and each persona's `worker:` stays its own.
 
 ## dricket side (not touched)
 
