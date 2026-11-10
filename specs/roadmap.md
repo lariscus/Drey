@@ -118,6 +118,8 @@ views, as milestone 140; D-4, runs.spec flaking under full-suite load, as milest
 
 ### Now (small, daily value)
 
+- **req-261 — Delete a persona from its details, confirmed by typing its name** (owner request, outside the list, 2026-11-10, during the verification round of the crew block). The Persona page has no way to delete a persona. Add a *Delete persona…* action to the page (its head `⋯` menu, or the footer's far side, in the page's style, no prose): a modal ask that names what goes — the folder `personas/<id>/` with prompt, memory, journal and own skills — and is confirmed only by typing the persona's title exactly (the Delete button stays disabled until the text matches); the deletion is one engine route and one commit `personas: <id> removed`. Refused, with the reason in the ask: the human persona `you`; a persona with a live or held run or 1:1; a persona a pipeline column pins (the ask names the columns). A seeded crew persona stays deleted (milestone 235's `seeded-crew:` marker). Mission Control's team detail gets the same action if its dialog pattern can carry a text field, else a follow-up row.
+
 
 _The Crew internals, designed 2026-11-07/08 — build in this order:_
 
