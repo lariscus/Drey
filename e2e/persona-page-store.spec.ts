@@ -92,7 +92,7 @@ test('reads and writes prompt.md in the checkout vault', async ({ page, vaultDir
   await expect(editor).toContainText('You are Ben, on a store.', { timeout: 15_000 });
   await editor.fill('Changed on a store.');
   await body.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(body.locator('.persona-head .persona-state')).toHaveText('Saved', { timeout: 15_000 });
+  await expect(body.locator('.persona-head .persona-state')).toContainText('Saved', { timeout: 15_000 });
   expect(fs.readFileSync(path.join(vaultDir, 'tickets', '_meta', 'personas', 'ben', 'prompt.md'), 'utf8')).toBe('Changed on a store.');
   // Nothing of the persona landed in the store.
   expect(execFileSync('git', ['log', '--all', '--name-only', '--format='], { cwd: storeDir, encoding: 'utf8', windowsHide: true })).not.toContain('prompt.md');

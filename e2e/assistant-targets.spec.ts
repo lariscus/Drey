@@ -16,7 +16,8 @@ process.env['HOME'] = engineHome;
  * The Assistant's conversation targets (E13-5): the Model target answers
  * from the endpoint registered in Settings, Mission Control answers through
  * the engine's chat (the same endpoint, an intent envelope), a proposal card
- * waits for the owner, a 1:1 appends to the persona's thread. The model is
+ * waits for the owner, a 1:1 answers from the persona's session (milestone 228;
+ * here an `api` persona over the same endpoint). The model is
  * a mock OpenAI-compatible endpoint on a fixed local port; the screenshots
  * in the test output are the evidence the changelog entry names.
  */
@@ -24,6 +25,7 @@ process.env['HOME'] = engineHome;
 const PORT = 41871;
 const MODEL_ANSWER = 'The model says: plain chat works, no tools involved.';
 const MC_SAY = 'I can create that ticket. Confirm and it lands in the inbox.';
+const ONE_ON_ONE_SAY = 'Short plans it is: three parts at most.';
 
 const requests: { body: Record<string, unknown> }[] = [];
 
@@ -40,6 +42,10 @@ function reply(text: string): string {
 function answerFor(body: Record<string, unknown>): string {
   const messages = (body['messages'] as { role: string; content: unknown }[] | undefined) ?? [];
   const text = messages.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n');
+  // The 1:1 of an `api` persona (milestone 228): the bridge reads one `say` envelope, no commands.
+  if (text.includes('Keep the plans short.')) {
+    return JSON.stringify({ say: ONE_ON_ONE_SAY });
+  }
   if (text.includes('"say"')) {
     return JSON.stringify({
       say: MC_SAY,
@@ -125,14 +131,14 @@ const PIPELINE = [
 
 const REPOS = ['---', 'repos:', '  drey:', '    url: https://example.invalid/drey.git', '    branch: main', '---', ''].join('\n');
 
-function persona(title: string, role: string, color: string): string {
-  return ['---', `title: ${title}`, `role: ${role}`, 'worker: opencode', 'models:', '  default: mock-model', '  pool: [mock-model]', '  router: off', `color: '${color}'`, 'skills: []', 'budget: 3', '---', `Who ${title} is.`, ''].join('\n');
+function persona(title: string, role: string, color: string, worker = 'opencode'): string {
+  return ['---', `title: ${title}`, `role: ${role}`, `worker: ${worker}`, 'models:', '  default: mock-model', '  pool: [mock-model]', '  router: off', `color: '${color}'`, 'skills: []', 'budget: 3', '---', `Who ${title} is.`, ''].join('\n');
 }
 
 const SEED = {
   'tickets/_meta/pipeline.md': PIPELINE,
   'tickets/_meta/repos.md': REPOS,
-  'tickets/_meta/personas/paul/persona.md': persona('Paul', 'planner', '#a78bfa'),
+  'tickets/_meta/personas/paul/persona.md': persona('Paul', 'planner', '#a78bfa', 'api'),
   'tickets/_meta/personas/ben/persona.md': persona('Ben', 'builder', '#3b82f6'),
 };
 
@@ -182,7 +188,8 @@ test.describe('Assistant conversation targets (E13-5)', () => {
     await page.keyboard.type('Keep the plans short.');
     await page.keyboard.press('Enter');
     await expect(thread).toContainText('Keep the plans short.', { timeout: 30_000 });
-    await expect(thread).toContainText('Paul reads this thread before the next run.');
+    // Since milestone 228 the line reaches Paul's own session; an `api` persona answers over the chat bridge, the same endpoint.
+    await expect(thread).toContainText(ONE_ON_ONE_SAY, { timeout: 60_000 });
     await page.screenshot({ path: testInfo.outputPath('target-one-to-one.png') });
 
     // Back on the model the old chat is still there, the target view is gone.

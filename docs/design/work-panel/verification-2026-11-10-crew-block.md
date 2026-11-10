@@ -10,10 +10,13 @@ marker where it holds and turns what fails into "Known defects" rows of
 
 What the integrator ran on the tip: typecheck (11 configs), import cycles,
 ESLint, the whole vitest suite (585 files / 5694 tests), the four Angular
-suites, and the full e2e suite (`npm run e2e`, 86 specs) — see the top
-entries of the changelog for the figures per milestone. What nobody ran: a
-real agent on a real harness through any of the new flows. That is this
-round's job.
+suites, and the full e2e suite (`npm run e2e`, 86 spec files: 273 passed,
+29 skipped, 3 failed — all three were expectations left behind by milestones
+228 and 233 (the Assistant's 1:1 now answers from the persona's session, the
+persona head reads `Saved · committed now`); the specs follow the milestones
+since the commit after `b1c29c0a`, and pass). See the top entries of the
+changelog for the figures per milestone. What nobody ran: a real agent on a
+real harness through any of the new flows. That is this round's job.
 
 **Back up first.** The first start migrates files in place, once each:
 

@@ -74,7 +74,7 @@ test('edit, discard and save a persona as one commit', async ({ page, vaultDir }
   await expect(body.locator('[data-field="role"]')).toHaveValue('Builder');
   await expect(body.locator('[data-field="summary"]')).toHaveValue('Builds one part, test first.');
   await expect(body.locator('.persona-step-on')).toHaveText('✓ Build');
-  await expect(state).toHaveText('Saved');
+  await expect(state).toContainText('Saved');
   // The prose of persona.md moved into prompt.md when the engine started: one logged commit, once.
   expect(fs.readFileSync(path.join(dir, 'prompt.md'), 'utf8')).toContain('## Who Ben is');
   expect(fs.readFileSync(path.join(dir, 'persona.md'), 'utf8')).not.toContain('Who Ben is');
@@ -98,7 +98,7 @@ test('edit, discard and save a persona as one commit', async ({ page, vaultDir }
   await body.locator('[data-field="summary"]').fill('Builds the part.');
   await editor.fill('You are Benno.');
   await body.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(state).toHaveText('Saved', { timeout: 15_000 });
+  await expect(state).toContainText('Saved', { timeout: 15_000 });
   await expect(page.locator('app-tab-bar .tab', { hasText: 'Benno · persona' })).toBeVisible();
   expect(fs.readFileSync(path.join(dir, 'prompt.md'), 'utf8')).toBe('You are Benno.');
   expect(fs.readFileSync(path.join(dir, 'persona.md'), 'utf8')).toContain('title: Benno');
@@ -110,7 +110,7 @@ test('edit, discard and save a persona as one commit', async ({ page, vaultDir }
   // Allowed to: a choice is part of the same Save.
   await body.locator('.persona-allow-row select').nth(1).selectOption('on');
   await body.getByRole('button', { name: 'Save', exact: true }).click();
-  await expect(state).toHaveText('Saved', { timeout: 15_000 });
+  await expect(state).toContainText('Saved', { timeout: 15_000 });
   expect(fs.readFileSync(path.join(dir, 'persona.md'), 'utf8')).toContain('allowed:\n  network: true');
 
   // The Proposals card: Dismiss is written to the proposals file.
