@@ -26,6 +26,8 @@ export const TEAM_METHODS = [
   'personaPatch', 'personaImprovements', 'personaImprovementDecide',
   // req-172: the Skills tab and the prompt preview (the same service the routes call).
   'sharedSkills', 'personaSkills', 'personaSkillToggle', 'personaSkillRemove', 'skillUpload', 'personaPromptPreview',
+  // req-261: delete a persona, confirmed by its typed title.
+  'personaRemove',
 ] as const;
 
 // pair/revoke take primitive args; the invoke channel carries one object

@@ -33,6 +33,7 @@ import { parseAutopilotSet } from '../fleet/autopilot';
 import type { AutopilotRefusal } from '../fleet/protocol';
 import { parseReviewComments, sendBackNoteOf, type ReviewComment } from '../core/review-feedback';
 import { parsePersonaPatch } from './persona-patch-body';
+import { parsePersonaRemove } from './persona-remove-body';
 import { parseSkillRemove, parseSkillToggle, parseSkillUpload } from './skill-bodies';
 import { TICKET_ID_PATTERN } from '../contracts/tickets';
 import { parseRevoke, parseSettingsPatch, type SettingsAccess } from './settings';
@@ -504,6 +505,11 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
   }
   if (req.path === '/api/skills') {
     return write('skill upload', parseSkillUpload(body), (cmd) => port.skillUpload(cmd));
+  }
+  // req-261: deleting a persona; the id is pinned by the path, the typed title rides in the body.
+  const personaRemove = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/remove$/.exec(req.path);
+  if (personaRemove !== null) {
+    return write(`persona remove ${personaRemove[1]}`, parsePersonaRemove(personaRemove[1]!, body), (cmd) => port.personaRemove(cmd));
   }
   // req-172: a persona's skill switch and the removal of an own skill; the id is pinned by the path.
   const skillWrite = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/skills\/(toggle|remove)$/.exec(req.path);

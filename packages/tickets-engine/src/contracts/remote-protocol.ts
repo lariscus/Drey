@@ -26,6 +26,7 @@ import type { BoardSnapshot, CreateResult, MutationResult, RecentDone, TicketCar
 import type { ImprovementProposal, ImprovementState } from '../core/improvements';
 import type { Persona, PersonaAllowed } from '../core/persona';
 import type { PersonaAllowedPatch } from './persona-allowed';
+import type { PersonaRemovePort } from './persona-remove';
 import type { ScoutReport } from './scout';
 import type { SkillsPort } from './skills';
 
@@ -142,7 +143,7 @@ import type { TicketDiff, TicketFileReply, WorktreeFile } from '../core/worktree
  * ticket Log records (`owner@<device>`); the gateway derives it from the
  * paired device, never from the request.
  */
-export interface TicketsRemotePort extends SkillsPort {
+export interface TicketsRemotePort extends SkillsPort, PersonaRemovePort {
   board(): Promise<BoardSnapshot>;
   fleet(): Promise<FleetSnapshot>;
   needs(): Promise<readonly NeedItem[]>;

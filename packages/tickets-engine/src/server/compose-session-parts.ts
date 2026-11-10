@@ -3,7 +3,9 @@ import { hostname } from 'node:os';
 import { createChatBridge } from '../services/chat-llm';
 import { ChatService } from '../services/chat-service';
 import { composePersonaSessions } from '../services/compose-persona-sessions';
+import { PersonaPinReader } from '../services/persona-pin-reader';
 import { PersonaProseMigrator } from '../services/persona-prose-migrator';
+import { PersonaRemoveService } from '../services/persona-remove-service';
 import { PersonaRecords } from '../services/persona-records';
 import { PersonaSessionService } from '../services/persona-session-service';
 import { FilePlanShadowStore } from '../services/plan-shadow';
@@ -20,6 +22,8 @@ export interface SessionParts {
   readonly personaSessions: PersonaSessionService;
   readonly personaRecords: PersonaRecords;
   readonly skills: SkillService;
+  /** req-261: deleting a persona. */
+  readonly personaRemoval: PersonaRemoveService;
   /** The start's own work (req-256: seeding the default crew): `ready` of the engine awaits it, and so does `close`. */
   readonly startupWork: Promise<void>;
 }
@@ -65,8 +69,9 @@ export function composeSessionParts(opts: EngineOptions, config: FileConfigStore
   });
   const personaRecords = new PersonaRecords({ board, host, git, log });
   const skills = new SkillService({ board, host, git });
+  const personaRemoval = new PersonaRemoveService({ board, fleet, host, git, pins: new PersonaPinReader(host, parts.crew.crewFiles) });
   const startupWork = migrateOnce(log, { personaRecords, skills, prose: new PersonaProseMigrator({ board, host, git, log }), crew: { board, seeder: parts.crewSeeder } });
-  return { chat, personaSessions, personaRecords, skills, startupWork };
+  return { chat, personaSessions, personaRecords, skills, personaRemoval, startupWork };
 }
 
 /** The migrations that run behind startup: failures are logged, never fatal. */

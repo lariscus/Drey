@@ -37,6 +37,7 @@ export async function composeRemoteParts(opts: EngineOptions, config: FileConfig
     sessions.personaSessions,
     sessions.personaRecords,
     sessions.skills,
+    sessions.personaRemoval,
   );
   // req-100: the active vault's notes for paired devices. Drey keeps the key on
   // its active vault; without Drey it is the last one it named, or the hosted vault.
