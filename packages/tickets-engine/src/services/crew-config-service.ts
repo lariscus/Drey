@@ -24,6 +24,11 @@ export class CrewConfigService {
     private readonly log: (message: string, level?: 'info' | 'warn') => void,
   ) {}
 
+  /** The file's reader, writer and queue for the one writer that commits `crew.md` together with other files (the crew seeder, req-256). */
+  get crewFiles(): Pick<CrewConfigFiles, 'read' | 'put' | 'serial'> {
+    return this.files;
+  }
+
   /** The crew resolved for this vault (vault over built-in defaults); a file that does not parse resolves to the defaults. */
   async effective(vault: EngineVault): Promise<EffectiveCrew> {
     await this.migrator.ensure(vault);

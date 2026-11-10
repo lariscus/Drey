@@ -5,7 +5,8 @@ import { FleetEventWriter } from '../fleet/event-writer';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from '../fleet/protocol';
 import { RunnerComponent } from '../service/runner-component';
 import { EngineBoardService } from '../services/board-service';
-import { composeCrewConfig, composeFreeSessions } from '../services/compose-crew-sessions';
+import { composeCrewConfig, composeCrewSeeder, composeFreeSessions } from '../services/compose-crew-sessions';
+import type { CrewSeeder } from '../services/crew-seeder';
 import { FleetClient } from '../services/fleet-client';
 import type { FreeSessionService } from '../services/free-session-service';
 import { ChangeHub } from './drey-port';
@@ -25,6 +26,8 @@ export interface BoardParts {
   readonly presence: DreyPresence;
   readonly events: FleetEventWriter;
   readonly crew: ReturnType<typeof composeCrewConfig>;
+  /** req-256: seeds the default crew — "Initialize board" through the board, the engine's start through the session parts. */
+  readonly crewSeeder: CrewSeeder;
   readonly board: EngineBoardService;
   readonly freeSessions: FreeSessionService;
 }
@@ -49,6 +52,7 @@ export function composeBoardParts(opts: EngineOptions, config: FileConfigStore, 
   // req-173 (R13): the vault layer of the configuration, `_meta/crew.md` — the board resolves its crew
   // keys from it; the first read of a vault moves the old keys of config.json and chain.json in once.
   const crew = composeCrewConfig({ host, git, config, fleetRoot, log });
+  const crewSeeder = composeCrewSeeder({ host, git, crew, home: opts.home, log });
   const board = new EngineBoardService(
     host,
     git,
@@ -61,12 +65,12 @@ export function composeBoardParts(opts: EngineOptions, config: FileConfigStore, 
     normalizeFleetPools({}),
     normalizeFleetHandover({}),
     `engine@${hostname().toLowerCase()}`,
-    { events, crew },
+    { events, crew, crewSeeder },
   );
   // req-173 (R12): the free sessions the owner opens (service window, Crew tab) or accepts from Pia's card.
   const freeSessions = composeFreeSessions({ board, fleet, crew, host, log });
   board.onChanged(() => hub.emit('board'));
-  return { hub, host, git, fleet, presence, events, crew, board, freeSessions };
+  return { hub, host, git, fleet, presence, events, crew, crewSeeder, board, freeSessions };
 }
 
 /** No runner was handed in: the engine's own, in-process, over `<home>/fleet`. */

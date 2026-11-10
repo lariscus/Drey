@@ -40,9 +40,14 @@ export class CrewConfigFiles {
     return next;
   }
 
+  /** Writes the text and nothing else — for the one writer that commits the file together with others (the crew seeder, req-256). */
+  put(vault: EngineVault, text: string): Promise<void> {
+    return this.host.write(vault.id, CREW_FILE, text);
+  }
+
   /** Writes the text and commits the file; a vault outside git keeps the write unversioned (logged). */
   async write(vault: EngineVault, text: string, message: string): Promise<void> {
-    await this.host.write(vault.id, CREW_FILE, text);
+    await this.put(vault, text);
     const location = await this.git.locate(vault.path);
     if (location === null) {
       this.host.log('the tickets vault is not a git repository — crew.md is not versioned', 'info');
