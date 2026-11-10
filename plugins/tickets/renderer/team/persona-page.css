@@ -639,6 +639,37 @@
   border-top: 1px solid var(--border);
 }
 
+/* The deletion ask (req-261): a modal in the host's overlay, so nothing here leans on the page as an ancestor. */
+.persona-delete {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(420px, calc(100vw - 48px));
+}
+
+.persona-delete-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.persona-delete-scope {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.persona-delete-error {
+  font-size: 13px;
+}
+
+.persona-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 @media (max-width: 900px) {
   .persona-cols {
     grid-template-columns: minmax(0, 1fr);
