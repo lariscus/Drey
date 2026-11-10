@@ -1133,6 +1133,15 @@ the format, the order, the upload rules and the migration.
   (never the owner's): `curl -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/api/personas/<id>/skills`.
   A `code` in the answer is what failed (`no_skill`, `exists`, `path_escape`, …).
 
+## The default crew (req-256)
+
+A board starts with four personas — **Paul** (planner), **Ben** (builder), **Ralf** (reviewer), **Tessa** (tester) — shipped as files in the package (`packages/tickets-engine/personas/<id>/`) and seeded by `CrewSeeder` (`services/crew-seeder.ts`): with "Initialize board" after the pipeline and the prompts, and once at the engine's start for a board that lacks them. What to know when reading a run, a Crew card or a log:
+
+- **Idempotent by id.** `tickets/_meta/crew.md` carries `seeded-crew: [paul, ben, ralf, tessa]` after a seeding; an id in it is never seeded again (delete a persona and it stays deleted), and a persona whose folder exists is never touched. One commit `personas: the default crew (req-256)` holds the persona files and `crew.md`; the engine logs one `crew: seeded the default crew (…)` line with the worker and the models.
+- **Worker and models.** The worker is `default-worker` of `crew.md`, else `opencode`. The models are read from the **model table in `service.json`** (`<service home>/service.json`, the file the runner reads — a sleeping runner does not matter): the worker's provider rows, strongest class first, the first is `models.default`, all are the `pool`. A worker the table has no model for (no table yet, `api`) leaves the parser's default and the log line says so — set it on the Persona page.
+- **The seeding changes no run.** The ladder is ticket pin → column `persona:` → the crew's `default-persona`; the seeding sets none of them, so a column without a pin still runs the ring with the step prompt. A run takes Ben when a ticket's gate (Flow tab → *who works it*) or a column (`persona: ben` on the phase in `_meta/pipeline.md`) names him; Paul, Ralf and Tessa the same, and each answers a 1:1 or a free session at once. A persona-pinned run uses the persona's `prompt.md` **instead of** the step prompt, which is why the seeded prompts end in the role's shipped step (`plan-default`, `build-default`, `review-default`, `qa-default`) — and why a Shape-mode (interactive) plan step must not be pinned to Paul yet (req-258).
+- **A persona you delete stays deleted; a persona you edit stays edited.** Nothing re-seeds, resets or updates a seeded persona; the shipped texts are in `specs/classifier-spec.md` ("The default crew's persona prompts").
+
 ## Free sessions (req-173, R12)
 
 A free session is a run record with `kind: 'free'`: a persona at work in a
