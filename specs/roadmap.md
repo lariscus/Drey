@@ -118,6 +118,8 @@ views, as milestone 140; D-4, runs.spec flaking under full-suite load, as milest
 
 ### Now (small, daily value)
 
+- **req-256 — The default crew Paul, Ben, Ralf, Tessa is shipped and seeded** (owner request, outside the list, 2026-11-10, during the verification round of the crew block; answers Q2 and Q3 of `docs/design/work-panel/default-names-audit.md`). Decision D7 names the default crew — planner Paul, builder Ben, reviewer Ralf, tester Tessa — but no code creates them: "Initialize board" writes the pipeline, the repos and the prompts only, and a board grows `<step>-default` personas on demand, so the owner's installation has none of them. Ship the four as files beside the shipped prompts (`persona.md` with role, colour, `summary:`, an empty `skills:` list; `prompt.md` with the "who X is" prose at its top per R11 and the role's way of working); "Initialize board" seeds them; an existing board that lacks them gets them once at the engine's start — idempotent by id, a `seeded-crew:` marker in `_meta/crew.md` so a persona the owner deleted stays deleted, existing folders never touched, one commit. Worker and model come from the vault's defaults (`crew.md`, else the fleet default) and the model table — never a hard-coded model id. Read D-56 and say whether this touches it.
+
 _The Crew internals, designed 2026-11-07/08 — build in this order:_
 
 - **req-184 — Persona page v2 as a canvas board** (follow-up of req-171; 7k v2). `crew-internals/persona-page-mockup.html` becomes board 7k v2 on the canvas, plus the concept's one row: the persona's sub-agent policy `off | read-only` per phase; req-171 was built against the mockup (milestone 231); the board is still to be drawn from it.
