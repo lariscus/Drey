@@ -16,7 +16,7 @@ The persona-board boards (`DeskBoardV2`, `DeskBoardV2Phases`, `DeskWorkV2`, `Des
 drawn for roadmap row req-264 from [../persona-board-concept.md](../persona-board-concept.md) and its draft
 and exported on 2026-11-11 from canvas version `1794411563-4786` (`DeskBoardV2` and `DeskBoardV2Phases` re-exported from
 `1794422747-c161`, the same day: the Capacity band merged into the column headers and a toolbar chip); they sit in their own row at the bottom of the
-canvas, the boards they revise stay as they were. **Not yet accepted by the owner.**
+canvas, the boards they revise stay as they were. **Accepted by the owner on 2026-11-11** (milestone 237); the boards they revise remain the record of the built state until rows req-271 and req-273 replace those screens.
 
 A session that builds or changes a screen reads the board's HTML for the exact
 measures, colours, spacing and strings, opens the PNG to see it, and compares
