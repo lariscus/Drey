@@ -657,6 +657,43 @@ is Pia a persona that triages a ticket, or the one who sets the chain?);
 boards); **the Q9 minimum**. Question 1 is settled by the model: the holder
 is the chain's entry at the cursor.
 
+## 12c. The owner's answers, third round (2026-11-11)
+
+- **Pia gets a persona.** "Pia kriegt eine Persona, damit ich ihr Infos
+  mitgeben kann, wie ich gerne mit ihr interagiere." Pia stays Mission
+  Control (decision D7 stands) and gains a persona record `personas/pia/`:
+  her `prompt.md` is where the owner writes how he wants to work with her, and
+  Mission Control's chat composes it into its system prompt; her model is
+  Mission Control's. Being a persona, Pia can also stand in a chain, as in the
+  owner's example `pia; you` (e.g. a ticket Pia answers herself). She ships
+  with the default crew (milestone 235's seeder gains her) and cannot be
+  deleted while Mission Control uses her (req-261's refusals).
+- **`sync-main` is the builder's last action.** "sync-main vor dem Test, ist
+  der letzte Schritt vom Builder": the builder persona's record names
+  `sync-main` as its leaving action; it runs after the builder's run and its
+  gate, before the ticket moves on, and shows as `Ben · merging main`. A merge
+  conflict there is the builder's: the card stays with Ben with the conflict as
+  the reason (it is not a send-back and does not count against Q5's one
+  send-back).
+- **Column order = the order of the personas in the team, and it can be
+  changed.** "Reihenfolge der Spalten richten sich nach der Reihenfolge der
+  Personas im Team, Reihenfolge soll geändert werden können." The crew gets an
+  explicit order (`order:` in `_meta/crew.md`, the seeder writes the default
+  crew's order); the owner changes it by dragging a persona in the Crew tab or
+  a column header on the Board. You is placed by the same order (default
+  last), Inbox and Prioritized stay left, Done right. **Tickets are dragged
+  between columns** (§4: a card dropped on another persona hands the current
+  entry of its chain to that persona; refused while it runs — the card then
+  offers *Stop and hand to …*).
+- **The Q9 minimum is 0 by default.** "Das Pool-Minimum ist auf 0 bei
+  Default und kann übersteuert werden in der Konfiguration, aber
+  standardmäßig muss alles im Pool bleiben." `min:` per persona, default 0,
+  set only in the configuration (no Settings field needed for the first cut);
+  with 0 nothing ever exceeds the big pool.
+
+Still open: **question 11** (wide boards). With it answered the concept is
+complete for the owner's approval.
+
 ## 13. Open questions for the owner
 
 Each with the options and the recommendation (first).
@@ -687,7 +724,7 @@ Each with the options and the recommendation (first).
    the ticket's own **(recommended)**; (b) applied live like today's delta.
 9. **Answered 2026-11-11: a persona pool inside the big pool, an optional minimum, §12a.** **Parallel runs of one persona.** (a) `parallel:` per persona, absent = no
    cap **(recommended)**; (b) no persona cap, the pool only.
-10. **Column order.** (a) the standard flow's order, other personas by title,
+10. **Answered 2026-11-11: the team's order, changeable by drag, §12c.** **Column order.** (a) the standard flow's order, other personas by title,
     You last **(recommended)**; (b) a manual order in `crew.md`; (c) by role.
 11. **Wide boards.** (a) agent persona columns that hold nothing fold into a
     *+ n personas* chip **(recommended)**; (b) always all columns; (c) a per-view
