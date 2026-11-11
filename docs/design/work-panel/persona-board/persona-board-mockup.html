@@ -12,7 +12,7 @@ h1{font-size:18px;font-weight:600;margin:0 0 16px}
 .tabs span{display:flex;align-items:center;gap:8px;padding:0 16px;color:var(--muted);border-right:1px solid var(--line)}
 .tabs .on{color:var(--fg);background:var(--bg)}
 .scroll{overflow-x:auto}
-.inner{min-width:1400px;padding:14px 16px 0}
+.inner{min-width:1520px;padding:14px 16px 0}
 .top{display:flex;align-items:center;gap:8px;margin-bottom:14px}
 .top h2{font-size:18px;font-weight:600;margin:0;flex:1}
 .btn{height:30px;padding:0 12px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--fg);font:13px var(--ui);display:inline-flex;align-items:center;gap:6px}
@@ -35,12 +35,12 @@ h1{font-size:18px;font-weight:600;margin:0 0 16px}
 .b{white-space:nowrap;font-size:12px}
 .b.q{color:var(--peach)}.b.acc{color:var(--mint)}.b.back{color:var(--bad)}.b.none{color:var(--warn)}.b.plan{color:var(--pink)}
 .t{font-weight:600;font-size:13px;line-height:18px}
-.step{display:flex;align-items:center;gap:8px;color:var(--fg);font-size:12px}
-.seg{display:flex;gap:2px;flex:none}
-.seg i{display:block;width:9px;height:4px;border-radius:2px;background:var(--line)}
+.step{display:flex;flex-wrap:wrap;align-items:center;column-gap:8px;row-gap:5px;color:var(--fg);font-size:12px;min-width:0}
+.seg{display:flex;gap:2px;flex:1 0 100%}
+.seg i{display:block;flex:1;max-width:28px;height:3px;border-radius:2px;background:var(--line)}
 .seg i.d{background:var(--ctl)}.seg i.cur{background:var(--accent)}.seg i.cur.w{background:var(--warn)}.seg i.cur.x{background:var(--bad)}
 .st{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;min-width:0}
-.st span:first-of-type{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st>span:not(.dot):not(.sp):not(.cost),.step>span:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--ctl)}
 .dot.run{background:var(--ok)}.dot.wait{background:transparent;border:1px solid var(--muted)}.dot.you{background:var(--warn)}.dot.red{background:var(--bad)}
 .cost{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -86,28 +86,28 @@ h1{font-size:18px;font-weight:600;margin:0 0 16px}
       </div></div>
 
       <div class="col"><h3><span class="av" style="background:#f2d3e2">PA</span>Paul<span class="n">2</span><span class="sp"></span><span class="v">$0.64</span></h3><div class="cards">
-        <div class="c hl"><div class="r"><span class="id">T-0134</span><span class="sp"></span><span class="b q">Question</span></div><div class="t">Voice capture for tickets</div><div class="step"><span class="seg"><i class="cur w"></i><i></i><i></i><i></i><i></i></span><span>Shape · 1 of 5</span></div><div class="st"><span class="dot you"></span><span>talking with you</span><span class="sp"></span><span class="cost">$0.18</span></div></div>
-        <div class="c"><div class="r"><span class="id">T-0131</span></div><div class="t">Weekly security audit run</div><div class="step"><span class="seg"><i class="cur"></i><i></i><i></i></span><span>Research · 1 of 3</span></div><div class="st"><span class="dot run"></span><span>running · 6 min</span><span class="sp"></span><span class="cost">$0.46</span></div></div>
+        <div class="c hl"><div class="r"><span class="id">T-0134</span><span class="sp"></span><span class="b q">Question</span></div><div class="t">Voice capture for tickets</div><div class="step"><span class="seg"><i class="cur w"></i><i></i><i></i><i></i><i></i></span><span>Shape · 1 of 5</span><span class="sp"></span><span class="cost">$0.18</span></div><div class="st"><span class="dot you"></span><span>talking with you</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0131</span></div><div class="t">Weekly security audit run</div><div class="step"><span class="seg"><i class="cur"></i><i></i><i></i></span><span>Research · 1 of 3</span><span class="sp"></span><span class="cost">$0.46</span></div><div class="st"><span class="dot run"></span><span>running · 6 min</span></div></div>
       </div></div>
 
       <div class="col"><h3><span class="av" style="background:#8ecbef">BE</span>Ben<span class="n">3</span><span class="sp"></span><span class="v">2 of 2 running</span></h3><div class="cards">
-        <div class="c"><div class="r"><span class="id">T-0126</span></div><div class="t">Git panel: stage single hunks</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i><i></i><i></i></span><span>Build · 4 of 6</span></div><div class="st"><span class="dot run"></span><span>running · 21 min</span><span class="sp"></span><span class="cost">$2.05</span></div></div>
-        <div class="c hl"><div class="r"><span class="id">T-0121</span><span class="sp"></span><span class="b back">Sent back</span></div><div class="t">Outline: drag headings to reorder</div><div class="step"><span class="seg"><i class="d"></i><i class="cur x"></i><i class="d"></i><i class="d"></i></span><span>Build · 2 of 4</span></div><div class="st"><span class="dot run"></span><span>from Test · return 1 of 3</span><span class="sp"></span><span class="cost">$1.20</span></div></div>
-        <div class="c"><div class="r"><span class="id">T-0122</span></div><div class="t">Win+H dictation hand-off</div><div class="step"><span class="seg"><i class="d"></i><i class="cur"></i><i></i><i></i></span><span>Build · 2 of 4</span></div><div class="st"><span class="dot wait"></span><span>waits for Ben</span><span class="sp"></span><span class="cost">$0.30</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0126</span></div><div class="t">Git panel: stage single hunks</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i><i></i><i></i></span><span>Build · 4 of 6</span><span class="sp"></span><span class="cost">$2.05</span></div><div class="st"><span class="dot run"></span><span>running · 21 min</span></div></div>
+        <div class="c hl"><div class="r"><span class="id">T-0121</span><span class="sp"></span><span class="b back">Sent back</span></div><div class="t">Outline: drag headings to reorder</div><div class="step"><span class="seg"><i class="d"></i><i class="cur x"></i><i class="d"></i><i class="d"></i></span><span>Build · 2 of 4</span><span class="sp"></span><span class="cost">$1.20</span></div><div class="st"><span class="dot run"></span><span>from Test · return 1 of 3</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0122</span></div><div class="t">Win+H dictation hand-off</div><div class="step"><span class="seg"><i class="d"></i><i class="cur"></i><i></i><i></i></span><span>Build · 2 of 4</span><span class="sp"></span><span class="cost">$0.30</span></div><div class="st"><span class="dot wait"></span><span>waits for Ben</span></div></div>
       </div></div>
 
       <div class="col"><h3><span class="av" style="background:#bfe3cd">RA</span>Ralf<span class="n">1</span><span class="sp"></span><span class="v">$0.90</span></h3><div class="cards">
-        <div class="c"><div class="r"><span class="id">T-0129</span></div><div class="t">Settings search across plugins</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="cur"></i><i></i><i></i><i></i></span><span>Architecture · 3 of 6</span></div><div class="st"><span class="dot wait"></span><span>queued · waits for a B slot</span><span class="sp"></span><span class="cost">$0.90</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0129</span></div><div class="t">Settings search across plugins</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="cur"></i><i></i><i></i><i></i></span><span>Architecture · 3 of 6</span><span class="sp"></span><span class="cost">$0.90</span></div><div class="st"><span class="dot wait"></span><span>queued · waits for a B slot</span></div></div>
       </div></div>
 
       <div class="col"><h3><span class="av" style="background:#f2cfae">TE</span>Tessa<span class="n">1</span><span class="sp"></span><span class="v">$1.05</span></h3><div class="cards">
-        <div class="c"><div class="r"><span class="id">T-0124</span></div><div class="t">PDF export keeps callout colors</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i><i></i></span><span>Test · 4 of 5</span></div><div class="st"><span class="dot run"></span><span>running · 4 min</span><span class="sp"></span><span class="cost">$1.05</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0124</span></div><div class="t">PDF export keeps callout colors</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i><i></i></span><span>Test · 4 of 5</span><span class="sp"></span><span class="cost">$1.05</span></div><div class="st"><span class="dot run"></span><span>running · 4 min</span></div></div>
       </div></div>
 
       <div class="col"><h3><span class="av" style="background:#e0bb6e">YO</span>You<span class="n">3</span></h3><div class="cards">
         <div class="c hl"><div class="r"><span class="id">T-0127</span><span class="sp"></span><span class="b none">No persona</span></div><div class="t">Theme picker in the status bar</div><div class="step"><span class="seg"><i class="d"></i><i class="cur w"></i><i></i><i></i><i></i><i></i></span><span>UX/UI design · 2 of 6</span></div><div class="st"><span class="dot you"></span><span>no persona for UX/UI design</span></div></div>
-        <div class="c hl"><div class="r"><span class="id">T-0118</span><span class="sp"></span><span class="b acc">Accept</span></div><div class="t">Palette opens twice on slow CI</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur w"></i><i></i></span><span>Acceptance · 5 of 6</span></div><div class="st"><span class="dot you"></span><span>ready to try</span><span class="sp"></span><span class="cost">$1.84</span></div></div>
-        <div class="c"><div class="r"><span class="id">T-0117</span></div><div class="t">Tag field: paste a list</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i></span><span>Commit · 4 of 4</span></div><div class="st"><span class="dot run"></span><span>merging · CI</span><span class="sp"></span><span class="cost">$0.92</span></div></div>
+        <div class="c hl"><div class="r"><span class="id">T-0118</span><span class="sp"></span><span class="b acc">Accept</span></div><div class="t">Palette opens twice on slow CI</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur w"></i><i></i></span><span>Acceptance · 5 of 6</span><span class="sp"></span><span class="cost">$1.84</span></div><div class="st"><span class="dot you"></span><span>ready to try</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0117</span></div><div class="t">Tag field: paste a list</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i></span><span>Commit · 4 of 4</span><span class="sp"></span><span class="cost">$0.92</span></div><div class="st"><span class="dot run"></span><span>merging · CI</span></div></div>
       </div></div>
 
       <div class="col edge"><h3><b>Done this week</b><span class="n">5</span><span class="sp"></span><span class="v">$9.80</span></h3><div class="cards">
@@ -159,26 +159,26 @@ h1{font-size:18px;font-weight:600;margin:0 0 16px}
       </div></div>
 
       <div class="col"><h3><span class="av" style="background:#f2d3e2">PL</span>Plan<span class="n">1</span><span class="sp"></span><span class="v">$0.46</span></h3><div class="cards">
-        <div class="c"><div class="r"><span class="id">T-0131</span></div><div class="t">Weekly security audit run</div><div class="step"><span class="seg"><i class="cur"></i><i></i><i></i><i></i><i></i></span><span>Plan · 1 of 5</span></div><div class="st"><span class="dot run"></span><span>running · 6 min</span><span class="sp"></span><span class="cost">$0.46</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0131</span></div><div class="t">Weekly security audit run</div><div class="step"><span class="seg"><i class="cur"></i><i></i><i></i><i></i><i></i></span><span>Plan · 1 of 5</span><span class="sp"></span><span class="cost">$0.46</span></div><div class="st"><span class="dot run"></span><span>running · 6 min</span></div></div>
       </div></div>
 
       <div class="col"><h3><span class="av" style="background:#8ecbef">BU</span>Build<span class="n">3</span><span class="sp"></span><span class="v">2 of 2 running</span></h3><div class="cards">
-        <div class="c"><div class="r"><span class="id">T-0126</span></div><div class="t">Git panel: stage single hunks</div><div class="step"><span class="seg"><i class="d"></i><i class="cur"></i><i></i><i></i><i></i></span><span>Build · 2 of 5</span></div><div class="st"><span class="dot run"></span><span>running · 21 min</span><span class="sp"></span><span class="cost">$2.05</span></div></div>
-        <div class="c hl"><div class="r"><span class="id">T-0121</span><span class="sp"></span><span class="b back">Sent back</span></div><div class="t">Outline: drag headings to reorder</div><div class="step"><span class="seg"><i class="d"></i><i class="cur x"></i><i class="d"></i><i class="d"></i><i></i></span><span>Build · 2 of 5</span></div><div class="st"><span class="dot run"></span><span>from Test · return 1 of 3</span><span class="sp"></span><span class="cost">$1.20</span></div></div>
-        <div class="c"><div class="r"><span class="id">T-0122</span></div><div class="t">Win+H dictation hand-off</div><div class="step"><span class="seg"><i class="d"></i><i class="cur"></i><i></i><i></i><i></i></span><span>Build · 2 of 5</span></div><div class="st"><span class="dot wait"></span><span>waits for Build</span><span class="sp"></span><span class="cost">$0.30</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0126</span></div><div class="t">Git panel: stage single hunks</div><div class="step"><span class="seg"><i class="d"></i><i class="cur"></i><i></i><i></i><i></i></span><span>Build · 2 of 5</span><span class="sp"></span><span class="cost">$2.05</span></div><div class="st"><span class="dot run"></span><span>running · 21 min</span></div></div>
+        <div class="c hl"><div class="r"><span class="id">T-0121</span><span class="sp"></span><span class="b back">Sent back</span></div><div class="t">Outline: drag headings to reorder</div><div class="step"><span class="seg"><i class="d"></i><i class="cur x"></i><i class="d"></i><i class="d"></i><i></i></span><span>Build · 2 of 5</span><span class="sp"></span><span class="cost">$1.20</span></div><div class="st"><span class="dot run"></span><span>from Test · return 1 of 3</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0122</span></div><div class="t">Win+H dictation hand-off</div><div class="step"><span class="seg"><i class="d"></i><i class="cur"></i><i></i><i></i><i></i></span><span>Build · 2 of 5</span><span class="sp"></span><span class="cost">$0.30</span></div><div class="st"><span class="dot wait"></span><span>waits for Build</span></div></div>
       </div></div>
 
       <div class="col"><h3><span class="av" style="background:#bfe3cd">RE</span>Review<span class="n">1</span><span class="sp"></span><span class="v">$0.90</span></h3><div class="cards">
-        <div class="c"><div class="r"><span class="id">T-0129</span></div><div class="t">Settings search across plugins</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="cur"></i><i></i><i></i></span><span>Review · 3 of 5</span></div><div class="st"><span class="dot wait"></span><span>queued · waits for a B slot</span><span class="sp"></span><span class="cost">$0.90</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0129</span></div><div class="t">Settings search across plugins</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="cur"></i><i></i><i></i></span><span>Review · 3 of 5</span><span class="sp"></span><span class="cost">$0.90</span></div><div class="st"><span class="dot wait"></span><span>queued · waits for a B slot</span></div></div>
       </div></div>
 
       <div class="col"><h3><span class="av" style="background:#f2cfae">TE</span>Test<span class="n">1</span><span class="sp"></span><span class="v">$1.05</span></h3><div class="cards">
-        <div class="c"><div class="r"><span class="id">T-0124</span></div><div class="t">PDF export keeps callout colors</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i><i></i></span><span>Test · 4 of 5</span></div><div class="st"><span class="dot run"></span><span>running · 4 min</span><span class="sp"></span><span class="cost">$1.05</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0124</span></div><div class="t">PDF export keeps callout colors</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i><i></i></span><span>Test · 4 of 5</span><span class="sp"></span><span class="cost">$1.05</span></div><div class="st"><span class="dot run"></span><span>running · 4 min</span></div></div>
       </div></div>
 
       <div class="col"><h3><span class="av" style="background:#e0bb6e">YO</span>You<span class="n">2</span></h3><div class="cards">
-        <div class="c hl"><div class="r"><span class="id">T-0118</span><span class="sp"></span><span class="b acc">Accept</span></div><div class="t">Palette opens twice on slow CI</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur w"></i></span><span>Acceptance · 5 of 5</span></div><div class="st"><span class="dot you"></span><span>ready to try</span><span class="sp"></span><span class="cost">$1.84</span></div></div>
-        <div class="c"><div class="r"><span class="id">T-0117</span></div><div class="t">Tag field: paste a list</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i></span><span>Commit · 5 of 5</span></div><div class="st"><span class="dot run"></span><span>merging · CI</span><span class="sp"></span><span class="cost">$0.92</span></div></div>
+        <div class="c hl"><div class="r"><span class="id">T-0118</span><span class="sp"></span><span class="b acc">Accept</span></div><div class="t">Palette opens twice on slow CI</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur w"></i></span><span>Acceptance · 5 of 5</span><span class="sp"></span><span class="cost">$1.84</span></div><div class="st"><span class="dot you"></span><span>ready to try</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0117</span></div><div class="t">Tag field: paste a list</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i></span><span>Commit · 5 of 5</span><span class="sp"></span><span class="cost">$0.92</span></div><div class="st"><span class="dot run"></span><span>merging · CI</span></div></div>
       </div></div>
 
       <div class="col edge"><h3><b>Done this week</b><span class="n">5</span><span class="sp"></span><span class="v">$9.80</span></h3><div class="cards">
@@ -187,7 +187,6 @@ h1{font-size:18px;font-weight:600;margin:0 0 16px}
       </div></div>
 
     </div>
-    <div class="hid">＋ 4 personas hold nothing</div>
     <div style="height:14px"></div>
   </div></div>
 </div>
