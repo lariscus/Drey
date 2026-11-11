@@ -118,6 +118,8 @@ views, as milestone 140; D-4, runs.spec flaking under full-suite load, as milest
 
 ### Now (small, daily value)
 
+- **req-276 — Drey Service shows Drey's icon with a status dot** (S; owner request, outside the list, 2026-11-11). The tray icon and the service window's taskbar / title-bar icon use Drey's own app icon instead of the drawn `D` square; a small dot in the tray icon's top-right corner tells the service's state — grey stopped, red a problem, green running, orange paused — live from the service's HTTP API, the tray tooltip naming the state in words (catalog, ADR-0091); the same dot on the window's taskbar icon where Windows allows it.
+
 _The persona board (req-257's concept, approved by the owner 2026-11-11, [persona-board-concept.md](../docs/design/work-panel/persona-board-concept.md)), in build order (req-264, the boards, shipped as milestone 237): req-265 first; then req-266 and req-258 in parallel; req-267 after req-258; req-257 after req-266, req-258 and req-267; req-268 after req-257; req-269 after req-258, beside req-267/req-257; req-270, then req-271 … req-273; req-274; req-275 lands with req-265 … req-257._
 
 - **req-265 — Lifecycle stages on the store** (owner request 2026-11-10/11, the approved persona board concept). `inbox prioritized active running done` with `claim = ["running"]` in `dricket.toml`; the reader maps stages to lifecycle columns and holders; the run lease releases into `active` in one commit (no R-31 workaround); migration steps 1–2. ADR-0090 later change. Concept row 2.
