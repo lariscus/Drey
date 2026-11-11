@@ -549,13 +549,21 @@ one key: `flow: paul:shape; paul; ben; ralf; tessa; you`.
   A run needs room in **both**: a persona with free places but a full big pool
   runs nothing. The card says which one it waits for: `waits for Ben` (persona at
   its cap) or `queued · waits for a B slot` (big pool full). Column header: `Ben
-  3 · 2 of 2 running`. Unlike today's column `wip:`, which nothing reads (§0),
-  the cap is enforced.
+  · 2/2 · 1 waiting` (the count emphasized at the cap; You shows none). Unlike
+  today's column `wip:`, which nothing reads (§0), the cap is enforced.
+- **No Capacity band** (owner, 2026-11-11: "die Capacity-Anzeige passt für mich
+  nicht mehr, entweder wir mergen mit dem Kanban oder entfernen" — merged). The
+  persona columns already carry the per-persona load, so the band's persona rows
+  go to the column headers and the big pool becomes **one chip in the board's
+  header row**, `4/5 · 1 queued`; its popover holds what the band's lower rows
+  held (slots per class with the upgrade mark, the tranche, the queue's head, a
+  minimum overrun) and links to the Service window. The bottom-dock band and
+  its Work-view arrangement go.
 - **The minimum.** `min:` per persona, **default 0**, set only in the
   configuration (no Settings field for the first cut). With 0 nothing ever
   exceeds the big pool. A persona with `min: 1` starts one run even when the big
-  pool is full, which overruns its maximum on purpose; the overrun is shown on the
-  Capacity band and counts in the ledgers like any run.
+  pool is full, which overruns its maximum on purpose; the overrun is shown in the
+  pool chip's popover and counts in the ledgers like any run.
 - **The breaker** counts red gates per persona instead of per column; a tripped
   persona is *held* the way a column is today (`ColumnMode` → a persona mode),
   shown on its column header and as today's chain alert.
@@ -589,7 +597,7 @@ one key: `flow: paul:shape; paul; ben; ralf; tessa; you`.
 | Surface | Today (where the columns come from) | Persona board |
 |---|---|---|
 | **Desktop Board, 7e** (`plugins/tickets/renderer/board/board-model.ts` 98–194, `board-view.ts`) | one column per pipeline phase; the card's persona is the live run's, else `x-persona`, else the column's (139–142); the last phase is "Done this week"; no drag (the context menu's *Move to ▸*, `renderer/index.ts` 2845–2880) | columns Inbox · Prioritized · the personas in team order (You included) · Done; the card's position (`Ben · 3 of 6`) with the chain as initials, status line, badges *Question / Accept / No persona / Sent back*; **drag** between columns and of column headers (§4, §9); empty agent persona columns fold into a *+ n personas* chip; *Move to ▸* lists holders |
-| **Capacity band** (`renderer/team/capacity-view.ts`, `capacity-model.ts`) | persona row, slot chips, tranche row — none by phase | the persona row reads its counts from the same holders (`2 of 2 · 1 waiting`); the band is the board's column header in small; slots and tranche unchanged; a minimum overrun drawn |
+| **Capacity band** (`renderer/team/capacity-view.ts`, `capacity-model.ts`) | persona row, slot chips, tranche row — none by phase | **goes** (owner 2026-11-11, §9): the persona row becomes the column headers' load (`Ben · 2/2 · 1 waiting`); slots, tranche, queue head and a minimum overrun move into the popover of the board's pool chip (`4/5 · 1 queued`); `capacity-model.ts` stays as the chip's and popover's model |
 | **Tickets panel** (`renderer/work-groups.ts` 199–321) | fixed groups Needs you · Shaping · Running · Ideas · Done, keyed on stage ids `SHAPING_STATE`, `READY_STATE` (232, 282); `runningStepOf` hard-codes *Planning/Building/Merging* on phase ids (420) | groups Needs you · Running · Prioritized · Inbox · Done; the row meta `T-0129 · Ralf · 3/6`; no hard-coded phase ids |
 | **Mission Control desk** (`libs/mission-ui/src/work/work.model.ts` 753 `groupsOf`) | Needs you, then one vertical group per non-empty pipeline column | Needs you, then one group per holder (team order), You's approvals inside Needs you; swipe right = *Accept* only at You |
 | **Mission Control iPad / phone** (`libs/mission-ui/src/work/phone-rows.ts` 118, hard-coded phase titles 41–45) | rows grouped by matching phase titles (`building` → "Running") | rows grouped by holder; the hard-coded title list goes; meta `id · n/m · word`. The phone does not change the argument (a grouped list either way), so the draft has no phone variant |
@@ -725,7 +733,7 @@ Ids are the integrator's. Sizes are rough.
 | 7 | **Live board migration** — migration steps 3–5: `pipeline.md`, `crew.md` order and persona settings, deleting `build-default` and `commit-default` (owner confirms each) | owner's `E:\projects\drey-tickets\tickets\_meta\`; req-261's route |
 | 8 | **Pia's persona and Mission Control's prompt** — `personas/pia/`, her `prompt.md` composed into the Mission Control system prompt, the seeder, the delete refusal while Mission Control uses her, Pia as a chain entry (a Mission Control turn) | `services/chat-llm.ts` (`MISSION_SYSTEM_PROMPT`), `core/default-crew.ts`, `contracts/persona-remove.ts`, `libs/mission-ui/src/chat/**` |
 | 9 | **Board DTO and moves** — holder, position n/m, the chain initials, wait reason on the card; start, drag between holders and of headers, Accept / Send back with a target, park | `contracts/tickets.ts`, `services/board-service.ts`, `server/router.ts` |
-| 10 | **Desktop Board, Tickets panel and Capacity band** per the accepted boards, with drag and the fold chip | `plugins/tickets/renderer/board/**`, `work-groups.ts`, `team/capacity-*` |
+| 10 | **Desktop Board and Tickets panel** per the accepted boards, with drag, the fold chip, the column headers' load and the pool chip with its popover (the Capacity band goes) | `plugins/tickets/renderer/board/**`, `work-groups.ts`, `team/capacity-*` |
 | 11 | **Shape and Flow chat as the assigned persona** — prompts composed from the holder and the wrapper, the roster from the crew | `services/shape-system-prompt.ts`, `services/chat-llm.ts` |
 | 12 | **Mission Control desk, iPad and phone** — groups by holder, Accept / Send back, the new cards, the flow editor, the team's order | `libs/mission-ui/src/work/**`, `flow/**`, `team/**` |
 | 13 | **Metrics per persona and position** — `hold` ledger lines, telemetry position, report grouping, Cost by persona | `fleet/telemetry.ts`, `fleet/report.ts` |

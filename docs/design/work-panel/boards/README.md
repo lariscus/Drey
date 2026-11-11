@@ -14,7 +14,8 @@ day; measure sheets and handoff in [../crew-concept-boards.md](../crew-concept-b
 The persona-board boards (`DeskBoardV2`, `DeskBoardV2Phases`, `DeskWorkV2`, `DeskPersonaV2`,
 `MPadWorkV2`, `MPhoneWorkV2`, `MPhoneReadyV2`, `MCCardsV2`) and the revised `canvas.json` were
 drawn for roadmap row req-264 from [../persona-board-concept.md](../persona-board-concept.md) and its draft
-and exported on 2026-11-11 from canvas version `1794411563-4786`; they sit in their own row at the bottom of the
+and exported on 2026-11-11 from canvas version `1794411563-4786` (`DeskBoardV2` and `DeskBoardV2Phases` re-exported from
+`1794422747-c161`, the same day: the Capacity band merged into the column headers and a toolbar chip); they sit in their own row at the bottom of the
 canvas, the boards they revise stay as they were. **Not yet accepted by the owner.**
 
 A session that builds or changes a screen reads the board's HTML for the exact
@@ -63,8 +64,8 @@ above.
 | 7c · Plan to accept: the Parts block inside the ticket | `DeskPlan` | 1440×900 | desktop |
 | 7d · Review tab: proof, files, line comments like a pull request | `DeskReview` | 1440×900 | desktop |
 | 7e · Board tab with the Capacity band in the bottom dock — **revised 2026-11-08**: slots row, tranche and queue row in the band | `DeskBoard` | 1440×900 | desktop |
-| 7e v2 · Board, persona columns: Inbox · Prioritized · the team in team order · You · Done, the position in the chain on the card (`Ben · 3 of 6`, the chain as initials), `running` / `waits for a slot` / `waits for Ben` / `merging main`, no persona for position 4, a run's question, Accept / Send back, sent back once and twice, an empty persona folded into `+ 1 persona`, the Capacity band per persona — **req-264, canvas `1794411563-4786`** | `DeskBoardV2` | 1440×900 | desktop |
-| 7e v2 · the same board with the personas named Plan · Build · Review · Test (the phase board as a special case) — **req-264, canvas `1794411563-4786`** | `DeskBoardV2Phases` | 1440×900 | desktop |
+| 7e v2 · Board, persona columns: Inbox · Prioritized · the team in team order · You · Done, the position in the chain on the card (`Ben · 3 of 6`, the chain as initials), `running` / `waits for a slot` / `waits for Ben` / `merging main`, no persona for position 4, a run's question, Accept / Send back, sent back once and twice, an empty persona folded into `+ 1 persona`, each agent persona's load in its column header (`2/2 · 1 waiting` on Ben, the count emphasized at the cap), the Capacity band replaced by a `4/5 · 1 queued` chip in the toolbar with its popover open (slots per class, tranche, queue, Open in Service window) — **req-264, canvas `1794422747-c161`** | `DeskBoardV2` | 1440×900 | desktop |
+| 7e v2 · the same board with the personas named Plan · Build · Review · Test (the phase board as a special case), the load in each column header and the Capacity chip closed — **req-264, canvas `1794422747-c161`** | `DeskBoardV2Phases` | 1440×900 | desktop |
 | 7f · Crew tab: personas, stuck worker, setup and cost | `DeskTeam` | 1440×900 | desktop |
 | 7g · Settings like VS Code: search, collapsible sections, scope tabs | `DeskSettings` | 1440×900 | desktop |
 | 7h · Views: Notes · Work · Crew, Layout menu with save, reset, rename, delete | `DeskViews` | 1440×900 | desktop |
