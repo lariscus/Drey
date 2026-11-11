@@ -118,6 +118,8 @@ views, as milestone 140; D-4, runs.spec flaking under full-suite load, as milest
 
 ### Now (small, daily value)
 
+- **req-277 — The installer ships `dk`** (owner request 2026-11-11, outside the list: "können wir den Installer anpassen, dass dieser dricket dk mit installiert"). `npm run fetch:dk` fetches the pinned dricket release (v0.6.2, `dricket_0.6.2_windows_amd64.zip` from the public GitHub release, checked against its `checksums.txt`) into `build/dk/` (not in git), the way `fetch:drawio` does; the pack scripts run it; `electron-builder.yml` ships it as an extra resource (`resources/dk/dk.exe`, installer and portable). Path rule: a configured `dk.path` wins, else the bundled `dk.exe` when packaged, else `dk` on PATH (dev); Drey Service and the runs get the same resolved path. At start Drey reads `dk version`: older than the pinned version, or git missing (dk calls the installed git), shows an issue on the board instead of failing silently. The store creation of a fresh install is E14-9b's item 6, not this row.
+
 _The persona board (req-257's concept, approved by the owner 2026-11-11, [persona-board-concept.md](../docs/design/work-panel/persona-board-concept.md)), in build order (req-264, the boards, shipped as milestone 237): req-265 first; then req-266 and req-258 in parallel; req-267 after req-258; req-257 after req-266, req-258 and req-267; req-268 after req-257; req-269 after req-258, beside req-267/req-257; req-270, then req-271 … req-273; req-274; req-275 lands with req-265 … req-257._
 
 - **req-265 — Lifecycle stages on the store** (owner request 2026-11-10/11, the approved persona board concept). `inbox prioritized active running done` with `claim = ["running"]` in `dricket.toml`; the reader maps stages to lifecycle columns and holders; the run lease releases into `active` in one commit (no R-31 workaround); migration steps 1–2. ADR-0090 later change. Concept row 2.
@@ -660,7 +662,25 @@ checks use a scratch store and a second instance, never `drey-tickets`.
   `--include-archive` is refused instead of skipping them with exit 0 (`migrate/cli.ts`); a
   `--phase-dirs` flag for the reverse converter (legacy folder numbers); a commit step settles into
   Done without a connected client (one line in `server/engine.ts`, req-99a hand-over).
-- **E14-9b — Decommission, part b.** After the cut-over **and the owner's
+- **E14-9b — Decommission, part b: Drey on dricket only.** **Released by the owner on
+  2026-11-11** ("sicherstellen, dass diese Version nur noch auf dricket läuft, und alle
+  Tickets entsprechend anpassen"; "Ja, so" to the plan) — no longer waits for the
+  verification round; **starts after req-265 is merged** (both touch `board-service.ts`
+  and the store settings). The owner's confirmations: no rollback to the files backend is
+  wanted (item 3 below goes), the legacy phone remote goes (item 4). **Added by the
+  owner's release:** (6) **a fresh install runs on dricket**: `tickets.backend` defaults
+  to `dricket`, and with no store configured the first start creates one (`dk init`, the
+  lifecycle stages of req-265, `claim = ["running"]`) beside the meta vault — the second
+  exception to Q-05 after req-265's stage migration; the bundled `dk` of req-277 is used;
+  (7) **the owner's legacy folders**: `E:\projects\drey-tickets\tickets\{10-inbox,
+  20-prioritized,50-build,60-commit,80-done,archive}` hold only the frozen pre-cut-over
+  copies of the store's 92 tickets (the tag `pre-dricket` keeps them) — deleted in one
+  commit **after the owner's OK on the exact list**, the untracked files (`tickets/videos/`,
+  the inbox attachments, `T-0092.md`, `ledger.jsonl`) shown to him one by one first,
+  `tickets/_meta/` untouched; (8) **the store's tickets on the new model**: through
+  req-265's stage migration and req-268's chain migration (where `x-legacy-phase` and
+  `x-rank` go; `x-legacy-id` stays — the board's `T-0091` numbers come from it). Original
+  text: after the cut-over **and the owner's
   verification round** (owner, 2026-11-05: no fixed 30 days), delete what part (a)
   proved cannot go earlier — the inventory with callers and evidence is
   [`docs/design/dricket/decommission.md`](../docs/design/dricket/decommission.md)
