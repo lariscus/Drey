@@ -226,7 +226,46 @@ with `plugins/` or `specs/`.
 
 ## 4. Owner decisions
 
-_Filled in after step 3._
+Asked on 2026-11-12 in one message; the owner answered "Take all recs".
+
+Settled by the code, no question asked:
+
+- **D1** plan schema: shape's chapters plus Decisions and Out of scope, no
+  file map; acceptance criteria are backticked commands at line start (the
+  only form `acceptanceCommands` reads).
+- **D2** ticket files: the runner merges the working copy back; no step
+  commits a ticket file (already the engine's behaviour, Q2).
+- **D3** superseded: the runner already writes every status line (Q4);
+  agents write none — the interim "agents append needs-decision/blocked
+  lines" would only leave a stray file in the worktree.
+- **D6** persona prompts keep invariant character only.
+
+Decided by the owner (all as recommended):
+
+- **A — shared fragments (T2), engine change:** new discipline files the
+  engine appends by run kind (working for every run; writing or read-only;
+  ticket file; handover for writing runs; language; precedence; signals
+  with the closing); `{{plan-format}}` and `{{chain-grammar}}` placeholders
+  resolved from one fragment file each, in step prompts at composition and
+  in crew prompts at load.
+- **B — review FAIL (T4):** FAIL ends the final message with
+  `BLOCKED: FAIL — …`; the reviewer fixes nothing; review runs no longer
+  get the handover discipline (engine). Automatic send-back to build stays
+  a proposal (collides with req-266).
+- **C — aggregator (T5), engine change:** fix the envelope parse bug; give
+  it the current `prompt.md`; prompt drafts become exact old→new edits
+  instead of whole-file replacements; the closing round's proposals the
+  same.
+- **D — QA (T5):** `qa-default` rewritten for what actually runs — a
+  read-only tester worker with one verdict line per criterion in its final
+  message, `BLOCKED:` on any failure.
+- **E — small engine fixes:** loaders strip `drey-prompt-version` from crew
+  prompts and disciplines (so they can carry it); owner-started board runs
+  stop leaking the marker; FRICTION is journaled from blocked and scout
+  runs too.
+- **F — language (D5 refined):** the sections the owner reads are written
+  in the language of the ticket's description; formats, labels, headings
+  and markers stay as given.
 
 ## 5. Sizes
 

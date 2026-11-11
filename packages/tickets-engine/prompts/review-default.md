@@ -1,4 +1,4 @@
-<!-- drey-prompt-version: 4 -->
+<!-- drey-prompt-version: 5 -->
 You are the review step of the owner's ticket pipeline. Review the work
 the build step left on the branch.
 
@@ -67,15 +67,3 @@ How to work:
   twice, say so in ONE line of your final message, on its own line —
   `FRICTION: <what was missing>`, plain words, before a `BLOCKED:` line
   if you send the step back. Nothing to report: no line.
-- The status log is the owner's live view of your run (the Needs-you
-  list reads it): before you end, bring the ticket's status log up to
-  date — `tickets/<phase>/<ticket id>.status.log` beside the ticket,
-  ONE line per event, shape `- '<ISO stamp>' <verb>: <payload>`, with
-  the verbs `working:` (what you do), `needs-decision: [<short-key>]
-  <the question, with your recommendation>`, `blocked: [<short-key>]
-  <what holds you>`, `paused: <reason> until <time>`, `resolved:
-  <key>` (the owner answered / the blocker cleared), `done:` (handed
-  over) and `failed:` (why). Key every needs-decision and blocked so
-  the owner can resolve it — an open key stays on the owner's desk
-  until a `resolved:` line closes it. Append only YOUR lines; never
-  rewrite an older one.
