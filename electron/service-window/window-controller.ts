@@ -3,8 +3,8 @@
  * 1100×720 window, sandboxed, its page the `apps/service-window` build
  * loaded from disk. Created when asked, destroyed when closed — a window
  * nobody looks at costs no renderer process; the tray stays. Its icon is
- * Drey's with the status dot (req-276), so the taskbar button tells the
- * service's state like the tray does.
+ * Drey's; Windows' taskbar overlay carries the status dot (req-276), so the
+ * button tells the service's state like the tray does.
  */
 import { BrowserWindow, type NativeImage } from 'electron';
 import * as path from 'node:path';
@@ -25,14 +25,21 @@ export function windowPaths(appPath: string, mainDir: string): WindowPaths {
   };
 }
 
-/** The window's icon per status (`StatusIcons`). */
+/** The window's icon and its taskbar overlay per status (`StatusIcons`). */
 export interface WindowPictures {
-  window(status: TrayStatus): NativeImage;
+  windowIcon(): NativeImage;
+  overlay(status: TrayStatus): NativeImage;
+}
+
+/** The service's state as the taskbar overlay shows it: the dot and its words for assistive technology. */
+export interface WindowStatus {
+  readonly status: TrayStatus;
+  readonly description: string;
 }
 
 export class ServiceWindowController {
   private window: BrowserWindow | null = null;
-  private status: TrayStatus = 'stopped';
+  private status: WindowStatus | null = null;
   private readonly closedListeners: Array<() => void> = [];
 
   constructor(
@@ -62,19 +69,29 @@ export class ServiceWindowController {
     const win = this.create();
     win.once('ready-to-show', () => {
       win.show();
+      // The taskbar button exists once the window shows.
+      this.applyOverlay();
       this.sendTab(tab);
     });
   }
 
-  /** The service's state for the window's (the taskbar button's) icon. */
-  setStatus(status: TrayStatus): void {
-    if (status === this.status) {
+  /** The service's state for the taskbar button's overlay. */
+  setStatus(next: WindowStatus): void {
+    if (next.status === this.status?.status && next.description === this.status.description) {
       return;
     }
-    this.status = status;
-    if (this.window !== null && !this.window.isDestroyed()) {
-      this.window.setIcon(this.pictures.window(status));
+    this.status = next;
+    this.applyOverlay();
+  }
+
+  /** Windows only, and Windows places it (top right on 11, bottom right on 10); null clears it. */
+  private applyOverlay(): void {
+    const win = this.window;
+    if (process.platform !== 'win32' || win === null || win.isDestroyed()) {
+      return;
     }
+    const status = this.status;
+    win.setOverlayIcon(status === null ? null : this.pictures.overlay(status.status), status?.description ?? '');
   }
 
   send(channel: string, payload: unknown): void {
@@ -103,7 +120,7 @@ export class ServiceWindowController {
       show: false,
       title: i18n.t('service_tray.window_title'),
       backgroundColor: '#18191b',
-      icon: this.pictures.window(this.status),
+      icon: this.pictures.windowIcon(),
       webPreferences: { preload: this.paths.preload, sandbox: true, contextIsolation: true, nodeIntegration: false },
     });
     win.removeMenu();

@@ -30,6 +30,7 @@ export interface TrayDeps {
 }
 
 const UNKNOWN: TrayVerdict = { status: 'stopped', problem: null };
+const translate = (key: string, params?: Record<string, string | number>): string => i18n.lookup(key, params);
 
 export class TrayController {
   private tray: Tray | null = null;
@@ -42,9 +43,14 @@ export class TrayController {
     return this.tray !== null;
   }
 
-  /** The service's state as of the last refresh — the window's taskbar icon follows it. */
+  /** The service's state as of the last refresh. */
   get status(): TrayStatus {
     return this.verdict.status;
+  }
+
+  /** The state and its words for the window's taskbar overlay (the words are the tooltip's). */
+  get windowStatus(): { readonly status: TrayStatus; readonly description: string } {
+    return { status: this.verdict.status, description: trayTooltip(this.verdict, translate) };
   }
 
   /** Shows or drops the icon (`service.trayIcon`). */
@@ -85,7 +91,7 @@ export class TrayController {
       return;
     }
     const { pictures } = this.deps;
-    const t = (key: string, params?: Record<string, string | number>): string => i18n.lookup(key, params);
+    const t = translate;
     this.tray.setImage(pictures.tray(this.verdict.status));
     this.tray.setToolTip(trayTooltip(this.verdict, t));
     this.tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate(this.state, this.actions(), t, pictures.menuDot(this.verdict.status))));

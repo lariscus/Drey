@@ -48,7 +48,10 @@ class ServiceWindowProcess {
   private goneTicks = 0;
   private readonly endpoints = new ServiceEndpoints(home, (file) => fsp.readFile(file, 'utf8'));
   private readonly calls = new ServiceCalls(this.endpoints, new JsonHttp());
-  private readonly icons = new StatusIcons(dreyIconPath(app.getAppPath(), app.isPackaged, process.resourcesPath));
+  private readonly icons = new StatusIcons(
+    dreyIconPath(app.getAppPath(), app.isPackaged, process.resourcesPath, 'png'),
+    dreyIconPath(app.getAppPath(), app.isPackaged, process.resourcesPath, 'ico'),
+  );
   private readonly window = new ServiceWindowController(windowPaths(app.getAppPath(), __dirname), this.icons);
   private readonly confirmations = new Confirmations(() => this.window.current);
   private readonly drey = new DreyLauncher(process.execPath, app.getAppPath());
@@ -107,7 +110,7 @@ class ServiceWindowProcess {
     const wanted = await this.snapshots.trayWanted();
     this.tray.setVisible(this.trayMode && wanted !== false);
     await this.tray.refresh();
-    this.window.setStatus(this.tray.status);
+    this.window.setStatus(this.tray.windowStatus);
     this.leaveIfIdle();
   }
 

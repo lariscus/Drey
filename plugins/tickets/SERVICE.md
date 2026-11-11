@@ -50,9 +50,11 @@ is gone, and is only a client: it reads `service.lock` and calls the routes
 below, the runner's and the engine's.
 
 - **Tray icon (req-276):** Drey's app icon (`build/icon.png`, packaged
-  `resources/icon.png`) with a status dot in its top-right corner, the same
-  dot on the window's taskbar icon (the window's own icon swapped — Windows'
-  overlay icon would sit bottom-right). The colour, from the lock,
+  `resources/icon.png`) with a status dot in its bottom-right corner, where
+  Windows puts badges (owner, 2026-11-11); the same dot on the window's
+  taskbar button as Windows' overlay icon (`setOverlayIcon`, the tooltip's
+  words as its description; Windows places it — top right on Windows 11,
+  bottom right on Windows 10; the window icon stays Drey's). The colour, from the lock,
   `GET /status` and the runner's `/chain` each tick (`trayVerdictOf`):
   **grey** stopped — no `service.lock`; **red** problem — a component
   `failed`, or a lock whose control port does not answer; **orange** paused

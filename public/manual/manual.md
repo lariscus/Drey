@@ -1816,7 +1816,7 @@ the board only while Drey is open.
 ### Drey Service's tray icon and window
 
 While Drey Service runs, its icon — Drey's own icon — sits in the
-notification area at the right of the taskbar. A dot in its top-right corner
+notification area at the right of the taskbar. A dot in its bottom-right corner
 tells how the service is doing; point at the icon and its tooltip says it in
 words:
 
@@ -1829,7 +1829,7 @@ words:
 - **Grey** — stopped: the service has gone. The icon leaves a few seconds
   later.
 
-The service window's taskbar button carries the same dot.
+The service window's taskbar button carries the same dot as a Windows badge.
 *Taskbar icon: Hide* in Settings → *Background service* removes the icon.
 Click it to open the service's window; its menu has:
 
@@ -2749,7 +2749,7 @@ history store is deliberately outside it).
 ---
 
 *Manual for Drey 0.8.1; manual content last changed
-2026-11-10. Screenshots were captured automatically from
+2026-11-11. Screenshots were captured automatically from
 the built app (Anthrazit theme, 1600Ã—1000) by
 `e2e/manual-screenshots.spec.ts` — run
 `$env:DREY_MANUAL_SHOTS='1'; npm run e2e:run -- manual-screenshots`
