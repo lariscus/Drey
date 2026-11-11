@@ -14,6 +14,9 @@ import type { ChainEntry } from './chain';
 import type { PhasePoolMeta, TicketPoolMeta } from './ticket-pool-meta';
 import type { RepoRef } from './repo-ref';
 import type { PriorityConfig, TicketPriority } from './ticket-priority';
+import type { TicketRun } from './ticket-run';
+export type { TicketRun } from './ticket-run';
+export type { StoreStageMigrationOffer, StoreStageMigrationResult } from './store-stage-migration';
 
 /** `T-` + at least four digits (`T-0042`). Grammar of ids AND file stems. */
 export const TICKET_ID_PATTERN = /^T-\d{4,}$/;
@@ -118,13 +121,6 @@ export function formatUtcStamp(date: Date): string {
 export interface TicketIssue {
   readonly level: 'error' | 'warning' | 'noise';
   readonly message: string;
-}
-
-/** The live-run map (ADR-0075 run control; written from M84, validated now). */
-export interface TicketRun {
-  readonly pid: number;
-  readonly 'started-at': string;
-  readonly stream: string;
 }
 
 /** Parsed, normalized ticket frontmatter (all optionals reflect absence). */
@@ -394,6 +390,8 @@ export interface BoardSnapshot {
   readonly isGitRepo: boolean;
   /** On the dricket backend: where the tickets live (store, branch, head, sync) — the panel's footer line (D-9). */
   readonly storeLine?: string | null;
+  /** req-265: the store still uses the old phase stages; absent when it does not (or on the files backend). */
+  readonly storeMigration?: import('./store-stage-migration').StoreStageMigrationOffer | null;
   /** The configured default fleet worker (M84). */
   readonly defaultWorker: string;
   readonly pipeline: readonly PipelinePhase[];

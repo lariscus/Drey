@@ -941,6 +941,16 @@ project. When the tickets vault is not a git repository, a one-line note at
 the foot says so — dismiss it with its ×. Errors and leftover worktree folders
 show there too; on a ticket store, the foot's tooltip names the store.
 
+**A ticket store on the old stages.** When the store still uses the old
+stages (Shaping, Building, Ready as stages of the store), a line at the top
+of the Tickets panel says so. **Migrate** moves the store to the new stages:
+two commits to the store's configuration and every ticket that stands in an
+old stage moved to *active*, keeping its column. It runs only when you click
+it, waits while a run holds a ticket, and picks up where it stopped if it was
+interrupted. When the store's configuration is not on this computer,
+**Copy stages** copies the stages to paste into its `dricket.toml`; Migrate
+then moves the tickets. The board's columns look the same before and after.
+
 **The step card** (req-75 W3, reworked in req-86). At the end of a
 step, the thread shows a card above the transcript that follows where the
 ticket stands:

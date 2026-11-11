@@ -137,7 +137,7 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
   };
   const pipelineRead = (): Promise<void> => orchestrator.pipelineRead();
   const board = new ChainBoard({
-    doorFor: deps.storeChainFor ?? ((config) => new StoreChainBoard(chainStoreIoOf(config), log)),
+    doorFor: deps.storeChainFor ?? ((config) => new StoreChainBoard(chainStoreIoOf(config), log, config.lifecycle === true)),
     ...(deps.releaseLeftovers !== undefined ? { releaseLeftovers: deps.releaseLeftovers } : {}),
     log,
   });

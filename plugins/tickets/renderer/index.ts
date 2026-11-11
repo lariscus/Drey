@@ -63,6 +63,7 @@ import { openFlowTab, registerFlowKind } from './flow/register';
 import { openReviewTab, registerReviewKind } from './review/register';
 import type { WorkRow } from './work-groups';
 import { boardIssuesChip, boardIssuesList, type BoardIssuesDeps } from './board-issues';
+import { storeMigrationBar } from './store-migration-bar';
 import type { ChainStatus, FleetHandoverConfig, RunInfo } from '../../../packages/tickets-engine/src/fleet/protocol';
 import type { NormalizedEvent } from '../../../packages/tickets-engine/src/fleet/harness/contract';
 import { DEFAULT_FLEET_HANDOVER, normalizeFleetHandover } from '../../../packages/tickets-engine/src/fleet/protocol';
@@ -629,6 +630,11 @@ function buildBoardView(api: DreyPluginApi): BoardView {
     const issues = boardIssuesList(boardIssuesDeps(api, snap.issues));
     if (issues !== null) {
       root.append(issues);
+    }
+    if (snap.storeMigration !== undefined && snap.storeMigration !== null) {
+      // req-265: the store still uses the old stages - the owner's click migrates it, nothing else does.
+      const migrate = (): void => void runMutation(api.i18n.t('work.store_migration.busy'), () => invokeBoard('migrateStoreStages'));
+      root.append(storeMigrationBar({ api, offer: snap.storeMigration, migrate }));
     }
     root.append(workListNode(workPanelDeps(api), snap, fleetRuns, folds, notifyViews, workFilter.get()));
     const statusBar = statusBarNode(api, snap, fleet.node);

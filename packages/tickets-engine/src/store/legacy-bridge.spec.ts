@@ -100,10 +100,18 @@ describe('legacyToDricketDocument', () => {
     expect(detailFromContent(revived).labels).toEqual(['placeholder']);
   });
 
-  it('keeps an x-phase pin in step with the stage', () => {
+  it('writes, keeps and removes the column pin x-phase as told (req-265)', () => {
     const pinned = DOC.replace('x-rank: 4000', 'x-rank: 4000\nx-phase: build');
-    const back = detailFromContent(legacyToDricketDocument(pinned, legacyOf(pinned), { stage: 'commit' }));
-    expect(back.extensions['x-phase']).toBe('commit');
+    const moved = detailFromContent(legacyToDricketDocument(pinned, legacyOf(pinned), { stage: 'active', pin: 'commit' }));
+    expect(moved.stage).toBe('active');
+    expect(moved.extensions['x-phase']).toBe('commit');
+    const kept = detailFromContent(legacyToDricketDocument(pinned, legacyOf(pinned), { stage: 'active' }));
+    expect(kept.extensions['x-phase']).toBe('build');
+    const edge = detailFromContent(legacyToDricketDocument(pinned, legacyOf(pinned), { stage: 'prioritized', pin: null }));
+    expect(edge.stage).toBe('prioritized');
+    expect(edge.extensions['x-phase']).toBeUndefined();
+    const fresh = detailFromContent(legacyToDricketDocument(DOC, legacyOf(DOC), { stage: 'active', pin: 'build' }));
+    expect(fresh.extensions['x-phase']).toBe('build');
   });
 
   it('refuses text that is not a ticket document', () => {

@@ -54,6 +54,12 @@ export interface ChainStoreConfig {
   readonly dkCheckout: string;
   /** Commit trailers + `dk validate --trailers` in the gate (`tickets.dk.trailers`). */
   readonly trailers: boolean;
+  /**
+   * req-265: the store is on the lifecycle stages (`inbox prioritized active running done`, claim
+   * `running`): a column is `active` + the pin `x-phase`, a run ends with one release into `active`.
+   * Absent or false = a store still on phase stages (stage = column id).
+   */
+  readonly lifecycle?: boolean;
 }
 
 export interface ChainConfig {

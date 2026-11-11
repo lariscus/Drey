@@ -1,4 +1,5 @@
 import { EXTENSION_KEYS } from './extension-keys';
+import { ACTIVE_STAGE, EDGE_STAGES, PHASE_PIN_KEY, RUNNING_STAGE } from '../core/lifecycle-stages';
 import { stringify } from 'yaml';
 import { TICKETS_ARCHIVE_DIR, type BoardSnapshot, type PipelinePhase } from '../contracts/tickets';
 import type { TicketDetail } from '../ports/ticket-store';
@@ -22,7 +23,7 @@ import { openStatusItems } from '../core/status-log';
  * Field map (dricket -> Drey ticket key):
  *
  *   id, title, priority            -> same
- *   stage                          -> phase (see {@link resolvePhase})
+ *   stage, x-phase                 -> phase (see {@link resolvePhase})
  *   depends                        -> blocked-by   (blocked is derived, never stored)
  *   parent                         -> parent
  *   repos                          -> repos
@@ -60,60 +61,99 @@ export interface PhaseResolution {
 /**
  * Which pipeline column a record belongs to.
  *
- *  1. `x-phase` when it names a pipeline phase (variant B of the migration plan:
- *     dricket's built-in stages with the phase kept beside them);
- *  2. the stage itself when it is a pipeline phase id (variant A: `[stages]` in
- *     `dricket.toml` lists the phase ids — the preferred setup);
- *  3. dricket's built-in stage names, by role: `open` / `blocked` -> the capture
- *     column, `in-progress` -> the first claiming column, `review` -> `commit`
- *     (else the column before the terminal one), `done` / `cancelled` -> the
- *     terminal column;
- *  4. otherwise the raw stage: the board shows it as an unknown column with a
+ *  1. a lifecycle edge stage (`inbox`, `prioritized`, `done`) that is a pipeline
+ *     phase: that column — the edges never take a pin (req-265);
+ *  2. `x-phase` when it names a pipeline phase: the interim column pin of an
+ *     `active` / `running` ticket on a lifecycle store (req-265, until `x-at`),
+ *     and variant B of the migration plan (dricket's built-in stages with the
+ *     phase kept beside them);
+ *  3. the stage itself when it is a pipeline phase id (variant A: `[stages]` in
+ *     `dricket.toml` lists the phase ids — a store not yet migrated);
+ *  4. by role: `active` / `running` / `in-progress` -> the first claiming column,
+ *     `open` / `blocked` -> the capture column, `review` -> `commit` (else the
+ *     column before the terminal one), `done` / `cancelled` -> the terminal column;
+ *  5. otherwise the raw stage: the board shows it as an unknown column with a
  *     warning, exactly like a stray directory.
  */
 export function resolvePhase(record: TicketDetail, phases: readonly PipelinePhase[]): PhaseResolution {
   const ids = phases.map((p) => p.id);
-  const pinned = record.extensions['x-phase'];
+  if (EDGE_STAGES.includes(record.stage) && ids.includes(record.stage)) {
+    return { phase: record.stage, unmapped: false };
+  }
+  const pinned = record.extensions[PHASE_PIN_KEY];
   if (pinned !== undefined && ids.includes(pinned)) {
     return { phase: pinned, unmapped: false };
   }
   if (ids.includes(record.stage)) {
     return { phase: record.stage, unmapped: false };
   }
-  const first = ids[0];
-  const last = ids[ids.length - 1];
-  let role: string | undefined;
-  switch (record.stage) {
-    case 'open':
-    case 'blocked':
-      role = first;
-      break;
-    case 'in-progress':
-      role = phases.find((p) => p.claim)?.id ?? ids[1];
-      break;
-    case 'review':
-      role = ids.includes('commit') ? 'commit' : ids.length >= 3 ? ids[ids.length - 2] : undefined;
-      break;
-    case 'done':
-    case 'cancelled':
-      role = last;
-      break;
-    default:
-      role = undefined;
-  }
+  const role = roleColumn(record.stage, phases);
   return role === undefined ? { phase: record.stage, unmapped: true } : { phase: role, unmapped: false };
 }
+
+/** The column a stage that is no pipeline phase stands for, by its role; undefined = none. */
+function roleColumn(stage: string, phases: readonly PipelinePhase[]): string | undefined {
+  const ids = phases.map((p) => p.id);
+  if (CAPTURE_ROLES.includes(stage)) {
+    return ids[0];
+  }
+  if (CLAIM_ROLES.includes(stage)) {
+    return phases.find((p) => p.claim)?.id ?? ids[1];
+  }
+  if (TERMINAL_ROLES.includes(stage)) {
+    return ids[ids.length - 1];
+  }
+  if (stage !== 'review') {
+    return undefined;
+  }
+  return ids.includes('commit') ? 'commit' : ids.length >= 3 ? ids[ids.length - 2] : undefined;
+}
+
+const CAPTURE_ROLES: readonly string[] = ['open', 'blocked'];
+const CLAIM_ROLES: readonly string[] = [ACTIVE_STAGE, RUNNING_STAGE, 'in-progress'];
+const TERMINAL_ROLES: readonly string[] = ['done', 'cancelled'];
 
 /** One record as the legacy ticket file the board reader understands. */
 export function recordToBoardFile(record: TicketDetail, phase: string): BoardFile {
   const x = record.extensions;
-  const header: Record<string, unknown> = { id: record.id, title: record.title };
+  const header: Record<string, unknown> = { id: record.id, title: record.title, ...placeFieldsOf(record), ...extensionFieldsOf(x), ...linkFieldsOf(record), ...enteredFieldsOf(x) };
+  const yaml = stringify(header, { lineWidth: 0 });
+  return { path: `tickets/${phase}/${record.id}.md`, text: `---\n${yaml}---\n${record.body}` };
+}
+
+/** dricket's repos and priority. */
+function placeFieldsOf(record: TicketDetail): Record<string, unknown> {
+  const header: Record<string, unknown> = {};
   if (record.repos.length > 0) {
     header['repos'] = [...record.repos];
   }
   if (record.priority !== null) {
     header['priority'] = record.priority;
   }
+  return header;
+}
+
+/** dricket's links in Drey's names: blocked-by, the claim, parent. */
+function linkFieldsOf(record: TicketDetail): Record<string, unknown> {
+  const header: Record<string, unknown> = {};
+  if (record.dependsOn.length > 0) {
+    header['blocked-by'] = [...record.dependsOn];
+  }
+  if (record.owner !== null) {
+    header['claimed-by'] = record.owner;
+    if (record.claimedAt !== null) {
+      header['claimed-at'] = record.claimedAt;
+    }
+  }
+  if (record.parent !== null) {
+    header['parent'] = record.parent;
+  }
+  return header;
+}
+
+/** The `x-` fields in Drey's names: rank, the extension keys, interactive, chain, references. */
+function extensionFieldsOf(x: Readonly<Record<string, string>>): Record<string, unknown> {
+  const header: Record<string, unknown> = {};
   const rank = x['x-rank'];
   if (rank !== undefined && rank !== '') {
     header['rank'] = /^\d+$/.test(rank) ? Number(rank) : rank;
@@ -127,34 +167,24 @@ export function recordToBoardFile(record: TicketDetail, phase: string): BoardFil
   if (x['x-interactive'] === 'true') {
     header['interactive'] = true;
   }
-  const chain = splitOn(x['x-chain'], ';');
-  if (chain.length > 0) {
-    header['chain'] = chain;
-  }
-  const references = splitOn(x['x-references'], ',');
-  if (references.length > 0) {
-    header['references'] = references;
-  }
-  if (record.dependsOn.length > 0) {
-    header['blocked-by'] = [...record.dependsOn];
-  }
-  if (record.owner !== null) {
-    header['claimed-by'] = record.owner;
-    if (record.claimedAt !== null) {
-      header['claimed-at'] = record.claimedAt;
+  const lists = { chain: splitOn(x['x-chain'], ';'), references: splitOn(x['x-references'], ',') };
+  for (const [key, list] of Object.entries(lists)) {
+    if (list.length > 0) {
+      header[key] = list;
     }
   }
-  if (record.parent !== null) {
-    header['parent'] = record.parent;
-  }
+  return header;
+}
+
+function enteredFieldsOf(x: Readonly<Record<string, string>>): Record<string, unknown> {
+  const header: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(x)) {
     const entered = /^x-entered-([a-z][a-z0-9-]*)$/.exec(key);
     if (entered !== null && value !== '') {
       header[`entered-${entered[1]}`] = value;
     }
   }
-  const yaml = stringify(header, { lineWidth: 0 });
-  return { path: `tickets/${phase}/${record.id}.md`, text: `---\n${yaml}---\n${record.body}` };
+  return header;
 }
 
 function splitOn(value: string | undefined, separator: string): string[] {

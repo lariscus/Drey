@@ -207,7 +207,7 @@ export class RunStarter {
       return { worktree, review };
     } catch (error) {
       if (lease !== null) {
-        await lease.release(this.deps.stores.stayPutStages(request, lease), `run ${id} did not start - worktree failed: ${messageOf(error)}`, { restoreTo: lease.preStage });
+        await lease.release(this.deps.stores.stayPutStages(request, lease), `run ${id} did not start - worktree failed: ${messageOf(error)}`);
       }
       return `worktree failed: ${messageOf(error)}`;
     }

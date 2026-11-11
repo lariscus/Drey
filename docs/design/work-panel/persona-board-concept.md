@@ -620,7 +620,10 @@ draft before any screen is built (first row of §15).
 shaping, prioritized, building or ready, so no ticket needs a holder.
 
 1. Add `active` and `running` to `dricket.toml`'s stages, `claim = ["running"]`
-   (by hand, Q-05; R-03 replays old history under the old set).
+   (R-03 replays old history under the old set). *As built (milestone 239):* steps 1–2
+   are the owner's **Migrate** in the Tickets panel — the engine commits the config on a
+   local store's `main` (Q-05's exception), a remote store is edited by hand; until
+   req-266 the column of an `active` ticket is kept in the interim pin `x-phase`.
 2. Re-check that `shaping`, `building` and `ready` are empty, then remove them.
    Any ticket that stands there by then: `shaping` → `active` at the interactive
    Paul entry; `building` → `active` at the entry of Ben with the standard flow

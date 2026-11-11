@@ -110,7 +110,7 @@ describe('RunStarter — the rules, the claim first, then the worktree and the w
       await settled(sup, info!.id, 'done');
       expect(gate).toEqual([]);
       expect(store.of('release').map((c) => c.stage)).not.toContain('build');
-      expect(store.stage).toBe('plan'); // the ticket never moved
+      expect(store.stage).toBe('prioritized'); // no move: back where it sat is refused (R-31), so it retreats - a lifecycle store releases to active (req-265)
       expect((await runnerNotes(dirs.fleet, info!.id)).some((line) => line.startsWith('interactive dialog ended'))).toBe(true);
     });
 

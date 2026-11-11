@@ -72,6 +72,22 @@ describe('resolvePhase', () => {
     expect(at('cancelled')).toBe('done');
   });
 
+  it('req-265: an active or running ticket stands in its pinned column; without a pin in the first claiming one', () => {
+    const at = (stage: string, pin?: string): string =>
+      resolvePhase(det({ id: 'T-0001', stage, extensions: pin === undefined ? {} : { 'x-phase': pin } }), phases).phase;
+    expect(at('active', 'commit')).toBe('commit');
+    expect(at('running', 'commit')).toBe('commit'); // a run holds it: the card stays in its column
+    expect(at('active')).toBe('build');
+    expect(at('running')).toBe('build');
+  });
+
+  it('req-265: the lifecycle edges are their own column, a stale pin does not move them', () => {
+    const at = (stage: string): string => resolvePhase(det({ id: 'T-0001', stage, extensions: { 'x-phase': 'build' } }), phases).phase;
+    expect(at('inbox')).toBe('inbox');
+    expect(at('prioritized')).toBe('prioritized');
+    expect(at('done')).toBe('done');
+  });
+
   it('leaves an unknown stage unmapped', () => {
     expect(resolvePhase(det({ id: 'T-0001', stage: 'needs-input' }), phases)).toEqual({ phase: 'needs-input', unmapped: true });
   });

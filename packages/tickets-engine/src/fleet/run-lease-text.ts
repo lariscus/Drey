@@ -1,6 +1,6 @@
 /**
  * The pure text of a run's dricket claim (E14-5, ADR-0090): the owner id,
- * the commit trailers and their instruction block, the `stage:` rewrite.
+ * the commit trailers and their instruction block.
  * `run-lease.ts` re-exports them.
  */
 import { hostname } from 'node:os';
@@ -36,20 +36,4 @@ export function trailerInstruction(trailers: readonly string[]): string {
     '',
     ...trailers.map((line) => `    ${line}`),
   ].join('\n');
-}
-
-/** `stage:` of a ticket document set to `stage` (the first header line only); null when the document has no stage line. */
-export function withStage(text: string, stage: string): string | null {
-  const eol = text.includes(String.fromCharCode(13)) ? String.fromCharCode(13, 10) : String.fromCharCode(10);
-  const lines = text.split(eol);
-  if (lines[0] !== '---') {
-    return null;
-  }
-  const close = lines.indexOf('---', 1);
-  const at = lines.findIndex((line, i) => i > 0 && (close < 0 || i < close) && /^stage:/.test(line));
-  if (at < 0) {
-    return null;
-  }
-  lines[at] = `stage: ${stage}`;
-  return lines.join(eol);
 }

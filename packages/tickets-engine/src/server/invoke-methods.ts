@@ -13,7 +13,7 @@ export const BOARD_METHODS = [
   'personaLearn', 'listPersonas', 'verifyTicket', 'verifyStatus', 'estimateOf',
   'chatSessions', 'chatOpen', 'chatSend', 'chatStart', 'chatConfirm', 'chatDismiss', 'chatShapeDecide', 'chatPlanStatus',
   'ticketDocument', 'saveDocument', 'setHumanName',
-  'initialize', 'onVaultEvent',
+  'initialize', 'onVaultEvent', 'migrateStoreStages',
 ] as const;
 
 // The team's reads and controls (E13-8): the remote port's own methods, so

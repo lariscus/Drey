@@ -56,29 +56,80 @@ describe('ClaimRelease — release is the one door', () => {
     expect(t.store.of('release').map((c) => c.stage)).toEqual(['build', 'prioritized']);
   });
 
-  it('R-31: a failed run that sat in the claim stage ends where it sat - release back, then put --claim writes the stage back', async () => {
+  it('req-265: a store still on phase stages keeps the retreat but no longer writes the stage back (the R-31 write-back is gone)', async () => {
     const t = setup();
     t.store.stage = 'build';
     const id = await startRun(t.sup, request({ nextPhase: null, nextPhaseDir: null }));
     t.adapter.handles[0]!.fail(1);
     await settled(t.sup, id, 'failed');
     expect(t.store.of('release').map((c) => c.stage)).toEqual(['build', 'prioritized']);
-    const puts = t.store.of('put');
-    expect(puts).toHaveLength(1);
-    expect(puts[0]?.put).toMatchObject({ expectedRev: 4 }); // the ticket is nobody's now: a normal put --claim --if-version
-    expect(puts[0]?.put?.holdsClaim).not.toBe(true);
-    expect(t.store.stage).toBe('build');
+    expect(t.store.of('put').filter((c) => c.put?.expectedRev !== undefined)).toEqual([]); // no put --claim after the release
+    expect(t.store.stage).toBe('prioritized');
   });
 
-  it('a retreat whose write-back fails leaves the ticket in the retreat stage (and the run still settles)', async () => {
-    const t = setup();
-    t.store.stage = 'build';
-    t.store.failNext('put', new TicketStoreError('invalid', 'put refused', 14));
-    const id = await startRun(t.sup, request({ nextPhase: null, nextPhaseDir: null }));
-    t.adapter.handles[0]!.fail(1);
-    await settled(t.sup, id, 'failed');
-    expect(t.store.stage).toBe('prioritized');
-    expect(t.logs.join('\n')).toContain('stays in its retreat stage');
+  describe('a lifecycle store (req-265: inbox prioritized active running done, claim running)', () => {
+    const LIFECYCLE_DK = { ...DK_TARGET, retreatStage: null, lifecycle: true };
+    const lifecycleSetup = (): Harness => {
+      const store = new FakeTicketStore();
+      store.stages = ['inbox', 'prioritized', 'active', 'running', 'done'];
+      store.claimStage = 'running';
+      store.stage = 'active';
+      store.text = '---\nid: t-1\nstage: active\nrev: 4\nx-phase: build\n---\n\n## Description\n\nx\n\n## Log\n\n- start\n';
+      return harness(dirs.fleet, {}, store);
+    };
+
+    it('a green gate: the next column rides as the pin in the in-claim put, then ONE release into active', async () => {
+      const t = lifecycleSetup();
+      const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK }));
+      endTurn(t.adapter.handles[0]!);
+      await settled(t.sup, id, 'done');
+      expect(t.store.of('release').map((c) => c.stage)).toEqual(['active']);
+      const ops = t.store.calls.map((c) => c.op);
+      expect(ops.indexOf('put')).toBeLessThan(ops.indexOf('release'));
+      expect(t.store.of('put')).toHaveLength(1);
+      expect(t.store.of('put')[0]?.put).toEqual({ holdsClaim: true, actor: expect.stringMatching(/^agent-r-/) });
+      expect(t.store.text).toContain('x-phase: commit');
+      expect(t.store.of('comment')[0]?.text).toContain('moving to commit');
+    });
+
+    it('a pin that cannot be written moves nothing: the ticket goes back to active in its old column', async () => {
+      const t = lifecycleSetup();
+      t.store.failNext('put', new TicketStoreError('invalid', 'put refused', 14));
+      const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK }));
+      endTurn(t.adapter.handles[0]!);
+      await settled(t.sup, id, 'failed'); // a move that could not be made fails the run, as a refused release does
+      expect(t.store.of('release').map((c) => c.stage)).toEqual(['active']);
+      expect(t.store.text).toContain('x-phase: build'); // not moved to commit
+      expect(t.store.of('comment').map((c) => c.text).join('\n')).not.toContain('moving to commit');
+    });
+
+    it('a failed run hands the ticket back to active in one release - no retreat, no write-back', async () => {
+      const t = lifecycleSetup();
+      const id = await startRun(t.sup, request({ nextPhase: null, nextPhaseDir: null, dk: LIFECYCLE_DK }));
+      t.adapter.handles[0]!.fail(1);
+      await settled(t.sup, id, 'failed');
+      expect(t.store.of('release').map((c) => c.stage)).toEqual(['active']);
+      expect(t.store.of('put').filter((c) => c.put?.expectedRev !== undefined)).toEqual([]);
+      expect(t.store.text).toContain('x-phase: build'); // the column is untouched
+    });
+
+    it('a takeover of a ticket left in running (an expired lease) also ends in active', async () => {
+      const t = lifecycleSetup();
+      t.store.stage = 'running';
+      const id = await startRun(t.sup, request({ nextPhase: null, nextPhaseDir: null, dk: LIFECYCLE_DK }));
+      t.adapter.handles[0]!.fail(1);
+      await settled(t.sup, id, 'failed');
+      expect(t.store.of('release').map((c) => c.stage)).toEqual(['active']);
+    });
+
+    it('a run started from an edge column (inbox) that moves nothing goes back there', async () => {
+      const t = lifecycleSetup();
+      t.store.stage = 'inbox';
+      const id = await startRun(t.sup, request({ nextPhase: null, nextPhaseDir: null, dk: LIFECYCLE_DK }));
+      t.adapter.handles[0]!.fail(1);
+      await settled(t.sup, id, 'failed');
+      expect(t.store.of('release').map((c) => c.stage)).toEqual(['inbox']);
+    });
   });
 
   it('park = the park stage plus a comment; without a park stage the ticket keeps its own', async () => {

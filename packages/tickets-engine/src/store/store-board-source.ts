@@ -1,20 +1,21 @@
-import { promises as fsp } from 'node:fs';
-import * as path from 'node:path';
 import type { BoardSnapshot, PriorityConfig } from '../contracts/tickets';
 import type { TicketComment, TicketDetail, TicketStore } from '../ports/ticket-store';
-import { diffBoards, renderBoardDiff, type BoardDiff } from './board-diff';
+import type { BoardDiff } from './board-diff';
 import { assembleBoardFromRecords, type RecordsBoardInput } from './store-board';
 import type { AddOptions, AddResult, Claim, ClaimOptions, PutOptions, ReleaseOptions, ReleaseResult } from '../ports/ticket-store';
 import type { DricketTicketStore } from './dricket-ticket-store';
 import { DricketFileStore, type WriteOutcome } from './dricket-file-store';
 import { FileStoreReader } from './file-store-reader';
-import { legacyToDricketDocument, type BridgeOptions } from './legacy-bridge';
+import { legacyToDricketDocument } from './legacy-bridge';
 import { StoreChangeFeed, type StoreChangeFeedStats, type WatchFn } from './store-change-feed';
 import { headFingerprint, remoteMovedProbe } from './store-git-probe';
 import { StorePathReporter, type StorePathChange } from './store-path-report';
-import { readStorePriorities } from './store-priorities';
+import { StoreConfigCache } from './store-config-cache';
+import { readStoreConfigText } from './store-config-text';
 import { StoreReader } from './store-reader';
 import { checkoutOf, createDricketStore, type StoreSettings } from './store-settings';
+import { StoreShadow } from './store-shadow';
+import { writePlacement, type StoreStageSet } from './store-stages';
 
 /** The seams of the file path (E14-4); specs replace them, the engine leaves them out. */
 export interface StoreBoardSourceOptions {
@@ -37,7 +38,21 @@ export interface StoreBoardSourceOptions {
   readonly remoteMoved?: ((dir: string) => () => Promise<boolean>) | null;
   /** The store's priority vocabulary; default `git show <config ref>:dricket.toml`. */
   readonly readPriorities?: (checkout: string) => Promise<PriorityConfig | null>;
+  /** The store's `[stages]` (req-265); default `git show <config ref>:dricket.toml`. */
+  readonly readStages?: (checkout: string) => Promise<StoreStageSet | null>;
 }
+
+/**
+ * A board write: the column the ticket ends in (the store's stage and pin follow from it, req-265),
+ * or `keepStage` for an edit that moves nothing (stage and pin stay as the document has them).
+ */
+export type LegacyWrite =
+  | {
+      readonly phase: string;
+      /** `true` adds the `archived` label, `false` removes it, absent leaves the labels. */
+      readonly archived?: boolean;
+    }
+  | { readonly keepStage: true };
 
 interface Source {
   readonly key: string;
@@ -48,12 +63,7 @@ interface Source {
   readonly feed: StoreChangeFeed | null;
   readonly remote: boolean;
   synced: boolean;
-  /** The last read of the store's `[priorities]` (D-11). */
-  priorities?: { readonly at: number; readonly value: PriorityConfig | null };
 }
-
-/** `dricket.toml` changes by an admin's commit, rarely: a board read does not pay a git process each time. */
-const PRIORITIES_MAX_AGE_MS = 60_000;
 
 /**
  * The glue between the board service and the dricket store: builds the store
@@ -65,23 +75,27 @@ const PRIORITIES_MAX_AGE_MS = 60_000;
  */
 export class StoreBoardSource {
   private current: Source | null = null;
-  private shadowRunning = false;
-  private shadowDone: Promise<unknown> = Promise.resolve();
   private readonly feeds = new Set<StoreChangeFeed>();
   private readonly pathReporters = new Set<StorePathReporter>();
-  private shadowAt = 0;
-  private lastDiff: BoardDiff | null = null;
+  private readonly shadow: StoreShadow;
+  private readonly config: StoreConfigCache;
 
   constructor(
     /** Where the shadow report lands (`<userRoot>/shadow`). */
-    private readonly reportDir: string,
+    reportDir: string,
     private readonly log: (message: string, level?: 'info' | 'warn' | 'error') => void,
     /** Minimum gap between two shadow runs (every snapshot would otherwise cost a `dk` pass). */
-    private readonly shadowIntervalMs = 30_000,
+    shadowIntervalMs = 30_000,
     /** Test seam: a store instead of the real `dk`. */
     private readonly storeFactory: (settings: StoreSettings) => TicketStore = createDricketStore,
     private readonly options: StoreBoardSourceOptions = {},
-  ) {}
+  ) {
+    this.shadow = new StoreShadow(reportDir, log, shadowIntervalMs, (settings) => this.records(settings));
+    this.config = new StoreConfigCache({
+      ...(options.readPriorities === undefined ? {} : { priorities: options.readPriorities }),
+      ...(options.readStages === undefined ? {} : { stages: options.readStages }),
+    });
+  }
 
   private sourceFor(settings: StoreSettings): Source {
     const key = JSON.stringify([settings.dkPath, settings.dkStore, settings.dkDataDir, settings.dkCheckout, settings.dkSyncSeconds]);
@@ -144,7 +158,7 @@ export class StoreBoardSource {
    * the folders are let go; the processes it waits for hold their working directory.
    */
   async idle(): Promise<void> {
-    await Promise.allSettled([...[...this.feeds].map((feed) => feed.idle()), this.shadowDone]);
+    await Promise.allSettled([...[...this.feeds].map((feed) => feed.idle()), this.shadow.idle()]);
     await Promise.allSettled([...this.pathReporters].map((paths) => paths.idle()));
   }
 
@@ -215,11 +229,36 @@ export class StoreBoardSource {
    * document is derived from `current` (`legacy-bridge`) and written with
    * `put --claim --if-version current.rev`; exit 12 comes back as a conflict.
    */
-  async writeLegacy(settings: StoreSettings, current: TicketDetail, legacyText: string, bridge: BridgeOptions): Promise<WriteOutcome> {
+  async writeLegacy(settings: StoreSettings, current: TicketDetail, legacyText: string, target: LegacyWrite): Promise<WriteOutcome> {
     if (current.rev === null) {
       throw new Error(`${current.id} has no rev: the store did not report one`);
     }
+    const bridge = 'keepStage' in target
+      ? { stage: current.stage }
+      : { ...writePlacement(target.phase, await this.stages(settings), current.text), ...(target.archived === undefined ? {} : { archived: target.archived }) };
     return this.write(settings, current.id, legacyToDricketDocument(current.text, legacyText, bridge), { expectedRev: current.rev });
+  }
+
+  /** The stage a release from the board hands a ticket in column `phase` to (req-265: a lifecycle stage on a migrated store). */
+  async releaseStageOf(settings: StoreSettings, phase: string): Promise<string> {
+    return writePlacement(phase, await this.stages(settings), '').stage;
+  }
+
+  /** The store's `[stages]` (cached a minute); null without a checkout, a config or a table. */
+  async stages(settings: StoreSettings): Promise<StoreStageSet | null> {
+    const checkout = checkoutOf(settings);
+    return checkout === null ? null : this.config.stages(checkout);
+  }
+
+  /** The store's `dricket.toml` as it is now (uncached; the stage migration plans from it). */
+  async configText(settings: StoreSettings): Promise<{ readonly ref: string; readonly text: string } | null> {
+    const checkout = checkoutOf(settings);
+    return checkout === null ? null : readStoreConfigText(checkout);
+  }
+
+  /** The store's config was just committed: the next read asks git again. */
+  invalidateConfig(): void {
+    this.config.invalidate();
   }
 
   /** Creates an unclaimed ticket through `dk add`; dk allocates the number. */
@@ -278,16 +317,8 @@ export class StoreBoardSource {
 
   /** The store's priority vocabulary (D-11), re-read at most once a minute; null when no ref holds a `dricket.toml`. */
   private async prioritiesOf(settings: StoreSettings): Promise<PriorityConfig | null> {
-    const source = this.sourceFor(settings);
     const checkout = checkoutOf(settings);
-    if (checkout === null) {
-      return null;
-    }
-    const now = Date.now();
-    if (source.priorities === undefined || now - source.priorities.at >= PRIORITIES_MAX_AGE_MS) {
-      source.priorities = { at: now, value: await (this.options.readPriorities ?? readStorePriorities)(checkout) };
-    }
-    return source.priorities.value;
+    return checkout === null ? null : this.config.priorities(checkout);
   }
 
   /** Every ticket's comments for the board's Needs-you rows (D-12); one unreadable ticket has none. */
@@ -307,50 +338,16 @@ export class StoreBoardSource {
 
   /** The last comparison, or null before the first shadow run finished. */
   get lastShadowDiff(): BoardDiff | null {
-    return this.lastDiff;
+    return this.shadow.lastDiff;
   }
 
-  /**
-   * Shadow mode: builds the board from the store, compares it with the board
-   * the UI shows and writes `board-diff.md` / `board-diff.json`. Fire and
-   * forget (never throws, never delays the snapshot), one run at a time, at
-   * most one per interval.
-   */
+  /** Shadow mode (E14-2): the store's board compared with the one the UI shows, off the request path ({@link StoreShadow}). */
   scheduleShadow(settings: StoreSettings, input: Omit<RecordsBoardInput, 'records'>, shown: BoardSnapshot): void {
-    const now = Date.now();
-    if (this.shadowRunning || now - this.shadowAt < this.shadowIntervalMs) {
-      return;
-    }
-    this.shadowRunning = true;
-    this.shadowAt = now;
-    this.shadowDone = this.runShadow(settings, input, shown).finally(() => {
-      this.shadowRunning = false;
-    });
+    this.shadow.schedule(settings, input, shown);
   }
 
   /** The awaitable core of {@link scheduleShadow} (specs call it directly). */
-  async runShadow(settings: StoreSettings, input: Omit<RecordsBoardInput, 'records'>, shown: BoardSnapshot): Promise<BoardDiff | null> {
-    const info = { generatedAt: new Date().toISOString(), leftName: 'files', rightName: 'dricket' };
-    let diff: BoardDiff | null = null;
-    let error: string | undefined;
-    try {
-      const candidate = assembleBoardFromRecords({ ...input, records: await this.records(settings) });
-      diff = diffBoards(shown, candidate);
-      this.lastDiff = diff;
-      if (!diff.equal) {
-        this.log(`tickets shadow: boards differ (${diff.differing.length} tickets differ, ${diff.onlyLeft.length} only in files, ${diff.onlyRight.length} only in dricket) - see ${path.join(this.reportDir, 'board-diff.md')}`, 'warn');
-      }
-    } catch (e) {
-      error = e instanceof Error ? e.message : String(e);
-      this.log(`tickets shadow: the dricket board could not be built: ${error}`, 'warn');
-    }
-    try {
-      await fsp.mkdir(this.reportDir, { recursive: true });
-      await fsp.writeFile(path.join(this.reportDir, 'board-diff.md'), renderBoardDiff(diff, { ...info, ...(error === undefined ? {} : { error }) }), 'utf8');
-      await fsp.writeFile(path.join(this.reportDir, 'board-diff.json'), JSON.stringify({ ...info, error: error ?? null, diff }, null, 2) + '\n', 'utf8');
-    } catch (e) {
-      this.log(`tickets shadow: the report could not be written: ${e instanceof Error ? e.message : String(e)}`, 'warn');
-    }
-    return diff;
+  runShadow(settings: StoreSettings, input: Omit<RecordsBoardInput, 'records'>, shown: BoardSnapshot): Promise<BoardDiff | null> {
+    return this.shadow.run(settings, input, shown);
   }
 }

@@ -5707,3 +5707,36 @@ sequenceDiagram
 ```
 
 A second run finds every id in the marker and writes nothing. An id whose folder exists is never touched, only marked. A seeding that fails logs and leaves the marker unset, so the next start tries again. The pipeline and the crew's `default-persona` are not changed: a column without a `persona:` pin keeps running the ring until the owner pins Paul, Ben, Ralf or Tessa on it (Flow tab), and the personas are at once on the Crew tab, in Mission Control's team list, in the flow editor's pins, and open to a 1:1 or a free session.
+
+## 6.118 A run on the lifecycle stages, and the owner's Migrate (req-265, milestone 239, [ADR-0090](09_architecture_decisions/0090-tickets-on-dricket.md) later change)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Owner
+    participant Panel as Tickets panel (store-migration-bar)
+    participant BS as BoardService
+    participant Mig as StoreStageMigration
+    participant Cfg as StoreConfigWriter (store's main)
+    participant DK as dk (store)
+    participant Run as RunLease / ClaimRelease
+    Note over BS,Mig: every board snapshot: offer() — plan from dricket.toml + the tickets
+    BS-->>Panel: snapshot.storeMigration (old stages, n moves, 2 config commits)
+    Owner->>Panel: Migrate
+    Panel->>BS: migrateStoreStages() (single-writer queue)
+    BS->>Mig: run()
+    Mig->>Mig: re-plan; a claimed ticket = wait, nothing written
+    Mig->>Cfg: commit 1 — the old stages + active, running; claim = ["running"]
+    loop every ticket in shaping / building / ready
+        Mig->>DK: put --claim --if-version (stage: active, x-phase: the old stage)
+    end
+    Mig->>Mig: re-plan (a ticket may have arrived meanwhile)
+    Mig->>Cfg: commit 2 — inbox prioritized active running done
+    BS->>BS: config cache invalidated; chainStoreOf → lifecycle: true
+    Note over Run,DK: a run on the migrated store
+    Run->>DK: claim (active → running; x-phase keeps the column)
+    Run->>DK: put inside the claim — the Verlauf line + x-phase: next column
+    Run->>DK: release --stage active (one commit; R-31 never arises)
+```
+
+A crash anywhere — between the two config commits, halfway through the moves — leaves a store the next Migrate plans the rest for: step 1 is skipped once `active` / `running` exist, moves are skipped for tickets already out of an old stage, and step 2 runs once none is left in one. A remote store's `dricket.toml` is not Drey's to write: the line offers **Copy stages** (the next table to paste) and Migrate does only the moves. A run that moves nothing releases to where it sat: `active`, or the edge stage (`inbox`, `prioritized`) the owner started it from.

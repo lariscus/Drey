@@ -29,4 +29,17 @@ describe('LeftoverClaims — the claims of this host no live run holds (E14-5b)'
     t.adapter.handles[0]!.fail(1);
     await settled(t.sup, id, 'failed');
   });
+
+  it('req-265: on a lifecycle store a leftover claim in running goes to active in one release', async () => {
+    const store = new FakeTicketStore();
+    store.stages = ['inbox', 'prioritized', 'active', 'running', 'done'];
+    store.claimStage = 'running';
+    const t = harness(dirs.fleet, {}, store);
+    const host = runOwnerHost();
+    t.store.list = (() => Promise.resolve([{ id: 'T-0007', stage: 'running', owner: `agent-r-dead@${host}` }])) as never;
+    const report = await t.sup.releaseLeftoverClaims({ ...DK_TARGET, retreatStage: null, lifecycle: true }, {});
+    expect(report.released).toEqual(['T-0007']);
+    expect(t.store.of('release').map((c) => c.stage)).toEqual(['active']);
+    expect(t.store.of('put')).toEqual([]);
+  });
 });

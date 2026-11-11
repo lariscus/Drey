@@ -65,8 +65,6 @@ export const SIZE_BASELINE = [
   'packages/tickets-engine/src/store/board-diff.ts',
   'packages/tickets-engine/src/store/dk-process.ts',
   'packages/tickets-engine/src/store/file-ticket-store.ts',
-  'packages/tickets-engine/src/store/legacy-bridge.ts',
   'packages/tickets-engine/src/store/store-board-source.ts',
-  'packages/tickets-engine/src/store/store-board.ts',
   'packages/tickets-engine/src/store/store-change-feed.ts',
 ];
