@@ -1,7 +1,8 @@
 # The persona board — concept for req-257 (2026-11-11)
 
-Status: **Complete, all questions answered 2026-11-11; awaiting the owner's
-approval.** Nothing is built. Roadmap row req-257 asked for *"a concept with a
+Status: **Approved by the owner on 2026-11-11** (all questions answered the
+same day). Built as roadmap rows req-264 … req-275, req-257 and req-258, in
+the order of §15. Nothing is built yet. Roadmap row req-257 asked for *"a concept with a
 board draft on the dricket store … then the owner's approval, then rows and
 sessions."* This note is the concept in its final form: the first version was
 corrected by the owner in three rounds on 2026-11-11, and this rewrite folds
