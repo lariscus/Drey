@@ -2,9 +2,12 @@
 
 ## Status
 
-Proposed (2026-11-04, owner request; analysis in
-[`docs/design/dricket/`](../design/dricket/fit-analysis.md)). Nothing is built.
-If accepted it supersedes, in part, [ADR-0076](0076-ticket-repository-format-and-coordination.md)
+Accepted and built (proposed 2026-11-04, owner request; analysis in
+[`docs/design/dricket/`](../design/dricket/fit-analysis.md)). E14-1 to E14-8 shipped
+(milestones 150-186, see the later changes below); the owner's board runs on the
+store since the cut-over of 2026-11-06 (E14-7 steps 1-8,
+[`cutover-2026-11-06.md`](../design/dricket/cutover-2026-11-06.md)). Open: E14-7 step 9,
+the owner's verification round, then the decommission E14-9b. It supersedes, in part, [ADR-0076](0076-ticket-repository-format-and-coordination.md)
 (file layout, phase folders, claims as phase transitions, the move machinery,
 the validator's structural half, normalization) and amends
 [ADR-0075](0075-agent-fleet-architecture-governance-and-run-control.md) and
