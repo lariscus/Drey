@@ -85,8 +85,13 @@ export interface RunDkTarget {
   readonly parkStage: string | null;
   /** E14-5b (Q-03): the stage a run that waits for the owner is released to; null = it stays where it is, unclaimed. Absent on older runners. */
   readonly needsInputStage?: string | null;
-  /** The stage before the working one, for a release that may not stay put (dk refuses `build -> build` for an agent). */
+  /**
+   * A store still on phase stages: the stage before the working one, for a release that may not stay
+   * put (dk refuses `build -> build` for an agent, R-31). Null on a lifecycle store.
+   */
   readonly retreatStage: string | null;
+  /** req-265: the store is on the lifecycle stages (see {@link ChainStoreConfig.lifecycle}); absent = phase stages. */
+  readonly lifecycle?: boolean;
   /** Workers put `Dricket-*` trailers on their commits and the gate runs `dk validate --trailers` (off by default). */
   readonly trailers: boolean;
 }

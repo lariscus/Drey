@@ -1,3 +1,4 @@
+import { stayPutStagesOf } from '../../core/lifecycle-stages';
 import type { RunDkTarget } from '../protocol';
 import { RunLease, runOwnerId } from '../run-lease';
 import type { StoreForTarget } from '../store/ticket-store';
@@ -13,7 +14,8 @@ export interface LeftoverClaimsReport {
  * runner killed with a run in flight leaves its `agent-<run>@<host>` claim
  * on the ticket until the lease ends. Every ticket owned by an agent
  * identity of THIS host that no live run holds is released as that owner:
- * where it sat when dk takes that (R-31 write-back), else one stage back.
+ * on a lifecycle store into `active` (req-265, one release), on a store still
+ * on phase stages where it sat when dk takes that, else one stage back.
  * Never touches another host's claims or a human's.
  */
 export class LeftoverClaims {
@@ -34,9 +36,8 @@ export class LeftoverClaims {
       }
       const lease = new RunLease({ store, ticketId: record.id, actor: owner, runId: 'leftover', size: 'S', log: this.log, onLost: () => undefined });
       lease.preStage = record.stage;
-      const result = await lease.release([record.stage, retreatByStage[record.stage] ?? null], 'the claim of a run that no longer exists, released', {
-        restoreTo: record.stage,
-      });
+      const stages = target.lifecycle === true ? stayPutStagesOf(record.stage) : [record.stage, retreatByStage[record.stage] ?? null];
+      const result = await lease.release(stages, 'the claim of a run that no longer exists, released');
       if (result.ok) {
         released.push(record.id);
         this.log(`released the leftover claim of ${owner} on ${record.id} (now in ${result.stage})`);

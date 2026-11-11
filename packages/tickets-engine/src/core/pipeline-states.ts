@@ -8,7 +8,11 @@
  * What the clients display is req-99b.
  */
 
-/** The six stages in board order. `ready` is titled "Ready to try". */
+/**
+ * The six phases of the default pipeline in board order (`ready` is titled "Ready to try"). Since
+ * req-265 these are the pipeline's COLUMNS only: a store's stages are the lifecycle ones
+ * (`core/lifecycle-stages.ts`), and a store still on these six is offered the stage migration.
+ */
 export const STATE_IDS = ['inbox', 'shaping', 'prioritized', 'building', 'ready', 'done'] as const;
 
 export const SHAPING_STATE = 'shaping';

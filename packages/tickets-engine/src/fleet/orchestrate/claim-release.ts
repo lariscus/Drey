@@ -1,6 +1,8 @@
+import { PHASE_PIN_KEY, placementOfPhase } from '../../core/lifecycle-stages';
 import { costOf } from '../../core/model-prices';
 import { renderStatusComment } from '../../core/status-comment';
 import { appendVerlaufEntry, renderVerlaufLine, verlaufEntryOf } from '../../core/verlauf';
+import { setDocumentField } from '../../store/document-fields';
 import type { Clock } from '../ports/clock';
 import type { RunLease } from '../run-lease';
 import type { TerminalRunState } from '../run/run-state';
@@ -15,7 +17,19 @@ function effectiveCost(run: LiveRun): number | null {
   return costUsd ?? (endedAt === null ? costOf(model ?? null, tokensIn, tokensOut) : null);
 }
 
-export type WriteResult = { readonly ok: true } | { readonly ok: false; readonly error: string };
+/**
+ * Where a green move releases to: on a lifecycle store (req-265) the next column's stage, with the
+ * write that pins the column inside the claim; on a store still on phase stages the phase id itself.
+ */
+function moveTarget(run: LiveRun, nextPhase: string): { readonly stage: string; readonly pin?: (text: string) => string } {
+  if (run.request.dk?.lifecycle !== true) {
+    return { stage: nextPhase };
+  }
+  const placement = placementOfPhase(nextPhase);
+  return { stage: placement.stage, pin: (text) => setDocumentField(text, PHASE_PIN_KEY, placement.pin) ?? text };
+}
+
+export type WriteResult ={ readonly ok: true } | { readonly ok: false; readonly error: string };
 
 /**
  * The run's hand-back of its ticket (E14-5/5b): release IS the one door —
@@ -42,13 +56,18 @@ export class ClaimRelease {
     // E14-6: a failed run says so as a `failed:` status comment (the Needs-you grammar); the rest is detail.
     const failed = run.info.state === 'failed' ? renderStatusComment({ verb: 'failed', text: failureLine(run.info), detail: note }) : null;
     await this.verlaufInClaim(run, lease, run.info.state as TerminalRunState);
-    const result = await lease.release(this.claims.stayPutStages(run.request, lease), failed ?? note, { restoreTo: lease.preStage });
+    const result = await lease.release(this.claims.stayPutStages(run.request, lease), failed ?? note);
     if (!result.ok) {
       this.log(`run ${run.info.id}: releasing ${run.request.ticketId} failed - ${result.error}${result.lost ? '' : ' (the claim stays until its lease ends)'}`);
     }
   }
 
-  /** Green gate with a next phase: the release IS the move (target stage, no file). */
+  /**
+   * Green gate with a next phase: the release IS the move. On a lifecycle store (req-265) the next
+   * column rides as the pin in the in-claim write that carries the Verlauf line, then one release
+   * into its stage (`active` for a working column); on a store still on phase stages the release
+   * names the next phase.
+   */
   async move(run: LiveRun, nextPhase: string): Promise<WriteResult> {
     const lease = run.lease;
     if (lease === undefined || lease.fenced) {
@@ -57,12 +76,15 @@ export class ClaimRelease {
     const parkFor = run.request.parkFor;
     const narrative = `run ${run.info.id} done - gate green, moving to ${nextPhase}${parkFor === undefined ? '' : `; parked for ${parkFor} (manual step)`}${usageSummary(run.info)}`;
     const note = renderStatusComment({ verb: 'done', text: `handed over on ${run.currentPhase}`, detail: narrative }) ?? narrative;
-    await this.verlaufInClaim(run, lease, 'done');
-    const result = await lease.release([nextPhase], note);
+    const target = moveTarget(run, nextPhase);
+    if (!(await this.verlaufInClaim(run, lease, 'done', target.pin)) && target.pin !== undefined) {
+      return { ok: false, error: `the next column ${nextPhase} could not be written inside the claim - nothing is moved` };
+    }
+    const result = await lease.release([target.stage], note);
     if (!result.ok) {
       return { ok: false, error: result.error };
     }
-    run.currentPhase = result.stage;
+    run.currentPhase = target.pin === undefined ? result.stage : nextPhase;
     return { ok: true };
   }
 
@@ -74,7 +96,7 @@ export class ClaimRelease {
     }
     await this.verlaufInClaim(run, lease, 'done');
     const stages = [run.request.dk!.parkStage, ...this.claims.stayPutStages(run.request, lease)];
-    const result = await lease.release(stages, comment, { restoreTo: lease.preStage });
+    const result = await lease.release(stages, comment);
     return result.ok ? { ok: true } : { ok: false, error: result.error };
   }
 
@@ -104,16 +126,25 @@ export class ClaimRelease {
     );
   }
 
-  /** Once per run: a second call (park after a failed move) finds the line written. */
-  private async verlaufInClaim(run: LiveRun, lease: RunLease, state: TerminalRunState): Promise<void> {
+  /**
+   * The one in-claim write before the release: the Verlauf line once per run (a second call — park
+   * after a failed move — finds it written) and `extra` (the move's column pin, req-265). Nothing to
+   * write = no commit. False only when a change was due and the write failed.
+   */
+  private async verlaufInClaim(run: LiveRun, lease: RunLease, state: TerminalRunState, extra?: (text: string) => string): Promise<boolean> {
     await this.copy.sync(run);
-    if (run.verlaufWritten === true) {
-      return;
-    }
+    const line = run.verlaufWritten === true ? null : this.verlaufLine(run, state);
     run.verlaufWritten = true;
-    const line = this.verlaufLine(run, state);
-    if (line !== null) {
-      await lease.patchInClaim((text) => appendVerlaufEntry(text, line));
+    if (line === null && extra === undefined) {
+      return true;
     }
+    let changed = false;
+    const written = await lease.patchInClaim((text) => {
+      const withLine = line === null ? text : appendVerlaufEntry(text, line);
+      const next = extra === undefined ? withLine : extra(withLine);
+      changed = next !== text;
+      return next;
+    });
+    return written || !changed;
   }
 }

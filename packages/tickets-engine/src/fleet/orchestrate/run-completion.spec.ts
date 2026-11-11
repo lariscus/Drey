@@ -76,7 +76,7 @@ describe('RunCompletion — the gate, the move and the other ends', () => {
     endTurn(adapter.handles[0]!);
     await settled(sup, id, 'done');
     expect(store.of('release').map((c) => c.stage)).toEqual(STAY_PUT);
-    expect(store.stage).toBe('plan');
+    expect(store.stage).toBe('prioritized'); // a store still on phase stages retreats; the R-31 write-back is gone (req-265)
     expect(store.of('comment').at(-1)?.text).toContain('parked for you (manual step)');
   });
 

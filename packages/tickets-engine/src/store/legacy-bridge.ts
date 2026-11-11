@@ -1,4 +1,5 @@
 import { parse } from 'yaml';
+import { PHASE_PIN_KEY } from '../core/lifecycle-stages';
 import { EXTENSION_KEYS } from './extension-keys';
 import { toDricketId } from './ids';
 
@@ -25,8 +26,13 @@ export const ARCHIVED_LABEL = 'archived';
 export const PLACEHOLDER_LABEL = 'placeholder';
 
 export interface BridgeOptions {
-  /** The stage the document gets (variant A: the pipeline phase id). */
+  /** The stage the document gets (a lifecycle stage, req-265; on a store still on phase stages, the phase id). */
   readonly stage: string;
+  /**
+   * The interim column pin `x-phase` (req-265): a string sets it, null removes it, absent leaves
+   * whatever the current document has.
+   */
+  readonly pin?: string | null;
   /** `true` adds the `archived` label, `false` removes it, absent leaves the labels. */
   readonly archived?: boolean;
 }
@@ -61,7 +67,16 @@ function listOf(value: unknown): string[] {
 }
 
 /** The dricket header values a legacy header implies. `null` = the key must not stay in the document. */
-function fieldsOf(legacy: Record<string, unknown>, stage: string): Map<string, string | null> {
+function fieldsOf(legacy: Record<string, unknown>, options: BridgeOptions): Map<string, string | null> {
+  const out = new Map<string, string | null>([...typedFieldsOf(legacy, options.stage), ...extensionFieldsOf(legacy)]);
+  if (options.pin !== undefined) {
+    out.set(PHASE_PIN_KEY, options.pin);
+  }
+  return out;
+}
+
+/** dricket's own fields: stage, title, priority, repos, depends, parent. */
+function typedFieldsOf(legacy: Record<string, unknown>, stage: string): Map<string, string | null> {
   const out = new Map<string, string | null>();
   out.set('stage', stage);
   if (typeof legacy['title'] === 'string') {
@@ -75,11 +90,24 @@ function fieldsOf(legacy: Record<string, unknown>, stage: string): Map<string, s
   out.set('depends', listOf(legacy['blocked-by']).map((id) => toDricketId(id) ?? id.toLowerCase()).join(', '));
   const parent = typeof legacy['parent'] === 'string' ? legacy['parent'] : '';
   out.set('parent', parent === '' ? '' : (toDricketId(parent) ?? parent.toLowerCase()));
+  return out;
+}
+
+/** One Drey key as an `x-` value: a non-empty string or a number; null = absent. */
+function extensionValue(value: unknown): string | null {
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  return typeof value === 'string' && value.trim() !== '' ? flat(value) : null;
+}
+
+/** Drey's keys as `x-` fields: rank, the extension keys, interactive, chain, references, `entered-*`. */
+function extensionFieldsOf(legacy: Record<string, unknown>): Map<string, string | null> {
+  const out = new Map<string, string | null>();
   const rank = legacy['rank'];
   out.set('x-rank', rank === undefined || rank === null ? null : flat(rank));
   for (const key of EXTENSION_KEYS) {
-    const value = legacy[key];
-    out.set(`x-${key}`, typeof value === 'string' && value.trim() !== '' ? flat(value) : typeof value === 'number' ? String(value) : null);
+    out.set(`x-${key}`, extensionValue(legacy[key]));
   }
   out.set('x-interactive', legacy['interactive'] === true ? 'true' : null);
   const chain = listOf(legacy['chain']);
@@ -106,6 +134,42 @@ function isManagedExtension(key: string): boolean {
   );
 }
 
+/** Empty typed fields that stay as `key: ` lines (dk's own empty list fields). */
+const KEPT_EMPTY: readonly string[] = ['repos', 'depends', 'parent'];
+
+function headerOf(text: string): Record<string, unknown> {
+  const parsed: unknown = parse(text);
+  return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+}
+
+/** The `labels:` line with the `archived` label added or removed. */
+function labelsLine(value: string, archived: boolean): string {
+  const labels = value
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '' && s !== ARCHIVED_LABEL);
+  if (archived) {
+    labels.push(ARCHIVED_LABEL);
+  }
+  return `labels: ${labels.join(', ')}`;
+}
+
+/** What one line of the current header becomes: itself, its replacement, or nothing. */
+function rewritten(line: string, wanted: ReadonlyMap<string, string | null>, written: Set<string>, archived: boolean | undefined): string[] {
+  const colon = line.indexOf(':');
+  const key = colon > 0 ? line.slice(0, colon) : '';
+  if (key === 'labels' && archived !== undefined) {
+    written.add(key);
+    return [labelsLine(line.slice(colon + 1), archived)];
+  }
+  if (wanted.has(key)) {
+    written.add(key);
+    const value = wanted.get(key)!;
+    return value === null ? [] : [`${key}: ${value}`];
+  }
+  return isManagedExtension(key) ? [] : [line];
+}
+
 /**
  * The dricket document for a patched legacy ticket text, built on `current` (the
  * document as stored now). Header lines keep their order; managed fields are
@@ -114,51 +178,11 @@ function isManagedExtension(key: string): boolean {
 export function legacyToDricketDocument(current: string, legacyText: string, options: BridgeOptions): string {
   const now = split(current);
   const legacy = split(legacyText);
-  const parsed: unknown = parse(legacy.header);
-  const header = parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
-  const wanted = fieldsOf(header, options.stage);
+  const wanted = fieldsOf(headerOf(legacy.header), options);
   const written = new Set<string>();
-  const lines: string[] = [];
-  for (const line of now.header.split('\n')) {
-    const colon = line.indexOf(':');
-    const key = colon > 0 ? line.slice(0, colon) : '';
-    if (key === 'labels' && options.archived !== undefined) {
-      const labels = line
-        .slice(colon + 1)
-        .split(',')
-        .map((s) => s.trim())
-        .filter((s) => s !== '' && s !== ARCHIVED_LABEL);
-      if (options.archived) {
-        labels.push(ARCHIVED_LABEL);
-      }
-      lines.push(`labels: ${labels.join(', ')}`);
-      written.add('labels');
-      continue;
-    }
-    if (key === 'x-phase') {
-      // Variant B documents pin the phase beside the stage: keep the pin in step.
-      lines.push(`x-phase: ${options.stage}`);
-      written.add(key);
-      continue;
-    }
-    if (wanted.has(key)) {
-      const value = wanted.get(key)!;
-      written.add(key);
-      if (value !== null) {
-        lines.push(`${key}: ${value}`);
-      }
-      continue;
-    }
-    if (isManagedExtension(key)) {
-      continue;
-    }
-    lines.push(line);
-  }
+  const lines = now.header.split('\n').flatMap((line) => rewritten(line, wanted, written, options.archived));
   for (const [key, value] of wanted) {
-    if (!written.has(key) && value !== null && (value !== '' || !key.startsWith('x-'))) {
-      if (value === '' && !['repos', 'depends', 'parent'].includes(key)) {
-        continue;
-      }
+    if (!written.has(key) && value !== null && (value !== '' || KEPT_EMPTY.includes(key))) {
       lines.push(`${key}: ${value}`);
     }
   }

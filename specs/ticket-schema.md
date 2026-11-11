@@ -863,7 +863,7 @@ column, so a run there on a ticket without acceptance criteria gates structurall
 branch, push (`plugins/tickets/BOARD.md`). A green end lands the ticket in Done, as bookkeeping;
 a `BLOCKED:` or red end leaves it on Ready to try. A ticket with no `repo:` has nothing to
 merge and moves directly. On a store dk refuses an agent's release into a terminal stage, so
-the run hands back to `ready` and the engine then makes the owner's move into `done`.
+the run hands back to `ready` (on a lifecycle store: `active` pinned to `ready`, req-265) and the engine then makes the owner's move into `done`.
 *Send back* is the ordinary send-back to Building.
 
 Boards and stores that exist keep their columns: a default is written only into an empty
@@ -1836,7 +1836,7 @@ its changed chapters back inside the claim (D-30, [FLEET.md](../plugins/tickets/
 
 | dricket | Ticket key here | Note |
 |---|---|---|
-| `stage` | the phase directory | `x-phase` if it names a phase, else the stage itself when it is a pipeline phase id (store configured with `[stages]` = the phase ids), else the built-in names by role: `open`/`blocked` → first column, `in-progress` → first `claim: true` column, `review` → `commit`, `done`/`cancelled` → last column; anything else is an unknown column with a warning |
+| `stage`, `x-phase` | the phase directory | an edge stage (`inbox`, `prioritized`, `done`) that is a pipeline phase is its own column; else `x-phase` if it names a phase (the interim column pin of an `active` / `running` ticket, req-265; also variant B); else the stage itself when it is a pipeline phase id (a store not yet migrated); else by role: `active`/`running`/`in-progress` → first `claim: true` column, `open`/`blocked` → first column, `review` → `commit`, `done`/`cancelled` → last column; anything else is an unknown column with a warning |
 | `id`, `title`, `priority`, `parent`, `repos` | same | the store's `[priorities]` must use the pipeline's words |
 | `depends` | `blocked-by` | `blocked`/`blocks` stay derived |
 | `owner`, `claimed_at` | `claimed-by`, `claimed-at` | |
@@ -1848,6 +1848,19 @@ its changed chapters back inside the claim (D-30, [FLEET.md](../plugins/tickets/
 | `x-chain` | `chain` | entries separated by `;` |
 | `x-references` | `references` | separated by `,` |
 | `x-entered-<phase>` | `entered-<phase>` | |
+
+**The store's stages (req-265).** A store's `[stages]` are the lifecycle, never the columns:
+`inbox prioritized active running done` (`cancelled` reserved), `claim = ["running"]`. A board
+write of column *c* writes `stage: c` with no pin for an edge column (`inbox`, `prioritized`,
+`done`) and `stage: active` with `x-phase: c` for every other column; a header edit keeps stage
+and pin as they are. `dk claim` moves `active -> running`; a run that moves the ticket on writes
+the next column as `x-phase` inside its claim and releases once into `active`; a run that moves
+nothing releases to where it sat. `x-phase` is interim: the chain's cursor `x-at` replaces it
+(req-266). A store still on the phase stages (variant A: the stages are the column ids) is read
+and written as before, and the Tickets panel offers **Migrate** (the owner's click only): one
+config commit adds `active` / `running`, every ticket in an old stage moves to `active` pinned to
+its old stage, a second config commit removes the old stages (ADR-0090 later change, concept §12
+steps 1–2).
 
 Not carried: `branch` (the rule `t/<id>` wins), `run` (the runner's table),
 `parked-*` (a parked ticket is stage `blocked`), `labels`, `kind`, `size`,

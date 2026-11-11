@@ -10,7 +10,7 @@
 import { randomBytes } from 'node:crypto';
 import { promises as fsp, existsSync } from 'node:fs';
 import * as path from 'node:path';
-import { archivedTicketIds, nextTicketId, TICKETS_ARCHIVE_DIR, TICKET_ID_PATTERN, type BoardSnapshot, type RecentDone, FolderStatus, PipelinePhase, ProjectRef, PromptEntry, PromptListing, RepoCandidate, RepoRef, ReposListing, TicketCard, TicketForm, TicketPriority, TicketTrack } from '../contracts/tickets';
+import { archivedTicketIds, nextTicketId, TICKETS_ARCHIVE_DIR, TICKET_ID_PATTERN, type BoardSnapshot, type RecentDone, type StoreStageMigrationOffer, type StoreStageMigrationResult, FolderStatus, PipelinePhase, ProjectRef, PromptEntry, PromptListing, RepoCandidate, RepoRef, ReposListing, TicketCard, TicketForm, TicketPriority, TicketTrack } from '../contracts/tickets';
 import { parseChanges, parseResult, planApprovedOf, storyOf, type ChangesReply } from '../contracts/changes';
 import { type RefineReply, TicketReply, AttachmentReply, type DocumentSaveReply, type TicketDocumentLocation } from '../contracts/replies';
 import { documentRelPath, idOfDocumentPath } from '../store/document-paths';
@@ -46,8 +46,11 @@ import { FileTicketStore } from '../store/file-ticket-store';
 import { checkoutOf, createDricketStore, groupByStage, readStoreSettings, type StoreListing, type StoreSettings } from '../store/store-settings';
 import { archivedRecordFiles, recordToBoardFile } from '../store/store-board';
 import type { TicketDetail } from '../ports/ticket-store';
-import { ARCHIVED_LABEL, type BridgeOptions } from '../store/legacy-bridge';
-import { StoreBoardSource } from '../store/store-board-source';
+import { ARCHIVED_LABEL } from '../store/legacy-bridge';
+import { StoreBoardSource, type LegacyWrite } from '../store/store-board-source';
+import { stageMigrationFor } from '../store/stage-migration-factory';
+import { legacyStagesOf, migratableStages } from '../store/stage-migration-plan';
+import { isLifecycleStore } from '../store/store-stages';
 import type { StorePathChange } from '../store/store-path-report';
 import { storeFooterLine } from '../store/store-footer';
 import { loadShippedPrompts } from '../core/default-prompts';
@@ -449,7 +452,25 @@ export class EngineBoardService {
   /** The dricket board: the store is itself a git repository, so the footer names the store, not the vault's repository state (D-9). */
   private async dricketSnapshot(store: StoreSettings, common: Parameters<StoreBoardSource['board']>[1]): Promise<BoardSnapshot> {
     const board = await this.storeBoard.board(store, common);
-    return { ...board, isGitRepo: true, storeLine: await storeFooterLine(store) };
+    const storeMigration = await this.storeMigrationOffer(store);
+    return { ...board, isGitRepo: true, storeLine: await storeFooterLine(store), ...(storeMigration === null ? {} : { storeMigration }) };
+  }
+
+  /**
+   * req-265: what the board offers for a store on the old phase stages. The cached `[stages]` answer
+   * most snapshots: a migrated store (or one the migration is not for) costs no further read.
+   */
+  private async storeMigrationOffer(store: StoreSettings): Promise<StoreStageMigrationOffer | null> {
+    const stages = await this.storeBoard.stages(store).catch(() => null);
+    if (!migratableStages(stages) || (isLifecycleStore(stages) && legacyStagesOf(stages).length === 0)) {
+      return null;
+    }
+    return stageMigrationFor(this.storeBoard, store, this.owner, (message) => this.host.log(message))
+      .offer()
+      .catch((error: unknown) => {
+        this.host.log(`stage migration: the store could not be checked - ${messageOf(error)}`, 'warn');
+        return null;
+      });
   }
 
   /**
@@ -559,10 +580,42 @@ export class EngineBoardService {
     }
   }
 
-  /** The store the chain and the leftover release hand to the runner process. */
+  /** The store the chain and the leftover release hand to the runner process (req-265: with its stage vocabulary). */
   private async chainStoreOf(store: StoreSettings): Promise<ChainStoreConfig> {
     const trailers = await this.host.configGet<boolean | string>('dk.trailers');
-    return { dkPath: store.dkPath, dkStore: store.dkStore, dkDataDir: store.dkDataDir, dkCheckout: store.dkCheckout, trailers: trailers === true || trailers === 'true' };
+    const lifecycle = isLifecycleStore(await this.storeBoard.stages(store).catch(() => null));
+    return {
+      dkPath: store.dkPath,
+      dkStore: store.dkStore,
+      dkDataDir: store.dkDataDir,
+      dkCheckout: store.dkCheckout,
+      trailers: trailers === true || trailers === 'true',
+      ...(lifecycle ? { lifecycle: true } : {}),
+    };
+  }
+
+  /**
+   * "Migrate" (req-265, concept §12 steps 1–2): the store moves from the phase stages to the lifecycle
+   * stages — on the owner's click only, never at start. Two config commits on the LOCAL store's `main`
+   * (Q-05's exception) around the moves of the tickets still standing in an old stage; re-planned on
+   * every call, so an interrupted migration resumes. Runs in the single-writer queue.
+   */
+  async migrateStoreStages(): Promise<StoreStageMigrationResult> {
+    const store = await this.refreshDricket();
+    if (store === null) {
+      return { ok: false, error: 'the stage migration is for a dricket store' };
+    }
+    const result = await this.enqueue(async () => {
+      try {
+        return await stageMigrationFor(this.storeBoard, store, this.owner, (message) => this.host.log(message)).run();
+      } catch (error) {
+        return { ok: false as const, error: messageOf(error) };
+      } finally {
+        this.storeBoard.invalidateConfig();
+      }
+    });
+    this.announceChanged();
+    return result;
   }
 
   /** Keeps the runner's chain config in step with the pipeline (never spawns). */
@@ -1851,7 +1904,7 @@ export class EngineBoardService {
           now,
           actor,
         });
-        await this.putRecord(store, await this.storeBoard.record(store, id), body, { stage: build.id });
+        await this.putRecord(store, await this.storeBoard.record(store, id), body, { phase: build.id });
         done.push(id);
       }
       await this.writeCardText(vault, card, withLogLine(text, now, actor, releaseLogText(done)));
@@ -2088,13 +2141,13 @@ export class EngineBoardService {
       return;
     }
     const record = this.records.get(card.id) ?? (await this.storeBoard.record(store, card.id));
-    // A header edit keeps the stage the document has; only a move changes it.
-    await this.putRecord(store, record, text, { stage: record.stage });
+    // A header edit keeps the stage (and the column pin) the document has; only a move changes it.
+    await this.putRecord(store, record, text, { keepStage: true });
     this.records.delete(card.id);
   }
 
-  private async putRecord(store: StoreSettings, record: TicketDetail, legacyText: string, bridge: BridgeOptions): Promise<void> {
-    const outcome = await this.storeBoard.writeLegacy(store, record, legacyText, bridge);
+  private async putRecord(store: StoreSettings, record: TicketDetail, legacyText: string, target: LegacyWrite): Promise<void> {
+    const outcome = await this.storeBoard.writeLegacy(store, record, legacyText, target);
     if (!outcome.ok) {
       throw new TicketChangedError(record.id);
     }
@@ -2141,7 +2194,7 @@ export class EngineBoardService {
       if (input.mode === 'takeover') {
         await this.storeBoard.claim(store, input.id, { actor, kind: 'human', size: 'S' });
       } else {
-        await this.storeBoard.release(store, input.id, { actor, stage: found.card.phase });
+        await this.storeBoard.release(store, input.id, { actor, stage: await this.storeBoard.releaseStageOf(store, found.card.phase) });
       }
     } catch (error) {
       return { ok: false, error: messageOf(error) };
@@ -2171,8 +2224,8 @@ export class EngineBoardService {
       write: async (p, text) => {
         const id = idOf(p);
         const record = this.records.get(id) ?? (await this.storeBoard.record(store, id));
-        const stage = inArchive(p) ? terminal : (ticketPathParts(p)?.phase ?? record.stage);
-        await this.putRecord(store, record, text, { stage, archived: inArchive(p) });
+        const phase = inArchive(p) ? terminal : ticketPathParts(p)?.phase;
+        await this.putRecord(store, record, text, phase === undefined ? { keepStage: true } : { phase, archived: inArchive(p) });
         this.records.delete(id);
       },
       renameInto: () => Promise.resolve({ ok: true }),
@@ -2364,7 +2417,7 @@ export class EngineBoardService {
         description: input.description,
         ...(input.raw !== undefined ? { rawCapture: input.raw } : {}),
       });
-      await this.putRecord(store, await this.storeBoard.record(store, id), text, { stage: firstPhase });
+      await this.putRecord(store, await this.storeBoard.record(store, id), text, { phase: firstPhase });
     } catch (error) {
       this.announceChanged();
       return { ok: false, error: `dricket: ${messageOf(error)}` };

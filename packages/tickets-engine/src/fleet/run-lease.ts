@@ -1,7 +1,6 @@
 import { TicketStoreError, type Claim, type TicketStore } from '../ports/ticket-store';
-import { withStage } from './run-lease-text';
 
-export { dricketTrailers, runOwnerId, trailerInstruction, withStage } from './run-lease-text';
+export { dricketTrailers, runOwnerId, trailerInstruction } from './run-lease-text';
 
 /**
  * The run's claim on a dricket ticket (E14-5, ADR-0090 decision 2). One
@@ -23,16 +22,6 @@ const FALLBACK_EXTEND_MS = 30 * 60_000;
 const MIN_EXTEND_MS = 30_000;
 /** A failed extension (network, busy store) is retried after this. */
 const RETRY_EXTEND_MS = 60_000;
-
-export interface LeaseReleaseOptions {
-  /**
-   * The stage the ticket should END in when the release itself may not stay put (R-31: dk
-   * refuses an agent's `build -> build` release). If this candidate was refused and a later one
-   * took the ticket, one `put --claim` writes it back — dk allows the move once nobody holds the
-   * ticket. Two commits and a short stop in the retreat stage, but the card ends where it sat.
-   */
-  readonly restoreTo?: string | null;
-}
 
 export type LeaseRelease =
   | { readonly ok: true; readonly stage: string }
@@ -68,7 +57,7 @@ export class RunLease {
   leaseUntil: string | null = null;
   /** True when the claim was a takeover of an expired lease. */
   takeover = false;
-  /** The stage the ticket sat in before the claim (dk may have moved it to a claim stage). */
+  /** The stage the ticket sat in before the claim (dk moves it into the claim stage: `active -> running`). */
   preStage: string | null = null;
   /** Another actor owns the ticket now: no further call is made. */
   fenced = false;
@@ -123,15 +112,16 @@ export class RunLease {
   }
 
   /**
-   * Hands the ticket back to the first stage dk accepts. `candidates` are tried in
-   * order; an `invalid` answer (exit 14: unknown stage, or the agent policy refuses
-   * a same-stage release) goes on to the next one. Exit 13 fences the lease.
+   * Hands the ticket back to the first stage dk accepts — one commit (req-265: on a lifecycle
+   * store the release goes from `running` to `active`, never the same-stage release dk refuses,
+   * R-31). `candidates` are tried in order; an `invalid` answer (exit 14: unknown stage, or the
+   * agent policy refuses the target) goes on to the next one. Exit 13 fences the lease.
    *
    * `note` becomes a COMMENT before the release, never `release -m`: dk's `-m` replaces
    * body chapters between `## Result` and `## Log` (dricket requirement R-21, open),
    * and Drey's tickets keep several chapters there.
    */
-  async release(candidates: readonly (string | null)[], note: string | null, options: LeaseReleaseOptions = {}): Promise<LeaseRelease> {
+  async release(candidates: readonly (string | null)[], note: string | null): Promise<LeaseRelease> {
     if (this.fenced) {
       return LOST_RELEASE;
     }
@@ -143,23 +133,21 @@ export class RunLease {
       }
     }
     const stages = [...new Set(candidates.filter((s): s is string => s !== null && s !== ''))];
-    return this.releaseToFirst(stages, options.restoreTo ?? null);
+    return this.releaseToFirst(stages);
   }
 
   /** Tries each stage in order until dk accepts one; only an `invalid` answer goes on to the next. */
-  private async releaseToFirst(stages: readonly string[], restoreTo: string | null): Promise<LeaseRelease> {
+  private async releaseToFirst(stages: readonly string[]): Promise<LeaseRelease> {
     let last = 'no target stage';
-    let restoreRefused = false;
     for (const stage of stages.length > 0 ? stages : [undefined]) {
       const attempt = await this.releaseOnce(stage);
       if (attempt.kind === 'released') {
-        return this.afterRelease(attempt.stage, restoreRefused ? restoreTo : null);
+        return { ok: true, stage: attempt.stage };
       }
       if (attempt.kind === 'lost') {
         return { ok: false, lost: true, error: attempt.error };
       }
       last = attempt.error;
-      restoreRefused ||= attempt.kind === 'invalid' && stage !== undefined && stage === restoreTo;
       if (attempt.kind !== 'invalid') {
         break; // a network or store failure does not get better with another stage
       }
@@ -182,42 +170,6 @@ export class RunLease {
       }
       const invalid = error instanceof TicketStoreError && error.kind === 'invalid';
       return { kind: invalid ? 'invalid' : 'failed', error: errorText(error) };
-    }
-  }
-
-  /** `restoreTo` is set when the stage to restore was refused and the release had to retreat. */
-  private async afterRelease(stage: string, restoreTo: string | null): Promise<LeaseRelease> {
-    if (restoreTo !== null && stage !== restoreTo) {
-      const restored = await this.restoreStage(restoreTo);
-      return { ok: true, stage: restored ? restoreTo : stage };
-    }
-    return { ok: true, stage };
-  }
-
-  /**
-   * Writes the ticket back into `stage` after a release that had to retreat (R-31, E14-5b): the
-   * ticket is nobody's now, so `put --claim --if-version` may move it. A failure is a log line —
-   * the ticket then simply stays in the retreat stage, as it did before this write existed.
-   */
-  private async restoreStage(stage: string): Promise<boolean> {
-    const store = this.options.store;
-    if (store.put === undefined) {
-      return false;
-    }
-    try {
-      const detail = await store.show(this.options.ticketId);
-      if (detail.stage === stage || detail.rev === null) {
-        return detail.stage === stage;
-      }
-      const text = withStage(detail.text, stage);
-      if (text === null) {
-        return false;
-      }
-      await store.put(this.options.ticketId, text, { expectedRev: detail.rev, actor: this.options.actor });
-      return true;
-    } catch (error) {
-      this.options.log(`run ${this.options.runId}: ${this.options.ticketId} stays in its retreat stage - the way back to ${stage} failed: ${errorText(error)}`);
-      return false;
     }
   }
 

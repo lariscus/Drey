@@ -3806,3 +3806,25 @@ button.tickets-statusbar-fleet:focus-visible {
   color: var(--text-2);
   font-size: 0.75rem;
 }
+
+/* req-265: the store's stage migration — the warn line with its Migrate / Copy stages buttons. */
+.tickets-store-migration-btn {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tickets-store-migration-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--hover-bg);
+}
+
+.tickets-store-migration-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

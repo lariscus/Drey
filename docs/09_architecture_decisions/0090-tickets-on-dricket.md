@@ -318,3 +318,57 @@ Accept on `ready` starts the commit step on the target repository, and a green s
 ticket to `done`. Clients recognise a `ready` stage by its id. Column titles stay stored data in
 `_meta/pipeline.md`, so a board on the old phases keeps its names until the cut-over rewrites them;
 no display mapping sits on top.
+
+## Later change — lifecycle stages on the store (req-265, milestone 239, 2026-11-11)
+
+**Decision (owner, 2026-11-10/11, the approved persona board concept §3).** A store's
+`[stages]` say where a ticket is in its *life*, never who works it:
+`inbox prioritized active running done` (dricket's reserved `cancelled` beside them) with
+`claim = ["running"]`. Variant A (stage = pipeline column) ends. The pipeline's columns stay
+Drey's (`_meta/pipeline.md`); until the chain's cursor `x-at` exists (req-266), a ticket in
+`active` or `running` carries its column as the **interim pin `x-phase`**, and the reader
+places it there (`store/store-board.ts` `resolvePhase`: the edge stages are their own column, a
+pin wins for every other stage, `active` / `running` without a pin go to the first claiming
+column). One rule writes the pair, `placementOfPhase` in `core/lifecycle-stages.ts`: an edge
+column is its own stage with no pin, every other column is `active` with the pin.
+
+**The run's end is one release.** `dk claim` moves `active -> running`; a run that moves the
+ticket on writes the next column as the pin in the in-claim `put` that already carries its
+Verlauf line, then makes **one** `release --stage active`; a run that moves nothing releases to
+where it sat (`active`, or the edge stage the owner started it from). The R-31 write-back of
+E14-5b (release one stage back, then `put --claim` to the stage it sat in — two commits) is
+removed: there is no same-stage release left on a lifecycle store. Reading of the concept: the
+concept says `dk commit --release`; that verb publishes an edit of a dk checkout, and `put` has
+no `--release`, so the field change rides the in-claim `put` instead — the same number of
+commits as before the change, and one fewer on every failed run. A store still on phase stages
+keeps the retreat but loses the write-back (its failed runs end one stage back, as before
+E14-5b). The runner learns which kind of store it drives from `ChainStoreConfig.lifecycle` /
+`RunDkTarget.lifecycle`, set by the board service from the store's `dricket.toml`.
+
+**The migration, and Q-05's one exception.** A store on the old phase stages (a `[stages]` table
+with `inbox` and `done`, not yet the lifecycle set) is migrated by the engine **only on the
+owner's click** — the Tickets panel shows a line *"The ticket store still uses the old stages"*
+with **Migrate** (`StoreStageMigration`, the integrator's ruling 2026-11-11: never unasked at
+start). Concept §12 steps 1–2: commit 1 adds `active` and `running` (the old stages still
+listed, `claim = ["running"]`); every ticket still in an old stage moves to `active` with its
+old stage as the pin (`dk put --claim --if-version`); commit 2 removes the old stages (dk's park
+stages `blocked` / `needs-input` stay when present). The plan is derived from the store as it
+is on every run, so a migration interrupted anywhere resumes; any claimed ticket makes it wait.
+The config commits are plain git plumbing on the **local** store's `main`
+(`store/store-config-writer.ts`: blob, tree, commit, compare-and-swap `update-ref`; the ticket
+checkout is never touched, nothing is pushed). Q-05 ("`dricket.toml` is edited by hand") gets
+its first exception: *the engine writes `dricket.toml` only for the stage migration, on the
+owner's confirmation*; the store creation of a fresh install (E14-9b) will be the second user of
+the same writer. A remote store, or a local one with `main` checked out, is not written: the line
+offers the next `[stages]` table to paste (**Copy stages**), and Migrate moves the tickets once
+that edit is in. A store whose stage set has no `inbox` / `done` is left alone.
+
+**Consequences.** `R-31` stays a nice-to-have and is no longer worked around. Clients that showed
+store stages (the store listing) know `active` and `running`; the board's columns are unchanged
+until req-266 / req-270 move them to holders. The files backend gets no counterpart (Drey runs on
+dricket only, owner 2026-11-11; E14-9b removes it). Specs: `core/lifecycle-stages.spec.ts`,
+`store/store-stages.spec.ts`, `store/stage-migration-plan.spec.ts`,
+`store/store-stage-migration.spec.ts`, `store/store-stage-migration-dk.spec.ts` (real `dk`: the
+two commits, a crash between them and the resume, `dk validate` over the whole history),
+`fleet/run-lease-dk.spec.ts` (real `dk`: claim to `running`, the pin in the claim, one release),
+the claim specs in `fleet/orchestrate/`.

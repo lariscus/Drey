@@ -1,6 +1,7 @@
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import type { BoardSnapshot, TicketCard } from '../contracts/tickets';
+import { PHASE_PIN_KEY, placementOfPhase } from '../core/lifecycle-stages';
 import { patchTicketFile, type TransitionPatch } from '../core/ticket-files';
 import { TicketStoreError, type PutOptions, type TicketDetail } from '../ports/ticket-store';
 import type { WriteOutcome } from '../store/dricket-file-store';
@@ -51,17 +52,24 @@ export function chainStoreIoOf(config: ChainStoreConfig): ChainStoreIo | null {
 }
 
 export interface ChainCardPatch extends Omit<TransitionPatch, 'to' | 'from' | 'claimBy' | 'releaseClaim'> {
-  /** The stage the ticket ends in; absent = where it sits. */
+  /** The column the ticket ends in (the store's stage and pin follow, req-265); absent = where it sits. */
   readonly toStage?: string;
 }
 
+/** Where a record stands: its stage, plus the column pin on a lifecycle store (`active` alone says no column). */
+function placementKey(record: TicketDetail): string {
+  return `${record.stage}|${record.extensions[PHASE_PIN_KEY] ?? ''}`;
+}
+
 export class StoreChainBoard {
-  /** The stage each ticket had when the board was last read (id -> stage), for {@link moved}. */
+  /** Where each ticket stood when the board was last read (id -> stage + pin), for {@link moved}. */
   private readonly stages = new Map<string, string>();
 
   constructor(
     private readonly io: ChainStoreIo | null,
     private readonly log: (message: string) => void,
+    /** req-265: the store is on the lifecycle stages (a column is `active` + the pin). */
+    private readonly lifecycle = false,
   ) {}
 
   /** The board of this pass: pipeline + repos from the meta vault, tickets from the store. */
@@ -75,7 +83,7 @@ export class StoreChainBoard {
     const records = await this.io.readAll();
     this.stages.clear();
     for (const record of records) {
-      this.stages.set(record.id, record.stage);
+      this.stages.set(record.id, placementKey(record));
     }
     return assembleBoardFromRecords({ ...input, records });
   }
@@ -92,14 +100,14 @@ export class StoreChainBoard {
     }
   }
 
-  /** True when the ticket is not in the stage the board was read with (moved, claimed into another stage, gone). */
+  /** True when the ticket is not where the board was read with it (moved, claimed into another stage, gone). */
   async moved(card: TicketCard): Promise<boolean> {
     if (this.io === null) {
       return true;
     }
     try {
       const was = this.stages.get(card.id);
-      return was !== undefined && (await this.io.show(card.id)).stage !== was;
+      return was !== undefined && placementKey(await this.io.show(card.id)) !== was;
     } catch {
       return true;
     }
@@ -114,31 +122,43 @@ export class StoreChainBoard {
       return false;
     }
     try {
-      const record = await this.io.show(card.id);
-      if (record.rev === null) {
-        throw new Error(`${card.id} has no rev: the store did not report one`);
-      }
-      const { toStage, ...rest } = patch;
-      const legacy = patchTicketFile(recordToBoardFile(record, card.phase).text, {
-        ...rest,
-        to: toStage ?? card.phase,
-        from: toStage === undefined ? null : card.phase,
-      });
-      const document = legacyToDricketDocument(record.text, legacy, { stage: toStage ?? record.stage });
-      const outcome = await this.io.write(card.id, document, { expectedRev: record.rev, actor });
-      if (!outcome.ok) {
-        this.log(`the chain's write to ${card.id} found it changed in the meantime - nothing written`);
-        return false;
-      }
-      if (toStage !== undefined) {
-        this.stages.set(card.id, toStage);
-      }
-      return true;
+      return await this.write(this.io, card, patch, actor);
     } catch (error) {
       const why = error instanceof TicketStoreError ? `${error.kind}: ${error.message}` : error instanceof Error ? error.message : String(error);
       this.log(`the chain's write to ${card.id} failed - ${why}`);
       return false;
     }
+  }
+
+  private async write(io: ChainStoreIo, card: TicketCard, patch: ChainCardPatch, actor: string): Promise<boolean> {
+    const record = await io.show(card.id);
+    if (record.rev === null) {
+      throw new Error(`${card.id} has no rev: the store did not report one`);
+    }
+    const { toStage, ...rest } = patch;
+    const legacy = patchTicketFile(recordToBoardFile(record, card.phase).text, {
+      ...rest,
+      to: toStage ?? card.phase,
+      from: toStage === undefined ? null : card.phase,
+    });
+    const target = this.targetOf(record, toStage);
+    const outcome = await io.write(card.id, legacyToDricketDocument(record.text, legacy, target), { expectedRev: record.rev, actor });
+    if (!outcome.ok) {
+      this.log(`the chain's write to ${card.id} found it changed in the meantime - nothing written`);
+      return false;
+    }
+    if (toStage !== undefined) {
+      this.stages.set(card.id, `${target.stage}|${target.pin === undefined ? (record.extensions[PHASE_PIN_KEY] ?? '') : (target.pin ?? '')}`);
+    }
+    return true;
+  }
+
+  /** Stage and pin of a write into column `toStage` (absent = where it sits; pin absent = the document's). */
+  private targetOf(record: TicketDetail, toStage: string | undefined): { readonly stage: string; readonly pin?: string | null } {
+    if (toStage === undefined) {
+      return { stage: record.stage };
+    }
+    return this.lifecycle ? placementOfPhase(toStage) : { stage: toStage };
   }
 
   /** A comment through `dk comment` (status verbs, park notes); a failure is a log line. */
