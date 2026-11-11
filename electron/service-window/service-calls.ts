@@ -36,6 +36,11 @@ export class ServiceCalls {
     return (await this.endpoints.read())?.runner ?? null;
   }
 
+  /** A service holds the home: `service.lock` names one (req-276 tells it from one that does not answer). */
+  async locked(): Promise<boolean> {
+    return (await this.endpoints.read()) !== null;
+  }
+
   async status(): Promise<Record<string, unknown> | null> {
     const ep = await this.control();
     return ep === null ? null : this.http.get<Record<string, unknown>>(ep, '/status');

@@ -24,6 +24,7 @@ import { ServiceCalls } from './service-calls';
 import { ServiceEndpoints } from './service-endpoints';
 import { parseWindowArgs, type WindowArgs } from './service-window-args';
 import { SnapshotSource } from './snapshot-source';
+import { StatusIcons, dreyIconPath } from './status-icons';
 import { TrayController } from './tray-controller';
 import { ServiceWindowController, windowPaths } from './window-controller';
 import { WindowIpc } from './window-ipc';
@@ -47,14 +48,21 @@ class ServiceWindowProcess {
   private goneTicks = 0;
   private readonly endpoints = new ServiceEndpoints(home, (file) => fsp.readFile(file, 'utf8'));
   private readonly calls = new ServiceCalls(this.endpoints, new JsonHttp());
-  private readonly window = new ServiceWindowController(windowPaths(app.getAppPath(), __dirname));
+  private readonly icons = new StatusIcons(dreyIconPath(app.getAppPath(), app.isPackaged, process.resourcesPath));
+  private readonly window = new ServiceWindowController(windowPaths(app.getAppPath(), __dirname), this.icons);
   private readonly confirmations = new Confirmations(() => this.window.current);
   private readonly drey = new DreyLauncher(process.execPath, app.getAppPath());
   private readonly snapshots = new SnapshotSource(
     this.calls,
     new LocalModelProbe(async () => (JSON.parse(await fsp.readFile(path.join(dreyUserData, 'app-config.json'), 'utf8')) as { llm?: unknown }).llm),
   );
-  private readonly tray = new TrayController({ calls: this.calls, confirmations: this.confirmations, drey: this.drey, openWindow: () => this.openWindow() });
+  private readonly tray = new TrayController({
+    calls: this.calls,
+    confirmations: this.confirmations,
+    drey: this.drey,
+    pictures: this.icons,
+    openWindow: () => this.openWindow(),
+  });
   private readonly relay = new EventRelay(this.endpoints, (event) => this.window.send(SERVICE_WINDOW_CHANNELS.event, event));
 
   constructor(private readonly servicePid: number | null, first: WindowArgs) {
@@ -99,6 +107,7 @@ class ServiceWindowProcess {
     const wanted = await this.snapshots.trayWanted();
     this.tray.setVisible(this.trayMode && wanted !== false);
     await this.tray.refresh();
+    this.window.setStatus(this.tray.status);
     this.leaveIfIdle();
   }
 

@@ -47,7 +47,7 @@ Open work only. Everything implemented lives in
 lives in [`decisions.md`](decisions.md). When an item ships, move it to the
 changelog and delete it here — no shipped history on this page.
 
-**Status (2026-11-11):** version 0.8.1, milestones 1–151, 153–163, 165–169 and 171–237, plus req-98, req-101, req-104 (the desktop frame matches board 9a), req-126 (the frame follow-ups of wave 4.2: no strip on a one-panel bottom dock, a view badge, a view's own tabs), req-110 (the fleet runner leaves when deactivated or when Drey quits idle), req-102 (the i18n catalog, ADR-0091), req-99a, req-95a, req-95b, req-97, req-96 and req-99b built (109–111 are recorded in the changelog by the convergence audit backfill) — 1–83
+**Status (2026-11-11):** version 0.8.1, milestones 1–151, 153–163, 165–169 and 171–238, plus req-98, req-101, req-104 (the desktop frame matches board 9a), req-126 (the frame follow-ups of wave 4.2: no strip on a one-panel bottom dock, a view badge, a view's own tabs), req-110 (the fleet runner leaves when deactivated or when Drey quits idle), req-102 (the i18n catalog, ADR-0091), req-99a, req-95a, req-95b, req-97, req-96 and req-99b built (109–111 are recorded in the changelog by the convergence audit backfill) — 1–83
 owner-verified (milestone 82, auto-update from GitHub Releases ADR-0074,
 end-to-end on a real install, the 0.7.0 → 0.7.1 update round included
 docs/07 checklist; milestone 83, the tickets foundation ADR-0075/0076,
@@ -117,8 +117,6 @@ views, as milestone 140; D-4, runs.spec flaking under full-suite load, as milest
 (owner report 2026-11-04), as milestone 143; D-6, selecting a ticket switching the view and views saving themselves, as milestone 163; D-8, the flaky gate specs, as milestone 168; D-7, the phone chat about a ticket (unknown ticket, id prefix, view switching back, iOS keyboard) and D-5b (the phone wobble), as milestone 165; D-9, the Tickets panel footer on a dricket board, as milestone 171; D-11 to D-22, the sweep's store defects, as milestone 181; D-23 (the store's ticket header) and D-24 (the Autopilot stylesheet in the build), as milestone 184 — see the changelog.)
 
 ### Now (small, daily value)
-
-- **req-276 — Drey Service shows Drey's icon with a status dot** (S; owner request, outside the list, 2026-11-11). The tray icon and the service window's taskbar / title-bar icon use Drey's own app icon instead of the drawn `D` square; a small dot in the tray icon's top-right corner tells the service's state — grey stopped, red a problem, green running, orange paused — live from the service's HTTP API, the tray tooltip naming the state in words (catalog, ADR-0091); the same dot on the window's taskbar icon where Windows allows it.
 
 _The persona board (req-257's concept, approved by the owner 2026-11-11, [persona-board-concept.md](../docs/design/work-panel/persona-board-concept.md)), in build order (req-264, the boards, shipped as milestone 237): req-265 first; then req-266 and req-258 in parallel; req-267 after req-258; req-257 after req-266, req-258 and req-267; req-268 after req-257; req-269 after req-258, beside req-267/req-257; req-270, then req-271 … req-273; req-274; req-275 lands with req-265 … req-257._
 

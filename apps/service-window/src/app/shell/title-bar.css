@@ -13,12 +13,10 @@
   width: 22px;
   height: 22px;
   border-radius: 4px;
-  background: var(--accent);
-  color: var(--on-accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
+  object-fit: cover;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 .grow {
   flex-grow: 1;
