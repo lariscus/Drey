@@ -682,7 +682,7 @@ follows. None is a new decision; each is a place the owner may correct.
 2. **Where the read-only review mode comes from.** Today the phase decides
    (`fleet/orchestrate/review-checkout.ts`). The reading: a persona setting
    (`readonly: true` on Ralf) — Q12's "the role is in the prompt" does not say.
-3. **`sync-main`'s position.** §12a's flow put it between review and test; the
+3. **Confirmed by the owner 2026-11-11 ("Nach Ben, vor Review").** **`sync-main`'s position.** §12a's flow put it between review and test; the
    third round (later) makes it the builder's last action, so it runs when the
    ticket leaves Ben, before review. The later ruling is used. Consequence: `main`
    can move during review and test; the `commit` leaving action then meets any
