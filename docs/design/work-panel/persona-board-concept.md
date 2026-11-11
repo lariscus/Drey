@@ -134,11 +134,11 @@ integrator adds the phase-board sentence.
 2. **No persona, no run (2026-11-11).** *"A step with no persona from the
    ticket or the column does not run: the ticket stands at the human persona
    as a manual step and says why."* (a Needs-you card).
-3. **Steps per ticket (2026-11-10/11).** The steps of a ticket are set per
+3. **Answered 2026-11-11: (a), §12a.** **Steps per ticket (2026-11-10/11).** The steps of a ticket are set per
    ticket by **Paul** (with the plan) or **Pia** (Mission Control, as a card) —
    e.g. *plan → UX/UI design → architecture → build → test → acceptance*, or
    *research → plan → acceptance*.
-4. **Send-back anywhere earlier (2026-11-10/11).** *"A step may send a ticket
+4. **Answered 2026-11-11: (a), as invalidation, §12a.** **Send-back anywhere earlier (2026-11-10/11).** *"A step may send a ticket
    back to any earlier step, up and down the chain."*
 5. **Columns are holders (2026-11-11).** *"The board's columns are the personas
    that hold a ticket, the step is status on the card."*
@@ -527,6 +527,69 @@ with `steps:` (req-256's seeding, unchanged otherwise).
 board is dricket-only. Until E14-9b removes the files backend, a files vault
 keeps the phase board.
 
+## 12a. The owner's answers (2026-11-11)
+
+The owner answered questions 3, 4, 9, 12 and 15 and, with them, parts of 6, 8
+and 16. In his words where they decide something, then what follows for the
+concept.
+
+- **Q3 — Shaping is Paul's step.** "ja das ist bei paul": the `shape` step,
+  held by Paul, entered from Inbox (option a).
+- **Q4 — A send-back invalidates.** "die müssen alle erneut durchlaufen
+  werden, es handelt sich dabei um eine invalidierung eines vorherigen
+  schritts und dann müssen alle nachfolgenden invalidierten erneut durchlaufen
+  werden": a send-back to step *k* marks step *k* and every later step of the
+  chain **invalid**; the chain runs forward from *k* and every invalidated step
+  runs again (option a). The ticket's status log records the invalidation with
+  its reason; a step's earlier result stays readable as history, it is no
+  longer its verdict.
+- **Q9 — A big pool and a pool per persona.** "Es soll einen großen Pool geben
+  und pro Persona ebenfalls einen Pool. Der Persona-Pool bedient sich aber aus
+  dem großen, das heißt es könnte passieren, dass eine Persona Slots hat, aber
+  der Gesamtpool keine mehr, dann darf auch nichts bearbeitet werden. Ggf. fügt
+  man noch eine Min-Zahl hinzu, bei dem es dann aber eine Überschreitung des
+  Max-Kontingents geben könnte." So: each persona has a **maximum** of
+  parallel runs (`parallel:` of §9); a run needs a free place in its persona's
+  pool **and** in the big pool (ADR-0095's cap and slots); one of the two full
+  = it waits, and the card says which (`waits for Ben` / `waits for a B slot`).
+  **Optional, to decide when built:** a persona **minimum** — up to that many
+  runs of the persona start even when the big pool is full, and then the big
+  pool's maximum is exceeded on purpose. The overrun is shown on the Capacity
+  band and counts in the ledgers like any run.
+- **Q12, Q16 and the end of the chain.** "build ist bei Ben, das Commit ist der
+  Sign-off-Schritt, der wird nach Human Review gesetzt und danach wird
+  committet, wichtig an der Stelle ist, dass vorher der main reingemerged wird
+  damit man die Wahrscheinlichkeit erhöht, dass es keinen Merge-Konflikt mehr
+  nach dem Test beim Merge gibt. build-default und commit-default entfallen."
+  So:
+  - the `build` step belongs to **Ben** in the standard flow;
+  - a **machine step `sync-main`** merges `main` into the ticket's branch
+    **before the test**, so the test runs on what will be merged and the
+    final merge after the human review rarely conflicts; a conflict in
+    `sync-main` is a send-back to `build` (it invalidates build and what
+    follows, Q4);
+  - **acceptance** is the human review at You; the owner's **sign-off** is
+    the act that ends it, and the **commit** (the merge into `main`) follows
+    as a machine step with no persona and no model (Q16 option a: the
+    commit is not a persona step);
+  - the standard flow therefore reads
+    `shape(paul) → plan(paul) → build(ben) → review(ralf) → sync-main → test(tessa) → acceptance(you) → commit`;
+  - **`build-default` and `commit-default` go**: the migration of the live
+    board removes both folders (one commit each, req-261's route, with the
+    owner's confirmation) and assigns their steps to Ben and to the machine
+    commit (Q12 option b, not the recommended a).
+- **Q15 and Q8 — The default flow is written into a new ticket at creation.**
+  "beim Anlegen eines neuen Tickets soll der Default-Ablauf in das Ticket
+  eingetragen werden, dann kann manuell oder durch einen der Planer das noch
+  angepasst werden." So: the standard flow is copied into `x-chain` **when the
+  ticket is created** (not when it starts, a change against §6's "copy at
+  start"); from then on the ticket's chain is its own (Q8 option a); the owner
+  edits it by hand, Paul with the plan, Pia as a card. A later change of the
+  standard flow does not touch existing tickets.
+
+Still open: questions 1, 2, 5, 6 (where a machine step shows on the board),
+7, 10, 11, 13 and 14, and the Q9 minimum.
+
 ## 13. Open questions for the owner
 
 Each with the options and the recommendation (first).
@@ -553,16 +616,16 @@ Each with the options and the recommendation (first).
 7. **A question inside a running step.** (a) the card stays with its holder,
    badge *Question* + Needs-you card **(recommended)**; (b) the card moves to
    You until answered.
-8. **The standard flow on a ticket.** (a) copied into the ticket at start, then
+8. **Answered 2026-11-11 with Q15: (a), copied at creation, §12a.** **The standard flow on a ticket.** (a) copied into the ticket at start, then
    the ticket's own **(recommended)**; (b) applied live like today's delta.
-9. **Parallel runs of one persona.** (a) `parallel:` per persona, absent = no
+9. **Answered 2026-11-11: a persona pool inside the big pool, an optional minimum, §12a.** **Parallel runs of one persona.** (a) `parallel:` per persona, absent = no
    cap **(recommended)**; (b) no persona cap, the pool only.
 10. **Column order.** (a) the standard flow's order, other personas by title,
     You last **(recommended)**; (b) a manual order in `crew.md`; (c) by role.
 11. **Wide boards.** (a) agent persona columns that hold nothing fold into a
     *+ n personas* chip **(recommended)**; (b) always all columns; (c) a per-view
     choice.
-12. **`build-default` and `commit-default` on the live board.** (a) kept as
+12. **Answered 2026-11-11: (b), both go, §12a.** **`build-default` and `commit-default` on the live board.** (a) kept as
     ordinary personas, unpinned, the owner deletes them **(recommended)**;
     (b) their prompts folded into Ben and a commit step, the folders deleted;
     (c) kept and given steps (`build`, `commit`).
@@ -571,9 +634,9 @@ Each with the options and the recommendation (first).
     everywhere.
 14. **Shape and Flow chat.** (a) the persona's character over the chat bridge
     now **(recommended)**; (b) wait until Shape is a persona session.
-15. **A ticket started without steps.** (a) the standard flow is copied
+15. **Answered 2026-11-11: copied at creation, §12a.** **A ticket started without steps.** (a) the standard flow is copied
     **(recommended)**; (b) refused until Paul or Pia set steps.
-16. **The machine step's persona slot.** (a) a `ci:` step has no persona and no
+16. **Answered 2026-11-11: (a), the commit is a machine step after the sign-off, with `sync-main` before the test, §12a.** **The machine step's persona slot.** (a) a `ci:` step has no persona and no
     model **(recommended)**; (b) `commit` stays a persona step (today
     `commit-default` is an owner-started agent run).
 
