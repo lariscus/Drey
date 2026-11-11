@@ -18,6 +18,9 @@ electron-builder ([ADR-0023](09_architecture_decisions/0023-windows-packaging-el
 1. `clean` — wipes `dist/`, `dist-electron/`, `release/` (`tsc` never
    cleans its `outDir`, so a stale build could otherwise ship orphaned
    files).
+1b. `fetch:drawio`, `fetch:dk` — the two pinned downloads that come from
+   neither git nor npm (the draw.io web app, ADR-0064; the dricket CLI
+   `dk`, req-277 — both described under "asar and `asarUnpack`" below).
 2. `build` → `prebuild` regenerates `src/assets/build-info.json`
    (`scripts/stamp-build.mjs`: `buildNumber` = `git rev-list --count HEAD`,
    plus the short SHA, build timestamp, and the branch + checkout path
@@ -62,7 +65,7 @@ One `windows-latest` job per push to `main` / PR / `v*` tag, one build, in
 pipeline order: lint (import boundaries + the typed promise rules) → the
 tsc typechecks (main, main-process specs, plugins, renderer, e2e) → unit
 tests (`ng test`, `test:plugins`) → `fetch:drawio` (cached on the version
-pin) → build → e2e → `electron-builder --win` → `verify:pack`. The fetch
+pin) → `fetch:dk` (cached on its pin) → build → e2e → `electron-builder --win` → `verify:pack`. The fetch
 is its own step because the job builds and packs separately instead of
 running `npm run pack`; without it the drawio e2e tests skip and the
 packed app ships no editor. The e2e project is typechecked too
@@ -298,6 +301,28 @@ flowchart LR
   draw.io version. It is served from inside the asar over `plugin://`.
   `npm run dev` and the unit tests do not need it; the diagram e2e tests
   skip without it.
+
+- **The dricket CLI `dk`** (req-277, [ADR-0090](09_architecture_decisions/0090-tickets-on-dricket.md))
+  is the second download. The tickets board runs on dricket, so the
+  installer and the portable exe ship the pinned release.
+  `npm run fetch:dk` (`scripts/fetch-dk.mjs`, pure halves in
+  `fetch-dk-lib.mjs`) downloads `dricket_<version>_windows_amd64.zip` of
+  the public GitHub release pinned in `scripts/dk-version.json`, requires
+  the digest of the archive to match BOTH the pin and the release's
+  `checksums.txt`, and unpacks `dk.exe` plus the GPL-3.0 licence text into
+  `build/dk/` (gitignored; the `.version` stamp skips a repeat).
+  `electron-builder.yml` `extraResources` copies them to
+  `resources/dk/dk.exe` and `resources/dk/LICENSE` (next to the exe; not in
+  the asar, it is an executable). `pack` / `pack:dir` run the fetch, so the
+  build machine needs GitHub once per dk version; CI has its own step.
+  To update dk: new `version` and `sha256` in `scripts/dk-version.json`
+  and `BUNDLED_DK_VERSION` in `packages/tickets-engine/src/store/dk-health.ts`
+  (a spec compares them). `dk` calls the **installed git**, which the
+  installer does not bundle (Drey's git vaults need it too); a missing git
+  is a board issue, not a crash. At runtime `plugins/tickets/main/dk-path.ts`
+  picks the binary: a configured `dk.path` wins, else the bundled file of a
+  packaged build, else `dk` on PATH (dev), and writes that path as the
+  engine's `dk.path`, so Drey Service, the runs and the chain use the same one.
 
 No native modules anywhere (`nspell` and `yaml` are pure JS), so there is
 **no `node-gyp` / electron-rebuild step**.

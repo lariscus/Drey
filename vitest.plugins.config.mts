@@ -53,7 +53,7 @@ export default defineConfig({
         test: {
           name: 'units',
           environment: 'node',
-          include: ['plugins/**/*.spec.ts', 'electron/**/*.spec.ts', 'shared/**/*.spec.ts', 'e2e/fixtures/**/*.spec.ts'],
+          include: ['plugins/**/*.spec.ts', 'electron/**/*.spec.ts', 'shared/**/*.spec.ts', 'e2e/fixtures/**/*.spec.ts', 'scripts/**/*.spec.mjs'],
           exclude: ['plugins/git/**/*.spec.ts', '**/node_modules/**'],
         },
       },

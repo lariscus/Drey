@@ -22,6 +22,7 @@
  */
 
 import { _electron as electron } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import path from 'node:path';
@@ -112,6 +113,19 @@ if (fs.existsSync(asarPath)) {
   }
 } else {
   check(`asar present at ${asarPath}`, false);
+}
+
+// -- 1b. the dricket CLI the installer ships (req-277): a real file in
+// resources/dk/ (not in the asar) that answers `version`.
+const dkExe = path.join(path.dirname(exePath), 'resources', 'dk', 'dk.exe');
+{
+  let answer = '';
+  try {
+    answer = execFileSync(dkExe, ['version'], { encoding: 'utf8', timeout: 30_000, windowsHide: true });
+  } catch (error) {
+    answer = String(error);
+  }
+  check('resources: dk/dk.exe answers `version`', /version:\s*v\d+\.\d+\.\d+/.test(answer), answer.split(/\r?\n/)[0]);
 }
 
 // -- 2-5. boot the packed exe ----------------------------------------------

@@ -20,6 +20,10 @@
 # scripts/fetch-drawio.mjs (pinned release + checksum), never checked in.
 /plugins/*/vendor/
 
+# The dricket CLI the installer ships -- fetched by scripts/fetch-dk.mjs
+# (pinned release + checksum), never checked in (req-277).
+/build/dk/
+
 # Node
 /node_modules
 npm-debug.log

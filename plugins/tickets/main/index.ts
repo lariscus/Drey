@@ -8,8 +8,8 @@
  * reaches the same engine through the gateway's pairing.
  */
 import { execFile } from 'node:child_process';
-import { promises as fsp } from 'node:fs';
-import { BrowserWindow, dialog, shell } from 'electron';
+import { existsSync, promises as fsp } from 'node:fs';
+import { app, BrowserWindow, dialog, shell } from 'electron';
 import type { MainPluginContext, MainPluginModule } from '../../../shared/plugin-api';
 import {
   DEFAULT_PRIORITY_CONFIG,
@@ -50,6 +50,7 @@ import { createFleetSnapshotSender } from './fleet-snapshot';
 import { listWorkerModels } from './worker-models';
 import { EngineClient } from './engine-client';
 import { PathAnnouncer } from './path-announcer';
+import { withEffectiveDkPath } from './dk-path';
 import { ensureService, syncChatConfig, syncNotesVault, syncStoreConfig, syncVaultRegistry } from './service-lifecycle';
 import { createServiceQuitGuard, liveRunsOf, quitWordsOf, type QuitChoice } from './service-quit-guard';
 import { ServiceControl, serviceHomeOf } from './service-control';
@@ -97,7 +98,13 @@ const plugin: MainPluginModule = {
     // Drey is a native client of it over the loopback invoke channel, and
     // so is the phone through the gateway's pairing. Adopt a live engine
     // or spawn one; never stop it.
-    const endpoints = await ensureService(ctx, ctx.log);
+    // req-277: the engine is told the resolved `dk.path` (a configured one, else the bundled dk.exe, else PATH).
+    const engineCtx = {
+      vault: ctx.vault,
+      appConfig: ctx.appConfig,
+      config: withEffectiveDkPath(ctx.config, { packaged: app.isPackaged, resourcesPath: process.resourcesPath, platform: process.platform, exists: existsSync }),
+    };
+    const endpoints = await ensureService(engineCtx, ctx.log);
     const client = new EngineClient(endpoints);
     // D-1: the assistant LLM settings reach the engine at activation (above)
     // AND whenever Settings -> Assistant changes them -- the chat reads them
@@ -186,7 +193,7 @@ const plugin: MainPluginModule = {
       engineConfigSet: (key, value) => client.invoke('configSet', { key, value }),
       engineConfigGet: (key) => client.invoke('configGet', { key }),
       control: serviceControl,
-      start: async () => client.rebind(await ensureService(ctx, ctx.log)),
+      start: async () => client.rebind(await ensureService(engineCtx, ctx.log)),
       openFolder: async (dir) => {
         const failure = await shell.openPath(dir);
         if (failure !== '') {
@@ -310,7 +317,7 @@ const plugin: MainPluginModule = {
       return typeof id === 'string' ? documents.open(id) : { ok: false, error: 'bad ticket document payload' };
     });
     ctx.ipc.handle('board', async () => {
-      await syncStoreConfig(client, ctx).catch(() => undefined);
+      await syncStoreConfig(client, engineCtx).catch(() => undefined);
       void pushNotesVault();
       void documents.refresh().catch(() => undefined);
       const snap = await board.refresh();
