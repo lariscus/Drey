@@ -7,6 +7,16 @@ anything: language conventions, the no-global-Node toolchain, architecture
 decisions, ownership map, coding style, and working style all apply to every
 agent, regardless of tool.
 
+**Platform conventions — tell the owner** (owner, 2026-11-11). When a request
+goes against a general convention of the platform or of common UI practice —
+Windows' own patterns (a status badge sits bottom-right on taskbar and tray
+icons, `setOverlayIcon`), the OS's dialogs, keyboard and accessibility norms,
+Electron or Angular idioms — say so **before building**: name the convention,
+where the request departs from it, and what following it would look like, then
+let the owner choose. Never build the departure silently, and never silently
+"correct" the request either. A brief that hands such a request to another
+agent carries the same note.
+
 **Fleet workers** — an unattended run on a ticket, whose brief names a
 ticket file — start from
 [`docs/agents/fleet-worker.md`](docs/agents/fleet-worker.md) instead: the
