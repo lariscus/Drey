@@ -10,6 +10,13 @@ redesign" (artifact `a401ec8a-b3e4-459f-b9df-ff8893105b9f`, version
 `canvas.json` from version `1794147040-05e9`, 2026-11-08, accepted by the owner the same
 day; measure sheets and handoff in [../crew-concept-boards.md](../crew-concept-boards.md)).
 **This folder is what "it looks like the design" means.**
+
+The persona-board boards (`DeskBoardV2`, `DeskBoardV2Phases`, `DeskWorkV2`, `DeskPersonaV2`,
+`MPadWorkV2`, `MPhoneWorkV2`, `MPhoneReadyV2`, `MCCardsV2`) and the revised `canvas.json` were
+drawn for roadmap row req-264 from [../persona-board-concept.md](../persona-board-concept.md) and its draft
+and exported on 2026-11-11 from canvas version `1794411563-4786`; they sit in their own row at the bottom of the
+canvas, the boards they revise stay as they were. **Not yet accepted by the owner.**
+
 A session that builds or changes a screen reads the board's HTML for the exact
 measures, colours, spacing and strings, opens the PNG to see it, and compares
 its own screenshot against the PNG before it reports done (see
@@ -19,9 +26,9 @@ appearance** where they disagree.
 
 Files: one `<Name>.dc.html` per board (plain HTML, inline styles; the
 `<x-dc>` / `<helmet>` wrappers are the canvas runtime's), `support.js` — a
-small stand-in for that runtime, so the ten boards that hold a template
+small stand-in for that runtime, so the eleven boards that hold a template
 (`{{holes}}` from `renderVals()`, `<sc-for>`, `<sc-if>`: DeskClean, DeskFind,
-DeskOutline, DeskPersona, DeskSettings, DeskSourceControl, PadFlow, PadReview,
+DeskOutline, DeskPersona, DeskPersonaV2, DeskSettings, DeskSourceControl, PadFlow, PadReview,
 PadSettings, PadTeam) render outside the canvas (it runs the board's own
 embedded sample-data script; the other 38 boards are static and ignore it), one
 `<Name>.png` rendered at the board's own size with headless Edge
@@ -51,16 +58,20 @@ above.
 | 5h · Review a file, comment like a pull request | `PadReview` | 1194×834 | iPad |
 | 5i · Shape the flow: standard by default, edit by hand or let Paul do it | `PadFlow` | 1194×834 | iPad |
 | 7a · Work layout: ticket in the editor, Mission Control in the Assistant | `DeskWork` | 1440×900 | desktop |
+| 7a v2 · Tickets panel, persona board: groups Needs you · Running · Prioritized · Inbox · Done, row meta by holder and position (`T-0129 · Ralf · 3/6`), the ticket pane with the chain — **req-264, canvas `1794411563-4786`** | `DeskWorkV2` | 1440×900 | desktop |
 | 7b · Shape: the plan is the ticket, Paul works in it through the Assistant | `DeskShape` | 1440×900 | desktop |
 | 7c · Plan to accept: the Parts block inside the ticket | `DeskPlan` | 1440×900 | desktop |
 | 7d · Review tab: proof, files, line comments like a pull request | `DeskReview` | 1440×900 | desktop |
 | 7e · Board tab with the Capacity band in the bottom dock — **revised 2026-11-08**: slots row, tranche and queue row in the band | `DeskBoard` | 1440×900 | desktop |
+| 7e v2 · Board, persona columns: Inbox · Prioritized · the team in team order · You · Done, the position in the chain on the card (`Ben · 3 of 6`, the chain as initials), `running` / `waits for a slot` / `waits for Ben` / `merging main`, no persona for position 4, a run's question, Accept / Send back, sent back once and twice, an empty persona folded into `+ 1 persona`, the Capacity band per persona — **req-264, canvas `1794411563-4786`** | `DeskBoardV2` | 1440×900 | desktop |
+| 7e v2 · the same board with the personas named Plan · Build · Review · Test (the phase board as a special case) — **req-264, canvas `1794411563-4786`** | `DeskBoardV2Phases` | 1440×900 | desktop |
 | 7f · Crew tab: personas, stuck worker, setup and cost | `DeskTeam` | 1440×900 | desktop |
 | 7g · Settings like VS Code: search, collapsible sections, scope tabs | `DeskSettings` | 1440×900 | desktop |
 | 7h · Views: Notes · Work · Crew, Layout menu with save, reset, rename, delete | `DeskViews` | 1440×900 | desktop |
 | 7i · Tabs belong to views: hidden elsewhere, added with Show here | `DeskTabs` | 1440×900 | desktop |
 | 7j · Ticket ready to try: proof, checks, screenshots, cost table, accept | `DeskReady` | 1440×900 | desktop |
 | 7k · Persona setup: profile, picture, work, permissions, prompt blocks — **superseded 2026-11-08 by the R11 mockup [`../crew-internals/persona-page-mockup.html`](../crew-internals/persona-page-mockup.html); built as milestone 231 (req-171), screenshot [`../crew-internals/persona-page-built.png`](../crew-internals/persona-page-built.png), retaken with the real skill routes, the prompt preview and the commit age as milestone 233 (req-237/238/239; [`persona-page-built-preview.png`](../crew-internals/persona-page-built-preview.png) with Preview full prompt open)** | `DeskPersona` | 1440×900 | desktop |
+| 7k v2 · Persona setup, Work block of the persona board: model pool, class floor, parallel max and min, leaving actions (`sync-main`), read-only; no steps chips — **req-264, canvas `1794411563-4786`** | `DeskPersonaV2` | 1440×900 | desktop |
 | 9a · Drey today, cleaned up — ticket T-0017 in Work, Assistant without the rail | `DeskClean` | 1440×900 | desktop |
 | 9b · Drey today — Calendar, Source control, Outline, Search and Tasks redesigned — **not a target design** (owner, 2026-11-06; a sketch, nothing is measured against it) | `DeskPanels` | 1440×900 | desktop |
 | 9c · Find: Search and Tasks in one left-dock panel, Search mode (req-161, accepted 2026-11-08) | `DeskFind` | 1440×900 | desktop |
@@ -74,8 +85,10 @@ above.
 | 10a · Mission Control, answer card with big touch targets | `MPhoneChat` | 390×844 | phone |
 | 10b · menu: the root screen with Notes, Work, Crew, Settings and chats | `MPhoneMenu` | 390×844 | phone |
 | 10c · Work: the desktop ticket list, sized for touch | `MPhoneWork` | 390×844 | phone |
+| 10c v2 · Work grouped by holder (Needs you, then Paul, Ben …), meta `id · n/m · word` — **req-264, canvas `1794411563-4786`** | `MPhoneWorkV2` | 390×844 | phone |
 | 10d · ticket: same card as the desktop, question inline | `MPhoneTicket` | 390×844 | phone |
 | 10e · Work, three panes: tickets, ticket, Mission Control | `MPadWork` | 1194×834 | iPad |
+| 10e v2 · Work, three panes, grouped by holder; Accept or Send back to a target in the Mission Control card — **req-264, canvas `1794411563-4786`** | `MPadWorkV2` | 1194×834 | iPad |
 | 10f · Mission Control: chats next to the chat | `MPadChat` | 1194×834 | iPad |
 | 10g · Settings: search and groups, same rows as the menu | `MPhoneSettings` | 390×844 | phone |
 | 10h · Appearance: theme, text size, switches | `MPhoneAppearance` | 390×844 | phone |
@@ -86,6 +99,7 @@ above.
 | 10m · Mission Control proposes changes: Confirm or Dismiss each | `MPhoneProposal` | 390×844 | phone |
 | 10n · Notes, three panes: files, note in View mode, Assistant | `MPadNotes` | 1194×834 | iPad |
 | 10o · Ready to try: checks, cost by phase, one decision card | `MPhoneReady` | 390×844 | phone |
+| 10o v2 · Ready to try on the persona board: chain, cost by position, Accept or Send back to a target — **req-264, canvas `1794411563-4786`** | `MPhoneReadyV2` | 390×844 | phone |
 | 10p · editing a note: pencil, Live Preview, Cancel and Save as icons | `MPhoneNoteEdit` | 390×844 | phone |
 | 10q · Ready to try, three panes: tickets, ticket with cost by phase, Mission Control | `MPadReady` | 1194×834 | iPad |
 | 10r · editing a note: files, Markdown editor, Assistant | `MPadNotesEdit` | 1194×834 | iPad |
@@ -96,6 +110,7 @@ above.
 | 8b · Drey Service window, Sessions: every harness session raw — stream, instruction, tool calls, process (req-166) — **built, milestone 222** | `ServiceSessions` | 1100×720 | desktop |
 | 8c · Settings → Background service: status, start with Windows, keep running, components, load, logs (req-165) — **built, milestone 216** | `DeskServiceSettings` | 1440×900 | desktop |
 | 10u · Mission Control cards of the Lead: checkpoint report, merge conflict, budget and quota stop, queued, early stop — desktop and phone — parts 1, 6 and 7 **built** milestone 221 (req-179); the burn-rate card (no part of its own: part 4's layout, desktop and phone) milestone 224 (req-181); 2–5, 8, 9 open | `MCCards` | 1480×1160 | parts |
+| 10u v2 · Mission Control cards of the persona board: no persona for a position, sent back twice, a run's question, merge conflict at Ben — desktop and phone — **req-264, canvas `1794411563-4786`** | `MCCardsV2` | 1640×1040 | parts |
 
 The older boards one folder up (`Home`, `Ticket`, `Workers`, `Ready`,
 `Shaping`, `Orchestrator`, `Phone*` of 2026-10-31) are superseded by the
