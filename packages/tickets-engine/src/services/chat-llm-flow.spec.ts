@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createChatBridge, FLOW_SYSTEM_PROMPT } from './chat-llm';
+import { createChatBridge } from './chat-llm';
+import { loadCrewPrompts } from './crew-prompts';
+
+/** req-279: the real shipped crew prompts, so the wire assertions see the bytes a run sends. */
+const CREW = await loadCrewPrompts();
 
 /**
  * E10-5: Paul's flow draft on the OpenAI-compatible wire -- the flow
@@ -23,6 +27,7 @@ describe('the flow draft turn', () => {
   it('sends the flow prompt with the context and returns the setChain command', async () => {
     const bodies: { messages: { role: string; content: string }[] }[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config,
       fetch: (async (_url: unknown, init?: RequestInit) => {
         bodies.push(JSON.parse(String(init?.body)) as never);
@@ -30,14 +35,14 @@ describe('the flow draft turn', () => {
       }) as typeof fetch,
     });
     const out = await bridge.runTurn({ text: 'Draft the flow.', history: [], board: 'BOARD', flow: { context: 'Standard flow: build -> review' }, emit: () => undefined });
-    expect(bodies[0]!.messages[0]!.content).toContain(FLOW_SYSTEM_PROMPT.slice(0, 60));
+    expect(bodies[0]!.messages[0]!.content).toContain(CREW.flow.slice(0, 60));
     expect(bodies[0]!.messages[0]!.content).toContain('Standard flow: build -> review');
     expect(bodies[0]!.messages[0]!.content).not.toContain('BOARD');
     expect(out.commands).toEqual([{ kind: 'setChain', id: 'T-0130', chain: ['insert security(ralf, notify) after review'] }]);
   });
 
   it('names the new grammar entries', () => {
-    expect(FLOW_SYSTEM_PROMPT).toContain('move <phase>');
-    expect(FLOW_SYSTEM_PROMPT).toContain('assign <phase>');
+    expect(CREW.flow).toContain('move <phase>');
+    expect(CREW.flow).toContain('assign <phase>');
   });
 });

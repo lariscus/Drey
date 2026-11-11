@@ -12,7 +12,11 @@ import {
   parseWorkerValue,
   resolveAssignment,
 } from '../../../packages/tickets-engine/src/fleet/assignment';
+import { loadDisciplineTexts } from '../../../packages/tickets-engine/src/fleet/discipline-texts';
 import { DEFAULT_FLEET_CAPS } from '../../../packages/tickets-engine/src/fleet/protocol';
+
+/** req-279: the real shipped discipline texts — this spec asserts the brief's bytes (the asking example's last line). */
+const DISCIPLINES = await loadDisciplineTexts();
 
 /**
  * The fleet's assignment brain (M84, the owner's ruling): ticket pin >
@@ -183,6 +187,7 @@ describe('worker values and the assignment ladder', () => {
 
 describe('composeInstruction — the context pack (T-0048)', () => {
   const baseInput = (over: Partial<Parameters<typeof composeInstruction>[0]> = {}): Parameters<typeof composeInstruction>[0] => ({
+    disciplines: DISCIPLINES,
     ticketId: 'T-0007',
     title: 'Add the thing',
     repo: 'lariscus',
@@ -328,6 +333,7 @@ Do it in two steps.
 
   it('tells the worker the quoted ticket is complete, so it does not read the file again (req-55)', () => {
     const base = {
+      disciplines: DISCIPLINES,
       ticketId: 'T-0007',
       title: 'Add the thing',
       repo: null,
@@ -352,6 +358,7 @@ Do it in two steps.
 
   it("names the linked toolchain and forbids an install, only when the repo links something (req-56)", () => {
     const base = {
+      disciplines: DISCIPLINES,
       ticketId: 'T-0007',
       title: 'Add the thing',
       repo: null,
@@ -375,6 +382,7 @@ Do it in two steps.
 
   it('tells every worker how to ask the owner (req-64)', () => {
     const { text } = composeInstruction({
+      disciplines: DISCIPLINES,
       ticketId: 'T-0007',
       title: 'Add the thing',
       repo: null,

@@ -29,7 +29,7 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
   const token = await tokenOf(config);
   const board = composeBoardParts(opts, config, log);
   const verify = await composeVerifyParts(opts, config, board, log);
-  const sessions = composeSessionParts(opts, config, board, log);
+  const sessions = await composeSessionParts(opts, config, board, log);
   const remote = await composeRemoteParts(opts, config, { board, verify, sessions }, log);
   const learning = await composeLearningParts(config, board, log);
   const parts = { config, board, verify, sessions, remote, learning };

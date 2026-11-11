@@ -3,8 +3,12 @@ import { parsePersonaFile } from '../core/persona';
 import { estimateTokens } from '../core/token-count';
 import { composeInstruction } from '../fleet/instruction';
 import { previewInstructionInput } from '../fleet/prompt-preview-input';
+import { loadDisciplineTexts } from '../fleet/discipline-texts';
 import { PromptPreview } from './prompt-preview';
 import { MemorySkillFileSystem } from './skill-file-system.fake';
+
+/** req-279: the real shipped discipline texts — the comparison below must compose the same bytes the service loads. */
+const DISCIPLINES = await loadDisciplineTexts();
 
 const PERSONA_FILE = '---\ntitle: Ben\nrole: builder\nworker: claude-code\nmodels:\n  default: opus\n  pool: [opus]\nskills: [review, ghost]\n---\n';
 const files = {
@@ -22,6 +26,7 @@ describe('PromptPreview', () => {
       previewInstructionInput(
         { id: 'ben', role: 'builder', worker: 'claude-code', model: 'opus', prompt: files['tickets/_meta/personas/ben/prompt.md'], memory: files['tickets/_meta/personas/ben/memory.md'], skills: [{ name: 'review', text: 'Look at the diff first.' }] },
         'build',
+        DISCIPLINES,
       ),
     );
     expect(data.text).toBe(expected.text);

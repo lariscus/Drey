@@ -6,6 +6,7 @@ import { readRepoInstructions, worktreeDiffStat } from '../context-pack';
 import { dkTargetFor } from '../dk-target';
 import { DEFAULT_FLEET_CAPS, type ChainConfig, type ClassRequest, type PoolGrantDecision, type RunRequest } from '../protocol';
 import { composeRunRequest } from '../request';
+import type { DisciplineTexts } from '../discipline-texts';
 import { worktreePathFor } from '../worktree-home';
 import type { BoardPersonas, TicketPersona } from './board-personas';
 import type { ChainBoard } from './chain-board';
@@ -39,6 +40,12 @@ export interface TicketDispatchDeps {
   readonly notes: WaitNotes;
   readonly log: (message: string) => void;
   readonly events?: FleetLedger;
+  /**
+   * The discipline texts the briefs end with (req-279: the files in
+   * `prompts/disciplines/`) — a provider, cached after its first call;
+   * the composition root passes the file loader (or a spec a fixture).
+   */
+  readonly disciplines: () => Promise<DisciplineTexts>;
 }
 
 /** The harness and model a persona runs: the pool's grant (req-170), else the persona's default. */
@@ -80,7 +87,15 @@ interface Target {
  * said once per ticket and reason.
  */
 export class TicketDispatch {
+  private disciplinesOnce: Promise<DisciplineTexts> | null = null;
+
   constructor(private readonly deps: TicketDispatchDeps) {}
+
+  /** The discipline texts, loaded once (the provider is the file loader by default). */
+  private disciplines(): Promise<DisciplineTexts> {
+    this.disciplinesOnce ??= this.deps.disciplines();
+    return this.disciplinesOnce;
+  }
 
   async dispatch(config: ChainConfig, snap: BoardSnapshot, planned: PlannedDispatch): Promise<DispatchOutcome> {
     const { card } = planned;
@@ -167,6 +182,7 @@ export class TicketDispatch {
     const nextPhaseId = parkFor !== null ? (card.phase !== workingPhaseId ? workingPhaseId : null) : nextPhaseIdOf(snap.columns, workingPhaseId);
     const context = await this.context(config, card, target.repo, workingPhaseId);
     return {
+      disciplines: await this.disciplines(),
       card,
       ticketText: got.text,
       vaultPath: config.ticketsVaultPath,

@@ -11,6 +11,7 @@ import type { PipelinePhase, RepoRef, TicketCard } from '../contracts/tickets';
 import type { ClosingSignal } from '../core/closing-signals';
 import { acceptanceCommands } from '../core/ticket-files';
 import type { Truncation } from './assignment';
+import type { DisciplineTexts } from './discipline-texts';
 import type { FleetCaps, HandoverMode, InteractiveMode, PermissionMode, RunDkTarget, RunRequest } from './protocol';
 import { assembleRunRequest } from './request-assemble';
 import { composeRunInstruction } from './request-instruction';
@@ -101,6 +102,12 @@ export interface ComposeRunInput {
    * ring decides everything, exactly as before personas.
    */
   readonly persona?: PersonaDispatch | null;
+  /**
+   * The discipline texts the composed brief ends with (`prompts/disciplines/`,
+   * req-279) — loaded once by the dispatching caller (board service or
+   * TicketDispatch), so the pure composer reads no files.
+   */
+  readonly disciplines: DisciplineTexts;
   /** req-169: the vault's closing-round signals (pipeline.md `closing-signals:`); absent = all five. */
   readonly closingSignals?: readonly ClosingSignal[];
 }

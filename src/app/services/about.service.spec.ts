@@ -31,7 +31,7 @@ describe('AboutService', () => {
             buildNumber: 68,
             commit: 'd1d3088',
             branch: 'worktree/silver-forest-0d1f',
-            checkoutPath: 'C:/Users/puls/.herdr/worktrees/Drey/worktree-silver-forest-0d1f',
+            checkoutPath: 'C:/Users/dev/.herdr/worktrees/Drey/worktree-silver-forest-0d1f',
             builtAt: '2026-09-08T18:00:00.000Z',
           }),
         ),

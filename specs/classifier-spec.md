@@ -11,6 +11,26 @@ assistant, by `plugins/assistant/main/` (`chat-engine.ts`,
 `action-engine.ts`, prompts in `ask-prompts.ts`) over the provider
 abstraction in `electron/llm/` (ADR-0047).
 
+## The prompt map — where every prompt text lives (req-279)
+
+| Family | File of record | Loaded by |
+|---|---|---|
+| Pipeline step prompts (plan, build, review, qa, commit, scout) | `packages/tickets-engine/prompts/*.md` (seeded into the vault's `tickets/_meta/prompts/` — the editable copy a board runs) | `core/default-prompts.ts` |
+| Default crew personas (the seed) | `packages/tickets-engine/personas/<id>/{persona,prompt}.md` | `services/shipped-crew-files.ts` |
+| Crew chat prompts (Mission Control, Shape, Flow, Aggregator) | `packages/tickets-engine/prompts/crew/*.md` | `services/crew-prompts.ts` (`loadCrewPrompts`) |
+| Run brief disciplines (completion, handover, dialog, asking, scout) | `packages/tickets-engine/prompts/disciplines/*.md` — `{{question}}`/`{{blocked}}` are the protocol markers, substituted on load | `fleet/discipline-texts.ts` (`loadDisciplineTexts`) |
+| Assistant role texts (`ASK_SYSTEM`, `askToolsSystem`, `liveEditSystem`, `ASK_ANSWER_SYSTEM`) | `plugins/assistant/main/ask-prompts.ts` (code; `system-prompt.ts` composes around them) | direct import |
+| Base app built-in templates (Autotag, search summary, lossless format) | `shared/config/schema.ts` (code — the renderer needs them synchronously; the user's copies live in app-config) | direct import |
+| The closing round's prompt | `packages/tickets-engine/src/fleet/closing-round-prompt.ts` (a builder with per-run facts, code) | direct import |
+
+The rule of the map: a prompt's **text** is edited in its file of record,
+nothing else is a second copy. The loaders drop exactly the one trailing
+newline the files carry (and substitute the discipline markers), so the
+composed bytes — and with them the brief digests and the providers'
+prompt caches — change only when a text is deliberately edited. The
+classifier prompts below stay quoted in full; the crew chat prompts and
+the disciplines are described here, their full texts live in their files.
+
 ---
 
 ## Prompt 1 — Task vs. note
@@ -235,8 +255,8 @@ create as a `raw capture:` Log line (ticket-schema).
   appended to a user's own Action template prompt when the Action rewrites
   the document. The Action context carries the current selection
   (`SELECTED SECTION`) next to the whole document.
-- **`SHAPE_SYSTEM_PROMPT`** (`packages/tickets-engine/src/services/shape-system-prompt.ts`,
-  re-exported by `chat-llm.ts`; E10-3) — Paul shapes one ticket with the
+- **`SHAPE_SYSTEM_PROMPT`** (the file `packages/tickets-engine/prompts/crew/shape.md`,
+  loaded by `services/crew-prompts.ts`; E10-3) — Paul shapes one ticket with the
   owner; the system message is the prompt plus `## Ticket <id>` and the
   ticket text. The reply is one JSON object `{say, thought?, plan?,
   question?, split?, read?}`; `plan` is the whole Plan chapter with
@@ -244,7 +264,8 @@ create as a `raw capture:` Log line (ticket-schema).
   `### Open questions`. A part carries indented `persona:`, **`size: S|M|L`**
   (req-170: how demanding it is — the capacity pool maps it to class C, B
   or A), `reason:` and optionally `chain:` lines.
-- **`FLOW_SYSTEM_PROMPT`** (`packages/tickets-engine/src/services/chat-llm.ts`,
+- **`FLOW_SYSTEM_PROMPT`** (the file `packages/tickets-engine/prompts/crew/flow.md`,
+  loaded by `services/crew-prompts.ts`;
   E10-5) — Paul drafts one ticket's or one plan part's flow. The system
   message is the prompt plus `## Flow` (the standard flow's phase ids, the
   flow now with each gate's persona and marks, the saved delta, the crew);
@@ -254,7 +275,8 @@ create as a `raw capture:` Log line (ticket-schema).
   delta in the chain grammar incl. `move` and `assign` — and a `say` that is
   his reason. The desk validates it like any edit and shows it as a draft;
   nothing is written.
-- **`MISSION_SYSTEM_PROMPT` and its context** (`chat-llm.ts` + `chat-service.ts`,
+- **`MISSION_SYSTEM_PROMPT` and its context** (the file `packages/tickets-engine/prompts/crew/mission.md`
+  via `services/crew-prompts.ts`; the context `chat-service.ts`,
   E5a; D-7a / milestone 165; req-173) — the seven intents (steer, create, promote, chain,
   blocked, session, report) and the strict `{say, thought, commands}` envelope. The system
   message is the prompt, then `## Board digest` (priority vocabulary, the columns
@@ -312,7 +334,9 @@ create as a `raw capture:` Log line (ticket-schema).
   are the progress. The Cancel control is req-157.
 - **The fleet's step prompts and the run brief's persona line**
   (`packages/tickets-engine/prompts/*.md`, `fleet/assignment.ts`; milestone
-  212, D-60 / D-61). The shipped step prompts (`build-default` v6,
+  212, D-60 / D-61). The run brief's disciplines (completion, handover,
+  dialog, asking, scout) are files too since req-279 —
+  `prompts/disciplines/*.md` via `fleet/discipline-texts.ts`. The shipped step prompts (`build-default` v6,
   `qa-default` v2, `review-default` v3, `scout-default` v2) ask the worker,
   in their "How to work" list, to report friction as one `FRICTION:` line
   of the final message (req-169, milestone 229 — the step prompts are

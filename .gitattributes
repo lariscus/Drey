@@ -1,9 +1,12 @@
-# The shipped ticket prompts in packages/tickets-engine/prompts/ are
-# byte-compared raw (default-prompts.spec.ts): LF, newline-terminated.
-# GitHub's Windows runners default to core.autocrlf=true, which would check
-# the LF blobs out as CRLF and fail CI while local worktrees (never
-# re-checked out) stay green. eol=lf overrides autocrlf at checkout.
-packages/tickets-engine/prompts/*.md text eol=lf
+# The shipped ticket prompts in packages/tickets-engine/prompts/ (the
+# pipeline step prompts at the top level, the crew chat prompts in crew/
+# and the run disciplines in disciplines/, req-279) are byte-compared raw
+# (default-prompts.spec.ts, crew-prompts.spec.ts, discipline-texts.spec.ts):
+# LF, newline-terminated. GitHub's Windows runners default to
+# core.autocrlf=true, which would check the LF blobs out as CRLF and fail
+# CI while local worktrees (never re-checked out) stay green. eol=lf
+# overrides autocrlf at checkout.
+packages/tickets-engine/prompts/**/*.md text eol=lf
 # The shipped default crew (req-256), the same rule: LF, newline-terminated.
 packages/tickets-engine/personas/**/*.md text eol=lf
 

@@ -6,7 +6,7 @@
 // the engine reads back for the "Needs you" report card.
 
 import type { InteractiveMode } from './protocol';
-import { ASKING, INTERACTIVE_DISCIPLINE, SCOUT_DISCIPLINE } from './disciplines';
+import type { DisciplineTexts } from './discipline-texts';
 import { briefHead, headParts, memoryOf, optional, personaLine, trimmed, type ComposedInstruction } from './instruction-parts';
 
 /**
@@ -29,6 +29,12 @@ function scoutReportShape(by: string): string {
 }
 
 export interface ScoutInstructionInput {
+  /**
+   * The discipline texts the scout brief ends with (`prompts/disciplines/`,
+   * req-279) — loaded once by the composer's caller and carried here, so
+   * the pure composer reads no files.
+   */
+  readonly disciplines: DisciplineTexts;
   readonly ticketId: string;
   readonly title: string;
   /**
@@ -78,14 +84,14 @@ export function composeScoutInstruction(input: ScoutInstructionInput): ComposedI
   const description = input.description.trim();
   const changing = optional(memoryOf(input.memorySection));
   const signedBy = trimmed(input.personaId);
-  const discipline = input.interactive !== undefined ? INTERACTIVE_DISCIPLINE : SCOUT_DISCIPLINE;
+  const discipline = input.interactive !== undefined ? input.disciplines.interactive : input.disciplines.scout;
   const parts = [
     ...headParts(head),
     ...scoutWhoAndWhere(input, description),
     ...changing,
     scoutReportShape(signedBy !== '' ? signedBy : 'scout'),
     discipline,
-    ASKING,
+    input.disciplines.asking,
   ];
   const continuation = [
     `You are resuming the exploration of ticket ${input.ticketId} — ${input.title}, the scout run, in this same session. ` +

@@ -3,6 +3,7 @@ import { hostname } from 'node:os';
 import { createChatBridge } from '../services/chat-llm';
 import { ChatService } from '../services/chat-service';
 import { composePersonaSessions } from '../services/compose-persona-sessions';
+import { loadCrewPrompts } from '../services/crew-prompts';
 import { PersonaPinReader } from '../services/persona-pin-reader';
 import { PersonaProseMigrator } from '../services/persona-prose-migrator';
 import { PersonaRemoveService } from '../services/persona-remove-service';
@@ -39,13 +40,16 @@ const messageOf = (error: unknown): string => (error instanceof Error ? error.me
  * Memory tab's journal (req-169), the skills (req-172) and the one-time
  * migrations those moved (the persona prose, req-171).
  */
-export function composeSessionParts(opts: EngineOptions, config: FileConfigStore, parts: BoardParts, log: Log): SessionParts {
+export async function composeSessionParts(opts: EngineOptions, config: FileConfigStore, parts: BoardParts, log: Log): Promise<SessionParts> {
   const { board, host, git, fleet, hub } = parts;
+  // req-279: the crew's chat prompts load here, once — the compose is the
+  // engine's async wiring, a missing file names itself at the start.
+  const crew = await loadCrewPrompts();
   const chat = new ChatService({
     board,
     host,
     git,
-    bridge: opts.chatBridge ?? createChatBridge({ config }),
+    bridge: opts.chatBridge ?? createChatBridge({ config, crew }),
     sessions: parts.freeSessions, // req-173: Pia's startSession card
     shadows: new FilePlanShadowStore(path.join(opts.home, 'plan-shadow.json')),
     modelName: () => config.get<string>('chat.model'),
@@ -63,7 +67,7 @@ export function composeSessionParts(opts: EngineOptions, config: FileConfigStore
     fleet,
     fleetChanges: (listener) => hub.subscribe((what) => (what === 'fleet' ? listener() : undefined)),
     changed: (file) => hub.emit('chat', { file, event: { kind: 'done' } }),
-    bridge: (systemPrompt) => opts.chatBridge ?? createChatBridge({ config, systemPrompt }),
+    bridge: (systemPrompt) => opts.chatBridge ?? createChatBridge({ config, crew, systemPrompt }),
     log,
     ...(opts.oneOnOneTools === undefined ? {} : { tools: opts.oneOnOneTools }),
   });

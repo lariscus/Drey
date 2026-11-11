@@ -6,8 +6,10 @@
  */
 import type { InstructionInput } from './instruction';
 import { capHead, capTail } from './capping';
-import { HANDOVER_CAP } from './disciplines';
 import { memoryOf, optional, trimmed, type Truncation } from './instruction-parts';
+
+/** The most of an earlier handover the brief carries. */
+const HANDOVER_CAP = 2_000;
 
 /** What `whoAndWhere` needs beyond the input, already resolved by the caller. */
 export interface WhoAndWhereContext {

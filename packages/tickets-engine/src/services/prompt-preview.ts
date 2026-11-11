@@ -5,6 +5,7 @@ import { estimateTokens, tokenizerFor } from '../core/token-count';
 import { personaMemorySection } from '../fleet/context-pack';
 import { composeInstruction } from '../fleet/instruction';
 import { previewInstructionInput } from '../fleet/prompt-preview-input';
+import { loadDisciplineTexts, type DisciplineTexts } from '../fleet/discipline-texts';
 import { skillsSection } from '../fleet/skills-section';
 import type { SkillFileSystem } from './skill-file-system';
 
@@ -29,7 +30,15 @@ export interface PromptPreviewData {
  * `model` asked for).
  */
 export class PromptPreview {
+  /** req-279: the discipline texts of the previewed brief (`prompts/disciplines/`), loaded once from the shipped files. */
+  private disciplinesOnce: Promise<DisciplineTexts> | null = null;
+
   constructor(private readonly fs: SkillFileSystem) {}
+
+  private disciplines(): Promise<DisciplineTexts> {
+    this.disciplinesOnce ??= loadDisciplineTexts();
+    return this.disciplinesOnce;
+  }
 
   async build(persona: Persona, options: { readonly step: string; readonly model: string | null }): Promise<PromptPreviewData> {
     const dir = `${PERSONAS_DIR}/${persona.id}`;
@@ -44,6 +53,7 @@ export class PromptPreview {
       previewInstructionInput(
         { id: persona.id, role: persona.role, worker: entry.provider ?? persona.worker, model: entry.model, prompt, memory: memory ?? '', skills: loaded.skills },
         options.step,
+        await this.disciplines(),
       ),
     );
     const tokens = estimateTokens(composed.text, tokenizer);

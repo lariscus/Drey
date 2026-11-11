@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { composeInstruction, composeScoutInstruction } from './assignment';
+import { loadDisciplineTexts } from './discipline-texts';
 
 /**
  * The instruction composer's persona memory seam (E3, ADR-0088): the
@@ -8,8 +9,12 @@ import { composeInstruction, composeScoutInstruction } from './assignment';
  * must not move with a persona's lessons (the T-0048 rule).
  */
 
+/** req-279: the real shipped discipline texts, so the briefs here are the bytes a run sends. */
+const DISCIPLINES = await loadDisciplineTexts();
+
 function base(over: Partial<Parameters<typeof composeInstruction>[0]> = {}): Parameters<typeof composeInstruction>[0] {
   return {
+    disciplines: DISCIPLINES,
     ticketId: 'T-0001',
     title: 'Add the thing',
     repo: 'drey',
@@ -72,6 +77,7 @@ describe('composeInstruction — the persona line (D-60)', () => {
 describe('composeScoutInstruction (E8, concept §5.6)', () => {
   function scoutBase(over: Partial<Parameters<typeof composeScoutInstruction>[0]> = {}): Parameters<typeof composeScoutInstruction>[0] {
     return {
+      disciplines: DISCIPLINES,
       ticketId: 'T-0004',
       title: 'Which storage should back the index?',
       readGround: 'W:/drey',
