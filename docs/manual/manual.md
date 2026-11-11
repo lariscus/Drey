@@ -1806,9 +1806,22 @@ the board only while Drey is open.
 
 ### Drey Service's tray icon and window
 
-While Drey Service runs, its icon — the blue **D** square — sits in the
-notification area at the right of the taskbar (grey when the service has
-gone). *Taskbar icon: Hide* in Settings → *Background service* removes it.
+While Drey Service runs, its icon — Drey's own icon — sits in the
+notification area at the right of the taskbar. A dot in its top-right corner
+tells how the service is doing; point at the icon and its tooltip says it in
+words:
+
+- **Green** — running. A Crew runner that is asleep, or a remote gateway that
+  is switched off, still counts as running: the service is just at rest.
+- **Orange** — the Autopilot is Paused.
+- **Red** — a problem: a part of the service (tickets engine, Crew runner, MCP
+  server, remote gateway) has failed, or the service does not answer. The
+  tooltip names which; the window's *Components* tab has the details.
+- **Grey** — stopped: the service has gone. The icon leaves a few seconds
+  later.
+
+The service window's taskbar button carries the same dot.
+*Taskbar icon: Hide* in Settings → *Background service* removes the icon.
 Click it to open the service's window; its menu has:
 
 - **Open Drey Service…** — the window.

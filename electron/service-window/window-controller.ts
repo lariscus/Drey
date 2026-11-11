@@ -2,13 +2,15 @@
  * The Drey Service window (req-165/166, boards 8a/8b): one frameless
  * 1100×720 window, sandboxed, its page the `apps/service-window` build
  * loaded from disk. Created when asked, destroyed when closed — a window
- * nobody looks at costs no renderer process; the tray stays.
+ * nobody looks at costs no renderer process; the tray stays. Its icon is
+ * Drey's with the status dot (req-276), so the taskbar button tells the
+ * service's state like the tray does.
  */
-import { BrowserWindow, nativeImage } from 'electron';
+import { BrowserWindow, type NativeImage } from 'electron';
 import * as path from 'node:path';
 import { i18n } from '../../shared/i18n';
 import { SERVICE_WINDOW_CHANNELS, type ServiceWindowTab } from '../../shared/service-window/contract';
-import { trayIconBitmap } from './tray-icon';
+import type { TrayStatus } from './tray-status';
 
 export interface WindowPaths {
   /** `dist/service-window/browser/index.html`. */
@@ -23,11 +25,20 @@ export function windowPaths(appPath: string, mainDir: string): WindowPaths {
   };
 }
 
+/** The window's icon per status (`StatusIcons`). */
+export interface WindowPictures {
+  window(status: TrayStatus): NativeImage;
+}
+
 export class ServiceWindowController {
   private window: BrowserWindow | null = null;
+  private status: TrayStatus = 'stopped';
   private readonly closedListeners: Array<() => void> = [];
 
-  constructor(private readonly paths: WindowPaths) {}
+  constructor(
+    private readonly paths: WindowPaths,
+    private readonly pictures: WindowPictures,
+  ) {}
 
   get current(): BrowserWindow | null {
     return this.window;
@@ -53,6 +64,17 @@ export class ServiceWindowController {
       win.show();
       this.sendTab(tab);
     });
+  }
+
+  /** The service's state for the window's (the taskbar button's) icon. */
+  setStatus(status: TrayStatus): void {
+    if (status === this.status) {
+      return;
+    }
+    this.status = status;
+    if (this.window !== null && !this.window.isDestroyed()) {
+      this.window.setIcon(this.pictures.window(status));
+    }
   }
 
   send(channel: string, payload: unknown): void {
@@ -81,7 +103,7 @@ export class ServiceWindowController {
       show: false,
       title: i18n.t('service_tray.window_title'),
       backgroundColor: '#18191b',
-      icon: nativeImage.createFromBitmap(trayIconBitmap('running', 64), { width: 64, height: 64 }),
+      icon: this.pictures.window(this.status),
       webPreferences: { preload: this.paths.preload, sandbox: true, contextIsolation: true, nodeIntegration: false },
     });
     win.removeMenu();

@@ -197,6 +197,12 @@
             "browser": "apps/service-window/src/main.ts",
             "tsConfig": "apps/service-window/tsconfig.app.json",
             "outputPath": "dist/service-window",
+            "assets": [
+              {
+                "glob": "icon.png",
+                "input": "public"
+              }
+            ],
             "styles": [
               "apps/service-window/src/styles.css"
             ]

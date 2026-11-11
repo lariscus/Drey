@@ -6,9 +6,9 @@ import { newSessionAskOf } from './new-session-ask';
 import { endpointsOfLock } from './service-endpoints';
 import { parseWindowArgs } from './service-window-args';
 import { SseParser } from './sse-parser';
-import { dotBitmap, inLetterD, trayIconBitmap } from './tray-icon';
+import { composeStatusDot, dotBitmap, dotGeometry } from './tray-icon';
 
-/** The service window process's pure parts (req-165): its arguments, the lock, the event feed, the local model, Drey's command, the icon. */
+/** The service window process's pure parts (req-165): its arguments, the lock, the event feed, the local model, Drey's command, the icon's status dot. */
 describe('parseWindowArgs', () => {
   it('reads the home, the service pid and the mode', () => {
     expect(parseWindowArgs(['electron.exe', 'D:/app', '--drey-service-window', '--home', 'H', '--service-pid', '42', '--tray'])).toEqual({
@@ -92,17 +92,56 @@ describe('dreyCommand', () => {
   });
 });
 
-describe('the tray icon', () => {
-  it('is a BGRA square: accent while running, grey when stopped, the D in ink, transparent corners', () => {
-    const running = trayIconBitmap('running', 16);
-    expect(running).toHaveLength(16 * 16 * 4);
-    expect([...running.subarray(0, 4)]).toEqual([0, 0, 0, 0]);
-    const centreOfBody = (8 * 16 + 2) * 4;
-    expect([...running.subarray(centreOfBody, centreOfBody + 4)]).toEqual([0xef, 0xcb, 0x8e, 255]);
-    const stopped = trayIconBitmap('stopped', 16);
-    expect([...stopped.subarray(centreOfBody, centreOfBody + 3)]).toEqual([0x80, 0x79, 0x74]);
-    expect(inLetterD(0.36, 0.5)).toBe(true);
-    expect(inLetterD(0.5, 0.5)).toBe(false);
-    expect(dotBitmap(8)).toHaveLength(8 * 8 * 4);
+describe('the status dot on the icon (req-276)', () => {
+  const GREEN = [0x3f, 0xb9, 0x50] as const;
+  /** An opaque icon: every pixel BGRA (10, 20, 30, 255). */
+  const opaque = (size: number): Buffer => {
+    const buffer = Buffer.alloc(size * size * 4);
+    for (let i = 0; i < buffer.length; i += 4) {
+      buffer.set([10, 20, 30, 255], i);
+    }
+    return buffer;
+  };
+  const pixel = (buffer: Buffer, size: number, x: number, y: number): number[] => [...buffer.subarray((y * size + x) * 4, (y * size + x) * 4 + 4)];
+
+  it('sits in the top-right corner, a bit under half the icon, on whole pixels', () => {
+    expect(dotGeometry(16)).toEqual({ cx: 12.5, cy: 3.5, radius: 3.5, ring: 1 });
+    expect(dotGeometry(24)).toEqual({ cx: 18.5, cy: 5.5, radius: 5.5, ring: 2 });
+    expect(dotGeometry(32)).toEqual({ cx: 25, cy: 7, radius: 7, ring: 2 });
+  });
+
+  for (const size of [16, 24, 32]) {
+    it(`at ${size} px: the dot opaque in its colour, a transparent ring around it, the rest of the icon untouched`, () => {
+      const icon = opaque(size);
+      const out = composeStatusDot(icon, size, GREEN);
+      const { cx, cy, radius, ring } = dotGeometry(size);
+      // BGRA: blue first.
+      expect(pixel(out, size, Math.floor(cx), Math.floor(cy))).toEqual([0x50, 0xb9, 0x3f, 255]);
+      // Straight left of the dot, inside the ring: cut out.
+      const ringX = Math.floor(cx - radius - ring / 2);
+      expect(pixel(out, size, ringX, Math.floor(cy))[3]).toBeLessThan(128);
+      // The opposite corner and the centre keep the icon.
+      expect(pixel(out, size, 0, size - 1)).toEqual([10, 20, 30, 255]);
+      expect(pixel(out, size, Math.floor(size / 2) - 2, Math.floor(size / 2) + 2)).toEqual([10, 20, 30, 255]);
+      // A copy: the scaled icon is reused for every state.
+      expect(pixel(icon, size, Math.floor(cx), Math.floor(cy))).toEqual([10, 20, 30, 255]);
+    });
+  }
+
+  it('on a transparent icon (the file missing) the dot alone still shows', () => {
+    const out = composeStatusDot(Buffer.alloc(16 * 16 * 4), 16, GREEN);
+    expect(pixel(out, 16, 12, 3)).toEqual([0x50, 0xb9, 0x3f, 255]);
+    expect(pixel(out, 16, 2, 12)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('refuses a buffer of the wrong size', () => {
+    expect(() => composeStatusDot(Buffer.alloc(10), 16, GREEN)).toThrow();
+  });
+
+  it('the menu dot: a centred circle on transparency', () => {
+    const dot = dotBitmap(16, GREEN);
+    expect(dot).toHaveLength(16 * 16 * 4);
+    expect(pixel(dot, 16, 8, 8)).toEqual([0x50, 0xb9, 0x3f, 255]);
+    expect(pixel(dot, 16, 0, 0)).toEqual([0, 0, 0, 0]);
   });
 });

@@ -1,35 +1,40 @@
 /**
  * The tray icon and its menu (req-165, board 8a's inset): present while
  * `service.trayIcon` is shown, its picture and menu refreshed from the
- * service every few seconds. A click opens the window. Every entry is a
- * call to the service, the runner or the engine — the tray holds nothing.
+ * service every few seconds. The picture is Drey's icon with the status
+ * dot, the tooltip the state in words (req-276). A click opens the window.
+ * Every entry is a call to the service, the runner or the engine — the
+ * tray holds nothing.
  */
-import { Menu, Tray, nativeImage, type NativeImage } from 'electron';
+import { Menu, Tray, type NativeImage } from 'electron';
 import { i18n } from '../../shared/i18n';
 import type { Confirmations } from './confirmations';
 import type { DreyLauncher } from './drey-launcher';
 import type { ServiceCalls } from './service-calls';
 import { isLive } from './snapshot-map';
-import { dotBitmap, trayIconBitmap, type TrayIconState } from './tray-icon';
 import { trayMenuTemplate, type TrayActions, type TrayState } from './tray-menu';
+import { trayTooltip, trayVerdictOf, type TrayStatus, type TrayVerdict } from './tray-status';
+
+/** The pictures the tray draws (`StatusIcons`). */
+export interface TrayPictures {
+  tray(status: TrayStatus): NativeImage;
+  menuDot(status: TrayStatus): NativeImage;
+}
 
 export interface TrayDeps {
   readonly calls: ServiceCalls;
   readonly confirmations: Confirmations;
   readonly drey: DreyLauncher;
+  readonly pictures: TrayPictures;
   readonly openWindow: () => void;
 }
 
-const image = (state: TrayIconState): NativeImage => {
-  const icon = nativeImage.createFromBitmap(trayIconBitmap(state, 32), { width: 32, height: 32, scaleFactor: 2 });
-  icon.addRepresentation({ width: 16, height: 16, scaleFactor: 1, buffer: trayIconBitmap(state, 16) });
-  return icon;
-};
+const UNKNOWN: TrayVerdict = { status: 'stopped', problem: null };
 
 export class TrayController {
   private tray: Tray | null = null;
-  private state: TrayState = { running: false, autopilot: 'off', liveRuns: 0, autostart: false };
-  private readonly headerDot = nativeImage.createFromBitmap(dotBitmap(16), { width: 16, height: 16 });
+  private verdict: TrayVerdict = UNKNOWN;
+  private state: TrayState = { running: false, status: UNKNOWN.status, autopilot: 'off', liveRuns: 0, autostart: false };
 
   constructor(private readonly deps: TrayDeps) {}
 
@@ -37,10 +42,15 @@ export class TrayController {
     return this.tray !== null;
   }
 
+  /** The service's state as of the last refresh — the window's taskbar icon follows it. */
+  get status(): TrayStatus {
+    return this.verdict.status;
+  }
+
   /** Shows or drops the icon (`service.trayIcon`). */
   setVisible(visible: boolean): void {
     if (visible && this.tray === null) {
-      this.tray = new Tray(image(this.state.running ? 'running' : 'stopped'));
+      this.tray = new Tray(this.deps.pictures.tray(this.verdict.status));
       this.tray.on('click', () => this.deps.openWindow());
       this.tray.on('double-click', () => this.deps.openWindow());
       this.render();
@@ -53,9 +63,16 @@ export class TrayController {
   /** Reads the service's state now and redraws the icon and the menu. */
   async refresh(): Promise<void> {
     const { calls } = this.deps;
-    const [status, runs, autopilot] = await Promise.all([calls.status(), calls.runs(), calls.autopilot()]);
+    const [locked, status, runs, autopilot] = await Promise.all([calls.locked(), calls.status(), calls.runs(), calls.autopilot()]);
     const settings = (status?.['settings'] ?? {}) as { enabled?: unknown; autostart?: unknown };
-    this.state = { running: status !== null, autopilot, liveRuns: runs.filter(isLive).length, autostart: settings.enabled === true && settings.autostart === true };
+    this.verdict = trayVerdictOf({ locked, status, autopilot });
+    this.state = {
+      running: status !== null,
+      status: this.verdict.status,
+      autopilot,
+      liveRuns: runs.filter(isLive).length,
+      autostart: settings.enabled === true && settings.autostart === true,
+    };
     this.render();
   }
 
@@ -67,11 +84,11 @@ export class TrayController {
     if (this.tray === null) {
       return;
     }
-    const header = i18n.t(this.state.running ? 'service_tray.header.running' : 'service_tray.header.stopped');
-    this.tray.setImage(image(this.state.running ? 'running' : 'stopped'));
-    this.tray.setToolTip(header);
+    const { pictures } = this.deps;
     const t = (key: string, params?: Record<string, string | number>): string => i18n.lookup(key, params);
-    this.tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate(this.state, this.actions(), t, this.state.running ? this.headerDot : undefined)));
+    this.tray.setImage(pictures.tray(this.verdict.status));
+    this.tray.setToolTip(trayTooltip(this.verdict, t));
+    this.tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate(this.state, this.actions(), t, pictures.menuDot(this.verdict.status))));
   }
 
   private actions(): TrayActions {

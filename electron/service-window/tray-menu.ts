@@ -1,15 +1,19 @@
 /**
- * The tray menu of board 8a (req-165): `Drey Service · running`, Open Drey
+ * The tray menu of board 8a (req-165): `Drey Service · <state>` (req-276), Open Drey
  * Service…, Open Drey, `Autopilot: <state> ›` (On / Paused / Off), Stop all
  * running steps…, a divider, Start with Windows ✓, Quit service. Pure: the
  * template from the state, the strings through the catalog.
  */
 import type { MenuItemConstructorOptions, NativeImage } from 'electron';
+import type { TrayStatus } from './tray-status';
 
 export type AutopilotState = 'on' | 'paused' | 'off';
 
 export interface TrayState {
+  /** The service answered: its entries are on. */
   readonly running: boolean;
+  /** The dot's word (req-276), also the header's. */
+  readonly status: TrayStatus;
   readonly autopilot: AutopilotState;
   readonly liveRuns: number;
   readonly autostart: boolean;
@@ -32,7 +36,7 @@ export function trayMenuTemplate(state: TrayState, actions: TrayActions, t: Tran
   const autopilotLabel = t(`autopilot.state.${state.autopilot}`);
   return [
     {
-      label: t(state.running ? 'service_tray.header.running' : 'service_tray.header.stopped'),
+      label: t(`service_tray.header.${state.status}`),
       enabled: false,
       ...(headerIcon === undefined ? {} : { icon: headerIcon }),
     },

@@ -49,7 +49,17 @@ lives in `~/.drey-engine/service-window/`), leaves by itself when its service
 is gone, and is only a client: it reads `service.lock` and calls the routes
 below, the runner's and the engine's.
 
-- **Tray menu:** `Drey Service · running`, *Open Drey Service…*, *Open Drey*,
+- **Tray icon (req-276):** Drey's app icon (`build/icon.png`, packaged
+  `resources/icon.png`) with a status dot in its top-right corner, the same
+  dot on the window's taskbar icon (the window's own icon swapped — Windows'
+  overlay icon would sit bottom-right). The colour, from the lock,
+  `GET /status` and the runner's `/chain` each tick (`trayVerdictOf`):
+  **grey** stopped — no `service.lock`; **red** problem — a component
+  `failed`, or a lock whose control port does not answer; **orange** paused
+  — the Autopilot Paused; **green** running — everything else, a sleeping or
+  starting runner and a gateway switched off included. The tooltip and the
+  menu's first row name the state; a problem's tooltip names its cause.
+- **Tray menu:** `Drey Service · <state>`, *Open Drey Service…*, *Open Drey*,
   *Autopilot: On/Paused/Off ›* (the engine's `chainAutopilot`), *Stop all
   running steps…* (asks; the runner's `/chain/abort`), *Start with Windows ✓*
   (`POST /settings {autostart}`), *Quit service* (asks while runs live;
