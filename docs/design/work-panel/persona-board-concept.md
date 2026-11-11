@@ -691,8 +691,10 @@ is the chain's entry at the cursor.
   set only in the configuration (no Settings field needed for the first cut);
   with 0 nothing ever exceeds the big pool.
 
-Still open: **question 11** (wide boards). With it answered the concept is
-complete for the owner's approval.
+- **Q11 — Wide boards fold.** Agent persona columns that hold no ticket fold into a
+  *+ n personas* chip (option a); the chip opens them for a drop.
+
+All questions are answered (2026-11-11); the concept is complete for the owner's approval.
 
 ## 13. Open questions for the owner
 
@@ -726,7 +728,7 @@ Each with the options and the recommendation (first).
    cap **(recommended)**; (b) no persona cap, the pool only.
 10. **Answered 2026-11-11: the team's order, changeable by drag, §12c.** **Column order.** (a) the standard flow's order, other personas by title,
     You last **(recommended)**; (b) a manual order in `crew.md`; (c) by role.
-11. **Wide boards.** (a) agent persona columns that hold nothing fold into a
+11. **Answered 2026-11-11: (a), fold, §12c.** **Wide boards.** (a) agent persona columns that hold nothing fold into a
     *+ n personas* chip **(recommended)**; (b) always all columns; (c) a per-view
     choice.
 12. **Answered 2026-11-11: (b), both go, §12a.** **`build-default` and `commit-default` on the live board.** (a) kept as
