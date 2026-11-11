@@ -116,6 +116,18 @@ jobs:
       - name: Fetch the draw.io web app
         run: npm run fetch:drawio
 
+      # The dricket CLI the installer ships (req-277): same story, the pack
+      # step below needs build/dk/dk.exe. The script checks the release's
+      # checksums.txt and the pinned digest; its stamp makes a cache hit a no-op.
+      - name: Cache the dricket CLI
+        uses: actions/cache@v6
+        with:
+          path: build/dk
+          key: dk-${{ hashFiles('scripts/dk-version.json', 'scripts/fetch-dk.mjs', 'scripts/fetch-dk-lib.mjs') }}
+
+      - name: Fetch the dricket CLI
+        run: npm run fetch:dk
+
       - name: Build (renderer + main + plugins)
         run: npm run build
 

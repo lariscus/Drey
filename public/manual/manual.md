@@ -49,6 +49,15 @@ unless you explicitly switch on a hosted AI provider.
 - **Portable** (`drey-<version>-portable.exe`): single file, no
   installation, registers nothing.
 
+Both carry **`dk`**, the dricket command-line tool the Work panel's
+tickets run on, so a fresh install needs nothing else for the board
+except **git** (`dk` calls the git you have installed, like the git plugin
+does). Drey uses the `dk` that came with it unless the tickets plugin's
+`config.json` (`<userData>\plugins\tickets\`) sets `"dk.path"`: a path
+you enter there always wins. If `dk` is missing, older than the one Drey ships, or git cannot be
+found, the Work panel shows an issue saying which, instead of failing
+silently.
+
 ### Your vault is just a folder
 
 On first start Drey asks for a vault folder. A vault is an ordinary

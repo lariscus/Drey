@@ -14,6 +14,7 @@ import { archivedTicketIds, nextTicketId, TICKETS_ARCHIVE_DIR, TICKET_ID_PATTERN
 import { parseChanges, parseResult, planApprovedOf, storyOf, type ChangesReply } from '../contracts/changes';
 import { type RefineReply, TicketReply, AttachmentReply, type DocumentSaveReply, type TicketDocumentLocation } from '../contracts/replies';
 import { documentRelPath, idOfDocumentPath } from '../store/document-paths';
+import type { DkHealth } from '../store/dk-health';
 import { detailFromContent } from '../store/dricket-ticket-store';
 import { assembleBoard, parseRepos, addPipelinePhase, patchPipelinePhase, removePipelinePhase, renamePipelinePhase, parsePipeline, reorderPipelinePhases, reposFileText, reposProse } from '../core/ticket-board';
 import { newTicketFileText, parseTicketFile, patchTicketFile, patchBlockedBy, patchChain, patchClass, patchForm, patchTrack, ticketPathParts, withLogLine } from '../core/ticket-files';
@@ -229,6 +230,8 @@ export interface BoardServiceOptions {
   readonly crew?: { effective(vault: EngineVault): Promise<EffectiveCrew> };
   /** req-256: "Initialize board" seeds the default crew through it, after the pipeline and the prompts; absent = no crew is seeded. */
   readonly crewSeeder?: { seed(vault: EngineVault): Promise<unknown> };
+  /** req-277: `dk` missing, older than the bundled release or no git become board issues on dricket; absent = no check. */
+  readonly dkHealth?: DkHealth;
 }
 
 /** A dricket write that met a ticket changed in the meantime (dk exit 12): nothing was written, the caller asks the user. */
@@ -449,7 +452,8 @@ export class EngineBoardService {
   /** The dricket board: the store is itself a git repository, so the footer names the store, not the vault's repository state (D-9). */
   private async dricketSnapshot(store: StoreSettings, common: Parameters<StoreBoardSource['board']>[1]): Promise<BoardSnapshot> {
     const board = await this.storeBoard.board(store, common);
-    return { ...board, isGitRepo: true, storeLine: await storeFooterLine(store) };
+    const health = (await this.options.dkHealth?.issues(store.dkPath === '' ? 'dk' : store.dkPath)) ?? [];
+    return { ...board, isGitRepo: true, storeLine: await storeFooterLine(store), issues: [...health, ...board.issues] };
   }
 
   /**

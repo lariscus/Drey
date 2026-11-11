@@ -9,6 +9,8 @@ import { composeCrewConfig, composeCrewSeeder, composeFreeSessions } from '../se
 import type { CrewSeeder } from '../services/crew-seeder';
 import { FleetClient } from '../services/fleet-client';
 import type { FreeSessionService } from '../services/free-session-service';
+import { DkHealthProbe } from '../store/dk-health';
+import { execProbe } from '../store/dk-health-exec';
 import { ChangeHub } from './drey-port';
 import { DreyPresence } from './drey-presence';
 import type { EngineOptions } from './engine-types';
@@ -65,7 +67,7 @@ export function composeBoardParts(opts: EngineOptions, config: FileConfigStore, 
     normalizeFleetPools({}),
     normalizeFleetHandover({}),
     `engine@${hostname().toLowerCase()}`,
-    { events, crew, ...(crewSeeder === null ? {} : { crewSeeder }) },
+    { events, crew, dkHealth: new DkHealthProbe(execProbe), ...(crewSeeder === null ? {} : { crewSeeder }) },
   );
   // req-173 (R12): the free sessions the owner opens (service window, Crew tab) or accepts from Pia's card.
   const freeSessions = composeFreeSessions({ board, fleet, crew, host, log });

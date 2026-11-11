@@ -111,6 +111,20 @@ configuration layers"). Drey's mirrored device settings (`service.*`,
 `remote.*`, `chat.*`, `gitPath`, `dk.*`) still sit in `config.json`;
 folding them into `service.json` is req-231.
 
+**Which `dk`** (req-277): the installer ships the pinned dricket release as
+`resources/dk/dk.exe`. Drey resolves the path (`main/dk-path.ts`: a configured
+`dk.path` wins, else the bundled binary of a packaged build when the file
+exists, else empty = `dk` on PATH) and writes the RESULT as `dk.path` into
+`config.json` — before it starts the service, at every adoption and with every
+board fetch. The service, its runs and the chain read that one key, so they
+run the same `dk` as the board; the service never learns about Electron or
+the resources folder. The last Drey to start sets it: a service that starts at
+Windows sign-in without Drey runs the path the last Drey wrote. The board
+carries an issue (`DkHealthProbe`, `store/dk-health.ts`) when that `dk` is
+missing or cannot run, is older than the engine's minimum, is older than the
+bundled release (a warning), or when `git --version` fails — `dk` calls the
+installed git.
+
 ### `service.lock`
 
 Written owner-only and atomically, rewritten whenever a component changes:
