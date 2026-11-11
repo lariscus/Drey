@@ -1816,7 +1816,7 @@ the board only while Drey is open.
 ### Drey Service's tray icon and window
 
 While Drey Service runs, its icon — Drey's own icon — sits in the
-notification area at the right of the taskbar. A dot in its top-right corner
+notification area at the right of the taskbar. A dot in its bottom-right corner
 tells how the service is doing; point at the icon and its tooltip says it in
 words:
 
@@ -1829,7 +1829,7 @@ words:
 - **Grey** — stopped: the service has gone. The icon leaves a few seconds
   later.
 
-The service window's taskbar button carries the same dot.
+The service window's taskbar button carries the same dot as a Windows badge.
 *Taskbar icon: Hide* in Settings → *Background service* removes the icon.
 Click it to open the service's window; its menu has:
 

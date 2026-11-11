@@ -1,24 +1,24 @@
 /**
  * Drey's app icon with the status dot (req-276), as the tray, the window's
- * taskbar button and the menu header take it. The icon is the one the
- * installer ships (`build/icon.png`, packaged as `resources/icon.png` by
- * `extraResources`), scaled once per size; each status' picture is built
- * on first use and kept.
+ * taskbar overlay and the menu header take it, plus the window's plain icon.
+ * The icon is the one the installer ships (`build/icon.png` / `icon.ico`,
+ * packaged as `resources/icon.png` / `icon.ico` by `extraResources`), scaled
+ * once per size; each status' picture is built on first use and kept.
  */
 import { nativeImage, type NativeImage } from 'electron';
 import * as path from 'node:path';
-import { composeStatusDot, dotBitmap } from './tray-icon';
+import { composeStatusDot, dotBitmap, overlayDotBitmap } from './tray-icon';
 import { STATUS_COLOURS, type TrayStatus } from './tray-status';
 
 /** Tray sizes per display scale: 100 %, 125 %, 150 %, 200 %. */
 const TRAY_SIZES: readonly number[] = [16, 20, 24, 32];
-/** The window icon: Windows scales the 1× bitmap for the title, taskbar and Alt-Tab. */
-const WINDOW_SIZE = 64;
+/** The taskbar overlay: Windows scales the 1× bitmap down to the overlay's 16 px (more on a scaled display). */
+const OVERLAY_SIZE = 32;
 const MENU_DOT_SIZE = 16;
 
-/** Where Drey's icon lies: next to the resources when packaged, in `build/` of a checkout. */
-export function dreyIconPath(appPath: string, isPackaged: boolean, resourcesPath: string): string {
-  return isPackaged ? path.join(resourcesPath, 'icon.png') : path.join(appPath, 'build', 'icon.png');
+/** Where Drey's icon lies (`ext` `png` or `ico`): next to the resources when packaged, in `build/` of a checkout. */
+export function dreyIconPath(appPath: string, isPackaged: boolean, resourcesPath: string, ext: 'png' | 'ico'): string {
+  return path.join(isPackaged ? resourcesPath : path.join(appPath, 'build'), `icon.${ext}`);
 }
 
 export class StatusIcons {
@@ -26,8 +26,12 @@ export class StatusIcons {
   private readonly scaled = new Map<number, Buffer>();
   private readonly built = new Map<string, NativeImage>();
 
-  constructor(iconPath: string) {
-    this.icon = nativeImage.createFromPath(iconPath);
+  /** `pngPath` is drawn on; `icoPath` is the window's own icon (its frames are what Windows wants). */
+  constructor(
+    pngPath: string,
+    private readonly icoPath: string,
+  ) {
+    this.icon = nativeImage.createFromPath(pngPath);
   }
 
   /** The tray's picture: one representation per display scale. */
@@ -41,10 +45,18 @@ export class StatusIcons {
     });
   }
 
-  /** The window's (and so the taskbar button's) icon. */
-  window(status: TrayStatus): NativeImage {
-    return this.cached(`window:${status}`, () =>
-      nativeImage.createFromBitmap(this.withDot(status, WINDOW_SIZE), { width: WINDOW_SIZE, height: WINDOW_SIZE }),
+  /** The window's (and so the taskbar button's) icon: Drey's, plain. */
+  windowIcon(): NativeImage {
+    return this.cached('window', () => {
+      const ico = nativeImage.createFromPath(this.icoPath);
+      return ico.isEmpty() ? this.icon : ico;
+    });
+  }
+
+  /** The taskbar button's overlay (`setOverlayIcon`): the dot alone, centred; Windows places it. */
+  overlay(status: TrayStatus): NativeImage {
+    return this.cached(`overlay:${status}`, () =>
+      nativeImage.createFromBitmap(overlayDotBitmap(OVERLAY_SIZE, STATUS_COLOURS[status]), { width: OVERLAY_SIZE, height: OVERLAY_SIZE }),
     );
   }
 

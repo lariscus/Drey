@@ -6,7 +6,7 @@ import { newSessionAskOf } from './new-session-ask';
 import { endpointsOfLock } from './service-endpoints';
 import { parseWindowArgs } from './service-window-args';
 import { SseParser } from './sse-parser';
-import { composeStatusDot, dotBitmap, dotGeometry } from './tray-icon';
+import { composeStatusDot, dotBitmap, dotGeometry, overlayDotBitmap, overlayDotGeometry } from './tray-icon';
 
 /** The service window process's pure parts (req-165): its arguments, the lock, the event feed, the local model, Drey's command, the icon's status dot. */
 describe('parseWindowArgs', () => {
@@ -104,10 +104,11 @@ describe('the status dot on the icon (req-276)', () => {
   };
   const pixel = (buffer: Buffer, size: number, x: number, y: number): number[] => [...buffer.subarray((y * size + x) * 4, (y * size + x) * 4 + 4)];
 
-  it('sits in the top-right corner, a bit under half the icon, on whole pixels', () => {
-    expect(dotGeometry(16)).toEqual({ cx: 12.5, cy: 3.5, radius: 3.5, ring: 1 });
-    expect(dotGeometry(24)).toEqual({ cx: 18.5, cy: 5.5, radius: 5.5, ring: 2 });
-    expect(dotGeometry(32)).toEqual({ cx: 25, cy: 7, radius: 7, ring: 2 });
+  it('sits in the bottom-right corner (where tray badges sit), a bit under half the icon, on whole pixels', () => {
+    expect(dotGeometry(16)).toEqual({ cx: 12.5, cy: 12.5, radius: 3.5, ring: 1 });
+    expect(dotGeometry(20)).toEqual({ cx: 15.5, cy: 15.5, radius: 4.5, ring: 1 });
+    expect(dotGeometry(24)).toEqual({ cx: 18.5, cy: 18.5, radius: 5.5, ring: 2 });
+    expect(dotGeometry(32)).toEqual({ cx: 25, cy: 25, radius: 7, ring: 2 });
   });
 
   for (const size of [16, 24, 32]) {
@@ -120,9 +121,10 @@ describe('the status dot on the icon (req-276)', () => {
       // Straight left of the dot, inside the ring: cut out.
       const ringX = Math.floor(cx - radius - ring / 2);
       expect(pixel(out, size, ringX, Math.floor(cy))[3]).toBeLessThan(128);
-      // The opposite corner and the centre keep the icon.
-      expect(pixel(out, size, 0, size - 1)).toEqual([10, 20, 30, 255]);
-      expect(pixel(out, size, Math.floor(size / 2) - 2, Math.floor(size / 2) + 2)).toEqual([10, 20, 30, 255]);
+      // The other corners and the centre keep the icon.
+      for (const [x, y] of [[0, 0], [size - 1, 0], [0, size - 1], [Math.floor(size / 2) - 2, Math.floor(size / 2) - 2]] as const) {
+        expect(pixel(out, size, x, y)).toEqual([10, 20, 30, 255]);
+      }
       // A copy: the scaled icon is reused for every state.
       expect(pixel(icon, size, Math.floor(cx), Math.floor(cy))).toEqual([10, 20, 30, 255]);
     });
@@ -130,12 +132,25 @@ describe('the status dot on the icon (req-276)', () => {
 
   it('on a transparent icon (the file missing) the dot alone still shows', () => {
     const out = composeStatusDot(Buffer.alloc(16 * 16 * 4), 16, GREEN);
-    expect(pixel(out, 16, 12, 3)).toEqual([0x50, 0xb9, 0x3f, 255]);
-    expect(pixel(out, 16, 2, 12)).toEqual([0, 0, 0, 0]);
+    expect(pixel(out, 16, 12, 12)).toEqual([0x50, 0xb9, 0x3f, 255]);
+    expect(pixel(out, 16, 2, 3)).toEqual([0, 0, 0, 0]);
   });
 
   it('refuses a buffer of the wrong size', () => {
     expect(() => composeStatusDot(Buffer.alloc(10), 16, GREEN)).toThrow();
+  });
+
+  it('the taskbar overlay: the dot centred in its canvas (Windows places the badge) with a dark rim, the rest transparent', () => {
+    expect(overlayDotGeometry(32)).toEqual({ cx: 16, cy: 16, radius: 10, ring: 2 });
+    expect(overlayDotGeometry(16)).toEqual({ cx: 8, cy: 8, radius: 5, ring: 1 });
+    const overlay = overlayDotBitmap(32, GREEN);
+    expect(overlay).toHaveLength(32 * 32 * 4);
+    expect(pixel(overlay, 32, 16, 16)).toEqual([0x50, 0xb9, 0x3f, 255]);
+    // On the rim, straight right of the dot: dark and opaque.
+    expect(pixel(overlay, 32, 26, 16)).toEqual([0x1e, 0x1c, 0x1c, 255]);
+    for (const [x, y] of [[0, 0], [31, 0], [0, 31], [31, 31], [2, 16]] as const) {
+      expect(pixel(overlay, 32, x, y)).toEqual([0, 0, 0, 0]);
+    }
   });
 
   it('the menu dot: a centred circle on transparency', () => {

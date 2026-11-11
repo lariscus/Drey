@@ -324,7 +324,8 @@ engine invoke) → `SnapshotSource` (board 8a's picture) and `EventRelay` (runne
 `GET /log/stream`); `TrayController` (native `Tray` + the pure `trayMenuTemplate`; Drey's icon with a status dot since req-276:
 the pure `trayVerdictOf` maps the lock, `GET /status` and the Autopilot to stopped / problem / running / paused,
 `composeStatusDot` paints the dot onto the icon's bitmap, `StatusIcons` loads `build/icon.png` — packaged
-`resources/icon.png` — and builds the tray's, the window's and the menu header's pictures),
+`resources/icon.png` — and builds the tray's picture, the taskbar overlay (`setOverlayIcon`, placed by Windows) and the
+menu header's dot; the window's own icon is Drey's plain `icon.ico`),
 `ServiceWindowController` (the sandboxed frameless window), `WindowIpc` (the contract's channels, arguments checked),
 `Confirmations`, `DreyLauncher`, `LocalModelProbe`. The page (`apps/service-window/`, Angular, `@mission-ui`'s
 catalog binding) talks to main only through `window.serviceWindow` (`shared/service-window/contract.ts`). On the

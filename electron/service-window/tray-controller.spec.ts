@@ -125,6 +125,7 @@ describe('TrayController', () => {
     calls.status.mockResolvedValueOnce({ components: { runner: { state: 'failed' } } });
     await tray.refresh();
     expect(trays[0]!.image).toBe('tray:problem');
+    expect(tray.windowStatus).toEqual({ status: 'problem', description: trays[0]!.tooltip });
     expect(trays[0]!.tooltip).toBe('Drey Service · problem\nCrew runner failed');
 
     calls.status.mockResolvedValueOnce(null);

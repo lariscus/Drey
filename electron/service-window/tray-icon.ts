@@ -1,10 +1,11 @@
 /**
  * The status dot on Drey's icon (req-276): composed at runtime onto the app
- * icon's bitmap at each size the tray and the taskbar ask for, in the
- * top-right corner, with a transparent ring cut out of the icon around it
- * so the dot reads on any picture. Pure: BGRA premultiplied buffers in and
- * out — the format of `nativeImage.toBitmap()` / `createFromBitmap` on
- * Windows. Plus the menu header's dot.
+ * icon's bitmap at each size the tray asks for, in the bottom-right corner
+ * where tray status badges sit (owner ruling 2026-11-11), with a
+ * transparent ring cut out of the icon around it so the dot reads on any
+ * picture. Pure: BGRA premultiplied buffers in and out — the format of
+ * `nativeImage.toBitmap()` / `createFromBitmap` on Windows. Plus the
+ * taskbar's overlay picture and the menu header's dot.
  */
 import type { Rgb } from './tray-status';
 
@@ -20,15 +21,29 @@ export interface DotGeometry {
 }
 
 /**
- * The dot at `size`: a bit under half the icon, touching its top and right
- * edges, the ring one pixel at 16 px. Whole-pixel diameters keep the
+ * The dot at `size`: a bit under half the icon, touching its bottom and
+ * right edges, the ring one pixel at 16 px. Whole-pixel diameters keep the
  * circle's edge on the pixel grid (16 → 7, 24 → 11, 32 → 14).
  */
 export function dotGeometry(size: number): DotGeometry {
   const diameter = Math.max(5, Math.round(size * 0.44));
   const radius = diameter / 2;
-  return { cx: size - radius, cy: radius, radius, ring: Math.max(1, Math.round(size / 16)) };
+  return { cx: size - radius, cy: size - radius, radius, ring: Math.max(1, Math.round(size / 16)) };
 }
+
+/**
+ * The taskbar overlay's dot (`setOverlayIcon`): Windows places the overlay
+ * itself — top right on Windows 11, bottom right on Windows 10 — so the dot
+ * is centred in its canvas, about two thirds of it, and sits evenly in
+ * either badge slot. It cannot cut the icon beneath, so a dark rim stands
+ * in for the tray's transparent ring.
+ */
+export function overlayDotGeometry(size: number): DotGeometry {
+  const ring = Math.max(1, Math.round(size / 16));
+  return { cx: size / 2, cy: size / 2, radius: Math.round(size * 0.62) / 2, ring };
+}
+
+const RIM: Rgb = [0x1c, 0x1c, 0x1e];
 
 /** Coverage of pixel (x, y) by the circle around (cx, cy), supersampled. */
 function circleCoverage(x: number, y: number, cx: number, cy: number, radius: number): number {
@@ -54,7 +69,7 @@ function over(buffer: Buffer, offset: number, rgb: Rgb, alpha: number): void {
   buffer[offset + 3] = Math.round(255 * alpha + buffer[offset + 3]! * rest);
 }
 
-/** A copy of the `size`×`size` icon bitmap with the dot in `rgb` top right. */
+/** A copy of the `size`×`size` icon bitmap with the dot in `rgb` bottom right. */
 export function composeStatusDot(icon: Buffer, size: number, rgb: Rgb): Buffer {
   if (icon.length !== size * size * 4) {
     // A programming error, never shown in the UI. i18n-ignore
@@ -77,6 +92,20 @@ export function composeStatusDot(icon: Buffer, size: number, rgb: Rgb): Buffer {
     }
   }
   return out;
+}
+
+/** The taskbar overlay: the dot in `rgb` with its dark rim, centred on transparency. */
+export function overlayDotBitmap(size: number, rgb: Rgb): Buffer {
+  const buffer = Buffer.alloc(size * size * 4);
+  const { cx, cy, radius, ring } = overlayDotGeometry(size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const offset = (y * size + x) * 4;
+      over(buffer, offset, RIM, circleCoverage(x, y, cx, cy, radius + ring));
+      over(buffer, offset, rgb, circleCoverage(x, y, cx, cy, radius));
+    }
+  }
+  return buffer;
 }
 
 /** The menu header's dot: a centred circle in `rgb` on transparency. */
