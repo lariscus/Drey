@@ -1,0 +1,193 @@
+<title>Persona Board</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Board 7e redrawn with persona columns (req-257 concept). Anthrazit tokens as the measure sheets map them. Two states of one page: the crew, then the crew named after phases. */
+:root{--bg:#18191b;--side:#222326;--card:#2c2d31;--line:#3b3d42;--ctl:#747980;--fg:#f4f5f6;--muted:#b3b7bc;--dim:#80858c;--accent:#8ecbef;--ok:#93c47f;--warn:#e0bb6e;--bad:#ee8f89;--peach:#f2cfae;--mint:#bfe3cd;--pink:#f2d3e2;--ui:"Segoe UI",system-ui,sans-serif;--mono:ui-monospace,Consolas,monospace;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.4 var(--ui);padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font-size:18px;font-weight:600;margin:0 0 16px}
+.frame{max-width:1440px;margin:0 auto 28px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg)}
+.cap{font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--dim);padding:8px 14px;border-bottom:1px solid var(--line);background:var(--side)}
+.tabs{display:flex;height:37px;border-bottom:1px solid var(--line);background:var(--side)}
+.tabs span{display:flex;align-items:center;gap:8px;padding:0 16px;color:var(--muted);border-right:1px solid var(--line)}
+.tabs .on{color:var(--fg);background:var(--bg)}
+.scroll{overflow-x:auto}
+.inner{min-width:1400px;padding:14px 16px 0}
+.top{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.top h2{font-size:18px;font-weight:600;margin:0;flex:1}
+.btn{height:30px;padding:0 12px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--fg);font:13px var(--ui);display:inline-flex;align-items:center;gap:6px}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#14181c}
+.board{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:10px;align-items:start;min-height:470px}
+.col h3{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:600;margin:0 0 8px;height:24px;white-space:nowrap}
+.col h3 .n{font-weight:400;color:var(--muted)}
+.col h3 .sp{flex:1}
+.col h3 .v{font-weight:400;color:var(--muted);font-size:12px}
+.col h3 .over{color:var(--bad)}
+.av{width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;font-size:9px;font-weight:700;color:#14181c;flex:none}
+.edge h3{color:var(--muted)}
+.edge h3 b{color:var(--fg);font-weight:600}
+.cards{display:flex;flex-direction:column;gap:8px}
+.c{display:flex;flex-direction:column;gap:6px;padding:10px;background:var(--card);border:1px solid var(--line);border-radius:8px}
+.c.hl{border-color:var(--muted)}
+.r{display:flex;align-items:center;gap:6px;min-width:0}
+.id{font:12px var(--mono);color:var(--muted);flex:none}
+.sp{flex:1}
+.b{white-space:nowrap;font-size:12px}
+.b.q{color:var(--peach)}.b.acc{color:var(--mint)}.b.back{color:var(--bad)}.b.none{color:var(--warn)}.b.plan{color:var(--pink)}
+.t{font-weight:600;font-size:13px;line-height:18px}
+.step{display:flex;align-items:center;gap:8px;color:var(--fg);font-size:12px}
+.seg{display:flex;gap:2px;flex:none}
+.seg i{display:block;width:9px;height:4px;border-radius:2px;background:var(--line)}
+.seg i.d{background:var(--ctl)}.seg i.cur{background:var(--accent)}.seg i.cur.w{background:var(--warn)}.seg i.cur.x{background:var(--bad)}
+.st{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;min-width:0}
+.st span:first-of-type{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--ctl)}
+.dot.run{background:var(--ok)}.dot.wait{background:transparent;border:1px solid var(--muted)}.dot.you{background:var(--warn)}.dot.red{background:var(--bad)}
+.cost{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.more{color:var(--muted);padding:2px 4px}
+.hid{display:flex;align-items:center;gap:6px;height:24px;color:var(--muted);font-size:12px;margin-top:2px}
+.band{margin:16px -16px 0;border-top:1px solid var(--line);padding:0 16px 10px}
+.band .hd{display:flex;align-items:center;gap:8px;height:30px;font-weight:600}
+.band .hd span{font-weight:400;color:var(--muted)}
+.prow{display:flex;align-items:center;gap:28px;height:48px}
+.p{display:flex;align-items:center;gap:8px}
+.p .av{width:30px;height:30px;font-size:11px}
+.p b{display:block;font-weight:600;font-size:13px}
+.p small{display:block;color:var(--muted);font-size:12px}
+.srow{display:flex;gap:8px;margin-top:4px}
+.slot{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:6px;padding:4px 10px;color:var(--muted);font-size:12px}
+.slot b{color:var(--fg);font-weight:600}
+.bar{width:54px;height:4px;border-radius:2px;background:var(--line);position:relative;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--accent)}
+.status{display:flex;justify-content:flex-end;align-items:center;gap:18px;height:29px;border-top:1px solid var(--line);background:var(--side);padding:0 14px;color:var(--fg);font-size:12px}
+.status .dot{margin-right:6px}
+</style>
+
+<h1>Persona Board</h1>
+
+<div class="frame">
+  <div class="cap">State 1 · columns are the crew</div>
+  <div class="tabs"><span class="on">▦ Board ✕</span><span>▤ 2026-11-11.md ✕</span></div>
+  <div class="scroll"><div class="inner">
+    <div class="top"><h2>Board</h2><button class="btn">Filter: all tickets</button><button class="btn">Cost by persona</button><button class="btn pri">New idea</button></div>
+    <div class="board">
+
+      <div class="col edge"><h3><b>Inbox</b><span class="n">6</span></h3><div class="cards">
+        <div class="c"><div class="r"><span class="id">T-0141</span></div><div class="t">Sync status in the title bar</div><div class="st"><span>unassigned</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0140</span></div><div class="t">Backlinks: unlinked mentions</div><div class="st"><span>unassigned</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0139</span></div><div class="t">Calendar week numbers</div><div class="st"><span>unassigned</span></div></div>
+        <div class="more">3 more</div>
+      </div></div>
+
+      <div class="col edge"><h3><b>Prioritized</b><span class="n">3</span></h3><div class="cards">
+        <div class="c"><div class="r"><span class="id">T-0136</span><span class="sp"></span><span class="b" style="color:var(--muted)">high</span></div><div class="t">Spellcheck: add French dictionary</div><div class="step"><span class="seg"><i></i><i></i><i></i><i></i></span><span>Standard flow · 4 steps</span></div><div class="st"><span>starts at Paul</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0135</span></div><div class="t">Tag rename keeps pill colors</div><div class="step"><span class="seg"><i></i><i></i><i></i></span><span>3 steps</span></div><div class="st"><span>starts at Ben</span></div></div>
+        <div class="more">1 more</div>
+      </div></div>
+
+      <div class="col"><h3><span class="av" style="background:#f2d3e2">PA</span>Paul<span class="n">2</span><span class="sp"></span><span class="v">$0.64</span></h3><div class="cards">
+        <div class="c hl"><div class="r"><span class="id">T-0134</span><span class="sp"></span><span class="b q">Question</span></div><div class="t">Voice capture for tickets</div><div class="step"><span class="seg"><i class="cur w"></i><i></i><i></i><i></i><i></i></span><span>Shape · 1 of 5</span></div><div class="st"><span class="dot you"></span><span>talking with you</span><span class="sp"></span><span class="cost">$0.18</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0131</span></div><div class="t">Weekly security audit run</div><div class="step"><span class="seg"><i class="cur"></i><i></i><i></i></span><span>Research · 1 of 3</span></div><div class="st"><span class="dot run"></span><span>running · 6 min</span><span class="sp"></span><span class="cost">$0.46</span></div></div>
+      </div></div>
+
+      <div class="col"><h3><span class="av" style="background:#8ecbef">BE</span>Ben<span class="n">3</span><span class="sp"></span><span class="v">2 of 2 running</span></h3><div class="cards">
+        <div class="c"><div class="r"><span class="id">T-0126</span></div><div class="t">Git panel: stage single hunks</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i><i></i><i></i></span><span>Build · 4 of 6</span></div><div class="st"><span class="dot run"></span><span>running · 21 min</span><span class="sp"></span><span class="cost">$2.05</span></div></div>
+        <div class="c hl"><div class="r"><span class="id">T-0121</span><span class="sp"></span><span class="b back">Sent back</span></div><div class="t">Outline: drag headings to reorder</div><div class="step"><span class="seg"><i class="d"></i><i class="cur x"></i><i class="d"></i><i class="d"></i></span><span>Build · 2 of 4</span></div><div class="st"><span class="dot run"></span><span>from Test · return 1 of 3</span><span class="sp"></span><span class="cost">$1.20</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0122</span></div><div class="t">Win+H dictation hand-off</div><div class="step"><span class="seg"><i class="d"></i><i class="cur"></i><i></i><i></i></span><span>Build · 2 of 4</span></div><div class="st"><span class="dot wait"></span><span>waits for Ben</span><span class="sp"></span><span class="cost">$0.30</span></div></div>
+      </div></div>
+
+      <div class="col"><h3><span class="av" style="background:#bfe3cd">RA</span>Ralf<span class="n">1</span><span class="sp"></span><span class="v">$0.90</span></h3><div class="cards">
+        <div class="c"><div class="r"><span class="id">T-0129</span></div><div class="t">Settings search across plugins</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="cur"></i><i></i><i></i><i></i></span><span>Architecture · 3 of 6</span></div><div class="st"><span class="dot wait"></span><span>queued · waits for a B slot</span><span class="sp"></span><span class="cost">$0.90</span></div></div>
+      </div></div>
+
+      <div class="col"><h3><span class="av" style="background:#f2cfae">TE</span>Tessa<span class="n">1</span><span class="sp"></span><span class="v">$1.05</span></h3><div class="cards">
+        <div class="c"><div class="r"><span class="id">T-0124</span></div><div class="t">PDF export keeps callout colors</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i><i></i></span><span>Test · 4 of 5</span></div><div class="st"><span class="dot run"></span><span>running · 4 min</span><span class="sp"></span><span class="cost">$1.05</span></div></div>
+      </div></div>
+
+      <div class="col"><h3><span class="av" style="background:#e0bb6e">YO</span>You<span class="n">3</span></h3><div class="cards">
+        <div class="c hl"><div class="r"><span class="id">T-0127</span><span class="sp"></span><span class="b none">No persona</span></div><div class="t">Theme picker in the status bar</div><div class="step"><span class="seg"><i class="d"></i><i class="cur w"></i><i></i><i></i><i></i><i></i></span><span>UX/UI design · 2 of 6</span></div><div class="st"><span class="dot you"></span><span>no persona for UX/UI design</span></div></div>
+        <div class="c hl"><div class="r"><span class="id">T-0118</span><span class="sp"></span><span class="b acc">Accept</span></div><div class="t">Palette opens twice on slow CI</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur w"></i><i></i></span><span>Acceptance · 5 of 6</span></div><div class="st"><span class="dot you"></span><span>ready to try</span><span class="sp"></span><span class="cost">$1.84</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0117</span></div><div class="t">Tag field: paste a list</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i></span><span>Commit · 4 of 4</span></div><div class="st"><span class="dot run"></span><span>merging · CI</span><span class="sp"></span><span class="cost">$0.92</span></div></div>
+      </div></div>
+
+      <div class="col edge"><h3><b>Done this week</b><span class="n">5</span><span class="sp"></span><span class="v">$9.80</span></h3><div class="cards">
+        <div class="c"><div class="r"><span class="id">T-0115</span></div><div class="t">Tag rename keeps descendants</div><div class="st"><span>Ralf · Ben · Tessa</span><span class="sp"></span><span class="cost">$2.10</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0112</span></div><div class="t">Spellcheck: German dictionary</div><div class="st"><span>Paul · Ben</span><span class="sp"></span><span class="cost">$1.45</span></div></div>
+        <div class="more">3 more</div>
+      </div></div>
+
+    </div>
+
+    <div class="band">
+      <div class="hd">⌄ Capacity <span>4 of 5 sessions · 1 queued</span></div>
+      <div class="prow">
+        <div class="p"><span class="av" style="background:#f2d3e2">PA</span><span><b>Paul ●</b><small>T-0131 · Research</small></span></div>
+        <div class="p"><span class="av" style="background:#8ecbef">BE</span><span><b>Ben ●●</b><small>2 of 2 · 1 waiting</small></span></div>
+        <div class="p"><span class="av" style="background:#bfe3cd">RA</span><span><b>Ralf ○</b><small>waits for a B slot</small></span></div>
+        <div class="p"><span class="av" style="background:#f2cfae">TE</span><span><b>Tessa ●</b><small>T-0124 · Test</small></span></div>
+        <div class="p"><span class="av" style="background:#e0bb6e">YO</span><span><b>You</b><small>3 need you</small></span></div>
+        <span class="sp"></span>
+        <div class="p"><span><small>Budget</small><b>$6.40 of $15 today</b></span></div>
+      </div>
+      <div class="srow">
+        <div class="slot"><b>Claude A</b>●●<span class="bar"><i style="width:62%"></i></span>62 % · q 1.4</div>
+        <div class="slot"><b>Claude B</b>●○<span class="bar"><i style="width:31%"></i></span>31 % · q 0.8</div>
+        <div class="slot"><b>z.ai</b>●○○<span class="bar"><i style="width:70%"></i></span>70 % · q 1.2</div>
+        <div class="slot"><b>Kimi</b>○○ unknown</div>
+      </div>
+    </div>
+  </div></div>
+  <div class="status"><span><span class="dot run" style="display:inline-block"></span>Autopilot · On</span><span>4 running · $6.40 today</span><span><span class="dot you" style="display:inline-block"></span>3 need you</span><span>Settings</span></div>
+</div>
+
+<div class="frame">
+  <div class="cap">State 2 · the same board, personas named after phases</div>
+  <div class="tabs"><span class="on">▦ Board ✕</span></div>
+  <div class="scroll"><div class="inner">
+    <div class="top"><h2>Board</h2><button class="btn">Filter: all tickets</button><button class="btn">Cost by persona</button><button class="btn pri">New idea</button></div>
+    <div class="board">
+
+      <div class="col edge"><h3><b>Inbox</b><span class="n">6</span></h3><div class="cards">
+        <div class="c"><div class="r"><span class="id">T-0141</span></div><div class="t">Sync status in the title bar</div><div class="st"><span>unassigned</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0140</span></div><div class="t">Backlinks: unlinked mentions</div><div class="st"><span>unassigned</span></div></div>
+        <div class="more">4 more</div>
+      </div></div>
+
+      <div class="col edge"><h3><b>Prioritized</b><span class="n">3</span></h3><div class="cards">
+        <div class="c"><div class="r"><span class="id">T-0136</span><span class="sp"></span><span class="b" style="color:var(--muted)">high</span></div><div class="t">Spellcheck: add French dictionary</div><div class="step"><span class="seg"><i></i><i></i><i></i><i></i><i></i></span><span>Standard flow · 5 steps</span></div><div class="st"><span>starts at Plan</span></div></div>
+        <div class="more">2 more</div>
+      </div></div>
+
+      <div class="col"><h3><span class="av" style="background:#f2d3e2">PL</span>Plan<span class="n">1</span><span class="sp"></span><span class="v">$0.46</span></h3><div class="cards">
+        <div class="c"><div class="r"><span class="id">T-0131</span></div><div class="t">Weekly security audit run</div><div class="step"><span class="seg"><i class="cur"></i><i></i><i></i><i></i><i></i></span><span>Plan · 1 of 5</span></div><div class="st"><span class="dot run"></span><span>running · 6 min</span><span class="sp"></span><span class="cost">$0.46</span></div></div>
+      </div></div>
+
+      <div class="col"><h3><span class="av" style="background:#8ecbef">BU</span>Build<span class="n">3</span><span class="sp"></span><span class="v">2 of 2 running</span></h3><div class="cards">
+        <div class="c"><div class="r"><span class="id">T-0126</span></div><div class="t">Git panel: stage single hunks</div><div class="step"><span class="seg"><i class="d"></i><i class="cur"></i><i></i><i></i><i></i></span><span>Build · 2 of 5</span></div><div class="st"><span class="dot run"></span><span>running · 21 min</span><span class="sp"></span><span class="cost">$2.05</span></div></div>
+        <div class="c hl"><div class="r"><span class="id">T-0121</span><span class="sp"></span><span class="b back">Sent back</span></div><div class="t">Outline: drag headings to reorder</div><div class="step"><span class="seg"><i class="d"></i><i class="cur x"></i><i class="d"></i><i class="d"></i><i></i></span><span>Build · 2 of 5</span></div><div class="st"><span class="dot run"></span><span>from Test · return 1 of 3</span><span class="sp"></span><span class="cost">$1.20</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0122</span></div><div class="t">Win+H dictation hand-off</div><div class="step"><span class="seg"><i class="d"></i><i class="cur"></i><i></i><i></i><i></i></span><span>Build · 2 of 5</span></div><div class="st"><span class="dot wait"></span><span>waits for Build</span><span class="sp"></span><span class="cost">$0.30</span></div></div>
+      </div></div>
+
+      <div class="col"><h3><span class="av" style="background:#bfe3cd">RE</span>Review<span class="n">1</span><span class="sp"></span><span class="v">$0.90</span></h3><div class="cards">
+        <div class="c"><div class="r"><span class="id">T-0129</span></div><div class="t">Settings search across plugins</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="cur"></i><i></i><i></i></span><span>Review · 3 of 5</span></div><div class="st"><span class="dot wait"></span><span>queued · waits for a B slot</span><span class="sp"></span><span class="cost">$0.90</span></div></div>
+      </div></div>
+
+      <div class="col"><h3><span class="av" style="background:#f2cfae">TE</span>Test<span class="n">1</span><span class="sp"></span><span class="v">$1.05</span></h3><div class="cards">
+        <div class="c"><div class="r"><span class="id">T-0124</span></div><div class="t">PDF export keeps callout colors</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i><i></i></span><span>Test · 4 of 5</span></div><div class="st"><span class="dot run"></span><span>running · 4 min</span><span class="sp"></span><span class="cost">$1.05</span></div></div>
+      </div></div>
+
+      <div class="col"><h3><span class="av" style="background:#e0bb6e">YO</span>You<span class="n">2</span></h3><div class="cards">
+        <div class="c hl"><div class="r"><span class="id">T-0118</span><span class="sp"></span><span class="b acc">Accept</span></div><div class="t">Palette opens twice on slow CI</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur w"></i></span><span>Acceptance · 5 of 5</span></div><div class="st"><span class="dot you"></span><span>ready to try</span><span class="sp"></span><span class="cost">$1.84</span></div></div>
+        <div class="c"><div class="r"><span class="id">T-0117</span></div><div class="t">Tag field: paste a list</div><div class="step"><span class="seg"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="cur"></i></span><span>Commit · 5 of 5</span></div><div class="st"><span class="dot run"></span><span>merging · CI</span><span class="sp"></span><span class="cost">$0.92</span></div></div>
+      </div></div>
+
+      <div class="col edge"><h3><b>Done this week</b><span class="n">5</span><span class="sp"></span><span class="v">$9.80</span></h3><div class="cards">
+        <div class="c"><div class="r"><span class="id">T-0115</span></div><div class="t">Tag rename keeps descendants</div><div class="st"><span>Plan · Build · Review · Test</span><span class="sp"></span><span class="cost">$2.10</span></div></div>
+        <div class="more">4 more</div>
+      </div></div>
+
+    </div>
+    <div class="hid">＋ 4 personas hold nothing</div>
+    <div style="height:14px"></div>
+  </div></div>
+</div>
