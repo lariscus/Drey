@@ -4,11 +4,17 @@
 // parts last).
 
 import type { FleetCaps, InteractiveMode } from './protocol';
-import { ASKING, COMPLETION_DISCIPLINE, HANDOVER_DISCIPLINE, INTERACTIVE_DISCIPLINE } from './disciplines';
+import type { DisciplineTexts } from './discipline-texts';
 import { briefHead, headParts, personaLine, type ComposedInstruction, type Truncation } from './instruction-parts';
 import { changingParts, whoAndWhere } from './instruction-sections';
 
 export interface InstructionInput {
+  /**
+   * The discipline texts the brief ends with (`prompts/disciplines/`,
+   * req-279) — loaded once by the composer's caller and carried here, so
+   * the pure composer reads no files.
+   */
+  readonly disciplines: DisciplineTexts;
   readonly ticketId: string;
   readonly title: string;
   readonly repo: string | null;
@@ -127,7 +133,7 @@ export function composeInstruction(input: InstructionInput): ComposedInstruction
   // brief and the whole of a resume's continuation (req-80).
   const changing = changingParts(input, truncations);
   const closing = closingParts(input);
-  const parts = [...headParts(head), ...whoAndWhere(input, { persona, plan: head.plan, description }), ...changing, ...closing, ASKING];
+  const parts = [...headParts(head), ...whoAndWhere(input, { persona, plan: head.plan, description }), ...changing, ...closing, input.disciplines.asking];
   const continuation = [resumeLine(input), ...changing, ...closing].join('\n\n');
   const stable = JSON.stringify([
     head.repoInstructions,
@@ -156,9 +162,9 @@ function closingParts(input: InstructionInput): string[] {
     parts.push(lead + input.acceptance.map((command) => `- \`${command}\``).join('\n'));
   }
   if (input.interactive !== undefined) {
-    parts.push(INTERACTIVE_DISCIPLINE);
+    parts.push(input.disciplines.interactive);
   } else {
-    parts.push(COMPLETION_DISCIPLINE, HANDOVER_DISCIPLINE);
+    parts.push(input.disciplines.completion, input.disciplines.handover);
   }
   return parts;
 }

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ChatStreamEvent } from '../contracts/chat';
-import { createChatBridge, MISSION_SYSTEM_PROMPT } from './chat-llm';
+import { createChatBridge } from './chat-llm';
+import { loadCrewPrompts } from './crew-prompts';
+
+/** req-279: the real shipped crew prompts, so the wire assertions see the bytes a run sends. */
+const CREW = await loadCrewPrompts();
 
 /**
  * The Mission Control bridge (E5a): one POST against the OpenAI-compatible
@@ -91,6 +95,7 @@ describe('createChatBridge', () => {
   it('posts the wire shape the OpenAI-compatible dialect expects', async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1/', 'chat.apiKey': 'sk-test-1', 'chat.model': 'glm-5' }),
       fetch: fakeFetch(calls, [frame('{"say":"Hi."}'), 'data: [DONE]\n\n']),
     });
@@ -120,7 +125,7 @@ describe('createChatBridge', () => {
     expect(body.model).toBe('glm-5');
     expect(body.stream).toBe(true);
     expect(body.messages[0].role).toBe('system');
-    expect(body.messages[0].content).toContain(MISSION_SYSTEM_PROMPT);
+    expect(body.messages[0].content).toContain(CREW.mission);
     expect(body.messages[0].content).toContain(BOARD);
     expect(body.messages.slice(1)).toEqual([
       { role: 'user', content: 'morning' },
@@ -133,6 +138,7 @@ describe('createChatBridge', () => {
   it('omits the bearer header when no api key is configured', async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
       fetch: fakeFetch(calls, [frame('{"say":"Hi."}')]),
     });
@@ -146,6 +152,7 @@ describe('createChatBridge', () => {
     const calls: RecordedCall[] = [];
     // The first frame is split mid-line to prove the SSE buffer reassembles it.
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.apiKey': 'k', 'chat.model': 'glm-5' }),
       fetch: fakeFetch(calls, [`data: ${JSON.stringify({ choices: [{ index: 0, delta: { content: part1 } }] })}\n\nda`, `ta: ${JSON.stringify({ choices: [{ index: 0, delta: { content: part2 } }] })}\n\n`, 'data: [DONE]\n\n']),
     });
@@ -166,6 +173,7 @@ describe('createChatBridge', () => {
   it('resolves a not-configured failure without calling the model — and never throws', async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1' }), // no model
       fetch: fakeFetch(calls, []),
     });
@@ -185,6 +193,7 @@ describe('createChatBridge', () => {
   it('treats a blank base URL as unconfigured too', async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': '   ', 'chat.model': 'glm-5' }),
       fetch: fakeFetch(calls, []),
     });
@@ -198,6 +207,7 @@ describe('createChatBridge', () => {
   it('answers honestly when the provider answers non-OK', async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.apiKey': 'k', 'chat.model': 'glm-5' }),
       fetch: fakeFetch(calls, [], 500),
     });
@@ -212,6 +222,7 @@ describe('createChatBridge', () => {
 
   it('answers honestly when the transport itself fails', async () => {
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
       fetch: (async () => {
         throw new Error('connection refused');
@@ -226,6 +237,7 @@ describe('createChatBridge', () => {
 
   it('names the cause node hides behind "fetch failed" (nothing listening)', async () => {
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://localhost:1234/v1', 'chat.model': 'glm-5.3-flash' }),
       fetch: (async () => {
         throw Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }) });
@@ -241,6 +253,7 @@ describe('createChatBridge', () => {
     const calls: RecordedCall[] = [];
     const text = '{"say":"Hello from Pia.","thought":"","commands":[]}';
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({
         'chat.provider': 'zai-glm',
         'chat.baseUrl': 'https://api.z.ai/api/anthropic/',
@@ -279,6 +292,7 @@ describe('createChatBridge', () => {
   it('refuses a provider it cannot speak by name, without calling anything', async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.provider': 'copilot-cli', 'chat.baseUrl': 'http://localhost:1234/v1', 'chat.model': 'gpt' }),
       fetch: fakeFetch(calls, []),
     });
@@ -292,6 +306,7 @@ describe('createChatBridge', () => {
     const calls: RecordedCall[] = [];
     const values: Record<string, unknown> = { 'chat.baseUrl': 'http://x/v1', 'chat.model': 'm', 'chat.enabled': false };
     const bridge = createChatBridge({
+      crew: CREW,
       config: { get: async <T,>(key: string) => values[key] as T | undefined },
       fetch: fakeFetch(calls, []),
     });
@@ -302,6 +317,7 @@ describe('createChatBridge', () => {
 
   it('answers honestly when the reply holds no envelope', async () => {
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
       fetch: fakeFetch([], [frame('plain prose, no envelope at all')]),
     });
@@ -315,6 +331,7 @@ describe('createChatBridge', () => {
     try {
       const calls: RecordedCall[] = [];
       const bridge = createChatBridge({
+        crew: CREW,
         config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
         fetch: slowFetch(calls, [frame('{"say":"Finally."}')], 10 * 60_000),
       });
@@ -338,6 +355,7 @@ describe('createChatBridge', () => {
   it("the client's cancel ends the turn: the signal aborts the request, the outcome says cancelled (D-63)", async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
       fetch: hangingFetch(calls),
     });
@@ -359,6 +377,7 @@ describe('createChatBridge', () => {
   it('puts the tickets the owner named after the digest, before any desktop reference (D-7a)', async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
       fetch: fakeFetch(calls, [frame('{"say":"Done."}')]),
     });
@@ -381,6 +400,7 @@ describe('createChatBridge', () => {
   it('prompts the promote intent — the scout → ship promotion is one of the seven intents', async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
       fetch: fakeFetch(calls, [frame('{"say":"Understood."}')]),
     });
@@ -397,6 +417,7 @@ describe('createChatBridge', () => {
   it('prompts the blocked intent with the setBlockedBy grammar — the sixth intent', async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
       fetch: fakeFetch(calls, [frame('{"say":"Understood."}')]),
     });
@@ -415,6 +436,7 @@ describe('createChatBridge', () => {
   it('prompts the chain intent with the setChain grammar — the fifth intent', async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
       fetch: fakeFetch(calls, [frame('{"say":"Understood."}')]),
     });
@@ -434,6 +456,7 @@ describe('createChatBridge', () => {
   it('round-trips a promote command from the strict envelope', async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
       fetch: fakeFetch(calls, [
         frame('{"say":"Promoted — the ticket enters the normal pipeline on its next run.","thought":"The scout report on T-0004 is ready and the owner accepted it.","commands":[{"kind":"promote","id":"T-0004"}]}'),
@@ -451,6 +474,7 @@ describe('createChatBridge', () => {
   it('round-trips a setChain command from the strict envelope', async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
       fetch: fakeFetch(calls, [
         frame('{"say":"The chain now skips verify and notifies you after design.","thought":"The owner wants verify bypassed and a Bescheid on the inserted design gate.","commands":[{"kind":"setChain","id":"T-0086","chain":["insert security(ralf, notify) after review","skip verify"]}]}'),
@@ -474,6 +498,7 @@ describe('createChatBridge', () => {
   it('round-trips a setBlockedBy command and validates priorities against the vocabulary the turn carries', async () => {
     const calls: RecordedCall[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
       fetch: fakeFetch(calls, [
         frame('{"say":"T-0002 waits for T-0001 and T-0003 now.","thought":"The owner wants the dependency, and p0 as the class.","commands":[{"kind":"setBlockedBy","id":"T-0002","blockedBy":["T-0001","T-0003"]},{"kind":"setPriority","id":"T-0002","priority":"p0"},{"kind":"setPriority","id":"T-0002","priority":"low"}]}'),

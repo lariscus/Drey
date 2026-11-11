@@ -5,6 +5,7 @@
  */
 import { ChainConfigRestorer } from './config/chain-config-restorer';
 import type { PipelinePhase } from '../contracts/tickets';
+import { loadDisciplineTexts, type DisciplineTexts } from './discipline-texts';
 import { NodeFileSystem } from './node-file-system';
 import { Orchestrator, type OrchestratorParts, type SlotSummarySource } from './orchestrator';
 import type { FileSystem } from './ports/file-system';
@@ -59,6 +60,12 @@ export interface OrchestratorDeps {
   readonly seats?: GateSeats;
   /** The shipped default prompt's text for a ref (version comparison); absent = no check. */
   readonly shippedPrompt?: (ref: string) => Promise<string | null>;
+  /**
+   * The discipline texts of the run briefs (req-279: `prompts/disciplines/`);
+   * absent = the shipped files beside the compiled engine (a spec may
+   * pass a fixture).
+   */
+  readonly disciplines?: () => Promise<DisciplineTexts>;
   /** The pool probe: a llama.cpp server's `total_slots`, or null. */
   readonly probeSlots?: SlotProbe;
   /** E7: the fleet ledger; absent = silent. */
@@ -83,6 +90,11 @@ export interface OrchestratorDeps {
   readonly sink?: EventSink;
   /** req-179: what a settled run changed (default: git in its worktree); a spec passes its own. */
   readonly changeSize?: ChangeSizeReader;
+}
+
+/** req-279: the discipline texts of the briefs — the shipped files by default, a spec's fixture over the deps. */
+function disciplinesOf(deps: OrchestratorDeps): () => Promise<DisciplineTexts> {
+  return deps.disciplines ?? loadDisciplineTexts;
 }
 
 /** The tranche parts (req-179); their changes go out after each write of `chain.json`. */
@@ -148,7 +160,7 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
   const personas = new BoardPersonas(note, fs);
   const events = deps.events !== undefined ? { events: deps.events } : {};
   const breaker = new Breaker(state, board, bookkeeper, { clock, log, persist });
-  const dispatch = new TicketDispatch({ board, directory, personas, prompts: new PromptSource(note, fs, log, deps.shippedPrompt), notes, log, ...events });
+  const dispatch = new TicketDispatch({ board, directory, personas, prompts: new PromptSource(note, fs, log, deps.shippedPrompt), disciplines: disciplinesOf(deps), notes, log, ...events });
   const humanGates = new HumanGates(board, personas, bookkeeper, log);
   const pool = deps.pool !== undefined ? { pool: deps.pool, ledgerCards: new LedgerCards({ state, board, bookkeeper, persist, log }) } : {};
   const hold = holdOf(deps);

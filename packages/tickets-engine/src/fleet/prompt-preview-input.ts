@@ -1,4 +1,5 @@
 import type { InstructionInput } from './instruction';
+import type { DisciplineTexts } from './discipline-texts';
 import { personaInstructionParts } from './request-instruction';
 import { DEFAULT_FLEET_CAPS } from './protocol';
 import type { PersonaDispatch } from './request';
@@ -20,10 +21,11 @@ export const PREVIEW_TICKET = {
   description: '<what and why of the ticket>',
 } as const;
 
-export function previewInstructionInput(persona: PersonaDispatch, step: string): InstructionInput {
+export function previewInstructionInput(persona: PersonaDispatch, step: string, disciplines: DisciplineTexts): InstructionInput {
   const prompt = persona.prompt !== null && persona.prompt.trim() !== '' ? persona.prompt : null;
   return {
     ...PREVIEW_TICKET,
+    disciplines,
     repo: null,
     phase: step,
     plan: null,

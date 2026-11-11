@@ -5,7 +5,8 @@
  * to fleet changes by the engine), and when a persona's friction log
  * crosses the threshold — 3 findings, or 3 findings plus 5 settled runs
  * since the last aggregation — it asks the LLM (through the same bridge
- * the mission chat uses, under AGGREGATOR_SYSTEM_PROMPT) for improvement
+ * the mission chat uses, under the aggregator's crew prompt file,
+ * `prompts/crew/aggregator.md`) for improvement
  * drafts, validates them against core/improvements' strict reader, and
  * hands the survivors to the board's applyAggregation — the board
  * service's single-writer queue owns the improvements.md write and its

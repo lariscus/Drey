@@ -64,6 +64,7 @@ import type { ImprovementDecision, PersonaImprovementsReply, PersonaMemoryReply 
 import { isMap, isScalar, parseDocument } from 'yaml';
 import { splitFrontmatter } from '../../../../shared/frontmatter';
 import { composeRunRequest, type PersonaDispatch } from '../fleet/request';
+import { loadDisciplineTexts, type DisciplineTexts } from '../fleet/discipline-texts';
 import { deriveWorkerModel, personaLoader, resolvePersonaForTicket } from './persona-loader';
 import { personaPatchError } from './persona-patch';
 import { columnPromptRef, isAutoPhase, nextPhaseIdOf } from '../fleet/chain';
@@ -264,6 +265,8 @@ export class EngineBoardService {
   /** The commit steps Accept started on a store (ticket id -> run id), until their run settles; see {@link settleCommitSteps}. */
   private readonly commitSteps = new Map<string, string>();
   private settling: Promise<void> = Promise.resolve();
+  /** req-279: the discipline texts, loaded once (see {@link disciplines}). */
+  private disciplinesOnce: Promise<DisciplineTexts> | null = null;
   /** req-173: the vault layer as the last snapshot resolved it; null before one (or without `options.crew`). */
   private crew: EffectiveCrew | null = null;
 
@@ -321,6 +324,12 @@ export class EngineBoardService {
   /** After {@link dispose}: resolves when the store's background processes ended (see `StoreBoardSource.idle`). */
   idle(): Promise<void> {
     return Promise.all([this.storeBoard.idle(), this.settling]).then(() => undefined);
+  }
+
+  /** req-279: the discipline texts of the composed briefs (`prompts/disciplines/`), loaded once from the shipped files. */
+  private disciplines(): Promise<DisciplineTexts> {
+    this.disciplinesOnce ??= loadDisciplineTexts();
+    return this.disciplinesOnce;
   }
 
   onChanged(listener: () => void): () => void {
@@ -3179,6 +3188,7 @@ export class EngineBoardService {
     }
     const composed = composeRunRequest({
       origin: input.origin,
+      disciplines: await this.disciplines(),
       card,
       ticketText: text,
       vaultPath: vault.path,

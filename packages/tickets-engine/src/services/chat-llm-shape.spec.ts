@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatStreamEvent } from '../contracts/chat';
 import { parseEnvelope } from '../core/chat-intents';
-import { createChatBridge, SHAPE_SYSTEM_PROMPT } from './chat-llm';
+import { createChatBridge } from './chat-llm';
+import { loadCrewPrompts } from './crew-prompts';
+
+/** req-279: the real shipped crew prompts, so the wire assertions see the bytes a run sends. */
+const CREW = await loadCrewPrompts();
 
 /**
  * E10-3: a shape turn on the OpenAI-compatible wire. Paul's envelope
@@ -60,6 +64,7 @@ describe('the shape turn', () => {
   it('embeds the ticket under Paul’s prompt and returns the shape reply', async () => {
     const bodies: { messages: { role: string; content: string }[] }[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config,
       fetch: (async (_url: unknown, init?: RequestInit) => {
         bodies.push(JSON.parse(String(init?.body)) as never);
@@ -74,7 +79,7 @@ describe('the shape turn', () => {
       shape: { ticket: 'T-0130', ticketText: 'TICKET BODY', readFile: async () => ({ ok: false, error: 'unused' }) },
       emit: (e) => events.push(e),
     });
-    expect(bodies[0]!.messages[0]!.content).toContain(SHAPE_SYSTEM_PROMPT);
+    expect(bodies[0]!.messages[0]!.content).toContain(CREW.shape);
     expect(bodies[0]!.messages[0]!.content).toContain('## Ticket T-0130\n\nTICKET BODY');
     expect(out.shape).toEqual({ plan: '### Goal\n\nx', question: null, splitReason: 'One part', sources: [] });
   });
@@ -86,6 +91,7 @@ describe('the shape turn', () => {
     ];
     const bodies: { messages: { role: string; content: string }[] }[] = [];
     const bridge = createChatBridge({
+      crew: CREW,
       config,
       fetch: (async (_url: unknown, init?: RequestInit) => {
         bodies.push(JSON.parse(String(init?.body)) as never);
@@ -119,6 +125,7 @@ describe('the shape turn', () => {
   it('stops reading after a few rounds and takes the last reply as it is', async () => {
     let calls = 0;
     const bridge = createChatBridge({
+      crew: CREW,
       config,
       fetch: (async () => {
         calls += 1;
@@ -137,7 +144,7 @@ describe('the shape turn', () => {
   });
 
   it('adds no shape reply to a plain turn', async () => {
-    const bridge = createChatBridge({ config, fetch: (async () => sse(JSON.stringify({ say: 'hi', plan: 'ignored' }))) as typeof fetch });
+    const bridge = createChatBridge({ crew: CREW, config, fetch: (async () => sse(JSON.stringify({ say: 'hi', plan: 'ignored' }))) as typeof fetch });
     const out = await bridge.runTurn({ text: 'x', history: [], board: '', emit: () => undefined });
     expect(out.shape).toBeUndefined();
   });

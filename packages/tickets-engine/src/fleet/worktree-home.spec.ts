@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { phaseWithoutPoolKeys, type PipelinePhase, type RepoRef, type TicketCard } from '../contracts/tickets';
 import { parseRepos } from '../core/ticket-board';
 import { composeRunRequest } from './request';
+import { DISCIPLINES } from './request-spec-support';
 import {
   isReviewCheckoutPath,
   isUnderAnyBase,
@@ -179,6 +180,7 @@ describe('composeRunRequest carries the home rule', () => {
   const compose = (over: Partial<RepoRef> = {}) =>
     composeRunRequest({
       origin: 'spec',
+      disciplines: DISCIPLINES,
       card,
       ticketText,
       vaultPath: 'V:/tickets',

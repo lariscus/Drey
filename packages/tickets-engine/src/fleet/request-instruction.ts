@@ -18,6 +18,7 @@ function scoutInstructionInput(plan: RunPlan): ScoutInstructionInput {
   const { input } = plan;
   const sections = ticketSections(input.ticketText);
   return {
+    disciplines: input.disciplines,
     ticketId: input.card.id,
     title: titleOf(input),
     readGround: plan.readGround,
@@ -40,6 +41,7 @@ function shipInstructionInput(plan: RunPlan): InstructionInput {
   const sections = ticketSections(input.ticketText);
   const extras = plan.extras.worktrees;
   return {
+    disciplines: input.disciplines,
     ticketId: input.card.id,
     title: titleOf(input),
     repo: repo.name,

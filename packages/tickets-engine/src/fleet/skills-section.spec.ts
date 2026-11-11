@@ -3,7 +3,11 @@ import { composeInstruction } from './instruction';
 import { composeFreeSessionBrief } from './free-session-brief';
 import { composeOneOnOneBrief } from './one-on-one-brief';
 import { previewInstructionInput } from './prompt-preview-input';
+import { loadDisciplineTexts } from './discipline-texts';
 import { skillsSection } from './skills-section';
+
+/** req-279: the real shipped discipline texts, so the briefs here are the bytes a run sends. */
+const DISCIPLINES = await loadDisciplineTexts();
 
 const SKILLS = [
   { name: 'review', text: '  Look at the diff first.\n' },
@@ -36,16 +40,16 @@ describe('the three session kinds carry the same block', () => {
   const persona = { id: 'ben', role: 'builder', worker: 'claude-code', model: 'opus', prompt: 'Be terse.', memory: '', skills: SKILLS };
 
   it("the chain run's composer puts it right behind the persona's prompt, before the plan", () => {
-    const { text } = composeInstruction({ ...previewInstructionInput(persona, 'build'), plan: 'The plan.' });
+    const { text } = composeInstruction({ ...previewInstructionInput(persona, 'build', DISCIPLINES), plan: 'The plan.' });
     expect(text).toContain(BLOCK);
     expect(text.indexOf('Be terse.')).toBeLessThan(text.indexOf('## Skills'));
     expect(text.indexOf('## Skills')).toBeLessThan(text.indexOf('## Plan'));
   });
 
   it('a changed skill changes the stable digest; no skills leaves the brief without the block', () => {
-    const base = composeInstruction(previewInstructionInput(persona, 'build'));
-    const edited = composeInstruction(previewInstructionInput({ ...persona, skills: [{ name: 'review', text: 'Different.' }] }, 'build'));
-    const none = composeInstruction(previewInstructionInput({ ...persona, skills: [] }, 'build'));
+    const base = composeInstruction(previewInstructionInput(persona, 'build', DISCIPLINES));
+    const edited = composeInstruction(previewInstructionInput({ ...persona, skills: [{ name: 'review', text: 'Different.' }] }, 'build', DISCIPLINES));
+    const none = composeInstruction(previewInstructionInput({ ...persona, skills: [] }, 'build', DISCIPLINES));
     expect(edited.stable).not.toBe(base.stable);
     expect(none.text).not.toContain('## Skills');
   });
