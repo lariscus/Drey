@@ -124,14 +124,14 @@ Recorded in `specs/decisions.md` ("A role fallback in the persona ladder",
 2026-11-11) and in roadmap row req-257 (re-scoped 2026-11-11); the relay of the
 integrator adds the phase-board sentence.
 
-1. **No role fallback (2026-11-11).** *"Everything hangs on the personas, not
+1. **Settled 2026-11-11 by §12b: the holder is the chain's entry at the cursor.** **No role fallback (2026-11-11).** *"Everything hangs on the personas, not
    on roles — two builders build differently ('Bob the Builder and Rubble from
    Paw Patrol both build, but not alike'), so a role says nothing about who
    should take a step; where the owner wants the same character several times,
    that is one persona running several tickets at once."* Rejected with it:
    `default-persona` set at seeding. *"The `role:` field stays a free label
    without logic."*
-2. **No persona, no run (2026-11-11).** *"A step with no persona from the
+2. **Answered 2026-11-11: shown in the running persona's column, `running` stays the store's claim stage, §12b.** **No persona, no run (2026-11-11).** *"A step with no persona from the
    ticket or the column does not run: the ticket stands at the human persona
    as a manual step and says why."* (a Needs-you card).
 3. **Answered 2026-11-11: (a), §12a.** **Steps per ticket (2026-11-10/11).** The steps of a ticket are set per
@@ -140,9 +140,9 @@ integrator adds the phase-board sentence.
    *research → plan → acceptance*.
 4. **Answered 2026-11-11: (a), as invalidation, §12a.** **Send-back anywhere earlier (2026-11-10/11).** *"A step may send a ticket
    back to any earlier step, up and down the chain."*
-5. **Columns are holders (2026-11-11).** *"The board's columns are the personas
+5. **Answered 2026-11-11: one send-back per ticket, the second goes to You, §12b.** **Columns are holders (2026-11-11).** *"The board's columns are the personas
    that hold a ticket, the step is status on the card."*
-6. **The phase board is a special case (2026-11-11, relayed).** *"If I name the
+6. **Answered 2026-11-11: in the responsible persona's column, §12b.** **The phase board is a special case (2026-11-11, relayed).** *"If I name the
    personas after phases I have my phase board again — we gain flexibility."*
 
 Earlier rulings this concept keeps: R10 (a session requests a class and gets
@@ -300,7 +300,7 @@ step with no persona. Both stand at You; only the first is an approval. The
 second's card says why and offers *Assign…* (a persona picker over the crew,
 filtered by the persona's steps, §5) and *Do it myself*.
 
-## 5. The step catalogue and the composition of persona and step
+## 5. The step catalogue and the composition of persona and step (superseded by §12b)
 
 **The catalogue** is a folder in the meta vault, `tickets/_meta/steps/<id>.md`,
 one file per step:
@@ -590,6 +590,73 @@ concept.
 Still open: questions 1, 2, 5, 6 (where a machine step shows on the board),
 7, 10, 11, 13 and 14, and the Q9 minimum.
 
+## 12b. The owner's correction: the chain is a list of personas (2026-11-11)
+
+**This section supersedes §2's *Step*, §5 (the step catalogue and the
+composition) and question 13, and changes §3, §4, §6 and §8 where they speak
+of steps.** The owner, on the step catalogue: "warum sind wir jetzt wieder bei
+den Schritten zurück? Er soll anzeigen, an welche Personas das geht, die haben
+eine Rolle, welche über die Prompts definiert sind. Und es kann heißen Pia,
+Paul, Ben, Tessa, You oder Pia, You, und das definiert genau die Schritte …
+das heißt, es ist mir vollkommen egal, welche Schritte eine Person kriegt, sie
+macht das, was in ihrer Rolle steht."
+
+So the model has **no step as a separate thing**:
+
+- **The chain is the ordered list of personas** a ticket goes through:
+  `paul; ben; ralf; tessa; you`, or `pia; you`. Each entry *is* a step; what
+  happens there is what the persona's `prompt.md` says (R11: the prompt is the
+  persona). The same persona may appear twice (`paul; ben; paul; you`), so the
+  cursor is the entry's position, not a persona id.
+- **The run's instruction is the persona's prompt**, plus skills, memory and
+  the ticket context as today. There is no step text to compose with it —
+  req-258's "a persona's prompt replaces the step prompt" is therefore the
+  intended behaviour, not a defect. What a *mode* needs is added by the
+  runner as a mode wrapper, not by a step: the interactive `QUESTION:`
+  protocol when Paul shapes in the Shape chat, the closing round's ask
+  (milestone 229), the read-only rules of a review checkout (milestone 225).
+- **The settings that §5 put on a step move to the persona**: the class floor
+  (`min-class`), the model needs, the run ceilings (`max-turns`, `max-work`),
+  and whether the ticket's acceptance commands gate the persona's hand-over
+  (`gate:`, today the build column's).
+- **No step catalogue, no `steps:` field on the persona** (question 13 falls
+  away). Paul and Pia propose chains from the crew list (title, summary, the
+  prompt's opening lines).
+- **Machine actions belong to a persona's responsibility** (owner, Q6: "in der
+  Spalte desjenigen, in dessen Verantwortlichkeit die Schritte liegen"): a
+  persona record lists what the runner does when the ticket leaves it —
+  e.g. the builder's `sync-main` (merge `main` into the branch before the
+  ticket goes on to the test), the human persona's `commit` after the
+  sign-off. The card shows the action as status in that persona's column
+  (`Ben · merging main`, `You · committing`). Where exactly `sync-main` sits
+  (on the builder's hand-over, or on the tester's start) is open below.
+
+Answers of this round:
+
+- **Q2 — `running` is shown where the run happens**: in the column of the
+  persona that runs it, as the card's status (`running`, `waits for a slot`,
+  `waits for Ben`). The store's `running` stage stays the claim's stage (it
+  removes the two-commit workaround); the board never draws it as a column.
+- **Q5 — One send-back per ticket.** "Das Ticket darf vollständig
+  zurücklaufen bis zur Planung, aber nur einmal … wenn es das zweite Mal
+  passiert, dann direkt zu mir." A ticket may be sent back once, to any
+  earlier persona in its chain (planning included; Q4's invalidation applies);
+  a second send-back does not move it back, it goes straight to You with both
+  reasons. `max-returns` is 1 and not a setting.
+- **Q6 — Machine actions in the responsible persona's column** (above).
+- **Q7 — A question inside a running run moves the card to You** ("die Karte
+  müsste dann vermutlich zu mir geschoben werden"): the run releases, the
+  card stands at You with the question and the persona's name; the answer
+  returns it to the same persona, which resumes (option b).
+- **Q14 — Shape and Flow chat run as the persona** (option a).
+
+Still open after this round: **Pia in a chain** (the owner's examples start
+with Pia, while decision D7 makes Pia Mission Control itself, not a persona —
+is Pia a persona that triages a ticket, or the one who sets the chain?);
+**where `sync-main` sits**; **questions 10 and 11** (column order, wide
+boards); **the Q9 minimum**. Question 1 is settled by the model: the holder
+is the chain's entry at the cursor.
+
 ## 13. Open questions for the owner
 
 Each with the options and the recommendation (first).
@@ -613,7 +680,7 @@ Each with the options and the recommendation (first).
    **(recommended)**; (b) per pair of steps; (c) no limit, the breaker only.
 6. **Machine steps on the board.** (a) status in the previous holder's column
    **(recommended)**; (b) a column of their own ("CI"); (c) always at You.
-7. **A question inside a running step.** (a) the card stays with its holder,
+7. **Answered 2026-11-11: (b), the card moves to You, §12b.** **A question inside a running step.** (a) the card stays with its holder,
    badge *Question* + Needs-you card **(recommended)**; (b) the card moves to
    You until answered.
 8. **Answered 2026-11-11 with Q15: (a), copied at creation, §12a.** **The standard flow on a ticket.** (a) copied into the ticket at start, then
@@ -629,10 +696,10 @@ Each with the options and the recommendation (first).
     ordinary personas, unpinned, the owner deletes them **(recommended)**;
     (b) their prompts folded into Ben and a commit step, the folders deleted;
     (c) kept and given steps (`build`, `commit`).
-13. **`steps:` on the persona.** (a) a filter and a hint for Paul and Pia,
+13. **Fallen away 2026-11-11: no step catalogue, no `steps:` field, §12b.** **`steps:` on the persona.** (a) a filter and a hint for Paul and Pia,
     never a fallback **(recommended)**; (b) no such field, every persona offered
     everywhere.
-14. **Shape and Flow chat.** (a) the persona's character over the chat bridge
+14. **Answered 2026-11-11: (a), §12b.** **Shape and Flow chat.** (a) the persona's character over the chat bridge
     now **(recommended)**; (b) wait until Shape is a persona session.
 15. **Answered 2026-11-11: copied at creation, §12a.** **A ticket started without steps.** (a) the standard flow is copied
     **(recommended)**; (b) refused until Paul or Pia set steps.
