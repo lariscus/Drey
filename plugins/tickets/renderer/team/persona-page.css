@@ -301,27 +301,85 @@
   font-size: 12px;
 }
 
-/* Steps */
-.persona-steps {
+/* The run settings (req-258, board 7k v2): two fields side by side, the read-only switch, the leaving-action chips */
+.persona-pair {
+  display: flex;
+  gap: 12px;
+}
+
+.persona-pair > .persona-field {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.persona-switch.persona-switch-lg {
+  width: 52px;
+  height: 32px;
+  border: 1px solid var(--field-border);
+  border-radius: 16px;
+  background: var(--bg-input);
+}
+
+.persona-switch.persona-switch-lg::after {
+  top: 7px;
+  left: 7px;
+  width: 16px;
+  height: 16px;
+  background: var(--text-3);
+}
+
+.persona-switch.persona-switch-lg.persona-switch-on {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.persona-switch.persona-switch-lg.persona-switch-on::after {
+  left: 27px;
+  background: var(--accent-contrast);
+}
+
+.persona-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
 }
 
-.persona-step {
+.persona-action {
   display: inline-flex;
   align-items: center;
-  height: 26px;
-  padding: 0 10px;
-  border-radius: var(--radius-chip);
-  color: var(--text-4);
-  border: 1px solid var(--field-border);
-  font-size: 13px;
+  gap: 8px;
+  height: 30px;
+  padding: 0 8px 0 12px;
+  border: 1px solid var(--text-primary);
+  border-radius: 16px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
-.persona-step-on {
-  color: var(--text-primary);
-  border-color: var(--text-primary);
+.persona-action-x {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+}
+
+.persona-action-add {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px dashed var(--field-border);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 13px;
 }
 
 /* The models */

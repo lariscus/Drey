@@ -73,7 +73,10 @@ test('edit, discard and save a persona as one commit', async ({ page, vaultDir }
   await expect(body.locator('.persona-head-name')).toHaveText('Ben');
   await expect(body.locator('[data-field="role"]')).toHaveValue('Builder');
   await expect(body.locator('[data-field="summary"]')).toHaveValue('Builds one part, test first.');
-  await expect(body.locator('.persona-step-on')).toHaveText('✓ Build');
+  // req-258: no step chips; the run settings, the builder's read-only off by its role.
+  await expect(body.locator('.persona-step')).toHaveCount(0);
+  await expect(body.locator('[data-field="min-class"]')).toHaveValue('');
+  await expect(body.locator('[data-field="readonly"]')).toHaveAttribute('aria-checked', 'false');
   await expect(state).toContainText('Saved');
   // The prose of persona.md moved into prompt.md when the engine started: one logged commit, once.
   expect(fs.readFileSync(path.join(dir, 'prompt.md'), 'utf8')).toContain('## Who Ben is');
@@ -112,6 +115,19 @@ test('edit, discard and save a persona as one commit', async ({ page, vaultDir }
   await body.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(state).toContainText('Saved', { timeout: 15_000 });
   expect(fs.readFileSync(path.join(dir, 'persona.md'), 'utf8')).toContain('allowed:\n  network: true');
+
+  // req-258: the run settings ride the same Save into persona.md.
+  await body.locator('[data-field="min-class"]').selectOption('A');
+  await body.locator('[data-field="readonly"]').click();
+  await body.locator('[data-field="parallel"]').fill('2');
+  await body.getByRole('button', { name: 'Add action…', exact: true }).click();
+  await body.locator('.persona-actions select').selectOption('sync-main');
+  await body.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(state).toContainText('Saved', { timeout: 15_000 });
+  const settings = fs.readFileSync(path.join(dir, 'persona.md'), 'utf8');
+  for (const line of ['min-class: A', 'parallel: 2', 'leaving: [sync-main]', 'readonly: true']) {
+    expect(settings).toContain(line);
+  }
 
   // The Proposals card: Dismiss is written to the proposals file.
   await expect(body.locator('[data-proposal]')).toContainText('Add a line about the ADR index');

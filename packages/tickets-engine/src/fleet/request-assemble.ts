@@ -115,10 +115,12 @@ function profileParts(repo: RepoRef | null): Pick<RunRequest, 'profile'> {
   return repo !== null && repo.profile !== undefined ? { profile: repo.profile } : {};
 }
 
+const firstSet = (own: number | null | undefined, column: number | null | undefined): number | null => own ?? column ?? null;
+
 /** The run ceilings as the request carries them — the persona's where its record sets one (req-258), else the column's; null when neither does. */
 function limitsOf(phase: PipelinePhase | null, persona: Pick<PersonaRunSettings, 'maxTurns' | 'maxWorkMin'> | null): { maxTurns?: number; maxWorkMs?: number } | null {
-  const maxTurns = persona?.maxTurns ?? phase?.maxTurns ?? null;
-  const maxWorkMin = persona?.maxWorkMin ?? phase?.maxWorkMin ?? null;
+  const maxTurns = firstSet(persona?.maxTurns, phase?.maxTurns);
+  const maxWorkMin = firstSet(persona?.maxWorkMin, phase?.maxWorkMin);
   if (maxTurns === null && maxWorkMin === null) {
     return null;
   }

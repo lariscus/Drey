@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { PersonaView } from '../../shared/remote-protocol';
-import type { PipelinePhase } from '../../shared/tickets';
-import { budgetOf, draftOf, isDirty, isMissingFileError, patchOf, personaIdOfKey, personaKeyOf, personaPathsOf, savedBaseOf, stepsOf, wordsOf } from './persona-model';
+import { EMPTY_PERSONA_SETTINGS } from '../../../../packages/tickets-engine/src/core/persona-settings';
+import { budgetOf, draftOf, isDirty, isMissingFileError, patchOf, personaIdOfKey, personaKeyOf, personaPathsOf, savedBaseOf, wordsOf } from './persona-model';
 
 const view: PersonaView = { id: 'ben', title: 'Ben', role: 'builder', worker: 'opencode', model: 'qwen3-coder', pool: ['qwen3-coder', 'sonnet'], color: '#8ecbef', budget: 5 };
-
-const phase = (id: string, handover: string): PipelinePhase => ({ id, title: id.toUpperCase(), handover }) as unknown as PipelinePhase;
 
 describe('the persona tab key and paths', () => {
   it('round-trips the id and refuses another key', () => {
@@ -51,18 +49,30 @@ describe('what a Save sends', () => {
   });
 });
 
-describe('the steps', () => {
-  const pipeline = [phase('inbox', 'manual'), phase('plan', 'agent plan-default'), phase('build', 'agent build-default@opencode'), phase('ready', 'manual'), phase('done', 'none')];
+describe('the run settings (req-258)', () => {
+  const settings = { ...EMPTY_PERSONA_SETTINGS, minClass: 'B' as const, parallel: 2, leaving: ['sync-main' as const] };
+  const recorded: PersonaView = { ...view, settings: { ...settings, readOnly: false }, readOnly: false };
+  const base = draftOf(recorded, 'P');
 
-  it('offers the agent steps in flow order and marks the persona\'s', () => {
-    expect(stepsOf(pipeline, ['build'])).toEqual([
-      { id: 'plan', title: 'PLAN', on: false },
-      { id: 'build', title: 'BUILD', on: true },
-    ]);
+  it('reads the class floor, read-only, the pool and the leaving actions off the record', () => {
+    expect(base.settings).toEqual({ minClass: 'B', readOnly: false, readOnlyStored: true, parallel: '2', min: '0', leaving: ['sync-main'] });
+    expect(draftOf(view, '').settings).toEqual({ minClass: '', readOnly: false, readOnlyStored: true, parallel: '', min: '0', leaving: [] });
   });
 
-  it('also shows a manual step the persona is pinned on', () => {
-    expect(stepsOf(pipeline, ['ready']).map((step) => step.id)).toEqual(['plan', 'build', 'ready']);
+  it('sends only the settings that differ; a cleared floor and an emptied cap are null', () => {
+    expect(patchOf(base, { ...base, settings: { ...base.settings, minClass: '' } })).toEqual({ settings: { minClass: null } });
+    expect(patchOf(base, { ...base, settings: { ...base.settings, parallel: '' } })).toEqual({ settings: { parallel: null } });
+    expect(patchOf(base, { ...base, settings: { ...base.settings, min: '1', leaving: [] } })).toEqual({ settings: { min: 1, leaving: [] } });
+    expect(patchOf(base, { ...base, settings: { ...base.settings, readOnly: true } })).toEqual({ settings: { readOnly: true } });
+    expect(patchOf(base, { ...base, settings: { ...base.settings, parallel: 'many', min: '-1' } })).toEqual({});
+  });
+
+  it("writes the role's read-only default into a record that lacks the key, once something else is saved", () => {
+    const tester: PersonaView = { ...view, role: 'tester', settings: settings, readOnly: true };
+    const fresh = draftOf(tester, 'P');
+    expect(isDirty(fresh, fresh)).toBe(false);
+    expect(patchOf(fresh, { ...fresh, title: 'Tess' })).toEqual({ title: 'Tess', settings: { readOnly: true } });
+    expect(savedBaseOf({ ...fresh, title: 'Tess' }).settings.readOnlyStored).toBe(true);
   });
 });
 
