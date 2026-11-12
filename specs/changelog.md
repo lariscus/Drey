@@ -8,7 +8,7 @@
 - **D-65 — `persona-page-delete` e2e no longer races the engine's commits** (`e2e/persona-page-delete.spec.ts`): the spec's `seed` commit collided on `index.lock` with two commits the engine makes in that vault on its own — the default crew's seeding at start and `tickets: you persona` when the Crew list is first read. `trackSeed` now waits for both subjects in the log before it commits. Measured against the unfixed spec: 3 of 15 runs failed (`--repeat-each=5`, two workers); fixed: 24 of 24 green (`--repeat-each=8`). No retry loop, no clock.
 - **Left out:** nothing; the engine and the runner (req-257) are untouched.
 - **Docs:** none needed (no manual passage describes the hover behaviour or the marker); `specs/roadmap.md` loses the four rows.
-- **Gate:** see below.
+- **Gate** (2026-11-12, this branch merged with desktop-integration at 0d2bd16c): `npm run typecheck` clean (every config); `check-cycles` none across 2269 files; ESLint over all seven roots clean (`--max-old-space-size=8192`); vitest (whole `vitest.plugins.config.mts`) 5962 passed / 7 skipped; `ng test drey` 1112 passed (the only Angular project touched); the plugin renderer bundle check (each `plugins/<id>/renderer/index.ts` bundled for the browser into a temp dir) — 13 plugins, no `node:` import; `npm run e2e`'s build then the whole Playwright suite with a temp USERPROFILE/HOME: 280 passed, 29 skipped, 0 failed.
 
 ### Milestone 246 — req-269: Pia's persona and Mission Control's prompt (the persona board, concept row 8)
 
