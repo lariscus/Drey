@@ -135,7 +135,10 @@ test.describe('Assistant plugin — composer chips and pickers', () => {
     await picker.locator('.assistant-picker-row.this-note').click();
     await expect(noteChip.locator('.chip-name')).toHaveText('notiz.md');
 
-    // A prompt replaces the composer's text.
+    // A prompt replaces the composer's text. The icon is there without the pointer on its row (D-53).
+    await panel.locator('.composer-meta .plus').hover();
+    await panel.locator('.composer-input').hover();
+    await expect(panel.locator('.composer-meta .prompt-btn')).toHaveCSS('opacity', '1');
     await panel.locator('.composer-meta .prompt-btn').click();
     await expect(picker.locator('.assistant-picker-head')).toHaveText('Prompts');
     await picker.locator('.assistant-picker-row', { hasText: 'Short summary' }).click();

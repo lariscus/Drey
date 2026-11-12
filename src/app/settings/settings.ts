@@ -175,6 +175,11 @@ export class Settings implements OnDestroy {
   /** The section entry highlighted for the page's scroll position (E13-22). */
   protected readonly currentSection = signal<string | null>(null);
 
+  /** A smooth scroll the page started itself is under way: the spy is held (D-54). */
+  private programmaticScroll = false;
+  /** Whether the spy runs once when that scroll ends (an entry scroll names no marker of its own). */
+  private spyAfterProgrammaticScroll = false;
+
   /** A category's own expand/collapse choice; unset follows the selection. */
   private readonly expandChoice = signal<Readonly<Record<string, boolean>>>({});
 
@@ -197,6 +202,7 @@ export class Settings implements OnDestroy {
       this.expandChoice.update(({ [id]: _unset, ...rest }) => rest);
     }
     this.currentSection.set(null);
+    this.programmaticScroll = false;
     this.selected.set(id);
     this.afterRender(() => {
       this.detail()?.nativeElement.scrollTo({ top: 0 });
@@ -230,7 +236,47 @@ export class Settings implements OnDestroy {
   }
 
   protected onScroll(): void {
+    if (this.programmaticScroll) {
+      return;
+    }
     this.updateSpy();
+  }
+
+  /** A smooth scroll the page started itself came to rest: the spy follows the user again. */
+  protected onScrollEnd(): void {
+    this.endProgrammaticScroll(this.spyAfterProgrammaticScroll);
+  }
+
+  /** The user took the scroll over (wheel, touch, keys, the scrollbar): the page's own scroll is cancelled. */
+  protected onUserScroll(event: Event): void {
+    if (event instanceof PointerEvent && event.target !== event.currentTarget) {
+      return;
+    }
+    this.endProgrammaticScroll(false);
+  }
+
+  private endProgrammaticScroll(spy: boolean): void {
+    if (!this.programmaticScroll) {
+      return;
+    }
+    this.programmaticScroll = false;
+    if (spy) {
+      this.updateSpy();
+    }
+  }
+
+  /**
+   * Scrolls the page smoothly and holds the spy until the scroll ends, so the
+   * marker does not walk through every section on the way (D-54). A scroll
+   * that would not move the page never ends, so it does not hold the spy.
+   */
+  private scrollSmoothly(root: HTMLElement, top: number, spyAfter: boolean): void {
+    const reachable = Math.min(Math.max(0, top), Math.max(0, root.scrollHeight - root.clientHeight));
+    if (Math.abs(reachable - root.scrollTop) >= 1) {
+      this.programmaticScroll = true;
+      this.spyAfterProgrammaticScroll = spyAfter;
+    }
+    root.scrollTo({ top, behavior: 'smooth' });
   }
 
   private afterRender(work: () => void): void {
@@ -266,7 +312,7 @@ export class Settings implements OnDestroy {
     const root = this.detail()?.nativeElement;
     const anchor = this.anchors().find((a) => a.id === sectionId);
     if (root && anchor) {
-      root.scrollTo({ top: Math.max(0, anchor.top - SPY_OFFSET / 2), behavior: 'smooth' });
+      this.scrollSmoothly(root, Math.max(0, anchor.top - SPY_OFFSET / 2), false);
       this.currentSection.set(sectionId);
     }
   }
@@ -288,7 +334,9 @@ export class Settings implements OnDestroy {
     }
     if (target) {
       const found = target;
-      found.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      // The setting centred in the page; the spy settles on the section where the scroll ends.
+      const offset = found.getBoundingClientRect().top - root.getBoundingClientRect().top;
+      this.scrollSmoothly(root, root.scrollTop + offset - (root.clientHeight - found.offsetHeight) / 2, true);
       found.classList.add('setting-found');
       setTimeout(() => found.classList.remove('setting-found'), 1600);
     } else if (entry.section) {
