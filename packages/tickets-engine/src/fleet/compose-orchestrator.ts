@@ -24,6 +24,8 @@ import type { DispatchPool } from './orchestrate/dispatch-pool';
 import { Dispatcher } from './orchestrate/dispatcher';
 import type { GateSeats, GateShell } from './orchestrate/gate-runner';
 import { HumanGates } from './orchestrate/human-gates';
+import { HolderPass } from './orchestrate/holder-pass';
+import { PersonaBreaker } from './orchestrate/persona-breaker';
 import { LedgerCards } from './orchestrate/ledger-cards';
 import { PoolCapacity, type SlotProbe } from './orchestrate/pool-capacity';
 import { fetchTotalSlots } from './orchestrate/pool-sizes';
@@ -160,6 +162,7 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
   const personas = new BoardPersonas(note, fs);
   const events = deps.events !== undefined ? { events: deps.events } : {};
   const breaker = new Breaker(state, board, bookkeeper, { clock, log, persist });
+  const personaBreaker = new PersonaBreaker(state, { clock, log, persist });
   const dispatch = new TicketDispatch({ board, directory, personas, prompts: new PromptSource(note, fs, log, deps.shippedPrompt), disciplines: disciplinesOf(deps), notes, log, ...events });
   const humanGates = new HumanGates(board, personas, bookkeeper, log);
   const pool = deps.pool !== undefined ? { pool: deps.pool, ledgerCards: new LedgerCards({ state, board, bookkeeper, persist, log }) } : {};
@@ -169,8 +172,8 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
     store,
     directory,
     pools,
-    settled: new SettledRuns({ state, directory, pools, breaker, clock, persist, ...events }),
-    dispatcher: new Dispatcher({ state, board, directory, pools, personas, humanGates, dispatch, notes, clock, log, pipelineRead, persist, tranches, ...pool, ...hold }),
+    settled: new SettledRuns({ state, directory, pools, breaker, personaBreaker, clock, persist, ...events }),
+    dispatcher: new Dispatcher({ state, board, directory, pools, personas, humanGates, dispatch, notes, clock, log, pipelineRead, persist, tranches, holders: new HolderPass({ state, personas, directory, notes, breaker: personaBreaker }), ...pool, ...hold }),
     ci: new CiSweep({ state, board, bookkeeper, shell: deps.execShell ?? execShell, clock, log, pipelineRead, persist, ...(deps.seats !== undefined ? { seats: deps.seats } : {}) }),
     clock,
     log,

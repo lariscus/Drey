@@ -48,7 +48,16 @@ import { TicketsGit, type RepoLocation } from '../core/tickets-git';
 import { TicketStoreError } from '../ports/ticket-store';
 import { FileTicketStore } from '../store/file-ticket-store';
 import { checkoutOf, createDricketStore, groupByStage, readStoreSettings, type StoreListing, type StoreSettings } from '../store/store-settings';
-import { archivedRecordFiles, recordToBoardFile } from '../store/store-board';
+import { archivedRecordFiles, recordToBoardFile, type HolderPlacement } from '../store/store-board';
+import { withCursorForMove } from '../store/chain-move';
+import { ownerAcceptOf, ownerSendBackOf } from './chain-owner-moves';
+import { chainFinished } from '../core/chain-placement';
+import { setDocumentField } from '../store/document-fields';
+import { ACTIVE_STAGE } from '../core/lifecycle-stages';
+import { cursorForPin, placementColumnsOf } from '../core/chain-placement';
+import { parseTicketChainFields } from '../core/ticket-chain-fields';
+import type { PinCursorOf } from '../store/stage-migration-plan';
+import { crewLookupOf } from '../core/chain-holder';
 import type { TicketDetail } from '../ports/ticket-store';
 import { ARCHIVED_LABEL } from '../store/legacy-bridge';
 import { StoreBoardSource, type LegacyWrite } from '../store/store-board-source';
@@ -79,12 +88,12 @@ import { legacyWorktreeBase, worktreeBaseFor, worktreePathFor, WORKTREES_DIR } f
 import { reservedIgnoreEntries, withIgnoreEntries } from './reserved-ignore';
 import { dkTargetFor, retreatStages } from '../fleet/dk-target';
 import { trancheConfigOf } from './tranche-config';
-import { isWorkerProvider, WORKER_PROVIDERS, type ChainConfig, type ChainStoreConfig, FleetCaps, FleetHandoverConfig, HandoverMode, InteractiveMode, PermissionMode, RunDkTarget, RunInfo, FleetPools } from '../fleet/protocol';
+import { isWorkerProvider, WORKER_PROVIDERS, type ChainConfig, type ChainStoreConfig, FleetCaps, FleetHandoverConfig, HandoverMode, InteractiveMode, PermissionMode, RunCursor, RunDkTarget, RunInfo, FleetPools } from '../fleet/protocol';
 import { type EngineHost, type EngineVaultChangeEvent, EngineVault, FleetPort } from './host';
 import { handoverFromConfig, handoverOverrideKeys } from './handover-config';
 import type { EffectiveCrew } from '../fleet/config/layered-config-resolver';
 import { appendMemory, describeMemoryEntries, memoryPathFor, toggleMemoryPin } from './persona-store';
-import { EMPTY_PERSONA_SETTINGS, HUMAN_PERSONA_ID, humanPersona, isAgentPersona, loadPersonaSkills, personaFileText, personaMigrationFor, parsePersonaFile, personaRef, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaMigration, type PersonaSkill } from '../core/persona';
+import { EMPTY_PERSONA_SETTINGS, HUMAN_PERSONA_ID, humanPersona, isAgentPersona, loadPersonaSkills, personaFileText, parsePersonaFile, personaRef, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaSkill } from '../core/persona';
 import { crewOrderOf, inCrewOrder } from '../core/crew-order';
 import { personaRunSettingsOf } from '../core/persona-settings';
 import { settingsAfter, type PersonaSettingsPatch } from '../contracts/persona-settings-patch';
@@ -450,7 +459,7 @@ export class EngineBoardService {
     const store = await readStoreSettings(this.host.configGet.bind(this.host));
     this.dricket = store.backend === 'dricket' ? store : null;
     const snapshot = store.backend === 'dricket'
-      ? await this.dricketSnapshot(store, common)
+      ? await this.dricketSnapshot(store, { ...common, crew: await this.crewKinds(vault, mdFiles) })
       : assembleBoard({
         ...common,
         files,
@@ -484,10 +493,10 @@ export class EngineBoardService {
    */
   private async storeMigrationOffer(store: StoreSettings): Promise<StoreStageMigrationOffer | null> {
     const stages = await this.storeBoard.stages(store).catch(() => null);
-    if (!migratableStages(stages) || (isLifecycleStore(stages) && legacyStagesOf(stages).length === 0)) {
+    if (!migratableStages(stages) || (isLifecycleStore(stages) && legacyStagesOf(stages).length === 0 && !this.storeBoard.pinsLeft())) {
       return null;
     }
-    return stageMigrationFor(this.storeBoard, store, this.owner, (message) => this.host.log(message))
+    return stageMigrationFor(this.storeBoard, store, { actor: this.owner, log: (message) => this.host.log(message) })
       .offer()
       .catch((error: unknown) => {
         this.host.log(`stage migration: the store could not be checked - ${messageOf(error)}`, 'warn');
@@ -542,12 +551,23 @@ export class EngineBoardService {
     }
   }
 
-  /** The default persona: the vault layer's (req-173), else the legacy config key. */
-  private async defaultPersonaOf(): Promise<string | null> {
-    if (this.crew !== null) {
-      return this.crew.defaultPersona;
+  /** req-257: the crew's persona kinds from the vault's listing — what places a chain ticket by its holder. */
+  private async crewKinds(vault: EngineVault, mdFiles: readonly string[]): Promise<ReadonlyMap<string, Persona['kind']>> {
+    const loader = this.personaLoaderFor(vault);
+    const kinds = new Map<string, Persona['kind']>();
+    for (const file of mdFiles) {
+      const match = /^tickets\/_meta\/personas\/([a-z0-9][a-z0-9-]{0,63})\/persona\.md$/.exec(file);
+      const persona = match === null ? null : await loader.load(match[1]!);
+      if (persona !== null) {
+        kinds.set(persona.id, persona.kind);
+      }
     }
-    return ((await this.host.configGet<string>('personas.default')) ?? '').trim() || null;
+    return kinds;
+  }
+
+  /** The default persona: the vault layer's (req-173), else the legacy config key. */
+  private defaultPersonaOf(): Promise<string | null> {
+    return Promise.resolve(null); // req-257: the crew's default persona (and the legacy `personas.default`) retired — never used
   }
 
   /** Re-reads the handover thresholds with the board's override keys (T-0049); the vault layer's once there is one (req-173). */
@@ -629,7 +649,8 @@ export class EngineBoardService {
     }
     const result = await this.enqueue(async () => {
       try {
-        return await stageMigrationFor(this.storeBoard, store, this.owner, (message) => this.host.log(message)).run();
+        const pinCursor = await this.pinCursorOf();
+        return await stageMigrationFor(this.storeBoard, store, { actor: this.owner, log: (message) => this.host.log(message), ...(pinCursor !== null ? { pinCursor } : {}) }).run();
       } catch (error) {
         return { ok: false as const, error: messageOf(error) };
       } finally {
@@ -638,6 +659,30 @@ export class EngineBoardService {
     });
     this.announceChanged();
     return result;
+  }
+
+  /**
+   * req-257: the migration's column -> cursor rule over this board's pipeline, crew and standard flow
+   * (concept §12 step 2: Shaping -> the `:shape` entry, a working column -> the first entry after the
+   * planning, Ready to try -> the last You entry); a chainless ticket gets the flow copied.
+   */
+  private async pinCursorOf(): Promise<PinCursorOf | null> {
+    const vault = await this.detect();
+    if (vault === null) {
+      return null;
+    }
+    const [pipelineText, mdFiles] = await Promise.all([this.readOptional(vault.id, PIPELINE_PATH), this.host.listMarkdownFiles(vault.id)]);
+    const pipeline = parsePipeline(pipelineText ?? '');
+    const columns = placementColumnsOf(pipeline.phases);
+    const lookup = crewLookupOf(await this.crewKinds(vault, mdFiles));
+    return (record, pin) => {
+      const own = parseTicketChainFields({ chain: record.extensions['x-chain'] }, [], false).chain;
+      const chain = own ?? pipeline.flow;
+      if (chain === undefined || chain.length === 0) {
+        return null;
+      }
+      return { at: cursorForPin(chain, pin, lookup, columns), chain: own === undefined ? renderChainEntries(chain).join(';') : null };
+    };
   }
 
   /** Keeps the runner's chain config in step with the pipeline (never spawns). */
@@ -1909,15 +1954,14 @@ export class EngineBoardService {
 
   /**
    * The `board` IPC route (T-0041): normalize first — a file move is a
-   * ticket move — then migrate legacy column keys onto personas (E3,
-   * same single-writer queue), then snapshot. Normalization and the
-   * migration run enqueued (the same single-writer queue as every
-   * mutation) and snapshots are taken OUTSIDE it, so this never nests
-   * `enqueue` inside `enqueue`.
+   * ticket move — then snapshot. Normalization runs enqueued (the same
+   * single-writer queue as every mutation) and snapshots are taken
+   * OUTSIDE it, so this never nests `enqueue` inside `enqueue`. (The
+   * legacy column-key migration onto `<phase>-default` personas retired
+   * with req-257: no persona is created from a column any more.)
    */
   async refresh(): Promise<BoardSnapshot> {
     await this.normalizeDrift();
-    await this.migrateLegacyPersonas();
     return this.snapshot();
   }
 
@@ -2158,7 +2202,7 @@ export class EngineBoardService {
    * `put` with the target stage; the archive is stage `terminal` + the `archived`
    * label, an unarchive removes it.
    */
-  private dricketTransitionIo(store: StoreSettings, terminal: string): TransitionIo {
+  private dricketTransitionIo(store: StoreSettings, terminal: string, placement: () => Promise<HolderPlacement | null>): TransitionIo {
     const idOf = (p: string): string => p.slice(p.lastIndexOf('/') + 1).replace(/\.md$/, '');
     const inArchive = (p: string): boolean => p.startsWith(`${TICKETS_ARCHIVE_DIR}/`);
     return {
@@ -2174,7 +2218,10 @@ export class EngineBoardService {
         const id = idOf(p);
         const record = this.records.get(id) ?? (await this.storeBoard.record(store, id));
         const phase = inArchive(p) ? terminal : ticketPathParts(p)?.phase;
-        await this.putRecord(store, record, text, phase === undefined ? { keepStage: true } : { phase, archived: inArchive(p) });
+        // req-257: on a lifecycle store a move into a working column moves a chain ticket's cursor (its column follows the holder).
+        const held = phase === undefined ? null : await placement();
+        const moved = held === null || phase === undefined ? text : withCursorForMove(text, record, phase, held);
+        await this.putRecord(store, record, moved, phase === undefined ? { keepStage: true } : { phase, archived: inArchive(p) });
         this.records.delete(id);
       },
       renameInto: () => Promise.resolve({ ok: true }),
@@ -2188,7 +2235,32 @@ export class EngineBoardService {
   private moveIo(vault: EngineVault, snap: BoardSnapshot): TransitionIo {
     return this.dricket === null
       ? this.transitionIo(vault)
-      : this.dricketTransitionIo(this.dricket, snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done');
+      : this.dricketTransitionIo(this.dricket, snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done', () => this.holderPlacement(vault, snap.pipeline));
+  }
+
+  /**
+   * req-257: the chain entry an owner-started run of `card` works on a lifecycle store — the cursor and,
+   * when the entry is an agent's, its persona; null on the phase board or for a chainless ticket.
+   */
+  private async chainRunOf(vault: EngineVault, snap: BoardSnapshot, card: TicketCard): Promise<{ readonly persona: string | null; readonly cursor: RunCursor } | null> {
+    const chain = card.meta.chain;
+    const placement = chain === undefined || chain.length === 0 ? null : await this.holderPlacement(vault, snap.pipeline);
+    if (placement === null || chain === undefined) {
+      return null;
+    }
+    const at = Math.min(Math.max(card.meta.at ?? 1, 1), chain.length);
+    const persona = placement.lookup(chain[at - 1]!.persona);
+    return { persona: persona?.kind === 'agent' ? persona.id : null, cursor: { at, length: chain.length } };
+  }
+
+  /** req-257: what places a chain ticket by its holder — null unless the board runs on a lifecycle store. */
+  private async holderPlacement(vault: EngineVault, pipeline: readonly PipelinePhase[]): Promise<HolderPlacement | null> {
+    const store = this.dricket;
+    if (store === null || !isLifecycleStore(await this.storeBoard.stages(store).catch(() => null))) {
+      return null;
+    }
+    const kinds = await this.crewKinds(vault, await this.host.listMarkdownFiles(vault.id));
+    return { columns: placementColumnsOf(pipeline), lookup: crewLookupOf(kinds) };
   }
 
   /** The git step of a mutation: one commit for exactly these paths. */
@@ -2578,6 +2650,10 @@ export class EngineBoardService {
         return { ok: false, error: `${input.id} is not on the board` };
       }
       const actor = input.actor ?? this.owner;
+      const chained = await this.chainAccept(vault, snap, card, actor);
+      if (chained !== null) {
+        return chained;
+      }
       const next = nextPhaseIdOf(snap.columns, card.phase);
       if (next !== null && card.phase === READY_STATE && card.meta.repo !== null && (card.meta.form ?? 'ship') !== 'scout' && nextPhaseIdOf(snap.columns, next) === null) {
         const missing = await this.commitActionMissing(vault, card.id);
@@ -2607,6 +2683,68 @@ export class EngineBoardService {
       const kept = warnings.filter((w): w is string => w !== undefined);
       return { ok: true, ...(kept.length === 0 ? {} : { warning: kept.join('; ') }) };
     });
+  }
+
+  /** req-257: Accept on a chain ticket of a lifecycle store (`chain-owner-moves.ts`); null = the column move of old. */
+  private async chainAccept(vault: EngineVault, snap: BoardSnapshot, card: TicketCard, actor: string): Promise<BoardMutationResult | null> {
+    const placement = await this.holderPlacement(vault, snap.pipeline);
+    const decision = placement === null ? null : ownerAcceptOf(card, placement);
+    if (decision === null || decision.kind === 'none') {
+      return null;
+    }
+    if (decision.kind === 'commit') {
+      return (await this.commitActionMissing(vault, card.id)) ?? this.startCommitStep(card.id);
+    }
+    const terminal = snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done';
+    return this.writeChainCursor(card, decision.kind === 'done' ? { done: terminal } : { at: decision.at }, { line: decision.line, actor });
+  }
+
+  /**
+   * req-257: one owner write of a chain ticket's cursor on the store — `x-at` moved (the stage stays
+   * `active`), or the ticket to `done` — with the status line, one `put`.
+   */
+  private async writeChainCursor(card: TicketCard, target: { readonly at: number } | { readonly done: string }, why: { readonly line: string; readonly actor: string; readonly text?: string }): Promise<BoardMutationResult> {
+    const store = this.dricket;
+    if (store === null) {
+      return { ok: false, error: 'the cursor of a chain lives on a dricket store' };
+    }
+    try {
+      const record = await this.storeBoard.record(store, card.id);
+      const legacy = why.text ?? recordToBoardFile(record, card.phase).text;
+      const text = 'at' in target ? (setDocumentField(legacy, 'at', String(target.at)) ?? legacy) : legacy;
+      await this.putRecord(store, record, text, 'at' in target ? { keepStage: true } : { phase: target.done });
+    } catch (error) {
+      return { ok: false, error: error instanceof TicketChangedError ? `${card.id} changed meanwhile — look again and retry` : messageOf(error) };
+    }
+    await this.noteStatus(card, 'done', { text: why.line }, why.actor);
+    this.announceChanged();
+    return { ok: true };
+  }
+
+  /**
+   * req-257: a chain ticket whose cursor stands past its last entry (an agent's run ended the chain) is
+   * moved to `done` by the engine — an agent may not release into a terminal stage. Idempotent.
+   */
+  async settleFinishedChains(): Promise<void> {
+    if (this.dricket === null) {
+      return;
+    }
+    const due = await this.enqueue(async () => {
+      const snap = await this.snapshot();
+      const terminal = snap.pipeline[snap.pipeline.length - 1]?.id ?? null;
+      const column = snap.columns.find((c) => c.phase.id === terminal);
+      return (column?.tickets ?? []).filter((card) => chainFinished(card.meta.chain, card.meta.at) && card.meta.claimedBy === null);
+    });
+    for (const card of due) {
+      await this.enqueue(async () => {
+        const store = this.dricket;
+        const record = store === null ? null : await this.storeBoard.record(store, card.id).catch(() => null);
+        if (store === null || record === null || record.stage !== ACTIVE_STAGE) {
+          return;
+        }
+        await this.putRecord(store, record, recordToBoardFile(record, card.phase).text, { phase: card.phase }).catch((error: unknown) => this.host.log(`chain: ${card.id} could not be moved to done — ${messageOf(error)}`, 'warn'));
+      });
+    }
   }
 
   /**
@@ -2761,6 +2899,10 @@ export class EngineBoardService {
       if (card === null) {
         return { ok: false, error: `${input.id} is not on the board` };
       }
+      const chained = await this.chainSendBack(vault, snap, card, input);
+      if (chained !== null) {
+        return chained;
+      }
       const at = snap.pipeline.findIndex((p) => p.id === card.phase);
       let to: string | null = null;
       for (let i = at - 1; i >= 0; i--) {
@@ -2784,6 +2926,26 @@ export class EngineBoardService {
       }
       return moved;
     });
+  }
+
+  /** req-257: the owner's Send back on a chain ticket of a lifecycle store — the cursor to the nearest earlier agent position; null = the column move of old. */
+  private async chainSendBack(vault: EngineVault, snap: BoardSnapshot, card: TicketCard, input: { readonly note: string; readonly actor?: string; readonly comments?: readonly ReviewComment[] }): Promise<BoardMutationResult | null> {
+    const placement = await this.holderPlacement(vault, snap.pipeline);
+    const decision = placement === null ? null : ownerSendBackOf(card, placement);
+    if (decision === null || decision.kind === 'none') {
+      return null;
+    }
+    if (decision.kind === 'refused') {
+      return { ok: false, error: decision.error };
+    }
+    const actor = input.actor ?? this.owner;
+    const text = input.comments !== undefined && input.comments.length > 0 ? withReviewFeedback(await this.readCardText(vault, card), input.comments) : undefined;
+    const line = `sent back to position ${decision.at} (${decision.persona}): ${input.note.trim().slice(0, 500)}`;
+    const written = await this.writeChainCursor(card, { at: decision.at }, { line, actor, ...(text !== undefined ? { text } : {}) });
+    if (written.ok) {
+      await this.commentOn(card, `sent back: ${input.note.trim()}`, actor);
+    }
+    return written;
   }
 
   /** A plain comment on a store ticket; a failure is a log line, the move it follows already happened. */
@@ -3099,8 +3261,10 @@ export class EngineBoardService {
         }
       }
     }
+    // req-257: on a lifecycle store a chain ticket's run hands on by its cursor, never by a move.
+    const chainRun = await this.chainRunOf(vault, snap, card);
     // On a store the commit step moves nothing itself: dk refuses an agent's release into the terminal stage (settleCommitSteps).
-    const nextPhaseId = commitStep && dricket !== null ? null : nextPhaseIdOf(snap.columns, phaseId);
+    const nextPhaseId = (commitStep && dricket !== null) || chainRun !== null ? null : nextPhaseIdOf(snap.columns, phaseId);
     const nextPhaseClaims =
       nextPhaseId !== null ? (snap.pipeline.find((p) => p.id === nextPhaseId)?.claim === true) : false;
     // The context pack (T-0048): repo instructions, the worktree's diff
@@ -3117,20 +3281,14 @@ export class EngineBoardService {
       );
     }
     const gateFailure = await this.lastGateFailure(card.id);
-    // E3: the persona ladder (ticket pin > phase persona > engine
-    // default) — a resolved persona contributes worker/model/prompt/
-    // memory; an owner-picked worker in the dialog still wins.
+    // req-257: who works it — the chain entry at the cursor on a lifecycle store, else the column's
+    // persona; a resolved persona contributes worker/model/prompt/memory; an owner-picked worker in
+    // the dialog still wins. (The ticket pin and the crew's default persona retired.)
     const loader = personaLoader((rel) => this.host.read(vault.id, rel));
     // The commit step is a machine run (req-267): no agent persona works it; the request names the human's.
     const personaResolution = await resolvePersonaForTicket(
       loader,
-      commitStep
-        ? { ticketPersona: null, phasePersona: null, defaultPersona: null }
-        : {
-            ticketPersona: card.meta.persona,
-            phasePersona: workingPhase?.persona ?? null,
-            defaultPersona: await this.defaultPersonaOf(),
-          },
+      commitStep ? { phasePersona: null } : { chainPersona: chainRun?.persona ?? null, phasePersona: chainRun !== null ? null : (workingPhase?.persona ?? null) },
     );
     let personaDispatch: PersonaDispatch | null = null;
     if (personaResolution.persona !== null) {
@@ -3179,6 +3337,7 @@ export class EngineBoardService {
       ...(input.handover !== null ? { handover: input.handover } : input.interactive !== null ? { handover: 'auto' } : {}),
       ...(input.interactive !== null ? { interactive: input.interactive } : {}),
       ...(commitStep ? { commitStep: true } : {}),
+      ...(chainRun !== null && !commitStep ? { cursor: chainRun.cursor } : {}),
       ...(dricket !== null ? { dk: await this.runTarget(dricket, snap.pipeline, phaseId) } : {}),
     });
     if (!composed.ok) {
@@ -4131,99 +4290,6 @@ export class EngineBoardService {
         this.announceChanged();
       } catch (error) {
         this.host.log(`human persona setup failed: ${messageOf(error)}`, 'warn');
-      }
-    });
-  }
-
-  /**
-   * The legacy column-key migration (E3, idempotent — the marker is the
-   * absence of the legacy keys themselves): a pipeline phase still
-   * carrying `worker:`/`model:`/`prompt:` keys is the pre-persona world.
-   * Each such phase's configuration becomes a persona directory
-   * (`persona.md` + `prompt.md`, the prompt text from
-   * `_meta/prompts/<ref>.md` when that file exists, else an empty
-   * prompt.md) and the phase rewrites to `persona: <id>` through
-   * `patchPipelinePhase` — the legacy keys go, the `handover:` stays, so
-   * the column keeps draining itself, now through the persona. Exactly
-   * one commit `tickets: personas migrated`. Passes where every derived
-   * persona already exists leave the owner's files alone. A failure
-   * logs and leaves the board refresh unscathed.
-   */
-  private migrateLegacyPersonas(): Promise<void> {
-    return this.enqueue(async () => {
-      try {
-        const vault = await this.detect();
-        if (vault === null) {
-          return;
-        }
-        const pipelineText = await this.readOptional(vault.id, PIPELINE_PATH);
-        if (pipelineText === null) {
-          return;
-        }
-        const { phases } = parsePipeline(pipelineText);
-        const legacy = phases.filter((p) => p.worker !== null || p.model !== null || p.prompt !== null);
-        if (legacy.length === 0) {
-          return; // nothing carries the old keys — the migration is done (or never needed)
-        }
-        const candidates = new Map<string, { readonly phaseId: string; readonly migration: PersonaMigration }>();
-        for (const phase of legacy) {
-          const migration = personaMigrationFor({ phaseId: phase.id, worker: phase.worker, model: phase.model, prompt: phase.prompt });
-          if (migration !== null && !candidates.has(migration.id)) {
-            candidates.set(migration.id, { phaseId: phase.id, migration });
-          }
-        }
-        if (candidates.size === 0) {
-          return;
-        }
-        const loader = this.personaLoaderFor(vault);
-        const missing: PersonaMigration[] = [];
-        for (const { migration } of candidates.values()) {
-          if ((await loader.load(migration.id)) === null) {
-            missing.push(migration);
-          }
-        }
-        if (missing.length === 0) {
-          return; // every derived persona exists — the owner's state stays as written
-        }
-        const written: string[] = [];
-        for (const migration of missing) {
-          const persona: Persona = {
-            id: migration.id,
-            kind: 'agent',
-            title: migration.title,
-            role: 'custom',
-            worker: migration.worker,
-            models: { default: migration.model ?? 'opus', pool: [migration.model ?? 'opus'] },
-            color: '#a78bfa',
-            summary: '',
-            skills: [],
-            budget: null,
-            allowed: { spendAboveAllowance: false },
-            settings: EMPTY_PERSONA_SETTINGS,
-          };
-          const personaPath = `${PERSONAS_DIR}/${migration.id}/persona.md`;
-          await this.host.write(vault.id, personaPath, personaFileText(persona));
-          written.push(personaPath);
-          const promptText =
-            migration.promptRef !== null
-              ? await this.readOptional(vault.id, `${PROMPTS_DIR}/${migration.promptRef}.md`)
-              : null;
-          const promptPath = `${PERSONAS_DIR}/${migration.id}/prompt.md`;
-          await this.host.write(vault.id, promptPath, promptText ?? '');
-          written.push(promptPath);
-        }
-        // Every candidate phase rewrites — including those whose persona
-        // already existed (their keys are still the old world).
-        let patched = pipelineText;
-        for (const { phaseId, migration } of candidates.values()) {
-          patched = patchPipelinePhase(patched, phaseId, { persona: migration.id });
-        }
-        await this.host.write(vault.id, PIPELINE_PATH, patched);
-        await this.commit(vault, [PIPELINE_PATH, ...written], 'tickets: personas migrated');
-        this.host.announceChanges(vault.id, [PIPELINE_PATH, ...written]);
-        this.announceChanged();
-      } catch (error) {
-        this.host.log(`persona migration failed: ${messageOf(error)}`, 'warn');
       }
     });
   }

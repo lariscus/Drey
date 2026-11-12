@@ -36,7 +36,7 @@ describe('crew.md (req-173, the vault layer)', () => {
   it('reads the keys it knows, off as null, and the overrides', () => {
     const { config, error, warnings } = parseCrewFile(FILE);
     expect(error).toBeNull();
-    expect(warnings).toEqual([]);
+    expect(warnings).toEqual(['crew.md: default-persona is retired (req-257) — it is read and never used; a chain entry says who works a ticket']);
     expect(config.values).toEqual({
       defaultPersona: 'ben',
       defaultWorker: 'claude-code',

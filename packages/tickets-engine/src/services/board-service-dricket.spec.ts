@@ -388,7 +388,9 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
     dk(['put', 't-2', '-F', writeTemp(text), '--claim', '--if-version', String(rev('t-2'))]);
     await fsp.mkdir(abs('tickets/_meta/prompts'), { recursive: true });
     await fsp.writeFile(abs('tickets/_meta/prompts/build-default.md'), 'Build the ticket.\n', 'utf8');
-    const ben = abs('tickets/_meta/personas/ben'); // T-0002 carries this persona
+    // req-257: the ticket pin is retired — the column's persona works the build
+    await fsp.writeFile(abs('tickets/_meta/pipeline.md'), PIPELINE.replace('handover: agent build-default }', 'handover: agent build-default, persona: ben }'), 'utf8');
+    const ben = abs('tickets/_meta/personas/ben');
     await fsp.mkdir(path.join(ben, 'skills'), { recursive: true });
     await fsp.writeFile(
       path.join(ben, 'persona.md'),

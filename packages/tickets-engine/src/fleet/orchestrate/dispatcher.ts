@@ -1,5 +1,6 @@
 import type { BoardColumn, BoardSnapshot, PipelinePhase } from '../../contracts/tickets';
 import { planDispatch, type PlannedDispatch as PlanItem } from '../chain';
+import { chainWorkingPhase } from '../holder-plan';
 import type { Clock } from '../ports/clock';
 import { normalizeFleetPools, type ChainConfig, type ClassRequest, type ColumnMode, type PoolWaitDecision, type WorkerProviderId } from '../protocol';
 import { BLOCKING_RUN_STATES, LIVE_RUN_STATES } from '../run/run-state';
@@ -8,6 +9,7 @@ import type { ChainBoard } from './chain-board';
 import type { ChainState } from './chain-state';
 import { ClassRequestBuilder } from './class-request-builder';
 import type { DispatchPool } from './dispatch-pool';
+import type { HolderPass, HolderPassView } from './holder-pass';
 import type { HumanGates } from './human-gates';
 import type { LedgerCards } from './ledger-cards';
 import { messageOf } from './live-run';
@@ -41,6 +43,8 @@ export interface DispatcherDeps {
   readonly tranches?: TrancheGate;
   /** req-181: the burn rate's hold over every new start; absent = nothing holds. */
   readonly hold?: StartHold;
+  /** req-257: the chain's pass on a lifecycle store (dispatch by holder); absent = every board dispatches by column. */
+  readonly holders?: HolderPass;
 }
 
 /** The tranche as the dispatch sees it (req-179): may a start go, count one, raise a checkpoint the clock reached. */
@@ -114,6 +118,9 @@ export class Dispatcher {
     if (this.deps.tranches?.review() === true) {
       await this.deps.persist(); // req-179: the time span ran out — the checkpoint pauses the Autopilot before planning
     }
+    if (config.store?.lifecycle === true && this.deps.holders !== undefined) {
+      return this.runHolders(config, snap, occupied);
+    }
     const running = state.master === 'run';
     const personas = running ? await this.deps.personas.resolve(config, snap) : new Map<string, TicketPersona>();
     const paused = [...personas].filter(([, entry]) => entry.resolution.persona !== null && state.pausedPersonas.has(entry.resolution.persona));
@@ -143,6 +150,36 @@ export class Dispatcher {
     const held = running && (this.deps.hold?.current() ?? null) !== null; // req-181: asked once per pass, before any start
     const refusedByColumn = await this.dispatchPlan(config, snap, { plan, personas, pools, held });
     this.noteWaits(snap, pools, { busy: occupied.busy, dispatched: new Set(plan.map((item) => item.card.id)), refusedByColumn });
+    this.deps.notes.endPass();
+  }
+
+  /**
+   * req-257: the pass on a lifecycle store — the holders instead of the columns: the chain's plan
+   * (position order, the persona's pool, its min overrun), the same starts through the pool and the
+   * tranche, and the holders' wait lines. No human gate parks here: a You entry is the owner's in Needs you.
+   */
+  private async runHolders(config: ChainConfig, snap: BoardSnapshot, occupied: Occupancy): Promise<void> {
+    const { state } = this.deps;
+    const holders = this.deps.holders!;
+    const running = state.master === 'run';
+    const view: HolderPassView = running ? await holders.resolve(config, snap) : { held: new Map(), entries: new Map() };
+    const pools = new PassPools(config, snap, view.entries, this.deps.pool !== undefined);
+    const planned = holders.plan(config, snap, view, {
+      busy: occupied.busy,
+      poolSize: this.deps.pools.sizes(config, this.sessionsOf()),
+      liveByPool: occupied.liveByPool,
+      poolOf: (card) => pools.poolOf(card, chainWorkingPhase(snap.pipeline, card.phase)),
+    });
+    state.phases = snap.pipeline;
+    await this.deps.pipelineRead();
+    this.deps.notes.beginPass();
+    const held = running && (this.deps.hold?.current() ?? null) !== null;
+    await this.dispatchPlan(config, snap, { plan: planned.plan, personas: view.entries, pools, held });
+    if (running) {
+      holders.noteWaits(view, planned, new Set(planned.plan.map((item) => item.card.id)));
+    } else {
+      this.deps.pool?.queue.clear();
+    }
     this.deps.notes.endPass();
   }
 
@@ -187,7 +224,9 @@ export class Dispatcher {
   private async askAndStart(config: ChainConfig, snap: BoardSnapshot, item: PlanItem, pass: Pass): Promise<DispatchOutcome | 'queued'> {
     const persona = pass.personas.get(item.card.id) ?? null;
     const asked = pass.pools.asksPool(item.card) ? this.ask(snap, item, persona) : null;
-    if (asked !== null && asked.wait !== null) {
+    // req-257: a persona below its `min:` starts even when the pool has no room — an overrun on purpose.
+    const overrun = (item as { readonly overrun?: boolean }).overrun === true;
+    if (asked !== null && asked.wait !== null && !overrun) {
       await this.queued(config, item, asked.request, asked.wait);
       return 'queued';
     }
@@ -200,7 +239,7 @@ export class Dispatcher {
 
   /** The class request of a persona's dispatch and the pool's answer; null when it cannot be built. */
   private ask(snap: BoardSnapshot, item: PlanItem, entry: TicketPersona | null): Asked | null {
-    const phase = snap.pipeline.find((p) => p.id === item.workingPhase) ?? null;
+    const phase = this.deps.state.config?.store?.lifecycle === true ? chainWorkingPhase(snap.pipeline, item.workingPhase) : (snap.pipeline.find((p) => p.id === item.workingPhase) ?? null);
     const persona = entry?.persona ?? null;
     if (this.classes === null || this.deps.pool === undefined || phase === null || persona === null) {
       return null;

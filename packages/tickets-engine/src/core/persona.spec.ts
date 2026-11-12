@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_PERSONA_SETTINGS } from './persona-settings';
 import { entryWorkOf } from './chain-entry-work';
-import { inPipelineOrder, isAgentPersona, isHumanPersona, isMissionPersona, MISSION_PERSONA_ID, parsePersonaFile, personaFileText, personaMigrationFor, personaRef, resolvePersona, splitPoolEntry } from './persona';
+import { inPipelineOrder, isAgentPersona, isHumanPersona, isMissionPersona, MISSION_PERSONA_ID, parsePersonaFile, personaFileText, personaRef, resolvePersona, splitPoolEntry } from './persona';
 
 const PIA = `---
 title: Pia
@@ -163,23 +163,10 @@ describe('budget — the daily spend limit (concept §4.3)', () => {
 });
 
 describe('resolvePersona', () => {
-  it('runs the three-level ladder: ticket > phase > default', () => {
-    expect(resolvePersona({ ticketPersona: 'tessa', phasePersona: 'pia', defaultPersona: 'ben' })).toEqual({
-      persona: 'tessa',
-      source: 'ticket',
-    });
-    expect(resolvePersona({ ticketPersona: null, phasePersona: 'pia', defaultPersona: 'ben' })).toEqual({
-      persona: 'pia',
-      source: 'phase',
-    });
-    expect(resolvePersona({ ticketPersona: '', phasePersona: null, defaultPersona: 'ben' })).toEqual({
-      persona: 'ben',
-      source: 'default',
-    });
-    expect(resolvePersona({ ticketPersona: null, phasePersona: null, defaultPersona: null })).toEqual({
-      persona: null,
-      source: 'none',
-    });
+  it('on the phase board only the column decides (req-257: the ticket pin and the default retired)', () => {
+    expect(resolvePersona({ phasePersona: 'pia' })).toEqual({ persona: 'pia', source: 'phase' });
+    expect(resolvePersona({ phasePersona: '  ' })).toEqual({ persona: null, source: 'none' });
+    expect(resolvePersona({ phasePersona: null })).toEqual({ persona: null, source: 'none' });
   });
 });
 
@@ -208,19 +195,3 @@ describe('allowed: and the pool entries (req-170)', () => {
   });
 });
 
-describe('personaMigrationFor', () => {
-  it('builds a persona candidate from legacy column keys', () => {
-    expect(personaMigrationFor({ phaseId: 'build', worker: 'claude-code', model: 'sonnet', prompt: 'build-default' })).toEqual({
-      id: 'build-default',
-      title: 'build default',
-      worker: 'claude-code',
-      model: 'sonnet',
-      promptRef: 'build-default',
-    });
-  });
-
-  it('slugifies odd prompt refs and falls back to the phase id', () => {
-    expect(personaMigrationFor({ phaseId: 'qa', worker: null, model: 'glm', prompt: 'QA — Default!!' })!.id).toBe('qa-default');
-    expect(personaMigrationFor({ phaseId: 'qa', worker: null, model: null, prompt: null })).toBeNull();
-  });
-});

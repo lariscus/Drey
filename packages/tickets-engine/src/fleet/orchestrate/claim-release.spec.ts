@@ -78,7 +78,28 @@ describe('ClaimRelease — release is the one door', () => {
       return harness(dirs.fleet, {}, store);
     };
 
-    it('a green gate: the next column rides as the pin in the in-claim put, then ONE release into active', async () => {
+    it('req-257: a chain run hands on by its cursor — x-at in the in-claim put, then ONE release into active', async () => {
+      const t = lifecycleSetup();
+      const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK, nextPhase: null, nextPhaseDir: null, cursor: { at: 3, length: 6 } }));
+      endTurn(t.adapter.handles[0]!);
+      await settled(t.sup, id, 'done');
+      expect(t.store.of('release').map((c) => c.stage)).toEqual(['active']);
+      expect(t.store.of('put')).toHaveLength(1);
+      expect(t.store.text).toMatch(/^x-at: 4$/m);
+      expect(t.store.of('comment')[0]?.text).toContain('handed over at position 3 of 6');
+    });
+
+    it('req-257: past the last entry the cursor stands one beyond it — the engine moves the ticket to done', async () => {
+      const t = lifecycleSetup();
+      const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK, nextPhase: null, nextPhaseDir: null, cursor: { at: 6, length: 6 } }));
+      endTurn(t.adapter.handles[0]!);
+      await settled(t.sup, id, 'done');
+      expect(t.store.of('release').map((c) => c.stage)).toEqual(['active']);
+      expect(t.store.text).toMatch(/^x-at: 7$/m);
+      expect(t.store.of('comment')[0]?.text).toContain('the chain is through');
+    });
+
+    it('a green gate: the next column is the release, the pin goes (req-257), ONE release into active', async () => {
       const t = lifecycleSetup();
       const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK }));
       endTurn(t.adapter.handles[0]!);
@@ -88,7 +109,7 @@ describe('ClaimRelease — release is the one door', () => {
       expect(ops.indexOf('put')).toBeLessThan(ops.indexOf('release'));
       expect(t.store.of('put')).toHaveLength(1);
       expect(t.store.of('put')[0]?.put).toEqual({ holdsClaim: true, actor: expect.stringMatching(/^agent-r-/) });
-      expect(t.store.text).toContain('x-phase: commit');
+      expect(t.store.text).not.toContain('x-phase:');
       expect(t.store.of('comment')[0]?.text).toContain('moving to commit');
     });
 

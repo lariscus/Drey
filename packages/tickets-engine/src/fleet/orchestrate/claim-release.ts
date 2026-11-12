@@ -1,4 +1,4 @@
-import { PHASE_PIN_KEY, placementOfPhase } from '../../core/lifecycle-stages';
+import { ACTIVE_STAGE, PHASE_PIN_KEY, placementOfPhase } from '../../core/lifecycle-stages';
 import { costOf } from '../../core/model-prices';
 import { renderStatusComment } from '../../core/status-comment';
 import { appendVerlaufEntry, renderVerlaufLine, verlaufEntryOf } from '../../core/verlauf';
@@ -10,6 +10,9 @@ import { failureLine, usageSummary } from '../run/run-summary';
 import type { LiveRun } from './live-run';
 import type { StoreClaims } from './store-claims';
 import type { TicketCopy } from './ticket-copy';
+
+/** The store's extension field of the chain's cursor (req-266). */
+const CURSOR_KEY = 'x-at';
 
 /** Inside the claim the line is written before the settle: the price-table estimate is the settle's own fallback, applied here. */
 function effectiveCost(run: LiveRun): number | null {
@@ -86,6 +89,31 @@ export class ClaimRelease {
     }
     run.currentPhase = target.pin === undefined ? result.stage : nextPhase;
     return { ok: true };
+  }
+
+  /**
+   * req-257: a chain run's green end — the cursor's next position (`x-at`) rides the in-claim write
+   * that carries the Verlauf line, then ONE release into `active` (the run cannot release into the
+   * stage it holds, R-31: `running` is the claim's own stage). Past the last entry the cursor stands
+   * one beyond it: the chain is through, and the engine moves the ticket to `done` (an agent may not
+   * release into a terminal stage).
+   */
+  async advance(run: LiveRun): Promise<WriteResult> {
+    const lease = run.lease;
+    const cursor = run.request.cursor;
+    if (lease === undefined || lease.fenced || cursor === undefined) {
+      return { ok: false, error: 'the claim on the ticket was lost - the cursor is not moved' };
+    }
+    const next = cursor.at + 1;
+    const where = next > cursor.length ? `the chain is through (${cursor.length} of ${cursor.length})` : `position ${next} of ${cursor.length} next`;
+    const narrative = `run ${run.info.id} done - gate green at position ${cursor.at} of ${cursor.length}; ${where}${usageSummary(run.info)}`;
+    const note = renderStatusComment({ verb: 'done', text: `handed over at position ${cursor.at} of ${cursor.length}`, detail: narrative }) ?? narrative;
+    const written = await this.verlaufInClaim(run, lease, 'done', (text) => setDocumentField(text, CURSOR_KEY, String(next)) ?? text);
+    if (!written) {
+      return { ok: false, error: `the cursor could not be written inside the claim - nothing is handed on` };
+    }
+    const result = await lease.release([ACTIVE_STAGE], note);
+    return result.ok ? { ok: true } : { ok: false, error: result.error };
   }
 
   /** Park = the park stage (when the store has one) + a comment; otherwise the ticket keeps its stage and gets the comment. */

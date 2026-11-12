@@ -140,6 +140,10 @@ export interface ChainStatus {
    * before the persona pause existed — readers treat that as none.
    */
   readonly pausedPersonas?: readonly string[];
+  /** req-257: consecutive red gates per persona on a chain board (the persona breaker). Absent on older runners. */
+  readonly personaRedStreak?: Readonly<Record<string, number>>;
+  /** req-257: the personas the breaker holds, why and since when (each is also in `pausedPersonas`). Absent on older runners. */
+  readonly personaTripped?: Readonly<Record<string, ChainTrip>>;
   /**
    * Per provider: the effective parallel runs its pool carries right now
    * (configured size, capped by a probe, minus a rate-limit shrink) — the

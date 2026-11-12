@@ -16,6 +16,7 @@ import { StoreReader } from './store-reader';
 import { checkoutOf, createDricketStore, type StoreSettings } from './store-settings';
 import { StoreShadow } from './store-shadow';
 import { writePlacement, type StoreStageSet } from './store-stages';
+import { ACTIVE_STAGE, PHASE_PIN_KEY, RUNNING_STAGE } from '../core/lifecycle-stages';
 
 /** The seams of the file path (E14-4); specs replace them, the engine leaves them out. */
 export interface StoreBoardSourceOptions {
@@ -79,6 +80,8 @@ export class StoreBoardSource {
   private readonly pathReporters = new Set<StorePathReporter>();
   private readonly shadow: StoreShadow;
   private readonly config: StoreConfigCache;
+  /** req-257: an `active` ticket of the last board read still carries req-265's column pin. */
+  private pinned = false;
 
   constructor(
     /** Where the shadow report lands (`<userRoot>/shadow`). */
@@ -244,6 +247,11 @@ export class StoreBoardSource {
     return writePlacement(phase, await this.stages(settings), '').stage;
   }
 
+  /** req-257: whether the last board read found an `active` ticket still carrying req-265's column pin (the migration converts it). */
+  pinsLeft(): boolean {
+    return this.pinned;
+  }
+
   /** The store's `[stages]` (cached a minute); null without a checkout, a config or a table. */
   async stages(settings: StoreSettings): Promise<StoreStageSet | null> {
     const checkout = checkoutOf(settings);
@@ -306,6 +314,7 @@ export class StoreBoardSource {
   async board(settings: StoreSettings, input: Omit<RecordsBoardInput, 'records'>): Promise<BoardSnapshot> {
     try {
       const records = await this.records(settings);
+      this.pinned = records.some((r) => (r.stage === ACTIVE_STAGE || r.stage === RUNNING_STAGE) && (r.extensions[PHASE_PIN_KEY] ?? '') !== '');
       const [priorities, comments] = await Promise.all([this.prioritiesOf(settings), this.commentsByTicket(settings, records)]);
       return assembleBoardFromRecords({ ...input, records, comments, ...(priorities === null ? {} : { priorities }) });
     } catch (error) {

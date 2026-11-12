@@ -7,9 +7,8 @@
  * tickets sitting in a checkpoint column; oldest first within a kind.
  * The E8 report card is not derived here — it needs the ticket files'
  * `## Report` sections, so the port sweeps those (drey-port.ts) and packs
- * each item through `reportNeedOf` below. The E9 Bescheid card (a gate's notify
- * rule) pauses with req-266: the chain is a persona list whose cursor
- * nothing walks until req-257, which brings the card back on the cursor.
+ * each item through `reportNeedOf` below. The E9 Bescheid card is derived
+ * here too, on the chain's cursor (req-257, `notifyNeedsOf` below).
  */
 import type { NeedItem, NeedKind } from '../contracts/remote-protocol';
 import type { ScoutReport } from '../contracts/scout';
@@ -168,6 +167,34 @@ export function reportNeedOf(card: TicketCard, phase: string, report: ScoutRepor
     since: report.writtenAt === '' ? null : report.writtenAt,
     report,
   };
+}
+
+/**
+ * The Bescheid cards on the chain's cursor (E9, req-257): an entry marked
+ * `(notify)` lands a card in Needs you once it is done — while the cursor
+ * stands on the position right after it (the next step has not ended yet).
+ * A notify on the chain's last entry has nothing after it and never fires.
+ * Pure over the snapshot; the store keeps no time of the cursor's move, so
+ * the card carries none.
+ */
+export function notifyNeedsOf(board: BoardSnapshot): readonly NeedItem[] {
+  const terminal = board.pipeline[board.pipeline.length - 1]?.id ?? null;
+  const items: NeedItem[] = [];
+  for (const column of board.columns) {
+    if (column.phase.id === terminal || ['inbox', 'prioritized'].includes(column.phase.id)) {
+      continue;
+    }
+    for (const card of column.tickets) {
+      const chain = card.meta.chain ?? [];
+      const at = card.meta.at ?? 1;
+      const done = chain[at - 2];
+      if (at < 2 || at > chain.length || done === undefined || !done.notify) {
+        continue;
+      }
+      items.push({ kind: 'notify', ticketId: card.id, title: titleOf(card), phase: column.phase.id, runId: null, text: `${done.persona} finished position ${at - 1} of ${chain.length}`, since: null });
+    }
+  }
+  return items;
 }
 
 function titleOf(card: TicketCard): string {

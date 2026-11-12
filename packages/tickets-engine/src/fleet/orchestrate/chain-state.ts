@@ -60,6 +60,12 @@ export interface ChainFile {
   readonly ownerHold?: Record<string, OwnerHold>;
   /** The personas the owner paused (U4, concept §4.3): their tickets hold until played again. */
   readonly pausedPersonas?: string[];
+  /** req-257: the persona breaker — consecutive red gates per persona on a chain board. */
+  readonly personaRedStreak?: Record<string, number>;
+  /** req-257: per persona, the instant it may start again after a red gate. */
+  readonly personaCooldownUntil?: Record<string, string>;
+  /** req-257: per persona, the breaker's trip while the persona is held (paused). */
+  readonly personaTripped?: Record<string, ChainTrip>;
   /** req-170: per ticket, the ledger cards (Needs-you blockers) the pool raised and has not resolved yet. */
   readonly ledgerCards?: Record<string, string[]>;
   /** req-179: the current tranche's counters, facts and checkpoint; absent before the first release. */
@@ -88,6 +94,10 @@ export class ChainState {
   readonly ownerHold: Record<string, OwnerHold> = {};
   readonly ciBackoff: Record<string, string> = {};
   readonly pausedPersonas = new Set<string>();
+  /** req-257: the persona breaker on a chain board (see {@link ChainFile}). */
+  readonly personaRedStreak: Record<string, number> = {};
+  readonly personaCooldownUntil: Record<string, string> = {};
+  readonly personaTripped: Record<string, ChainTrip> = {};
   /** req-170: per ticket, the open ledger cards' keys (`ledger-ticket`, `ledger-persona-ben`). */
   readonly ledgerCards: Record<string, string[]> = {};
   /** req-179: the current tranche; null before the first release (the tranche parts own it). */
@@ -131,6 +141,8 @@ export class ChainState {
       tripped: { ...this.tripped },
       quotaPausedUntil: pools.quotaPausedUntil,
       pausedPersonas: [...this.pausedPersonas].sort(),
+      personaRedStreak: { ...this.personaRedStreak },
+      personaTripped: { ...this.personaTripped },
       poolSize: pools.poolSize,
     };
   }
@@ -140,7 +152,7 @@ export class ChainState {
     this.config = null;
     this.vault = null;
     this.autopilot = AUTOPILOT_OFF;
-    const maps = [this.columns, this.redStreak, this.cooldownUntil, this.tokensDay, this.tokensUsed, this.tripped, this.ticketFailures, this.ownerHold, this.ciBackoff, this.ledgerCards];
+    const maps = [this.columns, this.redStreak, this.cooldownUntil, this.tokensDay, this.tokensUsed, this.tripped, this.ticketFailures, this.ownerHold, this.ciBackoff, this.ledgerCards, this.personaRedStreak, this.personaCooldownUntil, this.personaTripped];
     for (const map of maps as Record<string, unknown>[]) {
       for (const key of Object.keys(map)) {
         delete map[key];
@@ -166,6 +178,9 @@ export class ChainState {
       ticketFailures: { ...this.ticketFailures },
       ownerHold: { ...this.ownerHold },
       pausedPersonas: [...this.pausedPersonas].sort(),
+      personaRedStreak: { ...this.personaRedStreak },
+      personaCooldownUntil: { ...this.personaCooldownUntil },
+      personaTripped: { ...this.personaTripped },
       ledgerCards: Object.fromEntries(Object.entries(this.ledgerCards).map(([ticket, keys]) => [ticket, [...keys]])),
       ...(this.tranche !== null ? { tranche: this.tranche } : {}),
       ...(handoverAt !== undefined ? { handoverAt } : {}),

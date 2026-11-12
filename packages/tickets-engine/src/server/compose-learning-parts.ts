@@ -46,7 +46,7 @@ export async function composeLearningParts(config: FileConfigStore, parts: Board
   await improvements.start();
   const stopSettling = settleCommitStepsOnFleet(
     (listener) => hub.subscribe((what) => listener(what)),
-    () => board.settleCommitSteps(),
+    () => board.settleFinishedChains().then(() => board.settleCommitSteps()),
     log,
   );
   return { improvements, stopSettling };

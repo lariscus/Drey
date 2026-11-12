@@ -104,7 +104,8 @@ export class LayeredConfigResolver {
       sources[key] = own !== undefined ? 'vault' : 'default';
     }
     return {
-      defaultPersona: typeof values.defaultPersona === 'string' ? values.defaultPersona : null,
+      // req-257 (owner 2026-11-11): the crew's default persona is retired — read with a warning (crew-file.ts), never used.
+      defaultPersona: null,
       defaultWorker: typeof values.defaultWorker === 'string' ? values.defaultWorker : BUILT_IN_WORKER,
       permissionMode: values.permissionMode === 'bypass' ? 'bypass' : 'accept-edits',
       caps: normalizeFleetCaps(group(values, 'caps.')),

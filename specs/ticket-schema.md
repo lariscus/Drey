@@ -356,7 +356,7 @@ of the Plan and removes it for fewer than two parts.
 | `repo` | string | Name from `_meta/repos.md`: the ticket's **primary** work repo (req-72) — where the fleet's gate runs and whose worktree is the run's home. May be empty until the ticket leaves inbox for a work phase; entering one without a known repo is an issue. |
 | `repos` | list of names | Optional (req-72). Every work repo the ticket touches, **primary first** — `repos: [drey, lariscus]`. When set, the list is the truth and `repo:` repeats its first entry (a mismatch is a noise finding, the list wins). One worktree per named repo, all on the ticket's branch; a run refuses while any named repo lacks a local `path:` in `_meta/repos.md`. One or zero names write no `repos:` line. |
 | `worker` | string | Optional pin for the fleet worker (M84): `opencode`, `claude-code`, `kimi`, `copilot` (req-182), or `<provider>/<model>`. Wins over the column's `worker:` key, the phase handover's `@worker` pin, the repo's `worker:` and the configured default (M85's assignment ring). An unknown value badges the card; a run start with it refuses. |
-| `persona` | string | Optional persona pin (ADR-0088 E3): `persona: paul` — the top of the persona ladder, winning over the phase's `persona:` key and the engine default (`personas.default`). The persona's worker/model/prompt drive the dispatch; when nothing resolves or the persona file is missing the legacy assignment ring runs unchanged. See `_meta/personas/` below. |
+| `persona` | string | **Retired** (req-257): the old persona pin (ADR-0088 E3, `x-persona` on a store). Still read and shown on a card until req-270, never used to dispatch — on a lifecycle store the chain's entry at the cursor says who works a ticket, on the phase board the column's `persona:`. See `_meta/personas/` below. |
 | `awaiting` | persona id | Optional (E10-6). The ticket is **parked at a manual step** for that human persona (`awaiting: you`): the dispatcher never takes it (no run, no worktree) and it shows in Needs you as a `manual` card. Machine-written when a manual gate parks the ticket; **any transition clears it** (Accept or Send back are ordinary board moves, so is a hand move). See "The human persona" under The chain. |
 | `priority` | one id of the board's configured vocabulary | Required. The vocabulary is the vault's own — `_meta/pipeline.md`'s `priorities:` list (default `urgent \| high \| normal \| low`); the list's order IS the weight, first = highest. An omitted or unknown id reads as the vocabulary's default (its middle entry) with a warning badge; machine writers always write a vocabulary word. See [Priorities](#priorities-priorities-in-pipelinemd). |
 | `track` | `auto \| shape` | Optional (req-75 W1b, ADR-0087 decision 2). The ticket's triage track: `auto` runs on its own, `shape` goes through the plan-mode dialog with the owner. Absent (or any other value — a warning) reads as not triaged; set from the Work panel's row menu (Track ›) until W5c/W6 fill it from triage. |
@@ -682,7 +682,7 @@ The grammar, one entry per list item (`core/chain-list.ts`):
   (req-269). What happens at an entry follows the persona's `kind`
   (`core/chain-entry-work.ts` `entryWorkOf`): an `agent`'s is a **run**, a
   `mission` persona's a **Mission Control turn** on the ticket (no session,
-  no slot, no budget — R9; the dispatch is req-257's), the human's parks the
+  no slot, no budget — R9; it runs with milestone 248), the human's parks the
   ticket for the owner, and an entry naming no readable persona is *missing*.
 - `<persona>:shape` — the run's **mode**: the interactive entry (the owner
   shapes the ticket with that persona in the Shape chat). `shape` is the only
@@ -690,20 +690,44 @@ The grammar, one entry per list item (`core/chain-list.ts`):
   `you:shape` and a mission persona's (`pia:shape`) at any position after the
   cursor (req-269).
 - `<persona>(notify)` — the **notify rule**: a card lands in "Needs you"
-  when that position is done.
+  when that position is done — while the cursor stands on the next position
+  (`server/needs.ts` `notifyNeedsOf`, req-257; a notify on the last entry
+  never fires).
 
 `at:` is the **cursor**, the position of the current entry (absent = 1). It
 means something while the ticket is worked; a ticket in Inbox, Prioritized
 or the pipeline's first column has no current position (every entry is
 ahead), one in the terminal column is past the last. `sent-back: <from>><to>`
-marks the one send-back a ticket may use (concept §4). **Until req-257
-nothing walks the chain** (owner, 2026-11-12): the runner and the board keep
-working by pipeline column — on a lifecycle store with req-265's interim pin
-`x-phase` — no run advances `at` or writes `sent-back`, and the chain pins no
-persona to a column. req-257 makes the holder (the persona of the entry at
-the cursor) the one who runs, moves the cursor at a green end, turns the
-store's `x-phase` pins into cursors, parks a ticket at a `you` entry and
-brings the notify card back.
+marks the one send-back a ticket may use (concept §4; the send-back verb is
+milestone 248's).
+
+**The cursor walks on a lifecycle store** (req-257, milestone 247; the files
+backend and a store on phase stages keep the phase board). Who holds a
+ticket is **derived, never stored** (`core/chain-holder.ts` `holderOf`): a
+lifecycle edge (`inbox`, `prioritized`, `done`, `cancelled`) has no holder;
+`awaiting: you` puts it at You; an entry at the cursor that names no
+readable persona puts it at You with *no persona for position n*;
+otherwise the entry's persona holds it. The holder of an agent entry is the
+one who runs — no column persona, no ticket pin, no default (below); a
+`:shape` entry waits for the owner's Shape chat; a You entry waits for the
+owner in Needs you; a Pia entry waits for milestone 248. A run's green end
+writes the next position into `x-at` inside its claim and releases once
+into `active` (`ClaimRelease.advance`); past the last entry the cursor
+stands one beyond it and the engine moves the ticket to `done`
+(`settleFinishedChains`: an agent may not release into a terminal stage).
+The owner's **Accept** on an `active` chain ticket moves the cursor on; at
+the chain's last entry a You entry of a repository ticket is the sign-off
+(You's `commit` machine run, then `done`), any other last entry goes to
+`done`. The owner's **Send back** moves the cursor to the nearest earlier
+agent position (a target picker is req-270's) and never uses the ticket's
+one send-back. **Until req-270/271 draw holder columns** the board keeps the
+pipeline's columns, and an `active` ticket stands in the column of its
+holder (`core/chain-placement.ts`, owner 2026-11-12): the agent column whose
+`persona:` names the holder, else the first agent column; a `:shape` entry in
+the queue column before it (Shaping); You in the first checkpoint (Ready to
+try); a pipeline with none of these shows the stage as one "active"
+column. An owner's move of a chain ticket into a working column moves the
+cursor to the position that stands there (`store/chain-move.ts`).
 
 **The reader** (`core/ticket-chain-fields.ts`) is strict per entry and
 whole per chain: one entry outside the grammar — the old delta's `insert …`
@@ -1040,8 +1064,19 @@ finishing beats starting — then the column's derived order. A persona run asks
 (req-170, ADR-0095: `class:` / `model:` pin, else `size:` or the persona's default class, raised to
 `min-class:`) and gets exactly that class or waits — queued, no process — while the next candidate whose class
 has room goes ahead; within the class the routing (req-178) filters by the phase's and the ticket's `needs:`
-and takes the slot with the largest surplus; a ring run (no persona) takes a slot of the provider pool its assignment resolves to. A
-running run is never preempted.
+and takes the slot with the largest surplus. No persona, no run (req-257, owner 2026-11-11): the ring run of a ticket nobody works is gone —
+a lifecycle store's ticket whose entry names no readable persona stands at You with the reason, a phase-board ticket whose column names
+no persona waits with *no persona for the … column*. A running run is never preempted.
+
+**On a lifecycle store the dispatch is by holder** (req-257, the persona board concept §9, `fleet/holder-plan.ts`): the candidates are
+the tickets an agent persona holds (no `:shape` entry, no held or cooling persona), ordered by priority class, then **the later cursor
+position first** (finishing beats starting), then rank. A run needs a free place in the **big pool** (the provider's slots and the
+capacity pool's class, as above) **and** in its **persona's pool** (`parallel:` on `persona.md`; absent = no cap): a persona at its cap
+waits — *waits for Ben* — even with the big pool free. A persona with `min: n` and fewer than n runs starts one even when the big pool
+is full, an overrun on purpose (default 0). **The breaker counts per persona** (`orchestrate/persona-breaker.ts`): a red gate raises the
+persona's streak and cools it down a minute; at the column's `max-red` (default 3) the persona is held like the owner's pause, the
+trip's reason in the chain status (`personaTripped`, `personaRedStreak`); playing the persona again resets it. The column breaker,
+cooldown and column modes stay the phase board's.
 
 ## `_meta/personas/` — the agent personas (E3)
 
@@ -1507,7 +1542,7 @@ every device working this tickets repository shares, versioned with it.
 ---
 seeded-crew: [pia, paul, ben, ralf, tessa]  # the shipped default crew already offered to this board (req-256, req-269)
 order: [pia, paul, ben, ralf, tessa, you]  # the crew's order (req-258): the Crew tab, later the board's persona columns
-default-persona: ben          # the persona ladder's floor (was config personas.default)
+default-persona: ben          # retired (req-257): read with a warning, never used
 default-worker: claude-code   # the assignment ring's floor (was defaultWorker)
 permission-mode: accept-edits # dispatched runs: accept-edits | bypass (was autoPermissionMode)
 caps:                          # the instruction output caps (was fleet.cap.*)
@@ -1864,7 +1899,7 @@ its changed chapters back inside the claim (D-30, [FLEET.md](../plugins/tickets/
 
 | dricket | Ticket key here | Note |
 |---|---|---|
-| `stage`, `x-phase` | the phase directory | an edge stage (`inbox`, `prioritized`, `done`) that is a pipeline phase is its own column; else `x-phase` if it names a phase (the interim column pin of an `active` / `running` ticket, req-265; also variant B); else the stage itself when it is a pipeline phase id (a store not yet migrated); else by role: `active`/`running`/`in-progress` → first `claim: true` column, `open`/`blocked` → first column, `review` → `commit`, `done`/`cancelled` → last column; anything else is an unknown column with a warning |
+| `stage`, `x-chain`, `x-at`, `x-phase` | the phase directory | an edge stage (`inbox`, `prioritized`, `done`) that is a pipeline phase is its own column; else `x-phase` if it names a phase (req-265's pin on a ticket not yet converted; also variant B); else, for an `active` / `running` ticket with a readable chain, the column of its holder (req-257, see "The chain"); else the stage itself when it is a pipeline phase id (a store not yet migrated); else by role: `active`/`running`/`in-progress` → first `claim: true` column, `open`/`blocked` → first column, `review` → `commit`, `done`/`cancelled` → last column; anything else is an unknown column with a warning |
 | `id`, `title`, `priority`, `parent`, `repos` | same | the store's `[priorities]` must use the pipeline's words |
 | `depends` | `blocked-by` | `blocked`/`blocks` stay derived |
 | `owner`, `claimed_at` | `claimed-by`, `claimed-at` | |
@@ -1880,16 +1915,22 @@ its changed chapters back inside the claim (D-30, [FLEET.md](../plugins/tickets/
 
 **The store's stages (req-265).** A store's `[stages]` are the lifecycle, never the columns:
 `inbox prioritized active running done` (`cancelled` reserved), `claim = ["running"]`. A board
-write of column *c* writes `stage: c` with no pin for an edge column (`inbox`, `prioritized`,
-`done`) and `stage: active` with `x-phase: c` for every other column; a header edit keeps stage
-and pin as they are. `dk claim` moves `active -> running`; a run that moves the ticket on writes
-the next column as `x-phase` inside its claim and releases once into `active`; a run that moves
-nothing releases to where it sat. `x-phase` is interim: the chain's cursor `x-at` replaces it
-(req-257; req-266 writes `x-at` as data only). A store still on the phase stages (variant A: the stages are the column ids) is read
-and written as before, and the Tickets panel offers **Migrate** (the owner's click only): one
-config commit adds `active` / `running`, every ticket in an old stage moves to `active` pinned to
-its old stage, a second config commit removes the old stages (ADR-0090 later change, concept §12
-steps 1–2).
+write of column *c* writes `stage: c` for an edge column (`inbox`, `prioritized`, `done`) and
+`stage: active` for every other column — a chain ticket's cursor moves to the position that stands in
+*c* (req-257) — and removes any `x-phase`; a header edit keeps stage and fields as they are. `dk claim`
+moves `active -> running`; a chain run's green end writes the next position as `x-at` inside its
+claim and releases once into `active`; a run that hands nothing on releases to where it sat.
+**`x-phase` is retired** (req-257): the column of an `active` ticket follows its holder, the pin is
+read only on a ticket the migration has not converted and written by nothing. A store still on the
+phase stages (variant A: the stages are the column ids) is read and written as before, and the
+Tickets panel offers **Migrate** (the owner's click only): one config commit adds `active` /
+`running`, every ticket in an old stage moves to `active` with its old stage turned into its
+**cursor** (`core/chain-placement.ts` `cursorForPin`: Shaping → the `:shape` entry, a working column →
+the first entry after the planning that stands in it — Ben's build on the standard flow —, Ready to
+try → the last You entry; a ticket without a chain gets the standard flow copied; without chain and
+flow the old pin stays), a second config commit removes the old stages (ADR-0090 later change,
+concept §12 steps 1–2). An `active` ticket that a migration of milestones 239–246 left with a pin is
+offered the same conversion (the pin goes, the cursor comes).
 
 Not carried: `branch` (the rule `t/<id>` wins), `run` (the runner's table),
 `parked-*` (a parked ticket is stage `blocked`), `labels`, `kind`, `size`,

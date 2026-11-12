@@ -15,6 +15,14 @@ const LIFECYCLE: StoreStageSet = { ...OLD, values: ['inbox', 'prioritized', 'act
 const rec = (id: string, stage: string, over: Partial<StagePlanRecord> = {}): StagePlanRecord => ({ id, stage, owner: null, extensions: {}, ...over });
 
 describe('the stage migration plan (req-265, concept §12 steps 1–2)', () => {
+  it('req-257: a migrated store whose active tickets still carry the pin plans their conversion into cursors', () => {
+    const records = [rec('t-1', 'active', { extensions: { 'x-phase': 'building' } }), rec('t-2', 'active'), rec('t-3', 'done', { extensions: { 'x-phase': 'done' } }), rec('t-4', 'running', { extensions: { 'x-phase': 'odd' } })];
+    const cursor = (r: StagePlanRecord, pin: string) => (pin === 'odd' ? null : { at: 3, chain: null });
+    expect(planStageMigration(LIFECYCLE, records, cursor)).toMatchObject({ kind: 'needed', add: null, remove: null, moves: [], conversions: [{ id: 't-1', from: 'active', pin: 'building' }] });
+    // without a cursor rule (or where it gives none) a pin stays as it is: nothing to plan
+    expect(planStageMigration(LIFECYCLE, records)).toEqual({ kind: 'none' });
+  });
+
   it('a store on the six phase stages: add, move every ticket out of an old stage, remove', () => {
     const plan = planStageMigration(OLD, [rec('t-1', 'building'), rec('t-2', 'inbox'), rec('t-3', 'ready'), rec('t-4', 'done')]);
     expect(plan).toEqual({
@@ -24,6 +32,7 @@ describe('the stage migration plan (req-265, concept §12 steps 1–2)', () => {
         { id: 't-1', from: 'building', pin: 'building' },
         { id: 't-3', from: 'ready', pin: 'ready' },
       ],
+      conversions: [],
       remove: LIFECYCLE,
       legacy: ['shaping', 'building', 'ready'],
       claimed: [],

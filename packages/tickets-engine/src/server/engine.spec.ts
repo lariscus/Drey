@@ -403,63 +403,18 @@ describe('personas (ADR-0088, E3)', () => {
     expect(blank.ok).toBe(false);
   });
 
-  it('migrates legacy column keys onto personas with one commit, idempotently', async () => {
+  it('req-257: legacy column keys no longer turn into personas — a refresh creates none and commits nothing', async () => {
     await gitInitVault();
     await fsp.writeFile(path.join(vault, 'tickets/_meta/pipeline.md'), LEGACY_PIPELINE, 'utf8');
-    await fsp.mkdir(path.join(vault, 'tickets/_meta/prompts'), { recursive: true });
-    await fsp.writeFile(path.join(vault, 'tickets/_meta/prompts/build-v2.md'), 'Build prompt text.', 'utf8');
     await git(['add', '-A']);
     await git(['commit', '-m', 'seed']);
-
-    await engine.invoke('refresh');
-
-    // The persona directory carries the column's old configuration.
-    const personaText = await fsp.readFile(path.join(vault, 'tickets/_meta/personas/build-v2/persona.md'), 'utf8');
-    expect(personaText).toContain('title: build v2');
-    expect(personaText).toContain('worker: opencode');
-    expect(personaText).toContain('default: opus');
-    expect(personaText).toContain('pool: [opus]');
-    expect(await fsp.readFile(path.join(vault, 'tickets/_meta/personas/build-v2/prompt.md'), 'utf8')).toBe('Build prompt text.');
-
-    // The phase rewrote to persona: — legacy keys gone, the handover stays (the column keeps draining).
-    const pipelineText = await fsp.readFile(path.join(vault, 'tickets/_meta/pipeline.md'), 'utf8');
-    expect(pipelineText).toContain('persona: build-v2');
-    expect(pipelineText).toContain('handover: agent build-default');
-    expect(pipelineText).not.toContain('worker: opencode');
-    expect(pipelineText).not.toContain('model: opus');
-    expect(pipelineText).not.toContain('prompt: build-v2');
-    const snapshot = (await engine.invoke('snapshot')) as { pipeline: readonly { id: string; persona: string | null }[] };
-    expect(snapshot.pipeline.find((p) => p.id === 'build')?.persona).toBe('build-v2');
-
-    expect((await git(['log', '-1', '--format=%s'])).trim()).toBe('tickets: personas migrated');
-
-    // Idempotent: the next refresh changes nothing and commits nothing.
     const head = (await git(['rev-parse', 'HEAD'])).trim();
+
     await engine.invoke('refresh');
+
     expect((await git(['rev-parse', 'HEAD'])).trim()).toBe(head);
-    expect(await fsp.readFile(path.join(vault, 'tickets/_meta/pipeline.md'), 'utf8')).toBe(pipelineText);
-  });
-
-  it('migrates a worker-only column to a <phase>-default persona with an empty prompt.md', async () => {
-    await gitInitVault();
-    await fsp.writeFile(
-      path.join(vault, 'tickets/_meta/pipeline.md'),
-      LEGACY_PIPELINE.replace(', model: opus, prompt: build-v2', ''),
-      'utf8',
-    );
-    await git(['add', '-A']);
-    await git(['commit', '-m', 'seed']);
-
-    await engine.invoke('refresh');
-
-    const personaText = await fsp.readFile(path.join(vault, 'tickets/_meta/personas/build-default/persona.md'), 'utf8');
-    expect(personaText).toContain('title: build default');
-    expect(personaText).toContain('worker: opencode');
-    // The prompts file was never there: the persona still lands, prompt empty.
-    expect(await fsp.readFile(path.join(vault, 'tickets/_meta/personas/build-default/prompt.md'), 'utf8')).toBe('');
-    const pipelineText = await fsp.readFile(path.join(vault, 'tickets/_meta/pipeline.md'), 'utf8');
-    expect(pipelineText).toContain('persona: build-default');
-    expect(pipelineText).not.toContain('worker: opencode');
+    expect(await fsp.stat(path.join(vault, 'tickets/_meta/personas/build-v2')).then(() => true, () => false)).toBe(false);
+    expect(await fsp.readFile(path.join(vault, 'tickets/_meta/pipeline.md'), 'utf8')).toBe(LEGACY_PIPELINE);
   });
 
   it('leaves the pipeline alone when every derived persona already exists', async () => {

@@ -59,6 +59,14 @@ export class RunBookkeeper {
     return this.parts.release.move(run, nextPhase);
   }
 
+  /** req-257: the success transition of a chain run — the cursor's next position inside the claim, one release into `active`. */
+  async advanceOnSuccess(run: LiveRun): Promise<WriteResult> {
+    if (run.request.dk === undefined) {
+      return this.predatesStore(run, 'moved');
+    }
+    return this.parts.release.advance(run);
+  }
+
   /** E10-6: a manual step follows the green gate — the ticket waits where it is, parked for the human persona. */
   async parkOnSuccess(run: LiveRun, personaId: string): Promise<WriteResult> {
     if (run.request.dk === undefined) {

@@ -1,8 +1,9 @@
 import type { LedgerWrite } from '../../core/ledger';
 import type { Clock } from '../ports/clock';
 import type { RunInfo } from '../protocol';
-import type { Breaker } from './breaker';
+import { DEFAULT_MAX_RED, type Breaker } from './breaker';
 import type { ChainState } from './chain-state';
+import type { PersonaBreaker } from './persona-breaker';
 import type { PoolCapacity } from './pool-capacity';
 import type { SupervisorDirectory } from './supervisor-directory';
 
@@ -16,6 +17,8 @@ export interface SettledRunsDeps {
   readonly directory: SupervisorDirectory;
   readonly pools: PoolCapacity;
   readonly breaker: Breaker;
+  /** req-257: a chain run's red gate counts against its persona; absent = every run counts per column. */
+  readonly personaBreaker?: PersonaBreaker;
   readonly clock: Clock;
   readonly persist: () => Promise<void>;
   readonly events?: FleetLedger;
@@ -43,8 +46,12 @@ export class SettledRuns {
     const machineStopped = this.deps.directory.takeMachineStop(info.id);
     const state = this.deps.state;
     const hold = { phase: record.request.phase, at: this.deps.clock.now().toISOString() };
+    const chainPersona = record.request.cursor !== undefined && this.deps.personaBreaker !== undefined ? (info.persona ?? null) : null;
     if (info.state === 'done') {
       state.redStreak[column] = 0;
+      if (chainPersona !== null) {
+        this.deps.personaBreaker!.green(chainPersona);
+      }
       delete state.ticketFailures[info.ticketId];
       delete state.ownerHold[info.ticketId];
       if ((info.blocked ?? null) !== null) {
@@ -53,6 +60,10 @@ export class SettledRuns {
     }
     if (info.state === 'stopped' && !machineStopped) {
       state.ownerHold[info.ticketId] = hold; // the owner stopped it: the ticket stays put until they move or start it
+    }
+    if (info.state === 'failed' && chainPersona !== null) {
+      const maxRed = state.phases.find((p) => p.id === column)?.maxRed ?? DEFAULT_MAX_RED;
+      return this.deps.personaBreaker!.failed(info, chainPersona, maxRed);
     }
     await (info.state === 'failed' ? this.deps.breaker.failed(info, column) : this.deps.persist());
   }

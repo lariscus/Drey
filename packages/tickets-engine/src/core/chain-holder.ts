@@ -92,6 +92,21 @@ export function holderOf(ticket: HolderInput, lookup: PersonaLookup): TicketHold
   return { kind: 'entry', persona: persona.id, entry, work };
 }
 
+/**
+ * A lookup over the crew's kinds (persona id -> kind). Without a crew read
+ * (`kinds` absent) every named persona counts as readable: `you` is the
+ * human persona, `pia` Mission Control's, anyone else an agent.
+ */
+export function crewLookupOf(kinds: ReadonlyMap<string, Persona['kind']> | undefined): PersonaLookup {
+  if (kinds === undefined) {
+    return (id) => ({ id, kind: id === HUMAN_PERSONA_ID ? 'human' : id === 'pia' ? 'mission' : 'agent' });
+  }
+  return (id) => {
+    const kind = kinds.get(id);
+    return kind === undefined ? (id === HUMAN_PERSONA_ID ? { id, kind: 'human' } : null) : { id, kind };
+  };
+}
+
 /** The persona id whose column the ticket stands in; null in a lifecycle column. */
 export function holderPersonaOf(holder: TicketHolder): string | null {
   return holder.kind === 'none' ? null : holder.persona;
