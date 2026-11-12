@@ -682,7 +682,7 @@ The grammar, one entry per list item (`core/chain-list.ts`):
   (req-269). What happens at an entry follows the persona's `kind`
   (`core/chain-entry-work.ts` `entryWorkOf`): an `agent`'s is a **run**, a
   `mission` persona's a **Mission Control turn** on the ticket (no session,
-  no slot, no budget — R9; it runs with milestone 248), the human's parks the
+  no slot, no budget — R9; below), the human's parks the
   ticket for the owner, and an entry naming no readable persona is *missing*.
 - `<persona>:shape` — the run's **mode**: the interactive entry (the owner
   shapes the ticket with that persona in the Shape chat). `shape` is the only
@@ -698,8 +698,7 @@ The grammar, one entry per list item (`core/chain-list.ts`):
 means something while the ticket is worked; a ticket in Inbox, Prioritized
 or the pipeline's first column has no current position (every entry is
 ahead), one in the terminal column is past the last. `sent-back: <from>><to>`
-marks the one send-back a ticket may use (concept §4; the send-back verb is
-milestone 248's).
+marks the one send-back a ticket may use (concept §4).
 
 **The cursor walks on a lifecycle store** (req-257, milestone 247; the files
 backend and a store on phase stages keep the phase board). Who holds a
@@ -710,7 +709,7 @@ readable persona puts it at You with *no persona for position n*;
 otherwise the entry's persona holds it. The holder of an agent entry is the
 one who runs — no column persona, no ticket pin, no default (below); a
 `:shape` entry waits for the owner's Shape chat; a You entry waits for the
-owner in Needs you; a Pia entry waits for milestone 248. A run's green end
+owner in Needs you; a Pia entry gets a Mission Control turn (below). A run's green end
 writes the next position into `x-at` inside its claim and releases once
 into `active` (`ClaimRelease.advance`); past the last entry the cursor
 stands one beyond it and the engine moves the ticket to `done`
@@ -728,6 +727,38 @@ the queue column before it (Shaping); You in the first checkpoint (Ready to
 try); a pipeline with none of these shows the stage as one "active"
 column. An owner's move of a chain ticket into a working column moves the
 cursor to the position that stands there (`store/chain-move.ts`).
+
+**What a chain run may say** (req-257, milestone 248). The brief of a chain
+run lists the positions (`prompts/disciplines/chain.md`). Ending the turn
+with **`SEND-BACK: <position> <reason>`** names an earlier position whose
+work must be done again: no gate runs; the **first** send-back of a ticket
+moves the cursor there inside the claim and writes `sent-back: <from>><to>`,
+the invalidation line (`sent back 5>3 — from 5 (tessa) to 3 (ben): <reason>;
+positions 3–6 run again`) as the release's comment — the earlier results
+stay readable as history and every position from the target on runs again;
+a **second** send-back does not move the cursor: `awaiting: you` and a
+`needs-decision [second-send-back]` with both, so the owner decides (Accept
+hands on, Send back returns it); a position that is no earlier one of this
+chain is a red gate with the reason. A **question** (`QUESTION:`, Q-03's
+wait) writes `awaiting: you` before the claim is given up — the card stands
+at You — and the answer's reclaim removes it, the same persona goes on. A
+run's plan carrying **`### Chain`** makes that chain the ticket's at the run's
+green end (in the same in-claim write as the cursor), when the write guard
+holds (personas of the crew, nothing changed at or before the cursor);
+otherwise the ticket keeps its chain and the hand-on says why. The owner's
+Accept or Send back clears `awaiting`.
+
+**Pia's entry** (req-257, milestone 248; owner 2026-11-12). When the cursor
+reaches an entry of Mission Control's persona, the engine runs one
+ticket-scoped Mission Control turn (`services/mission-entry-turns.ts`): a
+chat session titled `<her title> — T-0123, position 2 of 4` whose system
+message is her prompt + `mission.md` + the ticket in the board digest's
+place; no runner session, no slot, no class, no budget. After it the
+ticket waits for the owner — `awaiting: you` and a `needs-decision
+[pia-turn]` naming her cards or her reply. **Confirming one of her cards
+ends her entry**: the cursor moves on (past the last entry: `done`) and the
+decision is resolved; a turn without a card, or dismissed cards, leave the
+ticket at You with her reply, and the owner's Accept moves it on.
 
 **The reader** (`core/ticket-chain-fields.ts`) is strict per entry and
 whole per chain: one entry outside the grammar — the old delta's `insert …`

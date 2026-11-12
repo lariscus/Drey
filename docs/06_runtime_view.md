@@ -5921,3 +5921,39 @@ sequenceDiagram
 ```
 
 On a lifecycle store the dispatch asks **who holds the ticket** instead of which column it sits in: the holder rule (`core/chain-holder.ts`) reads the chain's entry at the cursor; an agent entry runs with that persona alone (no ticket pin, no crew default, no ring run), a `:shape` entry waits for the Shape chat, a You entry for the owner, a Pia entry for milestone 248, an entry naming no readable persona stands at You with the reason. A run needs room in the big pool **and** in the persona's own pool; a persona below its `min:` overruns a full big pool. A red gate counts against the persona (`PersonaBreaker`): its streak, a minute's breather, the trip into the pause. Until req-270/271 the board keeps the pipeline's columns and places an `active` ticket in its holder's column (`core/chain-placement.ts`); an owner's move into a working column moves the cursor to the position that stands there (`store/chain-move.ts`). The stage migration turns a ticket's old column into its cursor (`cursorForPin`) and converts the pins a milestone-239 migration left.
+
+## 6.124 A chain run's verdicts and Pia's entry — send-back, question, the plan's chain, a Mission Control turn on a ticket (req-257, milestone 248)
+
+```mermaid
+sequenceDiagram
+    actor Owner
+    participant W as worker (chain run)
+    participant RC as RunCompletion / ClaimRelease
+    participant S as dricket store
+    participant MET as MissionEntryTurns (engine)
+    participant CS as ChatService (Pia)
+    participant BS as BoardService
+    W-->>RC: final message "SEND-BACK: 3 <reason>"
+    RC->>RC: decideSendBack (earlier position? the one send-back used?)
+    alt first send-back
+        RC->>S: in-claim put x-at = 3, x-sent-back = 5>3 · release → active (the invalidation line)
+    else second send-back
+        RC->>S: in-claim put x-awaiting = you · release · needs-decision [second-send-back]
+    else no earlier position
+        RC->>RC: red gate (the persona breaker counts it)
+    end
+    W-->>RC: QUESTION: (Q-03 wait)
+    RC->>S: put x-awaiting = you, give the claim up · the answer re-claims and removes it
+    W-->>RC: green end with ### Chain in the plan
+    RC->>S: in-claim put x-at + 1 and x-chain (when the guard holds)
+    Note over MET,BS: the cursor reaches Pia's entry
+    MET->>BS: missionEntries() — holder kind mission, not waiting
+    MET->>CS: start "Pia — T-0123, position 2 of 4" (system: her prompt + mission.md + ## Ticket)
+    CS-->>MET: say + proposal cards
+    MET->>BS: waitForOwner → x-awaiting: you + needs-decision [pia-turn]
+    Owner->>CS: confirm a card
+    CS->>MET: onConfirmed(title)
+    MET->>BS: finishMissionEntry → x-at + 1, resolved [pia-turn]
+```
+
+A chain run's brief lists the positions and the `SEND-BACK:` marker (`prompts/disciplines/chain.md`); the harness's result text is read for it (`event-text.ts` `sendBackOf`), `exitVerdict` answers `send-back` before the gate, and `RunCompletion.sendBack` decides with `decideSendBack` over the request's `cursor` (its entries and the send-back already used). Pia's entry never reaches the runner: the engine sweeps on every board and fleet change, runs one turn per entry, and the ticket's `awaiting` keeps a second turn from starting.

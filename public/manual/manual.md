@@ -1102,7 +1102,15 @@ the sign-off and merges the branch (You's *commit*). **Send back** returns it
 to the nearest earlier agent step. Moving a ticket into a working column
 moves it to the step that stands there. A step whose persona no longer
 exists, or a step marked *Tell me when it is done* that just finished, shows
-in **Needs you**. A step of **Pia** waits — her turn on a ticket comes next.
+in **Needs you**. A persona that finds an earlier step's work wanting can
+**send the ticket back** to it (once per ticket — a second time it comes
+to you with both reasons); every step from there runs again. A persona
+that asks you a question moves the card to you until you answer. When Paul
+writes a chain into his plan, it becomes the ticket's chain as his step
+ends. At a step of **Pia**, Mission Control looks at the ticket once and
+proposes changes as cards in a chat of its own (*Pia — T-0123, position 2
+of 4*); the ticket waits in **Needs you** — confirm one of her cards and it
+moves on, or press **Accept** if she proposed nothing you want.
 How many tickets one persona runs at once is its **Parallel · max** (the
 Persona page's Work block); *min* lets it start one even when the pool is
 full. Three red gates in a row hold that persona until you play it again on
