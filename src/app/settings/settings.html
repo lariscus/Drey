@@ -100,7 +100,16 @@
     </nav>
 
     <div class="right">
-      <div #detail class="detail" (scroll)="onScroll()">
+      <div
+        #detail
+        class="detail"
+        (scroll)="onScroll()"
+        (scrollend)="onScrollEnd()"
+        (wheel)="onUserScroll($event)"
+        (touchstart)="onUserScroll($event)"
+        (keydown)="onUserScroll($event)"
+        (pointerdown)="onUserScroll($event)"
+      >
         @if (searching()) {
           <h1 class="results-title">{{ 'settings.results.title' | t }}</h1>
           <div class="results" role="list" aria-label="Search results">

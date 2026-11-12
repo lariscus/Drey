@@ -74,6 +74,8 @@ export function createRepoSession(api: DreyPluginApi): RepoSession {
 
   const listeners = new Set<() => void>();
   const notify = (): void => {
+    // The panel header's count reads this state; the shell re-reads it on document and vault events only (D-64).
+    api.ui.refreshStatus();
     for (const listener of [...listeners]) {
       listener();
     }

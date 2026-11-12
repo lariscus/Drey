@@ -116,6 +116,74 @@ describe('Settings screen (E13-22)', () => {
     expect(active.getAttribute('aria-current')).toBe('location');
   });
 
+  describe('a programmatic scroll (D-54)', () => {
+    let detail: HTMLElement;
+    const scrollTo = vi.fn();
+
+    beforeEach(() => {
+      scrollTo.mockClear();
+      detail = root.querySelector<HTMLElement>('.detail')!;
+      const tops = [0, 400];
+      [...detail.querySelectorAll<HTMLElement>('[data-settings-section]')].forEach((a, i) =>
+        Object.defineProperty(a, 'getBoundingClientRect', { value: () => ({ top: tops[i] - detail.scrollTop }) }),
+      );
+      Object.defineProperty(detail, 'getBoundingClientRect', { value: () => ({ top: 0 }) });
+      Object.defineProperty(detail, 'scrollHeight', { value: 1000, configurable: true });
+      Object.defineProperty(detail, 'clientHeight', { value: 300, configurable: true });
+      detail.scrollTo = scrollTo as unknown as typeof detail.scrollTo;
+    });
+
+    const frame = (top: number): void => {
+      detail.scrollTop = top;
+      detail.dispatchEvent(new Event('scroll'));
+      fixture.detectChanges();
+    };
+    const activeLabel = (): string | undefined =>
+      root.querySelector('.section-entry.active .section-label')?.textContent?.trim();
+    const openPartTwo = async (): Promise<void> => {
+      click(entries()[1]);
+      await fixture.whenStable();
+      fixture.detectChanges();
+    };
+
+    it('marks the selected section once and ignores the scroll frames on the way', async () => {
+      await openPartTwo();
+      expect(scrollTo).toHaveBeenCalledWith({ top: 388, behavior: 'smooth' });
+      expect(activeLabel()).toBe('Part two');
+      for (const top of [40, 120, 200, 300]) {
+        frame(top);
+        expect(activeLabel()).toBe('Part two');
+      }
+      detail.dispatchEvent(new Event('scrollend'));
+      fixture.detectChanges();
+      expect(activeLabel()).toBe('Part two');
+    });
+
+    it('follows the user again once the scroll ended', async () => {
+      await openPartTwo();
+      frame(388);
+      detail.dispatchEvent(new Event('scrollend'));
+      frame(10);
+      expect(activeLabel()).toBe('Part one');
+    });
+
+    it('follows the user at once when they take the scroll over', async () => {
+      await openPartTwo();
+      frame(40);
+      expect(activeLabel()).toBe('Part two');
+      detail.dispatchEvent(new Event('wheel'));
+      frame(10);
+      expect(activeLabel()).toBe('Part one');
+    });
+
+    it('does not hold the spy for a scroll that would not move the page', async () => {
+      detail.scrollTop = 388;
+      await openPartTwo();
+      frame(10);
+      expect(activeLabel()).toBe('Part one');
+    });
+  });
+
   it('filters the settings of all pages and opens the page of a hit', () => {
     const search = root.querySelector<HTMLInputElement>('input[type="search"]')!;
     search.value = 'watch';

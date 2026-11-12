@@ -1899,15 +1899,6 @@
   min-height: 0;
 }
 
-.assistant-composer .prompt-btn {
-  opacity: 0;
-}
-
-.assistant-composer .composer-meta:hover .prompt-btn,
-.assistant-composer .composer-meta:focus-within .prompt-btn {
-  opacity: 1;
-}
-
 .assistant-composer .model-btn {
   height: 28px;
   display: flex;

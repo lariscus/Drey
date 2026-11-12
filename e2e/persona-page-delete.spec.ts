@@ -61,15 +61,35 @@ async function openCrew(page: Page): Promise<void> {
   await page.getByRole('menuitem', { name: 'Crew', exact: true }).click();
 }
 
-/** A board's persona files are tracked: the seed is committed (the fixture writes it when the app starts), so a deletion is a commit of removals. */
-function trackSeed(vaultDir: string): void {
+/** The commits the engine makes in a fresh board of its own accord: the default crew when it starts (req-256), the human persona when the Crew list is first read (E10-6). */
+const ENGINE_COMMITS = ['personas: the default crew (req-256)', 'tickets: you persona'];
+
+/**
+ * A board's persona files are tracked: the seed is committed (the fixture writes it when the app starts), so a deletion is a commit of removals.
+ * The engine makes its own commits in this vault, and two commits at once collide on `index.lock` (D-65), so the spec commits only after
+ * both of the engine's are in the log -- its work observed where it lands, not a clock.
+ */
+async function trackSeed(vaultDir: string): Promise<void> {
+  await expect
+    .poll(
+      () => {
+        try {
+          const subjects = git(vaultDir, 'log', '--format=%s').split('\n');
+          return ENGINE_COMMITS.filter((subject) => subjects.includes(subject));
+        } catch {
+          return []; // a repository without a commit yet
+        }
+      },
+      { message: 'the engine has made its own commits in the board', timeout: 60_000 },
+    )
+    .toEqual(ENGINE_COMMITS);
   git(vaultDir, 'add', '-A');
   git(vaultDir, '-c', 'user.name=Spec', '-c', 'user.email=spec@example.test', 'commit', '-q', '-m', 'seed');
 }
 
 async function openPersona(page: Page, id: string, vaultDir: string): Promise<void> {
   await openCrew(page);
-  trackSeed(vaultDir);
+  await trackSeed(vaultDir);
   await page.locator(`.desk-team [data-persona="${id}"]`).first().click();
   await page.locator('.desk-detail-head .persona-edit-btn').click();
   await expect(page.locator('.persona-page .persona-ed-view .cm-content').filter({ visible: true })).toBeVisible({ timeout: 15_000 });
@@ -102,7 +122,7 @@ test('a persona is deleted from its page by typing its name, in one commit, and 
 
   // The folder is gone in one commit; the chat file and the ticket stay.
   await expect.poll(() => fs.existsSync(path.join(personas, 'ralf'))).toBe(false);
-  // (the Crew tab it hands over to may add its own `tickets: you persona` commit on top, so the commit is found by its subject)
+  // (found by its subject: the board may hold further commits)
   const removal = git(vaultDir, 'log', '--format=%H', '--fixed-strings', '--grep', 'personas: ralf removed').split('\n');
   expect(removal).toHaveLength(1);
   const shown = git(vaultDir, 'show', '--name-status', '--format=', removal[0]!).split('\n');
