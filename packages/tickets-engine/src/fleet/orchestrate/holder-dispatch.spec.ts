@@ -34,7 +34,9 @@ describe('the holder dispatch on a lifecycle store (req-257)', () => {
 
     expect(fleet.records.map((r) => r.request.ticketId)).toEqual(['T-0300']);
     const request = fleet.records[0]!.request;
-    expect(request.cursor).toEqual({ at: 3, length: 4 });
+    expect(request.cursor).toMatchObject({ at: 3, length: 4, entries: STANDARD, crew: { personas: expect.arrayContaining(['paul', 'ben', 'you']) as unknown } });
+    expect(request.instruction).toContain('3. ben — you, now');
+    expect(request.instruction).toContain('SEND-BACK: <position>');
     expect(request.nextPhase).toBeNull();
     expect(request.dk?.lifecycle).toBe(true);
     expect(fleet.start.mock.calls[0]![1]).toEqual({ persona: 'ben' });

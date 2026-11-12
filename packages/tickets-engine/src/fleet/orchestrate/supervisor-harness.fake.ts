@@ -25,7 +25,7 @@ export interface FakeHandle extends WorkerHandle {
   fail(code: number | null): void;
   onEvent(text: string): void;
   emit(event: Omit<NormalizedEvent, 'ts'> & { ts?: string }): void;
-  result(blocked?: string | null): void;
+  result(blocked?: string | null, text?: string): void;
 }
 
 export interface FakeAdapter {
@@ -60,7 +60,7 @@ export function fakeAdapter(id: ProviderAdapter['id'] = 'opencode'): FakeAdapter
       fail: (code) => exitResolve?.(code),
       onEvent: (text) => start.onEvent({ ts: TS, kind: 'note', text }),
       emit: (event) => start.onEvent({ ts: TS, ...event }),
-      result: (blocked) => start.onEvent({ ts: TS, kind: 'result', text: 'done', ...(blocked !== undefined ? { blocked } : {}) }),
+      result: (blocked, text) => start.onEvent({ ts: TS, kind: 'result', text: text ?? 'done', ...(blocked !== undefined ? { blocked } : {}) }),
     };
     handles.push(handle);
     return handle;
@@ -244,6 +244,12 @@ export async function reportUsage(h: Harness, runId: string, worker: number, usa
 /** The worker finishes its turn (optionally blocked) and exits 0. */
 export function endTurn(handle: FakeHandle, blocked?: string | null): void {
   handle.result(blocked);
+  handle.fail(0);
+}
+
+/** The worker ends its turn with this final message (req-257: a `SEND-BACK:` verdict rides it). */
+export function endTurnSaying(handle: FakeHandle, text: string): void {
+  handle.result(undefined, text);
   handle.fail(0);
 }
 

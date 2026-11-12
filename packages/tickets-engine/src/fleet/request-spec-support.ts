@@ -24,6 +24,7 @@ export const DISCIPLINES: DisciplineTexts = {
   ticketFile: 'The ticket file named above: the spec fixture of the ticket-file text.',
   language: 'Language: the spec fixture of the language text.',
   precedence: 'Precedence: the spec fixture of the precedence text.',
+  chain: 'The chain: the spec fixture, position {{at}} of {{length}}.\n{{positions}}\n- SEND-BACK: <position> <reason in one line>',
   fragments: { planFormat: 'The plan format: the spec fixture.', chainGrammar: 'The chain grammar: the spec fixture.' },
 };
 

@@ -1,4 +1,5 @@
 import { renderStatusComment, slugStatusKey } from '../../core/status-comment';
+import { setDocumentField } from '../../store/document-fields';
 import type { WriteResult } from './claim-release';
 import { messageOf, type LiveRun } from './live-run';
 import type { StoreClaims } from './store-claims';
@@ -22,6 +23,9 @@ function releasable(run: LiveRun): boolean {
   return run.waitReleased !== true && !lease.released && !lease.fenced && run.claimLost === undefined;
 }
 
+/** The ticket waits for the owner (req-257: a chain run's question puts the card at You). */
+const AWAITING_KEY = 'x-awaiting';
+
 export class WaitClaim {
   constructor(
     private readonly claims: StoreClaims,
@@ -36,6 +40,10 @@ export class WaitClaim {
       return;
     }
     await this.copy.sync(run);
+    if (run.request.cursor !== undefined) {
+      // req-257: a question in a chain run moves the card to You (the holder rule's `awaiting`); the answer brings it back.
+      await lease.patchInClaim((text) => setDocumentField(text, AWAITING_KEY, 'you') ?? text);
+    }
     const key = slugStatusKey(`run ${run.info.id} waits`) ?? undefined;
     const note = renderStatusComment({
       verb: 'needs-decision',
@@ -68,6 +76,9 @@ export class WaitClaim {
       return { ok: false, error: `${run.request.ticketId} could not be re-claimed for the answer - ${messageOf(error)}` };
     }
     run.waitReleased = false;
+    if (run.request.cursor !== undefined) {
+      await lease.patchInClaim((text) => setDocumentField(text, AWAITING_KEY, null) ?? text); // req-257: back to the persona that asked
+    }
     const key = run.waitKey;
     if (key !== undefined) {
       const resolved = renderStatusComment({ verb: 'resolved', key, ...(answer === null ? {} : { detail: answer }) });

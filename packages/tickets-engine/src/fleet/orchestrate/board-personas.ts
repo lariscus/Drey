@@ -81,6 +81,13 @@ export class BoardPersonas {
     return held;
   }
 
+  /** req-257: who a plan run's `### Chain` may name — the crew with `you` — and who takes no mode (every non-agent). */
+  async crewGuard(config: ChainConfig): Promise<{ readonly personas: readonly string[]; readonly modeless: readonly string[] }> {
+    const kinds = await this.crewKinds(config, this.cacheFor(config));
+    const personas = [...kinds.keys()];
+    return { personas: personas.includes('you') ? personas : [...personas, 'you'], modeless: personas.filter((id) => kinds.get(id) !== 'agent') };
+  }
+
   /** The crew's persona kinds from the meta vault's `personas/` folders (unreadable records left out). */
   private async crewKinds(config: ChainConfig, fileOf: FileOf): Promise<Map<string, Persona['kind']>> {
     const kinds = new Map<string, Persona['kind']>();

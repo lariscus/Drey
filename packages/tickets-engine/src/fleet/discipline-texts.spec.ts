@@ -21,6 +21,7 @@ describe('the discipline files', () => {
     const names = (await fsp.readdir(dir)).filter((n) => n.endsWith('.md')).sort();
     expect(names).toEqual([
       'asking.md',
+      'chain.md',
       'completion.md',
       'handover.md',
       'interactive.md',
@@ -51,7 +52,12 @@ describe('the discipline files', () => {
     expect(texts.interactive).toMatch(/^Dialog discipline:/);
     expect(texts.asking).toMatch(/^Asking the owner:/);
     expect(texts.scout).toMatch(/^Scout discipline:/);
-    const { fragments, ...disciplines } = texts;
+    const { fragments, chain, ...disciplines } = texts;
+    // req-257: the chain section keeps its per-run placeholders ({{at}}, {{length}}, {{positions}}) for the composer
+    expect(chain).toMatch(/^The chain:/);
+    expect(chain).toContain('{{positions}}');
+    expect(chain).toContain('`SEND-BACK: <position> <reason in one line>`');
+    expect(chain).not.toContain('{{sendBack}}');
     for (const text of [...Object.values(disciplines), fragments.planFormat, fragments.chainGrammar]) {
       expect(text).not.toContain('{{');
       expect(text).not.toContain('drey-prompt-version');

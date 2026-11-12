@@ -50,6 +50,7 @@ import { FileTicketStore } from '../store/file-ticket-store';
 import { checkoutOf, createDricketStore, groupByStage, readStoreSettings, type StoreListing, type StoreSettings } from '../store/store-settings';
 import { archivedRecordFiles, recordToBoardFile, type HolderPlacement } from '../store/store-board';
 import { withCursorForMove } from '../store/chain-move';
+import { runCursorOf } from '../fleet/run-cursor';
 import { ownerAcceptOf, ownerSendBackOf } from './chain-owner-moves';
 import { chainFinished } from '../core/chain-placement';
 import { setDocumentField } from '../store/document-fields';
@@ -2248,9 +2249,9 @@ export class EngineBoardService {
     if (placement === null || chain === undefined) {
       return null;
     }
-    const at = Math.min(Math.max(card.meta.at ?? 1, 1), chain.length);
-    const persona = placement.lookup(chain[at - 1]!.persona);
-    return { persona: persona?.kind === 'agent' ? persona.id : null, cursor: { at, length: chain.length } };
+    const cursor = runCursorOf({ chain, at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.chainGuardIds() });
+    const persona = placement.lookup(chain[cursor.at - 1]!.persona);
+    return { persona: persona?.kind === 'agent' ? persona.id : null, cursor };
   }
 
   /** req-257: what places a chain ticket by its holder — null unless the board runs on a lifecycle store. */
@@ -2711,7 +2712,8 @@ export class EngineBoardService {
     try {
       const record = await this.storeBoard.record(store, card.id);
       const legacy = why.text ?? recordToBoardFile(record, card.phase).text;
-      const text = 'at' in target ? (setDocumentField(legacy, 'at', String(target.at)) ?? legacy) : legacy;
+      const moved = 'at' in target ? (setDocumentField(legacy, 'at', String(target.at)) ?? legacy) : legacy;
+      const text = setDocumentField(moved, 'awaiting', null) ?? moved; // the owner decided: no longer waiting for You
       await this.putRecord(store, record, text, 'at' in target ? { keepStage: true } : { phase: target.done });
     } catch (error) {
       return { ok: false, error: error instanceof TicketChangedError ? `${card.id} changed meanwhile — look again and retry` : messageOf(error) };

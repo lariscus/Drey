@@ -6,7 +6,7 @@ import type { RunSupervisorDeps } from '../compose-supervisor';
 import type { RunRequest } from '../protocol';
 import { FakeTicketStore } from '../store/ticket-store.fake';
 import { settled, waitFor } from './run-spec-support';
-import { buildRequest, DK_TARGET, endTurn, harness, startRun, useTempDirs, type Harness } from './supervisor-harness.fake';
+import { buildRequest, DK_TARGET, endTurn, endTurnSaying, harness, startRun, useTempDirs, type Harness } from './supervisor-harness.fake';
 
 /**
  * E14-5: the run's hand-back of its ticket. The store is a scripted fake
@@ -87,6 +87,57 @@ describe('ClaimRelease — release is the one door', () => {
       expect(t.store.of('put')).toHaveLength(1);
       expect(t.store.text).toMatch(/^x-at: 4$/m);
       expect(t.store.of('comment')[0]?.text).toContain('handed over at position 3 of 6');
+    });
+
+    it('req-257: a send-back to an earlier position moves the cursor there, marks x-sent-back and writes the invalidation — no gate', async () => {
+      const t = lifecycleSetup();
+      const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK, nextPhase: null, nextPhaseDir: null, cursor: { at: 3, length: 4, entries: ['paul:shape', 'paul', 'ben', 'you'], crew: { personas: ['paul', 'ben', 'ralf', 'you'], modeless: ['you'] } } }));
+      endTurnSaying(t.adapter.handles[0]!, 'The plan misses the migration.\nSEND-BACK: 2 the plan misses the migration step');
+      await settled(t.sup, id, 'done');
+      expect(t.store.of('release').map((c) => c.stage)).toEqual(['active']);
+      expect(t.store.text).toMatch(/^x-at: 2$/m);
+      expect(t.store.text).toMatch(/^x-sent-back: 3>2$/m);
+      expect(t.store.of('comment')[0]?.text).toContain('sent back 3>2 — from 3 (ben) to 2 (paul): the plan misses the migration step; positions 2–4 run again');
+    });
+
+    it('req-257: a second send-back does not move the cursor — the ticket waits for the owner with both', async () => {
+      const t = lifecycleSetup();
+      const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK, nextPhase: null, nextPhaseDir: null, cursor: { at: 3, length: 4, entries: ['paul:shape', 'paul', 'ben', 'you'], sentBack: { from: 4, to: 3 } } }));
+      endTurnSaying(t.adapter.handles[0]!, 'SEND-BACK: 1 start over');
+      await settled(t.sup, id, 'done');
+      expect(t.store.text).not.toMatch(/^x-at:/m);
+      expect(t.store.text).toMatch(/^x-awaiting: you$/m);
+      expect(t.store.of('comment')[0]?.text).toMatch(/^needs-decision: \[second-send-back\] a second send-back from position 3: start over/);
+    });
+
+    it('req-257: a send-back that names no earlier position is a red gate with the reason', async () => {
+      const t = lifecycleSetup();
+      const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK, nextPhase: null, nextPhaseDir: null, cursor: { at: 3, length: 4, entries: ['paul:shape', 'paul', 'ben', 'you'], crew: { personas: ['paul', 'ben', 'ralf', 'you'], modeless: ['you'] } } }));
+      endTurnSaying(t.adapter.handles[0]!, 'SEND-BACK: 4 later');
+      await settled(t.sup, id, 'failed');
+      expect(t.sup.get(id)?.gateFailure).toBe('send-back to position 4 is not an earlier position of this chain (1–2)');
+      expect(t.store.text).not.toMatch(/^x-sent-back:/m);
+    });
+
+    it("req-257: a plan run's ### Chain becomes the ticket's chain at its green end, when the guard holds", async () => {
+      const t = lifecycleSetup();
+      t.store.text = t.store.text.replace('## Log', '## Plan\n\n### Chain\n\npaul:shape; paul; ben; ralf; you\n\n## Log');
+      const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK, nextPhase: null, nextPhaseDir: null, cursor: { at: 3, length: 4, entries: ['paul:shape', 'paul', 'ben', 'you'], crew: { personas: ['paul', 'ben', 'ralf', 'you'], modeless: ['you'] } } }));
+      endTurn(t.adapter.handles[0]!);
+      await settled(t.sup, id, 'done');
+      expect(t.store.text).toMatch(/^x-chain: paul:shape;paul;ben;ralf;you$/m);
+      expect(t.store.text).toMatch(/^x-at: 4$/m);
+      expect(t.store.of('comment')[0]?.text).toContain("the plan's ### Chain is the ticket's chain now");
+    });
+
+    it("req-257: a plan's chain that changes a past position is not applied, and the hand-on says why", async () => {
+      const t = lifecycleSetup();
+      t.store.text = t.store.text.replace('## Log', '## Plan\n\n### Chain\n\nralf; ben; you\n\n## Log');
+      const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK, nextPhase: null, nextPhaseDir: null, cursor: { at: 3, length: 4, entries: ['paul:shape', 'paul', 'ben', 'you'], crew: { personas: ['paul', 'ben', 'ralf', 'you'], modeless: ['you'] } } }));
+      endTurn(t.adapter.handles[0]!);
+      await settled(t.sup, id, 'done');
+      expect(t.store.text).not.toMatch(/^x-chain:/m);
+      expect(t.store.of('comment')[0]?.text).toContain("the plan's ### Chain was not applied");
     });
 
     it('req-257: past the last entry the cursor stands one beyond it — the engine moves the ticket to done', async () => {

@@ -65,6 +65,7 @@ function shipInstructionInput(plan: RunPlan): InstructionInput {
     ...interactivePart(input),
     ...personaInstructionParts(input.persona ?? null),
     ...(plan.reviewCheckout !== null ? { reviewCheckout: plan.reviewCheckout } : {}),
+    ...(input.cursor !== undefined ? { chain: { at: input.cursor.at, length: input.cursor.length, entries: input.cursor.entries ?? [] } } : {}),
   };
 }
 

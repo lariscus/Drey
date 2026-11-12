@@ -138,3 +138,23 @@ function gateFailurePart(input: InstructionInput, truncations: Truncation[]): st
     `so continue from the existing diff instead of starting over. The failure's tail:\n\n${capped.text}`
   );
 }
+
+/**
+ * req-257: a chain run's section (`prompts/disciplines/chain.md`): the
+ * positions in order — the done ones marked, the run's own as "you" — and
+ * the `SEND-BACK:` marker. Null for a column run.
+ */
+export function chainSection(input: Pick<InstructionInput, 'chain' | 'disciplines'>): string | null {
+  const chain = input.chain;
+  if (chain === undefined || chain.entries.length === 0) {
+    return null;
+  }
+  const positions = chain.entries
+    .map((entry, index) => {
+      const position = index + 1;
+      const state = position < chain.at ? ' — done' : position === chain.at ? ' — you, now' : '';
+      return `${position}. ${entry}${state}`;
+    })
+    .join('\n');
+  return input.disciplines.chain.replaceAll('{{at}}', String(chain.at)).replaceAll('{{length}}', String(chain.length)).replaceAll('{{positions}}', positions);
+}
