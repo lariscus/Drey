@@ -316,7 +316,7 @@
   width: 52px;
   height: 32px;
   border: 1px solid var(--field-border);
-  border-radius: 16px;
+  border-radius: var(--radius-dialog);
   background: var(--bg-input);
 }
 
@@ -352,7 +352,7 @@
   height: 30px;
   padding: 0 8px 0 12px;
   border: 1px solid var(--text-primary);
-  border-radius: 16px;
+  border-radius: var(--radius-dialog);
   background: var(--bg-input);
   color: var(--text-primary);
   font-family: var(--font-mono);
@@ -375,7 +375,7 @@
   height: 30px;
   padding: 0 12px;
   border: 1px dashed var(--field-border);
-  border-radius: 16px;
+  border-radius: var(--radius-dialog);
   background: transparent;
   color: var(--text-3);
   font: inherit;
