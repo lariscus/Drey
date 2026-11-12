@@ -865,7 +865,11 @@ ones: an item leaves the roadmap exactly when it enters the changelog or
    alternatives wait for confirmation (Working Style).
 4. Parts you deliberately leave out become new roadmap items (backlog or
    "Follow-ups of shipped milestones"); alternatives that were rejected go
-   to `decisions.md`.
+   to `decisions.md`. **While the roadmap states a "Finish line"** (owner,
+   2026-11-12), only its items are worked, every other row is frozen, and
+   a new row is added only when something is broken or blocks a
+   finish-line item — anything else left out is one sentence in the
+   changelog entry.
 
 ### Definition of done — in the same change as the code
 

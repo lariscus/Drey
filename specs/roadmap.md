@@ -88,6 +88,20 @@ the same step).
 Items A1–A5 of the architectural cleanup shipped on 2026-10-13, and
 A10–A12 on 2026-10-17 (changelog); A6–A9 remain.
 
+### Finish line (owner, 2026-11-12)
+
+The owner fixed the end of the current stretch ("ich habe das gefühl mit jedem Lauf entferne ich mich weiter statt näher an das Ende zu kommen" — "Ja, so"). **Only these items count**, in this order:
+
+1. **req-257**, the runner on persona chains — milestone 247 (cursor, holder dispatch, You and notify entries, per-persona pool and breaker) and milestone 248 (send-back, questions, `### Chain`, Pia's entry).
+2. **The seven known defects** below — D-53, D-54, D-64, D-65 (milestone 249) and D-55, D-57 (milestone 250) run beside req-257; D-56 after the owner's decision on its settings half.
+3. **An interim verification round** by the owner after milestone 248, so the unverified pile stops growing.
+4. **req-270, req-271, req-272, req-273, req-274, req-281**, then **req-268** (the live board migration, together with req-270/271), then **req-275** (ADR and specs).
+5. **The owner's verification round** of everything since milestone 213, then the merge of `desktop-integration` into `main` on his word.
+
+**Everything else on this page is frozen** — the rest of "Now", "Tickets on dricket" (E14-9b included, unless the owner starts it), "Later", the cleanup, the backlog and the 160 follow-up rows. Frozen rows stay where they are, are not worked and do not count; after the merge into `main` the owner picks what comes next.
+
+**No new rows while the finish line stands.** A session adds a roadmap row only when something is broken or blocks an item above. Anything else it leaves out is one sentence in its changelog entry, not a row.
+
 ### Known defects
 
 
