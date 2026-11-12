@@ -442,9 +442,15 @@ blank falls back to `CLAUDE.md`, then `AGENTS.md`) → phase
 template (a persona's prompt — `prompt.md`, the persona's one prose since R11 / req-171, whose top is its "who it is" section and which the Persona page edits in Drey's Markdown editor; `persona.md` is frontmatter only — then its `## Skills`, D-46 / req-172: the folders the names in `persona.skills`
 point at, nearest first `personas/<id>/skills/<name>/SKILL.md`, then `_meta/skills/<name>/SKILL.md`, body only,
 in full — "Skills" below; a name with no text is
-a log line) → the ticket's `## Plan` verbatim → the variable parts
-(who/where, description, the worktree's diff stat (commits since the branch left the base — `base...HEAD`, then `git status --short`) head-capped, the earlier step's `## Handover` section,
-and on a retry the previous run's gate failure tail-capped). The prefix
+a log line) → the ticket's `## Plan` verbatim → who/where and the
+description → the shared rules of the run kind (req-280, ADR-0097: the
+discipline files `working`, then `read-only` or `writing` + `ticket-file` +
+`handover`, then `language` and `precedence` — `specs/classifier-spec.md`,
+"The run brief's composition") → the variable parts (the worktree's diff stat (commits since the branch left the base — `base...HEAD`, then `git status --short`) head-capped, the earlier step's `## Handover` section,
+and on a retry the previous run's gate failure tail-capped) → the gate
+commands, `completion` (or `interactive`), `signals`, `asking`. A step
+prompt's `{{plan-format}}` placeholder expands from
+`prompts/fragments/plan-format.md` whatever the prompt's source. The prefix
 up to the plan is byte-identical across runs of the same repo and
 phase, so a warm prompt cache survives. A red-gate retry is a fresh run
 whose instruction carries the ticket's most recent `gateFailure`
@@ -452,7 +458,7 @@ section — the worker continues the branch instead of starting over.
 A persona run names its persona right after the ticket line (milestone
 212, D-60: `Your persona: <id> (<role>) — its folder is
 tickets/_meta/personas/<id>/ …`, ship and scout brief alike), which is
-what lets the step prompts' Friction paragraph run; the persona's
+what lets the signals discipline's FRICTION line reach the persona's journal; the persona's
 `## Memory` slice rides the variable parts; the retired `thread.md` never
 did (D-61 — nothing is adopted unreviewed; req-168 made the 1:1 a session,
 "The 1:1 session" below).

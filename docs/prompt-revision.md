@@ -269,20 +269,111 @@ Decided by the owner (all as recommended):
 
 ## 5. Sizes
 
-| Composed brief | Before (bytes) | After (bytes) |
-|---|---|---|
-| plan | 7 641 | |
-| plan-interactive | 6 070 | |
-| build | 10 056 | |
-| review | 7 833 | |
-| qa | 6 485 | |
-| commit | 7 592 | |
-| scout | 8 394 | |
-| crew mission | 4 145 | |
-| crew shape | 2 651 | |
-| crew flow | 1 640 | |
-| crew aggregator | 1 203 | |
+| Composed brief | Before (bytes) | After (bytes) | Change |
+|---|---|---|---|
+| plan | 7 641 | 9 350 | +22 % |
+| plan-interactive | 6 070 | 9 128 | +50 % |
+| build | 10 056 | 11 619 | +16 % |
+| review | 7 833 | 6 812 | −13 % |
+| qa (after: as Tessa, read-only) | 6 485 | 5 875 | −9 % |
+| commit | 7 592 | 8 922 | +18 % |
+| scout | 8 394 | 6 726 | −20 % |
+| crew mission | 4 145 | 4 866 | +17 % |
+| crew shape | 2 651 | 3 980 | +50 % |
+| crew flow | 1 640 | 1 764 | +8 % |
+| crew aggregator | 1 203 | 1 606 | +34 % |
+| **the shipped set** (all files) | 45 016 | 33 148 | −26 % |
 
 Rendered with `scripts/render-composed-prompts.ts` (the engine's own
-`composeInstruction` / `composeScoutInstruction`, the step prompt as the
-column template, no persona, placeholder ticket facts).
+`composeInstruction` / `composeScoutInstruction` / `loadCrewPrompts`, the
+step prompt as the column template, no persona except Tessa for qa,
+placeholder ticket facts). The set shrank by a quarter; a writing step's
+brief grew because it now carries rules it never had (the signals table,
+precedence, language, the ticket file's duties) and the whole plan format
+instead of a field list. The plan and shape briefs carry the plan format in
+full — the price of one schema read by every planner.
+
+## 6. Fixes (step 4)
+
+| # | Fix | Move |
+|---|---|---|
+| F1 | One rule for the ticket file (`ticket-file.md`: working copy, merged back by the runner, never committed); writable places in `writing.md`; read-only runs get `read-only.md`; "commit on the branch" and the scout's "ONE writable place" contradictions gone | T2, T1 |
+| F2 | One plan format (`fragments/plan-format.md`, D1) pulled by shape, plan, plan-interactive and build; acceptance criteria are `` - [ ] `cmd` `` lines | T2, T1 |
+| F3 | One signals table (`signals.md`) with the three markers; status lines, Handover states and Log lines named as not read | T2, T3 |
+| F4 | A review FAIL ends `BLOCKED: FAIL — …`; the verdict is the final message's first line | T4 |
+| F5 | `qa-default` describes the run that happens: read-only, one verdict line per criterion, `BLOCKED:` on a failure | T5 |
+| F6 | Aggregator sees prompt.md, proposes edits; the parse bug fixed; closing-round proposals as edits; FRICTION journaled from blocked and scout runs | T5 |
+| F7 | Every shared block exists once (disciplines); the scout report shape only in code | T2 |
+| F8 | `working.md` (every run) carries reading and verification only; the change rules are `writing.md`'s; read-only runs never get them | T2 |
+| F9 | Status-log instructions deleted — the runner owns every persisted verb | T3 |
+| F10 | `ticket-file.md`: write your step's sections, the Handover when asked, one Log line; Description is the owner's, Verlauf and frontmatter the runner's. The full ownership table is §7 below and `docs/design/ticket-run-flow.md` | T2 |
+| F11 | One chain grammar (`fragments/chain-grammar.md`) for mission and flow, `move` and `assign` included | T2 |
+| F12 | `precedence.md`: the brief wins over the repo's instructions, above all on git | T2 |
+| F13 | `language.md`: what the owner reads is in the language of the ticket's description (decision F) | T2 |
+| F14 | build: orientation done when every touching point is named; a baseline run of the acceptance commands before the first change | T6 |
+| F15 | build: the same failure after three different fixes ends blocked | T6 |
+| F16 | build: no plan / no criteria → write the plan in the plan format first; an out-of-scope defect goes to Open, unfixed (`writing.md`) | T6, T2 |
+| F17 | build: one ordered "Done when" checklist; the persona keeps character only (D6) | T6, T1 |
+| F18 | build: "you" in the Changes label is named as the owner | T6 |
+| F19 | build: one Open line per review comment, beyond the 15-line limit (conditional injection: proposal) | T6 |
+| F20 | review: fixes nothing; findings in the final message | T4 |
+| F21 | commit: one attempt per conflict, one retry of a failed push; additive conflicts keep both sides in the file's own order; gate re-run after any resolution; the tip is checked from the work branch (no branch note exists) | T1 |
+| F22 | scout: decision lines are the one channel for owner decisions; `QUESTION:` only when the exploration cannot go on | T1 |
+| F23 | mission: every command with its fields and an example | T1 |
+| F24 | shape: a `read` reply is only a request; size S/M/L explained with its class in the plan format; criteria as commands | T1, T2 |
+| F25 | Version markers on disciplines, fragments and crew prompts; one reader strips them; board-started runs no longer leak them | T2 |
+
+## 7. Section ownership (F10, the record)
+
+| Section | Written by | Read by |
+|---|---|---|
+| `## Description` | the owner (Mission Control `createTicket`) | every brief (quoted) |
+| `## Plan` | Paul in the shape chat, the plan step; the build only when the ticket has none | every brief (quoted); the gate (`### Acceptance criteria`), the part release (`### Parts`) |
+| `## Handover` | every writing step outside a dialog (replaced) | the next brief (quoted, ≤ 2 000 chars); the verify step (`proof:`) |
+| `### Review feedback` | the owner's Send back (`core/review-feedback.ts`) | the next build |
+| `## Changes` | the build | the owner's Ready page |
+| `## Report` | the scout | the owner's Needs-you card (decision lines) |
+| `## Verification` | the verify step (machine) | the owner |
+| `## Result` | the commit step | the owner |
+| `## Log` | one line per writing step, the scout | the owner |
+| `## Verlauf`, frontmatter | the runner | the board |
+
+## 8. Verification (step 5)
+
+- **Checklist, every composed brief** (`scripts/render-composed-prompts.ts`
+  plus a check script): every guardrail of §3 present where it applies
+  (G1/G2/G6 in plan, plan-interactive, build and commit via `writing.md`;
+  G3–G5 in commit; G6 also as a review check; G7/G9 in mission, G9 in
+  flow; G8 in scout via its code lines, in review and qa via
+  `read-only.md`); no sentence of 40+ characters twice in one brief; no
+  `{{`, version marker, `status.log` or "branch note" left; exactly one
+  "Done when" in every step brief. Markers and headings match the parsers
+  (`BLOCKED:`, `QUESTION:`, `FRICTION:`, `### Acceptance criteria`,
+  `### Parts`, the scout report shape, the `## Changes` labels, the crew
+  JSON fields — the chat-llm specs assert them).
+- **Read through** the composed review and build briefs end to end; fixed
+  what contradicted: the commit step's merge worktree was not a "writable
+  place", "fix what the gate surfaces" sat in the shared rules though only
+  the build changes code, the scout's end repeated the signals' phrase.
+- **Gate:** see the changelog entry.
+
+## 9. Engine proposals not built
+
+1. A review FAIL sends the ticket back to build by itself (decision B,
+   option 2) — collides with req-266's persona chain.
+2. A `readonly` flag beyond the tester role — req-258's `readonly` persona
+   key — so a `qa-default` column template without a tester persona runs
+   read-only (today it composes as a writing run).
+3. Quote `### Review feedback` beside the handover instead of inside the
+   2 000-character handover cap (50 comments × 1 000 characters can be cut),
+   and add the review-feedback paragraph to the build brief only on a
+   rework (`FEEDBACK_HEADING` present).
+4. A plan phase re-run is gated by its own acceptance commands, which fail
+   before the build — the plan step should always get the structural gate.
+5. Skip the ticket-copy merge for read-only review runs (a harness without
+   plan mode could still edit the copy).
+6. `event-writer.ts`'s doc comment says status lines "ride along with the
+   next regular commit" — nothing commits them, and a legacy `.status.log`
+   does not move with its card.
+7. A lint rule or spec that a step prompt stays role-only (no shared block
+   sneaks back), beyond `default-prompts.spec.ts`'s "no How to work".

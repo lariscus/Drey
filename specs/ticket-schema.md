@@ -824,7 +824,10 @@ owner answers: an open key stays on the owner's desk (the Needs-you
 list raises one card per open key) until a `resolved:` line naming it
 closes it. Newer lines never close a key implicitly; a keyless line
 is its own item, surfaced visibly instead of matched. Writers append
-their own lines only — an older line is never rewritten or reordered;
+their own lines only — an older line is never rewritten or reordered
+(since req-280 no prompt asks an agent for a status line: the runner and
+the board write every persisted verb, on a store as comments —
+`core/status-comment.ts`);
 readers are tolerant (a broken line is skipped, never guessed). The
 log is plain text a human may read and append; it never lives inside
 the ticket file, and the ticket file never embeds it.
@@ -1093,7 +1096,7 @@ tickets/_meta/personas/
 **`paul`** (planner), **`ben`** (builder), **`ralf`** (reviewer), **`tessa`** (tester); Pia is Mission Control, the human
 persona `you` is written by "Initialize board". The shipped `persona.md` carries `title`, `role`, `summary:`, `color`
 (`#f2d3e2`, `#8ecbef`, `#bfe3cd`, `#f2cfae`) and `skills: []` — no `worker:` and no `models:`; the shipped `prompt.md` is the
-"who it is" part (`## Who Paul is`, `## How Paul works`, `## What done means`). **Seeding** (`CrewSeeder`) writes the
+"who it is" part (`## Who Paul is`, `## How Paul works` — the character only since req-280; what "done" means is the step prompt's). **Seeding** (`CrewSeeder`) writes the
 vault's copy: `persona.md` with the worker of `default-worker` in `_meta/crew.md` (else the fleet default `opencode`) and the
 models the machine's model table names for that worker (`service.json` → `models`: the worker's provider rows, strongest
 class first, the first is `models.default`, all of them the `pool`; none → the parser's default, and the log says so), and
