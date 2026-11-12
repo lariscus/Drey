@@ -5866,3 +5866,29 @@ sequenceDiagram
 ```
 
 A conflict is aborted in both actions and never resolved by the machine (`decisions.md`). req-257 moves the sign-off from "Accept on Ready to try" to the Accept at the chain's last You entry; the run-end hook stays before the cursor's advance.
+
+## 6.122 Mission Control speaks as Pia — the persona prompt on every turn, her entry in a chain (req-269, milestone 246)
+
+```mermaid
+sequenceDiagram
+    actor Owner
+    participant Page as Persona page (Pia)
+    participant P as personas/pia/prompt.md
+    participant CS as ChatService
+    participant CT as ChatTurn (bridge)
+    participant MP as MissionPersonaPrompt
+    participant M as chat model
+    Owner->>Page: edit "How the owner works with Pia" · Save
+    Page->>P: personaPatch {prompt} · one commit "personas: pia updated"
+    Owner->>CS: a line in the Mission Control chat
+    CS->>CT: runTurn {text, history, board digest, named}
+    CT->>MP: missionPersona() — a mission turn only
+    MP->>P: the first kind: mission persona's prompt.md (no cache)
+    MP-->>CT: text, or null (no persona, no file, blank, an error)
+    CT->>M: system = Pia's prompt + mission.md + ## Board digest (+ named, reference)
+    M-->>CT: {say, thought, commands}
+    CT-->>CS: say + proposal cards (each confirmed by the owner)
+    Note over CT,MP: shape / flow turns, the aggregator and a 1:1 never ask
+```
+
+The seeder ships Pia first: a fresh board gets `order: [pia, paul, ben, ralf, tessa, you]`; a board seeded before req-269 is offered her alone at the next start and she goes to the front of its existing `order:`. Her record is `kind: mission` — no worker, no models; the free sessions, the 1:1, capacity and the budgets skip her, and the delete refuses her (`mission`). **In a chain** she is an entry like any persona (`pia; you`); `validateChain` refuses a mode on her, and `entryWorkOf` answers `mission-turn` for her position — today nothing walks the cursor, req-257's dispatch turns that answer into a ticket-scoped Mission Control turn with no session, no slot and no budget.

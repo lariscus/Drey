@@ -1,5 +1,5 @@
 import type { PersonaMessage, PersonaProposalCommand, PersonaProposalDecision, PersonaThreadReply } from '../contracts/persona-session';
-import { personaRef, type Persona } from '../core/persona';
+import { isMissionPersona, personaRef, type Persona } from '../core/persona';
 import { parseWorkerValue } from '../fleet/assignment';
 import { OneOnOneRequestBuilder } from '../fleet/one-on-one-request';
 import type { CapabilityClass, ModelsReply, RunInfo, RunRequest, WorkerProviderId } from '../fleet/protocol';
@@ -78,6 +78,10 @@ export class PersonaSessionService {
       return { ok: false, error: found.error };
     }
     const id = found.persona.id;
+    if (isMissionPersona(found.persona)) {
+      // req-269: Mission Control's persona has no 1:1 — her conversation is the Mission Control chat.
+      return { ok: false, error: `${found.persona.title} is Mission Control — talk to her in the Mission Control chat` };
+    }
     if (this.answering.has(id)) {
       return { ok: false, error: `${found.persona.title} is still answering — wait for the answer` };
     }

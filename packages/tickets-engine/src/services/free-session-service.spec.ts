@@ -10,14 +10,14 @@ const VAULT: EngineVault = { id: 'v', name: 'tickets', path: 'E:\\T', exists: tr
 const BEN = { id: 'ben', kind: 'agent', title: 'Ben', role: 'build', worker: 'claude-code', models: { default: 'claude-code/sonnet', pool: [] }, color: '#fff', skills: [], budget: null, allowed: {} } as unknown as Persona;
 const PIA = { ...BEN, id: 'pia', title: 'Pia', worker: 'api' } as Persona;
 
-function world(crewText: string | null = null): { service: FreeSessionService; starts: RunRequest[]; sends: [string, string][]; runs: RunInfo[] } {
+function world(crewText: string | null = null, personas: readonly Persona[] = [BEN, PIA]): { service: FreeSessionService; starts: RunRequest[]; sends: [string, string][]; runs: RunInfo[] } {
   const starts: RunRequest[] = [];
   const sends: [string, string][] = [];
   const runs: RunInfo[] = [{ id: 'R-live', ticketId: 'T-0007', state: 'running', worktreePath: 'E:\\T\\_worktrees\\T-0007' } as RunInfo];
   const crew = new LayeredConfigResolver().crew(parseCrewFile(crewText).config);
   const models = { models: [{ provider: 'claude-code', model: 'sonnet', class: 'B' }] } as unknown as ModelsReply;
   const service = new FreeSessionService({
-    board: { detect: async () => VAULT, listPersonas: async () => [BEN, PIA], listRepos: async () => ({ repos: [{ name: 'drey', url: 'x', path: 'E:\\projects\\drey', profile: 'work' } as never] }) },
+    board: { detect: async () => VAULT, listPersonas: async () => personas, listRepos: async () => ({ repos: [{ name: 'drey', url: 'x', path: 'E:\\projects\\drey', profile: 'work' } as never] }) },
     fleet: {
       runs: async () => runs,
       start: async (request) => (starts.push(request), { ok: true, run: { id: `R-${starts.length}` } as RunInfo }),
@@ -56,6 +56,15 @@ describe('FreeSessionService (req-173, R12)', () => {
     expect(await w.service.start({ persona: 'ben', directory: 'E:\\T\\_worktrees\\T-0007' }, 'x')).toMatchObject({ ok: false, error: expect.stringContaining('live run') });
     expect(await w.service.start({ persona: 'nobody', directory: 'E:\\T' }, 'x')).toMatchObject({ ok: false, error: expect.stringContaining('not found') });
     expect(await w.service.start({ persona: 'pia', directory: 'E:\\T' }, 'x')).toMatchObject({ ok: false, error: expect.stringContaining('needs a harness') });
+    expect(w.starts).toEqual([]);
+  });
+
+  it('req-269: never offers or starts Mission Control\'s persona, whatever harness its record names', async () => {
+    const mission = { ...BEN, id: 'mara', title: 'Mara', kind: 'mission' } as Persona;
+    const w = world(null, [BEN, mission]);
+    const options = await w.service.options();
+    expect(options.ok && options.personas.map((p) => p.id)).toEqual(['ben']);
+    expect(await w.service.start({ persona: 'mara', directory: 'E:\\T' }, 'x')).toMatchObject({ ok: false, error: expect.stringContaining('not found') });
     expect(w.starts).toEqual([]);
   });
 

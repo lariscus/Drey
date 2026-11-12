@@ -10,10 +10,17 @@
  */
 import { MAX_CHAIN_ENTRIES, type ChainEntry } from '../contracts/chain';
 import { renderChainEntry } from './chain-list';
+import { HUMAN_PERSONA_ID } from './persona';
 
 export interface ChainGuard {
   /** The persona ids under `_meta/personas/` (the human persona included). */
   readonly personas: readonly string[];
+  /**
+   * The persona ids that are not agents besides `you` — Mission Control's
+   * persona (req-269): an entry naming one takes no mode, since only an
+   * agent's run can be the interactive one. `you` is always one of them.
+   */
+  readonly modeless?: readonly string[];
   /** The chain as the ticket holds it now — what the locked positions are compared with. */
   readonly saved: readonly ChainEntry[];
   /** How many leading positions are locked (core/chain-list.ts `lockedCount`). */
@@ -22,6 +29,18 @@ export interface ChainGuard {
 
 function sameStep(a: ChainEntry, b: ChainEntry): boolean {
   return a.persona === b.persona && a.mode === b.mode;
+}
+
+/** One entry's refusal: an unknown persona, or (after the cursor) a mode on an entry that is not an agent's (req-269). */
+function entryRefusal(entry: ChainEntry, index: number, guard: ChainGuard): string | null {
+  if (!guard.personas.includes(entry.persona)) {
+    return `position ${index + 1}: persona "${entry.persona}" does not exist`;
+  }
+  const modeless = entry.persona === HUMAN_PERSONA_ID || (guard.modeless ?? []).includes(entry.persona);
+  if (index >= guard.locked && entry.mode !== null && modeless) {
+    return `position ${index + 1}: only an agent persona's entry takes a mode — ${renderChainEntry(entry)}`;
+  }
+  return null;
 }
 
 /** The refusal line, or null when the chain may be written. */
@@ -33,10 +52,16 @@ export function validateChain(entries: readonly ChainEntry[], guard: ChainGuard)
     return `a chain holds at most ${MAX_CHAIN_ENTRIES} entries`;
   }
   for (const [index, entry] of entries.entries()) {
-    if (!guard.personas.includes(entry.persona)) {
-      return `position ${index + 1}: persona "${entry.persona}" does not exist`;
+    const refusal = entryRefusal(entry, index, guard);
+    if (refusal !== null) {
+      return refusal;
     }
   }
+  return lockedRefusal(entries, guard);
+}
+
+/** The first locked position the edit changed, or null: past entries stay, the current one may change only its notify rule. */
+function lockedRefusal(entries: readonly ChainEntry[], guard: ChainGuard): string | null {
   for (let index = 0; index < guard.locked; index += 1) {
     const was = guard.saved[index];
     const now = entries[index];

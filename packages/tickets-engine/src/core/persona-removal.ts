@@ -1,5 +1,5 @@
 import type { PersonaRemoveFailure } from '../contracts/persona-remove';
-import { HUMAN_PERSONA_ID, isHumanPersona, type Persona } from './persona';
+import { HUMAN_PERSONA_ID, isHumanPersona, isMissionPersona, type Persona } from './persona';
 
 /** What pins a persona on the board: the pipeline columns that name it and the crew's default persona. */
 export interface PersonaPins {
@@ -39,14 +39,18 @@ export interface RemovalFacts {
 
 /**
  * The first reason a persona is not deleted, or null. The order is the
- * order the owner can act on: the human persona is never a candidate, a
- * busy persona must be stopped first, a pinned one unpinned first — and
- * the typed title is checked last, so a refusal never depends on what was typed.
+ * order the owner can act on: the human persona and Mission Control's
+ * persona (req-269) are never candidates, a busy persona must be stopped
+ * first, a pinned one unpinned first — and the typed title is checked
+ * last, so a refusal never depends on what was typed.
  */
 export function removalRefusal(facts: RemovalFacts): PersonaRemoveFailure | null {
   const { persona } = facts;
   if (persona.id === HUMAN_PERSONA_ID || isHumanPersona(persona)) {
     return { ok: false, code: 'human', error: 'the owner\'s own persona is not deleted' };
+  }
+  if (isMissionPersona(persona)) {
+    return { ok: false, code: 'mission', error: `${persona.title} is Mission Control's persona — edit the prompt instead` };
   }
   if (facts.live) {
     return { ok: false, code: 'busy', error: `${persona.title} has a live or held run or 1:1 — stop it first` };

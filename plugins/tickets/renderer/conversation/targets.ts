@@ -445,8 +445,8 @@ export function createConversationProvider(deps: ConversationDeps): Conversation
       const targets: ConversationTarget[] = [mission];
       const live = new Set<string>();
       for (const persona of deps.personas()) {
-        // The owner as a team member has no thread worth opening.
-        if (persona.kind === 'human') {
+        // The owner as a team member has no thread worth opening; Mission Control's persona is the Mission Control target (req-269).
+        if (persona.kind === 'human' || persona.kind === 'mission') {
           continue;
         }
         live.add(persona.id);

@@ -185,6 +185,16 @@ describe('PersonaSessionService — the 1:1 as a persona session (req-168)', () 
     expect(await service.decide('ben', 'p-1', 'dismiss')).toEqual({ ok: false, error: 'no open proposal p-1' });
   });
 
+  it('req-269: Mission Control\'s persona has no 1:1 — a line to her is refused, nothing is written or started', async () => {
+    await write('tickets/_meta/personas/pia/persona.md', "---\ntitle: Pia\nkind: mission\nrole: custom\n---\n");
+    const service = boot();
+    expect(await service.send('pia', 'Hello')).toEqual({ ok: false, error: 'Pia is Mission Control — talk to her in the Mission Control chat' });
+    await service.idle();
+    expect(fleet.starts).toEqual([]);
+    expect(bridgeCalls).toEqual([]);
+    expect(changed).toEqual([]);
+  });
+
   it('an api persona talks over the chat bridge with its brief — no session is started', async () => {
     const service = boot();
     expect(await service.thread('anna')).toMatchObject({ session: 'bridge' });

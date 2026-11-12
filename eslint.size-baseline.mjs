@@ -55,7 +55,6 @@ export const SIZE_BASELINE = [
   'packages/tickets-engine/src/services/board-service.spec.ts',
   'packages/tickets-engine/src/services/board-service.ts',
   'packages/tickets-engine/src/services/chat-llm.spec.ts',
-  'packages/tickets-engine/src/services/chat-llm.ts',
   'packages/tickets-engine/src/services/chat-model.ts',
   'packages/tickets-engine/src/services/chat-service.spec.ts',
   'packages/tickets-engine/src/services/chat-service.ts',

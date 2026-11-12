@@ -25,6 +25,7 @@ import {
   timelineOf,
 } from './chat';
 import { MC_CHAT_STATE } from './chat.model';
+import { MC_WORK_STATE, type McWorkState } from '../work/work.model';
 
 // -- fixtures ---------------------------------------------------------------
 
@@ -1341,6 +1342,29 @@ describe('Chat error card (D-1: the model could not answer)', () => {
 
   it('shows no card when nothing failed', () => {
     expect(renderWithFailure(null).el.querySelector('.errcard')).toBeNull();
+  });
+
+  it('req-269: names Mission Control by its persona\'s title', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: MC_CHAT_STATE,
+          useValue: {
+            chat: signal<ChatStateView>({ sessions: [], active: activeSession() }),
+            chatPrefill: signal(null),
+            chatFailure: signal<ChatFailureView | null>(unreachable),
+            board: signal(null),
+            work: signal({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG }),
+            toast: () => undefined,
+          } as unknown as McChatState,
+        },
+        { provide: MC_WORK_STATE, useValue: { personas: [{ id: 'ben', title: 'Ben', color: '#8ecbef' }, { id: 'pia', title: 'Mara', color: '#d9cff5', kind: 'mission' }] } as unknown as McWorkState },
+      ],
+    });
+    const fixture = TestBed.createComponent(Chat);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.errcard .ck')!.textContent).toBe('Mara cannot reach the model');
   });
 });
 

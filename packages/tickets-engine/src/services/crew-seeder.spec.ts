@@ -10,7 +10,7 @@ const DIR = 'tickets/_meta/personas';
 const CREW = 'tickets/_meta/crew.md';
 const TABLE = [modelRow('opus-x', 'claude-code', 'A'), modelRow('glm-big', 'opencode', 'A'), modelRow('glm-small', 'opencode', 'C'), modelRow('glm-mid', 'opencode', 'B')];
 
-describe('CrewSeeder — the default crew Paul, Ben, Ralf, Tessa (req-256)', () => {
+describe('CrewSeeder — the default crew Pia, Paul, Ben, Ralf, Tessa (req-256, req-269)', () => {
   let rig: CrewSeederRig;
 
   afterEach(async () => {
@@ -22,11 +22,11 @@ describe('CrewSeeder — the default crew Paul, Ben, Ralf, Tessa (req-256)', () 
       rig = await CrewSeederRig.create({ rows: TABLE });
     });
 
-    it('writes all four personas, marks them in crew.md and commits once', async () => {
+    it('writes all five personas, marks them in crew.md and commits once', async () => {
       expect(await rig.seeder.seed(rig.vault)).toEqual({ kind: 'seeded', ids: [...DEFAULT_CREW_IDS] });
       for (const id of DEFAULT_CREW_IDS) {
         const persona = parsePersonaFile(id, (await rig.read(`${DIR}/${id}/persona.md`))!);
-        expect(persona.kind).toBe('agent');
+        expect(persona.kind).toBe(id === 'pia' ? 'mission' : 'agent');
         expect(persona.summary).not.toBe('');
         expect((await rig.read(`${DIR}/${id}/prompt.md`))!).toContain(`## Who ${persona.title} is`);
       }
@@ -52,14 +52,27 @@ describe('CrewSeeder — the default crew Paul, Ben, Ralf, Tessa (req-256)', () 
     it('gives each persona its role, a distinct colour and the role\'s step below its character', async () => {
       await rig.seeder.seed(rig.vault);
       const personas = await Promise.all(DEFAULT_CREW_IDS.map(async (id) => parsePersonaFile(id, (await rig.read(`${DIR}/${id}/persona.md`))!)));
-      expect(personas.map((p) => p.role)).toEqual(['planner', 'builder', 'reviewer', 'tester']);
-      expect(new Set(personas.map((p) => p.color)).size).toBe(4);
+      expect(personas.map((p) => p.role)).toEqual(['custom', 'planner', 'builder', 'reviewer', 'tester']);
+      expect(new Set(personas.map((p) => p.color)).size).toBe(5);
       const ben = (await rig.read(`${DIR}/ben/prompt.md`))!;
       expect(ben.startsWith('## Who Ben is\n')).toBe(true);
       expect(ben).toContain('## The build step');
       expect(ben).toContain('**What changed for you:**');
       expect(ben).not.toContain('drey-prompt-version');
       expect((await rig.read(`${DIR}/paul/prompt.md`))!).toContain('## The planning step');
+    });
+
+    it('req-269: seeds Pia as Mission Control\'s persona — her prompt as shipped, no worker, no models, no step', async () => {
+      await rig.seeder.seed(rig.vault);
+      const record = (await rig.read(`${DIR}/pia/persona.md`))!;
+      expect(record).toContain('kind: mission');
+      expect(record).not.toMatch(/^worker:/m);
+      expect(record).not.toMatch(/^models:/m);
+      const prompt = (await rig.read(`${DIR}/pia/prompt.md`))!;
+      expect(prompt.startsWith('## Who Pia is\n')).toBe(true);
+      expect(prompt).toContain('## How the owner works with Pia');
+      expect(prompt).not.toContain('## The ');
+      expect(rig.logs.join('\n')).not.toContain('no step prompt for pia');
     });
 
     it('takes the worker from the default and the models from the table, strongest first', async () => {
@@ -85,7 +98,7 @@ describe('CrewSeeder — the default crew Paul, Ben, Ralf, Tessa (req-256)', () 
     await rig.write(`${DIR}/paul/persona.md`, "---\ntitle: Paul\nrole: planner\nworker: claude-code\nmodels:\n  default: owner-pick\n  pool: [owner-pick]\ncolor: '#111111'\nskills: []\n---\n");
     await rig.write(`${DIR}/ben/memory.md`, '# Memory\n');
     const before = await rig.read(`${DIR}/paul/persona.md`);
-    expect(await rig.seeder.seed(rig.vault)).toEqual({ kind: 'seeded', ids: ['ralf', 'tessa'] });
+    expect(await rig.seeder.seed(rig.vault)).toEqual({ kind: 'seeded', ids: ['pia', 'ralf', 'tessa'] });
     expect(await rig.read(`${DIR}/paul/persona.md`)).toBe(before);
     expect(await rig.exists(`${DIR}/paul/prompt.md`)).toBe(false);
     expect(await rig.exists(`${DIR}/ben/persona.md`)).toBe(false);
@@ -96,13 +109,32 @@ describe('CrewSeeder — the default crew Paul, Ben, Ralf, Tessa (req-256)', () 
 
   it('seeds nothing once the marker is set, and a deleted persona stays deleted', async () => {
     rig = await CrewSeederRig.create({ rows: TABLE });
-    await rig.write(CREW, '---\nseeded-crew: [paul, ben, ralf, tessa]\ndefault-worker: opencode\n---\nProse.\n');
+    await rig.write(CREW, '---\nseeded-crew: [pia, paul, ben, ralf, tessa]\ndefault-worker: opencode\n---\nProse.\n');
     await rig.write(`${DIR}/ralf/persona.md`, '---\ntitle: Ralf\nrole: reviewer\n---\n');
     expect(await rig.seeder.seed(rig.vault)).toEqual({ kind: 'nothing' });
     expect(await rig.exists(`${DIR}/paul/persona.md`)).toBe(false);
     expect(await rig.exists(`${DIR}/ben/persona.md`)).toBe(false);
     expect(await rig.exists(`${DIR}/tessa/persona.md`)).toBe(false);
     expect(rig.commits).toEqual([]);
+  });
+
+  it('req-269: a board seeded before Pia gets her alone, at the front of its order, and the deleted personas stay deleted', async () => {
+    rig = await CrewSeederRig.create({ rows: TABLE });
+    await rig.write(CREW, '---\nseeded-crew: [paul, ben, ralf, tessa]\norder: [paul, ben, you]\n---\nProse.\n');
+    await rig.write(`${DIR}/ben/persona.md`, '---\ntitle: Ben\nrole: builder\n---\n');
+    expect(await rig.seeder.seed(rig.vault)).toEqual({ kind: 'seeded', ids: ['pia'] });
+    expect(await rig.exists(`${DIR}/paul/persona.md`)).toBe(false);
+    expect(seededCrewOf(await rig.read(CREW))).toEqual(['paul', 'ben', 'ralf', 'tessa', 'pia']);
+    expect(crewOrderOf(await rig.read(CREW))).toEqual(['pia', 'paul', 'ben', 'you']);
+    expect(rig.commits).toHaveLength(1);
+    expect(rig.commits[0]!.paths).toEqual([`${DIR}/pia/persona.md`, `${DIR}/pia/prompt.md`, CREW]);
+  });
+
+  it('req-269: an order that already names Pia, or a Pia the owner deleted, is left as it is', async () => {
+    rig = await CrewSeederRig.create({ rows: TABLE });
+    await rig.write(CREW, '---\nseeded-crew: [paul, ben, ralf, tessa]\norder: [ben, pia, you]\n---\n');
+    await rig.seeder.seed(rig.vault);
+    expect(crewOrderOf(await rig.read(CREW))).toEqual(['ben', 'pia', 'you']);
   });
 
   it('keeps every other key and the prose of an existing crew.md', async () => {
@@ -113,15 +145,15 @@ describe('CrewSeeder — the default crew Paul, Ben, Ralf, Tessa (req-256)', () 
     expect(text).toContain("# the owner's note");
     expect(text).toContain('default-worker: kimi');
     expect(text).toContain('diff-stat-lines: 12');
-    expect(text).toContain('seeded-crew: [paul, ben, ralf, tessa]');
+    expect(text).toContain('seeded-crew: [pia, paul, ben, ralf, tessa]');
     expect(text.endsWith('---\nMy prose.\n')).toBe(true);
   });
 
-  it('req-258: keeps an order the owner already set', async () => {
+  it('req-258: keeps an order the owner already set — Pia, offered for the first time, goes in front (req-269)', async () => {
     rig = await CrewSeederRig.create({ rows: TABLE });
     await rig.write(CREW, '---\norder: [you, ben]\n---\n');
     await rig.seeder.seed(rig.vault);
-    expect(crewOrderOf(await rig.read(CREW))).toEqual(['you', 'ben']);
+    expect(crewOrderOf(await rig.read(CREW))).toEqual(['pia', 'you', 'ben']);
   });
 
   describe('the worker and model rule', () => {

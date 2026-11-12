@@ -678,10 +678,17 @@ On a dricket store the three fields are `x-chain` (the entries joined by
 The grammar, one entry per list item (`core/chain-list.ts`):
 
 - `<persona>` — a persona id (`[a-z][a-z0-9-]*`, the directory under
-  `_meta/personas/`); `you` is the human persona.
+  `_meta/personas/`); `you` is the human persona, `pia` Mission Control's
+  (req-269). What happens at an entry follows the persona's `kind`
+  (`core/chain-entry-work.ts` `entryWorkOf`): an `agent`'s is a **run**, a
+  `mission` persona's a **Mission Control turn** on the ticket (no session,
+  no slot, no budget — R9; the dispatch is req-257's), the human's parks the
+  ticket for the owner, and an entry naming no readable persona is *missing*.
 - `<persona>:shape` — the run's **mode**: the interactive entry (the owner
   shapes the ticket with that persona in the Shape chat). `shape` is the only
-  mode.
+  mode, and only an **agent's** entry takes one: `validateChain` refuses
+  `you:shape` and a mission persona's (`pia:shape`) at any position after the
+  cursor (req-269).
 - `<persona>(notify)` — the **notify rule**: a card lands in "Needs you"
   when that position is done.
 
@@ -1064,7 +1071,7 @@ tickets/_meta/personas/
   | Field | Shape | Default |
   |---|---|---|
   | `title` | string | the id |
-  | `kind` | `agent \| human` | `agent` (an absent key). `human` is the owner as a crew member (E10-6): `personas/you`, created once by the board service (title = config `personas.humanName`, default `You`; editable like any title, and Settings → Tickets → Crew → *Your name* retitles it; "Initialize board" writes it with the default pipeline, whose manual columns pin it). Inert for `role`/`worker`/`models`/`skills`/`budget` — the human is never dispatched, counted toward capacity or budgeted. Written only when `human` |
+  | `kind` | `agent \| human \| mission` | `agent` (an absent key; any other word reads as `agent`). `mission` is **Mission Control's own persona** (req-269, Pia): her `prompt.md` opens the system message of every Mission Control turn (`specs/classifier-spec.md`), an entry she holds is a Mission Control turn, never a session; her record carries no `worker:` and no `models:` (the writer leaves them out), she is never dispatched, offered a free session or a 1:1, counted toward capacity or budgeted, and never deleted (`mission`, below); the first `mission` persona in the crew's order is the one Mission Control speaks as. `human` is the owner as a crew member (E10-6): `personas/you`, created once by the board service (title = config `personas.humanName`, default `You`; editable like any title, and Settings → Tickets → Crew → *Your name* retitles it; "Initialize board" writes it with the default pipeline, whose manual columns pin it). Inert for `role`/`worker`/`models`/`skills`/`budget` — the human is never dispatched, counted toward capacity or budgeted. Written only when not `agent` |
   | `role` | `planner \| builder \| reviewer \| tester \| custom` | `custom` |
   | `summary` | the one line for the crew list (req-144, R11): at most 200 characters, one line, written as a double-quoted YAML string so a colon cannot break the fence. The Crew cards of Drey, Mission Control (pad, phone, desk) and the Persona page's Profile block draw it as the card's line 3 in place of the role. Written only when set | none (the cards draw the role) |
   | `worker` | the CLI harness (`claude-code`, `opencode`, `kimi`, `copilot`, `api`) | `opencode` |
@@ -1097,10 +1104,10 @@ tickets/_meta/personas/
   carries nothing and is dropped; prose `prompt.md` already holds is not duplicated; a `persona.md` without a body is skipped. A
   persona patch written over a file whose prose has not migrated yet keeps that prose in place.
 
-**The shipped default crew (req-256, decision D7).** Four personas ship as files in the package,
+**The shipped default crew (req-256, decision D7; req-269).** Five personas ship as files in the package,
 `packages/tickets-engine/personas/<id>/persona.md` + `prompt.md`, and are seeded into a board:
-**`paul`** (planner), **`ben`** (builder), **`ralf`** (reviewer), **`tessa`** (tester); Pia is Mission Control, the human
-persona `you` is written by "Initialize board", with `leaving: [commit]` (req-267). The shipped `persona.md` carries `title`, `role`, `summary:`, `color`
+**`pia`** (Mission Control's persona, `kind: mission`, role `custom`, `#d9cff5` — req-269), **`paul`** (planner), **`ben`** (builder), **`ralf`** (reviewer), **`tessa`** (tester); the human
+persona `you` is written by "Initialize board", with `leaving: [commit]` (req-267). Pia's `prompt.md` is `## Who Pia is` and `## How the owner works with Pia` — the second part is the owner's to rewrite; she is seeded **as shipped** (no step below her prompt, no worker, no models). The shipped `persona.md` carries `title`, `role`, `summary:`, `color`
 (`#f2d3e2`, `#8ecbef`, `#bfe3cd`, `#f2cfae`), `skills: []` and the run settings that differ from nothing (req-258:
 Paul `gate: structural`, Ralf and Tessa `readonly: true`; req-267: Ben `leaving: [sync-main]`) — no `worker:` and no `models:`; the shipped `prompt.md` is the
 "who it is" part (`## Who Paul is`, `## How Paul works` — the character only since req-280; what "done" means is the step prompt's). **Seeding** (`CrewSeeder`) writes the
@@ -1111,23 +1118,24 @@ class first, the first is `models.default`, all of them the `pool`; none → the
 (`## The planning|build|review|verify step` + `plan-default` / `build-default` / `review-default` / `qa-default` without its
 version marker), because a persona's prompt replaces the step prompt as the run's instruction base. **When:** "Initialize
 board" after the pipeline and the prompts; and once at the engine's start for a board that lacks them. **Idempotent by id**:
-`seeded-crew: [paul, ben, ralf, tessa]` in `_meta/crew.md` (below) lists the ids already offered, so a persona the owner
+`seeded-crew: [pia, paul, ben, ralf, tessa]` in `_meta/crew.md` (below) lists the ids already offered, so a persona the owner
 deleted stays deleted; an id whose folder exists is never touched, only listed; the engine never re-seeds an id the marker
-lists. A `crew.md` without `order:` gets the default crew's, the human last (`order: [paul, ben, ralf, tessa, you]`, req-258);
-an order already set stays. One commit (`personas: the default crew (req-256)`: the persona files and `crew.md`), one log line. The seeding changes
+lists — a board seeded before req-269 (`seeded-crew: [paul, ben, ralf, tessa]`) is offered Pia alone at the next start. A `crew.md` without `order:` gets the default crew's, Pia first and the human last (`order: [pia, paul, ben, ralf, tessa, you]`, req-258/req-269);
+an order already set stays, except that Pia, offered for the first time, goes to its front (the concept §12). One commit (`personas: the default crew (req-256)`: the persona files and `crew.md`), one log line. The seeding changes
 **no** pipeline pin and not `default-persona`: a column without a `persona:` pin still runs the ring until the owner pins a
 persona on it (a ticket's gate on the Flow tab, or `persona: ben` on the column in `pipeline.md`).
 
 **Deleting a persona (req-261).** `POST /api/personas/<id>/remove` `{confirm: <the persona's title>}` (remote port and
 plugin IPC `personaRemove`; answers `{ok: true, persona, files, warning?}` or `{ok: false, code, error, columns?,
-crewDefault?}`; `code` is one of `no_vault`, `no_persona`, `human`, `busy`, `pinned`, `confirm`, `internal`, the client's
+crewDefault?}`; `code` is one of `no_vault`, `no_persona`, `human`, `mission`, `busy`, `pinned`, `confirm`, `internal`, the client's
 text `persona.delete.error.<code>`; types `contracts/persona-remove.ts`) removes **`_meta/personas/<id>/` whole** —
 `persona.md`, `prompt.md`, `memory.md`, `reviews.md`, `improvements.md` and the persona's own skills — in **one commit**
 `personas: <id> removed`, then the vault's change round. **What stays:** the ticket files and their history, the 1:1 chat
 files under `_meta/chat/` (the conversation is history, not the persona's folder), the shared skills, the fleet ledger and the
 run records (their `persona:` is a name, not a link), and a ticket's own `persona:` pin — a pin to an absent persona degrades to
 the ring like any unreadable persona (`BoardPersonas`). **Refused** (nothing is written), in this order: `human` — the owner's
-persona `you` (`kind: human`); `busy` — a run record of the persona in state `starting`, `running` or `stopping`, whatever
+persona `you` (`kind: human`); `mission` — Mission Control's persona (`kind: mission`, req-269): Mission Control speaks with her
+prompt, so she is edited, never deleted (the Persona page draws no *Delete persona…* for her); `busy` — a run record of the persona in state `starting`, `running` or `stopping`, whatever
 its kind (a ticket run, a held 1:1 or free session); `pinned` — a `pipeline.md` column with `persona: <id>` or the crew's
 `default-persona`, the reply naming the columns (`columns`, their titles) and `crewDefault`; `confirm` — `confirm` is not the
 persona's `title` **character for character** (case and whitespace; the engine checks it whatever the client did). A runner that
@@ -1497,8 +1505,8 @@ every device working this tickets repository shares, versioned with it.
 
 ```markdown
 ---
-seeded-crew: [paul, ben, ralf, tessa]  # the shipped default crew already offered to this board (req-256)
-order: [paul, ben, ralf, tessa, you]  # the crew's order (req-258): the Crew tab, later the board's persona columns
+seeded-crew: [pia, paul, ben, ralf, tessa]  # the shipped default crew already offered to this board (req-256, req-269)
+order: [pia, paul, ben, ralf, tessa, you]  # the crew's order (req-258): the Crew tab, later the board's persona columns
 default-persona: ben          # the persona ladder's floor (was config personas.default)
 default-worker: claude-code   # the assignment ring's floor (was defaultWorker)
 permission-mode: accept-edits # dispatched runs: accept-edits | bypass (was autoPermissionMode)

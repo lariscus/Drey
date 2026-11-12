@@ -42,10 +42,12 @@ export function createInstructionsBlock(ctx: BlockContext, initial: string, edit
   block.setAttribute('aria-label', t('persona.page.instructions'));
   const tokens = h('small', 'persona-muted persona-tokens');
   let current = initial;
+  // req-269: Mission Control's persona starts no run — her prompt rides Mission Control's turns, so no run brief applies.
+  const mission = ctx.persona.kind === 'mission';
   /** At the start of a run once the engine has counted the brief; the instructions alone until then (or when it cannot). */
   const countTokens = (text: string): void => {
     current = text;
-    const preview = ctx.preview.preview;
+    const preview = mission ? null : ctx.preview.preview;
     const own = ctx.draft();
     tokens.textContent = preview === null ? t('persona.page.tokens', { count: estimateTokens(text.trim(), tokenizerFor(own.worker, own.pool[0] ?? null)) }) : t('persona.page.tokens_at_start', { count: atStartTokensOf(preview, text) });
   };
@@ -128,7 +130,7 @@ export function createInstructionsBlock(ctx: BlockContext, initial: string, edit
     }
   });
 
-  block.append(blockHead(t('persona.page.instructions'), tokens, previewButton), problem, frame);
+  block.append(blockHead(t('persona.page.instructions'), tokens, mission ? null : previewButton), problem, frame);
   return {
     element: block,
     setText: (text) => {

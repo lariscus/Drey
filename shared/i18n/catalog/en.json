@@ -801,6 +801,7 @@
   "persona.delete.error.no_vault": "No tickets repository was found.",
   "persona.delete.error.no_persona": "That persona does not exist any more.",
   "persona.delete.error.human": "Your own persona cannot be deleted.",
+  "persona.delete.error.mission": "{name} is Mission Control's persona and cannot be deleted. Edit the prompt instead.",
   "persona.delete.error.busy": "{name} has a run or a 1:1 open. Stop it first.",
   "persona.delete.error.pinned": "{count, plural, one {The column {columns} pins} other {The columns {columns} pin}} {name}. Unpin it first.",
   "persona.delete.error.pinned_default": "{name} is the crew's default persona. Choose another one first.",

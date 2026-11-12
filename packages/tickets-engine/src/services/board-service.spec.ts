@@ -480,6 +480,16 @@ The pipeline.
     expect(await service.setChain({ id: 'T-0001', chain: ['ben', 'zed'] })).toEqual({ ok: false, error: 'position 2: persona "zed" does not exist' });
   });
 
+  it('req-269: Mission Control\'s persona stands in a chain, but takes no mode', async () => {
+    await fsp.mkdir(path.join(vaultDir, 'tickets', '_meta', 'personas', 'mara'), { recursive: true });
+    await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'personas', 'mara', 'persona.md'), '---\ntitle: Mara\nkind: mission\nrole: custom\n---\n', 'utf8');
+    await writeTicket('T-0001', 'build');
+    const service = serviceOf();
+
+    expect(await service.setChain({ id: 'T-0001', chain: ['ben', 'mara:shape', 'you'] })).toEqual({ ok: false, error: "position 2: only an agent persona's entry takes a mode — mara:shape" });
+    expect((await service.setChain({ id: 'T-0001', chain: ['mara', 'you'] })).ok).toBe(true);
+  });
+
   it('a change at or before the cursor refuses — only later positions change', async () => {
     await writeChainedTicket('T-0001', 'build', ['ben', 'ralf', 'you'], 2);
     const service = serviceOf();

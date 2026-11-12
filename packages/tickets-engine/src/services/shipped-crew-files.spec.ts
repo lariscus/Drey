@@ -16,7 +16,7 @@ describe('ShippedCrewFiles', () => {
     await fsp.rm(dir, { recursive: true, force: true });
   });
 
-  it('reads the package: the four personas in crew order and the step prompts their roles end in', async () => {
+  it('reads the package: the five personas in crew order and the step prompts their roles end in', async () => {
     const crew = await new ShippedCrewFiles().load();
     expect(SHIPPED_PERSONAS_DIR.endsWith(path.join('tickets-engine', 'personas'))).toBe(true);
     expect(crew.problems).toEqual([]);
@@ -35,7 +35,7 @@ describe('ShippedCrewFiles', () => {
     await fsp.writeFile(path.join(dir, 'ben', 'prompt.md'), '## Who Ben is\n');
     const crew = await new ShippedCrewFiles(dir, path.join(dir, 'no-prompts')).load();
     expect(crew.personas.map((p) => p.id)).toEqual(['paul']);
-    expect(crew.problems).toHaveLength(3);
+    expect(crew.problems).toHaveLength(4);
     expect(crew.problems.join('\n')).toContain('shipped persona ben: its role must be');
     expect(crew.problems.join('\n')).toContain('shipped persona ralf: persona.md or prompt.md is missing');
     expect(crew.steps.size).toBe(0);

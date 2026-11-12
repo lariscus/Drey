@@ -254,6 +254,21 @@ describe('the Crew tab', () => {
     expect(host.querySelector('.desk-detail .desk-persona-title')!.textContent).toBe('Tessa');
   });
 
+  it('req-269: Mission Control\'s persona has a card that opens her page; she is never selected and not counted', async () => {
+    const host = document.body.appendChild(document.createElement('div'));
+    const opens: string[] = [];
+    const pia = persona({ id: 'pia', title: 'Pia', kind: 'mission', role: 'custom', worker: '', model: '', pool: [], budget: null, dailyCost: undefined, phases: [] });
+    mountTeam({ ...deps(), openPersona: (id: string) => opens.push(id) } as DeskDeps, store([pia, ...personas]), host);
+    expect(host.querySelector('[data-persona="pia"]')).not.toBeNull();
+    expect(host.querySelector('.desk-detail .desk-persona-title')!.textContent).toBe('Ben');
+    expect(host.querySelector('.desk-head-sub')!.textContent).toBe('2 personas · 1 stuck');
+    host.querySelector<HTMLElement>('[data-persona="pia"]')!.click();
+    await nextFrame();
+    expect(opens).toEqual(['pia']);
+    expect(host.querySelector('.desk-detail .desk-persona-title')!.textContent).toBe('Ben');
+    expect(invoked.some(([method]) => method === 'personaThread')).toBe(false);
+  });
+
   it('leaves the owner out of the cards', () => {
     const host = document.body.appendChild(document.createElement('div'));
     mountTeam(deps(), store([...personas, persona({ id: 'you', title: 'You', kind: 'human' })]), host);

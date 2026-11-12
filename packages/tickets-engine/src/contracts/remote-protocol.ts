@@ -283,8 +283,8 @@ export interface TicketsRemotePort extends SkillsPort, PersonaRemovePort {
  */
 export interface PersonaView {
   readonly id: string;
-  /** `human` = the owner as a team member (E10-6): no model, budget or pause. Absent = agent. */
-  readonly kind?: 'agent' | 'human';
+  /** `human` = the owner as a team member (E10-6), `mission` = Mission Control's persona (req-269): no model, budget or pause. Absent = agent. */
+  readonly kind?: 'agent' | 'human' | 'mission';
   readonly title: string;
   readonly role: string;
   readonly worker: string;

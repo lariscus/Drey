@@ -213,6 +213,8 @@ export interface McPersona {
   readonly title: string;
   /** `#rrggbb`; the persona chip's dot. */
   readonly color: string;
+  /** `human` = the owner, `mission` = Mission Control's persona (req-269); absent = an agent. */
+  readonly kind?: string;
 }
 
 /** The result of `POST /api/tickets/<id>/move` (the MutationResult shape). */

@@ -95,6 +95,7 @@ describe('DreyTicketsPort', () => {
     vi.mocked(board.listPersonas).mockResolvedValue([
       {
         id: 'pia',
+        kind: 'agent',
         title: 'Pia',
         role: 'planner',
         worker: 'claude-code',
@@ -121,6 +122,16 @@ describe('DreyTicketsPort', () => {
         readOnly: false,
       },
     ]);
+  });
+
+  it('req-269: maps Mission Control\'s persona with its kind and no harness, models or run settings', async () => {
+    const { board, fleet } = fakes();
+    vi.mocked(board.listPersonas).mockResolvedValue([{ ...fakePersona('pia', 'Pia'), kind: 'mission', role: 'custom', summary: 'Mission Control.' }]);
+    const port = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false });
+    const [pia] = await port.personas();
+    expect(pia).toMatchObject({ id: 'pia', kind: 'mission', title: 'Pia', role: 'custom', worker: '', model: '', pool: [], summary: 'Mission Control.' });
+    expect(pia).not.toHaveProperty('settings');
+    expect(pia).not.toHaveProperty('allowed');
   });
 
   it('attaches the ledger’s settled costs of today as the persona’s dailyCost (concept §4.3)', async () => {

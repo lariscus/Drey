@@ -365,8 +365,9 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
     frame = 0;
     const model = teamModelOf(store.personas(), deps.runs(), deps.chain(), deps.titleOf, Date.now());
     // The first persona is selected until the owner picks another: the detail is always there (board 7f).
-    if (selected === null || !model.personas.some((entry) => entry.id === selected)) {
-      selected = model.personas[0]?.id ?? null;
+    // req-269: never Mission Control's persona — she has no 1:1, runs or setup; her card opens her page.
+    if (selected === null || !model.personas.some((entry) => entry.id === selected && !entry.mission)) {
+      selected = model.personas.find((entry) => !entry.mission)?.id ?? null;
       detailKey = '';
     }
     const head = h('header', 'desk-head');
@@ -452,6 +453,10 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
           card.id === selected,
           stopAskFor === card.id,
           () => {
+            if (card.mission) {
+              deps.openPersona?.(card.id);
+              return;
+            }
             selected = card.id;
             detailKey = '';
             schedule();

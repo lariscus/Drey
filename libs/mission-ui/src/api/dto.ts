@@ -249,8 +249,8 @@ export interface CapacityView {
 /** One team card: the persona directory slice plus what it is running now. */
 export interface PersonaView {
   readonly id: string;
-  /** `human` = the owner as a team member (E10-6); absent = an agent. */
-  readonly kind?: 'agent' | 'human';
+  /** `human` = the owner as a team member (E10-6), `mission` = Mission Control's persona (req-269); absent = an agent. */
+  readonly kind?: 'agent' | 'human' | 'mission';
   readonly title: string;
   readonly role: string;
   readonly worker: string;
@@ -1205,7 +1205,7 @@ function personaOf(raw: unknown): PersonaView | null {
   const summary = str(persona['summary']).trim();
   return {
     id,
-    ...(persona['kind'] === 'human' ? { kind: 'human' as const } : {}),
+    ...(persona['kind'] === 'human' || persona['kind'] === 'mission' ? { kind: persona['kind'] } : {}),
     title: str(persona['title'], id),
     role: str(persona['role']),
     worker: str(persona['worker']),
@@ -2041,8 +2041,8 @@ export interface McFlowStep {
 
 export interface McFlowPersona {
   readonly id: string;
-  /** `human` = the owner (E10-6). */
-  readonly kind: 'agent' | 'human';
+  /** `human` = the owner (E10-6), `mission` = Mission Control's persona (req-269). */
+  readonly kind: 'agent' | 'human' | 'mission';
   readonly title: string;
   readonly color: string;
   readonly model: string;
@@ -2102,7 +2102,7 @@ export function parseFlow(json: unknown): McFlow | null {
     if (persona !== null && typeof persona['id'] === 'string') {
       personas.push({
         id: persona['id'],
-        kind: persona['kind'] === 'human' ? 'human' : 'agent',
+        kind: persona['kind'] === 'human' || persona['kind'] === 'mission' ? persona['kind'] : 'agent',
         title: str(persona['title'], persona['id']),
         color: str(persona['color']),
         model: str(persona['model']),

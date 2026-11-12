@@ -104,6 +104,8 @@ export interface PersonaCardModel {
   readonly paused: boolean;
   /** The owner as a team member (`kind: human`); the boards draw agents only. */
   readonly human: boolean;
+  /** Mission Control's persona (req-269): her card opens her Persona page — she has no 1:1, runs or setup. */
+  readonly mission: boolean;
   readonly runs: readonly RunRowModel[];
 }
 
@@ -248,6 +250,7 @@ export function personaCardOf(
     overBudget: dailyCost !== null && budget !== null && dailyCost > budget,
     paused,
     human: persona.kind === 'human',
+    mission: persona.kind === 'mission',
     runs: rows,
   };
 }
@@ -310,9 +313,10 @@ export function teamModelOf(
   };
 }
 
-/** The Crew tab's header line (board 7f): `5 personas · 1 running · 1 stuck`; idle says nothing. The day's cost has its own block. */
+/** The Crew tab's header line (board 7f): `5 personas · 1 running · 1 stuck`; idle says nothing. The day's cost has its own block. Mission Control's persona is not counted (req-269, as in Mission Control). */
 export function teamHeadOf(model: TeamModel): string {
-  const count = `${model.personas.length} ${model.personas.length === 1 ? 'persona' : 'personas'}`;
+  const agents = model.personas.filter((card) => !card.mission).length;
+  const count = `${agents} ${agents === 1 ? 'persona' : 'personas'}`;
   return [count, ...(model.summary === 'All idle' ? [] : [model.summary])].join(' · ');
 }
 

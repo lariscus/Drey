@@ -48,7 +48,7 @@ interface Seeding {
 }
 
 /**
- * Seeds the shipped default crew Paul, Ben, Ralf and Tessa into a board
+ * Seeds the shipped default crew Pia, Paul, Ben, Ralf and Tessa into a board
  * (req-256, D7) — "Initialize board" after the pipeline and the prompts, and
  * once at the engine's start for a board that lacks them. **Idempotent by
  * id**: the `seeded-crew:` key of `_meta/crew.md` lists the ids already
@@ -60,13 +60,20 @@ interface Seeding {
  */
 /**
  * req-258: a file without `order:` gets the default crew's, the human last (the
- * concept §9); an order the owner already set stays as it is.
+ * concept §9); an order the owner already set stays as it is — except that
+ * Mission Control's persona, offered for the first time, goes to its front
+ * (req-269, the concept §12: "Pia first").
  */
-function withOrder(marked: CrewWrite, ids: readonly string[]): CrewWrite {
-  if (!marked.ok || crewOrderOf(marked.text).length > 0) {
+function withOrder(marked: CrewWrite, shipped: readonly ShippedPersona[], offered: readonly ShippedPersona[]): CrewWrite {
+  if (!marked.ok) {
     return marked;
   }
-  return withCrewOrder(marked.text, [...ids, HUMAN_PERSONA_ID]);
+  const order = crewOrderOf(marked.text);
+  if (order.length === 0) {
+    return withCrewOrder(marked.text, [...shipped.map((persona) => persona.id), HUMAN_PERSONA_ID]);
+  }
+  const front = offered.filter((persona) => persona.persona.kind === 'mission' && !order.includes(persona.id)).map((persona) => persona.id);
+  return front.length === 0 ? marked : withCrewOrder(marked.text, [...front, ...order]);
 }
 
 export class CrewSeeder {
@@ -112,7 +119,7 @@ export class CrewSeeder {
         missing.push(persona);
       }
     }
-    const marker = withOrder(withSeededCrew(read.text, [...marked, ...offered.map((persona) => persona.id)]), shipped.personas.map((persona) => persona.id));
+    const marker = withOrder(withSeededCrew(read.text, [...marked, ...offered.map((persona) => persona.id)]), shipped.personas, offered);
     if (!marker.ok) {
       this.deps.log(`crew: ${marker.error}`, 'warn');
       return { kind: 'refused', reason: marker.error };
@@ -166,7 +173,7 @@ export class CrewSeeder {
     if (seeded.length === 0) {
       this.deps.log(`crew: the default crew is marked as offered${keptNote}`);
     } else if (models === null) {
-      const fallback = shipped.personas[0]?.persona.models.default ?? '';
+      const fallback = shipped.personas.find((persona) => persona.persona.kind === 'agent')?.persona.models.default ?? '';
       this.deps.log(`crew: seeded the default crew (${ids}) with worker ${worker}; the model table names no model for it, so the persona default (${fallback}) stands${keptNote} — set it on the Persona page`);
     } else {
       this.deps.log(`crew: seeded the default crew (${ids}) with worker ${worker}, models ${models.default} (pool ${models.pool.join(', ')})${keptNote}`);

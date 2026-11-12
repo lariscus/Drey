@@ -248,14 +248,14 @@ test.describe('Board, Team and Capacity (E13-8)', () => {
     await expect(team.locator('.desk-pool-model')).toHaveText('qwen3-coder');
     await page.screenshot({ path: testInfo.outputPath('desk-team.png') });
 
-    // req-258: the crew's order -- Ctrl+Shift+PageDown moves the focused card right, written as order: in crew.md.
+    // req-258: the crew's order -- Ctrl+Shift+PageDown moves the focused card right, written as order: in crew.md (Pia, seeded at the start, first -- req-269).
     const cardIds = (): Promise<string[]> => team.locator('.desk-persona').evaluateAll((nodes) => nodes.map((node) => (node as HTMLElement).dataset['persona'] ?? ''));
-    await expect.poll(cardIds).toEqual(['paul', 'ben', 'ralf', 'tessa']);
+    await expect.poll(cardIds).toEqual(['pia', 'paul', 'ben', 'ralf', 'tessa']);
     await team.locator('[data-persona="paul"]').focus();
     await page.keyboard.press('Control+Shift+PageDown');
-    await expect.poll(cardIds, { timeout: 15_000 }).toEqual(['ben', 'paul', 'ralf', 'tessa']);
+    await expect.poll(cardIds, { timeout: 15_000 }).toEqual(['pia', 'ben', 'paul', 'ralf', 'tessa']);
     await expect(team.locator('[data-persona="paul"]')).toBeFocused();
-    expect(fs.readFileSync(path.join(vaultDir, 'tickets', '_meta', 'crew.md'), 'utf8')).toContain('order: [ben, paul, ralf, tessa');
+    expect(fs.readFileSync(path.join(vaultDir, 'tickets', '_meta', 'crew.md'), 'utf8')).toContain('order: [pia, ben, paul, ralf, tessa');
 
     // --- Capacity band in the bottom dock: only on the Board tab (board 7e; the Crew tab, 7f, has none)
     await expect(page.locator('.desk-capacity')).toBeHidden();

@@ -37,12 +37,12 @@ describe('CrewSeeder over a real git repository', () => {
     return git('show', '--name-only', '--format=%s', 'HEAD').split('\n').filter((line) => line !== '');
   }
 
-  it('commits the four personas and crew.md in one commit with the agreed message, and nothing else', async () => {
+  it('commits the five personas and crew.md in one commit with the agreed message, and nothing else', async () => {
     const shown = await seed();
     expect(shown[0]).toBe(CREW_SEED_COMMIT);
     expect(shown.slice(1).sort()).toEqual([
       'vault/tickets/_meta/crew.md',
-      ...['ben', 'paul', 'ralf', 'tessa'].flatMap((id) => [`vault/tickets/_meta/personas/${id}/persona.md`, `vault/tickets/_meta/personas/${id}/prompt.md`]),
+      ...['ben', 'paul', 'pia', 'ralf', 'tessa'].flatMap((id) => [`vault/tickets/_meta/personas/${id}/persona.md`, `vault/tickets/_meta/personas/${id}/prompt.md`]),
     ].sort());
     expect(git('rev-list', '--count', 'HEAD')).toBe('2');
     expect(git('status', '--porcelain')).toBe('');

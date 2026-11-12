@@ -14,7 +14,7 @@ import {
   type TrancheBinding,
 } from './targets';
 
-const persona = (id: string, title: string, kind?: 'human'): PersonaView =>
+const persona = (id: string, title: string, kind?: 'human' | 'mission'): PersonaView =>
   ({ id, title, ...(kind !== undefined ? { kind } : {}) }) as unknown as PersonaView;
 
 const FILE = 'tickets/_meta/chat/20261104-100000-demo.md';
@@ -35,7 +35,7 @@ function deps(over: Partial<ConversationDeps> = {}) {
       }
       return Promise.resolve({ ok: true, messages: [] });
     },
-    personas: () => [persona('paul', 'Paul'), persona('owner', 'You', 'human'), persona('ben', 'Ben')],
+    personas: () => [persona('pia', 'Pia', 'mission'), persona('paul', 'Paul'), persona('owner', 'You', 'human'), persona('ben', 'Ben')],
     subscribePersonas: () => () => undefined,
     ...over,
   };
@@ -43,7 +43,7 @@ function deps(over: Partial<ConversationDeps> = {}) {
 }
 
 describe('createConversationProvider', () => {
-  it('offers Mission Control first, then one 1:1 per agent persona', () => {
+  it("offers Mission Control first, then one 1:1 per agent persona — none for the owner or for Mission Control's persona (req-269)", () => {
     const targets = createConversationProvider(deps().deps).targets();
     expect(targets.map((t) => t.id)).toEqual([MISSION_CONTROL_TARGET, personaTargetId('paul'), personaTargetId('ben')]);
     expect(targets[1]?.group).toBe(PERSONA_GROUP);

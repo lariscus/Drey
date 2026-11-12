@@ -23,8 +23,8 @@ import type { CapacityView, LiveRunView } from '../api/dto';
  * until `app/api` lands; reconcile the shapes on import, do not guess.
  */
 export interface McPersonaView {
-  /** `human` = the owner as a team member (E10-6); absent = an agent. */
-  readonly kind?: 'agent' | 'human';
+  /** `human` = the owner as a team member (E10-6), `mission` = Mission Control's persona (req-269); absent = an agent. */
+  readonly kind?: 'agent' | 'human' | 'mission';
   readonly id: string;
   readonly title: string;
   readonly role: string;
@@ -271,8 +271,8 @@ export function headerSubOf(
   if (personas === null) {
     return null;
   }
-  // The human persona is the owner, not a worker: it does not count (E10-6).
-  const count = personas.filter((p) => (p as { kind?: string }).kind !== 'human').length;
+  // The human persona is the owner, Mission Control's persona speaks in the chat: neither is a worker (E10-6, req-269).
+  const count = personas.filter((p) => { const kind = (p as { kind?: string }).kind; return kind !== 'human' && kind !== 'mission'; }).length;
   const sum = dailySumOf(personas);
   const noun = count === 1 ? 'persona' : 'personas';
   return sum === null ? `${count} ${noun}` : `${count} ${noun} · today ${usdOf(sum)}`;
@@ -459,7 +459,7 @@ export class Team {
 
   /** The persona the Setup block below the cards shows: the tapped one, else the first with work. */
   protected readonly setupOf = computed<McTeamPersona | null>(() => {
-    const list = (this.personas() ?? []).filter((persona) => persona.kind !== 'human');
+    const list = (this.personas() ?? []).filter((persona) => persona.kind !== 'human' && persona.kind !== 'mission');
     const picked = this.setupId();
     return (
       list.find((persona) => persona.id === picked) ??

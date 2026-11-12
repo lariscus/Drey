@@ -80,7 +80,7 @@ export class FreeSessionService {
     const classes = [...new Set((models?.models ?? []).map((row) => row.class))].sort();
     return {
       ok: true,
-      personas: personas.filter((p) => p.kind !== 'human' && parseWorkerValue(p.worker) !== null).map((p) => ({ id: p.id, title: p.title, worker: p.worker })),
+      personas: personas.filter((p) => p.kind === 'agent' && parseWorkerValue(p.worker) !== null).map((p) => ({ id: p.id, title: p.title, worker: p.worker })),
       classes,
       ticketsVault: vault.path,
       repos: repos.repos.filter((r) => r.path !== null).map((r) => ({ name: r.name, path: r.path! })),
@@ -107,7 +107,7 @@ export class FreeSessionService {
     }
     const id = personaRef(ask.persona.trim());
     const persona = (await this.deps.board.listPersonas()).find((p) => p.id === id) ?? null;
-    if (persona === null || persona.kind === 'human') {
+    if (persona === null || persona.kind !== 'agent') {
       return { ok: false, error: `persona "${id}" not found` };
     }
     const runs = await this.deps.fleet.runs();
