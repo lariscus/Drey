@@ -9,6 +9,8 @@ import {
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { MC_CHAT_STATE } from '../chat/chat.model';
+import { ComposerFit } from '../chat/composer-fit';
+import { ComposerKeys } from '../chat/composer-keys';
 import {
   MC_WORK_STATE,
   questionCardOf,
@@ -137,7 +139,7 @@ export type TicketMode = 'ticket' | 'proof' | 'thread';
   templateUrl: './view.html',
   styleUrls: ['../seg.css', '../phone/kit.css', './view.css', './phone.css', './pad.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, Markdown, TicketModeSwitch, AppBar, CostTable, AnswerCard, McI18nPipe, PhoneIcon, PhoneAvatar],
+  imports: [NgTemplateOutlet, Markdown, TicketModeSwitch, AppBar, CostTable, AnswerCard, McI18nPipe, PhoneIcon, PhoneAvatar, ComposerFit],
 })
 export class TicketView {
   protected readonly vm = inject(MC_TICKET);
@@ -177,6 +179,8 @@ export class TicketView {
   // --- the phone's ticket face (boards 10d, 10o) ----------------------------------
 
   protected readonly phone = touchFaceSignal();
+  /** D-57: the thread composer's return key, as in the chat tab. */
+  protected readonly threadKeys = new ComposerKeys(this.phone);
   protected readonly pad = padSignal();
   private readonly panes = inject(Panes);
   private readonly padCards = inject(PadCards);
@@ -1149,7 +1153,7 @@ export class TicketView {
   }
 
   protected onThreadKeydown(event: KeyboardEvent): void {
-    if (event.key !== 'Enter' || event.shiftKey) {
+    if (!this.threadKeys.sendsOn(event)) {
       return;
     }
     event.preventDefault();

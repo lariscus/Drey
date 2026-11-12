@@ -341,7 +341,9 @@
       </button>
       <textarea
         class="composer-input"
-        [rows]="rows()"
+        rows="1"
+        [mcComposerFit]="draft()"
+        [attr.enterkeyhint]="keys.enterKeyHint()"
         [value]="draft()"
         [disabled]="readOnly()"
         (input)="onDraft($event)"

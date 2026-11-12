@@ -539,7 +539,6 @@ details.think .step-body {
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-dialog);
-  transition: border-color 0.15s ease;
 }
 
 .composer-input::placeholder {
@@ -549,8 +548,10 @@ details.think .step-body {
   white-space: nowrap;
 }
 
-.composer-input:focus {
-  border-color: var(--accent);
+/* D-57: the boards draw the field without a focus frame — the caret says where the text goes. */
+.composer-input:focus,
+.composer-input:focus-visible {
+  outline: none;
 }
 
 .attach,

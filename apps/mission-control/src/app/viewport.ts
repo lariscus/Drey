@@ -23,20 +23,56 @@ export interface ViewportBox {
  */
 export const KEYBOARD_MIN_PX = 120;
 
+/**
+ * D-55: while a field has focus, a shrink of the visual viewport is the keyboard's
+ * and nothing else — the bar collapsing does not happen under a typing finger. The
+ * short ones (the shortcut bar an iPad shows with a hardware keyboard, the accessory
+ * row, a floating keyboard's strip) are well under `KEYBOARD_MIN_PX` and used to
+ * leave the bottom bar behind them; below this still counts as no change at all.
+ */
+export const EDITING_KEYBOARD_MIN_PX = 40;
+
 /** The CSS variables for a visual viewport; both null = full height, the stylesheet's fallbacks apply. */
-export function viewportVarsOf(box: ViewportBox, innerHeight: number): { readonly vh: string | null; readonly top: string | null } {
+export function viewportVarsOf(
+  box: ViewportBox,
+  innerHeight: number,
+  editing = false,
+): { readonly vh: string | null; readonly top: string | null } {
   const top = Math.max(0, Math.round(box.offsetTop));
   const height = Math.round(box.height);
-  if ((box.scale ?? 1) > 1.01 || Math.round(innerHeight) - height < KEYBOARD_MIN_PX) {
+  const min = editing ? EDITING_KEYBOARD_MIN_PX : KEYBOARD_MIN_PX;
+  if ((box.scale ?? 1) > 1.01 || Math.round(innerHeight) - height < min) {
     return { vh: null, top: null };
   }
   return { vh: `${height}px`, top: `${top}px` };
 }
 
+/** True for what a keyboard types into: text fields and contenteditable surfaces (CodeMirror's content). */
+export function isEditableElement(element: Element | null | undefined): boolean {
+  if (element === null || element === undefined) {
+    return false;
+  }
+  const tag = element.tagName.toLowerCase();
+  if (tag === 'textarea' || tag === 'select') {
+    return true;
+  }
+  if (tag === 'input') {
+    return !['checkbox', 'radio', 'range', 'button', 'submit', 'reset', 'file', 'color', 'image'].includes(
+      (element.getAttribute('type') ?? 'text').toLowerCase(),
+    );
+  }
+  const editable = element.getAttribute('contenteditable');
+  return editable !== null && editable.toLowerCase() !== 'false';
+}
+
 /** The slice of `window` the tracker needs — the spec passes a fake. */
 export interface ViewportHost {
   readonly innerHeight: number;
-  readonly document: { readonly documentElement: { readonly style: Pick<CSSStyleDeclaration, 'setProperty' | 'removeProperty'> } };
+  readonly document: {
+    readonly documentElement: { readonly style: Pick<CSSStyleDeclaration, 'setProperty' | 'removeProperty'> };
+    /** The focused element; optional so a spec host stays small. */
+    readonly activeElement?: Element | null;
+  };
   readonly visualViewport?: (ViewportBox & Pick<EventTarget, 'addEventListener'>) | null;
   scrollTo(x: number, y: number): void;
   /** Optional so a spec host stays small; the browser has them. */
@@ -55,7 +91,7 @@ export function trackVisualViewport(host: ViewportHost): void {
   }
   const style = host.document.documentElement.style;
   const update = (): void => {
-    const vars = viewportVarsOf(viewport, host.innerHeight);
+    const vars = viewportVarsOf(viewport, host.innerHeight, isEditableElement(host.document.activeElement));
     if (vars.vh === null || vars.top === null) {
       style.removeProperty('--mc-vh');
       style.removeProperty('--mc-vv-top');

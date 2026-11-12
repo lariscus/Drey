@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { trackVisualViewport, viewportVarsOf, type ViewportHost } from './viewport';
+import { isEditableElement, trackVisualViewport, viewportVarsOf, type ViewportHost } from './viewport';
 
 describe('viewportVarsOf (D-7d)', () => {
   it('is silent at full height, so the stylesheet fallbacks stay in charge', () => {
@@ -23,6 +23,43 @@ describe('viewportVarsOf (D-7d)', () => {
   it('carries the pan iOS adds to reveal the focused field, never a negative one', () => {
     expect(viewportVarsOf({ height: 508, offsetTop: 120.6 }, 844)).toEqual({ vh: '508px', top: '121px' });
     expect(viewportVarsOf({ height: 508, offsetTop: -3 }, 844)).toEqual({ vh: '508px', top: '0px' });
+  });
+});
+
+describe('viewportVarsOf while a field is being edited (D-55)', () => {
+  it('follows a short shrink — the shortcut bar of a hardware keyboard, the accessory row — while a field has focus', () => {
+    expect(viewportVarsOf({ height: 790, offsetTop: 0 }, 844, true)).toEqual({ vh: '790px', top: '0px' });
+  });
+
+  it('still ignores the same shrink without a focused field: that is the browser bar collapsing (D-5b)', () => {
+    expect(viewportVarsOf({ height: 790, offsetTop: 0 }, 844, false)).toEqual({ vh: null, top: null });
+  });
+
+  it('ignores a few pixels and a pinch-zoomed viewport even while editing', () => {
+    expect(viewportVarsOf({ height: 830, offsetTop: 0 }, 844, true)).toEqual({ vh: null, top: null });
+    expect(viewportVarsOf({ height: 400, offsetTop: 120, scale: 2 }, 844, true)).toEqual({ vh: null, top: null });
+  });
+});
+
+describe('isEditableElement (D-55)', () => {
+  const el = (html: string): Element => {
+    const host = document.createElement('div');
+    host.innerHTML = html;
+    return host.firstElementChild!;
+  };
+
+  it('knows the fields a keyboard types into', () => {
+    expect(isEditableElement(el('<textarea></textarea>'))).toBe(true);
+    expect(isEditableElement(el('<input type="search" />'))).toBe(true);
+    expect(isEditableElement(el('<div contenteditable="true"></div>'))).toBe(true);
+    expect(isEditableElement(el('<div contenteditable=""></div>'))).toBe(true);
+  });
+
+  it('knows what is not one', () => {
+    expect(isEditableElement(null)).toBe(false);
+    expect(isEditableElement(el('<button></button>'))).toBe(false);
+    expect(isEditableElement(el('<input type="checkbox" />'))).toBe(false);
+    expect(isEditableElement(el('<div contenteditable="false"></div>'))).toBe(false);
   });
 });
 
@@ -104,6 +141,25 @@ describe('trackVisualViewport (D-7d)', () => {
     viewport.height = 500;
     timers[3]!.fn();
     expect(props.get('--mc-vh')).toBe('500px');
+  });
+
+  it('reads a focused field into the threshold: a short shrink moves the frame only while one has focus (D-55)', () => {
+    const { host, props, viewport } = fakeHost();
+    const doc = host.document as unknown as { activeElement: Element | null };
+    doc.activeElement = null;
+    trackVisualViewport(host);
+
+    viewport.height = 790;
+    viewport.fire('resize');
+    expect(props.size).toBe(0);
+
+    doc.activeElement = document.createElement('textarea');
+    viewport.fire('resize');
+    expect(props.get('--mc-vh')).toBe('790px');
+
+    doc.activeElement = null;
+    viewport.fire('resize');
+    expect(props.size).toBe(0);
   });
 
   it('does nothing without a visual viewport', () => {

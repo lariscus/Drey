@@ -2255,10 +2255,16 @@ Review and Flow use the room of the right sidebar; its toggle calls the Assistan
 list and the middle, and the right sidebar slides over the page. Which sidebars are open is
 remembered on that iPad, separately for each way it is held.
 
+The chat's **composer** grows with what you write, up to five lines, then scrolls. On the
+desktop web **Enter sends** and **Shift+Enter** starts a new line, as in Drey's Assistant. On a
+phone, and on an iPad without a keyboard, it is the other way round: the **return key makes a new line** and the **arrow sends**, as in
+WhatsApp, Telegram and the ChatGPT and Claude apps. An iPad with a keyboard attached sends on
+Enter from the first key you press on it.
+
 **Notes** (phone and iPad) reach the vault that is active on your computer, away from
 your desk. The list shows a search field, the **Recent** notes and the folders; the vault's name
 sits under the title. Tap a note to read it; the **View · Live · Source** switch above the text
-picks how it is shown. The **pencil** starts editing in Live Preview: **✕** cancels (it asks
+picks how it is shown. The **pencil** starts editing in Live Preview (the formatting bar sits directly above the keyboard, and tapping it keeps the keyboard open): **✕** cancels (it asks
 only if you changed something) and **✓** saves. If the note changed on your computer in the
 meantime, Mission Control shows both versions and you keep yours or the computer's. A note shows
 its tags, a link to its ticket when its header says `ticket: T-0123`, and **Ask about this

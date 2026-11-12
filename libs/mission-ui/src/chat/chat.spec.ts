@@ -13,7 +13,6 @@ import {
   basenameOf,
   cardPriorityOf,
   chainCompareOf,
-  composerRowsOf,
   errorOf,
   historyGroupsOf,
   isTurnStreaming,
@@ -167,28 +166,6 @@ describe('isTurnStreaming', () => {
   it('is false once mission text has landed', () => {
     const messages = [msg('owner', 'hi', '2026-11-02T09:00:00Z'), msg('mission', 'partial', '2026-11-02T09:00:10Z')];
     expect(isTurnStreaming(messages, true)).toBe(false);
-  });
-});
-
-// -- composerRowsOf --------------------------------------------------------------
-
-describe('composerRowsOf', () => {
-  it('starts at one row', () => {
-    expect(composerRowsOf('')).toBe(1);
-    expect(composerRowsOf('single line')).toBe(1);
-  });
-
-  it('grows with newline-separated lines', () => {
-    expect(composerRowsOf('a\nb\nc')).toBe(3);
-  });
-
-  it('caps at five rows', () => {
-    expect(composerRowsOf('1\n2\n3\n4\n5')).toBe(5);
-    expect(composerRowsOf(Array.from({ length: 30 }, (_, i) => `line ${i}`).join('\n'))).toBe(5);
-  });
-
-  it('honours a custom cap', () => {
-    expect(composerRowsOf('a\nb\nc', 2)).toBe(2);
   });
 });
 
@@ -1676,5 +1653,78 @@ describe('Chat dictation (the microphone in the composer)', () => {
     fixture.detectChanges();
     void (fixture.componentInstance as unknown as { send(): Promise<void> }).send();
     expect(abort).toHaveBeenCalled();
+  });
+});
+
+describe('the return key of the composer (D-57)', () => {
+  const realMatchMedia = window.matchMedia;
+
+  afterEach(() => {
+    window.matchMedia = realMatchMedia;
+  });
+
+  function touchFace(): void {
+    window.matchMedia = ((query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })) as unknown as typeof window.matchMedia;
+  }
+
+  function typed(el: HTMLElement, text: string): HTMLTextAreaElement {
+    const field = el.querySelector<HTMLTextAreaElement>('.composer-input')!;
+    field.value = text;
+    field.dispatchEvent(new Event('input'));
+    return field;
+  }
+
+  function press(field: HTMLElement, init: KeyboardEventInit): KeyboardEvent {
+    const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
+    field.dispatchEvent(event);
+    return event;
+  }
+
+  function sendSpy(fixture: ReturnType<typeof renderChat>['fixture']): ReturnType<typeof vi.fn> {
+    const send = vi.fn(async () => ({ ok: true }));
+    (fixture.componentInstance as unknown as { state: { send: unknown } }).state.send = send;
+    return send;
+  }
+
+  it('Enter sends and Shift+Enter breaks the line with a mouse (the desktop web)', () => {
+    const { fixture, el } = renderChat(activeSession());
+    const send = sendSpy(fixture);
+    const field = typed(el, 'hello');
+    fixture.detectChanges();
+    expect(field.getAttribute('enterkeyhint')).toBe('send');
+    expect(press(field, { key: 'Enter', shiftKey: true }).defaultPrevented).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+    expect(press(field, { key: 'Enter' }).defaultPrevented).toBe(true);
+    expect(send).toHaveBeenCalledWith('hello');
+  });
+
+  it('the return key is a newline on a touch face; the arrow sends', () => {
+    touchFace();
+    const { fixture, el } = renderChat(activeSession());
+    const send = sendSpy(fixture);
+    const field = typed(el, 'hello');
+    fixture.detectChanges();
+    expect(field.getAttribute('enterkeyhint')).toBe('enter');
+    expect(press(field, { key: 'Enter' }).defaultPrevented).toBe(false);
+    expect(send).not.toHaveBeenCalled();
+    el.querySelector<HTMLButtonElement>('.composer .send')!.click();
+    expect(send).toHaveBeenCalledWith('hello');
+  });
+
+  it('Enter sends on a touch face once a hardware keyboard has typed (an iPad with a keyboard)', () => {
+    touchFace();
+    const { fixture, el } = renderChat(activeSession());
+    const send = sendSpy(fixture);
+    const field = typed(el, 'hello');
+    press(field, { key: 'o', code: 'KeyO' });
+    fixture.detectChanges();
+    expect(field.getAttribute('enterkeyhint')).toBe('send');
+    expect(press(field, { key: 'Enter', code: 'Enter' }).defaultPrevented).toBe(true);
+    expect(send).toHaveBeenCalledWith('hello');
   });
 });
