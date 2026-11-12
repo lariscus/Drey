@@ -156,11 +156,25 @@ describe('chainOf', () => {
     phase('commit', 'Commit', 'manual'),
     phase('done', 'Done', 'none'),
   ];
+  const entry = (persona: string, extra: Record<string, unknown> = {}) => ({ persona, mode: null, notify: false, ...extra });
   const card = (meta: Record<string, unknown>): TicketCard =>
     ({ id: 'T-1', meta: { chain: [], persona: null, ...meta } }) as unknown as TicketCard;
   const personas = [{ id: 'ben', title: 'Ben' }];
+  const flow = [entry('paul'), entry('ben'), entry('ralf'), entry('you')];
 
-  it('shows the working phases up to the owner checkpoint, with who does each', () => {
+  it('shows the persona list around the cursor, with who does each', () => {
+    const chain = chainOf({ pipeline, currentPhaseId: 'build', card: card({ at: 2 }), personas, flow });
+    expect(chain.map((s) => [s.title, s.state, s.who])).toEqual([
+      ['Paul', 'past', 'Paul'],
+      ['Ben', 'current', 'Ben'],
+      ['Ralf', 'future', 'Ralf'],
+      ['You', 'future', 'you'],
+    ]);
+    expect(chain[1]!.personaId).toBe('ben');
+    expect(chain[3]!.personaId).toBeNull();
+  });
+
+  it('falls back to the working columns without a chain of its own and without a standard flow', () => {
     const chain = chainOf({ pipeline, currentPhaseId: 'build', card: card({}), personas });
     expect(chain.map((s) => [s.title, s.state, s.who])).toEqual([
       ['Plan', 'past', 'Paul'],
@@ -168,19 +182,16 @@ describe('chainOf', () => {
       ['Review', 'future', 'Ralf'],
       ['Commit', 'future', 'you'],
     ]);
-    expect(chain[1]!.personaId).toBe('ben');
-    expect(chain[3]!.personaId).toBeNull();
   });
 
-  it('lets the ticket pin and the chain delta override the column', () => {
-    const chain = chainOf({
-      pipeline,
-      currentPhaseId: 'plan',
-      card: card({ persona: 'tessa', chain: [{ kind: 'skip', phase: 'review' }] }),
-      personas,
-    });
-    expect(chain.find((s) => s.phase === 'plan')!.who).toBe('Tessa');
-    expect(chain.find((s) => s.phase === 'review')!.skipped).toBe(true);
+  it("prefers the ticket's own chain to the standard flow, and queues a ticket in the first column", () => {
+    const own = [entry('paul', { mode: 'shape' }), entry('tessa', { notify: true }), entry('you')];
+    const chain = chainOf({ pipeline, currentPhaseId: 'ideas', card: card({ chain: own }), personas, flow });
+    expect(chain.map((s) => [s.title, s.state, s.notify])).toEqual([
+      ['Paul', 'future', false],
+      ['Tessa', 'future', true],
+      ['You', 'future', false],
+    ]);
   });
 });
 
@@ -194,33 +205,49 @@ describe('the card of a page', () => {
     { id: 'ready', title: 'Ready to try', handover: 'manual' },
     { id: 'done', title: 'Done', handover: 'none' },
   ] as unknown as PipelinePhase[];
-  const chain = (currentPhaseId: string) => chainOf({ pipeline, currentPhaseId, card: { meta: {} } as unknown as TicketCard, personas: [] });
+  const standard = [
+    { persona: 'paul', mode: null, notify: false },
+    { persona: 'ben', mode: null, notify: false },
+    { persona: 'you', mode: null, notify: false },
+  ];
+  const chain = (currentPhaseId: string, at = 1) =>
+    chainOf({ pipeline, currentPhaseId, card: { meta: { chain: standard, at } } as unknown as TicketCard, personas: [] });
 
   it('Inbox and Prioritized follow board 9a, Shaping and later row 7', () => {
     expect(['inbox', 'prioritized', 'shaping', 'build', 'ready', null].map((phase) => pageShapeOf(phase, pipeline))).toEqual(['early', 'early', 'flow', 'flow', 'flow', 'flow']);
   });
 
   it('words the flow row as the boards do', () => {
-    const titles = (phase: string, parts: boolean) => flowItemsOf(i18n, chain(phase), phase, parts).map((item) => [item.title, item.state, item.note]);
+    const titles = (phase: string, parts: boolean, at = 1) => flowItemsOf(i18n, chain(phase, at), phase, parts).map((item) => [item.title, item.state, item.note]);
     expect(titles('shaping', false)).toEqual([
       ['Shape', 'current', '(with you)'],
-      ['Plan', 'future', null],
-      ['Build', 'future', null],
+      ['Paul', 'current', null],
+      ['Ben', 'future', null],
       ['Accept', 'future', null],
     ]);
     expect(titles('shaping', true).slice(0, 2)).toEqual([
       ['Shape', 'past', null],
-      ['Plan', 'current', '(waits for you)'],
+      ['Paul', 'current', '(waits for you)'],
     ]);
-    expect(titles('ready', false).slice(-2)).toEqual([
-      ['Build', 'past', null],
+    expect(titles('ready', false, 3).slice(-2)).toEqual([
+      ['Ben', 'past', null],
       ['Accept', 'current', '(your turn)'],
     ]);
   });
 
+  it('names the :shape entry of the chain Shape and adds no second one (req-266)', () => {
+    const shaped = chainOf({ pipeline, currentPhaseId: 'shaping', card: { meta: { chain: [{ persona: 'paul', mode: 'shape', notify: false }, ...standard], at: 1 } } as unknown as TicketCard, personas: [] });
+    expect(flowItemsOf(i18n, shaped, 'shaping', false).map((item) => [item.title, item.state, item.note])).toEqual([
+      ['Shape', 'current', '(with you)'],
+      ['Paul', 'future', null],
+      ['Ben', 'future', null],
+      ['Accept', 'future', null],
+    ]);
+  });
+
   it('names the worker of the current step, else the last one, else the next one', () => {
-    expect(workerOf(chain('build'))?.phase).toBe('build');
-    expect(workerOf(chain('ready'))?.phase).toBe('build');
+    expect(workerOf(chain('build', 2))?.phase).toBe('build');
+    expect(workerOf(chain('ready', 3))?.phase).toBe('build');
     expect(workerOf(chain('shaping'))?.phase).toBe('plan');
   });
 

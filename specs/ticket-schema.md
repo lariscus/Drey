@@ -295,11 +295,11 @@ execution order (the order IS the plan's order; moving a part is a
 list edit). Each part's detail lines indent under its item: the
 builder persona (`persona: ben`), the size (`size: M`, req-170), the
 model capabilities it needs (`needs: image`, req-178), the reason, and an
-optional per-part `chain:` entry list in the chain delta grammar. The parts
+optional per-part `chain:` line in the chain grammar (req-266: the persona list). The parts
 become **their own tickets** when the owner approves the plan
 ("Start" in the Plan-to-approve card): each carries `parent: <id>`,
 its own description, its own `persona:` pin and its own `chain:`
-delta — the parent's `chain:` never leaks into a part. A part that
+(the part's line, else the standard flow) — the parent's `chain:` never leaks into a part. A part that
 already runs is **locked**: the parts list refuses to move or delete
 it, and no part may move ahead of a running one. The number of parts
 follows the plan and is never fixed; one part means no `### Parts`
@@ -316,7 +316,7 @@ The canonical shape (`core/plan-parts.ts`):
   size: M
   needs: image
   reason: pure logic first, so the panel can build on it
-  chain: insert security(ralf, notify) after review; skip qa
+  chain: ben; ralf(notify); tessa; you
 - [x] Hunk rows in the Source control panel
   persona: ben
 ```
@@ -325,22 +325,23 @@ The canonical shape (`core/plan-parts.ts`):
 ticket yet into one (or only the first, "Run part 1 only"): the ticket
 lands in the build queue (`created in <first phase>`, then `<first> ->
 build` in its Log), named by the part's title, with `parent: <id>`, the
-part's `persona:` pin, its `size:` (req-170) and `needs:` (req-178), its own `chain:` entries, the parent's repo,
+part's `persona:` pin, its `size:` (req-170) and `needs:` (req-178), its own `chain:` (the standard flow when the part names none) with `at: 1`, the parent's repo,
 repos and priority, and `blocked-by:` the ticket of the part before it
 (none for part 1), so the plan's order is the order of the work. A part
 is matched to its ticket by title among the tickets that name the
 parent. Every part that is a ticket is locked in the list. The release
-is checked before it writes (persona files exist, each chain validates
-against the build phase) and is one commit `tickets: <id> plan released
+is checked before it writes (persona files exist, each part's chain
+names only existing personas) and is one commit `tickets: <id> plan released
 (<n> parts)`; the parent keeps its plan and gets one Log line, `plan
 released: T-0131, T-0132`. A list edit (persona pick, move, delete) is
 one commit `tickets: <id> parts` and keeps at least two parts.
 
 `[x]` marks a part whose ticket was accepted. Detail keys are `persona`
 (a persona id), `reason` (one line) and `chain` (entries of the
-[chain delta](#the-chain-delta-e9-concept-57) grammar separated by `;`
-— a `;` never occurs inside an entry). An unknown key, a bad persona or a
-chain entry outside the grammar warns and drops. Moving a part is
+[chain](#the-chain-req-266-was-the-chain-delta-of-e9) grammar separated by `;`
+— a `;` never occurs inside an entry). An unknown key or a bad persona warns
+and drops; a chain with an entry outside the grammar warns and drops whole (the
+part takes the standard flow). Moving a part is
 `movePlanPart`, deleting `deletePlanPart`: both refuse a running part,
 and `movePlanPart` refuses to put a part ahead of one that runs. Writing
 the chapter (`withPlanParts`) replaces it in place or adds it at the end
@@ -356,12 +357,14 @@ of the Plan and removes it for fewer than two parts.
 | `repos` | list of names | Optional (req-72). Every work repo the ticket touches, **primary first** — `repos: [drey, lariscus]`. When set, the list is the truth and `repo:` repeats its first entry (a mismatch is a noise finding, the list wins). One worktree per named repo, all on the ticket's branch; a run refuses while any named repo lacks a local `path:` in `_meta/repos.md`. One or zero names write no `repos:` line. |
 | `worker` | string | Optional pin for the fleet worker (M84): `opencode`, `claude-code`, `kimi`, `copilot` (req-182), or `<provider>/<model>`. Wins over the column's `worker:` key, the phase handover's `@worker` pin, the repo's `worker:` and the configured default (M85's assignment ring). An unknown value badges the card; a run start with it refuses. |
 | `persona` | string | Optional persona pin (ADR-0088 E3): `persona: paul` — the top of the persona ladder, winning over the phase's `persona:` key and the engine default (`personas.default`). The persona's worker/model/prompt drive the dispatch; when nothing resolves or the persona file is missing the legacy assignment ring runs unchanged. See `_meta/personas/` below. |
-| `awaiting` | persona id | Optional (E10-6). The ticket is **parked at a manual step** for that human persona (`awaiting: you`): the dispatcher never takes it (no run, no worktree) and it shows in Needs you as a `manual` card. Machine-written when a manual gate parks the ticket; **any transition clears it** (Accept or Send back are ordinary board moves, so is a hand move). See "The manual step" under the chain delta. |
+| `awaiting` | persona id | Optional (E10-6). The ticket is **parked at a manual step** for that human persona (`awaiting: you`): the dispatcher never takes it (no run, no worktree) and it shows in Needs you as a `manual` card. Machine-written when a manual gate parks the ticket; **any transition clears it** (Accept or Send back are ordinary board moves, so is a hand move). See "The human persona" under The chain. |
 | `priority` | one id of the board's configured vocabulary | Required. The vocabulary is the vault's own — `_meta/pipeline.md`'s `priorities:` list (default `urgent \| high \| normal \| low`); the list's order IS the weight, first = highest. An omitted or unknown id reads as the vocabulary's default (its middle entry) with a warning badge; machine writers always write a vocabulary word. See [Priorities](#priorities-priorities-in-pipelinemd). |
 | `track` | `auto \| shape` | Optional (req-75 W1b, ADR-0087 decision 2). The ticket's triage track: `auto` runs on its own, `shape` goes through the plan-mode dialog with the owner. Absent (or any other value — a warning) reads as not triaged; set from the Work panel's row menu (Track ›) until W5c/W6 fill it from triage. |
 | `form` | `ship \| scout` | Optional (concept §5.6, E8). The ticket's form: `ship` (the default — an absent key reads as ship) is the known way, plan → worktree → gate → move. `scout` is exploration only: a scout run reads repo/history/data and writes the ticket's `## Report` section — no worktree, no diff, no gate, no move; the report surfaces as a card in "Needs you" and the owner promotes the ticket to ship from there. Any other value warns (`form must be ship or scout — read as ship`) and reads as ship. See [The scout form](#the-scout-form-e8-concept-56). |
-| `chain` | list of strings | Optional (concept §5.7, E9). The ticket's **delta** against the pipeline's standard flow — the standard flow itself is crew configuration in `_meta/pipeline.md` and applies to every ticket silently; the ticket stores only the deviations, one declarative entry per item in the strict grammar: `insert <phase>[(<persona>[, notify] \| notify)] after\|before <anchor>` (add a gate at the anchor — a standard-flow phase may be revisited this way, at most once), `skip <phase>` (bypass a gate), `notify <phase>` (the notify rule: a card lands in "Needs you" when the gate completes), `move <phase> after\|before <anchor>` (a standard gate runs elsewhere, E10-5), `assign <phase> <persona>` (a standard gate's persona, E10-5); an inserted gate may be the manual step `manual` / `manual-<word>` (E10-6, see "The manual step"). Absent (or empty) reads as the standard flow. An entry outside the grammar warns and drops (`chain entry "<raw>" is not readable — expected e.g. "insert design after review"`). See [The chain delta](#the-chain-delta-e9-concept-57). |
-| `parent` | ticket id | Optional (E10, concept v2 §5.9). Set on a ticket that is one **part** of a split plan: `parent: T-0130` names the ticket whose `### Parts` list produced it. The parent keeps the plan; the part carries its own description, builder persona and `chain:` delta (a per-part scope — the parent's `chain:` never leaks into a part). A value that is no ticket id, or the ticket's own id, warns and reads as no parent; whether the parent still exists is not checked (a finished parent is archived). |
+| `chain` | list of strings | Optional (req-266, the persona board). The ticket's **chain: the ordered list of the personas it goes through**, one entry per position in the strict grammar `<persona>[:shape][(notify)]` (`chain: [paul:shape, paul, ben, ralf(notify), tessa, you]`; on a store `x-chain`, entries joined by `;`). Copied from `_meta/pipeline.md`'s `flow:` at creation, then the ticket's own. One entry outside the grammar — the old E9 delta included — reads the chain as absent, with a warning (silently on a done ticket). See [The chain](#the-chain-req-266-was-the-chain-delta-of-e9). |
+| `at` | position | Optional (req-266). The chain's **cursor**, 1-based (`x-at` on a store); absent = 1. Written as `1` with the chain; nothing advances it before req-257. A value that is no position warns and reads as 1. |
+| `sent-back` | `<from>><to>` | Optional (req-266). The one send-back the ticket used (`sent-back: 5>3`, `x-sent-back` on a store); written by req-257's runner. A value that does not read warns and is ignored. |
+| `parent` | ticket id | Optional (E10, concept v2 §5.9). Set on a ticket that is one **part** of a split plan: `parent: T-0130` names the ticket whose `### Parts` list produced it. The parent keeps the plan; the part carries its own description, builder persona and `chain:` (a per-part scope — the parent's `chain:` never leaks into a part). A value that is no ticket id, or the ticket's own id, warns and reads as no parent; whether the parent still exists is not checked (a finished parent is archived). |
 | `class` | `A \| B \| C` | Optional class pin (req-170): the run asks the capacity pool for exactly this class, whatever the size, the floor or the persona's default say. Any other value warns and reads as no pin. The Work row's menu (**Class ›**, req-186) writes it — one header patch, a Log line `class B` / `class none`, one commit `tickets: <id> class <value>`; a live run refuses. Dricket: `x-class`. |
 | `model` | string | Optional model pin (req-170): the run asks the pool for this model of the model table (its row's class); it beats `class:` and every class rule. Dricket: `x-model`. |
 | `size` | `S \| M \| L` | The plan part's size (req-170), written by the release from the part's `size:` detail: the run asks for class C, B or A (raised to the phase's `min-class:`). Absent = the class of the persona's default model. Dricket: `x-size`. |
@@ -653,136 +656,116 @@ above is what the board writes. From its next normal run the
 promoted ticket is an ordinary ship ticket: plan, worktree, gate.
 The `## Report` section stays in the file as history.
 
-### The chain delta (E9, concept §5.7)
+### The chain (req-266; was the chain delta of E9)
 
-The pipeline's standard flow is **crew configuration**
-(`_meta/pipeline.md`) and applies to every ticket **silently**. A
-ticket stores only its **delta** — declarative entries in the
-frontmatter's `chain:` list:
-
-```markdown
-chain:
-  - insert security(ralf, notify) after review
-  - skip verify
-```
-
-The engine merges standard + delta into the ticket's concrete
-chain, from which the gate bar, the notify cards and the chat's
-before/after confirmation render. No second source of truth, no UI
-state — the chain is data in the ticket. The merge is read-tolerant
-(an unknown phase renders with its id as title, an unknown anchor
-appends at the end); **writes** are guarded semantically.
-
-The grammar, one entry per list item:
-
-- `insert <phase>[(<persona>[, notify] | notify)] after|before
-  <anchor>` — adds a gate at the anchor phase. A phase the standard
-  flow already contains may be inserted — a **front-loaded revisit**
-  — at most once per phase. The persona pins who works the gate
-  (absent = the ladder decides); `notify` is the notify rule (see
-  below).
-- `skip <phase>` — the ticket bypasses the gate (rendered struck).
-- `notify <phase>` — the **notify rule** on a standard gate: a
-  card lands in "Needs you" when the gate completes. The card shows
-  from the gate's completion until the ticket leaves the following
-  gate or the freshness window (`NOTIFY_WINDOW_MS`, 24 h) runs out,
-  whichever comes first.
-- `move <phase> after|before <anchor>` — a standard gate runs
-  somewhere else in this ticket's chain (E10-5, the flow editor's move
-  earlier / later). Once per phase; an inserted gate is moved by
-  changing its own insert, never by `move`.
-- `assign <phase> <persona>` — pins who works a standard gate
-  (E10-5). An inserted gate carries its persona in the insert.
-
-**The manual step (E10-6).** A gate the owner works by hand. Its phase id
-is `manual` (a second one `manual-<word>`, e.g. `manual-qa`) — the only
-phase ids the chain accepts that are **not** a pipeline directory — and it
-exists only as an `insert`:
+A ticket's chain is its **whole way: the ordered list of the personas it
+goes through** (the persona board concept §3 and §6). Each entry is one
+position; what happens there is what that persona's `prompt.md` says (R11).
+The same persona may stand twice, so a **position** (1-based), never a
+persona id, is what the cursor and a send-back name.
 
 ```markdown
-chain:
-  - insert manual(you, notify) after review
+chain: [paul:shape, paul, ben, ralf(notify), tessa, you]
+at: 3
+sent-back: 5>3
 ```
 
-The persona is the **human** persona (`kind: human`, below); without one the
-step is the owner's anyway (`you`). A pinned **agent** persona is refused at
-the write guard (the flow service) and ignored by the dispatcher. It anchors
-on a real phase, is inserted at most once per id, and nothing anchors on it
-or moves it; `skip`/`assign` on it are refused (the existing "inserted"
-rules).
+On a dricket store the three fields are `x-chain` (the entries joined by
+`;`: `x-chain: paul:shape;paul;ben;ralf(notify);tessa;you`), `x-at` and
+`x-sent-back` — Drey extension fields like the others
+(`store/extension-keys.ts`).
 
-*Parking.* When the gate before the manual step finishes green, the run does
-not move the ticket on: it stamps `awaiting: you` where the ticket sits (a
-ticket the dispatcher pulled across a checkpoint moves into the working
-column first), appends one Log line (`parked for you (manual step)`, actor =
-the fleet) and the status log's `done:` line names who waits. No agent runs
-for the step and no worktree is prepared for it. The same park happens for a
-gate the human persona **works itself** — the delta's `assign`/insert pin,
-else the ticket's `persona:` pin, else the phase's `persona:`, else the
-engine default resolves to a `kind: human` persona: the dispatch pass
-stamps `awaiting` instead of composing a run (once; `paused:` status line,
-Log line `parked for <name> - the <phase> gate is a manual step`).
+The grammar, one entry per list item (`core/chain-list.ts`):
 
-*Finishing.* **Accept** is the board's ordinary accept — the ticket moves to
-the next phase, the field goes (Log line `manual step finished by <owner>
-(<persona>)`, the status log's `done:` line with the owner as actor, one
-commit). **Send back** is the ordinary send-back (nearest earlier agent
-phase, the mandatory note, the structured feedback of E11-3). Neither needs
-a new endpoint. The Needs-you list raises a `manual` item for every
-`awaiting` ticket (it replaces the checkpoint item when both would apply).
-The human persona never takes a pool slot, never appears in the capacity
-or stuck figures and carries no budget.
+- `<persona>` — a persona id (`[a-z][a-z0-9-]*`, the directory under
+  `_meta/personas/`); `you` is the human persona.
+- `<persona>:shape` — the run's **mode**: the interactive entry (the owner
+  shapes the ticket with that persona in the Shape chat). `shape` is the only
+  mode.
+- `<persona>(notify)` — the **notify rule**: a card lands in "Needs you"
+  when that position is done.
 
-A split ticket's **parts** each carry their own `chain:` delta (E10): the
-scope is the part, never the parent. A part's chain flows from the build
-gate on (the part's builder is the persona on the plan card, so the build
-gate itself is not editable in a part's flow).
+`at:` is the **cursor**, the position of the current entry (absent = 1). It
+means something while the ticket is worked; a ticket in Inbox, Prioritized
+or the pipeline's first column has no current position (every entry is
+ahead), one in the terminal column is past the last. `sent-back: <from>><to>`
+marks the one send-back a ticket may use (concept §4). **Until req-257
+nothing walks the chain** (owner, 2026-11-12): the runner and the board keep
+working by pipeline column — on a lifecycle store with req-265's interim pin
+`x-phase` — no run advances `at` or writes `sent-back`, and the chain pins no
+persona to a column. req-257 makes the holder (the persona of the entry at
+the cursor) the one who runs, moves the cursor at a green end, turns the
+store's `x-phase` pins into cursors, parks a ticket at a `you` entry and
+brings the notify card back.
 
-**The flow editor (E10-5).** Mission Control edits the chain as *steps*, not
-as strings: an insert after a gate, a removal (a strike for a standard gate,
-dropping an insert), a restore, move earlier / later, a persona, the notify
-rule, a reset to the standard flow. Every edit takes the draft delta and
-returns the next one (`core/flow-edit.ts`, `applyFlowOp`); the delta is
-regenerated canonically from the edited arrangement — standard gates that
-kept their relative order stay silent (the longest in-order run), the
-others get `move`, new gates `insert`, then `skip` / `notify` / `assign`
-follow — and is checked by merging it back to the same arrangement, so an
-arrangement the grammar cannot write (two gates of one phase make an
-anchor ambiguous) is refused with a reason instead of written wrong. Only
-the future is editable: the current and past gates are locked (a running
-gate stays as it is). Nothing is written before "Save flow": ticket scope
-goes through `setChain` (one commit `tickets: <id> chain <n entries|
-standard>`), part scope rewrites that part's `chain:` line in the parent's
-`### Parts` (one commit `tickets: <id> part <n> flow`); a part that is a
-ticket already, a live run and a delta the guard rejects refuse.
+**The reader** (`core/ticket-chain-fields.ts`) is strict per entry and
+whole per chain: one entry outside the grammar — the old delta's `insert …`
+/ `skip …` included — reads the chain as absent, with a warning on an open
+ticket and silently on a done one (its old delta text stays as history,
+concept §12 step 7). An `at:` that is no position warns and reads as 1; a
+`sent-back:` that does not read `<from>><to>` (to before from) warns and is
+ignored.
 
-Phase ids are the pipeline's id grammar (`[a-z][a-z0-9-]*`),
-persona names bare lowercase words.
+**The standard flow** is one key in `_meta/pipeline.md`, `flow:` (below);
+it is **copied into a ticket at creation** (`chain:` plus `at: 1`, every
+creation path: capture, the chat's createTicket, a released plan part
+without a chain of its own), and is then the ticket's own — a later change
+of `flow:` never reshuffles existing tickets. A pipeline without `flow:`
+creates tickets without a chain.
 
-**The write guard** (`validateChain`,
-`packages/tickets-engine/src/core/chain-delta.ts`) runs where a
-write is decided — the board service's `setChain`, the chat
-command's execution — never on render. It refuses, with the reason:
-a phase or anchor the pipeline does not contain; a phase anchored
-on its own insert; a phase inserted twice; a phase both skipped and
-inserted ("strike the gate or revisit it, not both"); a skip,
-anchor or notify of the current or a past gate (the delta only
-reaches future gates); a `move` of a current, past, inserted, skipped or
-already moved gate, onto itself, or ahead of the current gate; an `assign`
-of a current or past gate, of an inserted gate or twice.
+**The write guard** (`validateChain`, `core/chain-validate.ts`) runs where a
+write is decided — `setChain`, the flow editor, a part's chain, the plan's
+`### Chain` — never on read. It refuses, with the reason: an empty chain; more
+than 24 entries (`x-chain` is one size-capped line); a persona that does not
+exist when the chain is written (`you` always does); and any change at or
+before the cursor — past entries and the current one stay as they are, only
+the current entry's notify rule may still change. A persona deleted after
+the write is not an error on a stored ticket: that is req-257's "no persona
+for position n".
 
-**The machine write** is the chat's `setChain` command (concept §6:
-the change runs through the chat as a command **with confirmation**
-— the proposal card shows the chain before/after and executes only
-on the owner's confirm). The board half is one header rewrite
-(`patchChain`), one Log line — `chain <n> entries`, or
-`chain standard` when the delta goes away (the key is removed) —
-and exactly one commit `tickets: <id> chain <n entries|standard>`.
-It refuses while a run is live on the ticket and is a no-op success
-when the file already carries the delta — the mirror of `track` in
-every way. Setting the delta by hand is the same edit — frontmatter
-plus the Log line; the machine shape above is what the board
-service writes.
+**The flow editor (E10-5, re-cut by req-266)** edits the list itself: add a
+persona after a position, remove one, move one earlier / later, change who
+takes a position (the mode stays), the notify rule, or reset to the standard
+flow behind the locked positions (`core/flow-edit.ts`, `applyFlowOp`). It
+shows the positions from the current one on; a ticket without a chain shows
+the standard flow it would get. Nothing is written before "Save flow":
+ticket scope goes through `setChain`, part scope rewrites that part's
+`chain:` line in the parent's `### Parts` (one commit
+`tickets: <id> part <n> flow`); a part that is a ticket already, a live run
+and a chain the guard rejects refuse.
+
+**The machine write** is the chat's `setChain` command — the whole list,
+proposed as a card and executed only on the owner's confirm; an empty list
+means the standard flow. The board half is one header rewrite
+(`patchChain`: `chain:`, and `at: 1` when the ticket had no cursor yet — the
+cursor is never moved there), one Log line `chain <the entries>` and exactly
+one commit `tickets: <id> chain <the entries>`. It refuses while a run is
+live on the ticket and is a no-op success when the file already carries the
+chain.
+
+A split ticket's **parts** each carry their own `chain:` line in the same
+grammar (`chain: ben; ralf(notify); you`); a part without one gets the
+standard flow when it is released. The plan's own **`### Chain`** chapter
+(`core/plan-chain.ts`) is Paul's chain for the ticket: one line in the same
+grammar (a `- <entry>` list reads the same); when the plan is saved through
+the Shape chat (`setPlan`) it becomes the ticket's `chain:` in the same
+write and commit (`tickets: <id> plan, chain`), checked by the guard — one
+that does not hold leaves the chain as it was and the save says why. (A plan
+run's own `### Chain` is applied by req-257's runner.)
+
+**The human persona (E10-6).** A gate the human persona works runs no agent:
+the ticket's `persona:` pin, else the phase's `persona:`, else the engine
+default resolves to a `kind: human` persona, and the dispatch pass stamps
+`awaiting` instead of composing a run (once; `paused:` status line, Log line
+`parked for <name> - the <phase> gate is a manual step`). **Accept** is the
+board's ordinary accept (the ticket moves to the next phase, the field goes,
+Log line `manual step finished by <owner> (<persona>)`), **Send back** the
+ordinary send-back (nearest earlier agent phase, the mandatory note, the
+structured feedback of E11-3). The Needs-you list raises a `manual` item for
+every `awaiting` ticket. The human persona never takes a pool slot, never
+appears in the capacity or stuck figures and carries no budget. The old
+delta's `insert manual(you) after <phase>` is gone with the delta; its place
+is a `you` entry in the chain, parked by req-257.
 
 ### The fleet ledger (E7)
 
@@ -847,6 +830,7 @@ phases:
   - { id: building, title: Building, wip: 3, claim: true, handover: agent build-default, color: '#c96442' }
   - { id: ready, title: Ready to try, handover: manual, persona: you }
   - { id: done, title: Done, handover: none }
+flow: paul:shape; paul; ben; ralf; tessa; you
 ---
 Prose for humans. The board follows this file on refresh.
 ```
@@ -858,7 +842,8 @@ writes on an empty tickets repository, and the stages the dricket import writes
 stage: plan, build, review and test are phases of the chain inside it) · **Ready to try**
 (id `ready`, the owner's checkpoint, see "Agent lane rules") · **Done**. The manual columns
 carry `persona: you` (the human persona, whose name is configurable — `personas.humanName`,
-Settings → Tickets → Crew); the fleet takes nothing from them. Building is the first worker
+Settings → Tickets → Crew); the fleet takes nothing from them. The shipped `flow:` is the
+default crew's standard flow, `paul:shape; paul; ben; ralf; tessa; you` (req-266). Building is the first worker
 column, so a run there on a ticket without acceptance criteria gates structurally.
 
 **Accept on Ready to try is the sign-off** and no plain move: it starts the commit step
@@ -910,6 +895,12 @@ the old phase stays in `x-legacy-phase`. `migrate-tickets --pipeline-out` writes
   Default off; a push failure is a warning (board) / log line
   (runner), never a failed transition. Anything but a remote-name
   string is ignored with a noise badge.
+- `flow`: optional (req-266) — the **standard flow**, the chain a new ticket
+  is created with: one line in the chain grammar, entries separated by `;`
+  (`flow: paul:shape; paul; ben; ralf; tessa; you`), or a YAML list. Copied
+  into the ticket at creation and the ticket's own from then on; absent = new
+  tickets carry no chain. An unreadable entry drops the whole key with a
+  warning. Read by `core/pipeline-flow.ts`.
 - `closing-signals`: optional (req-169) — the signals that earn a run its
   **closing round** (see Personas, *The journal and the closing round*):
   a list of `red-gate`, `retry`, `steer`, `cost`, `friction`; `none` or
@@ -1794,12 +1785,12 @@ column; the board still renders), the fleet runner before every action
 11. `form` (E8): when present, `ship` or `scout` — any other value
     warns (`form must be ship or scout — read as ship`); the key is
     preserved on rewrite like every unknown field.
-12. `chain` (E9): each entry parses in the delta grammar (`insert …
-    after|before …`, `skip …`, `notify …`, `move …`, `assign …`) — an unreadable entry
-    warns and drops, never guessed; the semantic guard (unknown
-    phases, past-gate references, skip/insert conflicts) runs where a
-    write is decided, not on render (see
-    [The chain delta](#the-chain-delta-e9-concept-57)).
+12. `chain` (req-266): each entry parses in the persona-list grammar
+    (`<persona>[:shape][(notify)]`) — one unreadable entry reads the chain
+    as absent with a warning, never guessed; `at` is a position, `sent-back`
+    reads `<from>><to>`; the guard (known personas, nothing changed at or
+    before the cursor) runs where a write is decided, not on read (see
+    [The chain](#the-chain-req-266-was-the-chain-delta-of-e9)).
 
 A validation issue never blocks rendering and never blocks a human
 transition (a warning shows); it blocks an agent action.
@@ -1848,7 +1839,8 @@ its changed chapters back inside the claim (D-30, [FLEET.md](../plugins/tickets/
 | `x-class` `x-model` `x-size` `x-allowance` | `class` `model` `size` `allowance` | raw values (req-170); `allowance` as a number |
 | `x-needs` | `needs` | the one-line form (req-178), `image, context-200k` |
 | `x-interactive` | `interactive` | only `true` |
-| `x-chain` | `chain` | entries separated by `;` |
+| `x-chain` | `chain` | the persona list, entries separated by `;` (req-266) |
+| `x-at`, `x-sent-back` | `at`, `sent-back` | the chain's cursor and its one send-back (req-266) |
 | `x-references` | `references` | separated by `,` |
 | `x-entered-<phase>` | `entered-<phase>` | |
 
@@ -1859,7 +1851,7 @@ write of column *c* writes `stage: c` with no pin for an edge column (`inbox`, `
 and pin as they are. `dk claim` moves `active -> running`; a run that moves the ticket on writes
 the next column as `x-phase` inside its claim and releases once into `active`; a run that moves
 nothing releases to where it sat. `x-phase` is interim: the chain's cursor `x-at` replaces it
-(req-266). A store still on the phase stages (variant A: the stages are the column ids) is read
+(req-257; req-266 writes `x-at` as data only). A store still on the phase stages (variant A: the stages are the column ids) is read
 and written as before, and the Tickets panel offers **Migrate** (the owner's click only): one
 config commit adds `active` / `running`, every ticket in an old stage moves to `active` pinned to
 its old stage, a second config commit removes the old stages (ADR-0090 later change, concept §12

@@ -114,7 +114,9 @@ describe('recordToBoardFile', () => {
         'x-proof': 'tests',
         'x-awaiting': 'henrik',
         'x-interactive': 'true',
-        'x-chain': 'skip review; insert design after build',
+        'x-chain': 'paul:shape; ben',
+        'x-at': '2',
+        'x-sent-back': '2>1',
         'x-references': 'attachments/a.png, https://x.test/y',
         'x-entered-inbox': '2026-11-01T08:00:00Z',
         'x-entered-build': '2026-11-03T09:00:00Z',
@@ -146,6 +148,8 @@ describe('recordToBoardFile', () => {
       entered: { inbox: '2026-11-01T08:00:00Z', build: '2026-11-03T09:00:00Z' },
     });
     expect(meta.chain).toHaveLength(2);
+    expect(meta.at).toBe(2);
+    expect(meta.sentBack).toEqual({ from: 2, to: 1 });
     expect(file.text.endsWith('## Description\n\nBody.\n')).toBe(true);
   });
 
@@ -274,7 +278,7 @@ describe('assembleBoardFromRecords', () => {
     const files = [
       legacy('T-0001', 'inbox', 'entered-inbox: 2026-11-01T00:00:00Z\n'),
       legacy('T-0002', 'build', 'blocked-by: [T-0001]\nrank: 20\n'),
-      legacy('T-0003', 'build', 'rank: 10\nchain: [skip review]\npersona: ben\n'),
+      legacy('T-0003', 'build', 'rank: 10\nchain: [ralf]\npersona: ben\n'),
       legacy('T-0004', 'done'),
     ];
     const fromFiles = assembleBoard({ ...BASE, files });
@@ -283,7 +287,7 @@ describe('assembleBoardFromRecords', () => {
       records: [
         det({ id: 'T-0001', stage: 'inbox', extensions: { 'x-entered-inbox': '2026-11-01T00:00:00Z' } }),
         det({ id: 'T-0002', stage: 'build', dependsOn: ['T-0001'], extensions: { 'x-rank': '20' } }),
-        det({ id: 'T-0003', stage: 'build', extensions: { 'x-rank': '10', 'x-chain': 'skip review', 'x-persona': 'ben' } }),
+        det({ id: 'T-0003', stage: 'build', extensions: { 'x-rank': '10', 'x-chain': 'ralf', 'x-persona': 'ben' } }),
         det({ id: 'T-0004', stage: 'done' }),
       ],
     });

@@ -5,7 +5,8 @@ import { ChainHarness, ONE, pipelineWithPlan } from './chain-harness.fake';
  * Manual steps (E10-6, req-176): a gate the human persona works runs no
  * agent — the ticket parks where it sits with `awaiting:` (one `put`
  * through the store door, `x-awaiting` in the document) and a `paused:`
- * comment; a manual step after a gate rides the run request as `parkFor`.
+ * comment. req-266: the chain is a persona list now and inserts no manual
+ * step until req-257 parks at a You entry.
  */
 
 let h: ChainHarness;
@@ -22,7 +23,7 @@ describe('HumanGates (E10-6)', () => {
 
   it('a gate the human persona works parks the ticket: no run, no worktree, awaiting set', async () => {
     await h.writeHuman();
-    h.io.seed('T-0200', 'plan', { chain: ['assign plan you'] });
+    h.io.seed('T-0200', 'plan', { persona: 'you' });
     const { orch, fleet } = h.build();
     await orch.configure(h.config());
     await orch.setMaster('run');
@@ -54,7 +55,7 @@ describe('HumanGates (E10-6)', () => {
 
   it('an awaiting ticket is never dispatched, and the human never takes a pool slot', async () => {
     await h.writeHuman();
-    h.io.seed('T-0202', 'plan', { chain: ['assign plan you'] });
+    h.io.seed('T-0202', 'plan', { persona: 'you' });
     h.io.seed('T-0203', 'plan');
     const { orch, fleet } = h.build();
     await orch.configure(h.config({ pools: ONE }));
@@ -64,21 +65,9 @@ describe('HumanGates (E10-6)', () => {
     expect(fleet.records.map((r) => r.request.ticketId)).toEqual(['T-0203']);
   });
 
-  it('a manual step after the gate rides the run request: it parks, it does not move on', async () => {
-    h.io.seed('T-0204', 'plan', { chain: ['insert manual(you, notify) after plan'] });
-    const { orch, fleet } = h.build();
-    await orch.configure(h.config());
-    await orch.setMaster('run');
-
-    const request = fleet.records[0]!.request;
-    expect(request.parkFor).toBe('you');
-    expect(request.nextPhase).toBeNull();
-    expect(request.nextPhaseDir).toBeNull();
-  });
-
-  it('a manual step names an agent persona: ignored, the chain goes on', async () => {
-    await h.writeHuman('ben', 'agent');
-    h.io.seed('T-0205', 'plan', { chain: ['insert manual(ben) after plan'] });
+  it('a persona-list chain pins nothing and inserts no manual step until req-257 walks it: the chain goes on', async () => {
+    await h.writeHuman();
+    h.io.seed('T-0204', 'plan', { chain: ['ben', 'you(notify)'] });
     const { orch, fleet } = h.build();
     await orch.configure(h.config());
     await orch.setMaster('run');

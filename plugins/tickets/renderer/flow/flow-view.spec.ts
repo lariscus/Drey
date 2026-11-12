@@ -4,19 +4,17 @@ import type { FlowStepView } from '../../../../packages/tickets-engine/src/contr
 import type { FlowDraft } from './flow-model';
 import { mountFlow, type FlowDeps } from './flow-view';
 
-const step = (index: number, phase: string, extra: Partial<FlowStepView> = {}): FlowStepView => ({
+const step = (index: number, persona: string, extra: Partial<FlowStepView> = {}): FlowStepView => ({
   index,
-  phase,
-  title: phase.charAt(0).toUpperCase() + phase.slice(1),
+  position: index + 1,
+  persona,
+  title: persona.charAt(0).toUpperCase() + persona.slice(1),
+  mode: null,
   state: 'future',
-  inserted: false,
-  skipped: false,
-  moved: false,
   notify: false,
-  persona: null,
-  pinned: false,
   model: null,
   owner: false,
+  missing: false,
   locked: false,
   ...extra,
 });
@@ -26,18 +24,17 @@ const base: FlowDraft = {
   ticket: 'T-0130',
   title: 'Voice capture',
   scope: { kind: 'ticket' },
-  chain: [],
-  saved: [],
-  steps: [step(1, 'build', { state: 'current', persona: 'ben', locked: true }), step(2, 'review', { persona: 'ralf' })],
-  phases: [
-    { id: 'build', title: 'Build' },
-    { id: 'review', title: 'Review' },
-    { id: 'manual', title: 'Manual step' },
+  chain: ['ben', 'ralf'],
+  saved: ['ben', 'ralf'],
+  steps: [step(0, 'ben', { state: 'current', locked: true, model: 'sonnet' }), step(1, 'ralf')],
+  personas: [
+    { id: 'ben', kind: 'agent', title: 'Ben', color: '#6aa', model: 'sonnet' },
+    { id: 'ralf', kind: 'agent', title: 'Ralf', color: '#a6a', model: 'opus' },
+    { id: 'you', kind: 'human', title: 'You', color: '#aaa', model: '' },
   ],
-  personas: [{ id: 'ben', kind: 'agent', title: 'Ben', color: '#6aa', model: 'sonnet' }],
   readOnly: null,
 };
-const edited: FlowDraft = { ...base, chain: ['insert manual after review'], steps: [...base.steps, step(3, 'manual', { inserted: true })] };
+const edited: FlowDraft = { ...base, chain: ['ben', 'ralf', 'you'], steps: [...base.steps, step(2, 'you', { owner: true })] };
 
 function setup(replies: Record<string, unknown>): { host: HTMLElement; invoke: ReturnType<typeof vi.fn>; dispose: () => void } {
   const invoke = vi.fn((method: string) => Promise.resolve(replies[method]));
@@ -58,39 +55,39 @@ const settle = async (): Promise<void> => {
 };
 
 describe('Flow tab', () => {
-  it('lists the gates the engine answers, with the standard-flow chip', async () => {
+  it('lists the positions the engine answers, with the step-count chip', async () => {
     const { host, invoke } = setup({ flow: base });
     await settle();
     expect(invoke).toHaveBeenCalledWith('flow', { id: 'T-0130', part: null });
-    expect([...host.querySelectorAll('.flow-gate-title')].map((n) => n.textContent)).toEqual(['Build', 'Review']);
-    expect(host.querySelector('.flow-chip')?.textContent).toBe('Standard flow');
+    expect([...host.querySelectorAll('.flow-gate-title')].map((n) => n.textContent)).toEqual(['Ben', 'Ralf']);
+    expect(host.querySelector('.flow-chip')?.textContent).toBe('2 steps');
     expect(buttonNamed(host, 'Save flow').disabled).toBe(true);
   });
 
-  it('adds a gate through the engine and saves the resulting chain', async () => {
+  it('adds a persona through the engine and saves the resulting chain', async () => {
     const { host, invoke } = setup({ flow: base, flowEdit: edited, flowSave: { ok: true } });
     await settle();
     (host.querySelectorAll('.flow-plus')[1] as HTMLButtonElement).click();
     const chips = [...host.querySelectorAll<HTMLButtonElement>('.flow-add .flow-chipbtn')];
-    chips.find((c) => c.textContent === 'Manual step')!.click();
+    chips.find((c) => c.textContent === 'You')!.click();
     await settle();
-    expect(invoke).toHaveBeenCalledWith('flowEdit', { id: 'T-0130', part: null, chain: [], edit: { op: 'insert', phase: 'manual', after: 2 } });
-    expect(host.querySelector('.flow-chip')?.textContent).toBe('Standard flow + 1 change · not saved');
+    expect(invoke).toHaveBeenCalledWith('flowEdit', { id: 'T-0130', part: null, chain: ['ben', 'ralf'], edit: { op: 'insert', persona: 'you', after: 1 } });
+    expect(host.querySelector('.flow-chip')?.textContent).toBe('3 steps · not saved');
     const save = buttonNamed(host, 'Save flow');
     expect(save.disabled).toBe(false);
     save.click();
     await settle();
-    expect(invoke).toHaveBeenCalledWith('flowSave', { id: 'T-0130', part: null, chain: ['insert manual after review'] });
+    expect(invoke).toHaveBeenCalledWith('flowSave', { id: 'T-0130', part: null, chain: ['ben', 'ralf', 'you'] });
   });
 
   it('shows a refusal under the list and keeps the draft', async () => {
-    const { host } = setup({ flow: base, flowEdit: { ok: false, error: 'Review is in this flow already' } });
+    const { host } = setup({ flow: base, flowEdit: { ok: false, error: 'position 1 is the current step' } });
     await settle();
     (host.querySelectorAll('.flow-plus')[0] as HTMLButtonElement).click();
-    buttonNamed(host, 'Manual step').click();
+    buttonNamed(host, 'You').click();
     await settle();
-    expect(host.querySelector('.flow-message')?.textContent).toBe('Review is in this flow already');
-    expect(host.querySelector('.flow-chip')?.textContent).toBe('Standard flow');
+    expect(host.querySelector('.flow-message')?.textContent).toBe('position 1 is the current step');
+    expect(host.querySelector('.flow-chip')?.textContent).toBe('2 steps');
   });
 
   it("applies Paul's draft with his reason, and undo goes back", async () => {

@@ -467,34 +467,31 @@ describe('chainCompareOf', () => {
     { id: 'verify', title: 'Verify', checkpoint: true },
     { id: 'done', title: 'Done', checkpoint: false },
   ];
-  const skipVerify: McChainEntry = { kind: 'skip', phase: 'verify', anchor: null, position: null, persona: null, notify: false };
+  const own = (persona: string, notify = false): McChainEntry => ({ persona, mode: null, notify });
 
-  it('merges the current delta into "before" and the proposed entries into "after"', () => {
-    const compare = chainCompareOf(phases, 'build', [skipVerify], ['skip verify', 'notify build']);
-    expect(compare.before.map((step) => step.id)).toEqual(['inbox', 'build', 'verify', 'done']);
-    expect(compare.before.find((step) => step.id === 'verify')?.skipped).toBe(true);
-    expect(compare.before.find((step) => step.id === 'build')?.notify).toBe(false);
-    expect(compare.after.find((step) => step.id === 'build')?.notify).toBe(true);
-    expect(compare.after.find((step) => step.id === 'verify')?.skipped).toBe(true);
+  it('renders the current chain as "before" and the proposed list as "after"', () => {
+    const compare = chainCompareOf(phases, 'build', [own('ben'), own('you')], ['ben(notify)', 'ralf', 'you']);
+    expect(compare.before.map((step) => step.id)).toEqual(['ben', 'you']);
+    expect(compare.before.map((step) => step.state)).toEqual(['current', 'future']);
+    expect(compare.before[0]?.notify).toBe(false);
+    expect(compare.after.map((step) => step.id)).toEqual(['ben', 'ralf', 'you']);
+    expect(compare.after[0]?.notify).toBe(true);
+    expect(compare.after[2]?.checkpoint).toBe(true);
   });
 
-  it('splices inserted gates into the after strip only', () => {
-    const compare = chainCompareOf(phases, 'build', [], ['insert design(pia, notify) after build']);
-    expect(compare.before.map((step) => step.id)).not.toContain('design');
-    const at = compare.after.findIndex((step) => step.id === 'design');
-    expect(at).toBeGreaterThanOrEqual(0);
-    expect(compare.after[at! - 1]?.id).toBe('build');
-    expect(compare.after[at!]).toMatchObject({ inserted: true, persona: 'pia', notify: true });
+  it('shows an added persona in the after strip only', () => {
+    const compare = chainCompareOf(phases, 'build', [own('ben')], ['ben', 'pia(notify)']);
+    expect(compare.before.map((step) => step.id)).not.toContain('pia');
+    expect(compare.after[1]).toMatchObject({ id: 'pia', notify: true, position: 2 });
   });
 
-  it('drops proposed entries the grammar does not read — never a guess', () => {
-    const compare = chainCompareOf(phases, 'build', [], ['notify build', 'make tea', '']);
-    expect(compare.after.map((step) => step.id)).toEqual(['inbox', 'build', 'verify', 'done']);
-    expect(compare.after.find((step) => step.id === 'build')?.notify).toBe(true);
+  it('drops proposed entries the grammar does not read, never a guess', () => {
+    const compare = chainCompareOf(phases, 'build', [], ['ben', 'make tea', 'insert x after y', '']);
+    expect(compare.after.map((step) => step.id)).toEqual(['ben']);
   });
 
-  it('marks nothing current when the ticket sits outside the chain', () => {
-    const compare = chainCompareOf(phases, 'limbo', [], ['notify build']);
+  it('marks nothing current while the ticket has not started', () => {
+    const compare = chainCompareOf(phases, 'inbox', [], ['ben', 'you']);
     expect(compare.after.every((step) => step.state === 'future')).toBe(true);
   });
 });
@@ -515,7 +512,7 @@ describe('Chat setChain before/after card (E9)', () => {
       { phase: { id: 'inbox', title: 'Inbox' }, tickets: [] },
       {
         phase: { id: 'build', title: 'Build' },
-        tickets: [{ id: 'T-1', phase: 'build', meta: { chain: [{ kind: 'skip', phase: 'verify' }] } }],
+        tickets: [{ id: 'T-1', phase: 'build', meta: { chain: [{ persona: 'ben', mode: null, notify: false }, { persona: 'you', mode: null, notify: false }] } }],
       },
       { phase: { id: 'verify', title: 'Verify' }, tickets: [] },
       { phase: { id: 'done', title: 'Done' }, tickets: [] },
@@ -542,7 +539,7 @@ describe('Chat setChain before/after card (E9)', () => {
   }
 
   interface ChainSurface {
-    chainCompareFor(proposal: TimelineProposal): { before: readonly { id: string; skipped: boolean; notify: boolean }[]; after: readonly { id: string; skipped: boolean; notify: boolean }[] } | null;
+    chainCompareFor(proposal: TimelineProposal): { before: readonly { id: string; notify: boolean }[]; after: readonly { id: string; notify: boolean }[] } | null;
   }
 
   function setup(fake: ChainFakeState): ChainSurface {
@@ -558,16 +555,16 @@ describe('Chat setChain before/after card (E9)', () => {
     state: 'pending',
     summary: 'Set T-1 chain to 1 entry',
     outcome: null,
-    chain: { id: 'T-1', chain: ['notify build'] },
+    chain: { id: 'T-1', chain: ['ben(notify)', 'you'] },
   };
 
-  it('renders the ticket’s current delta as "before" and the proposal as "after"', () => {
+  it('renders the ticket’s current chain as "before" and the proposal as "after"', () => {
     const vm = setup(fakeState(BOARD, WORK));
     const compare = vm.chainCompareFor(setChain);
     expect(compare).not.toBeNull();
-    expect(compare!.before.find((step) => step.id === 'verify')?.skipped).toBe(true);
-    expect(compare!.before.find((step) => step.id === 'build')?.notify).toBe(false);
-    expect(compare!.after.find((step) => step.id === 'build')?.notify).toBe(true);
+    expect(compare!.before.map((step) => step.id)).toEqual(['ben', 'you']);
+    expect(compare!.before.find((step) => step.id === 'ben')?.notify).toBe(false);
+    expect(compare!.after.find((step) => step.id === 'ben')?.notify).toBe(true);
   });
 
   it('returns null for proposals that wrap no setChain command', () => {
@@ -596,12 +593,12 @@ describe('Chat setChain before/after card (E9)', () => {
     expect(vm.chainCompareFor(cleared)).toBeNull();
   });
 
-  it('degrades to an all-future "before" when the board holds no such card', () => {
+  it('degrades to an empty "before" when the board holds no such card', () => {
     const vm = setup(fakeState({ checkpoints: [], columns: [] }, WORK));
     const compare = vm.chainCompareFor(setChain);
     expect(compare).not.toBeNull();
-    expect(compare!.before.every((step) => !step.skipped)).toBe(true);
-    expect(compare!.after.find((step) => step.id === 'build')?.notify).toBe(true);
+    expect(compare!.before).toEqual([]);
+    expect(compare!.after.find((step) => step.id === 'ben')?.notify).toBe(true);
   });
 });
 

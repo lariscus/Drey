@@ -20,16 +20,12 @@
  */
 export type PartState = 'new' | 'queued' | 'running' | 'active' | 'done';
 
-/** One gate of a part's flow, from the build step on. */
+/** One position of a part's chain (req-266): the part's own, or the standard flow it would get. */
 export interface PartFlowStep {
-  readonly phase: string;
+  readonly position: number;
+  readonly persona: string;
+  /** The persona's title; its id when no persona record exists. */
   readonly title: string;
-  /** The persona on the gate (the part's builder on the build gate); null = none. */
-  readonly persona: string | null;
-  /** A delta-inserted gate. */
-  readonly inserted: boolean;
-  /** A delta-skipped gate. */
-  readonly skipped: boolean;
   readonly notify: boolean;
 }
 
@@ -41,7 +37,7 @@ export interface PlanPartCard {
   readonly reason: string | null;
   /** The pinned builder persona; null = the ladder decides (`defaultPersona`). */
   readonly persona: string | null;
-  /** The part's own chain delta, canonical strings. */
+  /** The part's own chain (req-266), canonical entries; empty = the standard flow. */
   readonly chain: readonly string[];
   readonly flow: readonly PartFlowStep[];
   /** The ticket this part became; null while `new`. */

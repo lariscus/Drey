@@ -49,6 +49,7 @@ phases:
   - { id: building, title: Building, wip: 3, claim: true, handover: agent build-default }
   - { id: ready, title: Ready to try, handover: manual, persona: you }
   - { id: done, title: Done, handover: none }
+flow: paul:shape; paul; ben; ralf; tessa; you
 ---
 ${PIPELINE_PROSE}`;
 

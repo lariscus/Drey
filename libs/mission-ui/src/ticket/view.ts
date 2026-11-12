@@ -43,6 +43,7 @@ import {
   MC_TICKET,
   chainPrefillOf,
   chainStepsOf,
+  gateStepsOf,
   changeCountOf,
   defaultFaceOf,
   ticketRunActive,
@@ -55,6 +56,7 @@ import {
   phaseTitleOf,
   proofOf,
   proofRecommendationOf,
+  renderChainEntryView,
   renderChainEntryViews,
   scoutReportOf,
   sendBackLabelOf,
@@ -622,6 +624,11 @@ export class TicketView {
     return persona.charAt(0).toUpperCase() + persona.slice(1);
   }
 
+  /** The persona's name off the crew when known, else the raised id. */
+  private personaName(persona: string): string {
+    return this.work?.personas.find((p) => p.id === persona)?.title ?? this.personaTitle(persona);
+  }
+
   /**
    * The ticket's accumulated cost for the head card's slot — the
    * ledger's settled-run usage the doc carries (`usage.cost`); null when
@@ -643,7 +650,12 @@ export class TicketView {
       return [];
     }
     const costs = verlaufCostsOf(doc.verlauf);
-    return chainStepsOf(doc.phases, doc.phase, doc.chain).map((step) => ({
+    // A ticket without a chain shows the pipeline's phases; one with a chain, its personas around the cursor.
+    const steps =
+      doc.chain.length === 0
+        ? gateStepsOf(doc.phases, doc.phase)
+        : chainStepsOf(doc.chain, doc.phases, doc.phase, doc.at, (persona) => this.personaName(persona));
+    return steps.map((step) => ({
       ...step,
       cost: gateCostOf(costs, step),
     }));
@@ -660,64 +672,71 @@ export class TicketView {
 
   /** The bottom sheet the tappable gate bar opens: the three chain interventions. */
   protected readonly sheetOpen = signal(false);
-  /** The insert form: which phase, hung where, and whether it raises the Bescheid. */
-  protected readonly insertPhase = signal('');
+  /** The insert form: which persona, hung where, and whether it raises the Bescheid. */
+  protected readonly insertPersona = signal('');
   protected readonly insertPosition = signal<'after' | 'before'>('after');
   protected readonly insertAnchor = signal('');
   protected readonly insertNotify = signal(false);
-  /** The notify form: which gate's completion lands a card in "Needs you". */
+  /** The notify form: which position's completion lands a card in "Needs you" (1-based, as text). */
   protected readonly notifyGate = signal('');
 
-  /** The ticket's own delta entries, canonically rendered. */
+  /** The ticket's own chain entries, canonically rendered. */
   private readonly chainTexts = computed<readonly string[]>(() => {
     const doc = this.doc();
     return doc === null ? [] : renderChainEntryViews(doc.chain);
   });
 
-  /** True when the ticket deviates from the standard flow. */
-  protected readonly hasDelta = computed(() => this.chainTexts().length > 0);
+  /** True when the ticket carries a chain of its own. */
+  protected readonly hasChain = computed(() => this.chainTexts().length > 0);
 
-  /** The insert form's phase options — the whole pipeline, anything may be revisited. */
-  protected readonly insertPhaseOptions = computed(() => this.doc()?.phases ?? []);
+  /** The insert form's persona options: the crew, else the personas the chain names. */
+  protected readonly insertPersonaOptions = computed<readonly { readonly id: string; readonly title: string }[]>(() => {
+    const crew = this.work?.personas ?? [];
+    if (crew.length > 0) {
+      return crew.map((p) => ({ id: p.id, title: p.title }));
+    }
+    const ids = [...new Set((this.doc()?.chain ?? []).map((entry) => entry.persona))];
+    return ids.map((id) => ({ id, title: this.personaTitle(id) }));
+  });
 
   /**
-   * The anchor/notify options — the current and the future gates. The
+   * The anchor/notify options: the current and the future positions. The
    * desk's validateChain refuses a past anchor and news from a past
-   * gate, so the sheet never offers them.
+   * position, so the sheet never offers them.
    */
   private readonly openSteps = computed<readonly GateStep[]>(() =>
-    this.steps().filter((step) => step.state !== 'past'),
+    this.steps().filter((step) => step.state !== 'past' && step.position !== null),
   );
 
   protected readonly anchorOptions = computed(() => this.openSteps());
 
-  /** The notify picker's gates — those without the Bescheid rule standing yet. */
+  /** The notify picker's positions: those without the Bescheid rule standing yet. */
   protected readonly notifyOptions = computed(() => this.openSteps().filter((step) => !step.notify));
 
-  /** The insert form's would-be entry; null while phase or anchor is unchosen. */
-  private readonly insertEntryText = computed<string | null>(() => {
-    const phase = this.insertPhase();
-    const anchor = this.insertAnchor();
-    if (phase === '' || anchor === '' || phase === anchor) {
+  /** The chain with the insert form's persona added, or null while the form is incomplete or not allowed. */
+  private readonly insertedTexts = computed<readonly string[] | null>(() => {
+    const persona = this.insertPersona();
+    const at = Number(this.insertAnchor());
+    const anchor = this.openSteps().find((step) => step.position === at);
+    if (persona === '' || anchor === undefined) {
       return null;
     }
-    const opts = this.insertNotify() ? '(notify)' : '';
-    return `insert ${phase}${opts} ${this.insertPosition()} ${anchor}`;
-  });
-
-  /** True when the insert form adds nothing the delta does not already hold. */
-  protected readonly insertDisabled = computed(() => {
-    const entry = this.insertEntryText();
-    if (entry === null) {
-      return true;
+    // The running position stays as it is: nothing goes in before it.
+    if (this.insertPosition() === 'before' && anchor.state === 'current') {
+      return null;
     }
-    return this.chainTexts().includes(entry);
+    const next = [...this.chainTexts()];
+    next.splice(this.insertPosition() === 'before' ? at - 1 : at, 0, `${persona}${this.insertNotify() ? '(notify)' : ''}`);
+    return next;
   });
 
-  /** True when the notify picker adds nothing new (the gate already rings). */
+  /** True while the insert form has nothing to add. */
+  protected readonly insertDisabled = computed(() => this.insertedTexts() === null);
+
+  /** True when the notify picker adds nothing new (the position already rings). */
   protected readonly notifyDisabled = computed(() => {
     const gate = this.notifyGate();
-    const step = this.steps().find((known) => known.id === gate);
+    const step = this.steps().find((known) => String(known.position) === gate);
     return gate === '' || step === undefined || step.notify;
   });
 
@@ -727,11 +746,12 @@ export class TicketView {
     }
     const open = this.openSteps();
     const current = this.steps().find((step) => step.state === 'current');
-    this.insertPhase.set(this.doc()?.phases[0]?.id ?? '');
+    const here = String(current?.position ?? open[0]?.position ?? '');
+    this.insertPersona.set(this.insertPersonaOptions()[0]?.id ?? '');
     this.insertPosition.set('after');
-    this.insertAnchor.set(current?.id ?? open[0]?.id ?? '');
+    this.insertAnchor.set(here);
     this.insertNotify.set(false);
-    this.notifyGate.set(current?.id ?? open[0]?.id ?? '');
+    this.notifyGate.set(here);
     this.sheetOpen.set(true);
   }
 
@@ -739,8 +759,8 @@ export class TicketView {
     this.sheetOpen.set(false);
   }
 
-  protected onInsertPhase(event: Event): void {
-    this.insertPhase.set((event.target as HTMLSelectElement).value);
+  protected onInsertPersona(event: Event): void {
+    this.insertPersona.set((event.target as HTMLSelectElement).value);
   }
 
   protected onInsertPosition(event: Event): void {
@@ -759,27 +779,28 @@ export class TicketView {
     this.notifyGate.set((event.target as HTMLSelectElement).value);
   }
 
-  /** Insert gate: prefill the chat with the delta plus the form's entry. */
+  /** Add a persona: prefill the chat with the whole chain plus the form's entry. */
   protected prefillInsert(): void {
-    const entry = this.insertEntryText();
-    const doc = this.doc();
-    if (entry === null || doc === null) {
+    const next = this.insertedTexts();
+    if (next === null || this.doc() === null) {
       return;
     }
-    this.propose([...this.chainTexts(), entry]);
+    this.propose(next);
   }
 
-  /** Set notify rule: prefill the chat with the delta plus the Bescheid entry. */
+  /** Set notify rule: prefill the chat with the whole chain, the position's entry raising the Bescheid. */
   protected prefillNotify(): void {
-    const gate = this.notifyGate();
-    const doc = this.doc();
-    if (gate === '' || doc === null) {
+    const at = Number(this.notifyGate());
+    const entry = this.doc()?.chain[at - 1];
+    if (entry === undefined) {
       return;
     }
-    this.propose([...this.chainTexts(), `notify ${gate}`]);
+    const next = [...this.chainTexts()];
+    next[at - 1] = renderChainEntryView({ ...entry, notify: true });
+    this.propose(next);
   }
 
-  /** Back to the standard flow: prefill the chat with the empty delta. */
+  /** Back to the standard flow: prefill the chat with the empty list. */
   protected prefillStandard(): void {
     if (this.doc() === null) {
       return;
@@ -855,7 +876,7 @@ export class TicketView {
       this.i18n,
       doc.verlauf,
       (id) => titles.get(id.trim().toLowerCase()) ?? titleCaseOf(id),
-      this.steps().map((step) => ({ id: step.id, title: step.title, skipped: step.skipped })),
+      this.steps().map((step) => ({ id: step.id, title: step.title })),
     );
   });
 

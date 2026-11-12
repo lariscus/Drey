@@ -1,5 +1,4 @@
 import type { BoardSnapshot, TicketCard } from '../../contracts/tickets';
-import { chainPersonaAt } from '../../core/manual-gate';
 import { isHumanPersona, type Persona } from '../../core/persona';
 import { dispatchable, isAutoPhase } from '../chain';
 import type { ChainConfig, ColumnMode } from '../protocol';
@@ -16,10 +15,9 @@ export interface GatePass {
   readonly modes: Readonly<Record<string, ColumnMode>>;
 }
 
-/** Who works the card's current gate: the delta's pin, then the persona ladder's winner. */
-function gatePersona(card: TicketCard, pass: GatePass, entry: TicketPersona | null): string | null {
-  const phases = pass.snap.pipeline.map((p) => ({ id: p.id, title: p.title }));
-  return chainPersonaAt(phases, card.phase, card.meta.chain ?? []) ?? entry?.resolution.persona ?? null;
+/** Who works the card's current gate: the persona ladder's winner (req-266: the chain pins no column until req-257). */
+function gatePersona(entry: TicketPersona | null): string | null {
+  return entry?.resolution.persona ?? null;
 }
 
 /**
@@ -62,7 +60,7 @@ export class HumanGates {
   /** The human persona that works the card's current gate, or null when an agent (or nobody) does. */
   private async humanOf(config: ChainConfig, card: TicketCard, pass: GatePass): Promise<Persona | null> {
     const entry = pass.resolved.get(card.id) ?? null;
-    const id = gatePersona(card, pass, entry);
+    const id = gatePersona(entry);
     if (id === null) {
       return null;
     }

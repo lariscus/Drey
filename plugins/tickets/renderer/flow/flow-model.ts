@@ -6,14 +6,13 @@
  * editor renders (`libs/mission-ui/src/flow/flow.model.ts` is its twin).
  */
 import type { FlowPersona, FlowReply, FlowStepView } from '../../../../packages/tickets-engine/src/contracts/flow';
-import { isManualPhase } from '../../../../packages/tickets-engine/src/core/chain-delta';
 
 /** An answer the desk gave for a flow, minus the failure case. */
 export type FlowDraft = Extract<FlowReply, { readonly ok: true }>;
 
-/** `Standard flow` or `Standard flow + 2 changes` — the number of delta entries. */
+/** The chip's wording: the number of positions, `6 steps`. */
 export function changesLabelOf(chain: readonly string[]): string {
-  return chain.length === 0 ? 'Standard flow' : `Standard flow + ${chain.length} ${chain.length === 1 ? 'change' : 'changes'}`;
+  return `${chain.length} ${chain.length === 1 ? 'step' : 'steps'}`;
 }
 
 /** The tab's eyebrow: `Flow` for a ticket, `Flow · Part 2` for a part. */
@@ -30,30 +29,51 @@ export function isDirty(flow: FlowDraft | null, saved: FlowDraft | null): boolea
 }
 
 function signatureOf(step: FlowStepView): string {
-  return [step.phase, step.inserted ? 'i' : '', step.skipped ? 's' : '', step.moved ? 'm' : '', step.notify ? 'n' : '', step.pinned ? (step.persona ?? '') : ''].join('|');
+  return [step.persona, step.mode ?? '', step.notify ? 'n' : ''].join('|');
 }
 
-/** The gates the draft changed against the saved flow; they are drawn dashed until "Save flow". */
-export function changedIndicesOf(flow: FlowDraft, saved: FlowDraft | null): ReadonlySet<number> {
-  const changed = new Set<number>();
-  if (saved === null) {
-    return changed;
-  }
-  const before = new Set(saved.steps.map(signatureOf));
-  for (const step of flow.steps) {
-    if (!before.has(signatureOf(step))) {
-      changed.add(step.index);
+/** The indices of `after` that sit outside a longest common subsequence with `before` — what an edit added or changed. */
+function unmatched(before: readonly string[], after: readonly string[]): ReadonlySet<number> {
+  const rows = before.length + 1;
+  const cols = after.length + 1;
+  const len: number[] = new Array<number>(rows * cols).fill(0);
+  for (let i = before.length - 1; i >= 0; i -= 1) {
+    for (let j = after.length - 1; j >= 0; j -= 1) {
+      len[i * cols + j] = before[i] === after[j] ? len[(i + 1) * cols + j + 1]! + 1 : Math.max(len[(i + 1) * cols + j]!, len[i * cols + j + 1]!);
     }
   }
-  return changed;
+  const out = new Set<number>();
+  let i = 0;
+  let j = 0;
+  while (j < after.length) {
+    if (i < before.length && before[i] === after[j]) {
+      i += 1;
+      j += 1;
+    } else if (i < before.length && len[(i + 1) * cols + j]! >= len[i * cols + j + 1]!) {
+      i += 1;
+    } else {
+      out.add(j);
+      j += 1;
+    }
+  }
+  return out;
 }
 
-/** Who works a gate, for its row: the persona, the owner's own name for the owner's gates. */
-export function whoOf(step: FlowStepView, flow: FlowDraft): string {
-  if (step.persona !== null) {
-    return flow.personas.find((p) => p.id === step.persona)?.title ?? step.persona;
+/** The positions the draft changed against the saved flow; they are drawn dashed until "Save flow". */
+export function changedIndicesOf(flow: FlowDraft, saved: FlowDraft | null): ReadonlySet<number> {
+  if (saved === null) {
+    return new Set<number>();
   }
-  return step.owner ? humanNameOf(flow) : 'Automatic';
+  const misses = unmatched(saved.steps.map(signatureOf), flow.steps.map(signatureOf));
+  return new Set(flow.steps.filter((_, at) => misses.has(at)).map((step) => step.index));
+}
+
+/** Who works a position, for its row: the persona's title, the owner's own name for the owner's position. */
+export function whoOf(step: FlowStepView, flow: FlowDraft): string {
+  if (step.owner) {
+    return humanNameOf(flow);
+  }
+  return step.missing ? step.persona : step.title;
 }
 
 /** The owner's display name: the human persona's title (configurable, default `You`). */
@@ -61,17 +81,11 @@ export function humanNameOf(flow: Pick<FlowDraft, 'personas'>): string {
   return flow.personas.find((p) => p.kind === 'human')?.title ?? 'You';
 }
 
-/** The short marks on a gate row. */
+/** The short marks on a position's row. */
 export function marksOf(step: FlowStepView): readonly string[] {
   const marks: string[] = [];
-  if (step.inserted) {
-    marks.push('Added');
-  }
-  if (step.moved) {
-    marks.push('Moved');
-  }
-  if (step.skipped) {
-    marks.push('Struck');
+  if (step.mode === 'shape') {
+    marks.push('Shape');
   }
   if (step.notify) {
     marks.push('Tell me');
@@ -96,23 +110,14 @@ export function moveRoomOf(flow: FlowDraft, step: FlowStepView): { readonly earl
   return { earlier: above !== undefined && above.state === 'future' && !above.locked, later: below !== undefined };
 }
 
-/**
- * The phases a gate can still be added for: those still ahead in this flow,
- * not added already and not struck. The manual step (E10-6) is no pipeline
- * phase: it is always on offer, once per id.
- */
-export function addablePhasesOf(flow: FlowDraft): readonly { readonly id: string; readonly title: string }[] {
-  const ahead = new Set(flow.steps.filter((s) => !s.inserted && s.state !== 'current').map((s) => s.phase));
-  return flow.phases.filter(
-    (phase) =>
-      (ahead.has(phase.id) || isManualPhase(phase.id)) &&
-      !flow.steps.some((s) => (s.inserted && s.phase === phase.id) || (!s.inserted && s.skipped && s.phase === phase.id)),
-  );
+/** The personas a position can be added for: the whole crew. */
+export function addablePersonasOf(flow: FlowDraft): readonly FlowPersona[] {
+  return flow.personas;
 }
 
-/** The personas a gate can be given: a manual step is worked by a human, so only those. */
-export function personasFor(flow: FlowDraft, step: FlowStepView): readonly FlowPersona[] {
-  return isManualPhase(step.phase) ? flow.personas.filter((p) => p.kind === 'human') : flow.personas;
+/** The personas a position can be given: the whole crew. */
+export function personasFor(flow: FlowDraft): readonly FlowPersona[] {
+  return flow.personas;
 }
 
 /** The flow tab's fixed key for a ticket (and optionally one plan part). */

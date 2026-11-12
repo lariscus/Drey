@@ -9,18 +9,17 @@
  * draft.
  */
 import { InjectionToken } from '@angular/core';
-import type { McFlow, McFlowStep } from '../api/dto';
+import type { McFlow, McFlowPersona, McFlowStep } from '../api/dto';
 
 export type McFlowReply = { readonly ok: true } | { readonly ok: false; readonly error: string };
 
 /** One edit on the draft, addressed by a step's `index`. */
 export type McFlowOp =
-  | { readonly op: 'insert'; readonly phase: string; readonly after: number }
+  | { readonly op: 'insert'; readonly persona: string; readonly after: number }
   | { readonly op: 'remove'; readonly step: number }
-  | { readonly op: 'restore'; readonly step: number }
   | { readonly op: 'move'; readonly step: number; readonly dir: -1 | 1 }
   | { readonly op: 'notify'; readonly step: number; readonly on: boolean }
-  | { readonly op: 'persona'; readonly step: number; readonly persona: string | null }
+  | { readonly op: 'persona'; readonly step: number; readonly persona: string }
   | { readonly op: 'reset' };
 
 /** Exactly what the flow editor consumes of the app state. */
@@ -46,9 +45,9 @@ export interface McFlowState {
 
 export const MC_FLOW_STATE = new InjectionToken<McFlowState>('mc-flow-state');
 
-/** `Standard flow` or `Standard flow + 2 changes` — the number of delta entries. */
+/** The chip's wording: the number of positions, `6 steps`. */
 export function changesLabelOf(chain: readonly string[]): string {
-  return chain.length === 0 ? 'Standard flow' : `Standard flow + ${chain.length} ${chain.length === 1 ? 'change' : 'changes'}`;
+  return `${chain.length} ${chain.length === 1 ? 'step' : 'steps'}`;
 }
 
 /** The screen's eyebrow: `Flow` for a ticket, `Flow · Part 2` for a part. */
@@ -65,48 +64,64 @@ export function isDirty(flow: McFlow | null, saved: McFlow | null): boolean {
 }
 
 function signatureOf(step: McFlowStep): string {
-  return [step.phase, step.inserted ? 'i' : '', step.skipped ? 's' : '', step.moved ? 'm' : '', step.notify ? 'n' : '', step.pinned ? (step.persona ?? '') : ''].join('|');
+  return [step.persona, step.mode ?? '', step.notify ? 'n' : ''].join('|');
+}
+
+/** The indices of `after` that sit outside a longest common subsequence with `before` — what an edit added or changed. */
+function unmatched(before: readonly string[], after: readonly string[]): ReadonlySet<number> {
+  const rows = before.length + 1;
+  const cols = after.length + 1;
+  const len: number[] = new Array<number>(rows * cols).fill(0);
+  for (let i = before.length - 1; i >= 0; i -= 1) {
+    for (let j = after.length - 1; j >= 0; j -= 1) {
+      len[i * cols + j] = before[i] === after[j] ? len[(i + 1) * cols + j + 1]! + 1 : Math.max(len[(i + 1) * cols + j]!, len[i * cols + j + 1]!);
+    }
+  }
+  const out = new Set<number>();
+  let i = 0;
+  let j = 0;
+  while (j < after.length) {
+    if (i < before.length && before[i] === after[j]) {
+      i += 1;
+      j += 1;
+    } else if (i < before.length && len[(i + 1) * cols + j]! >= len[i * cols + j + 1]!) {
+      i += 1;
+    } else {
+      out.add(j);
+      j += 1;
+    }
+  }
+  return out;
 }
 
 /**
- * The gates the draft changed against the saved flow (they are drawn
- * dashed: "nothing counts before Save flow"). A gate counts as unchanged
- * when the saved flow holds the same gate with the same marks (a moved
- * gate carries the `moved` mark, so the jump shows on it alone).
+ * The positions the draft changed against the saved flow (they are drawn
+ * dashed: "nothing counts before Save flow"). A position counts as
+ * unchanged when it matches the saved flow's persona, mode and notify rule
+ * in order (a longest common subsequence), so an added persona does not mark
+ * every position after it.
  */
 export function changedIndicesOf(flow: McFlow, saved: McFlow | null): ReadonlySet<number> {
-  const changed = new Set<number>();
   if (saved === null) {
-    return changed;
+    return new Set<number>();
   }
-  const before = new Set(saved.steps.map(signatureOf));
-  for (const step of flow.steps) {
-    if (!before.has(signatureOf(step))) {
-      changed.add(step.index);
-    }
-  }
-  return changed;
+  const misses = unmatched(saved.steps.map(signatureOf), flow.steps.map(signatureOf));
+  return new Set(flow.steps.filter((_, at) => misses.has(at)).map((step) => step.index));
 }
 
-/** What one gate row says besides its title: the persona, `you` for the owner's own gates. */
-export function whoOf(step: McFlowStep, flow: McFlow): string {
-  if (step.persona !== null) {
-    return flow.personas.find((p) => p.id === step.persona)?.title ?? step.persona;
+/** What one row says besides its title: the persona's title, `you` for the owner's own position, the id of a persona with no record. */
+export function whoOf(step: McFlowStep, _flow: McFlow): string {
+  if (step.owner) {
+    return 'you';
   }
-  return step.owner ? 'you' : 'automatic';
+  return step.missing ? step.persona : step.title;
 }
 
-/** A short marks line for a gate row: `added`, `moved`, `struck`, `tell me`. */
+/** A short marks line for a row: `shape`, `tell me`. */
 export function marksOf(step: McFlowStep): readonly string[] {
   const marks: string[] = [];
-  if (step.inserted) {
-    marks.push('added');
-  }
-  if (step.moved) {
-    marks.push('moved');
-  }
-  if (step.skipped) {
-    marks.push('struck');
+  if (step.mode === 'shape') {
+    marks.push('shape');
   }
   if (step.notify) {
     marks.push('tell me');
@@ -131,20 +146,7 @@ export function moveRoomOf(flow: McFlow, step: McFlowStep): { readonly earlier: 
   return { earlier: above !== undefined && above.state === 'future' && !above.locked, later: below !== undefined };
 }
 
-/**
- * The phases a gate can still be added for: those still ahead in this flow
- * (a phase that is done or is the current gate is not offered), not added
- * already and not struck.
- */
-/** The manual step's ids: `manual`, or `manual-<word>` for a second one (the engine's `isManualPhase`). */
-export function isManualPhaseId(id: string): boolean {
-  return id === 'manual' || /^manual-[a-z0-9][a-z0-9-]*$/.test(id);
-}
-
-export function addablePhasesOf(flow: McFlow): readonly { readonly id: string; readonly title: string }[] {
-  const ahead = new Set(flow.steps.filter((s) => !s.inserted && s.state !== 'current').map((s) => s.phase));
-  return flow.phases.filter(
-    // The manual step (E10-6) is no pipeline phase: it is always on offer, once per id.
-    (phase) => (ahead.has(phase.id) || isManualPhaseId(phase.id)) && !flow.steps.some((s) => (s.inserted && s.phase === phase.id) || (!s.inserted && s.skipped && s.phase === phase.id)),
-  );
+/** The personas a position can be added for or given to: the whole crew. */
+export function addablePersonasOf(flow: McFlow): readonly McFlowPersona[] {
+  return flow.personas;
 }

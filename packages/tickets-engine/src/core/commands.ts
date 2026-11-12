@@ -295,14 +295,13 @@ export function parseFlowEdit(payload: unknown): Parsed<FlowEditCommand> {
     case 'reset':
       return done({ op: e['op'] });
     case 'insert': {
-      const phase = ident(e['phase']);
-      const after = int(e['after']);
-      return phase === null || after === null ? refuse('bad flow edit') : done({ op: 'insert', phase, after });
+      const persona = ident(e['persona']);
+      const after = e['after'] === -1 ? -1 : int(e['after']);
+      return persona === null || after === null ? refuse('bad flow edit') : done({ op: 'insert', persona, after });
     }
-    case 'remove':
-    case 'restore': {
+    case 'remove': {
       const step = int(e['step']);
-      return step === null ? refuse('bad flow edit') : done({ op: e['op'], step });
+      return step === null ? refuse('bad flow edit') : done({ op: 'remove', step });
     }
     case 'move': {
       const step = int(e['step']);
@@ -314,8 +313,8 @@ export function parseFlowEdit(payload: unknown): Parsed<FlowEditCommand> {
     }
     case 'persona': {
       const step = int(e['step']);
-      const persona = e['persona'] === null ? null : ident(e['persona']);
-      return step === null || (e['persona'] !== null && persona === null) ? refuse('bad flow edit') : done({ op: 'persona', step, persona });
+      const persona = ident(e['persona']);
+      return step === null || persona === null ? refuse('bad flow edit') : done({ op: 'persona', step, persona });
     }
     default:
       return refuse('unknown flow edit');

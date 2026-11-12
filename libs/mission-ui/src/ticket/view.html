@@ -1254,10 +1254,10 @@
       <h2 class="sheet-title">Gate chain</h2>
       <button type="button" class="sheet-close" aria-label="Close" (click)="closeSheet()">×</button>
     </div>
-    @if (hasDelta()) {
-      <p class="sheet-note">This ticket deviates from the standard flow — the bar shows what changes.</p>
+    @if (hasChain()) {
+      <p class="sheet-note">The bar shows the personas this ticket goes through.</p>
     } @else {
-      <p class="sheet-note">The pipeline's standard flow applies to this ticket.</p>
+      <p class="sheet-note">This ticket has no chain of its own yet.</p>
     }
 
     @if (canEditFlow()) {
@@ -1266,25 +1266,25 @@
       </section>
     }
 
-    <section class="sheet-section" aria-label="Insert a gate">
-      <h3 class="sheet-label">Insert a gate</h3>
+    <section class="sheet-section" aria-label="Add a persona">
+      <h3 class="sheet-label">Add a persona</h3>
       <div class="sheet-row">
-        <select class="sheet-select" aria-label="Phase to insert" [value]="insertPhase()" (change)="onInsertPhase($event)">
-          @for (phase of insertPhaseOptions(); track phase.id) {
-            <option [value]="phase.id">{{ phase.title }}</option>
+        <select class="sheet-select" aria-label="Persona to add" [value]="insertPersona()" (change)="onInsertPersona($event)">
+          @for (persona of insertPersonaOptions(); track persona.id) {
+            <option [value]="persona.id">{{ persona.title }}</option>
           }
         </select>
         <select
           class="sheet-select sheet-select-narrow"
-          aria-label="Position against the anchor"
+          aria-label="Before or after the position"
           [value]="insertPosition()"
           (change)="onInsertPosition($event)">
           <option value="after">after</option>
           <option value="before">before</option>
         </select>
-        <select class="sheet-select" aria-label="Anchor gate" [value]="insertAnchor()" (change)="onInsertAnchor($event)">
-          @for (step of anchorOptions(); track step.id) {
-            <option [value]="step.id">{{ step.title }}</option>
+        <select class="sheet-select" aria-label="Position" [value]="insertAnchor()" (change)="onInsertAnchor($event)">
+          @for (step of anchorOptions(); track step.position) {
+            <option [value]="step.position">{{ step.position }}. {{ step.title }}</option>
           }
         </select>
       </div>
@@ -1301,9 +1301,9 @@
       <h3 class="sheet-label">Notify me</h3>
       <div class="sheet-row">
         <span class="sheet-static">when</span>
-        <select class="sheet-select" aria-label="Gate whose completion notifies" [value]="notifyGate()" (change)="onNotifyGate($event)">
-          @for (step of notifyOptions(); track step.id) {
-            <option [value]="step.id">{{ step.title }}</option>
+        <select class="sheet-select" aria-label="Position whose completion notifies" [value]="notifyGate()" (change)="onNotifyGate($event)">
+          @for (step of notifyOptions(); track step.position) {
+            <option [value]="step.position">{{ step.position }}. {{ step.title }}</option>
           }
         </select>
         <span class="sheet-static">completes</span>
@@ -1315,7 +1315,7 @@
 
     <section class="sheet-section" aria-label="Back to the standard flow">
       <h3 class="sheet-label">Standard flow</h3>
-      <p class="sheet-note">Drop every deviation — the pipeline's standard flow applies again.</p>
+      <p class="sheet-note">Drop this chain — the standard flow applies again.</p>
       <button type="button" class="btn ghost" (click)="prefillStandard()">Prefill chat</button>
     </section>
   </div>
@@ -1328,7 +1328,7 @@
       type="button"
       class="gates gate-tap"
       [disabled]="readOnly()"
-      aria-label="Gate chain — tap to insert a gate, set a notify rule or return to the standard flow"
+      aria-label="Chain — tap to add a persona, set a notify rule or return to the standard flow"
       (click)="openSheet()">
       <ng-container [ngTemplateOutlet]="gatePills" />
       @if (costTotal(); as total) {
@@ -1354,19 +1354,11 @@
       class="gate"
       [class.done]="step.state === 'past'"
       [class.now]="step.state === 'current'"
-      [class.new]="step.inserted"
-      [class.skipped]="step.skipped"
       [attr.aria-current]="step.state === 'current' ? 'step' : null">
       @if (step.state === 'past' || step.state === 'current') {
         <span class="gs" aria-hidden="true">{{ step.state === 'past' ? '✓' : '●' }}</span>
       }
-      @if (step.inserted) {
-        <span class="gs" aria-hidden="true">+</span>
-      }
       <span class="gt">{{ step.title }}</span>
-      @if (step.state === 'current' && step.persona; as p) {
-        <span class="gp">{{ personaTitle(p) }}</span>
-      }
       @if (step.cost; as c) {
         <span class="gc">{{ c }}</span>
       }

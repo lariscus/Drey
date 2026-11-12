@@ -37,7 +37,7 @@ Goal text.
   persona: ben
   reason: small and isolated
 - [ ] Dictation hand-off
-  chain: skip commit; notify build
+  chain: ben; ralf(notify)
 - [ ] Tidy-up
   persona: paul
 `;
@@ -176,11 +176,11 @@ describe('planParts', () => {
       ['Dictation hand-off', null, 'new', false, 'After part 1'],
       ['Tidy-up', 'paul', 'new', false, 'After part 2'],
     ]);
-    // The flow starts at the build gate and ends before the terminal phase.
-    expect(reply.parts[0]!.flow.map((s) => `${s.title}:${s.persona}`)).toEqual(['Build:ben', 'Commit:null']);
-    expect(reply.parts[1]!.flow.map((s) => [s.title, s.skipped, s.notify])).toEqual([
-      ['Build', false, true],
-      ['Commit', true, false],
+    // req-266: a part's flow is its own chain; one without a chain shows the standard flow (none on this board).
+    expect(reply.parts[0]!.flow).toEqual([]);
+    expect(reply.parts[1]!.flow.map((s) => [s.position, s.title, s.notify])).toEqual([
+      [1, 'Ben', false],
+      [2, 'Ralf', true],
     ]);
     expect(reply.personas.map((p) => [p.id, p.model])).toEqual([
       ['ben', 'sonnet'],
@@ -250,8 +250,8 @@ describe('releasePlan', () => {
     expect(first).toContain('persona: ben');
     expect(first).not.toContain('blocked-by');
     expect(second).toMatch(/blocked-by:\n  - T-0131\n/);
-    expect(second).toContain('skip commit');
-    expect(second).toContain('notify build');
+    expect(second).toContain('chain: [ben, ralf(notify)]');
+    expect(first).not.toContain('chain:');
     expect(third).toMatch(/blocked-by:\n  - T-0132\n/);
     expect(first).toContain('priority: high');
     expect(first).toContain('repo: drey');
@@ -313,14 +313,14 @@ describe('releasePlan', () => {
     expect(reply.parts[1]!.locked).toBe(false);
   });
 
-  it('refuses a plan without parts, an unknown persona and a chain outside the pipeline', async () => {
+  it('refuses a plan without parts, an unknown persona and a chain naming an unknown persona', async () => {
     const board = serviceOf();
     await writeParent(`\n## Plan\n\nNo parts.\n`);
     expect(await board.releasePlan({ id: 'T-0130', scope: 'all' })).toEqual({ ok: false, error: 'This plan has no parts to release.' });
     await writeParent(`\n## Plan\n\n### Parts\n\n- [ ] A\n  persona: ben\n- [ ] B\n  persona: ghost\n`);
     const unknown = await board.releasePlan({ id: 'T-0130', scope: 'all' });
     expect(unknown.ok).toBe(false);
-    await writeParent(`\n## Plan\n\n### Parts\n\n- [ ] A\n- [ ] B\n  chain: skip nowhere\n`);
+    await writeParent(`\n## Plan\n\n### Parts\n\n- [ ] A\n- [ ] B\n  chain: ben; ghost\n`);
     const badChain = await board.releasePlan({ id: 'T-0130', scope: 'all' });
     expect(badChain.ok).toBe(false);
     // Nothing was written by either refusal.

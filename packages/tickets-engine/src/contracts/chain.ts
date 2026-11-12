@@ -1,79 +1,59 @@
 /**
- * The chain-delta contract (E9, concept §5.7): the shapes the ticket
- * frontmatter's `chain:` entries, the merged per-ticket gate chain and
- * the chat's setChain command exchange. The grammar and the merge live
- * in core/chain-delta.ts; the full specification is
- * specs/ticket-schema.md.
+ * The chain contract (req-266, the persona board concept §3 and §6): a
+ * ticket's chain is the full ORDERED LIST OF PERSONAS it goes through —
+ * `paul:shape; paul; ben; ralf; tessa; you`. Each entry is one step of the
+ * ticket's way; what happens there is what that persona's `prompt.md`
+ * says (R11). The same persona may stand twice, so a position (1-based),
+ * never a persona id, is what the cursor points at.
  *
- * The idea: the standard flow is team configuration
- * (`tickets/_meta/pipeline.md`) and applies to every ticket silently.
- * A ticket stores only its DELTA — declarative entries in the
- * frontmatter's `chain:` list, e.g.
+ * Where it lives: the frontmatter's `chain:` list, `at:` the cursor and
+ * `sent-back:` the one send-back (`5>3`) on the files backend; `x-chain`
+ * (entries joined by `;`), `x-at` and `x-sent-back` on a dricket store.
+ * The standard flow is `flow:` in `tickets/_meta/pipeline.md`; it is
+ * copied into a ticket at creation and is then the ticket's own.
  *
- *     chain: [insert security(ralf, notify) after review, skip verify]
- *
- * The engine merges standard + delta into the ticket's concrete chain,
- * from which the gate bar, the notify cards and the chat's before/after
- * confirmation render. No second source of truth, no UI state: the
- * chain is data in the ticket.
+ * The grammar and the guard live in core/chain-list.ts and
+ * core/chain-validate.ts; the specification is specs/ticket-schema.md
+ * ("The chain").
  */
 
-/** One declarative delta entry, parsed from the `chain:` list. */
-export type ChainEntry =
-  | {
-      readonly kind: 'insert';
-      /** The pipeline phase this ticket's chain gains. */
-      readonly phase: string;
-      /** The anchor phase the new gate hangs on. */
-      readonly anchor: string;
-      readonly position: 'after' | 'before';
-      /** The persona pinned to the inserted gate; null = the ladder decides. */
-      readonly persona: string | null;
-      /** The Bescheid rule: a card lands in "Needs you" when this gate completes. */
-      readonly notify: boolean;
-    }
-  | {
-      readonly kind: 'skip';
-      /** The pipeline phase this ticket bypasses (rendered struck). */
-      readonly phase: string;
-    }
-  | {
-      readonly kind: 'notify';
-      /** The gate whose completion lands a card in "Needs you". */
-      readonly phase: string;
-    }
-  | {
-      readonly kind: 'move';
-      /** The standard gate this ticket runs somewhere else (E10-5). */
-      readonly phase: string;
-      readonly anchor: string;
-      readonly position: 'after' | 'before';
-    }
-  | {
-      readonly kind: 'assign';
-      /** The standard gate whose persona this ticket pins (E10-5). */
-      readonly phase: string;
-      readonly persona: string;
-    };
+/** The run modes an entry may carry (concept §14 reading 1): `shape` = the interactive entry. */
+export const CHAIN_MODES = ['shape'] as const;
+export type ChainMode = (typeof CHAIN_MODES)[number];
 
-/** One step of the merged chain — what the gate bar renders. */
-export interface ChainStep {
-  readonly phase: string;
-  readonly title: string;
-  readonly state: 'past' | 'current' | 'future';
-  /** A delta-inserted gate (rendered as an addition). */
-  readonly inserted: boolean;
-  /** A delta-skipped gate (rendered struck; the ticket bypasses it). */
-  readonly skipped: boolean;
-  /** The Bescheid rule stands on this gate. */
+/** One entry of the chain: `<persona>[:<mode>][(notify)]`. */
+export interface ChainEntry {
+  /** The persona id that takes this position (`you` = the human persona). */
+  readonly persona: string;
+  /** The run's mode; null = an ordinary run. */
+  readonly mode: ChainMode | null;
+  /** The Bescheid rule: a card lands in Needs you when this position is done. */
   readonly notify: boolean;
-  /** The persona pinned to this gate by the delta; null = none (the pipeline decides). */
-  readonly persona: string | null;
-  /** A standard gate the delta moved (E10-5). */
-  readonly moved: boolean;
 }
 
-/** The Bescheid card's freshness window (concept §5.7): a notify card
- *  shows from the gate's completion until the ticket leaves the
- *  following gate or the window runs out, whichever comes first. */
-export const NOTIFY_WINDOW_MS = 24 * 60 * 60_000;
+/** One position of a ticket's chain as the surfaces render it. */
+export interface ChainStep extends ChainEntry {
+  /** 1-based position in the chain — what the cursor and a send-back name. */
+  readonly position: number;
+  readonly state: 'past' | 'current' | 'future';
+}
+
+/** The one send-back a ticket may use (concept §4): from position `from` back to position `to`. */
+export interface ChainSendBack {
+  readonly from: number;
+  readonly to: number;
+}
+
+/**
+ * A ticket's three chain fields (`TicketMeta` carries them): `chain:` / `x-chain`,
+ * the cursor `at:` / `x-at` (1-based, absent = 1 — nothing advances it before
+ * req-257) and `sent-back:` / `x-sent-back`. Absent chain = none, or it did not parse.
+ */
+export interface TicketChainFields {
+  readonly chain?: readonly ChainEntry[];
+  readonly at?: number;
+  readonly sentBack?: ChainSendBack;
+}
+
+/** At most this many entries — `x-chain` is one size-capped line on the store. */
+export const MAX_CHAIN_ENTRIES = 24;

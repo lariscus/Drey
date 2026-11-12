@@ -1,6 +1,5 @@
 import type { BoardSnapshot, TicketCard } from '../../contracts/tickets';
-import { manualStepAfter } from '../../core/manual-gate';
-import { HUMAN_PERSONA_ID, PERSONAS_DIR, isHumanPersona, loadPersonaSkills, parsePersonaFile, resolvePersona, type Persona, type PersonaResolution, type PersonaSkill } from '../../core/persona';
+import { PERSONAS_DIR, loadPersonaSkills, parsePersonaFile, resolvePersona, type Persona, type PersonaResolution, type PersonaSkill } from '../../core/persona';
 import type { FileSystem } from '../ports/file-system';
 import type { ChainConfig } from '../protocol';
 
@@ -60,26 +59,6 @@ export class BoardPersonas {
   async read(config: ChainConfig, id: string): Promise<Persona | null> {
     const text = await this.fs.readTextOrNull(this.fs.join(config.ticketsVaultPath, PERSONAS_DIR, id, 'persona.md'));
     return text === null ? null : parsed(id, text);
-  }
-
-  /**
-   * The human persona a manual step after `workingPhaseId` waits for (E10-6),
-   * or null when the card's chain holds none. A step with no pin is the
-   * owner's (`you`); a pin on an agent persona is no manual step (said once).
-   */
-  async manualParkFor(config: ChainConfig, snap: BoardSnapshot, card: TicketCard, workingPhaseId: string): Promise<string | null> {
-    const entries = card.meta.chain ?? [];
-    const step = entries.length === 0 ? null : manualStepAfter(snap.pipeline.map((p) => ({ id: p.id, title: p.title })), workingPhaseId, entries);
-    if (step === null) {
-      return null;
-    }
-    const id = step.persona ?? HUMAN_PERSONA_ID;
-    const persona = await this.read(config, id);
-    if (persona !== null && !isHumanPersona(persona)) {
-      this.note(card.id, `dispatch: the manual step of ${card.id} names "${id}", which is an agent - the step is ignored`);
-      return null;
-    }
-    return id;
   }
 
   private async load(resolution: PersonaResolution, card: TicketCard, fileOf: (rel: string) => Promise<string | null>): Promise<TicketPersona> {

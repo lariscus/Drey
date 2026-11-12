@@ -10,7 +10,7 @@
  * engine and the validator are main-side, where the `yaml` package is
  * reachable; the plugin renderer bundle may not import packages).
  */
-import type { ChainEntry } from './chain';
+import type { ChainEntry, TicketChainFields } from './chain';
 import type { PhasePoolMeta, TicketPoolMeta } from './ticket-pool-meta';
 import type { RepoRef } from './repo-ref';
 import type { PriorityConfig, TicketPriority } from './ticket-priority';
@@ -124,7 +124,7 @@ export interface TicketIssue {
 }
 
 /** Parsed, normalized ticket frontmatter (all optionals reflect absence). */
-export interface TicketMeta extends TicketPoolMeta {
+export interface TicketMeta extends TicketPoolMeta, TicketChainFields {
   readonly id: string | null;
   readonly title: string | null;
   /**
@@ -157,12 +157,6 @@ export interface TicketMeta extends TicketPoolMeta {
    * untouched ticket stays the default everywhere.
    */
   readonly form?: TicketForm;
-  /**
-   * The chain delta (concept §5.7): the ticket's deviations from the
-   * pipeline's standard flow, parsed from the frontmatter's `chain:`
-   * list. Absent = the standard flow applies silently.
-   */
-  readonly chain?: readonly ChainEntry[];
   readonly priority: TicketPriority;
   readonly rank: number;
   readonly branch: string | null;
@@ -400,6 +394,8 @@ export interface BoardSnapshot {
   readonly pushRemote: string | null;
   /** req-169: pipeline.md's `closing-signals:` — the signals that earn a run its closing round; absent = all five. */
   readonly closingSignals?: readonly ('red-gate' | 'retry' | 'steer' | 'cost' | 'friction')[];
+  /** req-266: pipeline.md's `flow:` — the standard flow a new ticket's chain is copied from; absent/empty = none. */
+  readonly flow?: readonly ChainEntry[];
   /**
    * The board's priority vocabulary — the order IS the weight: pipeline.md's
    * `priorities:` on the files backend, the store's `dricket.toml` on dricket (D-11).

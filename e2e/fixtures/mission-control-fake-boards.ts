@@ -236,7 +236,9 @@ export const SETTINGS = {
   ],
 };
 
-const flow = (persona: string) => ['Plan', 'Build', 'Review', 'Test', 'Accept'].map((title) => ({ phase: title.toLowerCase(), title, persona: title === 'Build' ? persona : null, inserted: false, skipped: false, notify: false }));
+const PERSONA_TITLES: Record<string, string> = { paul: 'Paul', ben: 'Ben', ralf: 'Ralf', tessa: 'Tessa', you: 'You' };
+const flow = (persona: string) =>
+  ['paul', persona, 'ralf', 'tessa', 'you'].map((id, i) => ({ position: i + 1, persona: id, title: PERSONA_TITLES[id] ?? id, notify: false }));
 for (const part of [...PARTS_121.parts, ...PARTS_130.parts]) {
   (part as { flow: unknown }).flow = flow(part.persona);
 }
@@ -348,7 +350,7 @@ export const PAD_PARTS_130 = {
     ...part,
     reason: ['Mod+Alt+T, focus handling', 'blocked-by P1', 'title from the first sentence'][i]!,
     start: ['starts first', 'after P1', 'after P2'][i]!,
-    flow: ['Plan', 'Build', 'Review', 'Test'].map((title) => ({ phase: title.toLowerCase(), title, persona: title === 'Build' ? part.persona : null, inserted: false, skipped: false, notify: false })),
+    flow: ['paul', part.persona, 'ralf', 'tessa'].map((id, i) => ({ position: i + 1, persona: id, title: PERSONA_TITLES[id] ?? id, notify: false })),
   })),
 };
 
@@ -437,43 +439,34 @@ export const PAD_ESTIMATES: Record<string, unknown> = {
 };
 
 /** 5i: the flow of T-0130's third part as the desk answers it before Paul's draft (the board's sample says part 3 whichever part is opened). */
-const flowStep = (index: number, phase: string, title: string, extra: Record<string, unknown>) => ({
+const flowStep = (index: number, persona: string, title: string, extra: Record<string, unknown>) => ({
   index,
-  phase,
+  position: index + 1,
+  persona,
   title,
+  mode: null,
   state: 'future',
-  inserted: false,
-  skipped: false,
-  moved: false,
   notify: false,
-  persona: null,
-  pinned: false,
   model: null,
   owner: false,
+  missing: false,
   locked: false,
   ...extra,
 });
 const FLOW_BASE_STEPS = [
-  flowStep(1, 'build', 'Build', { persona: 'ben', pinned: true, model: 'opus' }),
-  flowStep(2, 'review', 'Review', { persona: 'ralf', model: 'sonnet' }),
-  flowStep(3, 'verify', 'Verify', { persona: 'tessa', model: 'sonnet' }),
-  flowStep(4, 'accept', 'Accept', { owner: true }),
+  flowStep(0, 'ben', 'Ben', { model: 'opus' }),
+  flowStep(1, 'ralf', 'Ralf', { model: 'sonnet' }),
+  flowStep(2, 'tessa', 'Tessa', { model: 'sonnet' }),
+  flowStep(3, 'you', 'You', { owner: true }),
 ];
 export const PAD_FLOW_130 = {
   ok: true,
   ticket: 'T-0130',
   title: 'Voice capture for tickets',
   scope: { kind: 'part', index: 2, title: 'Ticket from transcript' },
-  chain: [],
-  saved: [],
+  chain: ['ben', 'ralf', 'tessa', 'you'],
+  saved: ['ben', 'ralf', 'tessa', 'you'],
   steps: FLOW_BASE_STEPS,
-  phases: [
-    { id: 'build', title: 'Build' },
-    { id: 'review', title: 'Review' },
-    { id: 'security', title: 'Security' },
-    { id: 'verify', title: 'Verify' },
-    { id: 'accept', title: 'Accept' },
-  ],
   personas: [
     { id: 'ralf', kind: 'agent', title: 'Ralf', color: 'var(--accent-peach)', model: 'sonnet' },
     { id: 'ben', kind: 'agent', title: 'Ben', color: 'var(--accent)', model: 'opus' },
@@ -488,13 +481,13 @@ export const PAD_FLOW_130 = {
 /** 5i: Paul's draft (what `POST /api/tickets/T-0130/flow-draft` answers): a security pass by Ralf after the review, with a card for the owner. */
 export const PAD_FLOW_130_DRAFT = {
   ...PAD_FLOW_130,
-  chain: ['insert security after review'],
+  chain: ['ben', 'ralf', 'ralf(notify)', 'tessa', 'you'],
   steps: [
     FLOW_BASE_STEPS[0],
     FLOW_BASE_STEPS[1],
-    flowStep(3, 'security', 'Security', { inserted: true, persona: 'ralf', pinned: true, model: 'sonnet', notify: true }),
-    { ...FLOW_BASE_STEPS[2], index: 4 },
-    { ...FLOW_BASE_STEPS[3], index: 5 },
+    flowStep(2, 'ralf', 'Ralf', { model: 'sonnet', notify: true }),
+    { ...FLOW_BASE_STEPS[2], index: 3, position: 4 },
+    { ...FLOW_BASE_STEPS[3], index: 4, position: 5 },
   ],
   reason: 'Part 3 touches the command parser, so I added a security pass by Ralf after the review. You would be told when it is done.',
 };

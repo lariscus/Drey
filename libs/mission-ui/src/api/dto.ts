@@ -178,20 +178,20 @@ export interface NeedView {
   readonly shaped?: ShapedQuestionView;
 }
 
-// --- Chain delta (E9, concept §5.7) ----------------------------------------------
+// --- Chain (req-266): the persona list --------------------------------------------
 
 /**
- * One `chain:` delta entry as the desk parsed it (the engine's ChainEntry,
- * contracts/chain.ts) — mirrored here tolerantly; the ticket screen's
- * model carries the same shape (`ticket/ticket.model.ts` stays the owner
- * of the render logic, this is the wire slice).
+ * One entry of a ticket's chain as the desk parsed it (the engine's
+ * ChainEntry, contracts/chain.ts) — mirrored here tolerantly; the ticket
+ * screen's model carries the same shape (`ticket/ticket.model.ts` stays the
+ * owner of the render logic, this is the wire slice).
  */
 export interface McChainEntry {
-  readonly kind: 'insert' | 'skip' | 'notify';
-  readonly phase: string;
-  readonly anchor: string | null;
-  readonly position: 'after' | 'before' | null;
-  readonly persona: string | null;
+  /** The persona id at this position (`you` = the owner). */
+  readonly persona: string;
+  /** `shape` = the interactive entry; null = an ordinary run. */
+  readonly mode: 'shape' | null;
+  /** The Bescheid rule on this position. */
   readonly notify: boolean;
 }
 
@@ -794,10 +794,12 @@ export interface TicketDetail {
   /** The card's phase (the highlighted entry of `phases`). */
   readonly phase: string;
   /**
-   * The `chain:` delta parsed off the card's meta (E9, concept §5.7);
-   * empty = the standard flow applies silently.
+   * The `chain:` persona list parsed off the card's meta (req-266);
+   * empty = the ticket carries none.
    */
   readonly chain: readonly McChainEntry[];
+  /** The chain's cursor (`at`, 1-based); absent = position 1. */
+  readonly at?: number;
   /**
    * The ticket's priority id as the vault configures it — the id IS the
    * label (the vocabulary is the desk's, never a fixed four); null when
@@ -909,38 +911,29 @@ export function isJumpPriority(priority: string | null, order: readonly string[]
   return at >= 0 && at < Math.floor(order.length / 2);
 }
 
-/** One chain entry's wire JSON; null when nothing renderable survives (no kind or no phase). */
+const CHAIN_ENTRY_TEXT = /^([a-z][a-z0-9-]*)(?::shape)?(?:\s*\(\s*notify\s*\))?$/;
+
+/** One chain entry's wire JSON (an object, or its canonical text); null when no persona survives. */
 function chainEntryOf(raw: unknown): McChainEntry | null {
+  if (typeof raw === 'string') {
+    const text = raw.trim();
+    const match = CHAIN_ENTRY_TEXT.exec(text);
+    return match === null
+      ? null
+      : { persona: match[1]!, mode: text.includes(':shape') ? 'shape' : null, notify: text.includes('(') };
+  }
   const entry = rec(raw);
   if (entry === null) {
     return null;
   }
-  const phase = str(entry['phase']);
-  if (phase === '') {
+  const persona = str(entry['persona']);
+  if (!/^[a-z][a-z0-9-]*$/.test(persona)) {
     return null;
   }
-  const kind = str(entry['kind']);
-  if (kind === 'skip' || kind === 'notify') {
-    return { kind, phase, anchor: null, position: null, persona: null, notify: false };
-  }
-  if (kind === 'insert') {
-    const anchor = str(entry['anchor']);
-    if (anchor === '') {
-      return null;
-    }
-    return {
-      kind: 'insert',
-      phase,
-      anchor,
-      position: entry['position'] === 'before' ? 'before' : 'after',
-      persona: strOrNull(entry['persona']),
-      notify: entry['notify'] === true,
-    };
-  }
-  return null;
+  return { persona, mode: entry['mode'] === 'shape' ? 'shape' : null, notify: entry['notify'] === true };
 }
 
-/** The `chain:` delta's wire JSON as entry views; junk entries drop out, never a throw. */
+/** The `chain:` list's wire JSON as entry views; junk entries drop out, never a throw. */
 export function chainEntriesOf(raw: unknown): readonly McChainEntry[] {
   return arr(raw)
     .map(chainEntryOf)
@@ -1761,6 +1754,7 @@ export function parseTicketDetail(
     phases,
     phase: str(card['phase']),
     chain: chainEntriesOf(meta['chain']),
+    ...(typeof meta['at'] === 'number' && meta['at'] >= 1 ? { at: Math.floor(meta['at']) } : {}),
     priority: priorityOf(meta['priority']),
     blockedBy: strArray(meta['blockedBy']),
     blocked: strArray(card['blocked']),
@@ -1794,13 +1788,13 @@ function commentsOf(value: unknown): readonly McTicketComment[] | undefined {
 
 /**
  * One board card off `/api/board` by id — the chat's chain before/after
- * card reads the ticket's current delta and phase from it; null when the
+ * card reads the ticket's current chain and phase from it; null when the
  * board JSON holds no such card (a stale board degrades to no "before").
  */
 export function parseBoardCard(
   json: unknown,
   id: string,
-): { readonly phase: string; readonly chain: readonly McChainEntry[] } | null {
+): { readonly phase: string; readonly chain: readonly McChainEntry[]; readonly at?: number } | null {
   const board = rec(json);
   for (const raw of arr(board?.['columns'])) {
     const column = rec(raw);
@@ -1810,7 +1804,8 @@ export function parseBoardCard(
         continue;
       }
       const meta = rec(card['meta']) ?? {};
-      return { phase: str(card['phase']), chain: chainEntriesOf(meta['chain']) };
+      const at = typeof meta['at'] === 'number' && meta['at'] >= 1 ? Math.floor(meta['at']) : undefined;
+      return { phase: str(card['phase']), chain: chainEntriesOf(meta['chain']), ...(at !== undefined ? { at } : {}) };
     }
   }
   return null;
@@ -1909,13 +1904,11 @@ export function parsePlanStatus(json: unknown): McPlanStatus | null {
 
 export type McPartState = 'new' | 'queued' | 'running' | 'active' | 'done';
 
-/** One gate of a part's flow, from the build step on. */
+/** One position of a part's chain: its own, or the standard flow it would get. */
 export interface McPartFlowStep {
-  readonly phase: string;
+  readonly position: number;
+  readonly persona: string;
   readonly title: string;
-  readonly persona: string | null;
-  readonly inserted: boolean;
-  readonly skipped: boolean;
   readonly notify: boolean;
 }
 
@@ -1973,13 +1966,11 @@ export function parsePlanApproval(json: unknown): McPlanApproval | null {
     const flow: McPartFlowStep[] = [];
     for (const rawStep of arr(card['flow'])) {
       const step = rec(rawStep);
-      if (step !== null && typeof step['phase'] === 'string') {
+      if (step !== null && typeof step['persona'] === 'string') {
         flow.push({
-          phase: step['phase'],
-          title: str(step['title'], step['phase']),
-          persona: strOrNull(step['persona']),
-          inserted: step['inserted'] === true,
-          skipped: step['skipped'] === true,
+          position: typeof step['position'] === 'number' ? step['position'] : flow.length + 1,
+          persona: step['persona'],
+          title: str(step['title'], step['persona']),
           notify: step['notify'] === true,
         });
       }
@@ -2028,29 +2019,29 @@ export function parsePlanApproval(json: unknown): McPlanApproval | null {
 /** Which flow: the ticket's own chain, or one part of a split plan. */
 export type McFlowScope = { readonly kind: 'ticket' } | { readonly kind: 'part'; readonly index: number; readonly title: string };
 
-/** One gate of a flow, from the current gate on (`GET /api/tickets/<id>/flow`). */
+/** One position of a flow, from the current one on (`GET /api/tickets/<id>/flow`). */
 export interface McFlowStep {
-  /** Position in the merged chain — what an edit addresses. */
+  /** 0-based index in the whole chain — what an edit addresses. */
   readonly index: number;
-  readonly phase: string;
+  /** 1-based position. */
+  readonly position: number;
+  readonly persona: string;
+  /** The persona's title; its id when no persona record exists. */
   readonly title: string;
+  readonly mode: 'shape' | null;
   readonly state: 'current' | 'future';
-  readonly inserted: boolean;
-  readonly skipped: boolean;
-  readonly moved: boolean;
   readonly notify: boolean;
-  readonly persona: string | null;
-  /** The delta pinned the persona. */
-  readonly pinned: boolean;
   readonly model: string | null;
-  /** A gate the owner works by hand. */
+  /** The owner's position (the human persona). */
   readonly owner: boolean;
+  /** The entry names no persona record. */
+  readonly missing: boolean;
   readonly locked: boolean;
 }
 
 export interface McFlowPersona {
   readonly id: string;
-  /** `human` = the owner (E10-6); the manual step offers only these. */
+  /** `human` = the owner (E10-6). */
   readonly kind: 'agent' | 'human';
   readonly title: string;
   readonly color: string;
@@ -2061,12 +2052,12 @@ export interface McFlow {
   readonly ticket: string;
   readonly title: string;
   readonly scope: McFlowScope;
-  /** The chain shown: the saved delta, an edit's result or Paul's draft. */
+  /** The chain shown: the saved list, an edit's result or Paul's draft; canonical entries. */
   readonly chain: readonly string[];
-  /** The delta in the file now. */
+  /** The chain in the file now. */
   readonly saved: readonly string[];
   readonly steps: readonly McFlowStep[];
-  readonly phases: readonly { readonly id: string; readonly title: string }[];
+  /** The crew — who a position can be given to. */
   readonly personas: readonly McFlowPersona[];
   /** Why nothing can be saved (a live run, a released part); null = editable. */
   readonly readOnly: string | null;
@@ -2088,31 +2079,22 @@ export function parseFlow(json: unknown): McFlow | null {
   const steps: McFlowStep[] = [];
   for (const raw of arr(body['steps'])) {
     const step = rec(raw);
-    if (step === null || typeof step['phase'] !== 'string' || typeof step['index'] !== 'number') {
+    if (step === null || typeof step['persona'] !== 'string' || typeof step['index'] !== 'number') {
       continue;
     }
     steps.push({
       index: step['index'],
-      phase: step['phase'],
-      title: str(step['title'], step['phase']),
+      position: typeof step['position'] === 'number' ? step['position'] : step['index'] + 1,
+      persona: step['persona'],
+      title: str(step['title'], step['persona']),
+      mode: step['mode'] === 'shape' ? 'shape' : null,
       state: step['state'] === 'current' ? 'current' : 'future',
-      inserted: step['inserted'] === true,
-      skipped: step['skipped'] === true,
-      moved: step['moved'] === true,
       notify: step['notify'] === true,
-      persona: strOrNull(step['persona']),
-      pinned: step['pinned'] === true,
       model: strOrNull(step['model']),
       owner: step['owner'] === true,
+      missing: step['missing'] === true,
       locked: step['locked'] === true,
     });
-  }
-  const phases: { id: string; title: string }[] = [];
-  for (const raw of arr(body['phases'])) {
-    const phase = rec(raw);
-    if (phase !== null && typeof phase['id'] === 'string') {
-      phases.push({ id: phase['id'], title: str(phase['title'], phase['id']) });
-    }
   }
   const personas: McFlowPersona[] = [];
   for (const raw of arr(body['personas'])) {
@@ -2135,7 +2117,6 @@ export function parseFlow(json: unknown): McFlow | null {
     chain: strings(body['chain']),
     saved: strings(body['saved']),
     steps,
-    phases,
     personas,
     readOnly: strOrNull(body['readOnly']),
     reason: strOrNull(body['reason']),

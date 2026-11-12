@@ -7,7 +7,7 @@
 
 import type { InteractiveMode } from './protocol';
 import type { DisciplineTexts } from './discipline-texts';
-import { expandFragments } from '../core/prompt-file';
+import { expandFragments } from '../core/prompt-fragments';
 import { briefHead, headParts, memoryOf, optional, personaLine, trimmed, type ComposedInstruction } from './instruction-parts';
 
 /**

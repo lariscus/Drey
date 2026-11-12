@@ -128,6 +128,8 @@ export interface PartTicketInput {
   readonly firstPhase: string;
   /** The phase the ticket lands in — the build queue; the Log shows the move from the first phase. */
   readonly phase: string;
+  /** req-266: the standard flow (pipeline.md `flow:`), canonical entries — the chain of a part that names none. */
+  readonly standard: readonly string[];
   readonly blockedBy: string | null;
   readonly now: Date;
   readonly actor: string;
@@ -151,11 +153,11 @@ export function partTicketText(input: PartTicketInput): string {
     now: input.now,
     actor: input.actor,
     description: partDescription(input),
+    chain: input.part.chain.length > 0 ? input.part.chain : input.standard,
   });
   const { yamlText, body } = splitFrontmatter(base);
   let block = patchHeaderFields(`---\n${yamlText ?? ''}\n---`, {
     ...(input.blockedBy !== null ? { blockedBy: [input.blockedBy] } : {}),
-    ...(input.part.chain.length > 0 ? { chain: input.part.chain } : {}),
   }, input.priorities);
   const size = input.part.size ?? null;
   const needs = needsText(input.part.needs);

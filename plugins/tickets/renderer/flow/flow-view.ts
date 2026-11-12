@@ -14,7 +14,7 @@ import type { FlowOp } from '../../../../packages/tickets-engine/src/contracts/f
 import type { DeskDeps } from '../desk-deps';
 import { h, textButton } from '../desk-deps';
 import {
-  addablePhasesOf,
+  addablePersonasOf,
   changedIndicesOf,
   changesLabelOf,
   eyebrowOf,
@@ -220,8 +220,6 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
     row.type = 'button';
     for (const [flag, name] of [
       [changed.has(gate.index), 'is-dashed'],
-      [gate.skipped, 'is-struck'],
-      [gate.inserted, 'is-added'],
       [gate.state === 'current', 'is-current'],
       [state.selected === gate.index, 'is-selected'],
     ] as const) {
@@ -246,8 +244,8 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
     const plus = h('button', `flow-plus${state.adding === gate.index ? ' is-open' : ''}`);
     plus.type = 'button';
     plus.disabled = readOnly();
-    plus.title = `Add a gate after ${gate.title}`;
-    plus.setAttribute('aria-label', `Add a gate after ${gate.title}`);
+    plus.title = `Add a persona after ${gate.title}`;
+    plus.setAttribute('aria-label', `Add a persona after ${gate.title}`);
     plus.setAttribute('aria-expanded', String(state.adding === gate.index));
     plus.append(h('span', 'flow-plus-line'), h('span', 'flow-plus-dot', '+'));
     plus.addEventListener('click', () => toggleAdding(gate.index));
@@ -261,18 +259,13 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
   function addNode(flow: FlowDraft, after: number): HTMLElement {
     const box = h('div', 'flow-add');
     box.setAttribute('role', 'group');
-    box.setAttribute('aria-label', 'Add a gate');
-    const phases = addablePhasesOf(flow);
-    if (phases.length === 0) {
-      box.append(h('span', 'flow-hint', 'Every phase is in this flow already.'));
-    }
-    for (const phase of phases) {
-      const chip = textButton(phase.title, 'flow-chipbtn', `Add ${phase.title}`, () => {
-        void run({ op: 'insert', phase: phase.id, after }).then((ok) => {
+    box.setAttribute('aria-label', 'Add a persona');
+    for (const persona of addablePersonasOf(flow)) {
+      const chip = textButton(persona.title, 'flow-chipbtn', `Add ${persona.title}`, () => {
+        void run({ op: 'insert', persona: persona.id, after }).then((ok) => {
           if (ok) {
             state.adding = null;
-            const added = state.draft?.steps.find((s) => s.inserted && s.phase === phase.id);
-            state.selected = added?.index ?? null;
+            state.selected = after + 1;
             paint();
           }
         });
@@ -350,25 +343,20 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
     }
     const chips = h('div', 'flow-chips');
     chips.setAttribute('role', 'group');
-    const choose = (label: string, on: boolean, persona: string | null, color: string | null): void => {
+    const choose = (label: string, on: boolean, persona: string, color: string): void => {
       const chip = h('button', `flow-chipbtn${on ? ' is-on' : ''}`);
       chip.type = 'button';
       chip.disabled = !editable;
       chip.setAttribute('aria-pressed', String(on));
-      if (color !== null) {
-        const dot = h('span', 'flow-dot is-small');
-        dot.style.background = color || 'var(--text-3)';
-        chip.append(dot);
-      }
+      const dot = h('span', 'flow-dot is-small');
+      dot.style.background = color || 'var(--text-3)';
+      chip.append(dot);
       chip.append(document.createTextNode(label));
       chip.addEventListener('click', () => void run({ op: 'persona', step: gate.index, persona }));
       chips.append(chip);
     };
-    if (!gate.owner) {
-      choose('Pipeline default', !gate.pinned, null, null);
-    }
-    for (const persona of personasFor(flow, gate)) {
-      choose(persona.title, gate.pinned && gate.persona === persona.id, persona.id, persona.color);
+    for (const persona of personasFor(flow)) {
+      choose(persona.title, gate.persona === persona.id, persona.id, persona.color);
     }
     who.append(chips);
     inspector.append(who);
@@ -405,32 +393,25 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
     inspector.append(after);
 
     const actions = h('div', 'flow-actions');
-    const addAfter = textButton('Add a gate after', 'desk-btn', 'Pick a phase to run after this gate', () => toggleAdding(gate.index));
+    const addAfter = textButton('Add a persona after', 'desk-btn', 'Pick a persona to run after this gate', () => toggleAdding(gate.index));
     addAfter.disabled = readOnly() || state.busy;
     actions.append(addAfter, h('span', 'flow-grow'));
-    if (gate.skipped) {
-      const restore = textButton('Restore gate', 'desk-btn', 'Run this standard gate again', () => void run({ op: 'restore', step: gate.index }));
-      restore.disabled = !editable;
-      actions.append(restore);
-    } else {
-      const remove = textButton('Remove gate', 'desk-btn desk-btn-danger', gate.inserted ? 'Take this added gate out' : 'Strike this standard gate for this ticket', () => {
-        void run({ op: 'remove', step: gate.index }).then((ok) => {
-          if (ok) {
-            state.selected = gate.inserted ? null : gate.index;
-            paint();
-          }
-        });
+    const remove = textButton('Remove gate', 'desk-btn desk-btn-danger', 'Take this position out of the flow', () => {
+      void run({ op: 'remove', step: gate.index }).then((ok) => {
+        if (ok) {
+          state.selected = null;
+          paint();
+        }
       });
-      remove.disabled = !editable;
-      actions.append(remove);
-    }
+    });
+    remove.disabled = !editable;
+    actions.append(remove);
     inspector.append(actions);
 
     async function moveGate(dir: -1 | 1): Promise<void> {
       if (await run({ op: 'move', step: gate!.index, dir })) {
         // The gate sits where its neighbour was: follow it with the selection.
-        const moved = state.draft?.steps.find((s) => s.phase === gate!.phase && s.inserted === gate!.inserted);
-        state.selected = moved?.index ?? null;
+        state.selected = gate!.index + dir;
         paint();
       }
     }
@@ -442,7 +423,7 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
     const locked = readOnly() || state.busy;
     ask.disabled = locked;
     askButton.disabled = locked;
-    resetButton.disabled = locked || (flow?.chain.length ?? 0) === 0;
+    resetButton.disabled = locked;
     saveButton.disabled = locked || !isDirty(flow, state.saved);
     messageLine.textContent = state.message !== '' ? state.message : state.notice;
     messageLine.classList.toggle('is-error', state.message !== '');

@@ -3,7 +3,7 @@
 // parts first so the prompt prefix stays identical across runs, variable
 // parts last).
 
-import { expandFragments } from '../core/prompt-file';
+import { expandFragments } from '../core/prompt-fragments';
 import type { FleetCaps, InteractiveMode } from './protocol';
 import type { DisciplineTexts } from './discipline-texts';
 import { briefHead, headParts, personaLine, type ComposedInstruction, type Truncation } from './instruction-parts';

@@ -28,10 +28,9 @@ import {
   type TicketTrack,
 } from '../contracts/tickets';
 import { rawCaptureLogText } from '../contracts/capture-tidy';
-import { parseChainEntry } from './chain-delta';
+import { parseTicketChainFields } from './ticket-chain-fields';
 import { parseProofMode } from './proof-mode';
 import { parseTicketPoolKeys } from './ticket-pool-keys';
-import type { ChainEntry } from '../contracts/chain';
 
 /** `entered-<phase>` key grammar (phase ids: lowercase, digits, dashes). */
 const ENTERED_KEY = /^entered-([a-z][a-z0-9-]*)$/;
@@ -155,18 +154,8 @@ export function parseTicketFile(text: string, relPath: string, priorities: Prior
     issues.push({ level: 'warning', message: 'form must be ship or scout — read as ship' });
   }
 
-  // The chain delta (concept §5.7): a list of declarative entries; an
-  // entry outside the grammar warns and drops — never a guess.
-  const rawChain = asStringArray(obj['chain']);
-  const chain: ChainEntry[] = [];
-  for (const raw of rawChain) {
-    const entry = parseChainEntry(raw);
-    if (entry === null) {
-      issues.push({ level: 'warning', message: `chain entry "${raw}" is not readable — expected e.g. "insert design after review"` });
-    } else {
-      chain.push(entry);
-    }
-  }
+  // The chain (req-266): the ordered persona list, its cursor and the one send-back.
+  const chainFields = parseTicketChainFields(obj, issues, parts.phase === 'done');
 
   const rawPriority = asText(obj['priority']);
   let priority: TicketPriority = priorities.default;
@@ -243,7 +232,7 @@ export function parseTicketFile(text: string, relPath: string, priorities: Prior
       ...poolKeys,
       track,
       ...(form !== undefined ? { form } : {}),
-      ...(chain.length > 0 ? { chain } : {}),
+      ...chainFields,
       priority,
       rank,
       // The rule wins over whatever the file says (ADR-0076).
@@ -604,11 +593,10 @@ export interface HeaderPatch {
   readonly track?: TicketTrack | null;
   /** The ticket form (concept §5.6); null removes the key (the ship default). */
   readonly form?: TicketForm | null;
-  /**
-   * The chain delta (concept §5.7) as canonical strings; null removes
-   * the key (back to the standard flow).
-   */
+  /** The chain (req-266) as canonical entries; null removes the key. */
   readonly chain?: readonly string[] | null;
+  /** The chain's cursor (req-266); null removes the key. */
+  readonly at?: number | null;
   /**
    * The `blocked-by:` dependency list (T-0050) as ticket ids, kept as
    * written; null or an empty list removes the key. Blocked state itself
@@ -690,6 +678,13 @@ export function patchHeaderFields(block: string, patch: HeaderPatch, priorities:
       removeKey(doc, 'chain');
     } else {
       doc.set('chain', [...patch.chain]);
+    }
+  }
+  if (patch.at !== undefined) {
+    if (patch.at === null) {
+      removeKey(doc, 'at');
+    } else {
+      doc.set('at', patch.at);
     }
   }
   if (patch.repo !== undefined && patch.repos === undefined) {
@@ -787,22 +782,18 @@ export function patchForm(text: string, form: TicketForm | null, now: Date, acto
 }
 
 /**
- * Rewrites the ticket's `chain:` delta (concept §5.7) in a whole ticket
- * file and appends one Log line — `chain standard` when the delta goes
- * away (back to the standard flow), else `chain <n> entries`. The
- * header patch carries the canonical strings; an empty delta removes
- * the key, exactly like `patchForm`'s null.
+ * Rewrites the ticket's `chain:` (req-266) in a whole ticket file and
+ * appends one Log line `chain <the entries>`. A ticket that had no chain
+ * gets its cursor `at: 1` with it; the cursor is never moved here.
  */
-export function patchChain(text: string, chain: readonly string[] | null, now: Date, actor: string): string {
+export function patchChain(text: string, chain: readonly string[], now: Date, actor: string): string {
   const { yamlText, body, hadFence } = splitFrontmatter(text);
   if (!hadFence || yamlText === null) {
     throw new Error('ticket has no frontmatter fence');
   }
-  const normalized = chain === null || chain.length === 0 ? null : chain;
-  const block = patchHeaderFields(`---\n${yamlText}\n---`, { chain: normalized });
-  const count = chain?.length ?? 0;
-  const value = normalized === null ? 'standard' : `${count} ${count === 1 ? 'entry' : 'entries'}`;
-  return `${block}\n${appendLogLine(body, formatUtcStamp(now), actor, `chain ${value}`)}`;
+  const hasCursor = /^at:/m.test(yamlText);
+  const block = patchHeaderFields(`---\n${yamlText}\n---`, { chain, ...(hasCursor ? {} : { at: 1 }) });
+  return `${block}\n${appendLogLine(body, formatUtcStamp(now), actor, `chain ${chain.join('; ')}`)}`;
 }
 
 /**
@@ -841,6 +832,8 @@ export interface NewTicketInput {
   /** The owner's raw words behind a tidied capture (req-75 W5c); absent
    *  for a hand-typed ticket — set only when tidy-up changed the fields. */
   readonly rawCapture?: string;
+  /** The chain copied in at creation (req-266: the standard flow, or a part's own); absent/empty = none. */
+  readonly chain?: readonly string[];
 }
 
 /** The strict canonical ticket file — exactly the shapes of the spec. */
@@ -861,6 +854,7 @@ export function newTicketFileText(input: NewTicketInput): string {
     `rank: ${input.rank}`,
     `branch: ${branchForTicket(input.id)}`,
     `entered-${input.firstPhase}: '${stamp}'`,
+    ...((input.chain ?? []).length > 0 ? [`chain: [${(input.chain ?? []).join(', ')}]`, 'at: 1'] : []),
     '---',
     '',
     '## Description',

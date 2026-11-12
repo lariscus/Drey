@@ -264,24 +264,34 @@ create as a `raw capture:` Log line (ticket-schema).
   `### Goal`, `### Architecture`, `### Parts`, `### Acceptance criteria`,
   `### Open questions`. A part carries indented `persona:`, **`size: S|M|L`**
   (req-170: how demanding it is — the capacity pool maps it to class C, B
-  or A), `reason:` and optionally `chain:` lines.
+  or A), `reason:` and optionally `chain:` lines (req-266: the part's persona
+  list). The plan format also has an optional `### Chain` chapter — one line,
+  the ticket's whole persona list; when the shape turn's plan is saved
+  (`setPlan`) it becomes the ticket's `chain:` if it holds (`validateChain`).
 - **`FLOW_SYSTEM_PROMPT`** (the file `packages/tickets-engine/prompts/crew/flow.md`,
   loaded by `services/crew-prompts.ts`;
-  E10-5) — Paul drafts one ticket's or one plan part's flow. The system
-  message is the prompt plus `## Flow` (the standard flow's phase ids, the
-  flow now with each gate's persona and marks, the saved delta, the crew);
+  E10-5, re-cut by req-266) — Paul drafts one ticket's or one plan part's
+  chain. The system message is the prompt plus `## Flow` (`Standard flow:` —
+  pipeline.md's `flow:`; the chain now from the current position, one
+  `<position>. <persona>[:mode]` line each with `(tell me)` / `(current,
+  locked)`; `Saved chain:`; `Personas:` the crew as `- <id> (<title>)`, the
+  human persona marked `the owner`; `services/flow-views.ts` `flowDraftText`);
   the user message is the owner's words or "Draft the flow for this
   ticket.". The reply is the mission envelope with exactly one
   `setChain` command (`{"kind":"setChain","id":…,"chain":[…]}`) — the whole
-  delta in the chain grammar incl. `move` and `assign` — and a `say` that is
-  his reason. The desk validates it like any edit and shows it as a draft;
+  persona list in the chain grammar, an empty list = the standard flow — and
+  a `say` that is his reason. Prompt version 2: the hard-coded roster line
+  ("paul plans, ben builds …") gave way to "pick personas from the crew
+  listed below". The desk validates it like any edit and shows it as a draft;
   nothing is written.
 - **`MISSION_SYSTEM_PROMPT` and its context** (the file `packages/tickets-engine/prompts/crew/mission.md`
   via `services/crew-prompts.ts`; the context `chat-service.ts`,
   E5a; D-7a / milestone 165; req-173) — the seven intents (steer, create, promote, chain,
   blocked, session, report) and the strict `{say, thought, commands}` envelope. The system
   message is the prompt, then `## Board digest` (priority vocabulary, the columns
-  with counts, one line per **open** ticket, capped near 2 KB — the terminal column
+  with counts, req-266's `standard flow: <entries>` line when pipeline.md has
+  `flow:`, one line per **open** ticket — with ` · chain: <entries> (at <n>)`
+  when the ticket carries a chain —, capped near 2 KB — the terminal column
   is never listed, and the digest says so in one line), then — D-7a — `## Tickets
   the owner named`: every ticket id the owner typed in this message (`T-0091`,
   `t-91`, `#91`; else in the last three owner messages, so a follow-up keeps its
@@ -409,8 +419,11 @@ part).
   shape `acceptanceCommands` runs; Open questions), pulled in by
   `plan-default`, `plan-interactive-default`, `build-default` (for a ticket
   that reaches the build without a plan) and the crew's shape prompt;
-  `chain-grammar.md` — the five chain verbs (`insert`, `skip`, `notify`,
-  `move`, `assign`) for the mission and flow prompts. A placeholder expands
+  `chain-grammar.md` (version 2, req-266) — the chain as the ordered
+  persona list: `<persona>`, `<persona>:shape`, `<persona>(notify)`, the
+  positions up to the current one (`at`) locked, the example
+  `["paul:shape", "paul", "ben", "ralf", "tessa", "you"]` — for the
+  mission and flow prompts; `plan-format.md` (version 2) gained `### Chain`. A placeholder expands
   whatever the prompt's source (column template, vault copy, persona
   prompt — also in a 1:1 and a free session's brief); vault copies keep it.
 - **Versions:** every discipline, fragment and crew prompt carries a
@@ -429,7 +442,8 @@ part).
 - **The crew prompts:** mission lists every command with its fields and an
   example (`createTicket` title, phase, priority, description?;
   `transition` id, from, to; `setPriority` id, priority; `promote` id;
-  `setChain` id, chain; `setBlockedBy` id, blockedBy; `startSession`
+  `setChain` id, chain — the whole persona list, empty = the standard flow
+  (req-266, mission.md version 3); `setBlockedBy` id, blockedBy; `startSession`
   persona, directory, poolClass, brief) and pulls the chain grammar; shape
   pulls the plan format and says a reply with `read` is only a request (its
   other fields are set aside, `chat-llm.ts`); the aggregator gets the

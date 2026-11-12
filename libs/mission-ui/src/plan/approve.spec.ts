@@ -27,8 +27,8 @@ const card = (index: number, extra: Partial<McPartCard> = {}): McPartCard => ({
   persona: null,
   chain: [],
   flow: [
-    { phase: 'build', title: 'Build', persona: 'ben', inserted: false, skipped: false, notify: false },
-    { phase: 'commit', title: 'Commit', persona: null, inserted: false, skipped: false, notify: false },
+    { position: 1, persona: 'ben', title: 'Ben', notify: false },
+    { position: 2, persona: 'you', title: 'You', notify: false },
   ],
   ticket: null,
   state: 'new',
@@ -83,8 +83,8 @@ describe('reading the parts answer', () => {
           ticket: 'T-0131',
           locked: true,
           start: 'Released as T-0131',
-          flow: [{ phase: 'build', title: 'Build', persona: 'ben', inserted: false, skipped: false, notify: true }, 7],
-          chain: ['notify build', 4],
+          flow: [{ position: 1, persona: 'ben', title: 'Ben', notify: true }, 7],
+          chain: ['ben(notify)', 4],
         },
         { index: 1, title: 'Tidy', state: 'bogus' },
         { title: 'no index' },
@@ -95,7 +95,7 @@ describe('reading the parts answer', () => {
       ['Tidy', 'new', false, null],
     ]);
     expect(read?.parts[0]!.flow).toHaveLength(1);
-    expect(read?.parts[0]!.chain).toEqual(['notify build']);
+    expect(read?.parts[0]!.chain).toEqual(['ben(notify)']);
     expect(read?.personas.map((p) => p.id)).toEqual(['ben']);
     expect(read?.warnings).toEqual(['x']);
   });
@@ -125,24 +125,19 @@ describe('the card helpers', () => {
   });
 
   it('writes the flow row and its note', () => {
-    const a = approval([card(0), card(1, { chain: ['skip commit', 'notify build'] })]);
-    expect(flowSegmentsOf(a.parts[0]!, a).map((s) => s.text)).toEqual(['Build · Ben', 'Commit']);
-    const withDelta = card(1, {
-      chain: ['skip commit', 'notify build'],
+    const a = approval([card(0), card(1, { chain: ['ben(notify)', 'ralf', 'you'] })]);
+    expect(flowSegmentsOf(a.parts[0]!, a).map((s) => s.text)).toEqual(['Ben', 'You']);
+    const own = card(1, {
+      chain: ['ben(notify)', 'ralf', 'you'],
       flow: [
-        { phase: 'build', title: 'Build', persona: 'ben', inserted: false, skipped: false, notify: true },
-        { phase: 'security', title: 'Security', persona: 'ralf', inserted: true, skipped: false, notify: false },
-        { phase: 'commit', title: 'Commit', persona: null, inserted: false, skipped: true, notify: false },
+        { position: 1, persona: 'ben', title: 'Ben', notify: true },
+        { position: 2, persona: 'ralf', title: 'Ralf', notify: false },
+        { position: 3, persona: 'you', title: 'You', notify: false },
       ],
     });
-    expect(flowSegmentsOf(withDelta, a)).toEqual([
-      { text: 'Build · Ben (tell me)', inserted: false, skipped: false },
-      { text: 'Security · Ralf', inserted: true, skipped: false },
-      { text: 'Commit', inserted: false, skipped: true },
-    ]);
+    expect(flowSegmentsOf(own, a)).toEqual([{ text: 'Ben (tell me)' }, { text: 'Ralf' }, { text: 'You' }]);
     expect(flowNoteOf(a.parts[0]!)).toBe('standard');
-    expect(flowNoteOf(withDelta)).toBe('standard + 2 changes');
-    expect(flowNoteOf(card(0, { chain: ['skip commit'] }))).toBe('standard + 1 change');
+    expect(flowNoteOf(own)).toBe('edited');
   });
 
   it('says what lets the next part start; the last part has no gate line', () => {
@@ -266,8 +261,8 @@ describe('PlanApprove', () => {
     expect(body).toContain('Part title 1');
     expect(body).toContain('Part title 3');
     expect(body).toContain('small and isolated');
-    expect(el.querySelector('.pa-flow')?.textContent).toContain('Build · Ben');
-    expect(el.querySelector('.pa-flow')?.textContent).toContain('Commit');
+    expect(el.querySelector('.pa-flow')?.textContent).toContain('Ben');
+    expect(el.querySelector('.pa-flow')?.textContent).toContain('You');
     expect(el.querySelector('.pa-flow-note')?.textContent).toBe('standard');
     expect(body).toContain('Change flow ›');
     expect(body).toContain('Runs now');

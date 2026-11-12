@@ -501,19 +501,15 @@
 <!-- The proposal cards' rich body, shared by the pending, done and dismissed faces. -->
 <ng-template #richBody let-proposal>
   @if (chainCompareFor(proposal); as compare) {
-    <div class="chain-compare" aria-label="The gate chain before and after">
+    <div class="chain-compare" aria-label="The chain before and after">
       <div class="cmp-label">Before</div>
       <div class="chainline">
         @for (step of compare.before; track $index) {
           <span
             class="gate"
             [class.past]="step.state === 'past'"
-            [class.now]="step.state === 'current'"
-            [class.new]="step.inserted">
-            @if (step.inserted) {
-              <span class="gadd" aria-hidden="true">+</span>
-            }
-            <span [class.struck]="step.skipped">{{ step.title }}</span>
+            [class.now]="step.state === 'current'">
+            <span>{{ step.title }}</span>
             @if (step.notify) {
               <span class="gnote" aria-hidden="true" title="notifies on completion">◎</span>
             }
@@ -529,12 +525,8 @@
           <span
             class="gate"
             [class.past]="step.state === 'past'"
-            [class.now]="step.state === 'current'"
-            [class.new]="step.inserted">
-            @if (step.inserted) {
-              <span class="gadd" aria-hidden="true">+</span>
-            }
-            <span [class.struck]="step.skipped">{{ step.title }}</span>
+            [class.now]="step.state === 'current'">
+            <span>{{ step.title }}</span>
             @if (step.notify) {
               <span class="gnote" aria-hidden="true" title="notifies on completion">◎</span>
             }

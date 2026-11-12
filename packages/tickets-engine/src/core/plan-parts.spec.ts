@@ -15,7 +15,7 @@ const B: PlanPart = {
   done: true,
   persona: 'ben',
   reason: null,
-  chain: ['insert security(ralf, notify) after review', 'skip qa'],
+  chain: ['ben', 'ralf(notify)', 'you'],
 };
 const C: PlanPart = { title: 'Changelog and manual', done: false, persona: null, reason: null, chain: [] };
 
@@ -53,7 +53,7 @@ describe('renderPlanParts / parsePlanParts', () => {
         '  reason: pure logic first',
         '- [x] Hunk rows in the panel',
         '  persona: ben',
-        '  chain: insert security(ralf, notify) after review; skip qa',
+        '  chain: ben; ralf(notify); you',
         '- [ ] Changelog and manual',
         '',
       ].join('\n'),
@@ -68,7 +68,7 @@ describe('renderPlanParts / parsePlanParts', () => {
     expect(parsePlanParts('## Notes\n\n### Parts\n\n- [ ] x\n').parts).toEqual([]);
   });
 
-  it('forgives: unreadable lines, unknown details, bad persona and chain entries warn and drop', () => {
+  it('forgives: unreadable lines, unknown details, a bad persona and a chain with an unreadable entry warn and drop', () => {
     const text = [
       '## Plan',
       '',
@@ -78,21 +78,21 @@ describe('renderPlanParts / parsePlanParts', () => {
       '- [ ] First',
       '  persona: Not A Persona',
       '  mood: cheerful',
-      '  chain: skip qa; frobnicate everything',
+      '  chain: ben; frobnicate everything',
       '- [ ] Second',
       '  reason:',
       '',
     ].join('\n');
     const parsed = parsePlanParts(text);
     expect(parsed.parts).toEqual([
-      { title: 'First', done: false, persona: null, reason: null, chain: ['skip qa'] },
+      { title: 'First', done: false, persona: null, reason: null, chain: [] },
       { title: 'Second', done: false, persona: null, reason: null, chain: [] },
     ]);
     expect(parsed.warnings).toEqual([
       'parts line "stray prose" is not readable — expected "- [ ] <title>"',
       'part "First": persona "Not A Persona" is not a persona id',
       'part "First": unknown detail "mood"',
-      'part "First": chain entry "frobnicate everything" is not readable',
+      'part "First": chain entry "frobnicate everything" is not readable — the part takes the standard flow',
     ]);
   });
 
@@ -102,7 +102,11 @@ describe('renderPlanParts / parsePlanParts', () => {
   });
 
   it('exposes a part’s chain as parsed entries', () => {
-    expect(partChainEntries(B).map((e) => e.kind)).toEqual(['insert', 'skip']);
+    expect(partChainEntries(B)).toEqual([
+      { persona: 'ben', mode: null, notify: false },
+      { persona: 'ralf', mode: null, notify: true },
+      { persona: 'you', mode: null, notify: false },
+    ]);
   });
 });
 

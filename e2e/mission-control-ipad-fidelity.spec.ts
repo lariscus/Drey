@@ -120,7 +120,7 @@ test.describe('landscape', () => {
     await page.locator('mc-flow-editor #pd-flow-ask').fill('Add a security pass for the command parser');
     await page.locator('mc-flow-editor').getByRole('button', { name: 'Send' }).click();
     await expect(page.locator('mc-flow-editor .pd-fpaul')).toBeVisible();
-    await page.locator('mc-flow-editor .pd-fgate', { hasText: 'Security' }).click();
+    await page.locator('mc-flow-editor .pd-fgate.draft').first().click();
     await expect(page.locator('mc-flow-editor .pd-fcard')).toBeVisible();
     await shot(page, 'PadFlow');
   });

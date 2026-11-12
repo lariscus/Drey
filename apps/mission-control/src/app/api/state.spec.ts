@@ -2125,8 +2125,7 @@ describe('McState shape mode (E10-3)', () => {
       scope: { kind: 'ticket' },
       chain: [],
       saved: [],
-      steps: [{ index: 2, phase: 'review', title: 'Review', state: 'future', persona: 'ralf' }],
-      phases: [{ id: 'review', title: 'Review' }],
+      steps: [{ index: 2, position: 3, persona: 'ralf', title: 'Ralf', state: 'future' }],
       personas: [{ id: 'ralf', title: 'Ralf', color: '#a6a', model: 'opus' }],
       readOnly: null,
     };
@@ -2137,7 +2136,7 @@ describe('McState shape mode (E10-3)', () => {
       desk.on('GET', '/api/tickets/T-0130/flow/1', () => ({ ...FLOW, scope: { kind: 'part', index: 1, title: 'B' } }));
       const state = makeState(desk);
       await state.openFlow('T-0130', null);
-      expect(state.flow()?.steps.map((s) => s.phase)).toEqual(['review']);
+      expect(state.flow()?.steps.map((s) => s.persona)).toEqual(['ralf']);
       expect(state.flowSaved()).toBe(state.flow());
       await state.openFlow('T-0130', 1);
       expect(state.flow()?.scope).toEqual({ kind: 'part', index: 1, title: 'B' });
@@ -2152,18 +2151,18 @@ describe('McState shape mode (E10-3)', () => {
 
     it('posts an edit with the draft chain and the part, and takes the desk’s next draft', async () => {
       const { desk } = makeDesk();
-      desk.on('GET', '/api/tickets/T-0130/flow/1', () => ({ ...FLOW, scope: { kind: 'part', index: 1, title: 'B' }, chain: ['skip verify'], saved: ['skip verify'] }));
+      desk.on('GET', '/api/tickets/T-0130/flow/1', () => ({ ...FLOW, scope: { kind: 'part', index: 1, title: 'B' }, chain: ['ben', 'ralf'], saved: ['ben', 'ralf'] }));
       const state = makeState(desk);
       await state.openFlow('T-0130', 1);
-      desk.on('POST', '/api/tickets/T-0130/flow-edit', () => ({ ...FLOW, chain: ['skip verify', 'notify review'], saved: ['skip verify'] }));
+      desk.on('POST', '/api/tickets/T-0130/flow-edit', () => ({ ...FLOW, chain: ['ben', 'ralf(notify)'], saved: ['ben', 'ralf'] }));
       expect(await state.editFlow({ op: 'notify', step: 2, on: true })).toEqual({ ok: true });
-      expect(desk.callsOf('POST', '/api/tickets/T-0130/flow-edit')[0]!.body).toEqual({ part: 1, chain: ['skip verify'], edit: { op: 'notify', step: 2, on: true } });
-      expect(state.flow()?.chain).toEqual(['skip verify', 'notify review']);
-      expect(state.flowSaved()?.chain).toEqual(['skip verify']);
+      expect(desk.callsOf('POST', '/api/tickets/T-0130/flow-edit')[0]!.body).toEqual({ part: 1, chain: ['ben', 'ralf'], edit: { op: 'notify', step: 2, on: true } });
+      expect(state.flow()?.chain).toEqual(['ben', 'ralf(notify)']);
+      expect(state.flowSaved()?.chain).toEqual(['ben', 'ralf']);
 
       desk.on('POST', '/api/tickets/T-0130/flow-edit', () => ({ ok: false, error: 'Review is done' }));
       expect(await state.editFlow({ op: 'remove', step: 2 })).toEqual({ ok: false, error: 'Review is done' });
-      expect(state.flow()?.chain).toEqual(['skip verify', 'notify review']);
+      expect(state.flow()?.chain).toEqual(['ben', 'ralf(notify)']);
     });
 
     it('takes Paul’s draft as the working draft and undoes it; a hand edit makes it the owner’s', async () => {
@@ -2171,10 +2170,10 @@ describe('McState shape mode (E10-3)', () => {
       desk.on('GET', '/api/tickets/T-0130/flow', () => FLOW);
       const state = makeState(desk);
       await state.openFlow('T-0130', null);
-      desk.on('POST', '/api/tickets/T-0130/flow-draft', () => ({ ...FLOW, chain: ['insert security(ralf, notify) after review'], reason: 'Auth change.' }));
+      desk.on('POST', '/api/tickets/T-0130/flow-draft', () => ({ ...FLOW, chain: ['ben', 'ralf(notify)'], reason: 'Auth change.' }));
       expect(await state.draftFlow('add a security pass')).toEqual({ ok: true });
       expect(desk.callsOf('POST', '/api/tickets/T-0130/flow-draft')[0]!.body).toEqual({ part: null, ask: 'add a security pass' });
-      expect(state.flow()?.chain).toEqual(['insert security(ralf, notify) after review']);
+      expect(state.flow()?.chain).toEqual(['ben', 'ralf(notify)']);
       expect(state.flowReason()).toBe('Auth change.');
 
       state.undoFlowDraft();
@@ -2182,8 +2181,8 @@ describe('McState shape mode (E10-3)', () => {
       expect(state.flowReason()).toBeNull();
 
       await state.draftFlow(null);
-      desk.on('POST', '/api/tickets/T-0130/flow-edit', () => ({ ...FLOW, chain: ['insert security after review'] }));
-      await state.editFlow({ op: 'persona', step: 3, persona: null });
+      desk.on('POST', '/api/tickets/T-0130/flow-edit', () => ({ ...FLOW, chain: ['ben', 'ralf'] }));
+      await state.editFlow({ op: 'persona', step: 3, persona: 'tessa' });
       expect(state.flowReason()).toBeNull();
 
       desk.on('POST', '/api/tickets/T-0130/flow-draft', () => ({ ok: false, error: 'Mission Control is not set up yet.' }));
@@ -2192,7 +2191,7 @@ describe('McState shape mode (E10-3)', () => {
 
     it('saves the draft, closes, toasts and refreshes what lies under it; a refusal keeps it open', async () => {
       const { desk } = makeDesk();
-      desk.on('GET', '/api/tickets/T-0130/flow/0', () => ({ ...FLOW, scope: { kind: 'part', index: 0, title: 'A' }, chain: ['skip verify'] }));
+      desk.on('GET', '/api/tickets/T-0130/flow/0', () => ({ ...FLOW, scope: { kind: 'part', index: 0, title: 'A' }, chain: ['ben', 'ralf'] }));
       desk.on('GET', '/api/tickets/T-0130/parts', () => ({ ok: true, ticket: 'T-0130', title: 't', gate: 'build', defaultPersona: null, warnings: [], personas: [], parts: [] }));
       const state = makeState(desk);
       await state.openApproval('T-0130');
@@ -2205,7 +2204,7 @@ describe('McState shape mode (E10-3)', () => {
       desk.on('POST', '/api/tickets/T-0130/flow-save', () => ({ ok: true }));
       const before = desk.callsOf('GET', '/api/tickets/T-0130/parts').length;
       expect(await state.saveFlow()).toEqual({ ok: true });
-      expect(desk.callsOf('POST', '/api/tickets/T-0130/flow-save').at(-1)!.body).toEqual({ part: 0, chain: ['skip verify'] });
+      expect(desk.callsOf('POST', '/api/tickets/T-0130/flow-save').at(-1)!.body).toEqual({ part: 0, chain: ['ben', 'ralf'] });
       expect(state.flowTarget()).toBeNull();
       expect(state.toastMessage()?.message).toBe('Flow saved');
       await waitFor(() => expect(desk.callsOf('GET', '/api/tickets/T-0130/parts').length).toBe(before + 1));

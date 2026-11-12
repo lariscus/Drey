@@ -11,7 +11,6 @@ const STEPS = [
   { title: 'Build', state: 'current' as const },
   { title: 'Review', state: 'future' as const },
   { title: 'Test', state: 'future' as const },
-  { title: 'Skipped', state: 'future' as const, skipped: true },
 ];
 
 describe('the flow row (board 10d)', () => {

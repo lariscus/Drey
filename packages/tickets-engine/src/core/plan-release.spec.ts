@@ -90,6 +90,7 @@ describe('the part ticket', () => {
     phase: 'build',
     now: new Date('2026-11-04T10:00:00Z'),
     actor: 'owner@desk',
+    standard: [] as string[],
   };
 
   it('describes the part, its reason and where the plan lives', () => {
@@ -102,20 +103,26 @@ describe('the part ticket', () => {
   it('carries parent, persona, chain and blocked-by in a file the reader accepts', () => {
     const file = partTicketText({
       ...base,
-      part: part('Dictation hand-off', { persona: 'ben', chain: ['insert security(ralf, notify) after build'] }),
+      part: part('Dictation hand-off', { persona: 'ben', chain: ['ben', 'ralf(notify)', 'you'] }),
       blockedBy: 'T-0141',
     });
     const parsed = parseTicketFile(file, 'tickets/30-build/T-0142.md');
     expect(parsed.meta.parent).toBe('T-0130');
     expect(parsed.meta.persona).toBe('ben');
     expect(parsed.meta.blockedBy).toEqual(['T-0141']);
-    expect(parsed.meta.chain?.length).toBe(1);
+    expect(parsed.meta.chain?.map((e) => e.persona)).toEqual(['ben', 'ralf', 'you']);
+    expect(parsed.meta.at).toBe(1);
     expect(parsed.meta.title).toBe('Dictation hand-off');
     expect(parsed.meta.repo).toBe('drey');
     expect(parsed.issues).toEqual([]);
     expect(file).toContain('created in inbox');
     expect(file).toContain('inbox -> build');
     expect(file).toMatch(/entered-build: '2026-11-04T10:00:00Z'/);
+  });
+
+  it('gives a part without a chain the standard flow', () => {
+    const file = partTicketText({ ...base, index: 0, part: part('First'), blockedBy: null, standard: ['paul', 'ben', 'you'] });
+    expect(parseTicketFile(file, 'tickets/30-build/T-0142.md').meta.chain?.map((e) => e.persona)).toEqual(['paul', 'ben', 'you']);
   });
 
   it('writes no persona, chain or blocker a part does not have', () => {
