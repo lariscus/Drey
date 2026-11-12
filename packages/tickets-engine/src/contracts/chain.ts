@@ -44,5 +44,16 @@ export interface ChainSendBack {
   readonly to: number;
 }
 
+/**
+ * A ticket's three chain fields (`TicketMeta` carries them): `chain:` / `x-chain`,
+ * the cursor `at:` / `x-at` (1-based, absent = 1 — nothing advances it before
+ * req-257) and `sent-back:` / `x-sent-back`. Absent chain = none, or it did not parse.
+ */
+export interface TicketChainFields {
+  readonly chain?: readonly ChainEntry[];
+  readonly at?: number;
+  readonly sentBack?: ChainSendBack;
+}
+
 /** At most this many entries — `x-chain` is one size-capped line on the store. */
 export const MAX_CHAIN_ENTRIES = 24;

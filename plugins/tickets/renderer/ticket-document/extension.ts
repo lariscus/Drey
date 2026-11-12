@@ -210,11 +210,10 @@ export function createTicketDocumentExtension(deps: TicketDocumentDeps): TicketD
       const chain =
         card === null
           ? []
-          : chainOf({ pipeline: snapshot.pipeline, currentPhaseId: card.phase, card, personas: [] }).map((step) => ({
+          : chainOf({ pipeline: snapshot.pipeline, currentPhaseId: card.phase, card, personas: [], flow: snapshot.flow }).map((step) => ({
               id: step.phase,
               title: step.title,
               checkpoint: step.checkpoint,
-              skipped: step.skipped,
             }));
       // The cost by phase starts with the work (7j); before it (9a, 7b, 7c) the card says the cost.
       const cost = costTableOfText(deps.api.i18n, text, phaseTitle, chain);
@@ -237,7 +236,7 @@ export function createTicketDocumentExtension(deps: TicketDocumentDeps): TicketD
                 i18n: deps.api.i18n,
                 icon: (name, size) => deps.api.ui.icon(name, size),
                 decide,
-                flowSteps: chain.filter((step) => !step.checkpoint && !step.skipped).map((step) => step.title),
+                flowSteps: chain.filter((step) => !step.checkpoint).map((step) => step.title),
                 edit: (edit) => {
                   void parts.edit(id, edit).then((refused) => {
                     if (refused !== null) {

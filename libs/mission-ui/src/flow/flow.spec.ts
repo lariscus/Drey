@@ -4,7 +4,7 @@ import { parseFlow, type McFlow, type McFlowStep } from '../api/dto';
 import { FlowEditor } from './flow';
 import {
   MC_FLOW_STATE,
-  addablePhasesOf,
+  addablePersonasOf,
   changedIndicesOf,
   changesLabelOf,
   eyebrowOf,
@@ -18,44 +18,35 @@ import {
   type McFlowState,
 } from './flow.model';
 
-const step = (index: number, phase: string, extra: Partial<McFlowStep> = {}): McFlowStep => ({
+const step = (index: number, persona: string, extra: Partial<McFlowStep> = {}): McFlowStep => ({
   index,
-  phase,
-  title: phase.charAt(0).toUpperCase() + phase.slice(1),
+  position: index + 1,
+  persona,
+  title: persona.charAt(0).toUpperCase() + persona.slice(1),
+  mode: null,
   state: 'future',
-  inserted: false,
-  skipped: false,
-  moved: false,
   notify: false,
-  persona: null,
-  pinned: false,
   model: null,
   owner: false,
+  missing: false,
   locked: false,
   ...extra,
 });
 
 const BASE_STEPS: McFlowStep[] = [
-  step(1, 'build', { state: 'current', persona: 'ben', model: 'sonnet', locked: true }),
-  step(2, 'review', { persona: 'ralf', model: 'opus' }),
-  step(3, 'verify', { persona: 'tessa', model: 'sonnet' }),
-  step(4, 'approve', { owner: true }),
+  step(0, 'ben', { state: 'current', model: 'sonnet', locked: true }),
+  step(1, 'ralf', { model: 'opus' }),
+  step(2, 'tessa', { model: 'sonnet' }),
+  step(3, 'you', { owner: true, title: 'You' }),
 ];
 
 const flow = (extra: Partial<McFlow> = {}): McFlow => ({
   ticket: 'T-0130',
   title: 'Voice capture for tickets',
   scope: { kind: 'ticket' },
-  chain: [],
-  saved: [],
+  chain: ['ben', 'ralf', 'tessa', 'you'],
+  saved: ['ben', 'ralf', 'tessa', 'you'],
   steps: BASE_STEPS,
-  phases: [
-    { id: 'build', title: 'Build' },
-    { id: 'review', title: 'Review' },
-    { id: 'verify', title: 'Verify' },
-    { id: 'approve', title: 'Approve' },
-    { id: 'security', title: 'Security' },
-  ],
   personas: [
     { id: 'ben', kind: 'agent', title: 'Ben', color: '#6aa', model: 'sonnet' },
     { id: 'ralf', kind: 'agent', title: 'Ralf', color: '#a6a', model: 'opus' },
@@ -74,19 +65,17 @@ describe('parseFlow', () => {
       ticket: 'T-0130',
       title: 'x',
       scope: { kind: 'part', index: 1, title: 'Dictation' },
-      chain: ['skip verify', 7],
+      chain: ['ben', 'tessa(notify)', 7],
       saved: [],
-      steps: [{ index: 2, phase: 'verify', title: 'Verify', state: 'future', skipped: true, persona: 'tessa', pinned: true }, { phase: 'broken' }],
-      phases: [{ id: 'build', title: 'Build' }, {}],
+      steps: [{ index: 2, position: 3, persona: 'tessa', title: 'Tessa', mode: 'shape', state: 'future', notify: true, missing: true }, { persona: 'broken' }],
       personas: [{ id: 'ben', title: 'Ben', color: '#fff', model: 'sonnet' }],
       readOnly: null,
       reason: 'because',
     })!;
     expect(read.scope).toEqual({ kind: 'part', index: 1, title: 'Dictation' });
-    expect(read.chain).toEqual(['skip verify']);
+    expect(read.chain).toEqual(['ben', 'tessa(notify)']);
     expect(read.steps).toHaveLength(1);
-    expect(read.steps[0]).toMatchObject({ phase: 'verify', skipped: true, pinned: true, persona: 'tessa', inserted: false, locked: false });
-    expect(read.phases).toEqual([{ id: 'build', title: 'Build' }]);
+    expect(read.steps[0]).toMatchObject({ index: 2, position: 3, persona: 'tessa', mode: 'shape', notify: true, missing: true, owner: false, locked: false });
     expect(read.reason).toBe('because');
     expect(parseFlow({ ok: false, error: 'no' })).toBeNull();
     expect(parseFlow(null)).toBeNull();
@@ -95,56 +84,50 @@ describe('parseFlow', () => {
 
 describe('the helpers', () => {
   it('words the chip and the eyebrow', () => {
-    expect(changesLabelOf([])).toBe('Standard flow');
-    expect(changesLabelOf(['skip verify'])).toBe('Standard flow + 1 change');
-    expect(changesLabelOf(['skip verify', 'notify build'])).toBe('Standard flow + 2 changes');
+    expect(changesLabelOf(['ben'])).toBe('1 step');
+    expect(changesLabelOf(['ben', 'you'])).toBe('2 steps');
     expect(eyebrowOf(flow())).toBe('Flow');
     expect(eyebrowOf(flow({ scope: { kind: 'part', index: 1, title: 'x' } }))).toBe('Flow · Part 2');
   });
 
   it('says whether the draft differs from what is saved', () => {
     expect(isDirty(flow(), flow())).toBe(false);
-    expect(isDirty(flow({ chain: ['skip verify'] }), flow())).toBe(true);
+    expect(isDirty(flow({ chain: ['ben', 'you'] }), flow())).toBe(true);
     expect(isDirty(null, flow())).toBe(false);
   });
 
-  it('marks only the changed gates as dashed: an added gate, a moved one, a new mark', () => {
+  it('marks only the changed positions as dashed: an added one, a swapped persona, a new mark', () => {
     const saved = flow();
-    const added = flow({ steps: [...BASE_STEPS.slice(0, 2), step(3, 'security', { inserted: true }), step(4, 'verify', { persona: 'tessa', model: 'sonnet' }), step(5, 'approve', { owner: true })] });
-    expect([...changedIndicesOf(added, saved)]).toEqual([3]);
-    const moved = flow({ steps: [BASE_STEPS[0]!, BASE_STEPS[2]!, { ...BASE_STEPS[1]!, index: 3 }, { ...BASE_STEPS[1]!, index: 4 }].slice(0, 3).map((s, i) => ({ ...s, index: i + 1, moved: s.phase === 'verify' })) });
-    expect([...changedIndicesOf(moved, saved)]).toEqual([2]);
+    const added = flow({ steps: [...BASE_STEPS, step(4, 'ralf')] });
+    expect([...changedIndicesOf(added, saved)]).toEqual([4]);
+    const swapped = flow({ steps: BASE_STEPS.map((s) => (s.index === 2 ? { ...s, persona: 'ralf' } : s)) });
+    expect([...changedIndicesOf(swapped, saved)]).toEqual([2]);
+    const notified = flow({ steps: BASE_STEPS.map((s) => (s.index === 1 ? { ...s, notify: true } : s)) });
+    expect([...changedIndicesOf(notified, saved)]).toEqual([1]);
     expect(changedIndicesOf(saved, null).size).toBe(0);
   });
 
-  it('names who works a gate and lists a gate’s marks', () => {
+  it('names who works a position and lists its marks', () => {
     const f = flow();
     expect(whoOf(BASE_STEPS[1]!, f)).toBe('Ralf');
     expect(whoOf(BASE_STEPS[3]!, f)).toBe('you');
-    expect(whoOf(step(9, 'x'), f)).toBe('automatic');
-    expect(marksOf(step(1, 'a', { inserted: true, moved: true, skipped: true, notify: true }))).toEqual(['added', 'moved', 'struck', 'tell me']);
+    expect(whoOf(step(9, 'ghost', { missing: true, title: 'ghost' }), f)).toBe('ghost');
+    expect(marksOf(step(1, 'a', { mode: 'shape', notify: true }))).toEqual(['shape', 'tell me']);
+    expect(marksOf(step(1, 'a'))).toEqual([]);
   });
 
-  it('finds what a gate runs after and where it may move', () => {
+  it('finds what a position runs after and where it may move', () => {
     const f = flow();
-    expect(runsAfterOf(f, BASE_STEPS[2]!)?.phase).toBe('review');
+    expect(runsAfterOf(f, BASE_STEPS[2]!)?.persona).toBe('ralf');
     expect(runsAfterOf(f, BASE_STEPS[0]!)).toBeNull();
     expect(moveRoomOf(f, BASE_STEPS[0]!)).toEqual({ earlier: false, later: false });
-    expect(moveRoomOf(f, BASE_STEPS[1]!)).toEqual({ earlier: false, later: true }); // behind the running gate
+    expect(moveRoomOf(f, BASE_STEPS[1]!)).toEqual({ earlier: false, later: true }); // behind the running position
     expect(moveRoomOf(f, BASE_STEPS[2]!)).toEqual({ earlier: true, later: true });
     expect(moveRoomOf(f, BASE_STEPS[3]!)).toEqual({ earlier: true, later: false });
   });
 
-  it('offers the phases that are not added or struck yet', () => {
-    const f = flow({ steps: [...BASE_STEPS, step(5, 'security', { inserted: true }), { ...step(6, 'verify'), skipped: true }] });
-    expect(addablePhasesOf(f).map((p) => p.id)).toEqual(['review', 'approve']);
-  });
-
-  it('always offers the manual step, once (E10-6)', () => {
-    const phases = [...flow().phases, { id: 'manual', title: 'Manual step' }];
-    expect(addablePhasesOf(flow({ phases })).map((p) => p.id)).toContain('manual');
-    const used = flow({ phases, steps: [...BASE_STEPS, step(5, 'manual', { inserted: true })] });
-    expect(addablePhasesOf(used).map((p) => p.id)).not.toContain('manual');
+  it('offers the whole crew to add', () => {
+    expect(addablePersonasOf(flow()).map((p) => p.id)).toEqual(['ben', 'ralf', 'tessa', 'you']);
   });
 });
 
@@ -191,74 +174,66 @@ function mount(
 }
 
 describe('FlowEditor', () => {
-  it('offers only the human persona on a manual step and shows no model for the owner (E10-6)', () => {
-    const steps = [...BASE_STEPS, step(5, 'manual', { title: 'Manual step', inserted: true, persona: 'you', pinned: true, owner: true })];
-    const { el, click } = mount(flow({ steps }));
-    click('.fe-gate', 4);
+  it('shows no model for the owner and lists the whole crew for any position', () => {
+    const { el, click } = mount(flow());
+    click('.fe-gate', 3);
     const panel = text(el.querySelector('.fe-inspector') as HTMLElement);
-    expect(panel).toContain('Manual step');
     expect(panel).toContain('You');
-    expect(panel).not.toContain('Ben');
-    expect(panel).not.toContain('Ralf');
     expect(panel).not.toContain('Model');
-    // an agent gate still lists everyone, the human included
     click('.fe-gate', 2);
     const agent = text(el.querySelector('.fe-inspector') as HTMLElement);
     expect(agent).toContain('Ralf');
     expect(agent).toContain('You');
+    expect(agent).not.toContain('Pipeline default');
   });
 
-  it('shows the gates with who works them, the running one marked, and the standard chip', () => {
+  it('shows the positions with who works them, the running one marked, and the step chip', () => {
     const { el } = mount(flow());
     const body = text(el);
     expect(body).toContain('Voice capture for tickets');
     expect(el.querySelectorAll('.fe-gate')).toHaveLength(4);
-    expect(body).toContain('Build');
     expect(body).toContain('Ben · sonnet');
     expect(body).toContain('current');
     expect(body).toContain('you');
-    expect(el.querySelector('.fe-chip')?.textContent).toContain('Standard flow');
+    expect(el.querySelector('.fe-chip')?.textContent).toContain('4 steps');
     expect(el.querySelectorAll('.fe-plus')).toHaveLength(4);
     expect(text(el).toLowerCase()).not.toMatch(/overlap|touches|routing/);
   });
 
-  it('titles a part’s flow and draws a changed gate dashed with the change count', () => {
+  it('titles a part flow and draws a changed position dashed', () => {
     const draft = flow({
       scope: { kind: 'part', index: 1, title: 'Dictation hand-off' },
-      chain: ['insert security after review'],
-      steps: [...BASE_STEPS.slice(0, 2), step(3, 'security', { inserted: true }), ...BASE_STEPS.slice(2).map((s, i) => ({ ...s, index: 4 + i }))],
+      chain: ['ben', 'ralf', 'tessa(notify)', 'you'],
+      steps: BASE_STEPS.map((s) => (s.index === 2 ? { ...s, notify: true } : s)),
     });
     const { el } = mount(draft, { saved: flow({ scope: draft.scope }) });
     expect(text(el)).toContain('Flow · Part 2');
     expect(text(el)).toContain('Dictation hand-off');
-    expect(el.querySelector('.fe-chip')?.textContent).toContain('Standard flow + 1 change');
     const dashed = el.querySelectorAll('.fe-gate.dashed');
     expect(dashed).toHaveLength(1);
-    expect(dashed[0]!.textContent).toContain('Security');
-    expect(dashed[0]!.textContent).toContain('added');
+    expect(dashed[0]!.textContent).toContain('Tessa');
+    expect(dashed[0]!.textContent).toContain('tell me');
   });
 
-  it('opens the inspector for a gate: who, model, tell me, runs after, move, add, remove', () => {
+  it('opens the inspector for a position: who, model, tell me, runs after, move, add, remove', () => {
     const { el, click } = mount(flow());
     click('.fe-gate', 2);
     const panel = text(el.querySelector('.fe-inspector') as HTMLElement);
-    expect(panel).toContain('Verify');
-    expect(panel).toContain('Pipeline default');
+    expect(panel).toContain('Tessa');
     expect(panel).toContain('Ralf');
     expect(panel).toContain('sonnet');
     expect(panel).toContain('Tell me when it is done');
     expect(panel).toContain('Runs after');
-    expect(panel).toContain('Review');
     expect(panel).toContain('↑ Earlier');
     expect(panel).toContain('↓ Later');
-    expect(panel).toContain('Add a gate after');
+    expect(panel).toContain('Add a persona after');
     expect(panel).toContain('Remove gate');
   });
 
-  it('turns taps into edits on the gate’s index', async () => {
+  it('turns taps into edits on the position index', async () => {
     const { el, ops, click, settle } = mount(flow());
-    click('.fe-gate', 2); // verify, index 3
-    click('.fe-inspector .fe-chips .chip', 3); // ralf? pipeline default, ben, ralf, tessa -> index 3 = tessa
+    click('.fe-gate', 2); // tessa, index 2
+    click('.fe-inspector .fe-chips .chip', 1); // ben, ralf, tessa, you -> ralf
     await settle();
     click('.fe-switch');
     await settle();
@@ -267,32 +242,29 @@ describe('FlowEditor', () => {
     click('.fe-actions .fe-btn', 1); // later
     await settle();
     expect(ops).toEqual([
-      { op: 'persona', step: 3, persona: 'tessa' },
-      { op: 'notify', step: 3, on: true },
-      { op: 'move', step: 3, dir: -1 },
-      { op: 'move', step: 3, dir: 1 },
+      { op: 'persona', step: 2, persona: 'ralf' },
+      { op: 'notify', step: 2, on: true },
+      { op: 'move', step: 2, dir: -1 },
+      { op: 'move', step: 1, dir: 1 }, // the selection followed the position up
     ]);
     expect(el.querySelector('.fe-error')).toBeNull();
   });
 
-  it('adds a gate from a connector’s picker', async () => {
-    const { el, ops, click, settle } = mount(flow({ steps: [...BASE_STEPS, step(5, 'security')] }));
-    click('.fe-plus', 1); // after review (index 2)
+  it('adds a persona from a connector picker', async () => {
+    const { el, ops, click, settle } = mount(flow());
+    click('.fe-plus', 1); // after ralf (index 1)
     const options = [...el.querySelectorAll('.fe-add .chip')].map((c) => c.textContent?.trim());
-    expect(options).toEqual(['Review', 'Verify', 'Approve', 'Security']);
-    click('.fe-add .chip', 3);
+    expect(options).toEqual(['Ben', 'Ralf', 'Tessa', 'You']);
+    click('.fe-add .chip', 2);
     await settle();
-    expect(ops).toEqual([{ op: 'insert', phase: 'security', after: 2 }]);
+    expect(ops).toEqual([{ op: 'insert', persona: 'tessa', after: 1 }]);
   });
 
-  it('keeps a running gate fixed and offers restore for a struck one', () => {
-    const struck = flow({ steps: [...BASE_STEPS.slice(0, 2), step(3, 'verify', { skipped: true }), BASE_STEPS[3]!] });
-    const { el, click } = mount(struck);
+  it('keeps the running position fixed', () => {
+    const { el, click } = mount(flow());
     click('.fe-gate', 0);
     expect(text(el.querySelector('.fe-inspector') as HTMLElement)).toContain('This is the current gate');
     expect((el.querySelector('.fe-switch') as HTMLButtonElement).disabled).toBe(true);
-    click('.fe-gate', 2);
-    expect(text(el.querySelector('.fe-inspector') as HTMLElement)).toContain('Restore gate');
   });
 
   it('shows a refusal inline and keeps working', async () => {
@@ -321,7 +293,7 @@ describe('FlowEditor', () => {
 
   it('saves a dirty draft; a read-only device can only look', async () => {
     const save = vi.fn(async (): Promise<McFlowReply> => ({ ok: true }));
-    const dirty = mount(flow({ chain: ['skip verify'] }), { saved: flow(), save });
+    const dirty = mount(flow({ chain: ['ben', 'you'] }), { saved: flow(), save });
     const button = dirty.el.querySelector('.fe-btn.primary') as HTMLButtonElement;
     expect(button.disabled).toBe(false);
     expect(button.textContent).toContain('Save flow');
@@ -330,14 +302,14 @@ describe('FlowEditor', () => {
     expect(save).toHaveBeenCalledTimes(1);
 
     TestBed.resetTestingModule();
-    const locked = mount(flow({ chain: ['skip verify'] }), { saved: flow(), readOnly: true });
+    const locked = mount(flow({ chain: ['ben', 'you'] }), { saved: flow(), readOnly: true });
     expect((locked.el.querySelector('.fe-btn.primary') as HTMLButtonElement).disabled).toBe(true);
     expect((locked.el.querySelector('.fe-plus') as HTMLButtonElement).disabled).toBe(true);
     expect((locked.el.querySelector('.fe-input') as HTMLInputElement).disabled).toBe(true);
   });
 
   it('shows Paul’s reason on his draft with an undo, and resets to the standard flow', async () => {
-    const { el, ops, state, click, settle } = mount(flow({ chain: ['insert security after review'] }), { reason: 'A security pass fits an auth change.' });
+    const { el, ops, state, click, settle } = mount(flow({ chain: ['ben', 'tessa', 'you'] }), { reason: 'A security pass fits an auth change.' });
     expect(text(el)).toContain('Paul drafted this flow');
     expect(text(el)).toContain('A security pass fits an auth change.');
     click('.fe-paul .fe-link');

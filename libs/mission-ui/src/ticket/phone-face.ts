@@ -15,7 +15,6 @@ export interface PhoneFlowLine {
 interface FlowStep {
   readonly title: string;
   readonly state: 'past' | 'current' | 'future';
-  readonly skipped?: boolean;
 }
 
 export function flowLineOf(
@@ -24,7 +23,7 @@ export function flowLineOf(
   yourTurn: boolean,
   t: Translate,
 ): PhoneFlowLine {
-  const live = steps.filter((step) => step.skipped !== true);
+  const live = steps;
   const current = live.find((step) => step.state === 'current') ?? null;
   const rest = live.filter((step) => step.state === 'future').map((step) => step.title);
   const past = live.filter((step) => step.state === 'past').map((step) => `✓ ${step.title}`);

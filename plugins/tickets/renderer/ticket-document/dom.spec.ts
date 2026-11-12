@@ -115,8 +115,8 @@ describe('cardNode', () => {
     kind: '',
     issues: null,
     flow: [
-      { title: 'Build', state: 'past', note: null, skipped: false },
-      { title: 'Accept', state: 'current', note: '(your turn)', skipped: false },
+      { title: 'Build', state: 'past', note: null },
+      { title: 'Accept', state: 'current', note: '(your turn)' },
     ],
     priority: 'Normal',
     worker: 'Tessa',
@@ -151,7 +151,7 @@ describe('cardNode', () => {
 
   it('9a: Priority / Worker / Flow / Repo, the flow in arrows with its Change link, no Review before there are changes', () => {
     const a = actions();
-    const node = cardNode(a, facts({ shape: 'early', decide: false, canReview: false, worker: 'opencode', workerNote: '· default', flow: [{ title: 'Build', state: 'future', note: null, skipped: false }, { title: 'Accept', state: 'future', note: null, skipped: false }] }));
+    const node = cardNode(a, facts({ shape: 'early', decide: false, canReview: false, worker: 'opencode', workerNote: '· default', flow: [{ title: 'Build', state: 'future', note: null }, { title: 'Accept', state: 'future', note: null }] }));
     expect(node.classList.contains('is-early')).toBe(true);
     expect(labels(node)).toEqual(['Thread']);
     expect(grid(node)).toEqual(['Priority', 'Worker', 'Flow', 'Repo']);

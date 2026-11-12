@@ -10,7 +10,7 @@
  * engine and the validator are main-side, where the `yaml` package is
  * reachable; the plugin renderer bundle may not import packages).
  */
-import type { ChainEntry, ChainSendBack } from './chain';
+import type { ChainEntry, TicketChainFields } from './chain';
 import type { PhasePoolMeta, TicketPoolMeta } from './ticket-pool-meta';
 import type { RepoRef } from './repo-ref';
 import type { PriorityConfig, TicketPriority } from './ticket-priority';
@@ -124,7 +124,7 @@ export interface TicketIssue {
 }
 
 /** Parsed, normalized ticket frontmatter (all optionals reflect absence). */
-export interface TicketMeta extends TicketPoolMeta {
+export interface TicketMeta extends TicketPoolMeta, TicketChainFields {
   readonly id: string | null;
   readonly title: string | null;
   /**
@@ -157,16 +157,6 @@ export interface TicketMeta extends TicketPoolMeta {
    * untouched ticket stays the default everywhere.
    */
   readonly form?: TicketForm;
-  /**
-   * The chain (req-266, contracts/chain.ts): the ordered persona list the
-   * ticket goes through, `chain:` / `x-chain`. Absent = the ticket has none
-   * (an older ticket, or a chain that did not parse).
-   */
-  readonly chain?: readonly ChainEntry[];
-  /** The chain's cursor, 1-based (`at:` / `x-at`); absent = 1. Nothing advances it before req-257. */
-  readonly at?: number;
-  /** The one send-back a ticket may use (`sent-back: 5>3` / `x-sent-back`); absent = not used. */
-  readonly sentBack?: ChainSendBack;
   readonly priority: TicketPriority;
   readonly rank: number;
   readonly branch: string | null;

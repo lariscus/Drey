@@ -309,7 +309,7 @@ function flowRow(items: readonly FlowItem[]): HTMLElement {
     if (index > 0) {
       row.append(el('li', 'tickets-doc-sep', '·'));
     }
-    const step = el('li', `tickets-doc-step is-${item.state}${item.skipped ? ' is-skipped' : ''}`);
+    const step = el('li', `tickets-doc-step is-${item.state}`);
     step.append(el('span', 'tickets-doc-step-title', item.state === 'past' ? `✓ ${item.title}` : item.title));
     row.append(step);
     if (item.note !== null) {

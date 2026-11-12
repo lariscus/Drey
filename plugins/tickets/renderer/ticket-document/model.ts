@@ -6,12 +6,13 @@
  *
  * Nothing is parsed twice: the sections come from the engine's own readers
  * (`parseVerificationSection`, `parseVerlaufEntries`), the chain from its
- * `mergeChain`, the estimate and its basis from its `RunEstimate`. This
+ * `chainSteps`, the estimate and its basis from its `RunEstimate`. This
  * file only turns them into the words the desktop shows (the same words
  * the phone's ticket screen uses: `$1.84`, `48k`, `9 min`).
  */
 import { maskFenceLines } from '../../../../shared/markdown/fences';
-import { mergeChain } from '../../../../packages/tickets-engine/src/core/chain-delta';
+import { chainCursor, chainLifeOf, chainSteps } from '../../../../packages/tickets-engine/src/core/chain-list';
+import type { ChainEntry } from '../../../../packages/tickets-engine/src/contracts/chain';
 import { parseVerificationSection } from '../../../../packages/tickets-engine/src/core/verification';
 import { parseVerlaufEntries, type VerlaufEntry } from '../../../../packages/tickets-engine/src/core/verlauf';
 import { costTableOf, type CostPhase, type CostTableView } from '../../../../shared/cost-table';
@@ -209,51 +210,57 @@ export interface PersonaName {
 }
 
 export interface ChainItem {
+  /** The pipeline column this persona's step is estimated under (the persona's own column), else the persona id. */
   readonly phase: string;
+  /** 1-based position in the chain. */
+  readonly position: number;
+  /** The persona's name (its id, title-cased, when no record names it). */
   readonly title: string;
   readonly state: 'past' | 'current' | 'future';
-  /** Who does the step: a persona's name, `you` at a checkpoint, '' when nobody is pinned. */
+  /** Who does the step: a persona's name, `you` for the owner. */
   readonly who: string;
-  /** The persona's id (for the estimate's key); null at a checkpoint or when nobody is pinned. */
+  /** The persona's id (for the estimate's key); null at the owner's step. */
   readonly personaId: string | null;
   readonly checkpoint: boolean;
-  readonly inserted: boolean;
-  readonly skipped: boolean;
   readonly notify: boolean;
+  /** The interactive entry (`<persona>:shape`): the card calls it Shape. */
+  readonly shape: boolean;
 }
 
+/** The human persona's id: the owner's own step. */
+export const OWNER_PERSONA = 'you';
+
 /**
- * The ticket's chain for the strip: the pipeline from the first working
- * phase to the last before the terminal one, merged with the ticket's
- * `chain:` delta (`mergeChain`). A step names its persona by the delta, else
- * the ticket's pin, else the column's persona; a manual column is the
- * owner's (`you`).
+ * The ticket's chain for the strip: the persona list in the ticket's own
+ * `chain:` (or the board's standard `flow:` for a ticket without one),
+ * folded around the cursor `at` (`chainSteps`). A step names its persona by
+ * the entry; the owner's persona (`you`) is the checkpoint.
  */
 export function chainOf(input: {
   readonly pipeline: readonly PipelinePhase[];
   readonly currentPhaseId: string;
   readonly card: TicketCard;
   readonly personas: readonly PersonaName[];
+  /** The standard flow (`BoardSnapshot.flow`), shown while the ticket has no chain of its own. */
+  readonly flow?: readonly ChainEntry[];
 }): ChainItem[] {
   const { pipeline, card } = input;
-  const ideas = new Set(ideaPhaseIds(pipeline));
-  const last = pipeline[pipeline.length - 1]?.id ?? null;
-  const shown = pipeline.filter((phase) => !ideas.has(phase.id) && phase.id !== last);
+  const own = card.meta.chain ?? [];
+  const entries = own.length > 0 ? own : (input.flow ?? []);
+  const cursor = chainCursor(entries, card.meta.at, chainLifeOf(input.currentPhaseId, pipeline.map((p) => p.id)));
   const nameOf = (id: string): string => input.personas.find((p) => p.id === id)?.title ?? titleCase(id);
-  return mergeChain(shown.map((p) => ({ id: p.id, title: p.title })), input.currentPhaseId, card.meta.chain ?? []).map((step) => {
-    const phase = pipeline.find((p) => p.id === step.phase);
-    const checkpoint = phase !== undefined && !isMachinePhase(phase);
-    const persona = step.persona ?? card.meta.persona ?? phase?.persona ?? null;
+  return chainSteps(entries, cursor).map((step) => {
+    const checkpoint = step.persona === OWNER_PERSONA;
     return {
-      phase: step.phase,
-      title: step.title,
+      phase: pipeline.find((p) => p.persona === step.persona)?.id ?? step.persona,
+      position: step.position,
+      title: nameOf(step.persona),
       state: step.state,
-      who: checkpoint ? 'you' : persona === null ? '' : nameOf(persona),
-      personaId: checkpoint ? null : persona,
+      who: checkpoint ? OWNER_PERSONA : nameOf(step.persona),
+      personaId: checkpoint ? null : step.persona,
       checkpoint,
-      inserted: step.inserted,
-      skipped: step.skipped,
       notify: step.notify,
+      shape: step.mode === 'shape',
     };
   });
 }
@@ -325,36 +332,36 @@ export interface FlowItem {
   readonly state: ChainItem['state'];
   /** The grey words after the current step: `(with you)`, `(waits for you)`, `(your turn)`. */
   readonly note: string | null;
-  readonly skipped: boolean;
 }
 
 /**
  * The card's Flow row: the chain in the words of the boards. A Shaping ticket
- * leads with its own step `Shape`; a plan to accept has passed it and waits on
- * the first step; the last owner checkpoint is the `Accept` of decision 26.
+ * leads with its own step `Shape` (the chain's `:shape` entry, req-266, or a
+ * leading one when the chain has none); a plan to accept has passed it and waits
+ * on the first step; the last owner checkpoint is the `Accept` of decision 26.
  */
 export function flowItemsOf(i18n: I18n, chain: readonly ChainItem[], phaseId: string, planToAccept: boolean): FlowItem[] {
   const shaping = phaseId === SHAPING_STATE;
   const lastCheckpoint = chain.map((step) => step.checkpoint).lastIndexOf(true);
   const items: FlowItem[] = chain.map((step, index) => ({
-    title: index === lastCheckpoint ? i18n.t('ticket.flow.accept') : step.title,
+    title: index === lastCheckpoint ? i18n.t('ticket.flow.accept') : step.shape ? i18n.t('ticket.flow.shape') : step.title,
     state: planToAccept && index === 0 ? 'current' : step.state,
     note:
       planToAccept && index === 0
         ? i18n.t('ticket.flow.waits_for_you')
-        : step.state === 'current' && step.checkpoint
-          ? i18n.t('ticket.flow.your_turn')
-          : null,
-    skipped: step.skipped,
+        : step.state === 'current' && step.shape && shaping
+          ? i18n.t('ticket.flow.with_you')
+          : step.state === 'current' && step.checkpoint
+            ? i18n.t('ticket.flow.your_turn')
+            : null,
   }));
-  if (!shaping) {
+  if (!shaping || chain.some((step) => step.shape)) {
     return items;
   }
   const shape: FlowItem = {
     title: i18n.t('ticket.flow.shape'),
     state: planToAccept ? 'past' : 'current',
     note: planToAccept ? null : i18n.t('ticket.flow.with_you'),
-    skipped: false,
   };
   return [shape, ...items];
 }

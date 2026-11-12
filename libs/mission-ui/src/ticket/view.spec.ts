@@ -428,54 +428,29 @@ describe('gateStepsOf', () => {
   });
 });
 
-// --- the chain delta (E9, concept §5.7) ------------------------------------------------
+// --- the chain: a persona list (req-266) ------------------------------------------------
 
 describe('parseChainEntryView', () => {
-  it('reads the three grammar shapes and never guesses', () => {
-    expect(parseChainEntryView('skip verify')).toEqual({
-      kind: 'skip',
-      phase: 'verify',
-      anchor: null,
-      position: null,
-      persona: null,
-      notify: false,
-    });
-    expect(parseChainEntryView('notify build')).toEqual({
-      kind: 'notify',
-      phase: 'build',
-      anchor: null,
-      position: null,
-      persona: null,
-      notify: false,
-    });
-    expect(parseChainEntryView('insert design(pia, notify) after review')).toEqual({
-      kind: 'insert',
-      phase: 'design',
-      anchor: 'review',
-      position: 'after',
-      persona: 'pia',
-      notify: true,
-    });
+  it('reads the entry grammar and never guesses', () => {
+    expect(parseChainEntryView('ben')).toEqual({ persona: 'ben', mode: null, notify: false });
+    expect(parseChainEntryView('paul:shape')).toEqual({ persona: 'paul', mode: 'shape', notify: false });
+    expect(parseChainEntryView('ralf(notify)')).toEqual({ persona: 'ralf', mode: null, notify: true });
+    expect(parseChainEntryView(' paul:shape (notify) ')).toEqual({ persona: 'paul', mode: 'shape', notify: true });
   });
 
   it('refuses anything the grammar does not hold', () => {
     expect(parseChainEntryView('')).toBeNull();
-    expect(parseChainEntryView('skip Verify')).toBeNull();
-    expect(parseChainEntryView('insert design after')).toBeNull();
-    expect(parseChainEntryView('insert design(nope!) after review')).toBeNull();
-    expect(parseChainEntryView('insert design(pia, extra, notify) after review')).toBeNull();
-    expect(parseChainEntryView('delete verify')).toBeNull();
+    expect(parseChainEntryView('Ben')).toBeNull();
+    expect(parseChainEntryView('paul:plan')).toBeNull();
+    expect(parseChainEntryView('ralf(tell)')).toBeNull();
+    expect(parseChainEntryView('skip verify')).toBeNull();
+    expect(parseChainEntryView('insert design after review')).toBeNull();
   });
 });
 
 describe('renderChainEntryView', () => {
   it('round-trips what the parser reads', () => {
-    const texts = [
-      'skip verify',
-      'notify build',
-      'insert design after review',
-      'insert design(pia, notify) before review',
-    ];
+    const texts = ['ben', 'paul:shape', 'ralf(notify)', 'paul:shape(notify)', 'you'];
     for (const text of texts) {
       const entry = parseChainEntryView(text);
       expect(entry).not.toBeNull();
@@ -492,34 +467,32 @@ describe('chainStepsOf', () => {
     { id: 'verify', title: 'Verify', checkpoint: true },
     { id: 'done', title: 'Done', checkpoint: false },
   ];
+  const entries = ['paul:shape', 'ben', 'ralf(notify)', 'you'].map((text) => parseChainEntryView(text)!);
 
-  it('renders the standard flow untouched when the delta is empty', () => {
-    expect(chainStepsOf(phases, 'build', [])).toEqual(gateStepsOf(phases, 'build'));
+  it('folds the positions around the cursor, the owner as a checkpoint', () => {
+    const steps = chainStepsOf(entries, phases, 'build', 3);
+    expect(steps.map((step) => [step.position, step.title, step.state])).toEqual([
+      [1, 'Paul', 'past'],
+      [2, 'Ben', 'past'],
+      [3, 'Ralf', 'current'],
+      [4, 'You', 'future'],
+    ]);
+    expect(steps[2]).toMatchObject({ persona: 'ralf', notify: true, checkpoint: false });
+    expect(steps[3]?.checkpoint).toBe(true);
   });
 
-  it('strikes a skipped gate and raises the notify flag', () => {
-    const entries = [
-      parseChainEntryView('skip verify')!,
-      parseChainEntryView('notify build')!,
-    ];
-    const steps = chainStepsOf(phases, 'build', entries);
-    expect(steps.find((step) => step.id === 'verify')?.skipped).toBe(true);
-    expect(steps.find((step) => step.id === 'build')?.notify).toBe(true);
+  it('starts at position 1 without a cursor, and a queued ticket has no current position', () => {
+    expect(chainStepsOf(entries, phases, 'build', undefined).map((step) => step.state)).toEqual(['current', 'future', 'future', 'future']);
+    expect(chainStepsOf(entries, phases, 'inbox', 2).every((step) => step.state === 'future')).toBe(true);
   });
 
-  it('splices an inserted gate after its anchor, persona and notify riding along', () => {
-    const entries = [parseChainEntryView('insert design(pia, notify) after verify')!];
-    const steps = chainStepsOf(phases, 'verify', entries);
-    const at = steps.findIndex((step) => step.id === 'design');
-    expect(at).toBeGreaterThanOrEqual(0);
-    expect(steps[at! - 1]?.id).toBe('verify');
-    expect(steps[at!]).toMatchObject({ inserted: true, persona: 'pia', notify: true, title: 'design' });
+  it('a done ticket is all past; an out-of-range cursor clamps', () => {
+    expect(chainStepsOf(entries, phases, 'done', undefined).every((step) => step.state === 'past')).toBe(true);
+    expect(chainStepsOf(entries, phases, 'build', 99).map((step) => step.state)).toEqual(['past', 'past', 'past', 'current']);
   });
 
-  it('tolerates an unknown anchor by appending and an unknown phase by id-title', () => {
-    const entries = [parseChainEntryView('insert design after limbo')!];
-    const steps = chainStepsOf(phases, 'inbox', entries);
-    expect(steps[steps.length - 1]).toMatchObject({ id: 'design', title: 'design', inserted: true });
+  it('names a persona through the callback', () => {
+    expect(chainStepsOf(entries, phases, 'build', 1, (id) => `<${id}>`)[0]?.title).toBe('<paul>');
   });
 });
 
@@ -529,27 +502,26 @@ describe('chainPrefillOf', () => {
   });
 
   it('carries the entries behind one colon', () => {
-    expect(chainPrefillOf('T-0042', ['skip verify'])).toBe('Set T-0042 chain: skip verify');
-    expect(chainPrefillOf('T-0042', ['insert design(pia, notify) after review', 'skip verify'])).toBe(
-      'Set T-0042 chain: insert design(pia, notify) after review; skip verify',
-    );
+    expect(chainPrefillOf('T-0042', ['ben'])).toBe('Set T-0042 chain: ben');
+    expect(chainPrefillOf('T-0042', ['paul:shape', 'ralf(notify)', 'you'])).toBe('Set T-0042 chain: paul:shape; ralf(notify); you');
   });
 });
 
-// --- the gate sheet (E9, concept §5.7) ------------------------------------------------
+// --- the gate sheet ------------------------------------------------------------------
 
 describe('TicketView gate sheet', () => {
   interface SheetSurface {
     sheetOpen(): boolean;
-    hasDelta(): boolean;
-    insertPhase(): string;
+    hasChain(): boolean;
+    insertPersona(): string;
     insertAnchor(): string;
     insertDisabled(): boolean;
     notifyGate(): string;
     notifyDisabled(): boolean;
     openSheet(): void;
     closeSheet(): void;
-    onInsertPhase(event: Event): void;
+    onInsertPersona(event: Event): void;
+    onInsertPosition(event: Event): void;
     onInsertAnchor(event: Event): void;
     onInsertNotify(event: Event): void;
     onNotifyGate(event: Event): void;
@@ -559,76 +531,71 @@ describe('TicketView gate sheet', () => {
   }
 
   const sheet = (view: TicketView): SheetSurface => view as unknown as SheetSurface;
+  const CHAIN_DOC: TicketDoc = { ...DOC, chain: ['ben', 'ralf', 'you'].map((text) => parseChainEntryView(text)!), at: 2 };
 
   function checkedEvent(checked: boolean): Event {
     return { target: { checked } } as unknown as Event;
   }
 
-  it('opens with the current gate as anchor and notify pick', () => {
-    const fake = makeFake({ docValue: DOC });
+  it('opens with the current position as anchor and notify pick', () => {
+    const fake = makeFake({ docValue: CHAIN_DOC });
     const vm = sheet(setup(fake));
     vm.openSheet();
     expect(vm.sheetOpen()).toBe(true);
-    expect(vm.insertAnchor()).toBe('verify');
-    expect(vm.notifyGate()).toBe('verify');
-    expect(vm.hasDelta()).toBe(false);
+    expect(vm.insertAnchor()).toBe('2');
+    expect(vm.notifyGate()).toBe('2');
+    expect(vm.hasChain()).toBe(true);
   });
 
-  it('prefills the chat with the delta plus the insert entry and closes', () => {
-    const fake = makeFake({ docValue: DOC });
+  it('prefills the chat with the whole chain plus the new persona and closes', () => {
+    const fake = makeFake({ docValue: CHAIN_DOC });
     const vm = sheet(setup(fake));
     vm.openSheet();
-    vm.onInsertPhase(noteEvent('design'));
+    vm.onInsertPersona(noteEvent('tessa'));
     vm.onInsertNotify(checkedEvent(true));
     vm.prefillInsert();
     expect(vm.sheetOpen()).toBe(false);
-    expect(fake.calls.proposeChain).toEqual(['Set T-0042 chain: insert design(notify) after verify']);
+    expect(fake.calls.proposeChain).toEqual(['Set T-0042 chain: ben; ralf; tessa(notify); you']);
   });
 
-  it('keeps the entries the ticket already holds when inserting', () => {
-    const doc: TicketDoc = { ...DOC, chain: [parseChainEntryView('skip done')!] };
-    const fake = makeFake({ docValue: doc });
+  it('inserts before a later position, never before the running one', () => {
+    const fake = makeFake({ docValue: CHAIN_DOC });
     const vm = sheet(setup(fake));
     vm.openSheet();
-    vm.onInsertPhase(noteEvent('design'));
-    vm.prefillInsert();
-    expect(fake.calls.proposeChain).toEqual(['Set T-0042 chain: skip done; insert design after verify']);
-    expect(vm.hasDelta()).toBe(true);
-  });
-
-  it('refuses the insert while phase and anchor match and when it adds nothing new', () => {
-    const fake = makeFake({ docValue: DOC });
-    const vm = sheet(setup(fake));
-    vm.openSheet();
-    vm.onInsertPhase(noteEvent('verify'));
-    expect(vm.insertDisabled()).toBe(true);
-    vm.onInsertPhase(noteEvent('design'));
+    vm.onInsertPersona(noteEvent('tessa'));
+    vm.onInsertPosition(noteEvent('before'));
+    expect(vm.insertDisabled()).toBe(true); // the anchor is the running position
+    vm.onInsertAnchor(noteEvent('3'));
     expect(vm.insertDisabled()).toBe(false);
     vm.prefillInsert();
-    // The same entry twice: the second run sees it in the delta and disables.
-    const again = sheet(setup(makeFake({ docValue: { ...DOC, chain: [parseChainEntryView('insert design after verify')!] } })));
-    again.openSheet();
-    again.onInsertPhase(noteEvent('design'));
-    expect(again.insertDisabled()).toBe(true);
+    expect(fake.calls.proposeChain).toEqual(['Set T-0042 chain: ben; ralf; tessa; you']);
   });
 
-  it('prefills the notify rule for the picked gate and disables gates that already ring', () => {
-    const doc: TicketDoc = { ...DOC, chain: [parseChainEntryView('notify build')!] };
+  it('has nothing to add without a persona, and nothing to anchor on without a chain', () => {
+    const vm = sheet(setup(makeFake({ docValue: CHAIN_DOC })));
+    vm.openSheet();
+    vm.onInsertPersona(noteEvent(''));
+    expect(vm.insertDisabled()).toBe(true);
+    const bare = sheet(setup(makeFake({ docValue: DOC })));
+    bare.openSheet();
+    expect(bare.hasChain()).toBe(false);
+    expect(bare.insertDisabled()).toBe(true);
+  });
+
+  it('prefills the notify rule for the picked position and disables positions that already ring', () => {
+    const doc: TicketDoc = { ...CHAIN_DOC, chain: ['ben', 'ralf(notify)', 'you'].map((text) => parseChainEntryView(text)!) };
     const fake = makeFake({ docValue: doc });
     const vm = sheet(setup(fake));
     vm.openSheet();
-    expect(vm.notifyDisabled()).toBe(false); // verify rings nothing yet
-    vm.onNotifyGate(noteEvent('build'));
-    expect(vm.notifyDisabled()).toBe(true);
-    vm.onNotifyGate(noteEvent('done'));
+    expect(vm.notifyDisabled()).toBe(true); // position 2 rings already
+    vm.onNotifyGate(noteEvent('3'));
     expect(vm.notifyDisabled()).toBe(false);
     vm.prefillNotify();
-    expect(fake.calls.proposeChain).toEqual(['Set T-0042 chain: notify build; notify done']);
+    expect(fake.calls.proposeChain).toEqual(['Set T-0042 chain: ben; ralf(notify); you(notify)']);
   });
 
-  it('prefills the standard-flow return with an empty delta', () => {
-    const doc: TicketDoc = { ...DOC, chain: [parseChainEntryView('skip done')!] };
-    const fake = makeFake({ docValue: doc });
+  it('prefills the standard-flow return with an empty list', () => {
+    const fake = makeFake({ docValue: CHAIN_DOC });
     const vm = sheet(setup(fake));
     vm.openSheet();
     vm.prefillStandard();
@@ -1024,7 +991,8 @@ describe('TicketView head card', () => {
     const doc: TicketDoc = {
       ...DOC,
       phase: 'design',
-      chain: [parseChainEntryView('insert design(pia) after build')!],
+      at: 2,
+      chain: ['ben', 'pia', 'you'].map((text) => parseChainEntryView(text)!),
     };
     const vm = surface(setup(makeFake({ docValue: doc })));
     expect(vm.persona()).toBe('pia');

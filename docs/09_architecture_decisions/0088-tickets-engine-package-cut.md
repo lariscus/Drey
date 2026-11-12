@@ -565,3 +565,61 @@ engine package has no zip dependency and Drey Service runs without the app.
 The routes are on the engine HTTP API, the remote port, the invoke allowlist
 (`TEAM_METHODS`) and the tickets plugin's IPC; a failure is `{ok: false,
 code, error}`, the catalog (`skills.error.<code>`) carries the client text.
+
+## Later change — the chain is a persona list (req-266, milestone 243)
+
+The persona board concept (`docs/design/work-panel/persona-board-concept.md`,
+approved 2026-11-11, §3 and §6) replaces E9's **chain delta** — a ticket's
+deviations from the pipeline's phases (`insert` / `skip` / `notify` /
+`move` / `assign`, the manual step `manual`) — with the **full ordered list
+of personas** the ticket goes through: `paul:shape; paul; ben; ralf(notify);
+tessa; you`. Each entry is one position; what happens there is what that
+persona's `prompt.md` says. The delta made sense while the standard flow was
+the pipeline's columns and a ticket only deviated; on the persona board the
+list *is* the ticket's way, and a chain is decoupled from the stages.
+
+**Decision.**
+
+- The grammar is `<persona>[:shape][(notify)]`, one entry per position
+  (`core/chain-list.ts`); `shape` is the only mode. Strict per entry and
+  whole per chain: one unreadable entry reads the chain as absent (every
+  later position would shift).
+- Three ticket fields: `chain:` (the list), `at:` the cursor (1-based,
+  absent = 1), `sent-back: <from>><to>` the one send-back — on a store
+  `x-chain` (`;`-joined, the key kept), `x-at`, `x-sent-back`. The holder
+  stays **derived** (the concept's option C): no `x-holder`.
+- The standard flow moves from the pipeline's columns into one key,
+  `flow:` in `_meta/pipeline.md`, and is **copied into every new ticket**
+  (capture, createTicket, a released part without its own chain); a later
+  change of `flow:` never reshuffles existing tickets.
+- `validateChain` (`core/chain-validate.ts`) guards writes over personas:
+  every entry names an existing persona (`you` always), nothing changes at
+  or before the cursor (only the current entry's notify may), at most 24
+  entries. A persona deleted later is the runner's case, not a read error.
+- The flow editor edits and writes the list (`core/flow-edit.ts`); the
+  canonical-delta regeneration and the longest-in-order run go. Plan parts
+  keep their `chain:` line in the same grammar; the plan gains a
+  `### Chain` chapter (Paul's chain, the same line), which the board
+  service writes into the ticket when the plan is saved (`setPlan`). The
+  grammar fragment and the plan format (req-280's `prompts/fragments/`)
+  changed with the parser, versions bumped.
+
+**As built, the chain is data only** (owner, 2026-11-12: "ein
+Zwischenschritt bringt mir nichts"). The runner and the board still work by
+pipeline column — on a lifecycle store with req-265's interim pin `x-phase`
+(ADR-0090 later change). Nothing advances `at` or writes `sent-back`; the
+switch from `x-phase` to `x-at` and the pins-to-cursors conversion moved to
+req-257 (the runner on chains), which makes the holder run. With them the
+delta's two runtime uses **pause** until req-257: the persona a delta
+pinned to a column (`chainPersonaAt` — the ladder decides alone), and the
+inserted manual step (`manualStepAfter` → `parkFor`; the plumbing stays for
+req-257's `you` entry). The Bescheid card (`notifyNeedsOf`) is gone with
+the merged chain; req-257 brings it back on the cursor.
+
+**Considered and not taken.** An interim bridge that places an `active`
+ticket in a column by its holder (agent → the claim column, You → Ready,
+`:shape` → Shaping) and advances the cursor at a green end — half of
+req-257, thrown away when the persona columns arrive; the owner chose no
+interim step. Keeping the delta on the files backend beside the list on the
+store — one grammar for both; the files backend keeps its phase board until
+E14-9b, and its chain is the same data. Recorded in `specs/decisions.md`.

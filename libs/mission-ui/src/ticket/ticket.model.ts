@@ -53,24 +53,21 @@ export interface GatePhase {
 export type GateStepState = 'past' | 'current' | 'future';
 
 /**
- * One gate-bar step: the phase plus where it sits against the current
- * one. The chain-delta flags (E9, concept §5.7) mark what the ticket's
- * `chain:` delta does to this gate: an inserted revisit, a skipped
- * bypass, the Bescheid rule standing on it, the pinned persona.
+ * One gate-bar step: a persona position of the ticket's chain (req-266) —
+ * or, for a ticket without a chain, a pipeline phase — plus where it sits
+ * against the cursor. `notify` marks the Bescheid rule standing on it.
  */
 export interface GateStep extends GatePhase {
   readonly state: GateStepState;
-  /** A delta-inserted gate (rendered as an addition). */
-  readonly inserted: boolean;
-  /** A delta-skipped gate (rendered struck; the ticket bypasses it). */
-  readonly skipped: boolean;
-  /** The Bescheid rule stands on this gate — its completion lands in "Needs you". */
+  /** The Bescheid rule stands on this step — its completion lands in "Needs you". */
   readonly notify: boolean;
-  /** The persona pinned to this gate; null = the ladder decides. */
+  /** The persona at this position; null on a phase-only step. */
   readonly persona: string | null;
+  /** 1-based position in the chain; null on a phase-only step. */
+  readonly position: number | null;
   /**
-   * The gate's run cost — the `## Verlauf` entries' sum for this phase
-   * (matched by id, then title); null = the phase's runs cost nothing
+   * The step's run cost — the `## Verlauf` entries' sum for this phase
+   * (matched by id, then title); null = the step's runs cost nothing
    * readable — the pill renders no cost slot.
    */
   readonly cost: string | null;
@@ -86,183 +83,94 @@ export function gateStepsOf(phases: readonly GatePhase[], currentPhaseId: string
   return phases.map((phase, index) => ({
     ...phase,
     state: at < 0 ? 'future' : index < at ? 'past' : index === at ? 'current' : 'future',
-    inserted: false,
-    skipped: false,
     notify: false,
     persona: null,
+    position: null,
     cost: null,
   }));
 }
 
-// --- the chain delta (E9, concept §5.7) -----------------------------------------
+// --- the chain: a list of personas (req-266) -------------------------------------
 
 /**
- * One declarative `chain:` entry as this screen renders it — the local
- * mirror of the engine's ChainEntry (contracts/chain.ts). The app never
- * imports engine code; the grammar below is the same strict writer the
- * desk parses (`insert security(ralf, notify) after review`, `skip verify`,
- * `notify build`) and the merge mirrors core/chain-delta.ts, tolerant by
- * design: unknown phases render with their id as title, an unknown
- * anchor appends.
+ * One entry of a ticket's chain as this screen renders it — the local
+ * mirror of the engine's ChainEntry (contracts/chain.ts, core/chain-list.ts).
+ * The app never imports engine code; the grammar is the same strict writer
+ * the desk parses: `<persona>[:shape][(notify)]`, one entry per position.
  */
 export interface ChainEntryView {
-  readonly kind: 'insert' | 'skip' | 'notify';
-  /** The pipeline phase the entry concerns. */
-  readonly phase: string;
-  /** The anchor phase an insert hangs on; null on skip/notify. */
-  readonly anchor: string | null;
-  /** The insert's position against its anchor; null on skip/notify. */
-  readonly position: 'after' | 'before' | null;
-  /** The persona pinned to an inserted gate; null = the ladder decides. */
-  readonly persona: string | null;
-  /** The Bescheid rule on an inserted gate. */
+  readonly persona: string;
+  /** The run's mode; `shape` = the interactive entry, null = an ordinary run. */
+  readonly mode: 'shape' | null;
+  /** The Bescheid rule on this position. */
   readonly notify: boolean;
 }
 
-const CHAIN_PHASE_ID = /^[a-z][a-z0-9-]*$/;
-const CHAIN_SKIP = /^skip ([a-z][a-z0-9-]*)$/;
-const CHAIN_NOTIFY = /^notify ([a-z][a-z0-9-]*)$/;
-const CHAIN_INSERT = /^insert ([a-z][a-z0-9-]*)(?:\(([^)]*)\))? (after|before) ([a-z][a-z0-9-]*)$/;
+/** The human persona's id: the owner's own position. */
+export const OWNER_PERSONA = 'you';
 
-/**
- * Parses one `chain:` entry; null when the text is not the grammar —
- * never a guess (the desk refuses the same text at execution, so the
- * screen only offers parses it can render).
- */
+const CHAIN_ENTRY = /^([a-z][a-z0-9-]*)(?::([a-z][a-z0-9-]*))?(?:\s*\(\s*(notify)\s*\))?$/;
+
+/** Parses one chain entry; null when the text is not the grammar — never a guess. */
 export function parseChainEntryView(text: string): ChainEntryView | null {
-  const raw = text.trim();
-  const skip = CHAIN_SKIP.exec(raw);
-  if (skip !== null) {
-    return { kind: 'skip', phase: skip[1]!, anchor: null, position: null, persona: null, notify: false };
+  const match = CHAIN_ENTRY.exec(text.trim());
+  if (match === null || (match[2] !== undefined && match[2] !== 'shape')) {
+    return null;
   }
-  const notify = CHAIN_NOTIFY.exec(raw);
-  if (notify !== null) {
-    return { kind: 'notify', phase: notify[1]!, anchor: null, position: null, persona: null, notify: false };
-  }
-  const insert = CHAIN_INSERT.exec(raw);
-  if (insert !== null) {
-    const opts = insert[2] === undefined ? [] : insert[2].split(',').map((o) => o.trim()).filter((o) => o !== '');
-    let persona: string | null = null;
-    let notifyFlag = false;
-    for (const opt of opts) {
-      if (opt === 'notify') {
-        notifyFlag = true;
-      } else if (CHAIN_PHASE_ID.test(opt) && persona === null) {
-        persona = opt;
-      } else {
-        return null; // an unreadable option poisons the whole entry
-      }
-    }
-    return {
-      kind: 'insert',
-      phase: insert[1]!,
-      anchor: insert[4]!,
-      position: insert[3] === 'before' ? 'before' : 'after',
-      persona,
-      notify: notifyFlag,
-    };
-  }
-  return null;
+  return { persona: match[1]!, mode: match[2] === 'shape' ? 'shape' : null, notify: match[3] !== undefined };
 }
 
 /** Renders one entry in the canonical grammar — the round trip with `parseChainEntryView`. */
 export function renderChainEntryView(entry: ChainEntryView): string {
-  switch (entry.kind) {
-    case 'skip':
-      return `skip ${entry.phase}`;
-    case 'notify':
-      return `notify ${entry.phase}`;
-    case 'insert': {
-      const opts: string[] = [];
-      if (entry.persona !== null) {
-        opts.push(entry.persona);
-      }
-      if (entry.notify) {
-        opts.push('notify');
-      }
-      const paren = opts.length > 0 ? `(${opts.join(', ')})` : '';
-      return `insert ${entry.phase}${paren} ${entry.position ?? 'after'} ${entry.anchor ?? ''}`.trim();
-    }
-  }
+  return `${entry.persona}${entry.mode === null ? '' : `:${entry.mode}`}${entry.notify ? '(notify)' : ''}`;
 }
 
-/** The canonical strings of a whole delta — what the sheet prefills into the chat command. */
+/** The canonical strings of a whole chain — what the sheet prefills into the chat command. */
 export function renderChainEntryViews(entries: readonly ChainEntryView[]): string[] {
   return entries.map((entry) => renderChainEntryView(entry));
 }
 
 /**
- * The gate sheet's chat prefill (E9, concept §5.7): the one mutation
- * path's "word" — a sentence the owner reviews and sends, the mission
- * answers with the setChain proposal card. An empty delta is the
- * standard-flow return, worded like the card's own summary sentence.
+ * The gate sheet's chat prefill: the one mutation path's "word" — a
+ * sentence the owner reviews and sends, the mission answers with the
+ * setChain proposal card. An empty list is the standard-flow return,
+ * worded like the card's own summary sentence.
  */
 export function chainPrefillOf(id: string, entries: readonly string[]): string {
   return entries.length === 0 ? `Return ${id} to the standard flow` : `Set ${id} chain: ${entries.join('; ')}`;
 }
 
 /**
- * Merges the standard flow with a ticket's delta into the concrete chain
- * the gate bar renders (mirrors the engine's mergeChain, same tolerance):
- * `skip` strikes its gate, `notify` raises the Bescheid flag, `insert`
- * splices a revisit at its anchor — or appends when the anchor is not in
- * the pipeline. The state fold marks the current gate; a ticket outside
- * the merged chain renders everything `future`.
+ * The chain as the gate bar's steps (mirrors the engine's `chainSteps` and
+ * `chainCursor`): the cursor `at` (1 when unset) marks the current position,
+ * everything before it is past; a ticket that has not started (Inbox,
+ * Prioritized, the pipeline's first column) has no current position, a done
+ * ticket (the last column) is all past. `titleOf` names a persona.
  */
 export function chainStepsOf(
+  entries: readonly ChainEntryView[],
   phases: readonly GatePhase[],
   currentPhaseId: string,
-  entries: readonly ChainEntryView[],
+  at: number | undefined,
+  titleOf: (persona: string) => string = (persona) => persona.charAt(0).toUpperCase() + persona.slice(1),
 ): GateStep[] {
-  const steps: GateStep[] = phases.map((phase) => ({
-    ...phase,
-    state: 'future',
-    inserted: false,
-    skipped: false,
-    notify: false,
-    persona: null,
-    cost: null,
-  }));
-  const indexOf = (phase: string): number => steps.findIndex((step) => step.id === phase);
-  for (const entry of entries) {
-    if (entry.kind === 'skip') {
-      const at = indexOf(entry.phase);
-      if (at >= 0) {
-        steps[at] = { ...steps[at]!, skipped: true };
-      }
-      continue;
-    }
-    if (entry.kind === 'notify') {
-      const at = indexOf(entry.phase);
-      if (at >= 0) {
-        steps[at] = { ...steps[at]!, notify: true };
-      }
-      continue;
-    }
-    const anchorAt = indexOf(entry.anchor ?? '');
-    const known = phases.find((phase) => phase.id === entry.phase);
-    const step: GateStep = {
-      id: entry.phase,
-      title: known?.title ?? entry.phase,
-      checkpoint: known?.checkpoint ?? false,
-      state: 'future',
-      inserted: true,
-      skipped: false,
+  const ids = phases.map((phase) => phase.id);
+  const queued = currentPhaseId === 'inbox' || currentPhaseId === 'prioritized' || currentPhaseId === ids[0];
+  const done = !queued && (currentPhaseId === ids[ids.length - 1] || currentPhaseId === 'done');
+  const cursor = queued ? null : done ? entries.length + 1 : Math.min(Math.max(at ?? 1, 1), Math.max(entries.length, 1));
+  return entries.map((entry, index) => {
+    const position = index + 1;
+    return {
+      id: entry.persona,
+      title: titleOf(entry.persona),
+      checkpoint: entry.persona === OWNER_PERSONA,
+      state: cursor === null ? 'future' : position < cursor ? 'past' : position === cursor ? 'current' : 'future',
       notify: entry.notify,
       persona: entry.persona,
+      position,
       cost: null,
     };
-    if (anchorAt >= 0) {
-      steps.splice(entry.position === 'before' ? anchorAt : anchorAt + 1, 0, step);
-    } else {
-      steps.push(step);
-    }
-  }
-  const at = indexOf(currentPhaseId);
-  return steps.map((step, index) => ({
-    ...step,
-    state: at < 0 ? 'future' : index < at ? 'past' : index === at ? 'current' : 'future',
-  }));
+  });
 }
 
 /** The current phase's display title; a phase the pipeline does not know shows its own id. */
@@ -906,10 +814,12 @@ export interface TicketDoc {
   /** The pipeline's phases in order — the gate bar's steps. */
   readonly phases: readonly GatePhase[];
   /**
-   * The ticket's chain delta (E9, concept §5.7) — the parsed `chain:`
-   * frontmatter entries; empty = the standard flow applies silently.
+   * The ticket's chain (req-266) — the parsed `chain:` frontmatter
+   * entries, the personas it goes through; empty = none written yet.
    */
   readonly chain: readonly ChainEntryView[];
+  /** The chain's cursor (`at:`, 1-based); absent = position 1. */
+  readonly at?: number;
   /**
    * The ticket's priority id as the vault configures it — the id IS the
    * chip's label (no fixed four); null when the card carries none.

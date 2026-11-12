@@ -5,15 +5,11 @@
  * later position would shift — with a warning, except on a done ticket,
  * whose old chain-delta text stays as history (concept §12 step 7).
  */
-import type { ChainEntry, ChainSendBack } from '../contracts/chain';
+import type { ChainEntry, ChainSendBack, TicketChainFields } from '../contracts/chain';
 import type { TicketIssue } from '../contracts/tickets';
 import { chainItemsOf, parseChainItems, parseSendBack, unreadableEntryMessage } from './chain-list';
 
-export interface TicketChainFields {
-  readonly chain?: readonly ChainEntry[];
-  readonly at?: number;
-  readonly sentBack?: ChainSendBack;
-}
+export type { TicketChainFields };
 
 function cursorOf(raw: unknown): number | null {
   const value = typeof raw === 'number' ? raw : typeof raw === 'string' && /^\d+$/.test(raw.trim()) ? Number(raw.trim()) : Number.NaN;

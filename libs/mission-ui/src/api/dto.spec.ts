@@ -921,7 +921,7 @@ describe('parseProposal', () => {
         at: 't1',
         decidedAt: null,
         outcome: null,
-        command: { kind: 'setChain', id: 'T-0042', chain: ['skip verify', 'notify build'] },
+        command: { kind: 'setChain', id: 'T-0042', chain: ['ben(notify)', 'you'] },
       }),
     ).toEqual({
       id: 'p-3',
@@ -930,7 +930,7 @@ describe('parseProposal', () => {
       at: 't1',
       decidedAt: null,
       outcome: null,
-      chain: { id: 'T-0042', chain: ['skip verify', 'notify build'] },
+      chain: { id: 'T-0042', chain: ['ben(notify)', 'you'] },
     });
     expect(
       parseProposal({
@@ -1331,7 +1331,7 @@ describe('parseTicketDetail', () => {
     expect(bare).toMatchObject({ priority: null, blockedBy: [], blocked: [], blocks: [] });
   });
 
-  it('maps the chain delta off the card meta tolerantly', () => {
+  it('maps the chain list and cursor off the card meta tolerantly', () => {
     const detail = parseTicketDetail(
       {
         ok: true,
@@ -1339,20 +1339,16 @@ describe('parseTicketDetail', () => {
           id: 'T-1',
           phase: 'build',
           meta: {
+            at: 2,
             chain: [
-              {
-                kind: 'insert',
-                phase: 'design',
-                anchor: 'review',
-                position: 'after',
-                persona: 'pia',
-                notify: true,
-              },
-              { kind: 'skip', phase: 'verify' },
-              { kind: 'notify', phase: 'build' },
-              { kind: 'mystery', phase: 'x' },
-              { kind: 'insert', phase: 'no-anchor' },
-              'junk',
+              { persona: 'paul', mode: 'shape', notify: false },
+              { persona: 'ben', mode: null, notify: true },
+              'ralf(notify)',
+              'tessa:shape',
+              { persona: 'Bad Id' },
+              { mode: 'shape' },
+              'insert x after y',
+              7,
             ],
           },
         },
@@ -1361,24 +1357,12 @@ describe('parseTicketDetail', () => {
       },
       phases,
     );
+    expect(detail?.at).toBe(2);
     expect(detail?.chain).toEqual([
-      {
-        kind: 'insert',
-        phase: 'design',
-        anchor: 'review',
-        position: 'after',
-        persona: 'pia',
-        notify: true,
-      },
-      { kind: 'skip', phase: 'verify', anchor: null, position: null, persona: null, notify: false },
-      {
-        kind: 'notify',
-        phase: 'build',
-        anchor: null,
-        position: null,
-        persona: null,
-        notify: false,
-      },
+      { persona: 'paul', mode: 'shape', notify: false },
+      { persona: 'ben', mode: null, notify: true },
+      { persona: 'ralf', mode: null, notify: true },
+      { persona: 'tessa', mode: 'shape', notify: false },
     ]);
   });
 
@@ -1408,7 +1392,7 @@ describe('parseBoardCard (E9)', () => {
           {
             id: 'T-1',
             phase: 'build',
-            meta: { chain: [{ kind: 'skip', phase: 'verify' }] },
+            meta: { chain: [{ persona: 'ben', mode: null, notify: false }], at: 2 },
           },
         ],
       },
@@ -1419,19 +1403,11 @@ describe('parseBoardCard (E9)', () => {
     ],
   };
 
-  it('finds the card and reads its phase and chain delta', () => {
+  it('finds the card and reads its phase, chain and cursor', () => {
     expect(parseBoardCard(BOARD, 'T-1')).toEqual({
       phase: 'build',
-      chain: [
-        {
-          kind: 'skip',
-          phase: 'verify',
-          anchor: null,
-          position: null,
-          persona: null,
-          notify: false,
-        },
-      ],
+      chain: [{ persona: 'ben', mode: null, notify: false }],
+      at: 2,
     });
     expect(parseBoardCard(BOARD, 'T-2')).toEqual({ phase: 'verify', chain: [] });
   });

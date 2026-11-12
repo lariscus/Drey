@@ -7,7 +7,7 @@ import { PhoneAvatar } from '../phone/avatar';
 import { padSignal } from '../phone/phone';
 import {
   MC_FLOW_STATE,
-  addablePhasesOf,
+  addablePersonasOf,
   changedIndicesOf,
   changesLabelOf,
   eyebrowOf,
@@ -97,12 +97,10 @@ export class FlowEditor {
     const t = (key: Parameters<McI18n['t']>[0]): string => this.i18n.t(key);
     return this.rows().map((row) => {
       const step = row.step;
-      const name = step.persona !== null ? row.who : step.owner ? t('flow.pad.you') : t('flow.pad.automatic');
-      const model = step.model === null ? (step.pinned ? t('flow.pad.pinned') : '') : step.pinned ? this.i18n.t('flow.pad.model_pinned', { model: step.model }) : step.model;
-      const sub = step.owner && step.model === null ? t('flow.pad.manual_gate') : model;
-      const extra = step.skipped
-        ? t('flow.pad.mark_removed')
-        : step.state === 'current'
+      const name = step.owner ? t('flow.pad.you') : row.who;
+      const sub = step.owner && step.model === null ? t('flow.pad.manual_gate') : (step.model ?? '');
+      const extra =
+        step.state === 'current'
           ? t('flow.pad.mark_running')
           : row.dashed && step.notify
             ? t('flow.pad.mark_draft_tells')
@@ -133,7 +131,7 @@ export class FlowEditor {
   /** The standard flow's gates in words, and the generic hint around it. */
   protected readonly explain = computed(() => {
     const flow = this.flow();
-    const gates = (flow?.steps ?? []).filter((s) => !s.inserted).map((s) => this.i18n.t('flow.pad.gate_who', { title: s.title, who: whoOf(s, flow!) }));
+    const gates = (flow?.steps ?? []).map((s) => this.i18n.t('flow.pad.gate_who', { title: s.title, who: whoOf(s, flow!) }));
     return gates.length === 0 ? this.i18n.t('flow.pad.explain_generic') : this.i18n.t('flow.pad.explain', { gates: gates.join(', ') });
   });
 
@@ -147,7 +145,7 @@ export class FlowEditor {
     const lines: string[] = [];
     flow.steps.forEach((step, at) => {
       const before = flow.steps[at - 1];
-      if (before !== undefined && step.inserted && !step.skipped && changed.has(step.index)) {
+      if (before !== undefined && changed.has(step.index)) {
         lines.push(this.i18n.t(step.notify ? 'flow.pad.change_added_tell' : 'flow.pad.change_added', { title: step.title, who: whoOf(step, flow), after: before.title }));
       }
     });
@@ -160,7 +158,7 @@ export class FlowEditor {
     if (flow === null || !this.dirty()) {
       return this.i18n.t('flow.pad.no_changes');
     }
-    const n = flow.chain.length;
+    const n = this.changed().size;
     return flow.scope.kind === 'part' ? this.i18n.t('flow.pad.draft_count_part', { n, part: flow.scope.index + 1 }) : this.i18n.t('flow.pad.draft_count', { n });
   });
 
@@ -193,15 +191,14 @@ export class FlowEditor {
     };
   });
 
-  /** The personas a gate can be given: a manual step is worked by a human, so only those (E10-6). */
-  protected personasFor(step: McFlowStep): readonly McFlowPersona[] {
-    const all = this.flow()?.personas ?? [];
-    return step.phase === 'manual' || step.phase.startsWith('manual-') ? all.filter((p) => p.kind === 'human') : all;
+  /** The personas a position can be given: the whole crew. */
+  protected personasFor(_step: McFlowStep): readonly McFlowPersona[] {
+    return this.flow()?.personas ?? [];
   }
 
   protected readonly addable = computed(() => {
     const flow = this.flow();
-    return flow === null ? [] : addablePhasesOf(flow);
+    return flow === null ? [] : addablePersonasOf(flow);
   });
 
   protected select(step: McFlowStep): void {
@@ -216,32 +213,24 @@ export class FlowEditor {
     this.adding.update((now) => (now === after ? null : after));
   }
 
-  protected async add(phase: string, after: number): Promise<void> {
-    const ok = await this.run({ op: 'insert', phase, after });
+  protected async add(persona: string, after: number): Promise<void> {
+    const ok = await this.run({ op: 'insert', persona, after });
     if (ok) {
       this.adding.set(null);
-      this.selectAdded(phase);
+      // The position just added opens in the inspector, so the persona can be changed at once.
+      this.selected.set(after + 1);
     }
   }
 
-  /** The gate just added opens in the inspector, so the persona can be picked at once. */
-  private selectAdded(phase: string): void {
-    const added = this.flow()?.steps.find((s) => s.inserted && s.phase === phase);
-    if (added !== undefined) {
-      this.selected.set(added.index);
-    }
-  }
-
-  protected setPersona(step: McFlowStep, persona: string | null): Promise<boolean> {
+  protected setPersona(step: McFlowStep, persona: string): Promise<boolean> {
     return this.run({ op: 'persona', step: step.index, persona });
   }
 
-  /** The persona select of the iPad: an empty value is the pipeline default. */
+  /** The persona select of the iPad. */
   protected async pickPersona(step: McFlowStep, event: Event): Promise<void> {
     const select = event.target as HTMLSelectElement;
-    const before = step.pinned ? (step.persona ?? '') : '';
-    if (!(await this.setPersona(step, select.value === '' ? null : select.value))) {
-      select.value = before;
+    if (!(await this.setPersona(step, select.value))) {
+      select.value = step.persona;
     }
   }
 
@@ -251,21 +240,15 @@ export class FlowEditor {
 
   protected async move(step: McFlowStep, dir: -1 | 1): Promise<void> {
     if (await this.run({ op: 'move', step: step.index, dir })) {
-      // The gate sits where its neighbour was: follow it with the selection.
-      const flow = this.flow();
-      const moved = flow?.steps.find((s) => s.phase === step.phase && s.inserted === step.inserted);
-      this.selected.set(moved?.index ?? null);
+      // The position sits where its neighbour was: follow it with the selection.
+      this.selected.set(step.index + dir);
     }
   }
 
   protected async remove(step: McFlowStep): Promise<void> {
     if (await this.run({ op: 'remove', step: step.index })) {
-      this.selected.set(step.inserted ? null : step.index);
+      this.selected.set(null);
     }
-  }
-
-  protected restore(step: McFlowStep): Promise<boolean> {
-    return this.run({ op: 'restore', step: step.index });
   }
 
   protected async reset(): Promise<void> {

@@ -60,8 +60,8 @@ export const MC_APPROVE_STATE = new InjectionToken<McApproveState>('mc-approve-s
 // --- the cards ---------------------------------------------------------------
 
 /** The person a part is built by: the pinned persona, else the default builder. */
-/** The Ready to try stage's id (`pipeline-states.ts`): the lib does not reach the engine at runtime. */
-const READY_STATE = 'ready';
+/** The human persona's id: the owner's own position, which the row's closing `Accept` stands for. */
+const OWNER_PERSONA = 'you';
 
 /** The Flow row of the iPad's plan (board 5c): Shape is done, the first step is the one the plan waits at. */
 export interface PadFlowLine {
@@ -76,7 +76,7 @@ export interface PadFlowLine {
  * first step, and the owner's Accept ends the flow, whatever the Ready stage is called.
  */
 export function padFlowLineOf(flow: readonly McPartFlowStep[], waitsForYou: boolean, i18n: I18n): PadFlowLine | null {
-  const live = flow.filter((step) => !step.skipped && step.phase !== READY_STATE);
+  const live = flow.filter((step) => step.persona !== OWNER_PERSONA);
   const [current, ...rest] = live;
   if (current === undefined) {
     return null;
@@ -115,24 +115,21 @@ export function partBadgeOf(card: McPartCard): string {
   }
 }
 
-/** One segment of the flow row: `Build · Ben`, an inserted gate with its mark, a skipped one struck. */
+/** One segment of the flow row: a position's persona, `Ben (tell me)` where it tells the owner. */
 export interface FlowSegment {
   readonly text: string;
-  readonly inserted: boolean;
-  readonly skipped: boolean;
 }
 
 export function flowSegmentsOf(card: McPartCard, approval: McPlanApproval): FlowSegment[] {
   return card.flow.map((step: McPartFlowStep) => {
-    const who = personaNameOf(step.persona, approval);
-    const base = who === '' ? step.title : `${step.title} · ${who}`;
-    return { text: step.notify ? `${base} (tell me)` : base, inserted: step.inserted, skipped: step.skipped };
+    const base = approval.personas.find((p) => p.id === step.persona)?.title ?? step.title;
+    return { text: step.notify ? `${base} (tell me)` : base };
   });
 }
 
-/** `standard` when the part runs the pipeline as it is, else how many changes it carries. */
+/** `standard` when the part runs the standard flow, `edited` when it carries a chain of its own. */
 export function flowNoteOf(card: McPartCard): string {
-  return card.chain.length === 0 ? 'standard' : `standard + ${card.chain.length} ${card.chain.length === 1 ? 'change' : 'changes'}`;
+  return card.chain.length === 0 ? 'standard' : 'edited';
 }
 
 /** The "Gate" line under a card: what lets the next part start. The last part has none. */

@@ -99,7 +99,7 @@ export class PlanApprove {
   /** The plan's flow in words (the first part's: the parts share the standard flow). */
   protected readonly flowLine = computed<string | null>(() => {
     const first = this.approval()?.parts[0];
-    return first === undefined || first.flow.length === 0 ? null : first.flow.filter((step) => !step.skipped).map((step) => step.title).join(' · ');
+    return first === undefined || first.flow.length === 0 ? null : first.flow.map((step) => step.title).join(' · ');
   });
 
   protected readonly costLine = computed<string | null>(() => {
@@ -435,8 +435,8 @@ export class PlanApprove {
     if (flow.length === 0) {
       return null;
     }
-    const steps = flow.filter((step) => !step.skipped).map((step) => step.title).join(', ');
-    return this.i18n.t(flow.some((step) => step.inserted || step.skipped) ? 'plan.pad.flow_edited' : 'plan.pad.flow_standard', { steps });
+    const steps = flow.map((step) => step.title).join(', ');
+    return this.i18n.t((this.firstCard()?.chain.length ?? 0) > 0 ? 'plan.pad.flow_edited' : 'plan.pad.flow_standard', { steps });
   });
 
   private readonly acceptPick = signal<number | null>(null);

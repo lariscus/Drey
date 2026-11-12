@@ -4244,17 +4244,17 @@ sequenceDiagram
     participant S as Ticket header strip
     participant F as Flow tab (renderer/flow)
     participant M as Plugin main (IPC)
-    participant E as Engine (flow-edit, chain-delta)
+    participant E as Engine (flow-edit, chain-list, chain-validate)
     participant T as Ticket file
 
     O->>S: Change flow
     S->>F: addDoc(tickets-flow, flow://T-0121)
     F->>M: flow {id}
-    M->>E: flowOf -> steps, phases, personas, readOnly
+    M->>E: flowOf -> steps (positions), personas, readOnly
     E-->>F: the flow as the file holds it (= the saved copy)
-    O->>F: + Security, move later, pick a persona, tell me
+    O->>F: + Ralf, move later, pick a persona, tell me
     F->>M: flowEdit {id, chain: draft, edit}
-    M->>E: applyFlowOp -> validateChain -> smallest delta
+    M->>E: applyFlowOp -> validateChain (personas, cursor) -> the next list
     E-->>F: the next draft (or a refusal, shown under the list)
     O->>F: Ask Paul
     F->>M: flowDraft {id, ask}
@@ -4265,6 +4265,11 @@ sequenceDiagram
     E-->>F: ok / warning
     F->>M: flow {id}
 ```
+
+Since req-266 the chain is the ticket's whole persona list: a step is a
+position, `+` adds a persona after it, only positions after the cursor
+change, and a ticket without a chain shows the standard flow (`flow:`) it
+would get.
 
 The tab keeps the only copy of the draft; closing it drops unsaved edits.
 A board change while the draft has no edits reloads the flow; with edits
@@ -5742,3 +5747,36 @@ sequenceDiagram
 ```
 
 A crash anywhere — between the two config commits, halfway through the moves — leaves a store the next Migrate plans the rest for: step 1 is skipped once `active` / `running` exist, moves are skipped for tickets already out of an old stage, and step 2 runs once none is left in one. A remote store's `dricket.toml` is not Drey's to write: the line offers **Copy stages** (the next table to paste) and Migrate does only the moves. A run that moves nothing releases to where it sat: `active`, or the edge stage (`inbox`, `prioritized`) the owner started it from.
+
+## 6.119 A ticket's chain — copied at creation, edited after the cursor, taken from the plan (req-266, milestone 243, [ADR-0088](09_architecture_decisions/0088-tickets-engine-package-cut.md) later change)
+
+```mermaid
+sequenceDiagram
+    actor Owner
+    participant Chat as Mission Control / capture
+    participant BS as BoardService
+    participant Pipe as _meta/pipeline.md
+    participant T as Ticket (file or store record)
+    participant Shape as Shape chat (Paul)
+    Owner->>Chat: capture an idea
+    Chat->>BS: createTicket
+    BS->>Pipe: snapshot.flow (flow: paul:shape; paul; ben; ralf; tessa; you)
+    BS->>T: chain: [paul:shape, paul, ben, ralf, tessa, you] · at: 1 (x-chain / x-at on a store)
+    Owner->>Chat: "give T-0121 a second review by Tessa"
+    Chat-->>Owner: setChain card (the whole list)
+    Owner->>Chat: confirm
+    Chat->>BS: setChain {id, chain}
+    BS->>BS: parse (strict, whole) → validateChain (personas exist, nothing at or before the cursor)
+    BS->>T: chain: … · Log "chain …" · one commit
+    Owner->>Shape: shape T-0121 with Paul
+    Shape->>BS: setPlan {plan with ### Chain}
+    BS->>BS: parsePlanChain → validateChain
+    alt the chain holds and differs
+        BS->>T: ## Plan + chain: … · one commit "plan, chain"
+    else it does not hold
+        BS->>T: ## Plan only · the save says why
+    end
+    Note over BS,T: nothing walks the chain yet — the runner works by column (x-phase) until req-257 moves the cursor
+```
+
+A plan's parts carry their own `chain:` line; when the owner releases the plan, a part without one gets the standard flow. A ticket whose chain does not parse (the old E9 delta, a typo) reads as having none — the flow editor then shows the standard flow it would get, and the next save writes a list.

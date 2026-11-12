@@ -35,6 +35,7 @@ test.afterAll(() => {
 
 const PIPELINE = [
   '---',
+  'flow: ben; ralf; you',
   'phases:',
   '  - { id: inbox, title: Inbox, handover: manual }',
   '  - { id: plan, title: Plan, handover: agent plan-default, persona: paul }',
@@ -95,23 +96,23 @@ test.describe('Flow tab and Settings → Tickets (E13-11, E13-12)', () => {
 
     const flow = page.locator('.flow-tab').filter({ visible: true });
     await expect(flow).toBeVisible({ timeout: 15_000 });
-    await expect(flow.locator('.flow-gate-title').first()).toHaveText('Build');
-    await expect(flow.locator('.flow-chip')).toHaveText('Standard flow');
+    await expect(flow.locator('.flow-gate-title').first()).toHaveText('Ben');
+    await expect(flow.locator('.flow-chip')).toHaveText('3 steps');
     await expect(flow.getByRole('button', { name: 'Save flow' })).toBeDisabled();
     await page.screenshot({ path: testInfo.outputPath('flow-standard.png') });
 
-    // --- add a manual step after Review and save it
-    await flow.locator('.flow-plus[aria-label="Add a gate after Review"]').click();
-    await flow.locator('.flow-add').getByRole('button', { name: 'Manual step' }).click();
-    await expect(flow.locator('.flow-gate.is-added')).toBeVisible();
-    await expect(flow.locator('.flow-chip')).toContainText('Standard flow + 1 change');
+    // --- add a persona after Ralf and save it
+    await flow.locator('.flow-plus[aria-label="Add a persona after Ralf"]').click();
+    await flow.locator('.flow-add').getByRole('button', { name: 'Paul' }).click();
+    await expect(flow.locator('.flow-gate.is-dashed')).toBeVisible();
+    await expect(flow.locator('.flow-chip')).toContainText('4 steps');
     await expect(flow.locator('.flow-inspector')).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('flow-edited.png') });
     await flow.getByRole('button', { name: 'Save flow' }).click();
     await expect(flow.locator('.flow-message')).toContainText('Saved', { timeout: 15_000 });
     const file = fs.readFileSync(path.join(vaultDir, 'tickets', '40-build', 'T-0121.md'), 'utf8');
     expect(file).toMatch(/chain:/);
-    expect(file).toContain('manual');
+    expect(file).toContain('paul');
     await expect(flow.getByRole('button', { name: 'Save flow' })).toBeDisabled();
 
     // --- Settings → Tickets

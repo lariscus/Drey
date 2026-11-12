@@ -148,9 +148,9 @@ export function isTurnStreaming(
 
 // --- the setChain before/after card (E9, concept §5.7) ----------------------------
 
-/** The two merged gate chains a setChain proposal card renders. */
+/** The two chains a setChain proposal card renders. */
 export interface ChainCompare {
-  /** The merge with the ticket's current delta (the board card's `chain:`). */
+  /** The ticket's current chain (the board card's `chain:`). */
   readonly before: readonly GateStep[];
   /** The merge with the proposed delta — the proposal command's entries. */
   readonly after: readonly GateStep[];
@@ -158,23 +158,23 @@ export interface ChainCompare {
 
 /**
  * The before/after the confirmation card shows before the owner commits
- * a chain change: both merges render through the same tolerant merger
- * the ticket screen's gate bar uses (standard flow + delta). Proposed
- * entries the grammar does not read drop out — the desk refuses them the
- * same way at execution, never a guess here.
+ * a chain change: both lists render through the ticket screen's gate-bar
+ * mapping. Proposed entries the grammar does not read drop out — the desk
+ * refuses them the same way at execution, never a guess here.
  */
 export function chainCompareOf(
   phases: readonly GatePhase[],
   currentPhaseId: string,
   current: readonly McChainEntry[],
   proposed: readonly string[],
+  at?: number,
 ): ChainCompare {
   const afterEntries = proposed
     .map((entry) => parseChainEntryView(entry))
     .filter((entry): entry is ChainEntryView => entry !== null);
   return {
-    before: chainStepsOf(phases, currentPhaseId, current),
-    after: chainStepsOf(phases, currentPhaseId, afterEntries),
+    before: chainStepsOf(current, phases, currentPhaseId, at),
+    after: chainStepsOf(afterEntries, phases, currentPhaseId, at),
   };
 }
 
@@ -1416,7 +1416,7 @@ export class Chat {
       return null;
     }
     const card = parseBoardCard(this.state.board(), chain.id);
-    return chainCompareOf(this.chainPhases(), card?.phase ?? '', card?.chain ?? [], chain.chain);
+    return chainCompareOf(this.chainPhases(), card?.phase ?? '', card?.chain ?? [], chain.chain, card?.at);
   }
 
   protected detailOf(proposal: TimelineProposal): ProposalDetail | null {

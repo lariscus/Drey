@@ -1062,18 +1062,30 @@ either: while the ticket waits at one of your checkpoints its head has the link
 **Decision waiting · go to the card**.
 
 **The Flow tab.** *Change* in the ticket's card or *Change flow* in its Parts
-block opens **Flow · T-0121**: the gates the ticket will still pass, each with who
-works it and on which model. Click a gate to open its settings on the right:
-who works it (the pipeline's default or one persona), *Tell me when it is
-done*, *Earlier* / *Later*, *Add a gate after* and *Remove gate* (a standard
-gate is struck, not deleted; *Restore gate* brings it back). The round **+**
-between two gates adds a gate there. A gate drawn with a dashed outline is a
-change you have not saved. Type into *Ask Paul to change this flow* (or leave
-it empty) and press *Ask Paul* to get his draft with the reason, *Undo draft*
-if you do not like it. Nothing is written until **Save flow**; *Reset to
-standard flow* drops every change. The gate that is running and the ones
-before it cannot change, and the whole flow is read-only while a run is live
-on the ticket.
+block opens **Flow · T-0121**: the ticket's **chain** — the personas it goes
+through, in order (*Paul, Paul, Ben, Ralf, Tessa, You*), each with its model.
+The same persona may stand twice; the entry where you shape the ticket with
+Paul carries the mark *Shape*. Click a step to open its settings on the right:
+who takes it (any persona of the crew), *Tell me when it is done*, *Earlier* /
+*Later*, *Add a persona after* and *Remove gate*. The round **+** between two
+steps adds a persona there. A step drawn with a dashed outline is a change you
+have not saved. Type into *Ask Paul to change this flow* (or leave it empty)
+and press *Ask Paul* to get his draft with the reason, *Undo draft* if you do
+not like it. Nothing is written until **Save flow**; *Reset to standard flow*
+puts the standard flow back behind the steps that have begun. The current step
+and the ones before it cannot change, and the whole flow is read-only while a
+run is live on the ticket.
+
+**Where a chain comes from.** A new ticket gets the board's **standard flow**
+(the `flow:` line in `_meta/pipeline.md`; a new board ships
+`paul:shape; paul; ben; ralf; tessa; you`), and from then on the chain is the
+ticket's own — changing the standard flow later leaves existing tickets alone.
+Paul may write a chain into the plan (`### Chain`); when the shaped plan is
+saved it becomes the ticket's chain. A plan's parts carry their own; a part
+without one gets the standard flow. For now the chain is what a ticket
+*will* go through: the board and the runner still move tickets column by
+column, and nothing steps along the chain yet — that comes with the persona
+board's runner.
 
 **By voice.** On Windows the dialog's Description label carries a
 **mic button**: it starts Windows dictation (Win+H — Windows' own;

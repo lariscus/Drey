@@ -122,7 +122,7 @@ export function createTicketStrip(deps: TicketStripDeps): TicketStrip {
         const row = deps.rowOf(card);
         const phase = snapshot.pipeline.find((p) => p.id === card.phase);
         const phaseTitle = phase?.title ?? card.phase;
-        const chain = chainOf({ pipeline: snapshot.pipeline, currentPhaseId: card.phase, card, personas: personas ?? [] });
+        const chain = chainOf({ pipeline: snapshot.pipeline, currentPhaseId: card.phase, card, personas: personas ?? [], flow: snapshot.flow });
         const planToAccept = card.phase === 'shaping' && hasOpenParts(text);
         const status = statusOf(deps.i18n, row, snapshot, phaseTitle, planToAccept);
         const shape = pageShapeOf(card.phase, snapshot.pipeline);
