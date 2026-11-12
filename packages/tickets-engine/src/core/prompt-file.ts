@@ -15,6 +15,9 @@
 import { promises as fsp } from 'node:fs';
 import path from 'node:path';
 import { SHIPPED_PROMPTS_DIR, stripPromptVersion } from './default-prompts';
+import { expandFragments, FRAGMENT_PLACEHOLDERS, type PromptFragments } from './prompt-fragments';
+
+export { expandFragments, FRAGMENT_PLACEHOLDERS, type PromptFragments };
 
 /** Reads one prompt file below `dir`; `what` names the family in the error ("discipline", "crew prompt", "fragment"). */
 export async function readPromptFile(dir: string, rel: string, what: string): Promise<string> {
@@ -27,12 +30,6 @@ export async function readPromptFile(dir: string, rel: string, what: string): Pr
     throw new Error(`the ${what} ${rel} in ${dir} is empty`);
   }
   return stripped;
-}
-
-/** The shared fragments a prompt pulls in by placeholder. */
-export interface PromptFragments {
-  readonly planFormat: string;
-  readonly chainGrammar: string;
 }
 
 const FRAGMENT_FILES: Readonly<Record<keyof PromptFragments, string>> = {
@@ -48,12 +45,6 @@ export async function loadPromptFragments(dir: string): Promise<PromptFragments>
   };
 }
 
-/** The placeholder each fragment replaces. */
-export const FRAGMENT_PLACEHOLDERS: Readonly<Record<keyof PromptFragments, string>> = {
-  planFormat: '{{plan-format}}',
-  chainGrammar: '{{chain-grammar}}',
-};
-
 /**
  * A persona prompt for a 1:1 or a free session: a seeded persona's
  * prompt.md carries its step prompt, placeholders included — they expand
@@ -64,14 +55,3 @@ export async function expandShippedFragments(text: string, dir: string = SHIPPED
   return named ? expandFragments(text, await loadPromptFragments(dir)) : text;
 }
 
-/** A prompt text with every fragment placeholder replaced; null stays null. */
-export function expandFragments<T extends string | null>(text: T, fragments: PromptFragments): T {
-  if (text === null) {
-    return text;
-  }
-  let out: string = text;
-  for (const key of Object.keys(FRAGMENT_PLACEHOLDERS) as (keyof PromptFragments)[]) {
-    out = out.replaceAll(FRAGMENT_PLACEHOLDERS[key], fragments[key]);
-  }
-  return out as T;
-}
