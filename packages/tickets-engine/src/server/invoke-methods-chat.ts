@@ -1,6 +1,6 @@
 import type { EngineParts } from './engine-parts';
 import type { InvokeTable } from './invoke-table';
-import { parseCrewOverrides, parseCrewPatches, parseFreeSessionAsk } from './session-payloads';
+import { parseCrewOrder, parseCrewOverrides, parseCrewPatches, parseFreeSessionAsk } from './session-payloads';
 
 type ChatService = EngineParts['sessions']['chat'];
 type FileOf = { readonly file: string };
@@ -16,6 +16,8 @@ export function addChatMethods(table: InvokeTable, parts: EngineParts): void {
   // req-173: the vault layer (Settings -> Tickets) and the free sessions.
   table.set('crewConfig', async () => crew.reply(await board.detect()));
   table.set('crewConfigSet', async (payload) => crew.set(await board.detect(), parseCrewPatches(payload), parseCrewOverrides(payload)));
+  // req-258: the crew's order (the Crew tab's drag), the whole list of persona ids.
+  table.set('crewOrderSet', async (payload) => crew.setOrder(await board.detect(), parseCrewOrder(payload)));
   table.set('sessionOptions', () => freeSessions.options());
   table.set('sessionStart', (payload) => {
     const ask = parseFreeSessionAsk(payload);

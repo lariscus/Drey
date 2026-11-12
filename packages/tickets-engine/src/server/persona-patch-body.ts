@@ -1,4 +1,5 @@
 import type { PersonaAllowedPatch } from '../contracts/persona-allowed';
+import type { PersonaSettingsPatch } from '../contracts/persona-settings-patch';
 import type { Parsed } from '../core/commands';
 
 /**
@@ -23,6 +24,7 @@ export interface PersonaPatchInput {
   summary?: string;
   budget?: number | null;
   allowed?: PersonaAllowedPatch;
+  settings?: PersonaSettingsPatch;
 }
 
 const PERSONA_PATCH_KEYS: readonly (keyof PersonaPatchInput)[] = [
@@ -37,6 +39,7 @@ const PERSONA_PATCH_KEYS: readonly (keyof PersonaPatchInput)[] = [
   'summary',
   'budget',
   'allowed',
+  'settings',
 ];
 
 /** One key's value as the patch carries it: the shape checked, or the refusal. */
@@ -50,7 +53,8 @@ function valueOf(key: keyof PersonaPatchInput, value: unknown): Parsed<unknown> 
     case 'budget':
       return value === null || typeof value === 'number' ? { ok: true, value } : { ok: false, error: 'budget is a number of dollars or null' };
     case 'allowed':
-      return asObject(value) !== null ? { ok: true, value } : { ok: false, error: 'allowed is an object' };
+    case 'settings':
+      return asObject(value) !== null ? { ok: true, value } : { ok: false, error: `${key} is an object` };
     default:
       return typeof value === 'string' ? { ok: true, value } : { ok: false, error: `${key} is a string` };
   }

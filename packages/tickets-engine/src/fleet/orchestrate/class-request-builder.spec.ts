@@ -50,6 +50,14 @@ describe('ClassRequestBuilder — who asks for which class (req-170)', () => {
     expect(builder.build({ card: card({ model: 'opus' }), phase: phase(), persona: persona('sonnet'), repo: null }).stepUp).toBeUndefined();
   });
 
+  it("req-258: the persona's own floor and needs win over the column's when its record names them", () => {
+    const floored = persona('opus, sonnet, kimi/k2', 'min-class: A\n');
+    expect(builder.build({ card: card({ size: 'S' }), phase: phase('B'), persona: floored, repo: null })).toMatchObject({ class: 'A', why: 'size S → C, floor A of ben' });
+    const needy = { ...phase(), needs: { image: true } } as PipelinePhase;
+    expect(builder.build({ card: card(), phase: needy, persona: persona('sonnet', 'needs: [tools]\n'), repo: null }).needs).toEqual({ tools: true });
+    expect(builder.build({ card: card(), phase: needy, persona: persona('sonnet'), repo: null }).needs).toEqual({ image: true });
+  });
+
   it("the repository's profile rides the request", () => {
     expect(builder.build({ card: card(), phase: phase(), persona: persona('sonnet'), repo: { name: 'w', profile: 'work' } as never }).profile).toBe('work');
   });

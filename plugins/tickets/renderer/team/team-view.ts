@@ -24,6 +24,7 @@ import {
   type RunRowModel,
   type TeamModel,
 } from './team-model';
+import { attachCrewReorder, withOthersKept, type CrewReorder } from './crew-reorder';
 import { mountMemoryPane } from './memory-pane';
 import { mountNewSessionForm, type NewSessionFormHandle } from './new-session-form';
 import { mountOneOnOnePane } from './one-on-one-pane';
@@ -153,6 +154,7 @@ function personaCardNode(
   stopAsk: boolean,
   select: () => void,
   setStopAsk: (open: boolean) => void,
+  reorder: CrewReorder,
 ): HTMLElement {
   const node = h('article', `desk-persona desk-persona-${card.state}${selected ? ' desk-persona-selected' : ''}`);
   node.dataset['persona'] = card.id;
@@ -161,6 +163,7 @@ function personaCardNode(
   node.setAttribute('aria-label', `${card.title}, ${card.stateWord}`);
   node.style.setProperty('--persona-color', card.color);
   node.addEventListener('click', select);
+  attachCrewReorder(node, card.id, reorder);
   node.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && event.target === node) {
       event.preventDefault();
@@ -343,6 +346,7 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
   let detailKey = '';
   let detail: HTMLElement | null = null;
   let newSession: NewSessionFormHandle | null = null;
+  let pendingFocus: string | null = null;
   // The Persona page's links (req-171) open this tab on a persona's Memory or 1:1: waiting at mount, or while it is open.
   const asked = takeCrewFocus();
   if (asked !== null) {
@@ -428,6 +432,16 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
       }),
     );
 
+    // req-258: the crew's order — drag, Ctrl+Shift+PageUp/PageDown, the card's menu; the human (no card) keeps its place.
+    const reorder: CrewReorder = {
+      t: deps.api.i18n.t,
+      ids: () => model.personas.map((entry) => entry.id),
+      apply: (order, focus) => {
+        pendingFocus = focus;
+        const full = withOthersKept(store.personas().map((entry) => entry.id), order);
+        void deps.mutate(deps.api.i18n.t('tickets.team.reordering'), () => deps.invoke('crewOrderSet', { order: full })).then(() => store.refresh());
+      },
+    };
     const grid = h('div', 'desk-persona-grid');
     for (const card of model.personas) {
       grid.append(
@@ -446,6 +460,7 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
             stopAskFor = open ? card.id : null;
             schedule();
           },
+          reorder,
         ),
       );
     }
@@ -470,7 +485,14 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
               schedule();
             });
     }
+    // A repaint replaces the cards: the focused one (or the one just moved) keeps the focus.
+    const active = document.activeElement instanceof HTMLElement && root.contains(document.activeElement) ? (document.activeElement.dataset['persona'] ?? null) : null;
     root.replaceChildren(head, ...(newSession === null ? [] : [newSession.node]), grid, ...(detail === null ? [] : [detail]));
+    const focus = pendingFocus ?? active;
+    pendingFocus = null;
+    if (focus !== null) {
+      grid.querySelector<HTMLElement>(`[data-persona="${CSS.escape(focus)}"]`)?.focus();
+    }
   };
 
   const schedule = (): void => {

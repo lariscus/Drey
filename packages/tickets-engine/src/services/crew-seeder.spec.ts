@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { crewOrderOf } from '../core/crew-order';
 import { seededCrewOf } from '../core/crew-seed-marker';
 import { DEFAULT_CREW_IDS } from '../core/default-crew';
 import { parsePersonaFile } from '../core/persona';
@@ -36,6 +37,16 @@ describe('CrewSeeder — the default crew Paul, Ben, Ralf, Tessa (req-256)', () 
       expect(rig.commits[0]!.paths).toContain(`${DIR}/tessa/prompt.md`);
       expect(rig.announced).toHaveLength(1);
       expect(rig.logs.filter((line) => line.startsWith('crew: seeded the default crew'))).toHaveLength(1);
+    });
+
+    it('req-258: writes the crew order, the human last, and the shipped run settings', async () => {
+      await rig.seeder.seed(rig.vault);
+      expect(crewOrderOf(await rig.read(CREW))).toEqual([...DEFAULT_CREW_IDS, 'you']);
+      const settingsOf = async (id: string) => parsePersonaFile(id, (await rig.read(`${DIR}/${id}/persona.md`))!).settings;
+      expect((await settingsOf('paul')).gate).toBe('structural');
+      expect((await settingsOf('ralf')).readOnly).toBe(true);
+      expect((await settingsOf('tessa')).readOnly).toBe(true);
+      expect((await settingsOf('ben')).readOnly).toBeNull();
     });
 
     it('gives each persona its role, a distinct colour and the role\'s step below its character', async () => {
@@ -104,6 +115,13 @@ describe('CrewSeeder — the default crew Paul, Ben, Ralf, Tessa (req-256)', () 
     expect(text).toContain('diff-stat-lines: 12');
     expect(text).toContain('seeded-crew: [paul, ben, ralf, tessa]');
     expect(text.endsWith('---\nMy prose.\n')).toBe(true);
+  });
+
+  it('req-258: keeps an order the owner already set', async () => {
+    rig = await CrewSeederRig.create({ rows: TABLE });
+    await rig.write(CREW, '---\norder: [you, ben]\n---\n');
+    await rig.seeder.seed(rig.vault);
+    expect(crewOrderOf(await rig.read(CREW))).toEqual(['you', 'ben']);
   });
 
   describe('the worker and model rule', () => {

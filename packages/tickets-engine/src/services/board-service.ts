@@ -84,7 +84,11 @@ import { type EngineHost, type EngineVaultChangeEvent, EngineVault, FleetPort } 
 import { handoverFromConfig, handoverOverrideKeys } from './handover-config';
 import type { EffectiveCrew } from '../fleet/config/layered-config-resolver';
 import { appendMemory, describeMemoryEntries, memoryPathFor, toggleMemoryPin } from './persona-store';
-import { HUMAN_PERSONA_ID, humanPersona, inPipelineOrder, isHumanPersona, loadPersonaSkills, personaFileText, personaMigrationFor, parsePersonaFile, personaRef, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaMigration, type PersonaSkill } from '../core/persona';
+import { EMPTY_PERSONA_SETTINGS, HUMAN_PERSONA_ID, humanPersona, isHumanPersona, loadPersonaSkills, personaFileText, personaMigrationFor, parsePersonaFile, personaRef, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaMigration, type PersonaSkill } from '../core/persona';
+import { crewOrderOf, inCrewOrder } from '../core/crew-order';
+import { personaRunSettingsOf } from '../core/persona-settings';
+import { settingsAfter, type PersonaSettingsPatch } from '../contracts/persona-settings-patch';
+import { CREW_FILE } from '../contracts/crew-config';
 import { scanRepoFolder } from './repos-scan';
 
 const PIPELINE_PATH = 'tickets/_meta/pipeline.md';
@@ -3117,6 +3121,7 @@ export class EngineBoardService {
         prompt: await loader.prompt(personaResolution.persona.id),
         memory: await loader.memory(personaResolution.persona.id),
         skills: await this.personaSkillsFor(vault, personaResolution.persona),
+        run: personaRunSettingsOf(personaResolution.persona),
       };
     }
     const composed = composeRunRequest({
@@ -3773,7 +3778,9 @@ export class EngineBoardService {
         personas.push(persona);
       }
     }
-    return inPipelineOrder(personas);
+    // req-258: the crew's order is `order:` in crew.md; a persona it does not name follows in pipeline order.
+    const crewText = await this.host.read(vault.id, CREW_FILE).catch(() => null);
+    return inCrewOrder(personas, crewOrderOf(crewText));
   }
 
   /** The persona directory's ids (the improvement loop's sweep list). */
@@ -3987,6 +3994,7 @@ export class EngineBoardService {
     summary?: string;
     budget?: number | null;
     allowed?: PersonaAllowedPatch;
+    settings?: PersonaSettingsPatch;
   }): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
       let id: string;
@@ -4007,8 +4015,8 @@ export class EngineBoardService {
         return { ok: false, error: refusal };
       }
       const sent = (key: string): boolean =>
-        input[key as 'title' | 'role' | 'worker' | 'model' | 'pool' | 'color' | 'skills' | 'prompt' | 'summary' | 'budget' | 'allowed'] !== undefined;
-      if (!['title', 'role', 'worker', 'model', 'pool', 'color', 'skills', 'prompt', 'summary', 'budget', 'allowed'].some(sent)) {
+        input[key as 'title' | 'role' | 'worker' | 'model' | 'pool' | 'color' | 'skills' | 'prompt' | 'summary' | 'budget' | 'allowed' | 'settings'] !== undefined;
+      if (!['title', 'role', 'worker', 'model', 'pool', 'color', 'skills', 'prompt', 'summary', 'budget', 'allowed', 'settings'].some(sent)) {
         return { ok: true }; // nothing to change
       }
       const personaPath = `${PERSONAS_DIR}/${id}/persona.md`;
@@ -4033,6 +4041,7 @@ export class EngineBoardService {
         ...(input.summary !== undefined ? { summary: input.summary.replace(/\s+/g, ' ').trim() } : {}),
         ...(input.budget !== undefined ? { budget: input.budget } : {}),
         ...(input.allowed !== undefined ? { allowed: allowedAfter(persona.allowed, input.allowed) } : {}),
+        ...(input.settings !== undefined ? { settings: settingsAfter(persona.settings, input.settings) } : {}),
       };
       const patched = personaFileText(next, hadFence ? body : undefined);
       const touched = [personaPath];
@@ -4164,6 +4173,7 @@ export class EngineBoardService {
             skills: [],
             budget: null,
             allowed: { spendAboveAllowance: false },
+            settings: EMPTY_PERSONA_SETTINGS,
           };
           const personaPath = `${PERSONAS_DIR}/${migration.id}/persona.md`;
           await this.host.write(vault.id, personaPath, personaFileText(persona));

@@ -31,6 +31,8 @@ export const view: PersonaView = {
   phases: ['build'],
   summary: 'Builds one part of a ticket, test first.',
   allowed: { spendAboveAllowance: false, writeVaults: ['notes'] },
+  settings: { minClass: 'B', needs: null, maxTurns: null, maxWorkMin: null, gate: null, parallel: 2, min: 0, leaving: ['sync-main'], readOnly: false },
+  readOnly: false,
 };
 
 export const OPEN_PROPOSAL = { id: 'imp-1', state: 'open', target: 'prompt.md', title: 'Add a line', evidence: ['a', 'b', 'c'], content: 'Suggested prompt', lesson: null, at: '', decidedAt: null };

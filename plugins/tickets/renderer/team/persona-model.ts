@@ -7,7 +7,9 @@
  */
 import type { PersonaAllowedPatch } from '../../../../packages/tickets-engine/src/contracts/persona-allowed';
 import type { PersonaRunCommands } from '../../../../packages/tickets-engine/src/core/persona';
+import type { PersonaSettingsPatch } from '../../../../packages/tickets-engine/src/contracts/persona-settings-patch';
 import type { PersonaView } from '../../shared/remote-protocol';
+import { savedSettingsOf, settingsDraftOf, settingsPatchOf, type SettingsDraft } from './persona-settings-model';
 import { roleLabel } from './team-model';
 
 export const PERSONA_KIND = 'tickets-persona';
@@ -57,6 +59,8 @@ export interface PersonaDraft {
   readonly prompt: string;
   readonly pool: readonly string[];
   readonly allowed: AllowedDraft;
+  /** The Work block's run settings (req-258). */
+  readonly settings: SettingsDraft;
 }
 
 /** The keys a Save sends. */
@@ -69,6 +73,7 @@ export interface PersonaPatchKeys {
   prompt?: string;
   pool?: readonly string[];
   allowed?: PersonaAllowedPatch;
+  settings?: PersonaSettingsPatch;
 }
 
 function allowedOf(view: PersonaView): AllowedDraft {
@@ -90,6 +95,7 @@ export function draftOf(view: PersonaView, prompt: string): PersonaDraft {
     prompt,
     pool: view.pool.length > 0 ? view.pool : view.model === '' ? [] : [view.model],
     allowed: allowedOf(view),
+    settings: settingsDraftOf(view),
   };
 }
 
@@ -155,6 +161,10 @@ export function patchOf(base: PersonaDraft, draft: PersonaDraft): PersonaPatchKe
   if (allowed !== null) {
     patch.allowed = allowed;
   }
+  const settings = settingsPatchOf(base.settings, draft.settings, Object.keys(patch).length > 0);
+  if (settings !== null) {
+    patch.settings = settings;
+  }
   return patch;
 }
 
@@ -164,21 +174,7 @@ export function isDirty(base: PersonaDraft, draft: PersonaDraft): boolean {
 
 /** The base after a Save of `draft`: what the form now shows is what the record holds. */
 export function savedBaseOf(draft: PersonaDraft): PersonaDraft {
-  return { ...draft, title: draft.title.trim(), role: roleLabel(draft.role.trim().toLowerCase()), summary: draft.summary.trim(), worker: draft.worker.trim(), budget: draft.budget.trim().replace(/^\$/, '') };
-}
-
-/** One step chip: what the persona works, read from the flows' `persona:` keys (`_meta/pipeline.md`). */
-export interface StepChip {
-  readonly id: string;
-  readonly title: string;
-  readonly on: boolean;
-}
-
-/** The agent steps of the flow, and any other step this persona is pinned on. A human step is never offered: Accept is always the owner's. */
-export function stepsOf(pipeline: readonly { readonly id: string; readonly title: string; readonly handover: string }[], phases: readonly string[]): readonly StepChip[] {
-  return pipeline
-    .filter((phase) => phase.handover.startsWith('agent') || phases.includes(phase.id))
-    .map((phase) => ({ id: phase.id, title: phase.title, on: phases.includes(phase.id) }));
+  return { ...draft, title: draft.title.trim(), role: roleLabel(draft.role.trim().toLowerCase()), summary: draft.summary.trim(), worker: draft.worker.trim(), budget: draft.budget.trim().replace(/^\$/, ''), settings: savedSettingsOf(draft.settings) };
 }
 
 /** The instructions' length as the status bar shows it. */

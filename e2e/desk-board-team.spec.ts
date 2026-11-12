@@ -145,7 +145,7 @@ function liveRun(id: string, ticketId: string, personaId: string, extra: Record<
 }
 
 test.describe('Board, Team and Capacity (E13-8)', () => {
-  test('shows the board, the team and the capacity band', async ({ page, electronApp }, testInfo) => {
+  test('shows the board, the team and the capacity band', async ({ page, electronApp, vaultDir }, testInfo) => {
     // The Work view exists once the plugin has registered it; Ctrl+2 before that does nothing.
     await expect(page.locator('[role="tablist"][aria-label="Views"] [role="tab"]')).toHaveText(['Notes', 'Work', 'Crew'], { timeout: 30_000 });
     // The title bar carries no capture button (board 9a); it is the Work panel's first header action (board 7a).
@@ -247,6 +247,15 @@ test.describe('Board, Team and Capacity (E13-8)', () => {
     await expect(team.locator('.desk-tab')).toHaveText(['Setup', 'Memory', '1:1']);
     await expect(team.locator('.desk-pool-model')).toHaveText('qwen3-coder');
     await page.screenshot({ path: testInfo.outputPath('desk-team.png') });
+
+    // req-258: the crew's order -- Ctrl+Shift+PageDown moves the focused card right, written as order: in crew.md.
+    const cardIds = (): Promise<string[]> => team.locator('.desk-persona').evaluateAll((nodes) => nodes.map((node) => (node as HTMLElement).dataset['persona'] ?? ''));
+    await expect.poll(cardIds).toEqual(['paul', 'ben', 'ralf', 'tessa']);
+    await team.locator('[data-persona="paul"]').focus();
+    await page.keyboard.press('Control+Shift+PageDown');
+    await expect.poll(cardIds, { timeout: 15_000 }).toEqual(['ben', 'paul', 'ralf', 'tessa']);
+    await expect(team.locator('[data-persona="paul"]')).toBeFocused();
+    expect(fs.readFileSync(path.join(vaultDir, 'tickets', '_meta', 'crew.md'), 'utf8')).toContain('order: [ben, paul, ralf, tessa');
 
     // --- Capacity band in the bottom dock: only on the Board tab (board 7e; the Crew tab, 7f, has none)
     await expect(page.locator('.desk-capacity')).toBeHidden();

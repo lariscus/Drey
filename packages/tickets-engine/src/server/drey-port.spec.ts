@@ -6,6 +6,7 @@ import { renderScoutReportSection } from '../core/scout';
 import { parseStatusLog, type StatusLine } from '../core/status-log';
 import { BYPASS_REFUSAL, ChangeHub, DreyTicketsPort, type RemoteBoard, type RemoteFleet } from './drey-port';
 
+import { EMPTY_PERSONA_SETTINGS } from '../core/persona-settings';
 /**
  * req-66: the Drey adapter behind the remote port — the actor reaches
  * every board write, bypass runs are refused unless allowed, and the
@@ -28,6 +29,7 @@ function fakePersona(id: string, title: string): import('../core/persona').Perso
     skills: [],
     budget: null,
     allowed: { spendAboveAllowance: false },
+    settings: EMPTY_PERSONA_SETTINGS,
   };
 }
 
@@ -101,6 +103,7 @@ describe('DreyTicketsPort', () => {
         skills: [],
         budget: 25,
         body: 'Who Pia is.',
+        settings: EMPTY_PERSONA_SETTINGS,
       },
     ] as unknown as Awaited<ReturnType<typeof board.listPersonas>>);
     const port = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false });
@@ -114,6 +117,8 @@ describe('DreyTicketsPort', () => {
         pool: ['opus', 'sonnet'],
         color: '#a78bfa',
         budget: 25,
+        settings: EMPTY_PERSONA_SETTINGS,
+        readOnly: false,
       },
     ]);
   });

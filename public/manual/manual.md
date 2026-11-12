@@ -1477,7 +1477,10 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   budgets, the pool load (*Local 1/2*), **Pause all** (running work
   finishes, nothing new starts; the button then reads **Resume all**) and
   **Stop all** (press twice — it aborts every live run and halts the
-  chain). Click a card to open the persona's **1:1** (a conversation with
+  chain). The cards stand in the crew's order: drag a card onto another to
+  move it, or focus one and press **Ctrl+Shift+PageUp** / **PageDown**, or
+  right-click it (or press the context-menu key) for **Move left** /
+  **Move right** — the order is saved for every device. Click a card to open the persona's **1:1** (a conversation with
   the persona, [The 1:1](#one-on-one); Ctrl+Enter sends), **Memory** (its memory lines with who wrote them —
   pin the ones that must always ride along, remove any, a line to teach
   it — and its journal of noteworthy runs, [Memory and journal](#memory-journal)) and **Setup** (worker,
@@ -1485,12 +1488,19 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   **Edit persona** on that head opens the persona's own page. On the left,
   **Profile** (the circle with the initials, the name, the role and **the one
   line for the crew list** — the line under the name on the crew cards, in
-  Mission Control too), **Work** (the steps of your flows the persona takes,
-  shown as chips — change them in the flow —; the harness; the models,
+  Mission Control too), **Work** (the harness; the models,
   strongest first, each with its class, its factor and how many of its
   sessions are busy (`1 / 3 busy`: the running runs and 1:1s on that model
   against what its accounts allow); **Add a model…** picks from the model table and the **⋮** menu moves or
-  removes a row; the daily budget) and **Allowed to** (which vaults the persona
+  removes a row; the **Class floor** — the lowest model class a run of the
+  persona may use, over the step's own; **Read-only** — the persona's runs
+  are told to change no file (an instruction in their brief, not a lock: the
+  reviewer and the tester are read-only unless you switch it off);
+  **Parallel · max** and **Parallel · min** — the most runs of the persona at
+  once, and how many it may start when the big pool is full (recorded for the
+  per-persona pool that comes next); **Leaving actions** — machine work when a
+  ticket leaves the persona, `sync-main` or `commit` (recorded; the runner
+  does them in a later release); the daily budget) and **Allowed to** (which vaults the persona
   may change, whether its runs ask before running commands, whether it may
   reach the network, whether it may spend past a ticket's allowance — hover a
   row for what it means; the vault and allowance choices apply to runs now,

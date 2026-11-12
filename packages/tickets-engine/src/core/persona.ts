@@ -1,5 +1,6 @@
 import { parseDocument } from 'yaml';
 import { splitFrontmatter } from '../../../../shared/frontmatter';
+import { EMPTY_PERSONA_SETTINGS, personaSettingsLines, personaSettingsOf, type PersonaSettings } from './persona-settings';
 
 /**
  * Personas (ADR-0088, E3 — the concept's §4): a named agent is role +
@@ -102,6 +103,8 @@ export interface Persona {
   readonly budget: number | null;
   /** `allowed:` — what it may do beyond its runs; absent in the file = nothing beyond. */
   readonly allowed: PersonaAllowed;
+  /** The run settings (req-258): class floor, needs, ceilings, gate, own pool, leaving actions, read-only. */
+  readonly settings: PersonaSettings;
 }
 
 export const PERSONAS_DIR = 'tickets/_meta/personas';
@@ -109,7 +112,8 @@ export const PERSONAS_DIR = 'tickets/_meta/personas';
 /**
  * Personas in pipeline order (fidelity ruling O12): `PERSONA_ROLES` is the crew's
  * order, plan to test, then custom ones, and the human last; within a role by id.
- * The role decides because the stock pipeline names no persona per step of Building.
+ * Since req-258 the crew's order is `order:` in crew.md (`inCrewOrder`); this
+ * order only places the personas the list does not name.
  */
 export function inPipelineOrder<P extends Pick<Persona, 'id' | 'role' | 'kind'>>(personas: readonly P[]): P[] {
   const rank = (persona: P): number => (persona.kind === 'human' ? PERSONA_ROLES.length : PERSONA_ROLES.indexOf(persona.role));
@@ -200,6 +204,7 @@ export function parsePersonaFile(id: string, text: string): Persona {
     skills: asStringList(get('skills')),
     budget: budgetOf(get('budget')),
     allowed: allowedOf(get('allowed')),
+    settings: personaSettingsOf(get),
   };
 }
 
@@ -222,6 +227,7 @@ export function humanPersona(title: string, id: string = HUMAN_PERSONA_ID): Pers
     skills: [],
     budget: null,
     allowed: { spendAboveAllowance: false },
+    settings: EMPTY_PERSONA_SETTINGS,
   };
 }
 
@@ -247,6 +253,7 @@ export function personaFileText(persona: Persona, body?: string): string {
     `color: '${persona.color}'`,
     `skills: [${persona.skills.join(', ')}]`,
     ...(persona.budget !== null ? [`budget: ${persona.budget}`] : []),
+    ...personaSettingsLines(persona.settings),
     ...allowedLines(persona.allowed),
     '---',
     '',
@@ -283,6 +290,7 @@ export function resolvePersona(input: {
 }
 
 export { splitPoolEntry } from './pool-entry';
+export { EMPTY_PERSONA_SETTINGS, type PersonaSettings } from './persona-settings';
 
 /**
  * The migration reader (concept §4.2): one pipeline column's legacy

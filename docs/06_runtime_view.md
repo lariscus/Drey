@@ -5780,3 +5780,41 @@ sequenceDiagram
 ```
 
 A plan's parts carry their own `chain:` line; when the owner releases the plan, a part without one gets the standard flow. A ticket whose chain does not parse (the old E9 delta, a typo) reads as having none — the flow editor then shows the standard flow it would get, and the next save writes a list.
+
+## 6.120 A persona's run settings and the crew's order — persona.md → dispatch → the brief and the request; the Crew tab's drag → crew.md (req-258, milestone 244)
+
+```mermaid
+sequenceDiagram
+    actor Owner
+    participant Page as Persona page / Crew tab
+    participant BS as BoardService / CrewConfigService
+    participant P as personas/<id>/persona.md
+    participant C as _meta/crew.md
+    participant TD as TicketDispatch / startRun
+    participant CB as ClassRequestBuilder
+    participant RC as composeRunRequest
+    Owner->>Page: Work block: class floor, read-only, parallel, leaving · Save
+    Page->>BS: personaPatch {settings: {minClass, readOnly, …}}
+    BS->>P: min-class: B · readonly: true · … · one commit "personas: <id> updated"
+    Owner->>Page: drag a card / Ctrl+Shift+PageDown / Move right
+    Page->>BS: crewOrderSet {order: [ben, paul, ralf, tessa, you]}
+    BS->>C: order: [...] · one commit "tickets: crew order"
+    Note over BS,C: listPersonas follows order: — unlisted personas after it in pipeline order
+    TD->>P: the resolved persona (ladder unchanged)
+    TD->>CB: class request — the persona's min-class / needs over the column's
+    TD->>RC: persona.run = {readOnly, gate, maxTurns, maxWorkMin} (role defaults resolved)
+    alt gate: structural (planner default)
+        RC->>RC: acceptance [] · gate structural · no refusal without criteria
+    else gate: commands
+        RC->>RC: the ticket's acceptance commands gate the hand-over
+    end
+    alt readOnly (record, else reviewer / tester)
+        RC->>RC: brief rules: working, read-only, language, precedence (worktree and session unchanged)
+    end
+    alt a dialog run (the Shape chat)
+        RC->>RC: prompt = persona prompt.md + the column's interactive prompt
+    end
+    RC-->>TD: RunRequest (limits: the persona's ceilings over the column's)
+```
+
+`parallel`, `min` and `leaving` are recorded only: req-257's per-persona pool reads the first two, req-267 runs the leaving actions. A review's detached read-only checkout and read-only session (§6.109, req-183) stay tied to the `review` phase and the `reviewer` role; `readonly:` adds only the instruction.

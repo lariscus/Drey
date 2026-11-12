@@ -1,29 +1,18 @@
 // i18n: catalog
 /**
- * The Work block (R11): the steps as read-only chips from the flows, the
- * harness, the persona's models from the model table, the daily budget.
- * "Tell me when" is not drawn: nothing records or reads it yet (req-236).
+ * The Work block (R11; board 7k v2, req-258): the harness, the persona's
+ * models from the model table, the run settings (class floor, read-only, the
+ * persona's pool, leaving actions), the daily budget. The step chips went with
+ * req-258 (the persona board has no steps). "Tell me when" is not drawn:
+ * nothing records or reads it yet (req-236).
  */
 import { WORKER_PROVIDERS } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { h } from '../desk-deps';
 import { RUNNER_LABEL } from '../settings-workers';
 import type { BlockContext } from './persona-block-context';
 import { blockHead, iconButton, labelled, outlineButton, selectOf, textInput } from './persona-dom';
-import { stepsOf } from './persona-model';
 import { addableModelsOf, modelLinesOf, movedPool, type ModelLine } from './persona-work-model';
-
-function stepsNode(ctx: BlockContext): HTMLElement {
-  const steps = h('div', 'persona-steps');
-  steps.setAttribute('role', 'group');
-  steps.setAttribute('aria-label', ctx.t('persona.page.steps', { name: ctx.draft().title }));
-  steps.title = ctx.t('persona.page.steps_tip');
-  for (const step of stepsOf(ctx.deps.snapshot()?.pipeline ?? [], ctx.persona.phases ?? [])) {
-    const chip = h('span', `persona-step${step.on ? ' persona-step-on' : ''}`, step.on ? `✓ ${step.title}` : step.title);
-    chip.dataset['step'] = step.id;
-    steps.append(chip);
-  }
-  return steps;
-}
+import { workSettingsNodes } from './persona-work-settings';
 
 function rowMenu(ctx: BlockContext, line: ModelLine, pool: readonly string[]): HTMLElement {
   const menu = h('div', 'persona-menu');
@@ -119,9 +108,9 @@ export function workBlock(ctx: BlockContext): HTMLElement {
   budget.inputMode = 'decimal';
   block.append(
     blockHead(t('persona.page.work')),
-    labelled(t('persona.page.steps', { name: draft.title }), stepsNode(ctx)),
     labelled(t('persona.page.harness'), harness),
     labelled(t('persona.page.models'), pool),
+    ...workSettingsNodes(ctx),
     labelled(t('persona.page.budget'), budget, 'persona-half'),
   );
   return block;

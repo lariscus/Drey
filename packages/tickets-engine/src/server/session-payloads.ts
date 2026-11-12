@@ -25,6 +25,12 @@ export function parseCrewPatches(payload: unknown): readonly CrewPatch[] {
   return out;
 }
 
+/** req-258: `{ order: [<persona id>, …] }` or the bare list; anything that is not a text is dropped (the service checks the ids). */
+export function parseCrewOrder(payload: unknown): readonly string[] {
+  const list = Array.isArray(payload) ? payload : isRecord(payload) && Array.isArray(payload['order']) ? payload['order'] : [];
+  return (list as unknown[]).filter((id): id is string => typeof id === 'string').map((id) => id.trim());
+}
+
 /** `{ overrides: [{ map, name, value? }] }`: the per-provider/model handover thresholds; without `value` the entry goes. */
 export function parseCrewOverrides(payload: unknown): readonly CrewOverridePatch[] {
   const list = isRecord(payload) && Array.isArray(payload['overrides']) ? (payload['overrides'] as unknown[]) : [];

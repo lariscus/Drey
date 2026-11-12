@@ -1,4 +1,5 @@
 import type { PersonaAllowedPatch } from '../contracts/persona-allowed';
+import { settingsPatchError, type PersonaSettingsPatch } from '../contracts/persona-settings-patch';
 import { PERSONA_ROLES, PERSONA_RUN_COMMANDS } from '../core/persona';
 
 /** The PATCH body's shape (U4). */
@@ -15,6 +16,8 @@ export interface PersonaPatchFields {
   /** The daily budget in USD; null clears it (req-171). */
   budget?: number | null;
   allowed?: PersonaAllowedPatch;
+  /** req-258: the run settings. */
+  settings?: PersonaSettingsPatch;
 }
 
 const isBool = (value: unknown): boolean => value === undefined || typeof value === 'boolean';
@@ -54,5 +57,5 @@ const RULES: readonly Rule[] = [
 
 /** The PATCH body's validation (U4): only the listed rules reject; null = the patch is writable. */
 export function personaPatchError(input: PersonaPatchFields): string | null {
-  return RULES.find(([broken]) => broken(input))?.[1] ?? null;
+  return RULES.find(([broken]) => broken(input))?.[1] ?? (input.settings !== undefined ? settingsPatchError(input.settings) : null);
 }

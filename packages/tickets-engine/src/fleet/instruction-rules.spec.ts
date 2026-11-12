@@ -57,8 +57,8 @@ describe('composeInstruction — the shared rules by run kind (req-280)', () => 
     expect(text).toContain('in the worktree at the commit you reviewed');
   });
 
-  it("a tester's run is read-only too, without a review checkout", () => {
-    const text = composeInstruction(input({ personaId: 'tessa', personaRole: 'tester' })).text;
+  it('a persona instructed read-only (req-258) gets the read-only rules without a review checkout', () => {
+    const text = composeInstruction(input({ personaId: 'tessa', personaRole: 'tester', readOnly: true })).text;
     expect(text).toContain(D.readOnly);
     expect(text).not.toContain(D.writing);
     expect(text).not.toContain(D.handover);

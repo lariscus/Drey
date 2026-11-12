@@ -855,6 +855,19 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   border-color: var(--accent);
 }
 
+/* req-258: reordering the crew by drag — the card in flight dims, the drop side shows as an accent edge. */
+.desk-persona.crew-dragging {
+  opacity: 0.5;
+}
+
+.desk-persona.crew-drop-before {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.desk-persona.crew-drop-after {
+  box-shadow: inset -3px 0 0 var(--accent);
+}
+
 .desk-persona-ghost {
   opacity: 0.7;
   cursor: default;

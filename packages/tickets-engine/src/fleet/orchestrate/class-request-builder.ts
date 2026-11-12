@@ -43,7 +43,8 @@ export class ClassRequestBuilder {
     const { card, persona } = input;
     const provider = this.providerOf(persona);
     const pool = persona.models.pool.map((entry) => this.entryOf(entry));
-    const needs = mergeNeeds(input.phase.needs, card.meta.needs);
+    // req-258: the persona's own needs replace the column's when its record names any.
+    const needs = mergeNeeds(persona.settings.needs ?? input.phase.needs, card.meta.needs);
     const base = {
       ticket: card.id,
       persona: persona.id,
@@ -84,13 +85,16 @@ export class ClassRequestBuilder {
     const sized = size === null ? null : PART_SIZE_CLASS[size];
     const fallback = this.lookup.classOf(this.entryOf(input.persona.models.default));
     const start = sized ?? fallback;
-    const floor = input.phase.minClass ?? null;
+    // req-258: the persona's own floor wins over the column's when its record names one.
+    const own = input.persona.settings.minClass;
+    const floor = own ?? input.phase.minClass ?? null;
+    const floorWhy = own !== null ? `floor ${floor} of ${input.persona.id}` : `floor ${floor} in ${input.phase.id}`;
     if (start === null) {
-      return { class: floor, why: floor === null ? [] : [`floor ${floor} in ${input.phase.id}`] };
+      return { class: floor, why: floor === null ? [] : [floorWhy] };
     }
     const why = [size !== null ? `size ${size} → ${sized}` : `${input.persona.id}'s default class ${fallback}`];
     if (floor !== null && stronger(start, floor) !== start) {
-      return { class: floor, why: [...why, `floor ${floor} in ${input.phase.id}`] };
+      return { class: floor, why: [...why, floorWhy] };
     }
     return { class: start, why };
   }

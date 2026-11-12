@@ -29,10 +29,12 @@ export function isReviewRun(input: ReviewRunInput): boolean {
   return input.phaseId === REVIEW_PHASE_ID || input.personaRole === REVIEWER_ROLE;
 }
 
-/** The persona role whose runs judge and change nothing, like a review (req-280). */
-export const TESTER_ROLE = 'tester';
-
-/** A run that changes no file: a review (its checkout and session are read-only) or a tester's run. */
-export function isReadOnlyRun(input: { readonly reviewCheckout?: string; readonly personaRole?: string | null }): boolean {
-  return input.reviewCheckout !== undefined || input.personaRole === TESTER_ROLE;
+/**
+ * A run whose brief carries the read-only rules: a review (its checkout and
+ * session are read-only) or a run of a persona instructed read-only
+ * (`readonly:` on the record, else the reviewer's and the tester's role
+ * default — req-258; instructed, the harness session keeps its permissions).
+ */
+export function isReadOnlyRun(input: { readonly reviewCheckout?: string; readonly readOnly?: boolean }): boolean {
+  return input.reviewCheckout !== undefined || input.readOnly === true;
 }
