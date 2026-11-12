@@ -3,6 +3,7 @@ import { hostname } from 'node:os';
 import type { PipelinePhase, RepoRef } from '../contracts/tickets';
 import type { ComposedInstruction } from './instruction-parts';
 import type { ClosingSignal } from '../core/closing-signals';
+import { HUMAN_PERSONA_ID } from '../core/persona';
 import type { PersonaRunSettings } from '../core/persona-settings';
 import { DEFAULT_CLOSING_SPEC, type RunRequest } from './protocol';
 import type { RunPlan } from './request-plan';
@@ -28,7 +29,7 @@ type WorkParts = Pick<
   'provider' | 'model' | 'permissionMode' | 'instruction' | 'continuationInstruction' | 'briefDigest' | 'acceptance' | 'gate' | 'git'
 >;
 type MoveParts = Pick<RunRequest, 'nextPhase' | 'nextPhaseDir' | 'pushRemote' | 'claimIdentity'>;
-type OptionalParts = Pick<RunRequest, 'limits' | 'recordWorker' | 'column' | 'handover' | 'interactive' | 'dk' | 'parkFor' | 'profile' | 'reviewCheckout' | 'closing'>;
+type OptionalParts = Pick<RunRequest, 'limits' | 'recordWorker' | 'column' | 'handover' | 'interactive' | 'dk' | 'parkFor' | 'leaving' | 'machine' | 'profile' | 'reviewCheckout' | 'closing'>;
 
 /** The wire request, its keys in the order the runner's log and record have always shown them. */
 export function assembleRunRequest(plan: RunPlan, worker: RunWorkerPin, instruction: ComposedInstruction): RunRequest {
@@ -96,10 +97,24 @@ function optionalParts(plan: RunPlan): OptionalParts {
     ...(input.interactive !== undefined ? { interactive: input.interactive } : {}),
     ...(input.dk !== undefined ? { dk: input.dk } : {}),
     ...(moves && input.parkFor ? { parkFor: input.parkFor } : {}),
+    ...leavingParts(plan),
     ...profileParts(input.repo),
     ...(plan.reviewCheckout !== null ? { reviewCheckout: plan.reviewCheckout } : {}),
     ...closingParts(input.closingSignals, input.gateFailure),
   };
+}
+
+/**
+ * req-267: `sync-main` rides a ship run with a repository whose persona lists it; the commit is the
+ * sign-off's machine run (`commitStep`), never a run's end.
+ */
+function leavingParts(plan: RunPlan): Pick<RunRequest, 'leaving' | 'machine'> {
+  const { input, scout } = plan;
+  if (input.commitStep === true) {
+    return input.repo === null ? {} : { machine: { action: 'commit', persona: HUMAN_PERSONA_ID, policy: input.repo.policy } };
+  }
+  const syncs = input.persona?.run?.leaving.includes('sync-main') === true;
+  return syncs && !scout && input.repo !== null && input.interactive === undefined ? { leaving: ['sync-main'] } : {};
 }
 
 /** req-169: the closing round's signals and the retry flag — carried only when they differ from the default (all five, no retry). */

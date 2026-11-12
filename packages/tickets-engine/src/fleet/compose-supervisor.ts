@@ -8,6 +8,7 @@
  */
 import { hostname } from 'node:os';
 import { TicketsGit } from '../core/tickets-git';
+import { commitRunOf, runLeavingOf } from './compose-leaving';
 import { NodeFileSystem } from './node-file-system';
 import { NodeProcessTable } from './node-process-table';
 import { NodeTreeMode } from './node-tree-mode';
@@ -187,7 +188,8 @@ function runtimeOf(deps: RunSupervisorDeps): Runtime {
   const gate = new GateRunner({ bookkeeper, shell: deps.execShell ?? execShell, trailers: deps.validateTrailers ?? validateTrailers, repo, review, ...(deps.seats !== undefined ? { seats: deps.seats } : {}) });
   const opinion = deps.secondOpinion !== undefined ? { secondOpinion: deps.secondOpinion } : {};
   const closing = closingRoundOf({ shared, repo, processes, log });
-  const completion: RunCompletion = new RunCompletion({ machine, repo, gate, bookkeeper, settler, processes, closing, ...opinion });
+  const leaving = runLeavingOf({ git, bookkeeper, repo, claims, seats: deps.seats });
+  const completion: RunCompletion = new RunCompletion({ machine, repo, gate, bookkeeper, settler, processes, closing, leaving, ...opinion });
   return { ...shared, deps, table, machine, background, repo, settings, claims, settler, processes, stopper, takeover, completion, git, review };
 }
 
@@ -271,5 +273,6 @@ export function composeRunSupervisor(deps: RunSupervisorDeps): RunSupervisor {
     reopener,
     reaper: new RunReaper({ repo, settler, bookkeeper, settings, background, clock, table, log, ...limits, idle: idleOf(rt), replayExit: (run) => rt.completion.onWorkerExit(run, null) }),
     leftovers: new LeftoverClaims(deps.storeFor, log),
+    commits: commitRunOf({ git, bookkeeper, repo, claims, machine, streams, settler, background, clock, log, retiring: () => handover.retiring, seats: deps.seats }),
   });
 }

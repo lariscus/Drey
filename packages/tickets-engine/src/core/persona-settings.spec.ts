@@ -65,7 +65,7 @@ describe('persona run settings (req-258)', () => {
     expect(personaGate(of('planner'))).toBe('structural');
     expect(personaGate(of('builder'))).toBe('commands');
     expect(personaGate(of('planner', { gate: 'commands' }))).toBe('commands');
-    expect(personaRunSettingsOf(of('tester', { maxTurns: 9 }))).toEqual({ readOnly: true, gate: 'commands', maxTurns: 9, maxWorkMin: null });
+    expect(personaRunSettingsOf(of('tester', { maxTurns: 9 }))).toEqual({ readOnly: true, gate: 'commands', maxTurns: 9, maxWorkMin: null, leaving: [] });
   });
 });
 
