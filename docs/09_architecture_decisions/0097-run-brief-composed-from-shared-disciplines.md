@@ -80,3 +80,17 @@ how the prompts fit together, not about one file:
   time (a fragment fix would never reach a seeded copy); keeping shared rules
   in the step prompts with a lint for drift (duplicates stay, and the
   contradictions with the engine were in the copies).
+
+## Later change — req-258 (milestone 244): read-only by the persona's record
+
+`isReadOnlyRun` no longer reads the `tester` role: a run's brief carries the
+read-only rules for a review (its checkout) or when the resolved persona is
+**instructed read-only** — `readonly:` on `persona.md`, else the role's
+default (`reviewer`, `tester`). The owner's ruling (2026-11-12): read-only
+is an instruction in the brief, not a technical lock — a lock needs a harness
+change (`specs/decisions.md`). The consequence above ("a `qa-default` column
+run without a tester persona composes as a writing run") is answered: any
+persona can be set read-only. Two mode wrappers join the composition: a
+dialog run appends the column's interactive prompt after the persona's
+prompt, and a persona whose `gate:` is `structural` gets no gate commands
+in its brief.

@@ -373,8 +373,8 @@ is a discipline file the composer appends by run kind
 | File | Label it opens with | Rides |
 |---|---|---|
 | `working.md` | `How to work:` | every run |
-| `writing.md` | `Changing files:` | writing runs (not a review, not a tester's run) |
-| `read-only.md` | `Read-only:` | a review (`reviewCheckout`) or a run whose persona role is `tester` (`isReadOnlyRun`) |
+| `writing.md` | `Changing files:` | writing runs (not a review, not a run instructed read-only) |
+| `read-only.md` | `Read-only:` | a review (`reviewCheckout`) or a run whose persona is instructed read-only — `readonly:` on its record, else the `reviewer` and `tester` roles' default (`isReadOnlyRun`, req-258) |
 | `ticket-file.md` | `The ticket file named above …` | writing runs |
 | `handover.md` | `Handover:` | writing runs outside a dialog |
 | `language.md` | `Language:` | every run, scout included |
@@ -393,6 +393,24 @@ handover; language; precedence) → memory, earlier handover, diff stat, gate
 failure → the gate commands → completion or dialog → signals → asking. A
 resume repeats only the part from memory on (the rules sit in the stable
 part).
+
+**The mode wrappers (req-258, the persona board concept §5).** A persona's
+prompt is the instruction; the runner adds only what a run's mode needs:
+
+- **interactive** — on a dialog run (the Shape chat) the column's
+  interactive prompt (`plan-interactive-default`, its version line dropped)
+  follows the persona's prompt after a blank line, so the interview-first
+  protocol is not displaced (`fleet/request-instruction.ts` `runPrompt`); an
+  ordinary run keeps the persona's prompt alone;
+- **closing round** — unchanged: the ask after a run with friction resumes
+  the same session (`fleet/closing-round-prompt.ts`), whatever the persona;
+- **read-only** — a review's detached read-only checkout and session
+  (req-183, the `review` phase or the `reviewer` role) and a persona
+  instructed read-only (`readonly:`) both get the read-only rules above;
+  the instructed one keeps its worktree and session.
+
+A persona whose `gate:` is `structural` (the planner's default) gets no gate
+commands in its brief: the runner judges its hand-over structurally.
 
 - **The signals** — the one table of what the runner acts on, each at a line
   start of the turn's last message: no marker = done; `BLOCKED: <reason in

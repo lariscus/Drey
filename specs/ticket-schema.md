@@ -1040,7 +1040,7 @@ directory (ADR-0088 E3). One folder per persona, directly under
 ```text
 tickets/_meta/personas/
   paul/
-    persona.md        # frontmatter only: title, kind, role, summary, worker, models, color, skills, budget, allowed
+    persona.md        # frontmatter only: title, kind, role, summary, worker, models, color, skills, budget, the run settings (req-258), allowed
     prompt.md         # the persona prompt — "who Ben is" at its top; the run's instruction base when present
     memory.md         # curated memory (format and cap below)
     thread.md         # retired (req-168): migrated once into the persona's first 1:1 session, then removed
@@ -1069,11 +1069,21 @@ tickets/_meta/personas/
   | `color` | `#rrggbb`, the chips and avatars | `#a78bfa` |
   | `skills` | the persona's **selection**: names of skill folders (`<name>/SKILL.md`, Agent Skills format) in the persona's own `skills/` folder, else the shared `_meta/skills/`, in the order the run's `## Skills` block lists them; a skill in a folder but not here is available, off. A legacy flat `<name>.md` is still read and migrated once (req-172, `_meta/skills/` below) | `[]` |
   | `budget` | USD per day — the Crew card shows the day's costs against it; the capacity pool's persona ledger (req-170): once the persona's runs of the day have spent it, it starts nothing more that day (a Needs-you card says so). Unset = `service.json` `ledgers.personaPerDay` | unset (null) |
+  | `min-class` | `A | B | C` — the class floor of the persona's runs (req-258, concept §5): no run of it asks the capacity pool for a lighter class. Wins over the column's `min-class:` when set (the dispatch's *why* says `floor B of ben`) | unset: the column's floor |
+  | `needs` | the req-178 grammar (`image`, `tools`, `context-<n>`, `output-<n>`), what every run of the persona needs of its model; **replaces** the column's `needs:` when set (the ticket's are merged in as before); an unknown token reads as absent | unset: the column's |
+  | `max-turns`, `max-work` | the run ceilings, turns and minutes of work; each wins over the column's key of the same name when set | unset: the column's |
+  | `gate` | `commands | structural` — what decides the persona's hand-over. `commands`: the ticket's acceptance commands gate it (none is a refusal, as before). `structural`: only the structural check — the run carries no acceptance commands, its brief names none, and a ticket without runnable criteria is not refused (a plan re-run is judged by what it wrote, never by build commands that pass only after the build; req-280 proposal 4) | the role's: `structural` for `planner`, else `commands` |
+  | `parallel` | the persona's maximum of parallel runs inside the big pool (concept §9). **Recorded, not yet enforced** — req-257's per-persona pool reads it | unset: no cap |
+  | `min` | runs the persona may start while the big pool is full, overrunning it on purpose (concept §9); config and the Persona page only. **Recorded, not yet enforced** (req-257). Written only when above 0 | `0` |
+  | `leaving` | the leaving actions, in order: `sync-main` (merge `main` into the branch when a ticket leaves the persona) and `commit` (the merge into `main` after the owner's sign-off). **Recorded, not yet run** — req-267 runs them and seeds Ben's and You's; an unknown name is dropped | `[]` |
+  | `readonly` | `true | false` — **instructed read-only** (req-258): the run's brief carries the read-only discipline instead of the writing rules, the ticket-file duties and the handover. An instruction, not a lock: the worktree, the harness session and its permissions stay as they are (a technical lock needs a harness change — `decisions.md`). The review run's detached read-only checkout and read-only session (req-183) stay tied to the `review` phase and the `reviewer` role | the role's: `true` for `reviewer` and `tester`, else `false` |
   | `allowed` | a map; four keys. `spend-above-allowance: true` — the persona runs on past a ticket's `allowance:` instead of waiting for the owner (req-170). `write-vaults: [<vault id>, …]` — the registered vaults (Drey's registry ids, ADR-0051) its runs may change through Drey Service's vault MCP (req-167, R5; one id reads as a list, duplicates drop); every registered vault stays readable, a vault not named is read-only for it, and a read-only run (a review) writes none whatever this says — a refusal reaches the model as `Error: <persona> may not write vault "<id>" (allowed: read)` and the run's stream as an audit line. `vault_move` counts as writing. `run-commands: accept-edits \| bypass` — the harness permission mode the persona's runs may take (the Persona page's "Run commands in the worktree"; absent = the crew's `permissionMode`) and `network: true` — it may reach the network (web search and fetch, package installs): both are **recorded and not yet read by the runner** (req-142's enforcement remainder; the page shows no more about them than the choice). Each key written only when set | nothing beyond: reads every vault, writes none |
 
 - `prompt.md` — the longform persona prompt, free Markdown, **the one prose of the persona** (R11, req-171: one prose, not two).
   The "who Ben is" part stands at its top, as a `## Who Ben is` section; `persona.md` keeps the frontmatter and nothing below
   the fence. When a persona resolves at dispatch, this file is the run's instruction base, replacing the phase handover prompt.
+  On a dialog run (the Shape chat's interactive mode) the column's interactive prompt (`plan-interactive-default`) follows it
+  as the mode wrapper (req-258) instead of being displaced.
   The Persona page edits it in Drey's Markdown editor.
   **Migration (once, idempotent):** at every engine start `PersonaProseMigrator` finds a `persona.md` that still has prose below
   its fence and moves it to the top of `prompt.md` under `## Who <title> is` — one logged commit per persona
@@ -1086,7 +1096,8 @@ tickets/_meta/personas/
 `packages/tickets-engine/personas/<id>/persona.md` + `prompt.md`, and are seeded into a board:
 **`paul`** (planner), **`ben`** (builder), **`ralf`** (reviewer), **`tessa`** (tester); Pia is Mission Control, the human
 persona `you` is written by "Initialize board". The shipped `persona.md` carries `title`, `role`, `summary:`, `color`
-(`#f2d3e2`, `#8ecbef`, `#bfe3cd`, `#f2cfae`) and `skills: []` — no `worker:` and no `models:`; the shipped `prompt.md` is the
+(`#f2d3e2`, `#8ecbef`, `#bfe3cd`, `#f2cfae`), `skills: []` and the run settings that differ from nothing (req-258:
+Paul `gate: structural`, Ralf and Tessa `readonly: true`) — no `worker:` and no `models:`; the shipped `prompt.md` is the
 "who it is" part (`## Who Paul is`, `## How Paul works` — the character only since req-280; what "done" means is the step prompt's). **Seeding** (`CrewSeeder`) writes the
 vault's copy: `persona.md` with the worker of `default-worker` in `_meta/crew.md` (else the fleet default `opencode`) and the
 models the machine's model table names for that worker (`service.json` → `models`: the worker's provider rows, strongest
@@ -1097,7 +1108,8 @@ version marker), because a persona's prompt replaces the step prompt as the run'
 board" after the pipeline and the prompts; and once at the engine's start for a board that lacks them. **Idempotent by id**:
 `seeded-crew: [paul, ben, ralf, tessa]` in `_meta/crew.md` (below) lists the ids already offered, so a persona the owner
 deleted stays deleted; an id whose folder exists is never touched, only listed; the engine never re-seeds an id the marker
-lists. One commit (`personas: the default crew (req-256)`: the persona files and `crew.md`), one log line. The seeding changes
+lists. A `crew.md` without `order:` gets the default crew's, the human last (`order: [paul, ben, ralf, tessa, you]`, req-258);
+an order already set stays. One commit (`personas: the default crew (req-256)`: the persona files and `crew.md`), one log line. The seeding changes
 **no** pipeline pin and not `default-persona`: a column without a `persona:` pin still runs the ring until the owner pins a
 persona on it (a ticket's gate on the Flow tab, or `persona: ben` on the column in `pipeline.md`).
 
@@ -1481,6 +1493,7 @@ every device working this tickets repository shares, versioned with it.
 ```markdown
 ---
 seeded-crew: [paul, ben, ralf, tessa]  # the shipped default crew already offered to this board (req-256)
+order: [paul, ben, ralf, tessa, you]  # the crew's order (req-258): the Crew tab, later the board's persona columns
 default-persona: ben          # the persona ladder's floor (was config personas.default)
 default-worker: claude-code   # the assignment ring's floor (was defaultWorker)
 permission-mode: accept-edits # dispatched runs: accept-edits | bypass (was autoPermissionMode)
@@ -1525,6 +1538,14 @@ setting, the marker `CrewSeeder` writes — a list of the shipped default crew's
 (`paul`, `ben`, `ralf`, `tessa`) the board has been offered; a missing key means none
 yet (the next engine start seeds), and an id in it is never seeded again, whether its
 folder exists or the owner deleted it.
+
+`order:` (req-258, concept §9) is the crew's order: a list of persona ids (`core/crew-order.ts`). The persona list
+(`listPersonas`, every crew surface — the Crew tab, Mission Control's team, the flow editor's pickers) draws the listed
+personas as listed, then any persona the list does not name in the old pipeline order (role, then id, the human last), so a
+board without the key looks as before; an unknown id is skipped, duplicates drop. The Crew tab's drag, Ctrl+Shift+PageUp /
+PageDown on a focused card and its Move left / Move right menu write the whole list (`crewOrderSet`, remote invoke and the
+plugin IPC; one commit `tickets: crew order`); the board's column-header drag is req-271's. Like `seeded-crew:` it is not a
+Settings key and every settings write keeps it.
 
 **Precedence** (written down once, enforced by `LayeredConfigResolver`):
 **session record > vault (`_meta/crew.md`) > built-in default**. The

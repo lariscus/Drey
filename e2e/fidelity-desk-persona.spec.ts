@@ -80,6 +80,11 @@ const BEN = [
   "color: '#8ecbef'",
   'skills: [go-conventions, tdd, drey-plugins]',
   'budget: 5',
+  // req-258: board 7k v2's Work block — class floor B, read-only off, at most 2 at once, sync-main when a ticket leaves him.
+  'min-class: B',
+  'parallel: 2',
+  'leaving: [sync-main]',
+  'readonly: false',
   'allowed:',
   '  write-vaults: [notes]',
   '---',
