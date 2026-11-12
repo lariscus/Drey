@@ -38,7 +38,7 @@ export function repoRefusal(input: ComposeRunInput, scout: boolean): string | nu
  */
 export function acceptanceRefusal(input: ComposeRunInput, acceptance: readonly string[], scout: boolean): string | null {
   const structural = input.structuralGateAllowed === true || input.persona?.run?.gate === 'structural';
-  if (acceptance.length === 0 && !scout && !structural && input.interactive === undefined) {
+  if (acceptance.length === 0 && !scout && !structural && input.interactive === undefined && input.commitStep !== true) {
     return `${input.card.id} has no runnable acceptance criteria: ${acceptanceFinding(input.ticketText)}`;
   }
   return null;

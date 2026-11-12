@@ -4,6 +4,7 @@ import type { StartOutcome, StopOutcome, SupervisorRecord, TakeoverOutcome } fro
 import { isTerminal } from '../run/run-state';
 import type { AttachOutcome, AttachmentStore } from './attachment-store';
 import type { BackgroundWork } from './background-work';
+import type { CommitRun } from './commit-run';
 import type { HandoverSettings } from './handover-settings';
 import type { LeftoverClaims, LeftoverClaimsReport } from './leftover-claims';
 import type { HeldSessionStarter } from './held-session-starter';
@@ -36,6 +37,8 @@ export interface RunSupervisorParts {
   readonly reopener: RunReopener;
   readonly reaper: RunReaper;
   readonly leftovers: LeftoverClaims;
+  /** req-267: You's commit as a machine run — no worker, no slot; absent = refused (a spec). */
+  readonly commits?: CommitRun;
 }
 
 /** What a dispatched run carries beyond the wire request (E3): the persona the ladder resolved. */
@@ -87,6 +90,9 @@ export class RunSupervisor {
   start(request: RunRequest, options: StartOptions = {}): Promise<StartOutcome> {
     if (isHeldSession(request)) {
       return this.parts.heldSessions.start(request);
+    }
+    if (request.machine !== undefined) {
+      return this.parts.commits?.start(request) ?? Promise.resolve({ ok: false, error: 'this runner runs no machine actions' });
     }
     return this.parts.starter.start(request, { persona: options.persona ?? null });
   }

@@ -5,7 +5,7 @@ import { base, phase, TICKET } from './request-spec-support';
 /** req-258: what a run takes from the persona's record — the gate, the ceilings, instructed read-only, the shape dialog's wrapper. */
 
 const NO_CRITERIA = TICKET.replace('- [ ] `npm run verify:unit` — exits 0', 'Nothing runnable yet.');
-const RUN = { readOnly: false, gate: 'commands', maxTurns: null, maxWorkMin: null } as const;
+const RUN = { readOnly: false, gate: 'commands', maxTurns: null, maxWorkMin: null, leaving: [] } as const;
 const PAUL = { id: 'paul', role: 'planner', worker: 'claude-code', model: 'sonnet', prompt: '## Who Paul is\n\nPaul plans.', memory: '', run: { ...RUN, gate: 'structural' as const } };
 
 function ok(result: ReturnType<typeof composeRunRequest>): Extract<ReturnType<typeof composeRunRequest>, { ok: true }>['request'] {
@@ -83,5 +83,27 @@ describe('the interactive mode wrapper', () => {
     const request = ok(composeRunRequest(base({ promptText: 'Phase template.', persona: PAUL })));
     expect(request.instruction).toContain('Paul plans.');
     expect(request.instruction).not.toContain('Phase template.');
+  });
+});
+
+describe('the leaving actions (leaving:, req-267)', () => {
+  const BEN = { id: 'ben', role: 'builder', worker: 'claude-code', model: 'sonnet', prompt: '## Who Ben is\n\nBen builds.', memory: '', run: { ...RUN, leaving: ['sync-main'] as const } };
+
+  it("a builder whose record lists sync-main carries it on the run's request", () => {
+    const request = ok(composeRunRequest(base({ workingPhase: phase('build', { handover: 'agent build-default' }), persona: BEN })));
+    expect(request.leaving).toEqual(['sync-main']);
+    expect(request.baseRef).toBe('main');
+  });
+
+  it('a persona without leaving actions carries none, and the commit never rides a run', () => {
+    const plain = ok(composeRunRequest(base({ workingPhase: phase('build', { handover: 'agent build-default' }), persona: { ...BEN, run: RUN } })));
+    expect(plain.leaving).toBeUndefined();
+    const committing = ok(composeRunRequest(base({ workingPhase: phase('build', { handover: 'agent build-default' }), persona: { ...BEN, run: { ...RUN, leaving: ['commit'] as const } } })));
+    expect(committing.leaving).toBeUndefined();
+  });
+
+  it('an interactive dialog never syncs main', () => {
+    const request = ok(composeRunRequest(base({ promptText: 'x', interactive: 'plan', persona: BEN })));
+    expect(request.leaving).toBeUndefined();
   });
 });

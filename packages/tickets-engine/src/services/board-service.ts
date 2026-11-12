@@ -23,7 +23,7 @@ import { parsePlanChain } from '../core/plan-chain';
 import { applyFlowOp, type FlowOp } from '../core/flow-edit';
 import type { FlowReply, FlowSaveReply, FlowStepView, FlowTarget, FlowScope } from '../contracts/flow';
 import { allowedAfter, type PersonaAllowedPatch } from '../contracts/persona-allowed';
-import { BUILDING_STATE, COMMIT_STEP_PROMPT, DEFAULT_PIPELINE_TEXT, READY_STATE } from '../core/pipeline-states';
+import { BUILDING_STATE, DEFAULT_PIPELINE_TEXT, READY_STATE } from '../core/pipeline-states';
 import { parseChainItems, renderChainEntries, unreadableEntryMessage } from '../core/chain-list';
 import { validateChain } from '../core/chain-validate';
 import { flowDraftText, flowPersonasOf, flowStepViews, lockedOfCard, partFlowSteps } from './flow-views';
@@ -2579,7 +2579,8 @@ export class EngineBoardService {
       const actor = input.actor ?? this.owner;
       const next = nextPhaseIdOf(snap.columns, card.phase);
       if (next !== null && card.phase === READY_STATE && card.meta.repo !== null && (card.meta.form ?? 'ship') !== 'scout' && nextPhaseIdOf(snap.columns, next) === null) {
-        return this.startCommitStep(card.id);
+        const missing = await this.commitActionMissing(vault, card.id);
+        return missing ?? this.startCommitStep(card.id);
       }
       if (next !== null) {
         // E10-6: finishing a manual step is an ordinary Accept; the Log says whose step it was.
@@ -2608,14 +2609,35 @@ export class EngineBoardService {
   }
 
   /**
-   * Accept on Ready to try is the sign-off (req-99a, build plan Q8): an
-   * owner-started run of the commit step on the TARGET repository: merge
-   * the ticket's branch, push. On the files backend its green end moves the
-   * ticket into Done like every run. On a store dk never lets an agent
-   * release into the terminal stage, so the run moves nothing and
-   * {@link settleCommitSteps} makes the owner's move afterwards. A blocked
-   * or red end leaves the ticket where it is, and Accept again starts it
-   * again (the prompt completes at once when the work is already pushed).
+   * req-267 (owner 2026-11-12): the sign-off's merge is the human persona's
+   * `commit` leaving action. A record that does not list it refuses the
+   * Accept — a ticket never lands in Done unmerged because a key is missing.
+   */
+  private async commitActionMissing(vault: EngineVault, ticketId: string): Promise<BoardMutationResult | null> {
+    const you = await personaLoader((rel) => this.host.read(vault.id, rel)).load(HUMAN_PERSONA_ID);
+    if (you?.settings.leaving.includes('commit') === true) {
+      return null;
+    }
+    const name = you?.title ?? 'You';
+    return {
+      ok: false,
+      error:
+        `Signing off ${ticketId} merges its branch into main, and that merge is ${name}'s "commit" leaving action — ${name}'s persona does not list it yet. ` +
+        `Open the Crew tab → ${name} → Work, choose Leaving actions → Add action… → commit, then Accept again.`,
+    };
+  }
+
+  /**
+   * Accept on Ready to try is the sign-off (req-99a, build plan Q8): You's
+   * `commit` leaving action (req-267) as a MACHINE run on the target
+   * repository — no worker, no model: the ticket's branch merged into the
+   * integration branch and pushed (`fleet/orchestrate/commit-run.ts`). On
+   * the files backend its green end moves the ticket into Done like every
+   * run. On a store dk never lets an agent release into the terminal stage,
+   * so the run moves nothing and {@link settleCommitSteps} makes the owner's
+   * move afterwards. A blocked or red end leaves the ticket where it is with
+   * the reason, and Accept again starts it again (it completes at once when
+   * the work is already on main).
    */
   private async startCommitStep(ticketId: string): Promise<BoardMutationResult> {
     const live = (await this.fleetRecords()).some((r) => r.ticketId === ticketId && !['done', 'stopped', 'failed'].includes(r.state));
@@ -3064,8 +3086,8 @@ export class EngineBoardService {
         };
       }
     } else {
-      // The commit step's prompt is its own: Ready to try is a manual column and names none.
-      const promptRef = commitStep ? COMMIT_STEP_PROMPT : workingPhase === null ? null : columnPromptRef(workingPhase);
+      // The commit step is a machine run (req-267): no brief, so no prompt.
+      const promptRef = commitStep || workingPhase === null ? null : columnPromptRef(workingPhase);
       if (promptRef !== null) {
         prompt = await this.readOptional(vault.id, `tickets/_meta/prompts/${promptRef}.md`);
         if (prompt === null) {
@@ -3098,12 +3120,11 @@ export class EngineBoardService {
     // default) — a resolved persona contributes worker/model/prompt/
     // memory; an owner-picked worker in the dialog still wins.
     const loader = personaLoader((rel) => this.host.read(vault.id, rel));
-    // The commit step is never the ticket's builder and never the human who owns the column:
-    // the persona of its own name when the crew has one (its model pin), else no persona.
+    // The commit step is a machine run (req-267): no agent persona works it; the request names the human's.
     const personaResolution = await resolvePersonaForTicket(
       loader,
       commitStep
-        ? { ticketPersona: null, phasePersona: COMMIT_STEP_PROMPT, defaultPersona: null }
+        ? { ticketPersona: null, phasePersona: null, defaultPersona: null }
         : {
             ticketPersona: card.meta.persona,
             phasePersona: workingPhase?.persona ?? null,

@@ -13,13 +13,16 @@ import type { EngineHost, EngineVault, FleetPort } from './host';
 
 /**
  * Accept on Ready to try (req-99a, build plan Q8): the commit step on the target
- * repository, and Done as its bookkeeping result. The first block is the files
+ * repository — since req-267 You's `commit` leaving action, a machine run — and
+ * Done as its bookkeeping result. The first block is the files
  * backend over a temp vault; the second a REAL `dk` over a scratch store with the
  * six stages (skipped, with the reason, when `dk` is missing), because dk's own rule
  * shapes this: an agent never releases into the terminal stage.
  */
 
-const COMMIT_PROMPT = 'You are the commit step.';
+/** The owner's persona; `leaving` is its key line (req-267: the sign-off's merge is its `commit`). */
+const YOU = (leaving: string): string => `---\ntitle: You\nkind: human\nrole: custom\n${leaving}---\n`;
+const WITH_COMMIT = 'leaving: [commit]\n';
 const REPOS = (repoPath: string): string => `---\nrepos:\n  kt:\n    url: https://example.test/kt.git\n    path: '${repoPath}'\n    branch: main\n---\n`;
 const BODY = '\n## Description\n\nDo it.\n\n## Plan\n\n### Acceptance criteria\n\n- [ ] `echo ok`\n\n## Log\n\n';
 
@@ -102,7 +105,8 @@ describe('Accept on the files backend', () => {
     await fsp.mkdir(abs('_meta', 'prompts'), { recursive: true });
     await usePipeline(DEFAULT_PIPELINE_TEXT);
     await fsp.writeFile(abs('_meta', 'repos.md'), REPOS(path.join(vaultDir, 'kt').split(path.sep).join('/')), 'utf8');
-    await fsp.writeFile(abs('_meta', 'prompts', 'commit-default.md'), COMMIT_PROMPT, 'utf8');
+    await fsp.mkdir(abs('_meta', 'personas', 'you'), { recursive: true });
+    await fsp.writeFile(abs('_meta', 'personas', 'you', 'persona.md'), YOU(WITH_COMMIT), 'utf8');
     service = serviceOver(hostOver(vaultDir, { id: 'v', name: 'vault', path: vaultDir, exists: true, active: true }, {}), fleet);
   });
 
@@ -110,42 +114,45 @@ describe('Accept on the files backend', () => {
     await fsp.rm(vaultDir, { recursive: true, force: true });
   });
 
-  it('starts the commit step instead of moving; the run itself moves the ticket into Done', async () => {
+  it('starts the commit as a machine run instead of moving; the run itself moves the ticket into Done', async () => {
     await ticket('T-0001', 'ready');
     expect(await service.acceptTicket({ id: 'T-0001' })).toEqual({ ok: true, runId: 'R-1' });
     expect(started).toHaveLength(1);
-    expect(started[0]).toMatchObject({ ticketId: 'T-0001', nextPhase: 'done', gate: 'commands', acceptance: ['echo ok'], permissionMode: 'accept-edits' });
-    expect(started[0]!.instruction).toContain(COMMIT_PROMPT);
+    expect(started[0]).toMatchObject({ ticketId: 'T-0001', nextPhase: 'done', baseRef: 'main', branch: 't/T-0001', machine: { action: 'commit', persona: 'you', policy: null } });
+    expect(started[0]!.leaving).toBeUndefined();
     await expect(fsp.stat(abs('ready', 'T-0001.md'))).resolves.toBeDefined();
   });
 
-  it('runs under no persona of the ticket or the column, and under the crew\'s commit persona when there is one', async () => {
-    const persona = async (id: string, prompt: string): Promise<void> => {
-      const dir = abs('_meta', 'personas', id);
-      await fsp.mkdir(dir, { recursive: true });
-      await fsp.writeFile(path.join(dir, 'persona.md'), `---\ntitle: ${id}\nrole: builder\nworker: opencode\nmodels:\n  default: sonnet\n  pool: [sonnet]\n  router: off\ncolor: '#a78bfa'\n---\n`, 'utf8');
-      await fsp.writeFile(path.join(dir, 'prompt.md'), prompt, 'utf8');
-    };
-    await persona('ben', 'The builder speaks.');
+  it("runs as You's machine action, never under the ticket's builder", async () => {
+    const dir = abs('_meta', 'personas', 'ben');
+    await fsp.mkdir(dir, { recursive: true });
+    await fsp.writeFile(path.join(dir, 'persona.md'), `---\ntitle: Ben\nrole: builder\nworker: opencode\nmodels:\n  default: sonnet\n  pool: [sonnet]\n  router: off\nleaving: [sync-main]\n---\n`, 'utf8');
     await ticket('T-0001', 'ready', { repo: 'kt', persona: 'ben' });
     await service.acceptTicket({ id: 'T-0001' });
-    expect(started[0]!.instruction).toContain(COMMIT_PROMPT);
-    expect(started[0]!.instruction).not.toContain('The builder speaks.');
-
-    await persona('commit-default', 'The crew member who commits speaks.');
-    await service.acceptTicket({ id: 'T-0001' });
-    expect(started[1]!.instruction).toContain('The crew member who commits speaks.');
-    expect(started[1]!.instruction).not.toContain('The builder speaks.');
+    expect(started[0]!.machine).toEqual({ action: 'commit', persona: 'you', policy: null });
+    expect(started[0]!.leaving).toBeUndefined();
   });
 
-  it('refuses while a run is live, and names the missing prompt', async () => {
+  it('refuses while a run is live', async () => {
     await ticket('T-0001', 'ready');
     runs = [runInfo('R-9', 'T-0001', 'running')];
     expect(await service.acceptTicket({ id: 'T-0001' })).toMatchObject({ ok: false, error: expect.stringContaining('live run') });
-    runs = [];
-    await fsp.rm(abs('_meta', 'prompts', 'commit-default.md'));
-    expect(await service.acceptTicket({ id: 'T-0001' })).toMatchObject({ ok: false, error: expect.stringContaining('commit-default.md is missing') });
     expect(started).toEqual([]);
+  });
+
+  it("refuses the sign-off while You's persona lists no commit, and says where to add it", async () => {
+    await ticket('T-0001', 'ready');
+    await fsp.writeFile(abs('_meta', 'personas', 'you', 'persona.md'), YOU(''), 'utf8');
+    const refused = await service.acceptTicket({ id: 'T-0001' });
+    expect(refused).toMatchObject({ ok: false });
+    const error = (refused as { error: string }).error;
+    expect(error).toContain('"commit" leaving action');
+    expect(error).toContain('Crew tab → You → Work');
+    expect(error).toContain('Add action… → commit');
+    expect(started).toEqual([]);
+    await expect(fsp.stat(abs('ready', 'T-0001.md'))).resolves.toBeDefined();
+    await fsp.rm(abs('_meta', 'personas', 'you'), { recursive: true });
+    expect(await service.acceptTicket({ id: 'T-0001' })).toMatchObject({ ok: false, error: expect.stringContaining('leaving action') });
   });
 
   it('a ticket without a repository has nothing to merge: Accept is the plain move into Done', async () => {
@@ -253,7 +260,8 @@ describe.skipIf(!found.ok)('Accept on a store with the six stages (real dk)', { 
     await fsp.mkdir(path.join(vaultDir, 'tickets', '_meta', 'prompts'), { recursive: true });
     await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'pipeline.md'), DEFAULT_PIPELINE_TEXT, 'utf8');
     await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'repos.md'), REPOS(kt.split(path.sep).join('/')), 'utf8');
-    await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'prompts', 'commit-default.md'), COMMIT_PROMPT, 'utf8');
+    await fsp.mkdir(path.join(vaultDir, 'tickets', '_meta', 'personas', 'you'), { recursive: true });
+    await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'personas', 'you', 'persona.md'), YOU(WITH_COMMIT), 'utf8');
 
     const fleet: FleetPort = {
       runs: async () => runs,
@@ -304,7 +312,7 @@ describe.skipIf(!found.ok)('Accept on a store with the six stages (real dk)', { 
     const accepted = await service.acceptTicket({ id });
     expect(accepted).toMatchObject({ ok: true });
     const request = started[started.length - 1]!;
-    expect(request).toMatchObject({ ticketId: id, nextPhase: null, gate: 'commands' });
+    expect(request).toMatchObject({ ticketId: id, nextPhase: null, machine: { action: 'commit', persona: 'you' } });
     expect(request.dk).toMatchObject({ store: storeDir, retreatStage: 'building' });
     const runId = (accepted as { runId?: string }).runId!;
 

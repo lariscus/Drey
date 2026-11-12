@@ -566,8 +566,8 @@ sessions are own line grammars, not ticket documents, and not covered.
   (renamed); a path without a why is fine. The page also reads the
   ticket's story ("How it got here") from the Log section alone — no
   frontmatter is added for any of this.
-- `## Result` — the closing report (req-86). The **commit step** writes
-  it after the merge: three to six plain lines for the owner — what
+- `## Result` — the closing report (req-86). The old commit step wrote
+  it after the merge (since req-267 the commit is a machine run that writes no ticket text): three to six plain lines for the owner — what
   landed (merge commit, branch), what they can now see or do
   differently, anything left over. Free text under the heading
   (`parseResult`); the final card shows it first, as "What was
@@ -846,10 +846,15 @@ Settings → Tickets → Crew); the fleet takes nothing from them. The shipped `
 default crew's standard flow, `paul:shape; paul; ben; ralf; tessa; you` (req-266). Building is the first worker
 column, so a run there on a ticket without acceptance criteria gates structurally.
 
-**Accept on Ready to try is the sign-off** and no plain move: it starts the commit step
-(`commit-default`, an owner-started run) on the ticket's **target repository**: merge its
-branch, push (`plugins/tickets/BOARD.md`). A green end lands the ticket in Done, as bookkeeping;
-a `BLOCKED:` or red end leaves it on Ready to try. A ticket with no `repo:` has nothing to
+**Accept on Ready to try is the sign-off** and no plain move: it starts the human persona's
+`commit` leaving action (req-267) on the ticket's **target repository** — a machine run of the
+Crew runner, no worker and no model: the branch merged into the integration branch in a scratch
+worktree, pushed to that branch's git upstream, proven from a fresh fetch (`plugins/tickets/BOARD.md`;
+without an upstream the local branch moves, only when no checkout has it checked out). A green end
+lands the ticket in Done, as bookkeeping; a protected branch (`policy:`) blocks for the owner, a
+conflict or a failed push ends red with git's reason, and either leaves it on Ready to try — the
+machine resolves no conflict. **A sign-off whose human persona does not list `commit` in `leaving:`
+is refused** with the way to add it (the Crew tab → You → Work → Leaving actions). A ticket with no `repo:` has nothing to
 merge and moves directly. On a store dk refuses an agent's release into a terminal stage, so
 the run hands back to `ready` (on a lifecycle store: `active` pinned to `ready`, req-265) and the engine then makes the owner's move into `done`.
 *Send back* is the ordinary send-back to Building.
@@ -1075,7 +1080,7 @@ tickets/_meta/personas/
   | `gate` | `commands | structural` — what decides the persona's hand-over. `commands`: the ticket's acceptance commands gate it (none is a refusal, as before). `structural`: only the structural check — the run carries no acceptance commands, its brief names none, and a ticket without runnable criteria is not refused (a plan re-run is judged by what it wrote, never by build commands that pass only after the build; req-280 proposal 4) | the role's: `structural` for `planner`, else `commands` |
   | `parallel` | the persona's maximum of parallel runs inside the big pool (concept §9). **Recorded, not yet enforced** — req-257's per-persona pool reads it | unset: no cap |
   | `min` | runs the persona may start while the big pool is full, overrunning it on purpose (concept §9); config and the Persona page only. **Recorded, not yet enforced** (req-257). Written only when above 0 | `0` |
-  | `leaving` | the leaving actions, in order: `sync-main` (merge `main` into the branch when a ticket leaves the persona) and `commit` (the merge into `main` after the owner's sign-off). **Recorded, not yet run** — req-267 runs them and seeds Ben's and You's; an unknown name is dropped | `[]` |
+  | `leaving` | the leaving actions, in order: `sync-main` (merge `main` into the branch when a ticket leaves the persona) and `commit` (the merge into `main` after the owner's sign-off). Run since req-267, inside the claim, on a heavy governor seat, no model: `sync-main` at the end of a green run of the persona, after the gate and the closing round, before the hand-on — the integration branch's git upstream (fetched; the local branch without one) merged into the ticket's branch, the card reading `merging main`; a conflict is aborted and ends the run red with the conflict as its gate failure (no send-back). `commit` on the human persona is the sign-off's merge ("Accept on Ready to try" above), the card reading `committing`. Seeded: the shipped Ben `[sync-main]`, the You a new board writes `[commit]`. An unknown name is dropped | `[]` |
   | `readonly` | `true | false` — **instructed read-only** (req-258): the run's brief carries the read-only discipline instead of the writing rules, the ticket-file duties and the handover. An instruction, not a lock: the worktree, the harness session and its permissions stay as they are (a technical lock needs a harness change — `decisions.md`). The review run's detached read-only checkout and read-only session (req-183) stay tied to the `review` phase and the `reviewer` role | the role's: `true` for `reviewer` and `tester`, else `false` |
   | `allowed` | a map; four keys. `spend-above-allowance: true` — the persona runs on past a ticket's `allowance:` instead of waiting for the owner (req-170). `write-vaults: [<vault id>, …]` — the registered vaults (Drey's registry ids, ADR-0051) its runs may change through Drey Service's vault MCP (req-167, R5; one id reads as a list, duplicates drop); every registered vault stays readable, a vault not named is read-only for it, and a read-only run (a review) writes none whatever this says — a refusal reaches the model as `Error: <persona> may not write vault "<id>" (allowed: read)` and the run's stream as an audit line. `vault_move` counts as writing. `run-commands: accept-edits \| bypass` — the harness permission mode the persona's runs may take (the Persona page's "Run commands in the worktree"; absent = the crew's `permissionMode`) and `network: true` — it may reach the network (web search and fetch, package installs): both are **recorded and not yet read by the runner** (req-142's enforcement remainder; the page shows no more about them than the choice). Each key written only when set | nothing beyond: reads every vault, writes none |
 
@@ -1095,9 +1100,9 @@ tickets/_meta/personas/
 **The shipped default crew (req-256, decision D7).** Four personas ship as files in the package,
 `packages/tickets-engine/personas/<id>/persona.md` + `prompt.md`, and are seeded into a board:
 **`paul`** (planner), **`ben`** (builder), **`ralf`** (reviewer), **`tessa`** (tester); Pia is Mission Control, the human
-persona `you` is written by "Initialize board". The shipped `persona.md` carries `title`, `role`, `summary:`, `color`
+persona `you` is written by "Initialize board", with `leaving: [commit]` (req-267). The shipped `persona.md` carries `title`, `role`, `summary:`, `color`
 (`#f2d3e2`, `#8ecbef`, `#bfe3cd`, `#f2cfae`), `skills: []` and the run settings that differ from nothing (req-258:
-Paul `gate: structural`, Ralf and Tessa `readonly: true`) — no `worker:` and no `models:`; the shipped `prompt.md` is the
+Paul `gate: structural`, Ralf and Tessa `readonly: true`; req-267: Ben `leaving: [sync-main]`) — no `worker:` and no `models:`; the shipped `prompt.md` is the
 "who it is" part (`## Who Paul is`, `## How Paul works` — the character only since req-280; what "done" means is the step prompt's). **Seeding** (`CrewSeeder`) writes the
 vault's copy: `persona.md` with the worker of `default-worker` in `_meta/crew.md` (else the fleet default `opencode`) and the
 models the machine's model table names for that worker (`service.json` → `models`: the worker's provider rows, strongest

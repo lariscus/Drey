@@ -9,7 +9,6 @@ describe('shipped prompts', () => {
     const prompts = await loadShippedPrompts();
     expect([...prompts.keys()]).toEqual([
       'build-default',
-      'commit-default',
       'plan-default',
       'plan-interactive-default',
       'qa-default',
@@ -31,8 +30,8 @@ describe('shipped prompts', () => {
     // The build step ends on the Changes section the Ready page reads (req-75 W3).
     expect(prompts.get('build-default')).toContain('## Changes');
     expect(prompts.get('build-default')).toContain('**What changed for you:**');
-    // The commit step closes with the report the final card shows.
-    expect(prompts.get('commit-default')).toContain('`## Result`');
+    // The commit is You's machine action since req-267: no prompt ships for it.
+    expect(prompts.has('commit-default')).toBe(false);
     // The interactive default (req-65): interview first. (The refine twin
     // was removed in E13-9.)
     expect(prompts.get('plan-interactive-default')).toContain('QUESTION:');

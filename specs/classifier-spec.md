@@ -362,8 +362,9 @@ create as a `raw capture:` Log line (ticket-schema).
 ## The run brief's composition (req-280, ADR-0097)
 
 A step prompt (`plan-default` v3, `plan-interactive-default` v3,
-`build-default` v8, `review-default` v5, `qa-default` v4, `commit-default`
-v4, `scout-default` v4) carries its **role only**: inputs, outputs, its own
+`build-default` v8, `review-default` v5, `qa-default` v4, `scout-default`
+v4; `commit-default` was removed by req-267 — the commit is the human
+persona's machine leaving action, no prompt and no model) carries its **role only**: inputs, outputs, its own
 guardrails and one closing **"Done when …"**. Everything several steps share
 is a discipline file the composer appends by run kind
 (`fleet/instruction.ts` `ruleParts` / `closingParts`,

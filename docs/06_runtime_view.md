@@ -5818,3 +5818,51 @@ sequenceDiagram
 ```
 
 `parallel`, `min` and `leaving` are recorded only: req-257's per-persona pool reads the first two, req-267 runs the leaving actions. A review's detached read-only checkout and read-only session (§6.109, req-183) stay tied to the `review` phase and the `reviewer` role; `readonly:` adds only the instruction.
+
+## 6.121 The leaving actions — a green run → `sync-main` → the hand-on; the sign-off → the commit machine run → Done (req-267, milestone 245)
+
+```mermaid
+sequenceDiagram
+    actor Owner
+    participant RCm as RunCompletion
+    participant RL as RunLeaving
+    participant SM as SyncMainAction
+    participant G as git (worktree / repo / scratch)
+    participant BS as BoardService
+    participant CR as CommitRun
+    participant CA as CommitAction
+    Note over RCm: worker ended, gate green, closing round done — the claim still held
+    RCm->>RL: afterGreen(run) — request.leaving has sync-main
+    RL->>RL: activity "merging main" · a heavy governor seat
+    RL->>SM: run(worktree, baseRef)
+    SM->>G: status --porcelain · fetch <upstream> (or the local branch) · merge-base --is-ancestor
+    alt main is new
+        SM->>G: merge --no-ff -m "Merge main … (sync-main, T-…)" + Dricket trailers
+        alt conflict
+            SM->>G: diff --diff-filter=U · merge --abort
+            SM-->>RCm: conflict (files, output)
+            RCm->>RCm: gateFailure = the conflict · red · finish failed (the ticket stays with the persona)
+        else merged
+            SM-->>RCm: merged
+        end
+    end
+    RCm->>RCm: hand-on (moveOnSuccess / park) · finish done
+    Owner->>BS: Accept on Ready to try (the sign-off)
+    BS->>BS: commitActionMissing — You's persona lists commit? (else refused, with the way to add it)
+    BS->>CR: start(RunRequest {machine: {action: commit, persona: you, policy}})
+    CR->>CR: the claim · record + stream · activity "committing" · no worker, no slot
+    CR->>CA: run (on a heavy seat)
+    CA->>G: clean worktree · tip · fetch upstream · already on main?
+    alt policy set
+        CA->>G: push the work branch → blocked "the policy merge awaits the owner"
+    else upstream
+        CA->>G: worktree add --detach <wt>-commit <upstream> · merge --no-ff tip · push HEAD:<branch> (a refused push: fetch, once more) · fetch · is-ancestor (the proof)
+    else no upstream
+        CA->>G: refuse while a checkout has the branch · else merge in the scratch · update-ref <branch> <merge> <old>
+    end
+    CA-->>CR: landed / blocked / conflict / failed
+    CR->>CR: green → finish done (files backend: the run's own move into Done) · red → gateFailure, the ticket stays
+    BS->>BS: settleCommitSteps (a store): the owner's move into done after the release
+```
+
+A conflict is aborted in both actions and never resolved by the machine (`decisions.md`). req-257 moves the sign-off from "Accept on Ready to try" to the Accept at the chain's last You entry; the run-end hook stays before the cursor's advance.

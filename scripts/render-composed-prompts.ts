@@ -47,7 +47,6 @@ async function main(): Promise<void> {
     'build': composeInstruction(base(text('build-default'))).text,
     'review': composeInstruction({ ...base(text('review-default')), reviewCheckout: '/fleet/review/T-0001' }).text,
     'qa': composeInstruction({ ...base(text('qa-default')), personaId: 'tessa', personaRole: 'tester' }).text,
-    'commit': composeInstruction(base(text('commit-default'))).text,
     'scout': composeScoutInstruction({
       disciplines,
       ticketId: 'T-0001',
