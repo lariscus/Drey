@@ -15,6 +15,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 export function registerSessionIpc(ctx: Pick<MainPluginContext, 'ipc'>, invoke: Invoke): void {
   ctx.ipc.handle('crewConfig', () => invoke('crewConfig'));
   ctx.ipc.handle('crewConfigSet', (payload) => (Array.isArray(payload) || isRecord(payload) ? invoke('crewConfigSet', payload) : { ok: false, error: 'bad crew patch payload' }));
+  ctx.ipc.handle('crewOrderSet', (payload) => (Array.isArray(payload) || isRecord(payload) ? invoke('crewOrderSet', payload) : { ok: false, error: 'bad crew order payload' }));
   ctx.ipc.handle('sessionOptions', () => invoke('sessionOptions'));
   ctx.ipc.handle('sessionStart', (payload) => (isRecord(payload) ? invoke('sessionStart', { ...payload, origin: 'drey:crew' }) : { ok: false, error: 'bad session payload' }));
 }

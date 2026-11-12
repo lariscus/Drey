@@ -1,5 +1,6 @@
 import type { BoardSnapshot, PipelinePhase, RepoRef, TicketCard } from '../../contracts/tickets';
 import { splitPoolEntry } from '../../core/persona';
+import { personaRunSettingsOf } from '../../core/persona-settings';
 import { TicketsGit } from '../../core/tickets-git';
 import { isAutoPhase, nextPhaseIdOf } from '../chain';
 import { readRepoInstructions, worktreeDiffStat } from '../context-pack';
@@ -241,6 +242,7 @@ export class TicketDispatch {
         prompt: prompt.personaPrompt,
         memory: entry?.memory ?? '',
         skills: entry?.skills ?? [],
+        run: personaRunSettingsOf(persona),
       },
     };
   }

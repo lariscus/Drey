@@ -9,6 +9,7 @@
  */
 import type { PipelinePhase, RepoRef, TicketCard } from '../contracts/tickets';
 import type { ClosingSignal } from '../core/closing-signals';
+import type { PersonaRunSettings } from '../core/persona-settings';
 import { acceptanceCommands } from '../core/ticket-files';
 import type { Truncation } from './assignment';
 import type { DisciplineTexts } from './discipline-texts';
@@ -134,6 +135,12 @@ export interface PersonaDispatch {
   readonly memory: string;
   /** The texts of the skills its record names (D-46); absent = none. */
   readonly skills?: readonly { readonly name: string; readonly text: string }[];
+  /**
+   * req-258: what the run takes from the record — instructed read-only, the
+   * hand-over gate, the run ceilings (the role's defaults resolved). Absent =
+   * today's behaviour: the column decides.
+   */
+  readonly run?: PersonaRunSettings;
 }
 
 export type ComposeRunResult =
@@ -166,7 +173,8 @@ export function composeRunRequest(input: ComposeRunInput): ComposeRunResult {
   }
   // A scout run has no machine gate (concept §5.6) — no acceptance
   // commands are demanded, carried or run.
-  const acceptance = scout ? [] : acceptanceCommands(input.ticketText);
+  // req-258: a persona whose gate is structural (a planner) is judged by what it wrote, never by the build's commands.
+  const acceptance = scout || structuralGate(input) ? [] : acceptanceCommands(input.ticketText);
   const gateRefusal = acceptanceRefusal(input, acceptance, scout);
   if (gateRefusal !== null) {
     return refused(gateRefusal);
@@ -179,6 +187,11 @@ export function composeRunRequest(input: ComposeRunInput): ComposeRunResult {
   const instruction = composeRunInstruction(plan);
   const request = assembleRunRequest(plan, worker, instruction);
   return { ok: true, request, truncations: instruction.truncations, persona: input.persona?.id ?? null };
+}
+
+/** The persona's record says its hand-over gate is structural. */
+export function structuralGate(input: ComposeRunInput): boolean {
+  return input.persona?.run?.gate === 'structural';
 }
 
 function refused(error: string): ComposeRunResult {

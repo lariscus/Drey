@@ -1,7 +1,9 @@
 import { CREW_FILE } from '../contracts/crew-config';
 import { seededPersonaText, seededPromptText, type ShippedPersona } from '../core/default-crew';
 import { seededCrewOf, withSeededCrew } from '../core/crew-seed-marker';
-import { PERSONAS_DIR, type PersonaModels } from '../core/persona';
+import { crewOrderOf, withCrewOrder } from '../core/crew-order';
+import { HUMAN_PERSONA_ID, PERSONAS_DIR, type PersonaModels } from '../core/persona';
+import type { CrewWrite } from '../core/crew-file-write';
 import type { TicketsGit } from '../core/tickets-git';
 import type { ModelRow } from '../fleet/protocol-pool';
 import type { CrewConfigFiles } from './crew-config-files';
@@ -56,6 +58,17 @@ interface Seeding {
  * ({@link CrewSeedModels}); the pipeline and the crew's default persona are
  * not changed. One commit of the persona files and `crew.md`.
  */
+/**
+ * req-258: a file without `order:` gets the default crew's, the human last (the
+ * concept §9); an order the owner already set stays as it is.
+ */
+function withOrder(marked: CrewWrite, ids: readonly string[]): CrewWrite {
+  if (!marked.ok || crewOrderOf(marked.text).length > 0) {
+    return marked;
+  }
+  return withCrewOrder(marked.text, [...ids, HUMAN_PERSONA_ID]);
+}
+
 export class CrewSeeder {
   constructor(private readonly deps: CrewSeederDeps) {}
 
@@ -99,7 +112,7 @@ export class CrewSeeder {
         missing.push(persona);
       }
     }
-    const marker = withSeededCrew(read.text, [...marked, ...offered.map((persona) => persona.id)]);
+    const marker = withOrder(withSeededCrew(read.text, [...marked, ...offered.map((persona) => persona.id)]), shipped.personas.map((persona) => persona.id));
     if (!marker.ok) {
       this.deps.log(`crew: ${marker.error}`, 'warn');
       return { kind: 'refused', reason: marker.error };

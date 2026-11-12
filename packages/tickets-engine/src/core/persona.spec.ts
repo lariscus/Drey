@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { EMPTY_PERSONA_SETTINGS } from './persona-settings';
 import { inPipelineOrder, parsePersonaFile, personaFileText, personaMigrationFor, personaRef, resolvePersona, splitPoolEntry } from './persona';
 
 const PIA = `---
@@ -44,6 +45,7 @@ describe('parsePersonaFile', () => {
       skills: ['repo-recherche', 'fragen-formulieren'],
       budget: null,
       allowed: { spendAboveAllowance: false },
+      settings: EMPTY_PERSONA_SETTINGS,
     });
   });
 

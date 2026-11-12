@@ -3,6 +3,7 @@ import { hostname } from 'node:os';
 import type { PipelinePhase, RepoRef } from '../contracts/tickets';
 import type { ComposedInstruction } from './instruction-parts';
 import type { ClosingSignal } from '../core/closing-signals';
+import type { PersonaRunSettings } from '../core/persona-settings';
 import { DEFAULT_CLOSING_SPEC, type RunRequest } from './protocol';
 import type { RunPlan } from './request-plan';
 import type { RunWorkerPin } from './request-worker';
@@ -86,7 +87,7 @@ function moveParts(plan: RunPlan): MoveParts {
 /** The keys a request carries only when they are set. */
 function optionalParts(plan: RunPlan): OptionalParts {
   const { input, moves } = plan;
-  const limits = limitsOf(input.workingPhase);
+  const limits = limitsOf(input.workingPhase, input.persona?.run ?? null);
   return {
     ...(limits !== null ? { limits } : {}),
     ...(input.workerChoice !== null ? { recordWorker: input.workerChoice } : {}),
@@ -114,14 +115,16 @@ function profileParts(repo: RepoRef | null): Pick<RunRequest, 'profile'> {
   return repo !== null && repo.profile !== undefined ? { profile: repo.profile } : {};
 }
 
-/** The column's own ceilings as the request carries them, or null when it sets none. */
-function limitsOf(phase: PipelinePhase | null): { maxTurns?: number; maxWorkMs?: number } | null {
-  if (phase === null || (phase.maxTurns === null && phase.maxWorkMin === null)) {
+/** The run ceilings as the request carries them — the persona's where its record sets one (req-258), else the column's; null when neither does. */
+function limitsOf(phase: PipelinePhase | null, persona: Pick<PersonaRunSettings, 'maxTurns' | 'maxWorkMin'> | null): { maxTurns?: number; maxWorkMs?: number } | null {
+  const maxTurns = persona?.maxTurns ?? phase?.maxTurns ?? null;
+  const maxWorkMin = persona?.maxWorkMin ?? phase?.maxWorkMin ?? null;
+  if (maxTurns === null && maxWorkMin === null) {
     return null;
   }
   return {
-    ...(phase.maxTurns !== null ? { maxTurns: phase.maxTurns } : {}),
-    ...(phase.maxWorkMin !== null ? { maxWorkMs: phase.maxWorkMin * 60_000 } : {}),
+    ...(maxTurns !== null ? { maxTurns } : {}),
+    ...(maxWorkMin !== null ? { maxWorkMs: maxWorkMin * 60_000 } : {}),
   };
 }
 

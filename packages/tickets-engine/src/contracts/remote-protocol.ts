@@ -26,6 +26,8 @@ import type { BoardSnapshot, CreateResult, MutationResult, RecentDone, TicketCar
 import type { ImprovementProposal, ImprovementState } from '../core/improvements';
 import type { Persona, PersonaAllowed } from '../core/persona';
 import type { PersonaAllowedPatch } from './persona-allowed';
+import type { PersonaSettingsPatch } from './persona-settings-patch';
+import type { PersonaSettings } from '../core/persona-settings';
 import type { PersonaRemovePort } from './persona-remove';
 import type { ScoutReport } from './scout';
 import type { SkillsPort } from './skills';
@@ -218,6 +220,8 @@ export interface TicketsRemotePort extends SkillsPort, PersonaRemovePort {
     readonly budget?: number | null;
     /** req-171: the `allowed:` keys the page's block sets. */
     readonly allowed?: PersonaAllowedPatch;
+    /** req-258: the run settings the page's Work block sets. */
+    readonly settings?: PersonaSettingsPatch;
   }): Promise<MutationResult>;
   /** The chain's persona pause (U4): a paused persona's tickets hold until played again. */
   chainPersonaPause(cmd: { readonly persona: string; readonly paused: boolean }): Promise<ChainPersonaPauseReply>;
@@ -293,6 +297,10 @@ export interface PersonaView {
   readonly summary?: string;
   /** `allowed:` (req-171): what the persona may do beyond its runs; absent on older servers and for the human. */
   readonly allowed?: PersonaAllowed;
+  /** req-258: the run settings as the record holds them (null = the column's value or the role's default); absent on older servers and for the human. */
+  readonly settings?: PersonaSettings;
+  /** req-258: whether its runs are instructed read-only — the record's `readonly:`, else the role's default. */
+  readonly readOnly?: boolean;
   /** When `personas/<id>/` was last committed (ISO committer date, req-239); absent = no git or no commit yet. */
   readonly committedAt?: string;
   /**

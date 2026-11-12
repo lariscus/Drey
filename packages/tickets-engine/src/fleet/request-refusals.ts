@@ -33,10 +33,12 @@ export function repoRefusal(input: ComposeRunInput, scout: boolean): string | nu
 /**
  * A ship run gates on the ticket's acceptance commands; none is a
  * refusal unless the run may gate structurally (the pipeline's first
- * worker column) or the owner drives it as a dialog.
+ * worker column, or a persona whose `gate:` is structural — req-258) or the
+ * owner drives it as a dialog.
  */
 export function acceptanceRefusal(input: ComposeRunInput, acceptance: readonly string[], scout: boolean): string | null {
-  if (acceptance.length === 0 && !scout && input.structuralGateAllowed !== true && input.interactive === undefined) {
+  const structural = input.structuralGateAllowed === true || input.persona?.run?.gate === 'structural';
+  if (acceptance.length === 0 && !scout && !structural && input.interactive === undefined) {
     return `${input.card.id} has no runnable acceptance criteria: ${acceptanceFinding(input.ticketText)}`;
   }
   return null;

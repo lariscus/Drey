@@ -8,7 +8,7 @@ import { DEFAULT_FLEET_CAPS, type InteractiveMode } from './protocol';
 import type { ComposeRunInput, PersonaDispatch } from './request';
 import type { RunPlan } from './request-plan';
 
-export type PersonaParts = Pick<InstructionInput, 'skillsSection' | 'memorySection' | 'personaId' | 'personaRole'>;
+export type PersonaParts = Pick<InstructionInput, 'skillsSection' | 'memorySection' | 'personaId' | 'personaRole' | 'readOnly'>;
 
 /** The worker's brief: an exploration brief for a scout ticket, the build brief otherwise. */
 export function composeRunInstruction(plan: RunPlan): ComposedInstruction {
@@ -72,13 +72,22 @@ function titleOf(input: ComposeRunInput): string {
   return input.card.meta.title ?? input.card.id;
 }
 
-/** The persona's prompt is the instruction base when it has one; else the phase's prompt stands. */
+/**
+ * The persona's prompt is the instruction base when it has one; else the
+ * phase's prompt stands. req-258's interactive mode wrapper: on a dialog run
+ * the column's interactive prompt (the shape dialog's interview-first
+ * protocol) follows the persona's prompt instead of being displaced by it.
+ */
 function runPrompt(input: ComposeRunInput): string | null {
   const persona = input.persona ?? null;
   const personaPrompt = persona !== null && persona.prompt !== null && persona.prompt.trim() !== '' ? persona.prompt : null;
   // req-280: a board-started run reads the vault prompt raw — its version marker is for the drift check, never for the model.
-  const text = personaPrompt ?? input.promptText;
-  return text === null ? null : stripPromptVersion(text);
+  const phasePrompt = input.promptText === null ? null : stripPromptVersion(input.promptText);
+  if (personaPrompt === null) {
+    return phasePrompt;
+  }
+  const own = stripPromptVersion(personaPrompt);
+  return input.interactive !== undefined && phasePrompt !== null && phasePrompt.trim() !== '' ? `${own.trimEnd()}\n\n${phasePrompt.trim()}` : own;
 }
 
 function interactivePart(input: ComposeRunInput): { interactive?: InteractiveMode } {
@@ -95,5 +104,6 @@ export function personaInstructionParts(persona: PersonaDispatch | null): Person
     memorySection: personaMemorySection(persona.memory),
     personaId: persona.id,
     personaRole: persona.role ?? null,
+    ...(persona.run?.readOnly === true ? { readOnly: true } : {}),
   };
 }

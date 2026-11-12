@@ -106,6 +106,12 @@ export interface InstructionInput {
    * commit the builder handed over, not the worktree. Absent = every other run.
    */
   readonly reviewCheckout?: string;
+  /**
+   * req-258: the persona is instructed read-only (its record's `readonly:`,
+   * else its role's default) — the brief carries the read-only rules instead
+   * of the writing rules. Absent = a writing run (unless it is a review).
+   */
+  readonly readOnly?: boolean;
 }
 
 /**
@@ -152,6 +158,7 @@ export function composeInstruction(input: InstructionInput): ComposedInstruction
     input.worktreePath,
     input.branch,
     ...(input.reviewCheckout !== undefined ? [input.reviewCheckout] : []),
+    ...(input.readOnly === true ? ['read-only'] : []),
     ...(head.skills !== '' ? [head.skills] : []),
     ...(persona !== null ? [persona] : []),
   ]);

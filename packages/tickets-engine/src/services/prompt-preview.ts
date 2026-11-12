@@ -5,6 +5,7 @@ import { estimateTokens, tokenizerFor } from '../core/token-count';
 import { personaMemorySection } from '../fleet/context-pack';
 import { composeInstruction } from '../fleet/instruction';
 import { previewInstructionInput } from '../fleet/prompt-preview-input';
+import { personaRunSettingsOf } from '../core/persona-settings';
 import { loadDisciplineTexts, type DisciplineTexts } from '../fleet/discipline-texts';
 import { skillsSection } from '../fleet/skills-section';
 import type { SkillFileSystem } from './skill-file-system';
@@ -51,7 +52,7 @@ export class PromptPreview {
     const tokenizer = tokenizerFor(entry.provider ?? persona.worker, entry.model);
     const composed = composeInstruction(
       previewInstructionInput(
-        { id: persona.id, role: persona.role, worker: entry.provider ?? persona.worker, model: entry.model, prompt, memory: memory ?? '', skills: loaded.skills },
+        { id: persona.id, role: persona.role, worker: entry.provider ?? persona.worker, model: entry.model, prompt, memory: memory ?? '', skills: loaded.skills, run: personaRunSettingsOf(persona) },
         options.step,
         await this.disciplines(),
       ),

@@ -3,7 +3,8 @@ import type { Persona } from '../core/persona';
 import { composeOneOnOneBrief, type OneOnOneBriefInput } from './one-on-one-brief';
 import { OneOnOneRequestBuilder } from './one-on-one-request';
 import { cutToOneOnOne, NO_TOOLS, ONE_ON_ONE_TOOLS, ONE_ON_ONE_VAULT_TOOLS } from './one-on-one-toolset';
-
+
+import { EMPTY_PERSONA_SETTINGS } from '../core/persona-settings';
 function persona(over: Partial<Persona> = {}): Persona {
   return {
     id: 'ben',
@@ -17,6 +18,7 @@ function persona(over: Partial<Persona> = {}): Persona {
     skills: [],
     budget: 4,
     allowed: { spendAboveAllowance: true },
+    settings: EMPTY_PERSONA_SETTINGS,
     ...over,
   };
 }

@@ -1,5 +1,7 @@
 import { CREW_FILE, type CrewConfigReply, type CrewOverridePatch, type CrewPatch } from '../contracts/crew-config';
 import { patchCrewFile } from '../core/crew-file-write';
+import { withCrewOrder } from '../core/crew-order';
+import { personaRef } from '../core/persona';
 import { LayeredConfigResolver, type EffectiveCrew } from '../fleet/config/layered-config-resolver';
 import type { CrewConfigFiles } from './crew-config-files';
 import type { CrewConfigMigrator } from './crew-config-migrator';
@@ -66,6 +68,33 @@ export class CrewConfigService {
       if (out.text !== read.text) {
         const names = [...patches.map((p) => p.key), ...overrides.map((o) => `handover.${o.map}.${o.name}`)];
         await this.files.write(vault, out.text, `tickets: crew settings (${names.join(', ')})`);
+      }
+      return { ok: true };
+    });
+  }
+
+  /**
+   * req-258: the crew's order — `order:` in crew.md, written whole by the Crew
+   * tab's drag (one commit); nothing written when it does not change.
+   */
+  async setOrder(vault: EngineVault | null, ids: readonly string[]): Promise<CrewSetResult> {
+    if (vault === null) {
+      return { ok: false, error: 'no tickets vault detected' };
+    }
+    try {
+      ids.forEach((id) => personaRef(id));
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : String(error) };
+    }
+    await this.migrator.ensure(vault);
+    return this.files.serial(async () => {
+      const read = await this.files.read(vault);
+      const out = withCrewOrder(read.text, ids);
+      if (!out.ok) {
+        return out;
+      }
+      if (out.text !== read.text) {
+        await this.files.write(vault, out.text, 'tickets: crew order');
       }
       return { ok: true };
     });
