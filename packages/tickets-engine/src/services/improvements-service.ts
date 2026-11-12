@@ -15,8 +15,15 @@
  * The service never writes itself and never throws: a broken read, a
  * malformed reply or a refused apply each log one line and leave the
  * persona for the next sweep.
+ *
+ * req-280 (T5): the aggregator sees the persona's current prompt.md and
+ * proposes prompt changes as exact edits (`core/prompt-edits.ts`); a draft
+ * whose edits do not apply is dropped, one that applies is stored as the
+ * resulting text. The reply is read from the streamed text — the chat
+ * bridge's envelope reader wants an object and dropped every array.
  */
-import type { ChatBridge } from '../contracts/chat';
+import type { ChatBridge, ChatStreamEvent } from '../contracts/chat';
+import { applyPromptEdits, parsePromptEdits } from '../core/prompt-edits';
 import {
   IMPROVEMENTS_THRESHOLD,
   validateDraft,
@@ -36,6 +43,8 @@ export interface PersonaImprovementInput {
   readonly lastAggregation: string | null;
   /** Settled runs since the last aggregation — the run history's digest. */
   readonly settledRuns: number;
+  /** The persona's current prompt.md (req-280); null or absent when it has none. */
+  readonly prompt?: string | null;
 }
 
 /** The board surface the service composes — the board service implements
@@ -84,7 +93,31 @@ function promptText(personaId: string, input: PersonaImprovementInput): string {
     '',
     'Run history:',
     `- ${input.settledRuns} run(s) settled since the last aggregation`,
+    '',
+    'Current prompt.md:',
+    (input.prompt ?? '').trim() === '' ? '(none — the persona has no prompt.md; propose no prompt.md draft)' : input.prompt!,
   ].join('\n');
+}
+
+/**
+ * A raw draft ready for the strict reader: a prompt.md draft's edits are
+ * applied to the current prompt and become its `content`; every other
+ * target passes as it is. Null = a prompt.md draft whose edits are missing
+ * or do not apply — dropped, with the reason.
+ */
+export function draftWithEdits(raw: unknown, prompt: string | null | undefined): { readonly draft: unknown } | { readonly dropped: string } {
+  if (typeof raw !== 'object' || raw === null || (raw as Record<string, unknown>)['target'] !== 'prompt.md') {
+    return { draft: raw };
+  }
+  const edits = parsePromptEdits((raw as Record<string, unknown>)['edits']);
+  if (edits === null) {
+    return { dropped: 'a prompt.md draft without well-formed edits' };
+  }
+  if ((prompt ?? '').trim() === '') {
+    return { dropped: 'a prompt.md draft for a persona without prompt.md' };
+  }
+  const applied = applyPromptEdits(prompt!, edits);
+  return applied.ok ? { draft: { ...(raw as Record<string, unknown>), content: applied.text } } : { dropped: `a prompt.md draft whose ${applied.error}` };
 }
 
 /** The digest the system prompt embeds below itself — the input's shape, not its bulk. */
@@ -206,13 +239,22 @@ export class ImprovementsService {
   }
 
   private async aggregate(personaId: string, input: PersonaImprovementInput): Promise<void> {
+    let streamed = '';
     const reply = await this.deps.bridge.runTurn({
       text: promptText(personaId, input),
       history: [],
       board: inputDigest(personaId, input),
-      emit: () => undefined,
+      emit: (event: ChatStreamEvent) => {
+        if (event.kind === 'text') {
+          streamed += event.text;
+        }
+      },
     });
-    const slice = extractJsonArray(reply.say);
+    if (reply.failure !== undefined) {
+      this.log(`improvements: ${personaId}: the aggregator could not be asked — ${reply.say}`, 'warn');
+      return;
+    }
+    const slice = extractJsonArray(streamed) ?? extractJsonArray(reply.say);
     if (slice === null) {
       this.log(`improvements: ${personaId}: the aggregator's reply held no JSON array — left for the next sweep`, 'warn');
       return;
@@ -228,16 +270,7 @@ export class ImprovementsService {
       this.log(`improvements: ${personaId}: the aggregator's reply was not a JSON array — left for the next sweep`, 'warn');
       return;
     }
-    const drafts: ImprovementDraft[] = [];
-    let dropped = 0;
-    for (const entry of raw) {
-      const draft = validateDraft(entry);
-      if (draft === null) {
-        dropped += 1;
-      } else {
-        drafts.push(draft);
-      }
-    }
+    const { drafts, dropped } = this.validated(personaId, raw, input.prompt);
     const applied = await this.deps.board.applyAggregation(personaId, drafts, this.now());
     if (!applied.ok) {
       this.log(`improvements: ${personaId}: apply failed: ${applied.error ?? 'unknown error'}`, 'warn');
@@ -247,5 +280,24 @@ export class ImprovementsService {
       this.log(`improvements: ${personaId}: ${dropped} draft(s) failed validation and were dropped`, 'info');
     }
     this.log(`improvements: ${personaId}: aggregated ${drafts.length} draft(s)`, 'info');
+  }
+
+  /** The drafts that pass: prompt.md edits applied (req-280), then the strict reader; the rest counted, each drop of an edit said. */
+  private validated(personaId: string, raw: readonly unknown[], prompt: string | null | undefined): { drafts: ImprovementDraft[]; dropped: number } {
+    const drafts: ImprovementDraft[] = [];
+    let dropped = 0;
+    for (const entry of raw) {
+      const prepared = draftWithEdits(entry, prompt);
+      if ('dropped' in prepared) {
+        this.log(`improvements: ${personaId}: dropped ${prepared.dropped}`, 'info');
+      }
+      const draft = 'draft' in prepared ? validateDraft(prepared.draft) : null;
+      if (draft === null) {
+        dropped += 1;
+      } else {
+        drafts.push(draft);
+      }
+    }
+    return { drafts, dropped };
   }
 }

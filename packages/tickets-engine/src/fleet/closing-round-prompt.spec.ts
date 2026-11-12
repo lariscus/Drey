@@ -42,6 +42,16 @@ describe('parseClosingAnswer (req-169)', () => {
     });
   });
 
+  it('reads a prompt.md proposal as edits, and refuses one that carries a whole text instead (req-280)', () => {
+    const edits = parseClosingAnswer('{"proposal":{"target":"prompt.md","title":"Read the plan first","edits":[{"old":"Orient first.","new":"Read the plan first."}]}}');
+    expect(edits?.proposal).toEqual({ target: 'prompt.md', title: 'Read the plan first', content: '', edits: [{ old: 'Orient first.', new: 'Read the plan first.' }] });
+    expect(parseClosingAnswer('{"proposal":{"target":"prompt.md","title":"t","content":"the whole new prompt"}}')?.proposal).toBeNull();
+  });
+
+  it('says when no gate ran (a blocked step, a scout run)', () => {
+    expect(closingRoundPrompt({ ticketId: 'T-1', gate: 'none', gateFailure: null, signals: ['friction'], steerCount: 0, costUsd: null, typicalCostUsd: null, friction: 'x' })).toContain('The step on T-1 is over: no machine gate ran.');
+  });
+
   it('drops what does not validate instead of guessing', () => {
     expect(parseClosingAnswer('no json here')).toBeNull();
     expect(parseClosingAnswer('{"finding":{"cause":"luck","text":"x"},"proposal":{"target":"skill","title":"t","content":"c"}}')).toEqual({

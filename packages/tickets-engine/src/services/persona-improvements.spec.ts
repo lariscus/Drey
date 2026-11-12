@@ -215,8 +215,9 @@ describe('improvementInput (E6 read)', () => {
       ],
       lastAggregation: null,
       settledRuns: 0,
+      prompt: 'The old prompt.\n', // req-280: the aggregator edits the current prompt.md
     });
-    expect(await serviceOf(files).improvementInput('ghost')).toEqual({ friction: [], lastAggregation: null, settledRuns: 0 });
+    expect(await serviceOf(files).improvementInput('ghost')).toEqual({ friction: [], lastAggregation: null, settledRuns: 0, prompt: null });
   });
 });
 
