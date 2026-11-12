@@ -32,19 +32,40 @@ function signatureOf(step: FlowStepView): string {
   return [step.persona, step.mode ?? '', step.notify ? 'n' : ''].join('|');
 }
 
-/** The positions the draft changed against the saved flow; they are drawn dashed until "Save flow". */
-export function changedIndicesOf(flow: FlowDraft, saved: FlowDraft | null): ReadonlySet<number> {
-  const changed = new Set<number>();
-  if (saved === null) {
-    return changed;
-  }
-  const before = new Map(saved.steps.map((step) => [step.index, signatureOf(step)]));
-  for (const step of flow.steps) {
-    if (before.get(step.index) !== signatureOf(step)) {
-      changed.add(step.index);
+/** The indices of `after` that sit outside a longest common subsequence with `before` — what an edit added or changed. */
+function unmatched(before: readonly string[], after: readonly string[]): ReadonlySet<number> {
+  const rows = before.length + 1;
+  const cols = after.length + 1;
+  const len: number[] = new Array<number>(rows * cols).fill(0);
+  for (let i = before.length - 1; i >= 0; i -= 1) {
+    for (let j = after.length - 1; j >= 0; j -= 1) {
+      len[i * cols + j] = before[i] === after[j] ? len[(i + 1) * cols + j + 1]! + 1 : Math.max(len[(i + 1) * cols + j]!, len[i * cols + j + 1]!);
     }
   }
-  return changed;
+  const out = new Set<number>();
+  let i = 0;
+  let j = 0;
+  while (j < after.length) {
+    if (i < before.length && before[i] === after[j]) {
+      i += 1;
+      j += 1;
+    } else if (i < before.length && len[(i + 1) * cols + j]! >= len[i * cols + j + 1]!) {
+      i += 1;
+    } else {
+      out.add(j);
+      j += 1;
+    }
+  }
+  return out;
+}
+
+/** The positions the draft changed against the saved flow; they are drawn dashed until "Save flow". */
+export function changedIndicesOf(flow: FlowDraft, saved: FlowDraft | null): ReadonlySet<number> {
+  if (saved === null) {
+    return new Set<number>();
+  }
+  const misses = unmatched(saved.steps.map(signatureOf), flow.steps.map(signatureOf));
+  return new Set(flow.steps.filter((_, at) => misses.has(at)).map((step) => step.index));
 }
 
 /** Who works a position, for its row: the persona's title, the owner's own name for the owner's position. */

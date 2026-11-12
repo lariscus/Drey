@@ -247,8 +247,11 @@ export function chainOf(input: {
   const { pipeline, card } = input;
   const own = card.meta.chain ?? [];
   const entries = own.length > 0 ? own : (input.flow ?? []);
-  const cursor = chainCursor(entries, card.meta.at, chainLifeOf(input.currentPhaseId, pipeline.map((p) => p.id)));
   const nameOf = (id: string): string => input.personas.find((p) => p.id === id)?.title ?? titleCase(id);
+  if (entries.length === 0) {
+    return phaseChainOf(pipeline, input.currentPhaseId, card, nameOf);
+  }
+  const cursor = chainCursor(entries, card.meta.at, chainLifeOf(input.currentPhaseId, pipeline.map((p) => p.id)));
   return chainSteps(entries, cursor).map((step) => {
     const checkpoint = step.persona === OWNER_PERSONA;
     return {
@@ -261,6 +264,33 @@ export function chainOf(input: {
       checkpoint,
       notify: step.notify,
       shape: step.mode === 'shape',
+    };
+  });
+}
+
+/**
+ * A ticket with neither a chain of its own nor a standard flow (`flow:`
+ * absent, every ticket from before req-266): the pipeline's working columns
+ * as the steps, as before — the manual ones are the owner's checkpoints.
+ */
+function phaseChainOf(pipeline: readonly PipelinePhase[], currentPhaseId: string, card: TicketCard, nameOf: (id: string) => string): ChainItem[] {
+  const ideas = new Set(ideaPhaseIds(pipeline));
+  const last = pipeline[pipeline.length - 1]?.id ?? null;
+  const shown = pipeline.filter((phase) => !ideas.has(phase.id) && phase.id !== last);
+  const at = shown.findIndex((phase) => phase.id === currentPhaseId);
+  return shown.map((phase, index) => {
+    const checkpoint = !isMachinePhase(phase);
+    const persona = card.meta.persona ?? phase.persona ?? null;
+    return {
+      phase: phase.id,
+      position: index + 1,
+      title: phase.title,
+      state: at < 0 ? 'future' : index < at ? 'past' : index === at ? 'current' : 'future',
+      who: checkpoint ? OWNER_PERSONA : persona === null ? '' : nameOf(persona),
+      personaId: checkpoint ? null : persona,
+      checkpoint,
+      notify: false,
+      shape: false,
     };
   });
 }

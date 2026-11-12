@@ -174,6 +174,16 @@ describe('chainOf', () => {
     expect(chain[3]!.personaId).toBeNull();
   });
 
+  it('falls back to the working columns without a chain of its own and without a standard flow', () => {
+    const chain = chainOf({ pipeline, currentPhaseId: 'build', card: card({}), personas });
+    expect(chain.map((s) => [s.title, s.state, s.who])).toEqual([
+      ['Plan', 'past', 'Paul'],
+      ['Build', 'current', 'Ben'],
+      ['Review', 'future', 'Ralf'],
+      ['Commit', 'future', 'you'],
+    ]);
+  });
+
   it("prefers the ticket's own chain to the standard flow, and queues a ticket in the first column", () => {
     const own = [entry('paul', { mode: 'shape' }), entry('tessa', { notify: true }), entry('you')];
     const chain = chainOf({ pipeline, currentPhaseId: 'ideas', card: card({ chain: own }), personas, flow });

@@ -67,24 +67,46 @@ function signatureOf(step: McFlowStep): string {
   return [step.persona, step.mode ?? '', step.notify ? 'n' : ''].join('|');
 }
 
+/** The indices of `after` that sit outside a longest common subsequence with `before` — what an edit added or changed. */
+function unmatched(before: readonly string[], after: readonly string[]): ReadonlySet<number> {
+  const rows = before.length + 1;
+  const cols = after.length + 1;
+  const len: number[] = new Array<number>(rows * cols).fill(0);
+  for (let i = before.length - 1; i >= 0; i -= 1) {
+    for (let j = after.length - 1; j >= 0; j -= 1) {
+      len[i * cols + j] = before[i] === after[j] ? len[(i + 1) * cols + j + 1]! + 1 : Math.max(len[(i + 1) * cols + j]!, len[i * cols + j + 1]!);
+    }
+  }
+  const out = new Set<number>();
+  let i = 0;
+  let j = 0;
+  while (j < after.length) {
+    if (i < before.length && before[i] === after[j]) {
+      i += 1;
+      j += 1;
+    } else if (i < before.length && len[(i + 1) * cols + j]! >= len[i * cols + j + 1]!) {
+      i += 1;
+    } else {
+      out.add(j);
+      j += 1;
+    }
+  }
+  return out;
+}
+
 /**
  * The positions the draft changed against the saved flow (they are drawn
  * dashed: "nothing counts before Save flow"). A position counts as
- * unchanged when the saved flow holds the same persona, mode and notify
- * rule at the same index.
+ * unchanged when it matches the saved flow's persona, mode and notify rule
+ * in order (a longest common subsequence), so an added persona does not mark
+ * every position after it.
  */
 export function changedIndicesOf(flow: McFlow, saved: McFlow | null): ReadonlySet<number> {
-  const changed = new Set<number>();
   if (saved === null) {
-    return changed;
+    return new Set<number>();
   }
-  const before = new Map(saved.steps.map((step) => [step.index, signatureOf(step)]));
-  for (const step of flow.steps) {
-    if (before.get(step.index) !== signatureOf(step)) {
-      changed.add(step.index);
-    }
-  }
-  return changed;
+  const misses = unmatched(saved.steps.map(signatureOf), flow.steps.map(signatureOf));
+  return new Set(flow.steps.filter((_, at) => misses.has(at)).map((step) => step.index));
 }
 
 /** What one row says besides its title: the persona's title, `you` for the owner's own position, the id of a persona with no record. */

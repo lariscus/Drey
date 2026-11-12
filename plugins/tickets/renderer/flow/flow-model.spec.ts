@@ -77,6 +77,9 @@ describe('flow model', () => {
     expect([...changedIndicesOf(swapped, flow())]).toEqual([2]);
     const notified = flow({ steps: flow().steps.map((s) => (s.index === 1 ? { ...s, notify: true } : s)) });
     expect([...changedIndicesOf(notified, flow())]).toEqual([1]);
+    // an added persona in the middle marks only itself, not every position after it
+    const inserted = flow({ steps: [step(0, 'ben'), step(1, 'ralf'), step(2, 'tessa'), step(3, 'paul'), step(4, 'you', { owner: true })] });
+    expect([...changedIndicesOf(inserted, flow())]).toEqual([3]);
   });
 
   it('names who works a position', () => {
