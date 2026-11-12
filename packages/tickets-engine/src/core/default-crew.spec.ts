@@ -49,13 +49,13 @@ describe('the shipped default crew files (req-256)', () => {
     }
   });
 
-  it('open prompt.md with the "who it is" section (R11: the prompt is the persona), then how it works and what done means', async () => {
+  it('open prompt.md with the "who it is" section (R11: the prompt is the persona), then how it works — character only, the step owns "done" (req-280, D6)', async () => {
     for (const id of DEFAULT_CREW_IDS) {
       const title = parsePersonaFile(id, await file(id, 'persona.md')).title;
       const text = await file(id, 'prompt.md');
       expect(text.startsWith(`## Who ${title} is\n`), id).toBe(true);
       expect(text, id).toContain(`## How ${title} works`);
-      expect(text, id).toContain('## What done means');
+      expect(text, id).not.toContain('## What done means');
       expect(text, id).not.toContain('drey-prompt-version');
     }
   });

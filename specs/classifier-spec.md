@@ -18,7 +18,8 @@ abstraction in `electron/llm/` (ADR-0047).
 | Pipeline step prompts (plan, build, review, qa, commit, scout) | `packages/tickets-engine/prompts/*.md` (seeded into the vault's `tickets/_meta/prompts/` — the editable copy a board runs) | `core/default-prompts.ts` |
 | Default crew personas (the seed) | `packages/tickets-engine/personas/<id>/{persona,prompt}.md` | `services/shipped-crew-files.ts` |
 | Crew chat prompts (Mission Control, Shape, Flow, Aggregator) | `packages/tickets-engine/prompts/crew/*.md` | `services/crew-prompts.ts` (`loadCrewPrompts`) |
-| Run brief disciplines (completion, handover, dialog, asking, scout) | `packages/tickets-engine/prompts/disciplines/*.md` — `{{question}}`/`{{blocked}}` are the protocol markers, substituted on load | `fleet/discipline-texts.ts` (`loadDisciplineTexts`) |
+| Run brief disciplines (working, writing, read-only, ticket-file, handover, language, precedence, completion, dialog, scout, signals, asking — req-280) | `packages/tickets-engine/prompts/disciplines/*.md` — `{{question}}`/`{{blocked}}` are the protocol markers, substituted on load | `fleet/discipline-texts.ts` (`loadDisciplineTexts`) |
+| Shared fragments (the plan format, the chain grammar — req-280) | `packages/tickets-engine/prompts/fragments/*.md`, pulled into a prompt by `{{plan-format}}` / `{{chain-grammar}}` | `core/prompt-file.ts` (`loadPromptFragments`, `expandFragments`) |
 | Assistant role texts (`ASK_SYSTEM`, `askToolsSystem`, `liveEditSystem`, `ASK_ANSWER_SYSTEM`) | `plugins/assistant/main/ask-prompts.ts` (code; `system-prompt.ts` composes around them) | direct import |
 | Base app built-in templates (Autotag, search summary, lossless format) | `shared/config/schema.ts` (code — the renderer needs them synchronously; the user's copies live in app-config) | direct import |
 | The closing round's prompt | `packages/tickets-engine/src/fleet/closing-round-prompt.ts` (a builder with per-run facts, code) | direct import |
@@ -334,16 +335,10 @@ create as a `raw capture:` Log line (ticket-schema).
   are the progress. The Cancel control is req-157.
 - **The fleet's step prompts and the run brief's persona line**
   (`packages/tickets-engine/prompts/*.md`, `fleet/assignment.ts`; milestone
-  212, D-60 / D-61). The run brief's disciplines (completion, handover,
-  dialog, asking, scout) are files too since req-279 —
-  `prompts/disciplines/*.md` via `fleet/discipline-texts.ts`. The shipped step prompts (`build-default` v6,
-  `qa-default` v2, `review-default` v3, `scout-default` v2) ask the worker,
-  in their "How to work" list, to report friction as one `FRICTION:` line
-  of the final message (req-169, milestone 229 — the step prompts are
-  `build-default` v7, `qa-default` v3, `review-default` v4, `scout-default`
-  v3; the wording is under *The closing round*). The brief — ship and
-  scout alike — names the persona right after the ticket line:
-  `Your persona: <id> (<role>) — its folder is
+  212, D-60 / D-61; req-280). How a brief is composed from the step prompt
+  and the disciplines is the section *The run brief's composition* below.
+  The brief — ship and scout alike — names the persona right after the
+  ticket line: `Your persona: <id> (<role>) — its folder is
   tickets/_meta/personas/<id>/ in the tickets repo.` (no line on a ring
   run). The brief's variable parts carry the persona's `## Memory` slice
   and no longer a `## Coaching` slice of `thread.md` (D-61: nothing is
@@ -354,29 +349,114 @@ create as a `raw capture:` Log line (ticket-schema).
 
 ---
 
+## The run brief's composition (req-280, ADR-0097)
+
+A step prompt (`plan-default` v3, `plan-interactive-default` v3,
+`build-default` v8, `review-default` v5, `qa-default` v4, `commit-default`
+v4, `scout-default` v4) carries its **role only**: inputs, outputs, its own
+guardrails and one closing **"Done when …"**. Everything several steps share
+is a discipline file the composer appends by run kind
+(`fleet/instruction.ts` `ruleParts` / `closingParts`,
+`fleet/scout-instruction.ts`), one meaning per file — the texts live in
+`prompts/disciplines/`, each opening with its label:
+
+| File | Label it opens with | Rides |
+|---|---|---|
+| `working.md` | `How to work:` | every run |
+| `writing.md` | `Changing files:` | writing runs (not a review, not a tester's run) |
+| `read-only.md` | `Read-only:` | a review (`reviewCheckout`) or a run whose persona role is `tester` (`isReadOnlyRun`) |
+| `ticket-file.md` | `The ticket file named above …` | writing runs |
+| `handover.md` | `Handover:` | writing runs outside a dialog |
+| `language.md` | `Language:` | every run, scout included |
+| `precedence.md` | `Precedence:` | every run, scout included |
+| `completion.md` | `Completion discipline:` | non-dialog ship runs, in the closing |
+| `interactive.md` | `Dialog discipline:` | a dialog, in the closing (instead of completion) |
+| `scout.md` | `Scout discipline:` | a scout run (a dialog on a scout ticket: `interactive.md`) |
+| `signals.md` | `Signals:` | every run, in the closing |
+| `asking.md` | `Asking the owner:` | every brief, last |
+
+Order of a ship brief: the repo's instructions → the step (or persona)
+prompt with its fragments expanded → `## Skills` → `## Plan` → who and
+where (ticket, persona line, checkout line, phase, ticket-file line,
+description) → the rules (working; read-only, or writing + ticket-file +
+handover; language; precedence) → memory, earlier handover, diff stat, gate
+failure → the gate commands → completion or dialog → signals → asking. A
+resume repeats only the part from memory on (the rules sit in the stable
+part).
+
+- **The signals** — the one table of what the runner acts on, each at a line
+  start of the turn's last message: no marker = done; `BLOCKED: <reason in
+  one line>` = no gate, no move, the ticket waits for the owner;
+  `QUESTION:` = the run waits for the owner's answer (the shape is
+  `asking.md`'s); `FRICTION: <what was missing>` = one line for the
+  improvement loop, before a `BLOCKED:` line. Status-log lines, Handover
+  states and Log lines are for people — the runner writes every persisted
+  status verb itself (store comments), so no prompt asks an agent for a
+  status line any more.
+- **The code-side lines** shrink to facts: `Work checkout: <path> (branch
+  <b>, repo <r>). Stay on that branch.`; `Review checkout: <path> (branch
+  <b> at the commit the builder handed over, detached, repo <r>). It is
+  read-only, and so is your session.`; `The ticket file: <path>. Use this
+  path directly; do not search the disk for another ticket file.` (a
+  read-only run: `… — read it if you need more than this brief quotes.`);
+  the gate lead-in `The machine gate runs exactly these after you finish:`
+  (a review: `…, in the worktree at the commit you reviewed:`).
+- **The fragments** (`prompts/fragments/`): `plan-format.md` — the one plan
+  schema (Goal; Architecture only when components or flows change;
+  Decisions; Out of scope; Parts only with two or more parts — `persona:`,
+  `size: S|M|L` with its class S → C, M → B, L → A, `reason:`, `chain:`;
+  Acceptance criteria as `` - [ ] `<command>` `` at line start, the only
+  shape `acceptanceCommands` runs; Open questions), pulled in by
+  `plan-default`, `plan-interactive-default`, `build-default` (for a ticket
+  that reaches the build without a plan) and the crew's shape prompt;
+  `chain-grammar.md` — the five chain verbs (`insert`, `skip`, `notify`,
+  `move`, `assign`) for the mission and flow prompts. A placeholder expands
+  whatever the prompt's source (column template, vault copy, persona
+  prompt — also in a 1:1 and a free session's brief); vault copies keep it.
+- **Versions:** every discipline, fragment and crew prompt carries a
+  `<!-- drey-prompt-version: N -->` line now; the one reader
+  (`core/prompt-file.ts` `readPromptFile`) strips it, and a board-started
+  run strips it from the vault prompt too (`request-instruction.ts`
+  `runPrompt`).
+- **The review verdict:** the final message's first line is `PASS`,
+  `PASS WITH NOTES` or `FAIL`; a FAIL ends with
+  `BLOCKED: FAIL — <the main finding in one line>` (the runner parks the
+  ticket for the owner's send-back). Nothing parses the verdict word itself.
+- **The tester's verdicts:** one line per criterion, `- passed|failed`
+  `` `<command>` `` ` — <what was seen>`, then `Findings:`, and `BLOCKED:`
+  when any criterion failed. Guidance only — the machine verify step
+  (`services/verify-service.ts`) writes `## Verification` on its own.
+- **The crew prompts:** mission lists every command with its fields and an
+  example (`createTicket` title, phase, priority, description?;
+  `transition` id, from, to; `setPriority` id, priority; `promote` id;
+  `setChain` id, chain; `setBlockedBy` id, blockedBy; `startSession`
+  persona, directory, poolClass, brief) and pulls the chain grammar; shape
+  pulls the plan format and says a reply with `read` is only a request (its
+  other fields are set aside, `chat-llm.ts`); the aggregator gets the
+  persona's current `prompt.md` in its user message (`Current prompt.md:`)
+  and answers an array of drafts — `prompt.md` drafts as
+  `"edits":[{"old","new"}]`, `models.default` / `memory` drafts as
+  `"content"`. The service reads the array from the streamed reply (the
+  bridge's envelope reader drops arrays), applies a draft's edits
+  (`core/prompt-edits.ts`: each `old` must match exactly once) and stores
+  the resulting text; a draft whose edits do not apply is dropped.
+
 ## The default crew's persona prompts (req-256, milestone 235)
 
-`packages/tickets-engine/personas/<id>/prompt.md` — four files read by `services/shipped-crew-files.ts` and seeded by `services/crew-seeder.ts` into `tickets/_meta/personas/<id>/prompt.md` (the persona's one prose, R11; `specs/ticket-schema.md`, "The shipped default crew"). **How the persona prompt and the step prompt compose:** a resolved persona's `prompt.md` **replaces** the step prompt as the run's instruction base (`fleet/request-instruction.ts` `runPrompt`; the brief's other parts — the repo's instructions, `## Skills`, `## Memory`, the persona line — follow as for any persona). So the seeded prompt is composed once, at seeding (`core/default-crew.ts` `seededPromptText`): the shipped text below, a blank line, `## The <name> step`, a blank line and the shipped step prompt of the role without its `<!-- drey-prompt-version -->` line — planner → `plan-default` (*planning*), builder → `build-default` (*build*), reviewer → `review-default` (*review*), tester → `qa-default` (*verify*). The repository holds each text once; the vault's copy is a snapshot (req-260). A persona seeded in a package that holds no step prompt for the role gets the character alone and a log line. The texts, as shipped (English like every prompt; the model is only ever asked to work, never to answer in a fixed shape here):
+`packages/tickets-engine/personas/<id>/prompt.md` — four files read by `services/shipped-crew-files.ts` and seeded by `services/crew-seeder.ts` into `tickets/_meta/personas/<id>/prompt.md` (the persona's one prose, R11; `specs/ticket-schema.md`, "The shipped default crew"). **How the persona prompt and the step prompt compose:** a resolved persona's `prompt.md` **replaces** the step prompt as the run's instruction base (`fleet/request-instruction.ts` `runPrompt`; the brief's other parts — the repo's instructions, `## Skills`, `## Memory`, the persona line — follow as for any persona). So the seeded prompt is composed once, at seeding (`core/default-crew.ts` `seededPromptText`): the shipped text below, a blank line, `## The <name> step`, a blank line and the shipped step prompt of the role without its `<!-- drey-prompt-version -->` line — planner → `plan-default` (*planning*), builder → `build-default` (*build*), reviewer → `review-default` (*review*), tester → `qa-default` (*verify*). The repository holds each text once; the vault's copy is a snapshot (req-260). A persona seeded in a package that holds no step prompt for the role gets the character alone and a log line. Since req-280 (D6) the shipped text is the persona's **character only** — `## Who <Name> is` and `## How <Name> works`; what "done" means is the step prompt's. The texts, as shipped (English like every prompt; the model is only ever asked to work, never to answer in a fixed shape here):
 
 **paul** (`personas/paul/prompt.md`):
 
 ````markdown
 ## Who Paul is
 
-Paul is the planner. He turns a rough idea into a plan the builder can carry out without asking again: what and why, the decisions that are settled, what is out of scope, and acceptance criteria a command can check.
-
-He reads before he writes. He asks only the question whose answer changes the plan, one at a time, and says so plainly when a ticket is too large and should split into parts. A plan names the touching points and the order of the work, never the code and never line numbers.
+Paul is the planner. He turns a rough idea into a plan the builder can carry out without asking again, and he reads before he writes: a plan never checked against the code is a guess.
 
 ## How Paul works
 
-- Find the touching points in the repo first; a plan that was never checked against the code is a guess.
-- Keep the plan lean: every step earns its place, and a decision is written down with its reason.
-- Write acceptance criteria as commands that pass or fail, never as adjectives.
-- Say what is out of scope. A builder that cannot tell where the work ends will not stop.
-
-## What done means
-
-The plan is in the ticket's `## Plan`, the builder could start from it alone, and every acceptance criterion can be run. Nothing outside the ticket file was changed.
+- He asks only the question whose answer changes the plan, and says plainly when a ticket is too large and should split.
+- He writes every decision down with its reason, and every acceptance criterion as a command that passes or fails, never as an adjective.
+- He keeps the plan lean and says where the work ends: a builder who cannot tell will not stop.
 ````
 
 **ben** (`personas/ben/prompt.md`):
@@ -384,20 +464,13 @@ The plan is in the ticket's `## Plan`, the builder could start from it alone, an
 ````markdown
 ## Who Ben is
 
-Ben is the builder. He implements the plan on the branch, in small commits that each say what they did, and he does not stop at "it compiles": he runs the acceptance commands himself while he works.
-
-He stays inside the ticket's scope. When the plan turns out wrong or incomplete he says what differs and why in the Log, adjusts the work, and never builds something else in silence. He does not weaken a criterion to make it pass.
+Ben is the builder. He does not stop at "it compiles": he works until the acceptance commands pass, and his commits tell the story of the work.
 
 ## How Ben works
 
-- Orient first, from the plan and the repo's own conventions; verify what the plan names before relying on it.
-- Write tests with new behaviour, and fix what the acceptance commands surface before moving on.
-- Touch only what a step asks for. The worktree and the branch are his only writable places.
-- When he is blocked and no honest adjustment exists, he stops and says why.
-
-## What done means
-
-The acceptance commands pass on the branch, the commits tell the story, the ticket's `## Changes` says what changed for the owner, and nothing outside the scope was touched.
+- He stays inside the ticket's scope and verifies what the plan names before relying on it.
+- When the plan turns out wrong he says what differs and why, and adjusts — he never builds something else in silence, and never weakens a criterion to make it pass.
+- When he is stuck and no honest adjustment exists, he stops and says why.
 ````
 
 **ralf** (`personas/ralf/prompt.md`):
@@ -405,20 +478,13 @@ The acceptance commands pass on the branch, the commits tell the story, the tick
 ````markdown
 ## Who Ralf is
 
-Ralf is the reviewer. He is the independent check on the builder's work: he judges the branch by its diff, the plan and the acceptance commands, not by what the build step says about itself. He verifies claims instead of adopting them.
-
-He is exact and fair. A finding names the file, the behaviour and why it is wrong; a nitpick is left out, and a real defect is never softened. He reviews and reports; he does not fix what he finds.
+Ralf is the reviewer, the independent check on the builder's work: he verifies claims instead of adopting them.
 
 ## How Ralf works
 
-- Read the ticket first, then the branch's diff against its base; read surrounding code only where the diff needs it.
-- Check in order: correctness, plan fidelity, the acceptance criteria, then the repo's own conventions.
-- A deviation the build logged must be justified; an unlogged one is a finding.
-- Run the acceptance commands rather than trusting a claim that they pass.
-
-## What done means
-
-Every finding is concrete and checkable, the verdict follows from the findings, and nothing on the branch was changed.
+- He is exact and fair: a finding names the file, the behaviour and why it is wrong; a nitpick is left out, a real defect is never softened.
+- He judges by the diff, the plan and the acceptance commands, not by what the build says about itself.
+- He reviews and reports; he does not fix what he finds.
 ````
 
 **tessa** (`personas/tessa/prompt.md`):
@@ -426,23 +492,16 @@ Every finding is concrete and checkable, the verdict follows from the findings, 
 ````markdown
 ## Who Tessa is
 
-Tessa is the tester. She is the check on the proof, not the proof: the engine ran the app along the acceptance criteria and captured one screenshot per criterion, and she compares each shot with its criterion and settles one verdict each.
-
-She is skeptical and literal. A shot that merely looks plausible is not a pass; she judges each criterion against its own picture, not against what the section already claims. She does not edit the ticket's verification section herself.
+Tessa is the tester, the check on the proof: skeptical and literal, she lets nothing pass that merely looks plausible.
 
 ## How Tessa works
 
-- Start from the acceptance criteria exactly as written, one verdict each.
-- Compare the captured shot with the criterion's wording and its expected state; say what she sees when they differ.
-- A missing or unreadable shot is a failed criterion, not a skipped one.
-- Keep the verdicts short and evidence-first: what the shot shows, then pass or fail.
-
-## What done means
-
-Every criterion has exactly one verdict with the evidence behind it, and nothing was edited except the verdict she reports.
+- One verdict per acceptance criterion, each backed by what she saw.
+- What she could not check is a failure, never a pass by default.
+- She reports what she found; she changes nothing.
 ````
 
-The shipped `persona.md` of each carries the `summary:` the crew cards draw (`Plans the work: settles what and why, writes the steps and the acceptance criteria the builder can check.` · `Builds what the plan says, on the branch, in small commits, and shows the acceptance commands passing.` · `Reviews the branch as the independent check: reads the diff against the plan and reports findings, never edits.` · `Judges the proof: compares each captured screenshot with its acceptance criterion and settles one verdict each.`).
+The shipped `persona.md` of each carries the `summary:` the crew cards draw (`Plans the work: settles what and why, writes the steps and the acceptance criteria the builder can check.` · `Builds what the plan says, on the branch, in small commits, and shows the acceptance commands passing.` · `Reviews the branch as the independent check: reads the diff against the plan and reports findings, never edits.` · `Judges the proof: runs each acceptance criterion and settles one verdict each, backed by what she saw.`).
 
 ## The worker's question shape (req-75 W2)
 
@@ -608,7 +667,7 @@ with this prompt (`packages/tickets-engine/src/fleet/closing-round-prompt.ts`,
 `closingRoundPrompt`; one line per raised signal, in this order):
 
 ````text
-The step on <ticket> is over: the machine gate is <green|red>. This is a short closing round — do not run tools, do not edit files; nothing changes any more.
+The step on <ticket> is over: the machine gate is <green|red> | no machine gate ran. This is a short closing round — do not run tools, do not edit files; nothing changes any more.
 
 Why this run is looked at:
 - the machine gate failed: <the gate failure's first line, 200 characters>
@@ -622,7 +681,7 @@ Answer with exactly one JSON object and nothing outside it — no prose, no mark
 - finding: where the run stumbled and why. cause "model" when a stronger or different model would have avoided it, "prompt" when the brief, the prompt or the skills lacked something, "task" when the ticket itself was unclear or wrong, "environment" for the repo, the tools or the machine. At most 400 characters; null when nothing stumbled.
 - friction: what you lacked, guessed or hit twice — one line, at most 200 characters; null when nothing.
 - lesson: one line the NEXT run of this persona should know — a concrete, reusable rule, not a story of this run; at most 200 characters. A wrong lesson misleads every later run: when in doubt, null.
-- proposal: null, or {"target":"prompt.md|models.default","title":"...","content":"..."} when the persona's prompt or model should change — the owner decides; content is the whole new prompt text, or the model id.
+- proposal: null, or a change the owner decides: {"target":"prompt.md","title":"...","edits":[{"old":"...","new":"..."}]} when the persona's prompt should change — each "old" copied exactly from the prompt you were given and found there once, "new" its replacement, the smallest edits that do it — or {"target":"models.default","title":"...","content":"<model id>"} when the model should.
 ````
 
 - **The parser** (`parseClosingAnswer`): the first `{` to the last `}` of
@@ -631,8 +690,12 @@ Answer with exactly one JSON object and nothing outside it — no prose, no mark
   written. Each field is checked on its own: a `finding` needs a known
   `cause` and a non-empty `text`; `friction` / `lesson` are flattened to
   one line and capped (200), `none` / `null` / `n/a` read as null; a
-  `proposal` needs the target `prompt.md` or `models.default`, a title
-  (120) and content (≤ 8 KiB; a model id is one line). What fails a check
+  `proposal` needs a title (120) and either the target `prompt.md` with
+  well-formed `edits` (req-280: at most 10, each `old` non-empty and
+  different from its `new`) or `models.default` with content (one line).
+  `RoundProposalWriter` applies the edits to the persona's current
+  `prompt.md` and stores the resulting text (≤ 8 KiB); edits that do not
+  match exactly once write nothing. What fails a check
   is dropped, never guessed.
 - **What it writes:** one journal entry (`reviews.md`) with the runner's
   facts and the finding; at most one memory line
@@ -643,16 +706,16 @@ Answer with exactly one JSON object and nothing outside it — no prose, no mark
 - **No round:** a run without a session ref, a harness that cannot resume
   it, a round past its 10-minute bound — the entry is written from the
   runner's facts with `note: round skipped — <why>`, no lesson. A 1:1, a
-  dialog, a blocked, scout or no-result run gets none.
-- **The worker's friction line:** the shipped step prompts
-  (`build-default` v7, `qa-default` v3, `review-default` v4,
-  `scout-default` v3) ask, in their "How to work" list: *"when you lacked
-  context, had to guess a convention, or hit the same obstacle twice, say
-  so in ONE line of your final message, on its own line —
-  `FRICTION: <what was missing>`, plain words, before a `BLOCKED:` line if
-  you send the step back. Nothing to report: no line."* The runner reads
-  the last line-start `FRICTION:` line (`harness/event-text.ts`
-  `frictionOf`, 300 characters).
+  dialog or a no-result run gets none; a blocked step and a scout run get
+  one since req-280 (the first line then reads *no machine gate ran*), so
+  their FRICTION line reaches the journal.
+- **The worker's friction line:** the signals discipline
+  (`prompts/disciplines/signals.md`, req-280) asks every run for it:
+  *"`FRICTION: <what was missing>` — one line when you lacked context, had
+  to guess a convention or hit the same obstacle twice; the owner's
+  improvement loop reads it. It goes before a `BLOCKED:` line. Nothing to
+  report: no line."* The runner reads the last line-start `FRICTION:` line
+  (`harness/event-text.ts` `frictionOf`, 300 characters).
 
 ## The free session brief (req-173, R12)
 

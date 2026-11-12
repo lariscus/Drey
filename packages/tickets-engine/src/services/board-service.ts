@@ -209,6 +209,8 @@ export interface ImprovementInput {
   readonly friction: readonly FrictionLine[];
   readonly lastAggregation: string | null;
   readonly settledRuns: number;
+  /** The persona's current prompt.md — the aggregator edits it, never replaces it blind (req-280). */
+  readonly prompt?: string | null;
 }
 
 /**
@@ -4310,17 +4312,18 @@ export class EngineBoardService {
     if (vault === null) {
       return { friction: [], lastAggregation: null, settledRuns: 0 };
     }
-    const [improvementsText, journalText, runs] = await Promise.all([
+    const [improvementsText, journalText, runs, prompt] = await Promise.all([
       this.readOptional(vault.id, improvementsPathFor(id)),
       this.readOptional(vault.id, journalPathFor(id)),
       this.fleetRecords().catch(() => [] as readonly RunInfo[]),
+      this.readOptional(vault.id, `${PERSONAS_DIR}/${id}/prompt.md`),
     ]);
     const lastAggregation = parseImprovements(improvementsText ?? '').lastAggregation;
     const settledRuns =
       lastAggregation === null
         ? 0
         : runs.filter((run) => (run.persona ?? null) === id && run.startedAt > lastAggregation).length;
-    return { friction: journalFrictions(journalText ?? '', lastAggregation), lastAggregation, settledRuns };
+    return { friction: journalFrictions(journalText ?? '', lastAggregation), lastAggregation, settledRuns, prompt };
   }
 
   /**

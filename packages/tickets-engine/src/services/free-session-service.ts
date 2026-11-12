@@ -1,6 +1,7 @@
 import type { FreeSessionAsk, FreeSessionStartReply, SessionOptionsReply } from '../contracts/free-session';
 import type { RepoRef } from '../contracts/repo-ref';
 import { loadPersonaSkills, personaRef, type Persona } from '../core/persona';
+import { expandShippedFragments } from '../core/prompt-file';
 import { parseWorkerValue } from '../fleet/assignment';
 import { composeFreeSessionBrief } from '../fleet/free-session-brief';
 import { FreeSessionRequestBuilder } from '../fleet/free-session-request';
@@ -151,7 +152,7 @@ export class FreeSessionService {
     return composeFreeSessionBrief({
       title: persona.title,
       role: persona.role,
-      prompt: prompt ?? '',
+      prompt: await expandShippedFragments(prompt ?? ''),
       skills: skills.skills.map((s) => ({ name: s.name, text: s.text })),
       workingDirectory: where.directory,
       permissionMode: where.permissionMode,

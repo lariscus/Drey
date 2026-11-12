@@ -20,4 +20,18 @@ describe('RoundProposalWriter (R11, req-169)', () => {
     ]);
     expect(file.proposals[1]).toMatchObject({ target: 'models.default', content: 'opus', evidence: ['2026-11-09T12:00:00Z · T-0102 · ben · claude-code/sonnet · gate red · $0.50'] });
   });
+
+  it('a prompt.md proposal stores the current prompt with its edits applied; edits that do not apply write nothing (req-280)', async () => {
+    const fs = new MemoryFileSystem();
+    const prompt = 'V:/vault/tickets/_meta/personas/ben/prompt.md';
+    fs.files.set(prompt, '## Who Ben is\n\nBen builds.\n');
+    const logs: string[] = [];
+    const writer = new RoundProposalWriter(clock, fs, (line) => logs.push(line));
+    const id = await writer.add('V:/vault', 'ben', { target: 'prompt.md', title: 'Run the gate first', content: '', edits: [{ old: 'Ben builds.', new: 'Ben builds and runs the gate first.' }] }, 'evidence');
+    expect(id).toBe('imp-1');
+    expect(parseImprovements(fs.files.get(FILE) as string).proposals[0]).toMatchObject({ target: 'prompt.md', content: '## Who Ben is\n\nBen builds and runs the gate first.' });
+    expect(fs.files.get(prompt)).toBe('## Who Ben is\n\nBen builds.\n'); // proposed, never adopted
+    expect(await writer.add('V:/vault', 'ben', { target: 'prompt.md', title: 'Nope', content: '', edits: [{ old: 'Ralf', new: 'x' }] }, 'evidence')).toBeNull();
+    expect(logs.some((line) => line.includes('occurs 0 times'))).toBe(true);
+  });
 });

@@ -18,11 +18,12 @@ describe('shipped prompts', () => {
     ]);
   });
 
-  it('reads the files as they are: newline-terminated, the working style included', async () => {
+  it('reads the files as they are: newline-terminated, the role only (req-280: the shared rules are disciplines)', async () => {
     const prompts = await loadShippedPrompts();
     for (const [ref, text] of prompts) {
       expect(text.endsWith('\n'), ref).toBe(true);
-      expect(text, ref).toContain('How to work:');
+      expect(text, ref).not.toContain('How to work:');
+      expect(text, ref).not.toContain('status.log');
       expect(text, ref).not.toContain('\r');
       expect(await fsp.readFile(path.join(SHIPPED_PROMPTS_DIR, `${ref}.md`), 'utf8')).toBe(text);
     }

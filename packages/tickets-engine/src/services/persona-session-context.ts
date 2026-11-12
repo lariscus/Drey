@@ -1,5 +1,6 @@
 import type { PersonaMessage } from '../contracts/persona-session';
 import { loadPersonaSkills, type Persona } from '../core/persona';
+import { expandShippedFragments } from '../core/prompt-file';
 import { parseWorkerValue } from '../fleet/assignment';
 import { BRIEF_RUNS, composeOneOnOneBrief, type BriefRun } from '../fleet/one-on-one-brief';
 import { NO_TOOLS, type OneOnOneToolSeam } from '../fleet/one-on-one-toolset';
@@ -46,7 +47,7 @@ export class PersonaSessionContext {
       id: persona.id,
       title: persona.title,
       role: persona.role,
-      prompt: prompt ?? '',
+      prompt: await expandShippedFragments(prompt ?? ''),
       skills: skills.skills.map((s) => ({ name: s.name, text: s.text })),
       memory,
       runs: latestRunsOf(runs, persona.id),

@@ -104,7 +104,7 @@ export class ClosingRound {
     const failure = run.info.gateFailure ?? null;
     return closingRoundPrompt({
       ticketId: run.info.ticketId,
-      gate: run.info.gateResult === 'red' ? 'red' : 'green',
+      gate: run.info.gateResult === 'red' ? 'red' : run.info.gateResult === 'green' ? 'green' : 'none',
       gateFailure: failure === null ? null : shortGateLine(failure),
       signals: assessment.signals,
       steerCount: run.info.steerCount,

@@ -1,5 +1,6 @@
 import type { ClosingSignal } from '../core/closing-signals';
 import { MAX_IMPROVEMENT_CONTENT } from '../core/improvements';
+import { parsePromptEdits, type PromptEdit } from '../core/prompt-edits';
 import { FINDING_CAUSES, oneLine, type FindingCause, type JournalFinding } from '../core/persona-journal';
 
 /**
@@ -9,12 +10,15 @@ import { FINDING_CAUSES, oneLine, type FindingCause, type JournalFinding } from 
  * journal finding — and whether it holds a lesson for the next run. The
  * answer is one JSON object; whatever does not parse is dropped, never
  * guessed. Prompt, skill and model changes ride only as a proposal the
- * owner decides (R11): the round never adopts.
+ * owner decides (R11): the round never adopts. A prompt.md proposal is a
+ * set of exact edits against the current file (req-280, T5), applied when
+ * the proposal is written (`RoundProposalWriter`).
  */
 
 export interface ClosingRoundFacts {
   readonly ticketId: string;
-  readonly gate: 'green' | 'red';
+  /** The gate's verdict; `none` when no gate ran (a blocked step, a scout run — req-280). */
+  readonly gate: 'green' | 'red' | 'none';
   /** The gate failure's first line, on a red gate. */
   readonly gateFailure: string | null;
   readonly signals: readonly ClosingSignal[];
@@ -29,7 +33,10 @@ export type ClosingProposalTarget = 'prompt.md' | 'models.default';
 export interface ClosingProposal {
   readonly target: ClosingProposalTarget;
   readonly title: string;
+  /** The model id (`models.default`); empty for a prompt.md proposal, whose text the writer derives from `edits`. */
   readonly content: string;
+  /** The prompt.md proposal's exact edits (req-280); absent for a model proposal. */
+  readonly edits?: readonly PromptEdit[];
 }
 
 export interface ClosingAnswer {
@@ -68,7 +75,7 @@ function signalLine(signal: ClosingSignal, facts: ClosingRoundFacts): string {
 /** The round's prompt — the second prompt of the run's own session. */
 export function closingRoundPrompt(facts: ClosingRoundFacts): string {
   return [
-    `The step on ${facts.ticketId} is over: the machine gate is ${facts.gate}. This is a short closing round — do not run tools, do not edit files; nothing changes any more.`,
+    `The step on ${facts.ticketId} is over: ${facts.gate === 'none' ? 'no machine gate ran' : `the machine gate is ${facts.gate}`}. This is a short closing round — do not run tools, do not edit files; nothing changes any more.`,
     '',
     'Why this run is looked at:',
     ...facts.signals.map((signal) => signalLine(signal, facts)),
@@ -78,7 +85,7 @@ export function closingRoundPrompt(facts: ClosingRoundFacts): string {
     `- finding: where the run stumbled and why. cause "model" when a stronger or different model would have avoided it, "prompt" when the brief, the prompt or the skills lacked something, "task" when the ticket itself was unclear or wrong, "environment" for the repo, the tools or the machine. At most ${CLOSING_FINDING_MAX} characters; null when nothing stumbled.`,
     `- friction: what you lacked, guessed or hit twice — one line, at most ${CLOSING_FRICTION_MAX} characters; null when nothing.`,
     `- lesson: one line the NEXT run of this persona should know — a concrete, reusable rule, not a story of this run; at most ${CLOSING_LESSON_MAX} characters. A wrong lesson misleads every later run: when in doubt, null.`,
-    '- proposal: null, or {"target":"prompt.md|models.default","title":"...","content":"..."} when the persona\'s prompt or model should change — the owner decides; content is the whole new prompt text, or the model id.',
+    '- proposal: null, or a change the owner decides: {"target":"prompt.md","title":"...","edits":[{"old":"...","new":"..."}]} when the persona\'s prompt should change — each "old" copied exactly from the prompt you were given and found there once, "new" its replacement, the smallest edits that do it — or {"target":"models.default","title":"...","content":"<model id>"} when the model should.',
   ].join('\n');
 }
 
@@ -125,11 +132,18 @@ function proposalOf(value: unknown): ClosingProposal | null {
   const obj = value as Record<string, unknown>;
   const target = obj['target'];
   const title = textOf(obj['title'], CLOSING_TITLE_MAX);
-  const content = typeof obj['content'] === 'string' ? obj['content'].trim() : '';
-  if ((target !== 'prompt.md' && target !== 'models.default') || title === null || content === '' || content.length > MAX_IMPROVEMENT_CONTENT) {
+  if (title === null) {
     return null;
   }
-  return { target, title, content: target === 'models.default' ? oneLine(content, 120) : content };
+  if (target === 'prompt.md') {
+    const edits = parsePromptEdits(obj['edits']);
+    return edits === null ? null : { target, title, content: '', edits };
+  }
+  const content = typeof obj['content'] === 'string' ? obj['content'].trim() : '';
+  if (target !== 'models.default' || content === '' || content.length > MAX_IMPROVEMENT_CONTENT) {
+    return null;
+  }
+  return { target, title, content: oneLine(content, 120) };
 }
 
 /** The round's answer, or null when no JSON object parses out of it. */

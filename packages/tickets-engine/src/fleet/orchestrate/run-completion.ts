@@ -86,6 +86,7 @@ export class RunCompletion {
   private async blocked(run: LiveRun, blocked: string): Promise<void> {
     run.info = { ...run.info, blocked };
     await this.deps.bookkeeper.note(run, `blocked — ${(blocked.split('\n')[0] ?? '').slice(0, 200)} — no gate runs, the ticket stays put`);
+    await this.deps.closing?.afterGate(run); // req-280: a blocked step's FRICTION reaches the journal too
     await this.deps.bookkeeper.parkBlocked(run, blocked);
     await this.deps.settler.finish(run, 'done');
   }
@@ -100,6 +101,7 @@ export class RunCompletion {
         ? `scout run finished (${exitWord(code)}) — the ## Report chapter waits for the owner in Needs you`
         : `scout run finished (${exitWord(code)}) without a ## Report chapter — the ticket file carries no report`,
     );
+    await this.deps.closing?.afterGate(run); // req-280: a scout's FRICTION reaches the journal too
     await this.deps.settler.finish(run, 'done');
   }
 

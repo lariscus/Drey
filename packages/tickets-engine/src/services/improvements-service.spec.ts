@@ -209,24 +209,54 @@ describe('ImprovementsService', () => {
 
   it('validates every draft and drops the invalid ones, counted', async () => {
     const reply = JSON.stringify([
-      { target: 'prompt.md', title: 'Order the pack', evidence: ['2026-10-01 · T-100 · finding 1'], content: 'Read the pack first.', lesson: 'Keep the recipe explicit.' },
+      { target: 'prompt.md', title: 'Order the pack', evidence: ['2026-10-01 · T-100 · finding 1'], edits: [{ old: 'Read the files.', new: 'Read the pack first.' }], lesson: 'Keep the recipe explicit.' },
       { target: 'worker', title: 'bogus target', content: 'x' },
-      { target: 'prompt.md', title: '', content: 'x' },
+      { target: 'prompt.md', title: '', edits: [{ old: 'Read', new: 'Skim' }] },
+      { target: 'prompt.md', title: 'A whole new text', content: 'Everything replaced.' },
+      { target: 'prompt.md', title: 'An edit that matches nothing', edits: [{ old: 'Not in the prompt.', new: 'x' }] },
     ]);
-    const { board, logs, service } = setup({ pia: input() }, [reply]);
+    const { board, logs, service } = setup({ pia: input({ prompt: '## Who Pia is\n\nRead the files.\n' }) }, [reply]);
 
     await service.start();
 
     expect(board.applies).toHaveLength(1);
     expect(board.applies[0]!.drafts).toHaveLength(1);
+    // req-280: the edits applied to the current prompt — the rest of it kept — become the draft's text.
     expect(board.applies[0]!.drafts[0]).toEqual({
       target: 'prompt.md',
       title: 'Order the pack',
       evidence: ['2026-10-01 · T-100 · finding 1'],
-      content: 'Read the pack first.',
+      content: '## Who Pia is\n\nRead the pack first.\n',
       lesson: 'Keep the recipe explicit.',
     });
-    expect(logs.some((l) => l.message.includes('2 draft(s) failed validation'))).toBe(true);
+    expect(logs.some((l) => l.message.includes('4 draft(s) failed validation'))).toBe(true);
+    expect(logs.some((l) => l.message.includes('dropped a prompt.md draft without well-formed edits'))).toBe(true);
+    expect(logs.some((l) => l.message.includes('occurs 0 times'))).toBe(true);
+  });
+
+  it('reads the drafts from the streamed reply — the real bridge leaves an array\'s say empty (req-280)', async () => {
+    const board = fakeBoard({ pia: input({ prompt: 'Read the files.\n' }) });
+    const drafts = '[{"target":"memory","title":"Remember the ledger","evidence":["x"],"content":"Read the ledger first."}]';
+    const bridge: ChatBridge = {
+      async runTurn(call) {
+        call.emit({ kind: 'text', text: drafts.slice(0, 20) });
+        call.emit({ kind: 'text', text: drafts.slice(20) });
+        return { say: '', thought: null, commands: [] };
+      },
+    };
+    const service = new ImprovementsService({ board, bridge, onRunsSettled: fakeRunsSettled().onRunsSettled, now: () => NOW });
+
+    await service.start();
+
+    expect(board.applies[0]!.drafts).toEqual([{ target: 'memory', title: 'Remember the ledger', evidence: ['x'], content: 'Read the ledger first.', lesson: null }]);
+  });
+
+  it('hands the aggregator the current prompt.md to edit', async () => {
+    const { bridge, service } = setup({ pia: input({ prompt: '## Who Pia is\n\nShe plans.' }) });
+
+    await service.start();
+
+    expect(bridge.calls[0]!.text).toContain('Current prompt.md:\n## Who Pia is\n\nShe plans.');
   });
 
   it('applies an empty array — the marker moves forward and nothing is proposed', async () => {

@@ -1,3 +1,4 @@
+import { stripPromptVersion } from '../core/default-prompts';
 import { ticketSections } from '../core/ticket-files';
 import { composeInstruction, composeScoutInstruction, type InstructionInput, type ScoutInstructionInput } from './assignment';
 import { personaMemorySection } from './context-pack';
@@ -75,7 +76,9 @@ function titleOf(input: ComposeRunInput): string {
 function runPrompt(input: ComposeRunInput): string | null {
   const persona = input.persona ?? null;
   const personaPrompt = persona !== null && persona.prompt !== null && persona.prompt.trim() !== '' ? persona.prompt : null;
-  return personaPrompt ?? input.promptText;
+  // req-280: a board-started run reads the vault prompt raw — its version marker is for the drift check, never for the model.
+  const text = personaPrompt ?? input.promptText;
+  return text === null ? null : stripPromptVersion(text);
 }
 
 function interactivePart(input: ComposeRunInput): { interactive?: InteractiveMode } {
