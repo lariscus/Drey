@@ -101,6 +101,26 @@ test('10a chat', async ({ page }) => {
   await shot(page, 'MPhoneChat');
 });
 
+test('10a composer (D-57): no focus frame, and the field grows with wrapped text up to five rows', async ({ page }) => {
+  await open(page);
+  await page.locator('mc-menu .chats .sess').first().click();
+  await expect(page.locator('mc-chat')).toBeVisible();
+  const field = page.locator('mc-chat .composer-input');
+  await field.click();
+  await expect(field).toBeFocused();
+  expect(await field.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe('none');
+  const one = (await field.boundingBox())!.height;
+  await field.fill('Please move the whole section when I drag a heading and keep the undo as one step, also tell Ben about the plan.');
+  const grown = (await field.boundingBox())!.height;
+  expect(grown).toBeGreaterThan(one * 2);
+  await field.fill(Array.from({ length: 12 }, (_, i) => `line ${i}`).join(String.fromCharCode(10)));
+  const capped = (await field.boundingBox())!.height;
+  expect(capped).toBeLessThanOrEqual(one * 5);
+  expect(await field.evaluate((el) => getComputedStyle(el).overflowY)).toBe('auto');
+  await field.fill('');
+  expect((await field.boundingBox())!.height).toBe(one);
+});
+
 test('10m proposal', async ({ page }) => {
   await open(page);
   await page.locator('mc-menu .chats .sess', { hasText: 'T-0091' }).click();

@@ -1185,6 +1185,8 @@
               <textarea
                 class="composer-input"
                 rows="1"
+                [mcComposerFit]="threadDraft()"
+                [attr.enterkeyhint]="threadKeys.enterKeyHint()"
                 [value]="threadDraft()"
                 (input)="onThreadDraft($event)"
                 (keydown)="onThreadKeydown($event)"

@@ -26,6 +26,8 @@ import { padSignal, touchFaceSignal } from '../phone/phone';
 import { PadCards } from '../shell/pad-card';
 
 import { COMPOSER_PLACEHOLDER } from '../../../../shared/composer-placeholder';
+import { ComposerFit } from './composer-fit';
+import { ComposerKeys } from './composer-keys';
 import { Dictation, browserDictationEnv, clockOf } from './dictation';
 import { PlanPane } from '../plan/plan-pane';
 import { MC_PLAN_STATE, planRowSubtitleOf, planSectionOf, splitLabelOf } from '../plan/plan.model';
@@ -176,12 +178,6 @@ export function chainCompareOf(
     before: chainStepsOf(current, phases, currentPhaseId, at),
     after: chainStepsOf(afterEntries, phases, currentPhaseId, at),
   };
-}
-
-/** The composer grows with the draft, up to `max` rows. */
-export function composerRowsOf(text: string, max = 5): number {
-  const lines = text === '' ? 1 : text.split('\n').length;
-  return Math.min(Math.max(lines, 1), max);
 }
 
 // --- the attach sheet (concept §6, the composer's attach slot) -----------------
@@ -516,7 +512,7 @@ interface SheetEntry {
   templateUrl: './chat.html',
   styleUrls: ['../phone/kit.css', './chat.css', './phone.css', './pad.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, PlanPane, AppBar, AnswerCard, McI18nPipe, PhoneAvatar, PhoneIcon, TrancheCardView, BurnRateCardView],
+  imports: [NgTemplateOutlet, PlanPane, AppBar, AnswerCard, McI18nPipe, PhoneAvatar, PhoneIcon, TrancheCardView, BurnRateCardView, ComposerFit],
 })
 export class Chat {
   protected readonly state: McChatState =
@@ -707,7 +703,6 @@ export class Chat {
     return last !== undefined && last.text === '' && (last.thought ?? '') === '';
   });
   protected readonly canSend = computed(() => !this.sending() && this.draft().trim() !== '');
-  protected readonly rows = computed(() => composerRowsOf(this.draft()));
   /**
    * The attach button's gate: read-only never uploads, an in-flight upload
    * waits, and a host that wires no `uploadAttachment` keeps the button
@@ -1006,7 +1001,7 @@ export class Chat {
   }
 
   protected onComposerKeydown(event: KeyboardEvent): void {
-    if (event.key !== 'Enter' || event.shiftKey) {
+    if (!this.keys.sendsOn(event)) {
       return;
     }
     event.preventDefault();
@@ -1100,6 +1095,8 @@ export class Chat {
   /** Paul's unanswered question: the last thing in the thread is his answer card. */
   protected readonly phone = touchFaceSignal();
   protected readonly pad = padSignal();
+  /** D-57: Enter sends with a mouse or a hardware keyboard; the soft keyboard's return key is a newline. */
+  protected readonly keys = new ComposerKeys(this.phone);
   /** The iPad's right pane (10e): the shell draws the Assistant head, the card of the open ticket shows here. */
   readonly assistant = input(false);
   /** The iPad's thread in the centre (10f): the ticket it was opened from. */

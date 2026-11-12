@@ -47,7 +47,7 @@
     @if (store.mode() !== 'view') {
       <div class="ph-format" role="toolbar" [attr.aria-label]="'notes.text_label' | t">
         @for (b of formatButtons; track b.icon) {
-          <button type="button" class="ph-iconbtn" [attr.aria-label]="b.label | t" [attr.title]="b.label | t" (click)="format(editor, b.action)">
+          <button type="button" class="ph-iconbtn" [attr.aria-label]="b.label | t" [attr.title]="b.label | t" (mousedown)="$event.preventDefault()" (click)="format(editor, b.action)">
             <mc-ph-icon [name]="b.icon" />
           </button>
         }

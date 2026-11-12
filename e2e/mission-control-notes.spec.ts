@@ -77,6 +77,9 @@ test.describe('phone (390×844)', () => {
     await expect(note.locator('.sheet')).toHaveCount(0);
     await note.getByRole('button', { name: 'Edit note' }).click();
     await typeIntoNote(page, 'Added on the phone.');
+    // D-55: a tap on the format bar must not take the focus from the text — on a phone that drops the keyboard.
+    await note.getByRole('toolbar').getByRole('button').first().click();
+    await expect(note.locator('.cm-content')).toBeFocused();
     await note.getByRole('button', { name: 'Cancel editing' }).click();
     await expect(note.locator('.sheet')).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('mc-phone-note-discard.png') });
