@@ -956,9 +956,11 @@ the old phase stays in `x-legacy-phase`. `migrate-tickets --pipeline-out` writes
   tab) are owner moves. While the run is live the ticket carries
   `interactive: true`, which keeps the dispatcher off it; the move
   drops the field.
-- `persona`: optional persona id (ADR-0088 E3) — the ladder's middle
-  level: every ticket of this column dispatches with this persona unless
-  the ticket pins its own. For the run the persona's worker and model
+- `persona`: optional persona id (ADR-0088 E3) — on the phase board (the
+  files backend, a store on phase stages) every ticket of this column
+  dispatches with this persona (the ticket pin and the crew default retired
+  with req-257); on a lifecycle store the chain says who works a ticket and
+  this key only picks the column a holder stands in (see "The chain"). For the run the persona's worker and model
   replace the assignment ring's resolution and the persona's `prompt.md`
   becomes the instruction base instead of the phase handover prompt.
   See `_meta/personas/` below.
@@ -1157,8 +1159,8 @@ board" after the pipeline and the prompts; and once at the engine's start for a 
 deleted stays deleted; an id whose folder exists is never touched, only listed; the engine never re-seeds an id the marker
 lists — a board seeded before req-269 (`seeded-crew: [paul, ben, ralf, tessa]`) is offered Pia alone at the next start. A `crew.md` without `order:` gets the default crew's, Pia first and the human last (`order: [pia, paul, ben, ralf, tessa, you]`, req-258/req-269);
 an order already set stays, except that Pia, offered for the first time, goes to its front (the concept §12). One commit (`personas: the default crew (req-256)`: the persona files and `crew.md`), one log line. The seeding changes
-**no** pipeline pin and not `default-persona`: a column without a `persona:` pin still runs the ring until the owner pins a
-persona on it (a ticket's gate on the Flow tab, or `persona: ben` on the column in `pipeline.md`).
+**no** pipeline pin: on a chain board the chain names the personas; a phase-board column without a `persona:` pin still runs
+the ring until the owner pins one (`persona: ben` on the column in `pipeline.md`).
 
 **Deleting a persona (req-261).** `POST /api/personas/<id>/remove` `{confirm: <the persona's title>}` (remote port and
 plugin IPC `personaRemove`; answers `{ok: true, persona, files, warning?}` or `{ok: false, code, error, columns?,
@@ -1167,12 +1169,12 @@ text `persona.delete.error.<code>`; types `contracts/persona-remove.ts`) removes
 `persona.md`, `prompt.md`, `memory.md`, `reviews.md`, `improvements.md` and the persona's own skills — in **one commit**
 `personas: <id> removed`, then the vault's change round. **What stays:** the ticket files and their history, the 1:1 chat
 files under `_meta/chat/` (the conversation is history, not the persona's folder), the shared skills, the fleet ledger and the
-run records (their `persona:` is a name, not a link), and a ticket's own `persona:` pin — a pin to an absent persona degrades to
-the ring like any unreadable persona (`BoardPersonas`). **Refused** (nothing is written), in this order: `human` — the owner's
+run records (their `persona:` is a name, not a link), a ticket's own (retired) `persona:` pin, and the chain entries that name it —
+an entry naming an absent persona is the chain's *no persona for position n* (the ticket stands at You, req-257). **Refused** (nothing is written), in this order: `human` — the owner's
 persona `you` (`kind: human`); `mission` — Mission Control's persona (`kind: mission`, req-269): Mission Control speaks with her
 prompt, so she is edited, never deleted (the Persona page draws no *Delete persona…* for her); `busy` — a run record of the persona in state `starting`, `running` or `stopping`, whatever
-its kind (a ticket run, a held 1:1 or free session); `pinned` — a `pipeline.md` column with `persona: <id>` or the crew's
-`default-persona`, the reply naming the columns (`columns`, their titles) and `crewDefault`; `confirm` — `confirm` is not the
+its kind (a ticket run, a held 1:1 or free session); `pinned` — a `pipeline.md` column with `persona: <id>`, the reply naming the columns (`columns`, their titles); `crewDefault` is
+always false since the crew's `default-persona` retired (req-257); `confirm` — `confirm` is not the
 persona's `title` **character for character** (case and whitespace; the engine checks it whatever the client did). A runner that
 does not answer counts as no run. A seeded crew persona stays deleted: the `seeded-crew:` marker in `crew.md` was written when
 it was first offered (spec: `persona-remove-seeded.spec.ts`). Removals queue.
@@ -1317,34 +1319,31 @@ aggregation stamps the file and truncates nothing (req-169):
   brings one. Ids are minted per persona file and never reused. The
   trigger's constant is `IMPROVEMENTS_THRESHOLD` = 3.
 
-**The resolution ladder** — three levels, first hit wins:
-
-1. the ticket's `persona:` frontmatter pin,
-2. the phase's `persona:` key in `pipeline.md`,
-3. the engine default, the config key `personas.default`.
+**Who works a ticket** (req-257 retired the old three-level ladder): on a
+lifecycle store the **chain's entry at the cursor** (the holder, "The
+chain"); on the phase board the **phase's `persona:` key** in
+`pipeline.md`. The ticket's `persona:` pin and the engine default
+(`personas.default`, `crew.md` `default-persona`) are read by nothing any
+more — no role fallback, no default (`decisions.md`).
 
 A resolved persona drives the dispatch: worker and model come from the
 persona (the model the capacity pool grants from `models.pool` for the
 requested class — req-170 — or `models.default` while no pool decides) and
 `prompt.md` replaces the handover prompt. When nothing
-resolves, or the persona file is missing, the legacy assignment ring runs
-unchanged — a board without personas behaves exactly as before. Every run
+resolves, or the persona file is missing, a phase-board column still runs
+the legacy assignment ring; on a chain board no persona means no run (the
+ticket stands at You with the reason). Every run
 records the resolved id in its `RunInfo.persona` (null on ring
 dispatches), which is also the key the token report's per-persona cost
 grouping aggregates under (`unassigned` for persona-less runs).
 
-**Migration of the legacy column keys.** The phase-level `worker:` /
-`model:` / `prompt:` pool keys stay readable until the board service
-migrates a column: on a snapshot that sees any of the three keys, the
-service writes the generated persona (`persona.md` + `prompt.md`, seeded
-from `tickets/_meta/prompts/<prompt-ref>.md` when that file exists, an
-empty `prompt.md` when it does not) under the derived id
-(`personaMigrationFor`), rewrites the phase with `persona: <id>` and the
-three legacy keys cleared to null, and closes with exactly one commit
-`tickets: personas migrated`. The pass is idempotent — a pipeline
-carrying no legacy key is left alone — and announces like every other
-board write. After the migration the ladder decides; the legacy keys are
-never written again.
+**The legacy column keys.** The phase-level `worker:` / `model:` /
+`prompt:` pool keys stay readable (the phase board's ring reads them). The
+migration that once turned them into a `<phase>-default` persona on every
+snapshot (`personaMigrationFor`, commit `tickets: personas migrated`) is
+**retired** (req-257): no persona is created from a column any more; the
+owner's `build-default` and `commit-default` go with the live migration
+(req-268).
 
 ## `_meta/skills/` — skills as Agent Skills (req-172, R8)
 

@@ -7,6 +7,12 @@ import type { PersonaBreaker } from './persona-breaker';
 import type { PoolCapacity } from './pool-capacity';
 import type { SupervisorDirectory } from './supervisor-directory';
 
+/** req-257: a chain run's persona and the breaker that counts it. */
+interface ChainPersona {
+  readonly persona: string;
+  readonly breaker: PersonaBreaker;
+}
+
 /** The E7 event sink (concept §3.3): fire-and-forget, a failure never reaches the loop. */
 export interface FleetLedger {
   readonly ledger: (write: LedgerWrite) => void;
@@ -46,12 +52,10 @@ export class SettledRuns {
     const machineStopped = this.deps.directory.takeMachineStop(info.id);
     const state = this.deps.state;
     const hold = { phase: record.request.phase, at: this.deps.clock.now().toISOString() };
-    const chainPersona = record.request.cursor !== undefined && this.deps.personaBreaker !== undefined ? (info.persona ?? null) : null;
+    const chainPersona = this.chainPersonaOf(record.request.cursor !== undefined, info);
     if (info.state === 'done') {
       state.redStreak[column] = 0;
-      if (chainPersona !== null) {
-        this.deps.personaBreaker!.green(chainPersona);
-      }
+      chainPersona?.breaker.green(chainPersona.persona);
       delete state.ticketFailures[info.ticketId];
       delete state.ownerHold[info.ticketId];
       if ((info.blocked ?? null) !== null) {
@@ -61,11 +65,26 @@ export class SettledRuns {
     if (info.state === 'stopped' && !machineStopped) {
       state.ownerHold[info.ticketId] = hold; // the owner stopped it: the ticket stays put until they move or start it
     }
-    if (info.state === 'failed' && chainPersona !== null) {
-      const maxRed = state.phases.find((p) => p.id === column)?.maxRed ?? DEFAULT_MAX_RED;
-      return this.deps.personaBreaker!.failed(info, chainPersona, maxRed);
+    await this.books(info, column, chainPersona);
+  }
+
+  /** req-257: the persona whose breaker a chain run counts against; null for a column run. */
+  private chainPersonaOf(chained: boolean, info: RunInfo): ChainPersona | null {
+    const breaker = this.deps.personaBreaker;
+    const persona = info.persona ?? null;
+    return chained && breaker !== undefined && persona !== null ? { persona, breaker } : null;
+  }
+
+  /** A failure to its breaker — the persona's for a chain run (req-257), else the column's; any other end persists. */
+  private async books(info: RunInfo, column: string, chainPersona: ChainPersona | null): Promise<void> {
+    if (info.state !== 'failed') {
+      return this.deps.persist();
     }
-    await (info.state === 'failed' ? this.deps.breaker.failed(info, column) : this.deps.persist());
+    if (chainPersona !== null) {
+      const maxRed = this.deps.state.phases.find((p) => p.id === column)?.maxRed ?? DEFAULT_MAX_RED;
+      return chainPersona.breaker.failed(info, chainPersona.persona, maxRed);
+    }
+    return this.deps.breaker.failed(info, column);
   }
 
   /** Costtracking (concept §4.3): what a completed run effectively consumed; an empty run writes nothing. */

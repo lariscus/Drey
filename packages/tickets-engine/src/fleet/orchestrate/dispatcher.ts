@@ -109,8 +109,8 @@ export class Dispatcher {
     }
   }
 
-  private async run(config: ChainConfig, snap: BoardSnapshot): Promise<void> {
-    const { state } = this.deps;
+  /** What every pass counts first: the occupancy, the holds, the column modes, the probes, a due tranche checkpoint. */
+  private async prepare(config: ChainConfig, snap: BoardSnapshot): Promise<{ readonly occupied: Occupancy; readonly modes: Record<string, ColumnMode> }> {
     const occupied = this.occupancy();
     this.holdFailingAndStopped(snap.columns, occupied.busy);
     const modes = this.modesWithBudget(snap.pipeline);
@@ -118,6 +118,12 @@ export class Dispatcher {
     if (this.deps.tranches?.review() === true) {
       await this.deps.persist(); // req-179: the time span ran out — the checkpoint pauses the Autopilot before planning
     }
+    return { occupied, modes };
+  }
+
+  private async run(config: ChainConfig, snap: BoardSnapshot): Promise<void> {
+    const { state } = this.deps;
+    const { occupied, modes } = await this.prepare(config, snap);
     if (config.store?.lifecycle === true && this.deps.holders !== undefined) {
       return this.runHolders(config, snap, occupied);
     }
@@ -239,7 +245,7 @@ export class Dispatcher {
 
   /** The class request of a persona's dispatch and the pool's answer; null when it cannot be built. */
   private ask(snap: BoardSnapshot, item: PlanItem, entry: TicketPersona | null): Asked | null {
-    const phase = this.deps.state.config?.store?.lifecycle === true ? chainWorkingPhase(snap.pipeline, item.workingPhase) : (snap.pipeline.find((p) => p.id === item.workingPhase) ?? null);
+    const phase = this.workingPhaseOf(snap, item.workingPhase);
     const persona = entry?.persona ?? null;
     if (this.classes === null || this.deps.pool === undefined || phase === null || persona === null) {
       return null;
@@ -248,6 +254,14 @@ export class Dispatcher {
     const request = this.classes.build({ card: item.card, phase, persona, repo, prefer: this.lastSlotOf(item.card.id) });
     const decision = this.deps.pool.classes.choose(request);
     return decision.kind === 'grant' ? { request, grant: { request, decision }, wait: null } : { request, grant: null, wait: decision };
+  }
+
+  /** The working column's phase: the pipeline's; on a chain board a plain agent column where the pipeline has none (req-257). */
+  private workingPhaseOf(snap: BoardSnapshot, id: string): PipelinePhase | null {
+    if (this.deps.state.config?.store?.lifecycle === true) {
+      return chainWorkingPhase(snap.pipeline, id);
+    }
+    return snap.pipeline.find((p) => p.id === id) ?? null;
   }
 
   /** req-178: the slot of the ticket's latest run — the start's gate prefers it too, so a resumable session stays on its account. */

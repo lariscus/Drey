@@ -115,26 +115,30 @@ function assignPlaces(input: HolderPlanInput, candidates: readonly Candidate[]):
   const plan: PlannedHolderDispatch[] = [];
   const waits = new Map<string, { persona: string; why: HolderWait }>();
   for (const { card, column, held } of candidates) {
-    const own = input.personaPool(held.persona);
-    const count = running[held.persona] ?? 0;
-    if (own.parallel !== null && count >= own.parallel) {
-      waits.set(card.id, { persona: held.persona, why: 'persona-full' });
-      continue;
-    }
     const pool = input.poolOf(card);
-    const room = pool === null || free[pool] > 0;
-    const overrun = !room && count < own.min;
-    if (!room && !overrun) {
-      waits.set(card.id, { persona: held.persona, why: 'pool-full' });
+    const place = placeOf(input.personaPool(held.persona), running[held.persona] ?? 0, pool === null || free[pool] > 0);
+    if (place.kind === 'wait') {
+      waits.set(card.id, { persona: held.persona, why: place.why });
       continue;
     }
-    if (pool !== null && room) {
+    if (pool !== null && !place.overrun) {
       free[pool] -= 1;
     }
-    running[held.persona] = count + 1;
-    plan.push({ card, workingPhase: column, fromPhase: card.phase, pool, persona: held.persona, position: held.position, overrun });
+    running[held.persona] = (running[held.persona] ?? 0) + 1;
+    plan.push({ card, workingPhase: column, fromPhase: card.phase, pool, persona: held.persona, position: held.position, overrun: place.overrun });
   }
   return { plan, waits };
+}
+
+/** One candidate's place: its persona's pool first, then the big pool, the persona's min overrunning a full one. */
+function placeOf(own: PersonaPool, count: number, room: boolean): { readonly kind: 'start'; readonly overrun: boolean } | { readonly kind: 'wait'; readonly why: HolderWait } {
+  if (own.parallel !== null && count >= own.parallel) {
+    return { kind: 'wait', why: 'persona-full' };
+  }
+  if (room) {
+    return { kind: 'start', overrun: false };
+  }
+  return count < own.min ? { kind: 'start', overrun: true } : { kind: 'wait', why: 'pool-full' };
 }
 
 /**
