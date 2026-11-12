@@ -76,6 +76,14 @@ function poolParts(grant: PoolGrantFor | null): Pick<RunRequest, 'poolClass' | '
   };
 }
 
+/** Where a column run's green gate moves the ticket: the next column, or only as far as the working column before a manual step (E10-6). */
+function moveTargetOf(snap: BoardSnapshot, card: TicketCard, workingPhaseId: string, parkFor: string | null): string | null {
+  if (parkFor === null) {
+    return nextPhaseIdOf(snap.columns, workingPhaseId);
+  }
+  return card.phase !== workingPhaseId ? workingPhaseId : null;
+}
+
 /** req-257: a run on a lifecycle store of a ticket with a chain works a chain entry (its cursor); false on the phase board. */
 function chained(config: ChainConfig, card: TicketCard): boolean {
   return config.store?.lifecycle === true && (card.meta.chain?.length ?? 0) > 0;
@@ -190,7 +198,7 @@ export class TicketDispatch {
     // req-257: a chain run hands on by its cursor (the column follows the holder), never by a move.
     const cursor = chained(config, card) ? await this.cursorOf(config, card) : null;
     // E10-6: a manual step after this gate parks the ticket on a green gate — it moves only as far as the working column.
-    const nextPhaseId = cursor !== null ? null : parkFor !== null ? (card.phase !== workingPhaseId ? workingPhaseId : null) : nextPhaseIdOf(snap.columns, workingPhaseId);
+    const nextPhaseId = cursor !== null ? null : moveTargetOf(snap, card, workingPhaseId, parkFor);
     const context = await this.context(config, card, target.repo, workingPhaseId);
     return {
       disciplines: await this.disciplines(),

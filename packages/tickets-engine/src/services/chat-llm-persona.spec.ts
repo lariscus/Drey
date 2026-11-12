@@ -47,6 +47,10 @@ describe('chatSystemOf (req-269)', () => {
     expect(chatSystemOf(texts, { board: BOARD, persona: `  ${PIA}\n\n` })).toBe(`${PIA}\n\nMISSION\n\n## Board digest\n\n${BOARD}`);
   });
 
+  it("req-257: Pia's entry in a ticket's chain puts the ticket in the board digest's place", () => {
+    expect(chatSystemOf(texts, { board: BOARD, persona: PIA, ticket: { id: 'T-0123', text: 'TICKET TEXT' } })).toBe(`${PIA}\n\nMISSION\n\n## Ticket T-0123\n\nTICKET TEXT`);
+  });
+
   it('opens with the mission prompt alone without a persona prompt, or with a blank one', () => {
     expect(chatSystemOf(texts, { board: BOARD })).toBe(`MISSION\n\n## Board digest\n\n${BOARD}`);
     expect(chatSystemOf(texts, { board: BOARD, persona: null })).toBe(`MISSION\n\n## Board digest\n\n${BOARD}`);

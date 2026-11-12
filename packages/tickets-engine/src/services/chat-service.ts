@@ -19,6 +19,7 @@
  * still running refuses politely instead of interleaving a second owner
  * line the file could not order honestly.
  */
+import { missionEntryOfTitle } from './mission-entry-turns';
 import { promises as fsp } from 'node:fs';
 import type {
   ChatBridge,
@@ -141,6 +142,8 @@ export interface ChatServiceDeps {
   readonly log?: (message: string, level?: 'info' | 'warn' | 'error') => void;
   /** The live stream sink: every bridge event, tagged with its session file. */
   readonly onEvent: (file: string, event: ChatStreamEvent) => void;
+  /** req-257: a card of a session was confirmed — Pia's entry sessions end their entry with it (`MissionEntryTurns.confirmed`). */
+  readonly onConfirmed?: (sessionTitle: string) => Promise<void>;
   /** The clock; the specs pin it for deterministic stamps and file names. */
   readonly now?: () => Date;
   /** The git seam — the engine passes its shared TicketsGit, the specs a fake. */
@@ -378,6 +381,8 @@ export class ChatService implements ChatServicePort {
     // the model and a "You edited the plan" card in the history. Switched
     // off (the chip deselected), the edits are acknowledged but never sent.
     const ticket = session?.ticket ?? null;
+    // req-257: a session of Pia's entry in a ticket's chain carries that ticket in the board digest's place.
+    const missionTicket = await this.missionTicketOf(session?.title ?? '');
     const planBefore = ticket === null ? null : await this.planOf(ticket);
     const shadow = ticket === null || this.deps.shadows === undefined ? null : await this.deps.shadows.get(ticket);
     const delta = planEdits && planBefore !== null && shadow !== null ? planDelta(shadow.text, planBefore) : null;
@@ -407,6 +412,7 @@ export class ChatService implements ChatServicePort {
         ...(delta === null ? {} : { planDelta: planDeltaForModel(delta) }),
         ...(reference === undefined || reference.trim() === '' ? {} : { reference }),
         ...(shape === undefined ? {} : { shape }),
+        ...(missionTicket === undefined ? {} : { missionTicket }),
         ...(signal === undefined ? {} : { signal }),
         emit: (event) => this.deps.onEvent(file, event),
       });
@@ -522,6 +528,17 @@ export class ChatService implements ChatServicePort {
   // --- shape mode (E10-3) -----------------------------------------------------
 
   /** What a shape turn hands the bridge: the ticket's file text and the read-only repository access. */
+  /** req-257: the ticket a session of Pia's entry names in its title, read for the turn; undefined for any other session. */
+  private async missionTicketOf(title: string): Promise<{ readonly id: string; readonly text: string } | undefined> {
+    const entry = missionEntryOfTitle(title);
+    const reader = this.deps.board.readTicket;
+    const reply = entry === null || reader === undefined ? null : await reader.call(this.deps.board, entry.id).catch(() => null);
+    if (entry === null || reply === null || !reply.ok) {
+      return undefined;
+    }
+    return { id: entry.id, text: reply.text.length > TICKET_TEXT_CAP ? `${reply.text.slice(0, TICKET_TEXT_CAP)}\n… (cut)` : reply.text };
+  }
+
   private async shapeContext(ticket: string): Promise<ChatShapeContext | undefined> {
     const reader = this.deps.board.readTicket;
     const reply = reader === undefined ? null : await reader.call(this.deps.board, ticket).catch(() => null);
@@ -724,6 +741,10 @@ export class ChatService implements ChatServicePort {
     await this.deps.host.write(vault.id, input.file, decided);
     await this.commit(vault, [input.file], `tickets: chat ${input.file}`);
     this.deps.host.announceChanges(vault.id, [input.file]);
+    if (state === 'confirmed') {
+      // req-257: a confirmed card of Pia's entry session ends her entry (MissionEntryTurns.confirmed).
+      await this.deps.onConfirmed?.(session.title).catch((error: unknown) => this.log(`after the confirm of ${input.id}: ${messageOf(error)}`, 'warn'));
+    }
     // The file is the truth — hand the caller back exactly what it now holds.
     const reread = parseSessionFile(decided, input.file, snap.priorities);
     return { ok: true, proposal: reread!.proposals.find((p) => p.id === input.id)! };

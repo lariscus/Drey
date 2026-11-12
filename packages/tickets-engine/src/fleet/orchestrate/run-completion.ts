@@ -33,6 +33,14 @@ export interface RunCompletionDeps {
   readonly leaving?: { afterGreen(run: LiveRun): Promise<SyncMainOutcome | null> };
 }
 
+/** The note of a dialog, a session or a reopened session that ended: the ticket stays where the owner put it. */
+function endedLine(run: LiveRun, kind: 'interactive' | 'session' | 'reopened', code: number | null): string {
+  if (kind === 'interactive') {
+    return `interactive dialog ended (${exitWord(code)}) — the owner moves the ticket`;
+  }
+  return kind === 'session' ? `${run.info.kind === 'free' ? 'free' : '1:1'} session ended (${exitWord(code)})` : `reopened session ended (${exitWord(code)})`;
+}
+
 /** The exit code as the notes say it. */
 function exitWord(code: number | null): string {
   return `exit ${code ?? 'signal'}`;
@@ -57,16 +65,12 @@ export class RunCompletion {
       case 'stopped':
         return settler.finish(run, 'stopped');
       case 'interactive':
-        await bookkeeper.note(run, `interactive dialog ended (${exitWord(code)}) — the owner moves the ticket`);
-        return settler.finish(run, 'done');
       case 'session':
-        await bookkeeper.note(run, `${run.info.kind === 'free' ? 'free' : '1:1'} session ended (${exitWord(code)})`);
+      case 'reopened':
+        await bookkeeper.note(run, endedLine(run, verdict.kind, code));
         return settler.finish(run, 'done');
       case 'no-result':
         return this.noResult(run, code);
-      case 'reopened':
-        await bookkeeper.note(run, `reopened session ended (${exitWord(code)})`);
-        return settler.finish(run, 'done');
       case 'blocked':
         return this.blocked(run, verdict.blocked);
       case 'send-back':

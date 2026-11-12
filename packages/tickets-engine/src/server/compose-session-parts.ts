@@ -4,6 +4,7 @@ import { createChatBridge } from '../services/chat-llm';
 import { ChatService } from '../services/chat-service';
 import { composePersonaSessions } from '../services/compose-persona-sessions';
 import { loadCrewPrompts } from '../services/crew-prompts';
+import { MissionEntryTurns } from '../services/mission-entry-turns';
 import { MissionPersonaPrompt } from '../services/mission-persona-prompt';
 import { PersonaPinReader } from '../services/persona-pin-reader';
 import { PersonaProseMigrator } from '../services/persona-prose-migrator';
@@ -47,6 +48,8 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
   // engine's async wiring, a missing file names itself at the start.
   const crew = await loadCrewPrompts();
   const missionPrompt = new MissionPersonaPrompt(board, host);
+  // req-257: Pia's entry in a ticket's chain — set once the chat exists, the chat's confirm reaches it late-bound.
+  let missionEntries: MissionEntryTurns | null = null;
   const chat = new ChatService({
     board,
     host,
@@ -59,6 +62,14 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
     actor: `chat@${hostname().toLowerCase()}`,
     log,
     onEvent: (file, event) => hub.emit('chat', { file, event }),
+    onConfirmed: (title) => missionEntries?.confirmed(title) ?? Promise.resolve(),
+  });
+  missionEntries = new MissionEntryTurns(board, chat, (message, level) => log(message, level ?? 'info'));
+  const entries = missionEntries;
+  hub.subscribe((what) => {
+    if (what === 'board' || what === 'fleet') {
+      void entries.sweep().catch((error: unknown) => log(`mission entry turns failed: ${messageOf(error)}`, 'warn'));
+    }
   });
   // req-168 (ADR-0093): the persona 1:1 — a held session of the persona's own harness over the runner,
   // or the chat bridge for an `api` persona; the conversation in its chat session file. req-217: the

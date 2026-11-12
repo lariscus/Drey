@@ -139,7 +139,7 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     await fsp.mkdir(path.join(meta, 'prompts'), { recursive: true });
     await fsp.writeFile(path.join(meta, 'pipeline.md'), DEFAULT_PIPELINE_TEXT, 'utf8');
     await fsp.writeFile(path.join(meta, 'repos.md'), `---\nrepos:\n  kt:\n    url: https://example.test/kt.git\n    path: '${kt.split(path.sep).join('/')}'\n    branch: main\n---\n`, 'utf8');
-    for (const [id, text] of [['ben', PERSONA('agent')], ['ralf', PERSONA('agent')], ['you', PERSONA('human', 'leaving: [commit]\n')]] as const) {
+    for (const [id, text] of [['ben', PERSONA('agent')], ['pia', PERSONA('mission')], ['ralf', PERSONA('agent')], ['you', PERSONA('human', 'leaving: [commit]\n')]] as const) {
       await fsp.mkdir(path.join(meta, 'personas', id), { recursive: true });
       await fsp.writeFile(path.join(meta, 'personas', id, 'persona.md'), text, 'utf8');
     }
@@ -243,5 +243,19 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     expect(await columnOf(id)).toBe('done');
     await service.settleFinishedChains();
     expect(field(dkId, 'stage')).toBe('done');
+  });
+
+  it("Pia's entry: listed while her cursor stands there, parked for the owner after her turn, finished by a confirmed card", async () => {
+    const { id, dkId } = chained('Pia', 'ben;pia;you', 2);
+    expect((await service.missionEntries()).filter((e) => e.id === id)).toEqual([{ id, position: 2, length: 3, persona: 'P' }]);
+
+    expect(await service.waitForOwner({ id, key: 'pia-turn', text: 'P proposes 1 change', detail: 'her reply' })).toMatchObject({ ok: true });
+    expect(field(dkId, 'x-awaiting')).toBe('you');
+    expect((await service.missionEntries()).some((e) => e.id === id)).toBe(false); // waiting for the owner: no second turn
+    expect(await columnOf(id)).toBe('ready');
+
+    expect(await service.finishMissionEntry({ id, position: 2 })).toMatchObject({ ok: true });
+    expect(field(dkId, 'x-at')).toBe('3');
+    expect(field(dkId, 'x-awaiting')).toBeNull();
   });
 });

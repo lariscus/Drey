@@ -109,7 +109,13 @@ export class ChatTurn {
     const { input } = this;
     const system = chatSystemOf(
       { mission: this.deps.systemPrompt ?? this.deps.crew.mission, shape: this.deps.crew.shape, flow: this.deps.crew.flow },
-      { board: input.board, ...(input.shape === undefined ? {} : { shape: input.shape }), ...(input.flow === undefined ? {} : { flow: input.flow }), persona: await this.missionPersona() },
+      {
+        board: input.board,
+        ...(input.shape === undefined ? {} : { shape: input.shape }),
+        ...(input.flow === undefined ? {} : { flow: input.flow }),
+        ...(input.missionTicket === undefined ? {} : { ticket: input.missionTicket }),
+        persona: await this.missionPersona(),
+      },
     );
     return [
       { role: 'system', content: [system, input.named, input.reference].filter((part) => part !== undefined && part !== '').join('\n\n') },
