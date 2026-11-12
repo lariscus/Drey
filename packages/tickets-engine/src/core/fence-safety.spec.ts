@@ -76,7 +76,7 @@ const TICKET = [
   '  persona: ben',
   '  reason: first',
   '- [x] Real part two',
-  '  chain: insert security(ralf) after review',
+  '  chain: ben; ralf; you',
   '',
   '### Acceptance criteria',
   '',
@@ -147,7 +147,7 @@ describe('plan and parts', () => {
     const parsed = parsePlanParts(TICKET);
     expect(parsed.parts.map((p) => p.title)).toEqual(['Real part one', 'Real part two']);
     expect(parsed.parts[0]!.persona).toBe('ben');
-    expect(parsed.parts[1]!.chain).toEqual(['insert security(ralf) after review']);
+    expect(parsed.parts[1]!.chain).toEqual(['ben', 'ralf', 'you']);
     expect(parsed.warnings).toEqual([]);
   });
 

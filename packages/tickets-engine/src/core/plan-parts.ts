@@ -12,13 +12,14 @@
  *       size: M
  *       needs: image
  *       reason: pure logic first, so the panel can build on it
- *       chain: insert security(ralf, notify) after review; skip qa
+ *       chain: ben; ralf(notify); tessa; you
  *     - [ ] Hunk rows in the Source control panel
  *       persona: ben
  *
  * Reading is tolerant (the asymmetric-tolerance rule): a line that is no
  * part and no detail is skipped with a warning, a detail key that is not
- * known warns, a chain entry outside the grammar warns and drops — never
+ * known warns, a chain with an entry outside the grammar (req-266: the
+ * persona list of core/chain-list.ts) warns and drops whole — never
  * a guess. Writing is strict and canonical. One part means no chapter at
  * all ("Keep as one"): {@link withPlanParts} removes the chapter then.
  */
@@ -26,7 +27,7 @@ import type { ChainEntry } from '../contracts/chain';
 import type { ModelNeeds } from '../contracts/ticket-pool-meta';
 import { needsText, parseNeeds } from './model-needs';
 import { maskFences } from '../../../../shared/markdown/fences';
-import { parseChainEntry } from './chain-delta';
+import { chainItemsOf, parseChainItems } from './chain-list';
 
 export interface PlanPart {
   /** The part's one-line title. */
@@ -37,7 +38,7 @@ export interface PlanPart {
   readonly persona: string | null;
   /** Why the part exists; null = none given. */
   readonly reason: string | null;
-  /** The part's own chain delta, canonical strings; the parent's never leaks in. */
+  /** The part's own chain (req-266: the persona list its ticket gets; empty = the standard flow), canonical strings. */
   readonly chain: readonly string[];
   /** req-170: Paul's size of the part (`size: S|M|L`) — its ticket asks the pool for class C, B or A; absent = unsized. */
   readonly size?: 'S' | 'M' | 'L' | null;
@@ -60,7 +61,7 @@ const PERSONA = /^[a-z][a-z0-9-]{0,63}$/;
 type MutablePart = { -readonly [K in keyof PlanPart]: PlanPart[K] };
 
 /** The `## Plan` section's [start, end) in the text (heading excluded); null without one. */
-function planBounds(text: string): { start: number; end: number } | null {
+export function planBounds(text: string): { start: number; end: number } | null {
   const scan = maskFences(text);
   const heading = /^## Plan[ \t]*$/m.exec(scan);
   if (heading === null) {
@@ -88,17 +89,15 @@ function partsBounds(text: string): { start: number; end: number } | null {
   return { start: plan.start + heading.index, end: plan.start + end };
 }
 
-/** The chain detail's entries; an unreadable one warns and drops. */
+/** The chain detail's entries; one unreadable entry drops the whole chain with a warning. */
 function chainDetail(title: string, value: string, warnings: string[]): string[] {
-  const entries: string[] = [];
-  for (const raw of value.split(';').map((e) => e.trim()).filter((e) => e !== '')) {
-    if (parseChainEntry(raw) === null) {
-      warnings.push(`part "${title}": chain entry "${raw}" is not readable`);
-    } else {
-      entries.push(raw);
-    }
+  const items = chainItemsOf(value);
+  const parsed = parseChainItems(items);
+  if (!parsed.ok) {
+    warnings.push(`part "${title}": chain entry "${parsed.bad}" is not readable — the part takes the standard flow`);
+    return [];
   }
-  return entries;
+  return items;
 }
 
 /** req-178: a part's `needs:` line; an unknown token warns and drops. */
@@ -265,7 +264,8 @@ export function deletePlanPart(parts: readonly PlanPart[], index: number, runnin
   return { ok: true, parts: parts.filter((_, i) => i !== index) };
 }
 
-/** The part's chain as parsed entries (for the flow row); unreadable entries were dropped on read. */
+/** The part's chain as parsed entries; empty when it names none (an unreadable chain was dropped on read). */
 export function partChainEntries(part: PlanPart): ChainEntry[] {
-  return part.chain.flatMap((raw) => parseChainEntry(raw) ?? []);
+  const parsed = parseChainItems(part.chain);
+  return parsed.ok ? [...parsed.entries] : [];
 }

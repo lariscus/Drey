@@ -314,10 +314,12 @@ describe('route', () => {
     expect(remote.flow).toHaveBeenLastCalledWith({ id: 'T-0052', part: 2 });
     expect((await route(req({ path: '/api/tickets/nope/flow', authorization: auth }), deps)).status).toBe(404);
 
-    await route(req({ method: 'POST', path: '/api/tickets/T-0052/flow-edit', authorization: auth, body: { part: 1, chain: ['skip verify'], edit: { op: 'move', step: 3, dir: -1 } } }), deps);
-    expect(remote.flowEdit).toHaveBeenLastCalledWith({ id: 'T-0052', part: 1, chain: ['skip verify'], edit: { op: 'move', step: 3, dir: -1 } });
-    await route(req({ method: 'POST', path: '/api/tickets/T-0052/flow-edit', authorization: auth, body: { chain: [], edit: { op: 'persona', step: 2, persona: null } } }), deps);
-    expect(remote.flowEdit).toHaveBeenLastCalledWith({ id: 'T-0052', part: null, chain: [], edit: { op: 'persona', step: 2, persona: null } });
+    await route(req({ method: 'POST', path: '/api/tickets/T-0052/flow-edit', authorization: auth, body: { part: 1, chain: ['ben', 'ralf'], edit: { op: 'move', step: 3, dir: -1 } } }), deps);
+    expect(remote.flowEdit).toHaveBeenLastCalledWith({ id: 'T-0052', part: 1, chain: ['ben', 'ralf'], edit: { op: 'move', step: 3, dir: -1 } });
+    await route(req({ method: 'POST', path: '/api/tickets/T-0052/flow-edit', authorization: auth, body: { chain: [], edit: { op: 'persona', step: 2, persona: 'ralf' } } }), deps);
+    expect(remote.flowEdit).toHaveBeenLastCalledWith({ id: 'T-0052', part: null, chain: [], edit: { op: 'persona', step: 2, persona: 'ralf' } });
+    await route(req({ method: 'POST', path: '/api/tickets/T-0052/flow-edit', authorization: auth, body: { chain: ['ben'], edit: { op: 'insert', persona: 'paul', after: -1 } } }), deps);
+    expect(remote.flowEdit).toHaveBeenLastCalledWith({ id: 'T-0052', part: null, chain: ['ben'], edit: { op: 'insert', persona: 'paul', after: -1 } });
     expect((await route(req({ method: 'POST', path: '/api/tickets/T-0052/flow-edit', authorization: auth, body: { chain: [], edit: { op: 'explode' } } }), deps)).body).toEqual({
       ok: false,
       error: 'unknown flow edit',
@@ -327,8 +329,8 @@ describe('route', () => {
       error: 'bad flow payload',
     });
 
-    await route(req({ method: 'POST', path: '/api/tickets/T-0052/flow-save', authorization: auth, body: { chain: ['insert security(ralf, notify) after review'] } }), deps);
-    expect(remote.flowSave).toHaveBeenLastCalledWith({ id: 'T-0052', part: null, chain: ['insert security(ralf, notify) after review'] }, 'owner@ipad');
+    await route(req({ method: 'POST', path: '/api/tickets/T-0052/flow-save', authorization: auth, body: { chain: ['ben', 'ralf(notify)'] } }), deps);
+    expect(remote.flowSave).toHaveBeenLastCalledWith({ id: 'T-0052', part: null, chain: ['ben', 'ralf(notify)'] }, 'owner@ipad');
     await route(req({ method: 'POST', path: '/api/tickets/T-0052/flow-draft', authorization: auth, body: { part: 0, ask: ' add a security pass ' } }), deps);
     expect(remote.flowDraft).toHaveBeenLastCalledWith({ id: 'T-0052', part: 0, ask: 'add a security pass' });
     await route(req({ method: 'POST', path: '/api/tickets/T-0052/flow-draft', authorization: auth, body: {} }), deps);

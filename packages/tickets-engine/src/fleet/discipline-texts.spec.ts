@@ -65,7 +65,7 @@ describe('the discipline files', () => {
     // The parsed plan shapes (acceptanceCommands, parsePlanParts) are spelled in the one plan format.
     expect(fragments.planFormat).toContain('### Acceptance criteria');
     expect(fragments.planFormat).toContain('### Parts');
-    expect(fragments.chainGrammar).toContain('assign <phase> <persona>');
+    expect(fragments.chainGrammar).toContain('"<persona>:shape"');
     expect(texts.asking).toContain('QUESTION: Should dragging');
   });
 

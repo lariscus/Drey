@@ -103,7 +103,8 @@ export class TicketDispatch {
     if (ready === null) {
       return 'skipped';
     }
-    const parkFor = await this.deps.personas.manualParkFor(config, snap, card, planned.workingPhaseId);
+    // req-266: the chain is a persona list now; the manual step it inserted pauses until req-257 parks at a You entry.
+    const parkFor = null;
     const composed = composeRunRequest(await this.input(config, snap, planned, { ...ready, parkFor }));
     if (!composed.ok) {
       this.deps.notes.skip(card.id, `dispatch skips ${card.id}: ${composed.error}`);

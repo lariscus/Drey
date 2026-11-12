@@ -388,7 +388,7 @@ describe('EngineBoardService setForm (E8)', () => {
 
 // `setChain` reads the pipeline via the non-enqueueing `snapshot()` (the
 // single-writer queue must never be re-entered from inside an op).
-describe('EngineBoardService setChain (E9)', () => {
+describe('EngineBoardService setChain (req-266: the chain as a persona list)', () => {
   const CHAIN_PIPELINE = `---
 phases:
   - { id: inbox, title: Inbox, handover: manual }
@@ -396,118 +396,99 @@ phases:
   - { id: review, title: Review, handover: manual }
   - { id: verify, title: Verify, handover: manual }
   - { id: done, title: Done, handover: none }
+flow: ben; ralf; you
 ---
 The pipeline.
 `;
 
   beforeEach(async () => {
     await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'pipeline.md'), CHAIN_PIPELINE, 'utf8');
+    for (const id of ['ben', 'ralf', 'pia']) {
+      await fsp.mkdir(path.join(vaultDir, 'tickets', '_meta', 'personas', id), { recursive: true });
+      await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'personas', id, 'persona.md'), `---\ntitle: ${id}\nrole: builder\n---\n\nWho.\n`, 'utf8');
+    }
   });
 
-  /** The same ticket with a `chain:` delta added to the frontmatter. */
-  async function writeChainedTicket(id: string, phase: string, chain: readonly string[]): Promise<void> {
+  /** The same ticket with a `chain:` list (and its cursor) added to the frontmatter. */
+  async function writeChainedTicket(id: string, phase: string, chain: readonly string[], at = 1): Promise<void> {
     await writeTicket(id, phase);
     const file = path.join(vaultDir, 'tickets', phase, `${id}.md`);
     const text = await fsp.readFile(file, 'utf8');
     const lines = chain.map((entry) => `  - ${entry}`).join('\n');
-    await fsp.writeFile(file, text.replace('priority: normal\n', `priority: normal\nchain:\n${lines}\n`), 'utf8');
+    await fsp.writeFile(file, text.replace('priority: normal\n', `priority: normal\nchain:\n${lines}\nat: ${at}\n`), 'utf8');
   }
 
-  it('setting a chain writes the canonical entries with the chain Log line — the commit degrades to the unversioned warning here', async () => {
+  it('setting a chain writes the canonical entries, the cursor and the chain Log line — the commit degrades to the unversioned warning here', async () => {
     await writeTicket('T-0001', 'build');
     const service = serviceOf();
 
-    const outcome = await service.setChain({
-      id: 'T-0001',
-      chain: ['insert review(pia, notify) after build', 'skip verify'],
-      actor: 'owner@test',
-    });
+    const outcome = await service.setChain({ id: 'T-0001', chain: ['ben', ' pia(notify) ', 'you'], actor: 'owner@test' });
 
     expect(outcome).toMatchObject({
       ok: true,
       warning: 'the tickets vault is not a git repository — the change is not versioned',
     });
     const text = await fsp.readFile(path.join(vaultDir, 'tickets', 'build', 'T-0001.md'), 'utf8');
-    expect(text).toContain('chain:\n  - insert review(pia, notify) after build\n  - skip verify');
-    expect(text).toMatch(/- '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z' owner@test — chain 2 entries/);
+    expect(text).toContain('chain:\n  - ben\n  - pia(notify)\n  - you\nat: 1');
+    expect(text).toMatch(/- '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z' owner@test — chain ben; pia\(notify\); you/);
     // The rest of the file is untouched — description and the creation line stand.
     expect(text).toContain('## Description');
     expect(text).toContain("- '2026-11-02T10:00:00Z' owner@test — created in build");
   });
 
-  it('returning to the standard flow removes the chain key with the chain standard Log line', async () => {
-    await writeChainedTicket('T-0001', 'build', ['skip verify']);
+  it('an empty list writes the standard flow', async () => {
+    await writeChainedTicket('T-0001', 'inbox', ['pia']);
     const service = serviceOf();
 
-    const outcome = await service.setChain({ id: 'T-0001', chain: [] });
+    expect((await service.setChain({ id: 'T-0001', chain: [] })).ok).toBe(true);
 
-    expect(outcome.ok).toBe(true);
-    const text = await fsp.readFile(path.join(vaultDir, 'tickets', 'build', 'T-0001.md'), 'utf8');
-    expect(text).not.toContain('chain:');
-    expect(text).toMatch(/- '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z' owner@test — chain standard/);
+    const text = await fsp.readFile(path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md'), 'utf8');
+    expect(text).toContain('chain:\n  - ben\n  - ralf\n  - you\nat: 1');
   });
 
   it('setting the chain the file already carries is a no-op success — no write, no Log line', async () => {
-    await writeChainedTicket('T-0001', 'build', ['skip verify']);
+    await writeChainedTicket('T-0001', 'build', ['ben', 'you']);
+    const file = path.join(vaultDir, 'tickets', 'build', 'T-0001.md');
+    const before = await fsp.readFile(file, 'utf8');
+    const service = serviceOf();
+
+    const outcome = await service.setChain({ id: 'T-0001', chain: ['ben', 'you'] });
+
+    expect(outcome).toEqual({ ok: true });
+    expect(await fsp.readFile(file, 'utf8')).toBe(before);
+  });
+
+  it('an unreadable entry (the old delta included) refuses with the expected-shape hint and touches nothing', async () => {
+    await writeTicket('T-0001', 'build');
     const file = path.join(vaultDir, 'tickets', 'build', 'T-0001.md');
     const before = await fsp.readFile(file, 'utf8');
     const service = serviceOf();
 
     const outcome = await service.setChain({ id: 'T-0001', chain: ['skip verify'] });
 
-    expect(outcome).toEqual({ ok: true });
-    expect(await fsp.readFile(file, 'utf8')).toBe(before);
-  });
-
-  it('an unreadable entry refuses with the expected-shape hint and touches nothing', async () => {
-    await writeTicket('T-0001', 'build');
-    const file = path.join(vaultDir, 'tickets', 'build', 'T-0001.md');
-    const before = await fsp.readFile(file, 'utf8');
-    const service = serviceOf();
-
-    const outcome = await service.setChain({ id: 'T-0001', chain: ['skip verify please'] });
-
     expect(outcome).toEqual({
       ok: false,
-      error: 'chain entry "skip verify please" is not readable — expected e.g. "insert design after review"',
+      error: 'chain entry "skip verify" is not readable — a chain lists personas, e.g. "paul:shape; paul; ben; ralf; tessa; you"',
     });
     expect(await fsp.readFile(file, 'utf8')).toBe(before);
   });
 
-  it('a delta naming a phase outside the pipeline refuses', async () => {
+  it('a persona that does not exist refuses', async () => {
     await writeTicket('T-0001', 'build');
-    const file = path.join(vaultDir, 'tickets', 'build', 'T-0001.md');
-    const before = await fsp.readFile(file, 'utf8');
     const service = serviceOf();
 
-    const outcome = await service.setChain({ id: 'T-0001', chain: ['skip design'] });
-
-    expect(outcome).toEqual({ ok: false, error: 'the pipeline has no phase "design"' });
-    expect(await fsp.readFile(file, 'utf8')).toBe(before);
+    expect(await service.setChain({ id: 'T-0001', chain: ['ben', 'zed'] })).toEqual({ ok: false, error: 'position 2: persona "zed" does not exist' });
   });
 
-  it('a skip of a past gate refuses — the delta only reaches future gates', async () => {
-    await writeTicket('T-0001', 'build');
+  it('a change at or before the cursor refuses — only later positions change', async () => {
+    await writeChainedTicket('T-0001', 'build', ['ben', 'ralf', 'you'], 2);
     const service = serviceOf();
 
-    const outcome = await service.setChain({ id: 'T-0001', chain: ['skip inbox'] });
-
-    expect(outcome).toEqual({
+    expect(await service.setChain({ id: 'T-0001', chain: ['ben', 'pia', 'you'] })).toEqual({
       ok: false,
-      error: 'inbox is the current or a past gate — a skip only reaches future gates',
+      error: 'position 2 (ralf) is the current step — only the positions after it can change',
     });
-  });
-
-  it('a phase both skipped and inserted refuses — strike the gate or revisit it, not both', async () => {
-    await writeTicket('T-0001', 'build');
-    const service = serviceOf();
-
-    const outcome = await service.setChain({ id: 'T-0001', chain: ['insert review after build', 'skip review'] });
-
-    expect(outcome).toEqual({
-      ok: false,
-      error: 'review is both skipped and inserted — strike the gate or revisit it, not both',
-    });
+    expect((await service.setChain({ id: 'T-0001', chain: ['ben', 'ralf', 'pia', 'you'] })).ok).toBe(true);
   });
 
   it('a live run refuses the chain change and leaves the file untouched', async () => {
@@ -524,7 +505,7 @@ The pipeline.
     );
     const service = serviceOf();
 
-    const outcome = await service.setChain({ id: 'T-0001', chain: ['skip verify'] });
+    const outcome = await service.setChain({ id: 'T-0001', chain: ['ben'] });
 
     expect(outcome).toEqual({
       ok: false,

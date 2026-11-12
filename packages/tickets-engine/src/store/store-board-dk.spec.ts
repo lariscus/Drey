@@ -93,7 +93,7 @@ describe.skipIf(!found.ok)('the board over a real dk store', { timeout: 120_000 
     git(['checkout', '-q', 'tickets']);
 
     env = { ...env, DK_STORE: storeDir };
-    dk(['add', '--unclaimed', '-m', 'First: with a colon', '--priority', 'urgent', '--set', 'x-rank=10', '--set', 'x-persona=ben', '--set', 'x-chain=skip review; insert design after build', '--set', 'x-entered-inbox=2026-11-01T08:00:00Z']);
+    dk(['add', '--unclaimed', '-m', 'First: with a colon', '--priority', 'urgent', '--set', 'x-rank=10', '--set', 'x-persona=ben', '--set', 'x-chain=paul:shape; ben', '--set', 'x-entered-inbox=2026-11-01T08:00:00Z']);
     dk(['add', '--unclaimed', '-m', 'Second, waits for first', '--depends', 't-1', '--parent', 't-1']);
     dk(['add', '--unclaimed', '-m', 'Third, in build', '--priority', 'high']);
     dk(['add', '--unclaimed', '-m', 'Fourth, in commit', '--priority', 'low']);

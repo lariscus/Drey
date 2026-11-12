@@ -38,7 +38,8 @@ import type {
   PlanStatus,
   ChatTurnResult,
 } from '../contracts/chat';
-import { titleFromDescription, type BoardSnapshot, type TicketForm, type TicketPriority } from '../contracts/tickets';
+import { titleFromDescription, type BoardSnapshot, type TicketCard, type TicketForm, type TicketPriority } from '../contracts/tickets';
+import { renderChainLine } from '../core/chain-list';
 import { parsePlanParts } from '../core/plan-parts';
 import { ticketRefsOf } from '../core/chat-ticket-refs';
 import { changedLinesOf, editsSummary, planDelta, planDeltaForModel, planSectionOf } from '../core/plan-delta';
@@ -180,6 +181,12 @@ function summaryOf(command: ChatCommand): string {
   }
 }
 
+/** req-266: an open ticket's chain and cursor as the digest line's tail; empty without a chain. */
+function chainNote(card: TicketCard): string {
+  const chain = card.meta.chain ?? [];
+  return chain.length === 0 ? '' : ` · chain: ${renderChainLine(chain)} (at ${card.meta.at ?? 1})`;
+}
+
 /**
  * The board digest the mission prompt embeds: the columns with their
  * counts, then every open ticket (everything but the terminal column)
@@ -199,14 +206,17 @@ function boardDigest(snap: BoardSnapshot): string {
     // that as "the ticket does not exist".
     lines.push('Closed (terminal-column) tickets and tickets that do not fit are not listed; a ticket the owner names by id is attached below.');
   }
+  if ((snap.flow ?? []).length > 0) {
+    lines.push(`standard flow: ${renderChainLine(snap.flow ?? [])}`);
+  }
   const terminal = snap.columns.length === 0 ? null : snap.columns[snap.columns.length - 1]!.phase.id;
   const open = snap.columns
     .filter((column) => column.phase.id !== terminal)
-    .flatMap((column) => column.tickets.map((t) => ({ id: t.id, title: t.meta.title, phase: column.phase.id })));
+    .flatMap((column) => column.tickets.map((t) => ({ id: t.id, title: t.meta.title, phase: column.phase.id, chain: chainNote(t) })));
   if (open.length > 0) {
     lines.push('open tickets:');
     for (const ticket of open) {
-      lines.push(ticket.title === null ? `- ${ticket.id} — ${ticket.phase}` : `- ${ticket.id} "${ticket.title}" — ${ticket.phase}`);
+      lines.push(`${ticket.title === null ? `- ${ticket.id} — ${ticket.phase}` : `- ${ticket.id} "${ticket.title}" — ${ticket.phase}`}${ticket.chain}`);
     }
   }
   let out = '';

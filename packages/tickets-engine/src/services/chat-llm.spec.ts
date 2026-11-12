@@ -448,12 +448,11 @@ describe('createChatBridge', () => {
     const body = JSON.parse(String(calls[0]!.init.body)) as { messages: { role: string; content: string }[] };
     const system = body.messages[0]!.content;
     expect(system).toContain('- chain —');
-    expect(system).toContain('setChain — replaces the ticket\'s whole chain delta');
-    expect(system).toContain('insert <phase>[(<persona>[, notify] | notify)] after|before <anchor>');
-    expect(system).toContain('skip <phase>');
-    expect(system).toContain('notify <phase>');
-    expect(system).toContain('an empty list means the standard flow');
-    expect(system).toContain('{"kind":"setChain","id":"T-0086","chain":["insert security(ralf, notify) after review","skip verify"]}');
+    expect(system).toContain('setChain — replaces the ticket\'s whole chain with the given list');
+    expect(system).toContain('the ordered list of the personas it goes through');
+    expect(system).toContain('"<persona>(notify)"');
+    expect(system).toContain('an empty list returns the ticket to the standard flow');
+    expect(system).toContain('{"kind":"setChain","id":"T-0086","chain":["paul","ben","ralf(notify)","you"]}');
   });
 
   it('round-trips a promote command from the strict envelope', async () => {

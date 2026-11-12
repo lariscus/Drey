@@ -41,8 +41,9 @@ describe('the flow draft turn', () => {
     expect(out.commands).toEqual([{ kind: 'setChain', id: 'T-0130', chain: ['insert security(ralf, notify) after review'] }]);
   });
 
-  it('names the new grammar entries', () => {
-    expect(CREW.flow).toContain('move <phase>');
-    expect(CREW.flow).toContain('assign <phase>');
+  it('names the persona-list grammar (req-266)', () => {
+    expect(CREW.flow).toContain('"<persona>:shape"');
+    expect(CREW.flow).toContain('"<persona>(notify)"');
+    expect(CREW.flow).not.toContain('assign <phase>');
   });
 });

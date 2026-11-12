@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { remoteActorOf } from '../contracts/remote-protocol';
 import type { BoardSnapshot, TicketCard } from '../contracts/tickets';
-import type { ChainEntry } from '../contracts/chain';
 import type { ScoutReport } from '../contracts/scout';
 import { renderScoutReportSection } from '../core/scout';
 import { parseStatusLog, type StatusLine } from '../core/status-log';
@@ -630,87 +629,12 @@ describe('DreyTicketsPort', () => {
     });
   });
 
-  describe('the E9 notify needs', () => {
-    /** A minimal board card — only what needsOf and notifyNeedsOf read. */
-    function card(id: string, phase: string, title: string | null, chain?: readonly ChainEntry[], entered: Record<string, string> = {}): TicketCard {
-      return {
-        id,
-        path: `tickets/${phase}/${id}.md`,
-        phase,
-        meta: { title, entered, run: null, claimedBy: null, ...(chain !== undefined && chain.length > 0 ? { chain } : {}) },
-      } as unknown as TicketCard;
-    }
-
-    const phases = [
-      { id: 'plan', title: 'Plan' },
-      { id: 'design', title: 'Design' },
-      { id: 'build', title: 'Build' },
-    ];
-
-    const boardWith = (tickets: readonly TicketCard[]): BoardSnapshot =>
-      ({
-        pipeline: phases,
-        columns: phases.map((phase) => ({ phase, tickets: tickets.filter((t) => t.phase === phase.id), unknown: false })),
-        checkpoints: [],
-      }) as unknown as BoardSnapshot;
-
-    it('appends a Bescheid card derived from the snapshot alone — no ticket file is read', async () => {
-      const { board, fleet } = fakes();
-      vi.mocked(board.refresh).mockResolvedValue(
-        boardWith([card('T-0001', 'design', 'The design ticket', [{ kind: 'notify', phase: 'plan' }], { design: new Date(Date.now() - 60 * 60_000).toISOString() })]),
-      );
-      const port = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false });
-
-      expect(await port.needs()).toEqual([
-        {
-          kind: 'notify',
-          ticketId: 'T-0001',
-          title: 'The design ticket',
-          phase: 'design',
-          runId: null,
-          text: 'the Plan gate completed',
-          since: expect.any(String),
-        },
-      ]);
-      expect(board.readTicket).not.toHaveBeenCalled();
-    });
-
-    it('appends the Bescheid cards after the status and report needs', async () => {
-      const { board, fleet } = fakes();
-      vi.mocked(board.refresh).mockResolvedValue(
-        boardWith([
-          card('T-0001', 'design', 'The design ticket', [{ kind: 'notify', phase: 'plan' }], { design: new Date(Date.now() - 60 * 60_000).toISOString() }),
-          card('T-0002', 'build', 'The build ticket', undefined, { build: new Date(Date.now() - 2 * 60 * 60_000).toISOString() }),
-        ]),
-      );
-      vi.mocked(board.statusOf).mockImplementation(async (id: string) =>
-        id === 'T-0002' ? parseStatusLog("- '2026-11-02T09:12:00Z' needs-decision: Which colour?") : [],
-      );
-      const port = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false });
-
-      const items = await port.needs();
-      expect(items.map((i) => [i.kind, i.ticketId])).toEqual([
-        ['needs-decision', 'T-0002'],
-        ['notify', 'T-0001'],
-      ]);
-    });
-
-    it('a stale or still-running gate appends nothing', async () => {
-      const { board, fleet } = fakes();
-      vi.mocked(board.refresh).mockResolvedValue(
-        boardWith([
-          // Stale: the completion is a day and a half old.
-          card('T-0001', 'design', 'Old news', [{ kind: 'notify', phase: 'plan' }], { design: new Date(Date.now() - 36 * 60 * 60_000).toISOString() }),
-          // Still running: the ticket sits in the notified gate.
-          card('T-0002', 'plan', 'Not yet', [{ kind: 'notify', phase: 'plan' }], { plan: new Date(Date.now() - 60 * 60_000).toISOString() }),
-          // No delta at all.
-          card('T-0003', 'build', 'Standard flow', undefined, { build: new Date(Date.now() - 60 * 60_000).toISOString() }),
-        ]),
-      );
-      const port = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false });
-
-      expect(await port.needs()).toEqual([]);
-    });
+  it('appends no Bescheid card while the chain is a persona list nothing walks (req-266, until req-257)', async () => {
+    const { board, fleet } = fakes();
+    const card = { id: 'T-0001', path: 'tickets/design/T-0001.md', phase: 'design', meta: { title: 'x', entered: {}, run: null, claimedBy: null, chain: [{ persona: 'paul', mode: null, notify: true }] } } as unknown as TicketCard;
+    vi.mocked(board.refresh).mockResolvedValue({ pipeline: [{ id: 'design', title: 'Design' }], columns: [{ phase: { id: 'design', title: 'Design' }, tickets: [card], unknown: false }], checkpoints: [] } as unknown as BoardSnapshot);
+    const port = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false });
+    expect(await port.needs()).toEqual([]);
   });
 });
 

@@ -34,6 +34,8 @@ import { parseRepos } from './repos-file';
 import { parseTicketFile, ticketPathParts } from './ticket-files';
 import { pipelinePhaseOf } from './pipeline-phase';
 import { CLOSING_SIGNALS_KEY, parseClosingSignals, type ClosingSignal } from './closing-signals';
+import { FLOW_KEY, parsePipelineFlow } from './pipeline-flow';
+import type { ChainEntry } from '../contracts/chain';
 
 const PHASE_ID = /^[a-z][a-z0-9-]*$/;
 
@@ -50,6 +52,8 @@ export interface PipelineParse {
   readonly issues: readonly TicketIssue[];
   /** req-169: `closing-signals:` — the signals that earn a run its closing round; set on a successful parse. */
   readonly closingSignals?: readonly ClosingSignal[];
+  /** req-266: `flow:` — the standard flow; set on a successful parse (empty = none). */
+  readonly flow?: readonly ChainEntry[];
 }
 
 export function parsePipeline(text: string): PipelineParse {
@@ -103,7 +107,8 @@ export function parsePipeline(text: string): PipelineParse {
     phases.push(pipelinePhaseOf(map, id, issues));
   }
   const closingSignals = parseClosingSignals(root[CLOSING_SIGNALS_KEY], issues);
-  return { phases, pushRemote, priorities, error: null, issues, closingSignals };
+  const flow = parsePipelineFlow(root[FLOW_KEY], issues);
+  return { phases, pushRemote, priorities, error: null, issues, closingSignals, flow };
 }
 
 // --- pipeline.md patching (the settings dialog's writer, M85) ----------------
@@ -664,6 +669,7 @@ export function assembleBoard(input: AssembleInput): BoardSnapshot {
     pipelineError: pipelineParse.error,
     pushRemote: pipelineParse.pushRemote,
     ...(pipelineParse.closingSignals !== undefined ? { closingSignals: pipelineParse.closingSignals } : {}),
+    ...(pipelineParse.flow !== undefined && pipelineParse.flow.length > 0 ? { flow: pipelineParse.flow } : {}),
     priorities: pipelineParse.priorities,
     repos: reposParse.repos,
     reposError: reposParse.error,
