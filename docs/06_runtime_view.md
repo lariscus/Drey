@@ -3213,6 +3213,8 @@ board warns "not versioned", and the commit step is skipped.
 
 ## 6.65 A fleet run: start, steer, gate, and the ticket moves itself (milestone 84, [ADR-0075](09_architecture_decisions/0075-agent-fleet-architecture-governance-and-run-control.md))
 
+The whole default run — the pipeline, one agent run end to end, how the brief is composed from the step prompt and the disciplines, and what each step hands on through the ticket — is drawn in [design/ticket-run-flow.md](design/ticket-run-flow.md) (Mermaid) and [design/ticket-run-flow.drawio](design/ticket-run-flow.drawio) (req-280, [ADR-0097](09_architecture_decisions/0097-run-brief-composed-from-shared-disciplines.md)); the diagram below is the original milestone-84 path.
+
 ```mermaid
 sequenceDiagram
     participant P as Tickets panel (renderer)
