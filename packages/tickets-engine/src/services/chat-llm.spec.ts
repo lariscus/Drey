@@ -411,7 +411,10 @@ describe('createChatBridge', () => {
     expect(system).toContain('exactly seven intents');
     expect(system).toContain('- promote —');
     expect(system).toContain('scout');
-    expect(system).toMatch(/createTicket, transition, setPriority, promote, setChain, setBlockedBy/);
+    // req-280: every command is listed with its fields and an example.
+    for (const kind of ['createTicket', 'transition', 'setPriority', 'promote', 'setChain', 'setBlockedBy', 'startSession']) {
+      expect(system).toContain(`{"kind":"${kind}"`);
+    }
   });
 
   it('prompts the blocked intent with the setBlockedBy grammar — the sixth intent', async () => {
@@ -426,7 +429,7 @@ describe('createChatBridge', () => {
     const body = JSON.parse(String(calls[0]!.init.body)) as { messages: { role: string; content: string }[] };
     const system = body.messages[0]!.content;
     expect(system).toContain('- blocked —');
-    expect(system).toContain("setBlockedBy replaces the ticket's whole blocked-by list");
+    expect(system).toContain("setBlockedBy — replaces the ticket's whole blocked-by list");
     expect(system).toContain('An empty list clears the blockers');
     expect(system).toContain('{"kind":"setBlockedBy","id":"T-0002","blockedBy":["T-0001","T-0003"]}');
     // Priorities come from the board's configured vocabulary, never a hard-coded list.
@@ -445,7 +448,7 @@ describe('createChatBridge', () => {
     const body = JSON.parse(String(calls[0]!.init.body)) as { messages: { role: string; content: string }[] };
     const system = body.messages[0]!.content;
     expect(system).toContain('- chain —');
-    expect(system).toContain('setChain replaces the ticket\'s whole chain delta');
+    expect(system).toContain('setChain — replaces the ticket\'s whole chain delta');
     expect(system).toContain('insert <phase>[(<persona>[, notify] | notify)] after|before <anchor>');
     expect(system).toContain('skip <phase>');
     expect(system).toContain('notify <phase>');
