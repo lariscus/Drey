@@ -17,12 +17,13 @@ export interface ComposerMetrics {
  * The height to set on the field and whether the text then outgrows it. The text decides, not the
  * count of `\n` — a sentence that wraps takes as many rows as it shows; five rows is the cap.
  */
-export function composerFitOf(m: ComposerMetrics, maxRows = COMPOSER_MAX_ROWS): { readonly height: number; readonly scrolls: boolean } {
+export function composerFitOf(m: ComposerMetrics, maxRows = COMPOSER_MAX_ROWS): { readonly height: number; readonly scrolls: boolean; readonly grown: boolean } {
   const cap = maxRows * m.lineHeight + m.paddingY;
   const outer = Math.min(Math.max(m.scrollHeight, m.lineHeight + m.paddingY), cap);
   return {
     height: m.borderBox ? outer + m.borderY : outer - m.paddingY,
     scrolls: m.scrollHeight > cap + 0.5,
+    grown: outer - m.paddingY > m.lineHeight * 1.5,
   };
 }
 
@@ -45,6 +46,8 @@ export function fitComposer(field: HTMLTextAreaElement, maxRows = COMPOSER_MAX_R
   );
   field.style.height = `${fit.height}px`;
   field.style.overflowY = fit.scrolls ? 'auto' : 'hidden';
+  // The phone's pill turns into a rounded box once the text takes a second row (chat/phone.css).
+  field.toggleAttribute('data-grown', fit.grown);
 }
 
 /** `<textarea [mcComposerFit]="draft()">`: the field follows its text after every render. */

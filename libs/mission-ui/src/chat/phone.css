@@ -143,7 +143,10 @@
     padding: 4px 4px 4px 16px;
     background: var(--bg);
     border: 1px solid var(--control-border);
-    border-radius: 26px;
+    border-radius: 999px;
+  }
+  .composer-row:has(.composer-input[data-grown]) {
+    border-radius: var(--radius-dialog);
   }
   .composer-input {
     flex-grow: 1;

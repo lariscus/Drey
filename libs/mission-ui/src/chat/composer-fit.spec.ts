@@ -14,29 +14,30 @@ const phoneField = (scrollHeight: number): ComposerMetrics => ({
 
 describe('composerFitOf (D-57)', () => {
   it('is one row for an empty or one-line draft', () => {
-    expect(composerFitOf(phoneField(24))).toEqual({ height: 24, scrolls: false });
-    expect(composerFitOf(phoneField(0))).toEqual({ height: 24, scrolls: false });
+    expect(composerFitOf(phoneField(24))).toEqual({ height: 24, scrolls: false, grown: false });
+    expect(composerFitOf(phoneField(0))).toEqual({ height: 24, scrolls: false, grown: false });
   });
 
   it('grows with the wrapped text, which has no newline at all', () => {
     expect(composerFitOf(phoneField(72)).height).toBe(72);
+    expect(composerFitOf(phoneField(72)).grown).toBe(true);
   });
 
   it('caps at five rows and scrolls beyond', () => {
-    expect(composerFitOf(phoneField(120))).toEqual({ height: 120, scrolls: false });
-    expect(composerFitOf(phoneField(240))).toEqual({ height: 120, scrolls: true });
+    expect(composerFitOf(phoneField(120))).toEqual({ height: 120, scrolls: false, grown: true });
+    expect(composerFitOf(phoneField(240))).toEqual({ height: 120, scrolls: true, grown: true });
     expect(COMPOSER_MAX_ROWS).toBe(5);
   });
 
   it('honours a custom cap', () => {
-    expect(composerFitOf(phoneField(240), 3)).toEqual({ height: 72, scrolls: true });
+    expect(composerFitOf(phoneField(240), 3)).toEqual({ height: 72, scrolls: true, grown: true });
   });
 
   it('counts padding and border as the box model says', () => {
     const padded: ComposerMetrics = { scrollHeight: 44, lineHeight: 20, paddingY: 20, borderY: 2, borderBox: true };
-    expect(composerFitOf(padded)).toEqual({ height: 46, scrolls: false });
-    expect(composerFitOf({ ...padded, borderBox: false })).toEqual({ height: 24, scrolls: false });
-    expect(composerFitOf({ ...padded, scrollHeight: 400 })).toEqual({ height: 122, scrolls: true });
+    expect(composerFitOf(padded)).toEqual({ height: 46, scrolls: false, grown: false });
+    expect(composerFitOf({ ...padded, borderBox: false })).toEqual({ height: 24, scrolls: false, grown: false });
+    expect(composerFitOf({ ...padded, scrollHeight: 400 })).toEqual({ height: 122, scrolls: true, grown: true });
   });
 });
 
@@ -58,6 +59,7 @@ describe('fitComposer (D-57)', () => {
     fitComposer(el);
     expect(el.style.height).toBe('72px');
     expect(el.style.overflowY).toBe('hidden');
+    expect(el.hasAttribute('data-grown')).toBe(true);
     el.remove();
   });
 
