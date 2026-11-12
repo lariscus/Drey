@@ -488,7 +488,13 @@ speech bubble (**Model**), a rocket (**Mission Control**) and two heads
   Studio, an OpenAI-compatible server, OpenRouter, the Anthropic API or
   Z.ai GLM); with a CLI provider it answers with an error card saying so.
   The head's list button opens the earlier Mission Control chats, `+`
-  starts a new one.
+  starts a new one. Pia speaks with her own instructions: on the Crew tab
+  her card (the first one) opens her page, where **Instructions** holds who
+  she is and **How the owner works with Pia** — a few lines the board ships
+  as a start. Rewrite them to say how you want her to answer you; she
+  reads them on your next message. Her page has only **Profile** and
+  **Instructions**: she runs no sessions, has no 1:1 and no budget, and she
+  cannot be deleted.
 - **1:1** opens a menu of the crew's agent personas: a conversation with
   that persona, answered by the persona itself — see [The 1:1](#one-on-one).
 
@@ -1536,7 +1542,8 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   files stay. It is refused, with the reason in the same window, for *You*, for
   a persona with a run, a 1:1 or a session open (stop it first) and for a
   persona a column of the Work panel or the crew's default persona names (the
-  message lists the columns; unpin it first). A crew member from a new board
+  message lists the columns; unpin it first). Pia, Mission Control's persona,
+  has no **Delete persona…**. A crew member from a new board
   (Paul, Ben, Ralf or Tessa) stays deleted. The persona's tab stays open on a
   *No persona* note until you close it.
 - **Capacity** (a panel for the bottom dock) — its header reads `2 of 5

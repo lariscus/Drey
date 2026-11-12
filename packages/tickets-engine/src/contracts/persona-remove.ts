@@ -18,6 +18,8 @@ export const PERSONA_REMOVE_CODES = [
   'no_persona',
   /** The owner's own persona (`you`, `kind: human`) is never deleted. */
   'human',
+  /** Mission Control's persona (`kind: mission`, Pia — req-269): Mission Control speaks with her prompt, so she is edited, never deleted. */
+  'mission',
   /** A live or held run, 1:1 or free session of the persona. */
   'busy',
   /** A pipeline column or the crew's default persona pins it. */

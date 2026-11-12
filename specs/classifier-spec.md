@@ -17,6 +17,7 @@ abstraction in `electron/llm/` (ADR-0047).
 |---|---|---|
 | Pipeline step prompts (plan, build, review, qa, commit, scout) | `packages/tickets-engine/prompts/*.md` (seeded into the vault's `tickets/_meta/prompts/` — the editable copy a board runs) | `core/default-prompts.ts` |
 | Default crew personas (the seed) | `packages/tickets-engine/personas/<id>/{persona,prompt}.md` | `services/shipped-crew-files.ts` |
+| Mission Control's persona prompt (Pia, req-269) | the vault's `tickets/_meta/personas/<the kind: mission persona>/prompt.md`, seeded from `packages/tickets-engine/personas/pia/prompt.md` — the owner's to edit | `services/mission-persona-prompt.ts` (every Mission Control turn) |
 | Crew chat prompts (Mission Control, Shape, Flow, Aggregator) | `packages/tickets-engine/prompts/crew/*.md` | `services/crew-prompts.ts` (`loadCrewPrompts`) |
 | Run brief disciplines (working, writing, read-only, ticket-file, handover, language, precedence, completion, dialog, scout, signals, asking — req-280) | `packages/tickets-engine/prompts/disciplines/*.md` — `{{question}}`/`{{blocked}}` are the protocol markers, substituted on load | `fleet/discipline-texts.ts` (`loadDisciplineTexts`) |
 | Shared fragments (the plan format, the chain grammar — req-280) | `packages/tickets-engine/prompts/fragments/*.md`, pulled into a prompt by `{{plan-format}}` / `{{chain-grammar}}` | `core/prompt-file.ts` (`loadPromptFragments`, `expandFragments`) |
@@ -275,7 +276,8 @@ create as a `raw capture:` Log line (ticket-schema).
   pipeline.md's `flow:`; the chain now from the current position, one
   `<position>. <persona>[:mode]` line each with `(tell me)` / `(current,
   locked)`; `Saved chain:`; `Personas:` the crew as `- <id> (<title>)`, the
-  human persona marked `the owner`; `services/flow-views.ts` `flowDraftText`);
+  human persona marked `the owner`, Mission Control's persona (req-269)
+  `Mission Control: a turn of hers, no session`; `services/flow-views.ts` `flowDraftText`);
   the user message is the owner's words or "Draft the flow for this
   ticket.". The reply is the mission envelope with exactly one
   `setChain` command (`{"kind":"setChain","id":…,"chain":[…]}`) — the whole
@@ -288,7 +290,12 @@ create as a `raw capture:` Log line (ticket-schema).
   via `services/crew-prompts.ts`; the context `chat-service.ts`,
   E5a; D-7a / milestone 165; req-173) — the seven intents (steer, create, promote, chain,
   blocked, session, report) and the strict `{say, thought, commands}` envelope. The system
-  message is the prompt, then `## Board digest` (priority vocabulary, the columns
+  message is — **req-269** — the `prompt.md` of Mission Control's persona (the crew's first
+  `kind: mission` persona, Pia as shipped; read from the vault on **every** turn by
+  `services/mission-persona-prompt.ts`, CRLF folded and trimmed, so the owner's edit applies on
+  the next message; absent, unreadable or blank = left out, and the turn opens with the prompt
+  alone) and a blank line, then the prompt (`mission.md`, unchanged at version 3: the intents
+  and the contract), then `## Board digest` (priority vocabulary, the columns
   with counts, req-266's `standard flow: <entries>` line when pipeline.md has
   `flow:`, one line per **open** ticket — with ` · chain: <entries> (at <n>)`
   when the ticket carries a chain —, capped near 2 KB — the terminal column
@@ -322,7 +329,9 @@ create as a `raw capture:` Log line (ticket-schema).
   card (`Start a session of ben in E:/projects/drey`) starts nothing until the
   owner confirms; Pia never sets a permission mode (the vault's applies).
 - **The Mission Control bridge's provider call** (`packages/tickets-engine/src/services/chat-model.ts`,
-  `chat-llm.ts`, D-1 / milestone 131) — every Mission Control prompt above
+  `chat-llm.ts`, D-1 / milestone 131; since req-269 one turn is `chat-turn.ts`, its system message
+  `chat-system-prompt.ts` `chatSystemOf` — the persona prompt rides only a mission turn of the
+  mission bridge, never a shape or flow turn, the aggregator's turn or a 1:1) — every Mission Control prompt above
   (mission, shape, flow, aggregator) goes out as ONE streamed request in the
   dialect of the provider Drey pushed as `chat.provider`: for `lmstudio`,
   `openai-compat`, `openrouter` `POST {baseUrl}/chat/completions` with
@@ -473,9 +482,9 @@ commands in its brief: the runner judges its hand-over structurally.
   (`core/prompt-edits.ts`: each `old` must match exactly once) and stores
   the resulting text; a draft whose edits do not apply is dropped.
 
-## The default crew's persona prompts (req-256, milestone 235)
+## The default crew's persona prompts (req-256, milestone 235; req-269, milestone 246)
 
-`packages/tickets-engine/personas/<id>/prompt.md` — four files read by `services/shipped-crew-files.ts` and seeded by `services/crew-seeder.ts` into `tickets/_meta/personas/<id>/prompt.md` (the persona's one prose, R11; `specs/ticket-schema.md`, "The shipped default crew"). **How the persona prompt and the step prompt compose:** a resolved persona's `prompt.md` **replaces** the step prompt as the run's instruction base (`fleet/request-instruction.ts` `runPrompt`; the brief's other parts — the repo's instructions, `## Skills`, `## Memory`, the persona line — follow as for any persona). So the seeded prompt is composed once, at seeding (`core/default-crew.ts` `seededPromptText`): the shipped text below, a blank line, `## The <name> step`, a blank line and the shipped step prompt of the role without its `<!-- drey-prompt-version -->` line — planner → `plan-default` (*planning*), builder → `build-default` (*build*), reviewer → `review-default` (*review*), tester → `qa-default` (*verify*). The repository holds each text once; the vault's copy is a snapshot (req-260). A persona seeded in a package that holds no step prompt for the role gets the character alone and a log line. Since req-280 (D6) the shipped text is the persona's **character only** — `## Who <Name> is` and `## How <Name> works`; what "done" means is the step prompt's. The texts, as shipped (English like every prompt; the model is only ever asked to work, never to answer in a fixed shape here):
+`packages/tickets-engine/personas/<id>/prompt.md` — five files (Pia's below the four agents') read by `services/shipped-crew-files.ts` and seeded by `services/crew-seeder.ts` into `tickets/_meta/personas/<id>/prompt.md` (the persona's one prose, R11; `specs/ticket-schema.md`, "The shipped default crew"). **How the persona prompt and the step prompt compose:** a resolved persona's `prompt.md` **replaces** the step prompt as the run's instruction base (`fleet/request-instruction.ts` `runPrompt`; the brief's other parts — the repo's instructions, `## Skills`, `## Memory`, the persona line — follow as for any persona). So the seeded prompt is composed once, at seeding (`core/default-crew.ts` `seededPromptText`): the shipped text below, a blank line, `## The <name> step`, a blank line and the shipped step prompt of the role without its `<!-- drey-prompt-version -->` line — planner → `plan-default` (*planning*), builder → `build-default` (*build*), reviewer → `review-default` (*review*), tester → `qa-default` (*verify*). The repository holds each text once; the vault's copy is a snapshot (req-260). A persona seeded in a package that holds no step prompt for the role gets the character alone and a log line. Since req-280 (D6) the shipped text is the persona's **character only** — `## Who <Name> is` and `## How <Name> works`; what "done" means is the step prompt's. The texts, as shipped (English like every prompt; the model is only ever asked to work, never to answer in a fixed shape here):
 
 **paul** (`personas/paul/prompt.md`):
 
@@ -533,7 +542,21 @@ Tessa is the tester, the check on the proof: skeptical and literal, she lets not
 - She reports what she found; she changes nothing.
 ````
 
-The shipped `persona.md` of each carries the `summary:` the crew cards draw (`Plans the work: settles what and why, writes the steps and the acceptance criteria the builder can check.` · `Builds what the plan says, on the branch, in small commits, and shows the acceptance commands passing.` · `Reviews the branch as the independent check: reads the diff against the plan and reports findings, never edits.` · `Judges the proof: runs each acceptance criterion and settles one verdict each, backed by what she saw.`).
+**pia** (`personas/pia/prompt.md`, req-269) — Mission Control's persona (`kind: mission`). Her prompt is **not** a run's instruction base and gets no step below it: Mission Control puts it in front of `mission.md` on every turn (above). The second section is the owner's to rewrite (owner, 2026-11-12: *"Pia kriegt eine Persona, damit ich ihr Infos mitgeben kann, wie ich gerne mit ihr interagiere"*); the shipped bullets are a starting point he approved:
+
+````markdown
+## Who Pia is
+
+Pia is Mission Control: the owner's one contact for the board and the crew. She steers the work and does not do it herself. She moves tickets, captures ideas, changes chains and starts sessions, and every change she proposes waits for the owner's confirmation.
+
+## How the owner works with Pia
+
+- She answers briefly and plainly, in the owner's language, with the answer first.
+- She proposes what the owner asked for and nothing beside it. When a request is unclear, she asks one question instead of guessing.
+- She says what she cannot see or do instead of inventing a ticket, a persona or a state.
+````
+
+The shipped `persona.md` of each carries the `summary:` the crew cards draw (`Plans the work: settles what and why, writes the steps and the acceptance criteria the builder can check.` · `Builds what the plan says, on the branch, in small commits, and shows the acceptance commands passing.` · `Reviews the branch as the independent check: reads the diff against the plan and reports findings, never edits.` · `Judges the proof: runs each acceptance criterion and settles one verdict each, backed by what she saw.`; Pia's: `Mission Control: the owner's one contact — steers the board and the crew; every change is a card the owner confirms.`).
 
 ## The worker's question shape (req-75 W2)
 

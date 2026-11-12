@@ -49,6 +49,16 @@ describe('validateChain', () => {
     expect(validateChain(list('paul; ben; tessa'), context('paul; ben; you', 2))).toBeNull();
   });
 
+  it('req-269: accepts Mission Control\'s persona as an entry, and a mode only on an agent\'s entry', () => {
+    const withPia = (saved: string, locked: number): FlowContext => ({ ...context(saved, locked), personas: [...PERSONAS, 'pia'], modeless: ['pia'] });
+    expect(validateChain(list('pia; you'), withPia('paul', 0))).toBeNull();
+    expect(validateChain(list('paul:shape; pia(notify); ben; you'), withPia('paul', 0))).toBeNull();
+    expect(validateChain(list('pia:shape; you'), withPia('paul', 0))).toMatch(/position 1: only an agent persona's entry takes a mode — pia:shape/);
+    expect(validateChain(list('paul; you:shape'), withPia('paul', 0))).toMatch(/position 2: only an agent persona's entry takes a mode/);
+    expect(validateChain(list('paul; you:shape'), context('paul', 0))).toMatch(/only an agent persona's entry takes a mode/);
+    expect(validateChain(list('you:shape; ben'), withPia('you:shape; paul', 1))).toBeNull();
+  });
+
   it('lets the current entry change its notify rule, never a past one', () => {
     expect(validateChain(list('paul; ben(notify); you'), context('paul; ben; you', 2))).toBeNull();
     expect(validateChain(list('paul(notify); ben; you'), context('paul; ben; you', 2))).toMatch(/position 1 \(paul\) is done/);

@@ -564,15 +564,16 @@ export class DreyTicketsPort implements TicketsRemotePort {
     const committed: Readonly<Record<string, string>> = (await this.records?.commitAges?.(personas.map((p) => p.id)).catch(() => ({}))) ?? {};
     return personas.map((p) => ({
       id: p.id,
-      ...(p.kind === 'human' ? { kind: 'human' as const } : {}),
+      // req-269: only an agent carries a harness, models and run settings; the owner and Mission Control's persona do not.
+      ...(p.kind === 'agent' ? {} : { kind: p.kind }),
       title: p.title,
       role: p.kind === 'human' ? 'owner' : p.role,
-      worker: p.kind === 'human' ? '' : p.worker,
-      model: p.kind === 'human' ? '' : p.models.default,
-      pool: p.kind === 'human' ? [] : p.models.pool,
+      worker: p.kind === 'agent' ? p.worker : '',
+      model: p.kind === 'agent' ? p.models.default : '',
+      pool: p.kind === 'agent' ? p.models.pool : [],
       color: p.color,
       ...(p.summary !== '' ? { summary: p.summary } : {}),
-      ...(p.kind === 'human' ? {} : { allowed: p.allowed, settings: p.settings, readOnly: personaReadOnly(p) }),
+      ...(p.kind === 'agent' ? { allowed: p.allowed, settings: p.settings, readOnly: personaReadOnly(p) } : {}),
       ...(committed[p.id] !== undefined ? { committedAt: committed[p.id] } : {}),
       budget: p.budget,
       ...(daily[p.id] !== undefined ? { dailyCost: daily[p.id] } : {}),

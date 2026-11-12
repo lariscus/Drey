@@ -116,6 +116,16 @@ describe('PersonaRemoveService', () => {
     expect(existsSync(path.join(dir, 'tickets/_meta/personas/you/persona.md'))).toBe(true);
   });
 
+  it('req-269: refuses Mission Control\'s persona even with its title typed — Mission Control speaks with her prompt', async () => {
+    write('tickets/_meta/personas/pia/persona.md', persona('Pia', 'mission'));
+    write('tickets/_meta/personas/pia/prompt.md', '## Who Pia is\n');
+    const reply = await rig().service.personaRemove({ persona: 'pia', confirm: 'Pia' });
+    expect(reply).toMatchObject({ ok: false, code: 'mission' });
+    expect(reply.ok === false && reply.error).toMatch(/Mission Control's persona/);
+    expect(existsSync(path.join(dir, 'tickets/_meta/personas/pia/prompt.md'))).toBe(true);
+    expect(git('log', '--format=%s')).toBe('initial');
+  });
+
   it.each([['running'], ['starting'], ['stopping']])('refuses a persona with a %s run, 1:1 or session', async (state) => {
     const reply = await rig({ runs: [{ persona: 'ralf', state: 'running' }, { persona: 'ben', state }] }).service.personaRemove({ persona: 'ben', confirm: 'Ben' });
     expect(reply).toMatchObject({ ok: false, code: 'busy' });

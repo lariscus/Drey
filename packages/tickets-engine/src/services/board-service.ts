@@ -84,7 +84,7 @@ import { type EngineHost, type EngineVaultChangeEvent, EngineVault, FleetPort } 
 import { handoverFromConfig, handoverOverrideKeys } from './handover-config';
 import type { EffectiveCrew } from '../fleet/config/layered-config-resolver';
 import { appendMemory, describeMemoryEntries, memoryPathFor, toggleMemoryPin } from './persona-store';
-import { EMPTY_PERSONA_SETTINGS, HUMAN_PERSONA_ID, humanPersona, isHumanPersona, loadPersonaSkills, personaFileText, personaMigrationFor, parsePersonaFile, personaRef, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaMigration, type PersonaSkill } from '../core/persona';
+import { EMPTY_PERSONA_SETTINGS, HUMAN_PERSONA_ID, humanPersona, isAgentPersona, loadPersonaSkills, personaFileText, personaMigrationFor, parsePersonaFile, personaRef, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaMigration, type PersonaSkill } from '../core/persona';
 import { crewOrderOf, inCrewOrder } from '../core/crew-order';
 import { personaRunSettingsOf } from '../core/persona-settings';
 import { settingsAfter, type PersonaSettingsPatch } from '../contracts/persona-settings-patch';
@@ -1208,7 +1208,7 @@ export class EngineBoardService {
       return { text, changed: false, refusal: null };
     }
     const snap = await this.snapshot();
-    const refusal = validateChain(plan.entries, { personas: await this.chainPersonaIds(), saved: current, locked: lockedOfCard(snap, card, current) });
+    const refusal = validateChain(plan.entries, { ...(await this.chainGuardIds()), saved: current, locked: lockedOfCard(snap, card, current) });
     return refusal === null ? { text: patchChain(text, canonical, new Date(), actor), changed: true, refusal: null } : { text, changed: false, refusal };
   }
 
@@ -1285,7 +1285,7 @@ export class EngineBoardService {
       }
       const entries = parsed.entries.length === 0 ? (snap.flow ?? []) : parsed.entries;
       const current = card.meta.chain ?? [];
-      const refusal = validateChain(entries, { personas: await this.chainPersonaIds(), saved: current, locked: lockedOfCard(snap, card, current) });
+      const refusal = validateChain(entries, { ...(await this.chainGuardIds()), saved: current, locked: lockedOfCard(snap, card, current) });
       if (refusal !== null) {
         return { ok: false, error: refusal };
       }
@@ -1422,9 +1422,9 @@ export class EngineBoardService {
       personas: personas.map((p) => ({
         id: p.id,
         title: p.title,
-        role: isHumanPersona(p) ? '' : p.role,
+        role: isAgentPersona(p) ? p.role : '',
         color: p.color,
-        model: isHumanPersona(p) ? '' : (deriveWorkerModel(p).model ?? ''),
+        model: isAgentPersona(p) ? (deriveWorkerModel(p).model ?? '') : '',
       })),
       warnings: parsed.warnings,
     };
@@ -1575,7 +1575,7 @@ export class EngineBoardService {
     if (!parsed.ok) {
       return { error: unreadableEntryMessage(parsed.bad) };
     }
-    const refusal = validateChain(parsed.entries, { personas: await this.chainPersonaIds(), saved: frame.saved, locked: frame.locked });
+    const refusal = validateChain(parsed.entries, { ...(await this.chainGuardIds()), saved: frame.saved, locked: frame.locked });
     return refusal === null ? parsed.entries : { error: refusal };
   }
 
@@ -1601,7 +1601,7 @@ export class EngineBoardService {
     if (frame.readOnly !== null && input.edit.op !== 'view') {
       return { ok: false, error: frame.readOnly };
     }
-    const context = { personas: await this.chainPersonaIds(), saved: frame.saved, locked: frame.locked, standard: frame.standard };
+    const context = { ...(await this.chainGuardIds()), saved: frame.saved, locked: frame.locked, standard: frame.standard };
     const edited = applyFlowOp(entries, input.edit, context);
     if (!edited.ok) {
       return { ok: false, error: edited.error };
@@ -1715,13 +1715,14 @@ export class EngineBoardService {
         return { ok: false, error: 'Every part is released already.' };
       }
       const personaIds = await this.listPersonaIds();
+      const guardIds = await this.chainGuardIds();
       for (const index of mint) {
         const part = parts[index]!;
         if (part.persona !== null && !personaIds.includes(part.persona)) {
           return { ok: false, error: `Part ${index + 1}: ${personaMissing(part.persona)}` };
         }
         const own = partChainEntries(part);
-        const refusal = own.length === 0 ? null : validateChain(own, { personas: personaIds, saved: [], locked: 0 });
+        const refusal = own.length === 0 ? null : validateChain(own, { ...guardIds, saved: [], locked: 0 });
         if (refusal !== null) {
           return { ok: false, error: `Part ${index + 1}: ${refusal}` };
         }
@@ -3789,10 +3790,14 @@ export class EngineBoardService {
     return personas.map((p) => p.id);
   }
 
-  /** req-266: who a chain entry may name — the crew, and the human persona even before its file exists. */
-  private async chainPersonaIds(): Promise<readonly string[]> {
-    const ids = await this.listPersonaIds();
-    return ids.includes(HUMAN_PERSONA_ID) ? ids : [...ids, HUMAN_PERSONA_ID];
+  /**
+   * req-266: who a chain entry may name — the crew, and the human persona even before its file exists;
+   * req-269: which of them take no mode (every persona that is not an agent — Mission Control's).
+   */
+  private async chainGuardIds(): Promise<{ readonly personas: readonly string[]; readonly modeless: readonly string[] }> {
+    const personas = await this.listPersonas();
+    const ids = personas.map((p) => p.id);
+    return { personas: ids.includes(HUMAN_PERSONA_ID) ? ids : [...ids, HUMAN_PERSONA_ID], modeless: personas.filter((p) => !isAgentPersona(p)).map((p) => p.id) };
   }
 
   /**

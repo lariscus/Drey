@@ -68,17 +68,24 @@ export interface PersonaAllowed {
 }
 
 /**
- * What a persona is (E10-6): an `agent` (the fleet runs it) or the `human`
- * — the owner as a team member. A gate assigned to the human persona
- * parks the ticket instead of dispatching a run; the human never counts
- * toward capacity, budget or the worker pool.
+ * What a persona is (E10-6): an `agent` (the fleet runs it), the `human`
+ * — the owner as a team member — or `mission`, Mission Control's own
+ * persona (req-269, Pia): her `prompt.md` is composed into every Mission
+ * Control turn, and an entry she holds is a Mission Control turn, never a
+ * session. A gate assigned to the human persona parks the ticket instead
+ * of dispatching a run; neither the human nor the mission persona counts
+ * toward capacity, budget or the worker pool — "is a worker" is
+ * `kind === 'agent'` ({@link isAgentPersona}).
  */
-export type PersonaKind = 'agent' | 'human';
+export type PersonaKind = 'agent' | 'human' | 'mission';
 
-export const PERSONA_KINDS: readonly PersonaKind[] = ['agent', 'human'];
+export const PERSONA_KINDS: readonly PersonaKind[] = ['agent', 'human', 'mission'];
 
 /** The directory id of the owner's own persona (`personas/you`). */
 export const HUMAN_PERSONA_ID = 'you';
+
+/** The directory id of Mission Control's persona as shipped (`personas/pia`, req-269). */
+export const MISSION_PERSONA_ID = 'pia';
 
 export interface Persona {
   /** The directory id (the folder name under `_meta/personas/`). */
@@ -116,7 +123,7 @@ export const PERSONAS_DIR = 'tickets/_meta/personas';
  * order only places the personas the list does not name.
  */
 export function inPipelineOrder<P extends Pick<Persona, 'id' | 'role' | 'kind'>>(personas: readonly P[]): P[] {
-  const rank = (persona: P): number => (persona.kind === 'human' ? PERSONA_ROLES.length : PERSONA_ROLES.indexOf(persona.role));
+  const rank = (persona: P): number => (persona.kind === 'human' ? PERSONA_ROLES.length : persona.kind === 'mission' ? -1 : PERSONA_ROLES.indexOf(persona.role));
   return [...personas].sort((a, b) => rank(a) - rank(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
@@ -129,6 +136,12 @@ export function personaRef(id: string): string {
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
+
+/** `kind:` — `human` or `mission`; anything else (absent included) is an agent. */
+function kindOf(value: unknown): PersonaKind {
+  const kind = asString(value);
+  return kind === 'human' || kind === 'mission' ? kind : 'agent';
 }
 
 function asStringList(value: unknown): readonly string[] {
@@ -177,6 +190,11 @@ function allowedLines(allowed: PersonaAllowed): string[] {
   return lines.length > 0 ? ['allowed:', ...lines] : [];
 }
 
+/** `worker:` and `models:` — a mission persona has neither (she speaks over the chat bridge, req-269). */
+function modelLines(persona: Persona): string[] {
+  return [`worker: ${persona.worker}`, 'models:', `  default: ${persona.models.default}`, `  pool: [${persona.models.pool.join(', ')}]`];
+}
+
 /** The one line is a double-quoted YAML scalar (JSON's escapes are YAML's), so a colon or a quote in it never breaks the fence. */
 function summaryLines(summary: string): string[] {
   const text = summary.replace(/\s+/g, ' ').trim();
@@ -194,7 +212,7 @@ export function parsePersonaFile(id: string, text: string): Persona {
   const roleRaw = asString(get('role')) ?? 'custom';
   return {
     id,
-    kind: asString(get('kind')) === 'human' ? 'human' : 'agent',
+    kind: kindOf(get('kind')),
     title: asString(get('title')) ?? id,
     role: (PERSONA_ROLES as readonly string[]).includes(roleRaw) ? (roleRaw as PersonaRole) : 'custom',
     worker: asString(get('worker')) ?? 'opencode',
@@ -211,6 +229,16 @@ export function parsePersonaFile(id: string, text: string): Persona {
 /** True for the owner's own persona (E10-6) — no run, no model, no budget. */
 export function isHumanPersona(persona: Pick<Persona, 'kind'> | null | undefined): boolean {
   return persona?.kind === 'human';
+}
+
+/** True for Mission Control's persona (req-269): her prompt speaks in Mission Control — no run, no model, no budget. */
+export function isMissionPersona(persona: Pick<Persona, 'kind'> | null | undefined): boolean {
+  return persona?.kind === 'mission';
+}
+
+/** True for a persona the fleet runs — the one test for "is a worker" (req-269). */
+export function isAgentPersona(persona: Pick<Persona, 'kind'> | null | undefined): boolean {
+  return persona?.kind === 'agent';
 }
 
 /** A fresh human persona: the owner as a team member; the model fields are inert placeholders. */
@@ -243,13 +271,10 @@ export function personaFileText(persona: Persona, body?: string): string {
   const lines = [
     '---',
     `title: ${persona.title}`,
-    ...(persona.kind === 'human' ? ['kind: human'] : []),
+    ...(persona.kind === 'agent' ? [] : [`kind: ${persona.kind}`]),
     `role: ${persona.role}`,
     ...summaryLines(persona.summary),
-    `worker: ${persona.worker}`,
-    'models:',
-    `  default: ${persona.models.default}`,
-    `  pool: [${persona.models.pool.join(', ')}]`,
+    ...(persona.kind === 'mission' ? [] : modelLines(persona)),
     `color: '${persona.color}'`,
     `skills: [${persona.skills.join(', ')}]`,
     ...(persona.budget !== null ? [`budget: ${persona.budget}`] : []),

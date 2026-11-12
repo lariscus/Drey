@@ -49,16 +49,17 @@ describe('the engine seeds the default crew at its start (req-256)', () => {
     await fsp.rm(root, { recursive: true, force: true });
   });
 
-  it('gives an existing board without the crew Paul, Ben, Ralf and Tessa in one commit, and the Crew tab lists them', async () => {
+  it('gives an existing board without the crew Pia, Paul, Ben, Ralf and Tessa in one commit, and the Crew tab lists them', async () => {
     const engine = await start();
     for (const [id, role] of [['paul', 'planner'], ['ben', 'builder'], ['ralf', 'reviewer'], ['tessa', 'tester']] as const) {
       expect(parsePersonaFile(id, (await read(`${PERSONAS}/${id}/persona.md`))!)).toMatchObject({ role, worker: 'opencode' });
     }
-    expect(seededCrewOf(await read('tickets/_meta/crew.md'))).toEqual(['paul', 'ben', 'ralf', 'tessa']);
+    expect(parsePersonaFile('pia', (await read(`${PERSONAS}/pia/persona.md`))!)).toMatchObject({ kind: 'mission', title: 'Pia' });
+    expect(seededCrewOf(await read('tickets/_meta/crew.md'))).toEqual(['pia', 'paul', 'ben', 'ralf', 'tessa']);
     expect((await git(['log', '--format=%s'])).trim().split('\n')).toEqual(['personas: the default crew (req-256)', 'seed']);
     expect((await git(['status', '--porcelain', '--', 'tickets/_meta'])).trim()).toBe('');
     const ids = ((await engine.invoke('personas')) as readonly { id: string }[]).map((p) => p.id);
-    expect(ids).toEqual(expect.arrayContaining(['paul', 'ben', 'ralf', 'tessa']));
+    expect(ids).toEqual(expect.arrayContaining(['pia', 'paul', 'ben', 'ralf', 'tessa']));
   });
 
   it('seeds once: the next start adds nothing, and a persona the owner deleted stays deleted', async () => {

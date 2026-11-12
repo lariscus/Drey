@@ -8,11 +8,11 @@ import type { FlowPersona, FlowStepView } from '../contracts/flow';
 import type { PartFlowStep } from '../contracts/plan-approval';
 import type { BoardSnapshot, TicketCard } from '../contracts/tickets';
 import { chainCursor, chainLifeOf, chainSteps, lockedCount } from '../core/chain-list';
-import { isHumanPersona, type Persona } from '../core/persona';
+import { isAgentPersona, isHumanPersona, type Persona } from '../core/persona';
 import { deriveWorkerModel } from './persona-loader';
 
 function modelOf(persona: Persona | undefined): string | null {
-  return persona === undefined || isHumanPersona(persona) ? null : (deriveWorkerModel(persona).model ?? null);
+  return persona === undefined || !isAgentPersona(persona) ? null : (deriveWorkerModel(persona).model ?? null);
 }
 
 /** How many leading positions of a ticket's chain are locked where it stands now. */
@@ -74,10 +74,15 @@ export function flowDraftText(input: {
   readonly saved: readonly string[];
   readonly personas: readonly FlowPersona[];
 }): string {
-  const crew = input.personas.map((p) => `- ${p.id} (${p.title}${p.kind === 'human' ? ', the owner' : ''})`).join('\n');
+  const crew = input.personas.map((p) => `- ${p.id} (${p.title}${crewNote(p.kind)})`).join('\n');
   const now = input.steps
     .map((s) => `${s.position}. ${s.persona}${s.mode === null ? '' : `:${s.mode}`}${s.notify ? ' (tell me)' : ''}${s.state === 'current' ? ' (current, locked)' : ''}`)
     .join('\n');
   const standard = input.standard.length === 0 ? '(none)' : input.standard.join('; ');
   return `Ticket ${input.ticket}: ${input.title}${input.plan}\n\nStandard flow: ${standard}\nThe chain now, from the current position:\n${now}\nSaved chain: ${input.saved.join('; ')}\n\nPersonas:\n${crew}`;
+}
+
+/** What the crew line says beside a persona that is not an agent. */
+function crewNote(kind: FlowPersona['kind']): string {
+  return kind === 'human' ? ', the owner' : kind === 'mission' ? ', Mission Control: a turn of hers, no session' : '';
 }

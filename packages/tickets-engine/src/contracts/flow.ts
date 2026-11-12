@@ -43,8 +43,8 @@ export interface FlowStepView {
 
 export interface FlowPersona {
   readonly id: string;
-  /** `human` = the owner (E10-6): the gate parks the ticket for them. */
-  readonly kind: 'agent' | 'human';
+  /** `human` = the owner (E10-6): the gate parks the ticket for them; `mission` = Mission Control's persona (req-269): a turn of hers, no session. */
+  readonly kind: 'agent' | 'human' | 'mission';
   readonly title: string;
   readonly color: string;
   readonly model: string;

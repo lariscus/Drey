@@ -7,9 +7,13 @@ import { parsePersonaFile } from './persona';
 
 const DIR = path.join(__dirname, '..', '..', 'personas');
 const file = (id: string, name: string): Promise<string> => fsp.readFile(path.join(DIR, id, name), 'utf8');
+/** The four agents of decision D7; Pia (req-269) is Mission Control's persona and has a block of her own. */
+const AGENT_IDS = DEFAULT_CREW_IDS.filter((id) => id !== 'pia');
+type Shipped = Exclude<ReturnType<typeof shippedPersonaOf>, string>;
 
 describe('the shipped default crew files (req-256)', () => {
-  it('ships exactly the four ids of decision D7, one folder each', async () => {
+  it('ships Pia first, then the four ids of decision D7, one folder each', async () => {
+    expect(DEFAULT_CREW_IDS).toEqual(['pia', 'paul', 'ben', 'ralf', 'tessa']);
     expect((await fsp.readdir(DIR)).sort()).toEqual([...DEFAULT_CREW_IDS].sort());
     for (const id of DEFAULT_CREW_IDS) {
       expect((await fsp.readdir(path.join(DIR, id))).sort()).toEqual(['persona.md', 'prompt.md']);
@@ -27,9 +31,10 @@ describe('the shipped default crew files (req-256)', () => {
   });
 
   it('read as planner, builder, reviewer and tester, each with a summary, a colour of its own and no skills', async () => {
-    const personas = await Promise.all(DEFAULT_CREW_IDS.map(async (id) => parsePersonaFile(id, await file(id, 'persona.md'))));
+    const personas = await Promise.all(AGENT_IDS.map(async (id) => parsePersonaFile(id, await file(id, 'persona.md'))));
     expect(personas.map((p) => [p.title, p.role])).toEqual([['Paul', 'planner'], ['Ben', 'builder'], ['Ralf', 'reviewer'], ['Tessa', 'tester']]);
-    expect(new Set(personas.map((p) => p.color)).size).toBe(4);
+    const pia = parsePersonaFile('pia', await file('pia', 'persona.md'));
+    expect(new Set([...personas, pia].map((p) => p.color)).size).toBe(5);
     for (const persona of personas) {
       expect(persona.kind).toBe('agent');
       expect(persona.summary.length, persona.id).toBeGreaterThan(20);
@@ -50,7 +55,7 @@ describe('the shipped default crew files (req-256)', () => {
   });
 
   it('open prompt.md with the "who it is" section (R11: the prompt is the persona), then how it works — character only, the step owns "done" (req-280, D6)', async () => {
-    for (const id of DEFAULT_CREW_IDS) {
+    for (const id of AGENT_IDS) {
       const title = parsePersonaFile(id, await file(id, 'persona.md')).title;
       const text = await file(id, 'prompt.md');
       expect(text.startsWith(`## Who ${title} is\n`), id).toBe(true);
@@ -67,6 +72,33 @@ describe('the shipped default crew files (req-256)', () => {
     expect(shippedPersonaOf('x', '---\ntitle: X\nrole: custom\n---\n', '## Who X is\n')).toMatch(/role must be/);
     expect(shippedPersonaOf('x', '---\ntitle: X\nkind: human\nrole: builder\n---\n', '## Who X is\n')).toMatch(/role must be/);
     expect(shippedPersonaOf('x', '---\ntitle: X\nrole: builder\n---\n', 'Just text.\n')).toMatch(/must open with "## Who X is"/);
+    expect(shippedPersonaOf('x', '---\ntitle: X\nkind: mission\nrole: custom\n---\n', '## Who X is\n')).toMatchObject({ id: 'x' });
+  });
+});
+
+describe('Pia, Mission Control\'s persona (req-269)', () => {
+  it('is kind mission, role custom, with her summary and no skills', async () => {
+    const pia = parsePersonaFile('pia', await file('pia', 'persona.md'));
+    expect(pia).toMatchObject({ kind: 'mission', title: 'Pia', role: 'custom', skills: [] });
+    expect(pia.summary).toBe("Mission Control: the owner's one contact — steers the board and the crew; every change is a card the owner confirms.");
+    expect(pia.color).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it('opens prompt.md with who she is, then how the owner works with her', async () => {
+    const text = await file('pia', 'prompt.md');
+    expect(text.startsWith('## Who Pia is\n\nPia is Mission Control: the owner\'s one contact for the board and the crew.')).toBe(true);
+    expect(text).toContain('\n## How the owner works with Pia\n\n- She answers briefly and plainly');
+    expect(text).not.toContain('drey-prompt-version');
+  });
+
+  it('is seeded as shipped: no step below her prompt, no worker and no models in her record', async () => {
+    const pia = shippedPersonaOf('pia', await file('pia', 'persona.md'), await file('pia', 'prompt.md')) as Shipped;
+    expect(seededPromptText(pia, await loadShippedPrompts())).toEqual({ text: pia.who, stepMissing: false });
+    const record = seededPersonaText(pia, 'claude-code', { default: 'm1', pool: ['m1'] });
+    expect(record).toContain('kind: mission');
+    expect(record).not.toMatch(/^worker:/m);
+    expect(record).not.toMatch(/^models:/m);
+    expect(parsePersonaFile('pia', record)).toMatchObject({ kind: 'mission', title: 'Pia', summary: pia.persona.summary, color: pia.persona.color });
   });
 });
 
@@ -82,7 +114,7 @@ describe('what is seeded from them', () => {
 
   it('puts the role\'s shipped step under the character, one prompt that works as the run\'s instruction base', async () => {
     const steps = await loadShippedPrompts();
-    for (const id of DEFAULT_CREW_IDS) {
+    for (const id of AGENT_IDS) {
       const shipped = shippedPersonaOf(id, await file(id, 'persona.md'), await file(id, 'prompt.md')) as Exclude<ReturnType<typeof shippedPersonaOf>, string>;
       const step = CREW_STEPS[shipped.persona.role]!;
       const out = seededPromptText(shipped, steps);

@@ -121,23 +121,29 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
     const head = personaHead(ctx, { memory: reads.memory, journal: reads.journal, proposals: loaded.proposal === null ? 0 : 1 }, () => host.back());
     stateNode = head.state;
     const left = h('div', 'persona-left');
-    left.append(profileBlock(ctx), workBlock(ctx), allowedBlock(ctx));
     const right = h('div', 'persona-right');
-    right.append(
-      loaded.instructions.element,
-      loaded.skills.element,
-      proposalsBlock(ctx, {
-        proposal: loaded.proposal,
-        memory: reads.memory,
-        journal: reads.journal,
-        promptDirty: loaded.draft.prompt !== loaded.base.prompt,
-        decide: (proposal, decision) => void decideProposal(env, proposal, decision),
-        openCrew: (tab) => host.openCrew(id, tab),
-      }),
-    );
+    if (ctx.persona.kind === 'mission') {
+      // req-269: Mission Control's persona has no harness, run settings, skills or run proposals — her profile and her prompt.
+      left.append(profileBlock(ctx));
+      right.append(loaded.instructions.element);
+    } else {
+      left.append(profileBlock(ctx), workBlock(ctx), allowedBlock(ctx));
+      right.append(
+        loaded.instructions.element,
+        loaded.skills.element,
+        proposalsBlock(ctx, {
+          proposal: loaded.proposal,
+          memory: reads.memory,
+          journal: reads.journal,
+          promptDirty: loaded.draft.prompt !== loaded.base.prompt,
+          decide: (proposal, decision) => void decideProposal(env, proposal, decision),
+          openCrew: (tab) => host.openCrew(id, tab),
+        }),
+      );
+    }
     const cols = h('div', 'persona-cols');
     cols.append(left, right);
-    foot = pageFoot(t, t('persona.page.save_title', { path: paths.dirShort }), { discard, save: () => void savePersona(env), remove: () => askPersonaDelete(env, () => host.removed()) });
+    foot = pageFoot(t, t('persona.page.save_title', { path: paths.dirShort }), { discard, save: () => void savePersona(env), ...(ctx.persona.kind === 'mission' ? {} : { remove: () => askPersonaDelete(env, () => host.removed()) }) });
     root.replaceChildren(head.element, cols, foot.element);
     [left, right].forEach((column, at) => (column.scrollTop = scrolls[at] ?? 0));
     syncState();

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_PERSONA_SETTINGS } from './persona-settings';
-import { inPipelineOrder, parsePersonaFile, personaFileText, personaMigrationFor, personaRef, resolvePersona, splitPoolEntry } from './persona';
+import { entryWorkOf } from './chain-entry-work';
+import { inPipelineOrder, isAgentPersona, isHumanPersona, isMissionPersona, MISSION_PERSONA_ID, parsePersonaFile, personaFileText, personaMigrationFor, personaRef, resolvePersona, splitPoolEntry } from './persona';
 
 const PIA = `---
 title: Pia
@@ -28,6 +29,44 @@ describe('inPipelineOrder (fidelity ruling O12)', () => {
       { id: 'ralf', role: 'reviewer', kind: 'agent' },
     ] as const;
     expect(inPipelineOrder(list).map((persona) => persona.id)).toEqual(['paul', 'ben', 'ralf', 'tessa', 'anna', 'zed', 'you']);
+  });
+
+  it('req-269: puts Mission Control\'s persona first', () => {
+    const list = [
+      { id: 'ben', role: 'builder', kind: 'agent' },
+      { id: 'you', role: 'custom', kind: 'human' },
+      { id: 'pia', role: 'custom', kind: 'mission' },
+    ] as const;
+    expect(inPipelineOrder(list).map((persona) => persona.id)).toEqual(['pia', 'ben', 'you']);
+  });
+});
+
+describe('kind: mission — Mission Control\'s persona (req-269)', () => {
+  const PIA = "---\ntitle: Pia\nkind: mission\nrole: custom\nsummary: \"Mission Control.\"\ncolor: '#d9cff5'\nskills: []\n---\n";
+
+  it('reads kind mission, and the three kind tests say which persona is what', () => {
+    const pia = parsePersonaFile('pia', PIA);
+    expect(pia.kind).toBe('mission');
+    expect([isMissionPersona(pia), isAgentPersona(pia), isHumanPersona(pia)]).toEqual([true, false, false]);
+    expect(isAgentPersona(parsePersonaFile('ben', '---\ntitle: Ben\n---\n'))).toBe(true);
+    expect(parsePersonaFile('x', '---\ntitle: X\nkind: robot\n---\n').kind).toBe('agent');
+    expect(MISSION_PERSONA_ID).toBe('pia');
+  });
+
+  it('writes kind mission and no worker or models, and reads back what it wrote', () => {
+    const text = personaFileText(parsePersonaFile('pia', PIA));
+    expect(text).toBe(PIA);
+    expect(parsePersonaFile('pia', text)).toMatchObject({ kind: 'mission', title: 'Pia', summary: 'Mission Control.' });
+  });
+});
+
+describe('entryWorkOf — what happens at a chain entry (req-269)', () => {
+  it('a run for an agent, a Mission Control turn for the mission persona, the owner for the human, missing for none', () => {
+    expect(entryWorkOf({ kind: 'agent' })).toBe('run');
+    expect(entryWorkOf({ kind: 'mission' })).toBe('mission-turn');
+    expect(entryWorkOf({ kind: 'human' })).toBe('owner');
+    expect(entryWorkOf(null)).toBe('missing');
+    expect(entryWorkOf(undefined)).toBe('missing');
   });
 });
 

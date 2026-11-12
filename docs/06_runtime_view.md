@@ -5818,3 +5818,29 @@ sequenceDiagram
 ```
 
 `parallel`, `min` and `leaving` are recorded only: req-257's per-persona pool reads the first two, req-267 runs the leaving actions. A review's detached read-only checkout and read-only session (§6.109, req-183) stay tied to the `review` phase and the `reviewer` role; `readonly:` adds only the instruction.
+
+## 6.121 Mission Control speaks as Pia — the persona prompt on every turn, her entry in a chain (req-269, milestone 246)
+
+```mermaid
+sequenceDiagram
+    actor Owner
+    participant Page as Persona page (Pia)
+    participant P as personas/pia/prompt.md
+    participant CS as ChatService
+    participant CT as ChatTurn (bridge)
+    participant MP as MissionPersonaPrompt
+    participant M as chat model
+    Owner->>Page: edit "How the owner works with Pia" · Save
+    Page->>P: personaPatch {prompt} · one commit "personas: pia updated"
+    Owner->>CS: a line in the Mission Control chat
+    CS->>CT: runTurn {text, history, board digest, named}
+    CT->>MP: missionPersona() — a mission turn only
+    MP->>P: the first kind: mission persona's prompt.md (no cache)
+    MP-->>CT: text, or null (no persona, no file, blank, an error)
+    CT->>M: system = Pia's prompt + mission.md + ## Board digest (+ named, reference)
+    M-->>CT: {say, thought, commands}
+    CT-->>CS: say + proposal cards (each confirmed by the owner)
+    Note over CT,MP: shape / flow turns, the aggregator and a 1:1 never ask
+```
+
+The seeder ships Pia first: a fresh board gets `order: [pia, paul, ben, ralf, tessa, you]`; a board seeded before req-269 is offered her alone at the next start and she goes to the front of its existing `order:`. Her record is `kind: mission` — no worker, no models; the free sessions, the 1:1, capacity and the budgets skip her, and the delete refuses her (`mission`). **In a chain** she is an entry like any persona (`pia; you`); `validateChain` refuses a mode on her, and `entryWorkOf` answers `mission-turn` for her position — today nothing walks the cursor, req-257's dispatch turns that answer into a ticket-scoped Mission Control turn with no session, no slot and no budget.

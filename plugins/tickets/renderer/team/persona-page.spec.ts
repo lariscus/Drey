@@ -159,6 +159,22 @@ describe('the Persona page v2 (R11, board 7k)', () => {
     expect(patches()).toEqual([]);
   });
 
+  it('req-269: Mission Control\'s persona shows her profile and her prompt only — no work, rights, skills, proposals, preview or Delete', async () => {
+    fx.view = { kind: 'mission', role: 'custom', worker: '', model: '', pool: [], phases: [], budget: null };
+    fx.prompt = { text: '## Who Pia is\n\nMission Control.' };
+    await mount();
+    expect(q<HTMLInputElement>('[data-field="title"]').value).toBe('Ben');
+    expect(editor().text).toBe('## Who Pia is\n\nMission Control.');
+    for (const selector of ['[data-field="worker"]', '[data-field="min-class"]', '[data-field="budget"]', '.persona-allow-row', '.persona-skill', '[data-proposal]', '.persona-delete-open']) {
+      expect(fx.host.querySelector(selector), selector).toBeNull();
+    }
+    expect([...fx.host.querySelectorAll('button')].some((entry) => entry.textContent === 'Preview full prompt')).toBe(false);
+    typeInEditor('## Who Pia is\n\nShorter answers.');
+    buttonOf('Save').click();
+    await settle();
+    expect(patches()).toEqual([{ persona: 'ben', prompt: '## Who Pia is\n\nShorter answers.' }]);
+  });
+
   it('draws no explanatory prose: titles, labels and controls only', async () => {
     await mount();
     const text = fx.host.textContent ?? '';

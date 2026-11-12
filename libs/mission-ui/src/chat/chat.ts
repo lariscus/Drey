@@ -678,7 +678,7 @@ export class Chat {
     if (failure === null || (failure.file !== undefined && failure.file !== this.active()?.file)) {
       return null;
     }
-    const who = this.shape() === null ? 'Pia' : 'Paul';
+    const who = this.shape() === null ? this.missionName() : 'Paul';
     const headline: Record<typeof failure.code, string> = {
       'not-configured': `${who} has no model yet`,
       unsupported: `${who} cannot use this provider`,
@@ -1085,6 +1085,11 @@ export class Chat {
       context: sources.length === 0 ? null : `Context: ${shown}${sources.length > 3 ? ` · +${sources.length - 3}` : ''}`,
     };
   });
+
+  /** Mission Control's persona by her title (req-269): whatever the owner named her, "Pia" before the crew is read or without one. */
+  private missionName(): string {
+    return this.work?.personas.find((persona) => persona.kind === 'mission')?.title ?? 'Pia';
+  }
 
   /** The shape session's planner as the iPad draws it above his answers (board 5b, 5c). */
   protected readonly shapeWho = computed(() => {

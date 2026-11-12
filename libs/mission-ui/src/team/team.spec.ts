@@ -507,6 +507,11 @@ describe('the human persona on the Team page (E10-6)', () => {
     expect(headerSubOf([YOU])).toBe('0 personas · today $1.50');
   });
 
+  it('req-269: Mission Control\'s persona does not count either', () => {
+    const MISSION: McTeamPersona = { ...PIA, id: 'mara', kind: 'mission', title: 'Mara', role: 'custom', budget: null };
+    expect(headerSubOf([MISSION, PIA, YOU])).toBe('1 persona · today $1.50');
+  });
+
   it('renders the owner as a card without a pause button or a tappable 1:1', () => {
     TestBed.resetTestingModule();
     const state: McTeamState = {
