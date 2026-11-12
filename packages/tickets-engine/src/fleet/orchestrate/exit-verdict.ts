@@ -16,6 +16,7 @@ import type { LiveRun } from './live-run';
  * - `no-result` — the worker ended without finishing its turn: it claimed nothing.
  * - `reopened` — an owner's reopened session ends done, nothing moves.
  * - `blocked` — the worker declared the step incomplete: no gate, the ticket stays put.
+ * - `send-back` — a chain run names an earlier position to do again (req-257): no gate.
  * - `scout` — the exploration ends; the report chapter is the deliverable.
  * - `gate` — a finished turn: the machine gate decides.
  */
@@ -28,6 +29,7 @@ export type ExitVerdict =
   | { readonly kind: 'no-result' }
   | { readonly kind: 'reopened' }
   | { readonly kind: 'blocked'; readonly blocked: string }
+  | { readonly kind: 'send-back'; readonly position: number; readonly reason: string }
   | { readonly kind: 'scout' }
   | { readonly kind: 'gate' };
 
@@ -71,6 +73,10 @@ export function exitVerdict(run: LiveRun): ExitVerdict {
   const blocked = run.blocked ?? null;
   if (blocked !== null) {
     return { kind: 'blocked', blocked };
+  }
+  const sendBack = run.sendBack ?? null;
+  if (sendBack !== null && run.request.cursor !== undefined) {
+    return { kind: 'send-back', ...sendBack };
   }
   return run.request.form === 'scout' ? { kind: 'scout' } : { kind: 'gate' };
 }

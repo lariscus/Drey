@@ -1,6 +1,10 @@
 import { ACTIVE_STAGE, PHASE_PIN_KEY, placementOfPhase } from '../../core/lifecycle-stages';
 import { costOf } from '../../core/model-prices';
+import type { ChainEntry } from '../../contracts/chain';
+import { invalidationLine, type SendBackDecision } from '../../core/chain-cursor';
+import { renderSendBack } from '../../core/chain-list';
 import { renderStatusComment } from '../../core/status-comment';
+import { advancedText } from '../advance-text';
 import { appendVerlaufEntry, renderVerlaufLine, verlaufEntryOf } from '../../core/verlauf';
 import { setDocumentField } from '../../store/document-fields';
 import type { Clock } from '../ports/clock';
@@ -13,6 +17,10 @@ import type { TicketCopy } from './ticket-copy';
 
 /** The store's extension field of the chain's cursor (req-266). */
 const CURSOR_KEY = 'x-at';
+/** The one send-back a ticket may use (req-266). */
+const SENT_BACK_KEY = 'x-sent-back';
+/** The ticket waits for the owner (E10-6; req-257: a question, a second send-back). */
+const AWAITING_KEY = 'x-awaiting';
 
 /** Inside the claim the line is written before the settle: the price-table estimate is the settle's own fallback, applied here. */
 function effectiveCost(run: LiveRun): number | null {
@@ -33,6 +41,13 @@ function moveTarget(run: LiveRun, nextPhase: string): { readonly stage: string; 
 }
 
 export type WriteResult ={ readonly ok: true } | { readonly ok: false; readonly error: string };
+
+/** req-257: what a run's send-back writes — the decision (moved or to the owner), the run's reason, the chain for the line. */
+export interface SendBackWrite {
+  readonly decision: Exclude<SendBackDecision, { readonly kind: 'refused' }>;
+  readonly reason: string;
+  readonly chain: readonly ChainEntry[];
+}
 
 /**
  * The run's hand-back of its ticket (E14-5/5b): release IS the one door —
@@ -104,13 +119,51 @@ export class ClaimRelease {
     if (lease === undefined || lease.fenced || cursor === undefined) {
       return { ok: false, error: 'the claim on the ticket was lost - the cursor is not moved' };
     }
-    const next = cursor.at + 1;
-    const where = next > cursor.length ? `the chain is through (${cursor.length} of ${cursor.length})` : `position ${next} of ${cursor.length} next`;
-    const narrative = `run ${run.info.id} done - gate green at position ${cursor.at} of ${cursor.length}; ${where}${usageSummary(run.info)}`;
-    const note = renderStatusComment({ verb: 'done', text: `handed over at position ${cursor.at} of ${cursor.length}`, detail: narrative }) ?? narrative;
-    const written = await this.verlaufInClaim(run, lease, 'done', (text) => setDocumentField(text, CURSOR_KEY, String(next)) ?? text);
+    let chainNote: string | null = null;
+    const written = await this.verlaufInClaim(run, lease, 'done', (text) => {
+      const advanced = advancedText(text, cursor); // req-257: the cursor on, and a plan run's ### Chain
+      chainNote = advanced.chainNote;
+      return advanced.text;
+    });
     if (!written) {
       return { ok: false, error: `the cursor could not be written inside the claim - nothing is handed on` };
+    }
+    const next = cursor.at + 1;
+    const where = next > cursor.length ? `the chain is through (${cursor.length} of ${cursor.length})` : `position ${next} of ${cursor.length} next`;
+    const narrative = `run ${run.info.id} done - gate green at position ${cursor.at} of ${cursor.length}; ${where}${chainNote === null ? '' : `; ${chainNote as string}`}${usageSummary(run.info)}`;
+    const note = renderStatusComment({ verb: 'done', text: `handed over at position ${cursor.at} of ${cursor.length}`, detail: narrative }) ?? narrative;
+    const result = await lease.release([ACTIVE_STAGE], note);
+    return result.ok ? { ok: true } : { ok: false, error: result.error };
+  }
+
+  /**
+   * req-257: a run's send-back inside the claim, then ONE release into `active`. Moved: the cursor
+   * to the named position and `x-sent-back`, the invalidation line as the release's comment (the
+   * status log). To the owner (a second send-back): `x-awaiting: you` and a `needs-decision` with
+   * both send-backs — the ticket stands at You.
+   */
+  async sendBack(run: LiveRun, back: SendBackWrite): Promise<WriteResult> {
+    const lease = run.lease;
+    if (lease === undefined || lease.fenced) {
+      return { ok: false, error: 'the claim on the ticket was lost - nothing is sent back' };
+    }
+    const { decision, reason, chain } = back;
+    const from = run.request.cursor?.at ?? 1;
+    const patch =
+      decision.kind === 'moved'
+        ? (text: string): string => setDocumentField(setDocumentField(text, CURSOR_KEY, String(decision.at)) ?? text, SENT_BACK_KEY, renderSendBack(decision.sentBack)) ?? text
+        : (text: string): string => setDocumentField(text, AWAITING_KEY, 'you') ?? text;
+    const note =
+      decision.kind === 'moved'
+        ? invalidationLine(chain, decision.sentBack, reason)
+        : (renderStatusComment({
+            verb: 'needs-decision',
+            key: 'second-send-back',
+            text: `a second send-back from position ${from}: ${reason.trim() || 'no reason given'}`.slice(0, 200),
+            detail: `The ticket was sent back once already (${renderSendBack(decision.earlier)}); one send-back per ticket — decide: Accept hands it on, Send back returns it.\n\nThis send-back: from position ${from} — ${reason.trim()}`,
+          }) ?? reason);
+    if (!(await this.verlaufInClaim(run, lease, 'done', patch))) {
+      return { ok: false, error: 'the send-back could not be written inside the claim' };
     }
     const result = await lease.release([ACTIVE_STAGE], note);
     return result.ok ? { ok: true } : { ok: false, error: result.error };

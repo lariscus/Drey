@@ -50,14 +50,16 @@ import { FileTicketStore } from '../store/file-ticket-store';
 import { checkoutOf, createDricketStore, groupByStage, readStoreSettings, type StoreListing, type StoreSettings } from '../store/store-settings';
 import { archivedRecordFiles, recordToBoardFile, type HolderPlacement } from '../store/store-board';
 import { withCursorForMove } from '../store/chain-move';
+import { runCursorOf } from '../fleet/run-cursor';
+import { MISSION_ENTRY_KEY, type MissionEntry } from './mission-entry-turns';
 import { ownerAcceptOf, ownerSendBackOf } from './chain-owner-moves';
 import { chainFinished } from '../core/chain-placement';
 import { setDocumentField } from '../store/document-fields';
-import { ACTIVE_STAGE } from '../core/lifecycle-stages';
+import { ACTIVE_STAGE, EDGE_STAGES } from '../core/lifecycle-stages';
 import { cursorForPin, placementColumnsOf } from '../core/chain-placement';
 import { parseTicketChainFields } from '../core/ticket-chain-fields';
 import type { PinCursorOf } from '../store/stage-migration-plan';
-import { crewLookupOf } from '../core/chain-holder';
+import { crewLookupOf, holderOf } from '../core/chain-holder';
 import type { TicketDetail } from '../ports/ticket-store';
 import { ARCHIVED_LABEL } from '../store/legacy-bridge';
 import { StoreBoardSource, type LegacyWrite } from '../store/store-board-source';
@@ -2248,9 +2250,9 @@ export class EngineBoardService {
     if (placement === null || chain === undefined) {
       return null;
     }
-    const at = Math.min(Math.max(card.meta.at ?? 1, 1), chain.length);
-    const persona = placement.lookup(chain[at - 1]!.persona);
-    return { persona: persona?.kind === 'agent' ? persona.id : null, cursor: { at, length: chain.length } };
+    const cursor = runCursorOf({ chain, at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.chainGuardIds() });
+    const persona = placement.lookup(chain[cursor.at - 1]!.persona);
+    return { persona: persona?.kind === 'agent' ? persona.id : null, cursor };
   }
 
   /** req-257: what places a chain ticket by its holder — null unless the board runs on a lifecycle store. */
@@ -2711,7 +2713,8 @@ export class EngineBoardService {
     try {
       const record = await this.storeBoard.record(store, card.id);
       const legacy = why.text ?? recordToBoardFile(record, card.phase).text;
-      const text = 'at' in target ? (setDocumentField(legacy, 'at', String(target.at)) ?? legacy) : legacy;
+      const moved = 'at' in target ? (setDocumentField(legacy, 'at', String(target.at)) ?? legacy) : legacy;
+      const text = setDocumentField(moved, 'awaiting', null) ?? moved; // the owner decided: no longer waiting for You
       await this.putRecord(store, record, text, 'at' in target ? { keepStage: true } : { phase: target.done });
     } catch (error) {
       return { ok: false, error: error instanceof TicketChangedError ? `${card.id} changed meanwhile — look again and retry` : messageOf(error) };
@@ -2719,6 +2722,79 @@ export class EngineBoardService {
     await this.noteStatus(card, 'done', { text: why.line }, why.actor);
     this.announceChanged();
     return { ok: true };
+  }
+
+  /**
+   * req-257: the tickets whose cursor stands on Mission Control's persona (Pia) and that do not wait
+   * for the owner yet — the entries `MissionEntryTurns` runs one ticket-scoped turn for. Lifecycle
+   * stores only; empty elsewhere.
+   */
+  async missionEntries(): Promise<readonly MissionEntry[]> {
+    const vault = await this.detect();
+    const store = vault === null ? null : await this.refreshDricket();
+    if (store === null || !isLifecycleStore(await this.storeBoard.stages(store).catch(() => null))) {
+      return []; // no chain board: no snapshot on every board and fleet change
+    }
+    const snap = vault === null ? null : await this.snapshot();
+    const placement = vault === null || snap === null ? null : await this.holderPlacement(vault, snap.pipeline);
+    if (vault === null || snap === null || placement === null) {
+      return [];
+    }
+    const terminal = placement.columns.terminal;
+    const loader = this.personaLoaderFor(vault);
+    const entries: MissionEntry[] = [];
+    for (const card of snap.columns.filter((c) => !EDGE_STAGES.includes(c.phase.id) && c.phase.id !== terminal).flatMap((c) => c.tickets)) {
+      const holder = holderOf({ stage: 'active', chain: card.meta.chain, at: card.meta.at, awaiting: card.meta.awaiting }, placement.lookup);
+      if (holder.kind === 'entry' && holder.work === 'mission-turn' && card.meta.claimedBy === null) {
+        const title = (await loader.load(holder.persona))?.title ?? holder.persona;
+        entries.push({ id: card.id, position: holder.entry.position, length: holder.entry.length, persona: title });
+      }
+    }
+    return entries;
+  }
+
+  /** req-257: the ticket waits for the owner — `awaiting: you` and a `needs-decision` under `key` (Pia's entry after her turn). */
+  waitForOwner(input: { readonly id: string; readonly key: string; readonly text: string; readonly detail: string }): Promise<BoardMutationResult> {
+    return this.enqueue(async () => {
+      const store = this.dricket;
+      const card = store === null ? null : findOnBoard(await this.snapshot(), input.id);
+      if (store === null || card === null) {
+        return { ok: false, error: `${input.id} is not on a dricket board` };
+      }
+      try {
+        const record = await this.storeBoard.record(store, card.id);
+        const legacy = recordToBoardFile(record, card.phase).text;
+        await this.putRecord(store, record, setDocumentField(legacy, 'awaiting', HUMAN_PERSONA_ID) ?? legacy, { keepStage: true });
+      } catch (error) {
+        return { ok: false, error: messageOf(error) };
+      }
+      await this.noteStatus(card, 'needs-decision', { key: input.key, text: input.text, detail: input.detail }, this.owner);
+      this.announceChanged();
+      return { ok: true };
+    });
+  }
+
+  /**
+   * req-257 (owner 2026-11-12, Q1a): a confirmed card of Pia's entry session ends her entry — the cursor
+   * moves on (past the last entry: `done`) and her `pia-turn` decision is resolved. Nothing when the
+   * ticket has moved on meanwhile.
+   */
+  finishMissionEntry(input: { readonly id: string; readonly position: number }): Promise<BoardMutationResult> {
+    return this.enqueue(async () => {
+      const snap = await this.snapshot();
+      const card = findOnBoard(snap, input.id);
+      const chain = card?.meta.chain;
+      if (card === null || chain === undefined || (card.meta.at ?? 1) !== input.position) {
+        return { ok: true }; // the ticket stands elsewhere now: nothing to finish
+      }
+      const terminal = snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done';
+      const last = input.position >= chain.length;
+      const written = await this.writeChainCursor(card, last ? { done: terminal } : { at: input.position + 1 }, { line: `Mission Control's entry at position ${input.position} of ${chain.length} is done — her card was confirmed`, actor: this.owner });
+      if (written.ok) {
+        await this.noteStatus(card, 'resolved', { key: MISSION_ENTRY_KEY }, this.owner);
+      }
+      return written;
+    });
   }
 
   /**

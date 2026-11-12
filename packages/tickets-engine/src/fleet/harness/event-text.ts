@@ -4,7 +4,7 @@
  * markers a turn ends with (`QUESTION:`, `BLOCKED:`) and the lead-ins of
  * thinking and tool results.
  */
-import { BLOCKED_MARKER, FRICTION_MARKER, FRICTION_MAX, QUESTION_MARKER } from '../protocol';
+import { BLOCKED_MARKER, FRICTION_MARKER, FRICTION_MAX, QUESTION_MARKER, SEND_BACK_MARKER } from '../protocol';
 
 /** The stream lead-in of a worker's thinking (the takeover transcript shows it quoted). */
 export const THINK_PREFIX = 'thinking › ';
@@ -95,6 +95,23 @@ export function questionOf(text: string): string | null {
 /** Why the worker declared the step incomplete (`BLOCKED:`), parsed like `questionOf`. A question wins over it. */
 export function blockedOf(text: string): string | null {
   return lastMarkerText(text, BLOCKED_MARKER);
+}
+
+/**
+ * req-257: a chain run's send-back — the LAST line-start `SEND-BACK: <position> <reason>`
+ * of the turn's message: the position (a whole number) and the reason (the rest of the
+ * line, may be empty); null without one, and a marker without a number reads as position 0
+ * (the runner refuses it as no earlier position).
+ */
+export function sendBackOf(text: string): { readonly position: number; readonly reason: string } | null {
+  const lines = text.split('\n').filter((line) => line.trimStart().toUpperCase().startsWith(SEND_BACK_MARKER));
+  const last = lines[lines.length - 1];
+  if (last === undefined) {
+    return null;
+  }
+  const said = last.trimStart().slice(SEND_BACK_MARKER.length).trim();
+  const match = /^(\d+)\b[\s:.,—-]*(.*)$/.exec(said);
+  return match === null ? { position: 0, reason: said } : { position: Number(match[1]), reason: match[2]!.trim() };
 }
 
 /**

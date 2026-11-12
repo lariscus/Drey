@@ -14,7 +14,7 @@
 import path from 'node:path';
 import { SHIPPED_PROMPTS_DIR } from '../core/default-prompts';
 import { loadPromptFragments, readPromptFile, type PromptFragments } from '../core/prompt-file';
-import { BLOCKED_MARKER, QUESTION_MARKER } from './protocol';
+import { BLOCKED_MARKER, QUESTION_MARKER, SEND_BACK_MARKER } from './protocol';
 
 /** The discipline texts a run brief is composed from, plus the shared fragments a step prompt pulls in. */
 export interface DisciplineTexts {
@@ -42,6 +42,11 @@ export interface DisciplineTexts {
   readonly language: string;
   /** Every brief: this brief beats the repo's instructions. */
   readonly precedence: string;
+  /**
+   * req-257: a chain run's brief — the positions and the `SEND-BACK:` marker; `{{at}}`, `{{length}}`
+   * and `{{positions}}` are filled per run by the composer (`instruction-sections.ts` `chainSection`).
+   */
+  readonly chain: string;
   /** The shared fragments (`{{plan-format}}`, `{{chain-grammar}}`). */
   readonly fragments: PromptFragments;
 }
@@ -61,12 +66,13 @@ const DISCIPLINE_FILES: Readonly<Record<DisciplineName, string>> = {
   ticketFile: 'ticket-file.md',
   language: 'language.md',
   precedence: 'precedence.md',
+  chain: 'chain.md',
 };
 
 /** Reads one discipline file with the marker placeholders substituted. */
 async function readDiscipline(dir: string, file: string): Promise<string> {
   const text = await readPromptFile(dir, path.join('disciplines', file), 'discipline');
-  return text.replaceAll('{{question}}', QUESTION_MARKER).replaceAll('{{blocked}}', BLOCKED_MARKER);
+  return text.replaceAll('{{question}}', QUESTION_MARKER).replaceAll('{{blocked}}', BLOCKED_MARKER).replaceAll('{{sendBack}}', SEND_BACK_MARKER);
 }
 
 /** Every discipline text and fragment, from the shipped prompts dir by default. */

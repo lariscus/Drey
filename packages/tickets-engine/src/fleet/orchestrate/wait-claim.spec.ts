@@ -33,6 +33,19 @@ describe('WaitClaim — the claim through a wait for the owner', () => {
     await settled(t.sup, id, 'failed');
   });
 
+  it('req-257: a question in a chain run puts the card at You (x-awaiting) and the answer brings it back', async () => {
+    const t = setup();
+    const id = await startRun(t.sup, request({ cursor: { at: 3, length: 4, entries: ['paul:shape', 'paul', 'ben', 'you'] } }));
+    t.adapter.starts[0]!.onEvent({ ts: '2026-10-17T12:00:01Z', kind: 'note', waiting: question('Which shortcut?', 'Ctrl+K') });
+    await waitFor(() => expect(t.store.of('release')).toHaveLength(1));
+    expect(t.store.text).toMatch(/^x-awaiting: you$/m);
+
+    expect((await t.sup.answerQuestion(id, { 'Which shortcut?': ['Ctrl+K'] } as never)).ok).toBe(true);
+    expect(t.store.text).not.toMatch(/^x-awaiting:/m);
+    t.adapter.handles[0]!.fail(1);
+    await settled(t.sup, id, 'failed');
+  });
+
   it('Q-03: an answer for a ticket someone else took meanwhile is refused and the worker gets nothing', async () => {
     const t = setup();
     const id = await startRun(t.sup, request());

@@ -5,7 +5,7 @@ import type { RunRequest } from '../protocol';
 import type { TerminalRunState } from '../run/run-state';
 import { usageSummary } from '../run/run-summary';
 import type { ChainCardPatch } from '../store-chain-board';
-import type { ClaimRelease, WriteResult } from './claim-release';
+import type { ClaimRelease, SendBackWrite, WriteResult } from './claim-release';
 import type { LiveRun } from './live-run';
 import type { RunStreams } from './run-streams';
 import type { TicketCopy } from './ticket-copy';
@@ -65,6 +65,14 @@ export class RunBookkeeper {
       return this.predatesStore(run, 'moved');
     }
     return this.parts.release.advance(run);
+  }
+
+  /** req-257: a chain run's send-back — the cursor back (`x-sent-back`) or the ticket to the owner, inside the claim, one release. */
+  async sendBack(run: LiveRun, back: SendBackWrite): Promise<WriteResult> {
+    if (run.request.dk === undefined) {
+      return this.predatesStore(run, 'moved');
+    }
+    return this.parts.release.sendBack(run, back);
   }
 
   /** E10-6: a manual step follows the green gate — the ticket waits where it is, parked for the human persona. */

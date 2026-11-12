@@ -7,8 +7,10 @@
  * - a **shape turn**: the shape prompt, then `## Ticket <id>` and its text;
  * - a **mission turn**: Mission Control's persona prompt (`prompt.md` of the
  *   `kind: mission` persona, Pia — req-269), a blank line, the mission
- *   prompt (the intents and the JSON contract), then `## Board digest`.
- *   Without a persona prompt the turn opens with the mission prompt alone.
+ *   prompt (the intents and the JSON contract), then `## Board digest` —
+ *   or, on Pia's entry in a ticket's chain (req-257), `## Ticket <id>` and
+ *   the ticket's text in the digest's place. Without a persona prompt the
+ *   turn opens with the mission prompt alone.
  *
  * The persona prompt opens the message (R11: the prompt is the persona — who
  * speaks comes before what she may do); it changes only when the owner
@@ -30,6 +32,8 @@ export interface ChatSystemContext {
   readonly flow?: { readonly context: string };
   /** Mission Control's persona prompt; absent or blank = none (a mission turn only). */
   readonly persona?: string | null;
+  /** req-257: Pia's entry in a ticket's chain — the ticket in the board digest's place. */
+  readonly ticket?: { readonly id: string; readonly text: string };
 }
 
 export function chatSystemOf(texts: ChatSystemTexts, turn: ChatSystemContext): string {
@@ -40,5 +44,6 @@ export function chatSystemOf(texts: ChatSystemTexts, turn: ChatSystemContext): s
     return `${texts.shape}\n\n## Ticket ${turn.shape.ticket}\n\n${turn.shape.ticketText}`;
   }
   const persona = turn.persona?.trim() ?? '';
-  return `${persona === '' ? '' : `${persona}\n\n`}${texts.mission}\n\n## Board digest\n\n${turn.board}`;
+  const context = turn.ticket !== undefined ? `## Ticket ${turn.ticket.id}\n\n${turn.ticket.text}` : `## Board digest\n\n${turn.board}`;
+  return `${persona === '' ? '' : `${persona}\n\n`}${texts.mission}\n\n${context}`;
 }

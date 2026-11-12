@@ -1,6 +1,8 @@
+import { decideSendBack } from '../../core/chain-cursor';
 import { hasScoutReport } from '../../core/scout';
 import { capTail, SANITY_CAP } from '../capping';
 import type { RunRequest } from '../protocol';
+import { cursorChain } from '../run-cursor';
 import type { RunStateMachine } from '../run/run-state-machine';
 import { shortGateLine } from '../run/run-summary';
 import { exitVerdict } from './exit-verdict';
@@ -31,6 +33,14 @@ export interface RunCompletionDeps {
   readonly leaving?: { afterGreen(run: LiveRun): Promise<SyncMainOutcome | null> };
 }
 
+/** The note of a dialog, a session or a reopened session that ended: the ticket stays where the owner put it. */
+function endedLine(run: LiveRun, kind: 'interactive' | 'session' | 'reopened', code: number | null): string {
+  if (kind === 'interactive') {
+    return `interactive dialog ended (${exitWord(code)}) — the owner moves the ticket`;
+  }
+  return kind === 'session' ? `${run.info.kind === 'free' ? 'free' : '1:1'} session ended (${exitWord(code)})` : `reopened session ended (${exitWord(code)})`;
+}
+
 /** The exit code as the notes say it. */
 function exitWord(code: number | null): string {
   return `exit ${code ?? 'signal'}`;
@@ -55,18 +65,16 @@ export class RunCompletion {
       case 'stopped':
         return settler.finish(run, 'stopped');
       case 'interactive':
-        await bookkeeper.note(run, `interactive dialog ended (${exitWord(code)}) — the owner moves the ticket`);
-        return settler.finish(run, 'done');
       case 'session':
-        await bookkeeper.note(run, `${run.info.kind === 'free' ? 'free' : '1:1'} session ended (${exitWord(code)})`);
+      case 'reopened':
+        await bookkeeper.note(run, endedLine(run, verdict.kind, code));
         return settler.finish(run, 'done');
       case 'no-result':
         return this.noResult(run, code);
-      case 'reopened':
-        await bookkeeper.note(run, `reopened session ended (${exitWord(code)})`);
-        return settler.finish(run, 'done');
       case 'blocked':
         return this.blocked(run, verdict.blocked);
+      case 'send-back':
+        return this.sendBack(run, verdict);
       case 'scout':
         return this.scout(run, code);
       case 'gate':
@@ -93,6 +101,29 @@ export class RunCompletion {
     await this.deps.closing?.afterGate(run); // req-280: a blocked step's FRICTION reaches the journal too
     await this.deps.bookkeeper.parkBlocked(run, blocked);
     await this.deps.settler.finish(run, 'done');
+  }
+
+  /**
+   * req-257: a chain run's send-back (concept §4) — no gate runs. The first
+   * send-back of a ticket moves the cursor to the named earlier position
+   * (`x-sent-back`, the invalidation in the status log); a second goes to
+   * the owner with both; a position that is no earlier one of this chain is
+   * a red gate with the reason.
+   */
+  private async sendBack(run: LiveRun, ask: { readonly position: number; readonly reason: string }): Promise<void> {
+    const cursor = run.request.cursor!;
+    const chain = cursorChain(cursor);
+    const decision = decideSendBack({ chain, at: cursor.at, sentBack: cursor.sentBack, target: ask.position });
+    await this.deps.closing?.afterGate(run);
+    if (decision.kind === 'refused') {
+      run.info = { ...run.info, gateFailure: decision.reason, gateResult: 'red' };
+      await this.deps.bookkeeper.note(run, `send-back refused — ${decision.reason}`);
+      return this.deps.settler.finish(run, 'failed');
+    }
+    const written = await this.deps.bookkeeper.sendBack(run, { decision, reason: ask.reason, chain });
+    const said = decision.kind === 'moved' ? `sent back to position ${decision.at}` : 'a second send-back — the ticket goes to the owner';
+    await this.deps.bookkeeper.note(run, written.ok ? said : `${said} failed — ${written.error}`);
+    await this.deps.settler.finish(run, written.ok ? 'done' : 'failed');
   }
 
   /** E8: the exploration's last word is only whether the ticket carries a report, so a report-less end is visible. */

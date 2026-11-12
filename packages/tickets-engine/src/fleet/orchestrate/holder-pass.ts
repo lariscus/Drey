@@ -102,7 +102,7 @@ export class HolderPass {
     const persona = holder.persona;
     const position = `position ${holder.entry.position} of ${holder.entry.length}`;
     if (holder.work === 'mission-turn') {
-      return `${id} waits at ${position} for ${persona} — a Mission Control turn on a ticket arrives with milestone 248`;
+      return `${id} waits at ${position} for ${persona} — her Mission Control turn runs in the engine, no session here`;
     }
     if (holder.work !== 'run') {
       return null; // You's entry: the ticket waits for the owner in Needs you

@@ -295,7 +295,12 @@ create as a `raw capture:` Log line (ticket-schema).
   `services/mission-persona-prompt.ts`, CRLF folded and trimmed, so the owner's edit applies on
   the next message; absent, unreadable or blank = left out, and the turn opens with the prompt
   alone) and a blank line, then the prompt (`mission.md`, unchanged at version 3: the intents
-  and the contract), then `## Board digest` (priority vocabulary, the columns
+  and the contract), then `## Board digest` — or, on **Pia's entry in a ticket's chain** (req-257:
+  a session titled `<her title> — T-0123, position 2 of 4`, `services/mission-entry-turns.ts`),
+  `## Ticket <id>` and the ticket's text (capped like a shape turn's) in the digest's place. Her
+  turn is opened by the engine with the line *"Your entry in the chain of <id> (position n of m):
+  read the ticket below and do what your prompt says for it. Every change you want is a card I
+  confirm; when nothing needs changing, say so."* (the session's first owner line) — (the digest: priority vocabulary, the columns
   with counts, req-266's `standard flow: <entries>` line when pipeline.md has
   `flow:`, one line per **open** ticket — with ` · chain: <entries> (at <n>)`
   when the ticket carries a chain —, capped near 2 KB — the terminal column
@@ -393,6 +398,7 @@ is a discipline file the composer appends by run kind
 | `interactive.md` | `Dialog discipline:` | a dialog, in the closing (instead of completion) |
 | `scout.md` | `Scout discipline:` | a scout run (a dialog on a scout ticket: `interactive.md`) |
 | `signals.md` | `Signals:` | every run, in the closing |
+| `chain.md` | `The chain:` | a chain run (req-257: a lifecycle store, `RunRequest.cursor`), in the closing after the signals, not in a dialog — `{{at}}`, `{{length}}` and `{{positions}}` filled per run (`fleet/instruction-sections.ts` `chainSection`: one line per position, `— done` before the cursor, `— you, now` at it), `{{sendBack}}` = `SEND-BACK:` on load |
 | `asking.md` | `Asking the owner:` | every brief, last |
 
 Order of a ship brief: the repo's instructions → the step (or persona)
@@ -400,7 +406,8 @@ prompt with its fragments expanded → `## Skills` → `## Plan` → who and
 where (ticket, persona line, checkout line, phase, ticket-file line,
 description) → the rules (working; read-only, or writing + ticket-file +
 handover; language; precedence) → memory, earlier handover, diff stat, gate
-failure → the gate commands → completion or dialog → signals → asking. A
+failure → the gate commands → completion or dialog → signals → the chain
+(a chain run, req-257) → asking. A
 resume repeats only the part from memory on (the rules sit in the stable
 part).
 
@@ -427,7 +434,13 @@ commands in its brief: the runner judges its hand-over structurally.
   one line>` = no gate, no move, the ticket waits for the owner;
   `QUESTION:` = the run waits for the owner's answer (the shape is
   `asking.md`'s); `FRICTION: <what was missing>` = one line for the
-  improvement loop, before a `BLOCKED:` line. Status-log lines, Handover
+  improvement loop, before a `BLOCKED:` line. A chain run (req-257) adds,
+  in `chain.md`, `SEND-BACK: <position> <reason in one line>` = no gate; the
+  cursor goes back to that earlier position (the ticket's one send-back), a
+  second goes to the owner, a position that is no earlier one is a red gate
+  (`fleet/harness/event-text.ts` `sendBackOf`: the last line-start marker,
+  the number then the rest of the line; a marker without a number reads as
+  position 0). Status-log lines, Handover
   states and Log lines are for people — the runner writes every persisted
   status verb itself (store comments), so no prompt asks an agent for a
   status line any more.

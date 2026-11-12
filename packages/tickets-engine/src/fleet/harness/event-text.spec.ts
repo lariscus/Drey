@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockedOf, editChanges, frictionOf, permissionText, questionOf, toolActivity } from './event-text';
+import { blockedOf, editChanges, frictionOf, permissionText, questionOf, sendBackOf, toolActivity } from './event-text';
 
 describe('questionOf / permissionText — what a worker waits on (req-64)', () => {
   it('reads the marker case-insensitively at the start of the message only', () => {
@@ -88,5 +88,14 @@ describe('frictionOf — the worker reports friction in one line (req-169)', () 
 
   it('is bounded to one short line', () => {
     expect(frictionOf(`friction: ${'x'.repeat(400)}`)?.length).toBe(300);
+  });
+});
+
+describe('the send-back marker (req-257)', () => {
+  it('reads the last line-start SEND-BACK: position and reason', () => {
+    expect(sendBackOf('Review done.\nSEND-BACK: 3 the login test fails')).toEqual({ position: 3, reason: 'the login test fails' });
+    expect(sendBackOf('send-back: 2: missing step')).toEqual({ position: 2, reason: 'missing step' });
+    expect(sendBackOf('SEND-BACK: back to the plan')).toEqual({ position: 0, reason: 'back to the plan' });
+    expect(sendBackOf('All good.')).toBeNull();
   });
 });

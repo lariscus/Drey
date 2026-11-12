@@ -7,6 +7,7 @@ import { chainWorkingPhase } from '../holder-plan';
 import { readRepoInstructions, worktreeDiffStat } from '../context-pack';
 import { dkTargetFor } from '../dk-target';
 import { DEFAULT_FLEET_CAPS, type ChainConfig, type ClassRequest, type PoolGrantDecision, type RunCursor, type RunRequest } from '../protocol';
+import { runCursorOf } from '../run-cursor';
 import { composeRunRequest } from '../request';
 import type { DisciplineTexts } from '../discipline-texts';
 import { worktreePathFor } from '../worktree-home';
@@ -75,13 +76,17 @@ function poolParts(grant: PoolGrantFor | null): Pick<RunRequest, 'poolClass' | '
   };
 }
 
-/** req-257: the chain entry a run on a lifecycle store works — null on the phase board or for a chainless ticket. */
-function cursorOf(config: ChainConfig, card: TicketCard): RunCursor | null {
-  const chain = card.meta.chain;
-  if (config.store?.lifecycle !== true || chain === undefined || chain.length === 0) {
-    return null;
+/** Where a column run's green gate moves the ticket: the next column, or only as far as the working column before a manual step (E10-6). */
+function moveTargetOf(snap: BoardSnapshot, card: TicketCard, workingPhaseId: string, parkFor: string | null): string | null {
+  if (parkFor === null) {
+    return nextPhaseIdOf(snap.columns, workingPhaseId);
   }
-  return { at: Math.min(Math.max(card.meta.at ?? 1, 1), chain.length), length: chain.length };
+  return card.phase !== workingPhaseId ? workingPhaseId : null;
+}
+
+/** req-257: a run on a lifecycle store of a ticket with a chain works a chain entry (its cursor); false on the phase board. */
+function chained(config: ChainConfig, card: TicketCard): boolean {
+  return config.store?.lifecycle === true && (card.meta.chain?.length ?? 0) > 0;
 }
 
 /** What the repo side of a dispatch resolved to. */
@@ -130,7 +135,7 @@ export class TicketDispatch {
   /** The target, the instruction base and the ticket's text; null (said once) when one of them is missing. */
   private async ready(config: ChainConfig, snap: BoardSnapshot, planned: PlannedDispatch): Promise<{ target: Target; prompt: DispatchPrompt; text: string } | null> {
     const { card } = planned;
-    const target = this.target(snap, card, planned.workingPhaseId, cursorOf(config, card) !== null);
+    const target = this.target(snap, card, planned.workingPhaseId, chained(config, card));
     const prompt = target === null ? null : await this.deps.prompts.promptFor(config, card, target.phase, planned.persona);
     if (target === null || prompt === null) {
       return null;
@@ -191,9 +196,9 @@ export class TicketDispatch {
     const { card, workingPhaseId } = planned;
     const { target, parkFor } = got;
     // req-257: a chain run hands on by its cursor (the column follows the holder), never by a move.
-    const cursor = cursorOf(config, card);
+    const cursor = chained(config, card) ? await this.cursorOf(config, card) : null;
     // E10-6: a manual step after this gate parks the ticket on a green gate — it moves only as far as the working column.
-    const nextPhaseId = cursor !== null ? null : parkFor !== null ? (card.phase !== workingPhaseId ? workingPhaseId : null) : nextPhaseIdOf(snap.columns, workingPhaseId);
+    const nextPhaseId = cursor !== null ? null : moveTargetOf(snap, card, workingPhaseId, parkFor);
     const context = await this.context(config, card, target.repo, workingPhaseId);
     return {
       disciplines: await this.disciplines(),
@@ -226,6 +231,11 @@ export class TicketDispatch {
       handover: 'auto', // the supervisor's rules decide (T-0049); the dialog is the only place a mode is chosen
       ...this.personaPins(planned, got.prompt),
     };
+  }
+
+  /** req-257: the chain entry the run works — position, the entries, the send-back used, the crew a plan run's `### Chain` may name. */
+  private async cursorOf(config: ChainConfig, card: TicketCard): Promise<RunCursor> {
+    return runCursorOf({ chain: card.meta.chain ?? [], at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.deps.personas.crewGuard(config) });
   }
 
   /** The context pack (T-0048): the repo's instructions, the worktree's diff stat and a retry's gate failure; a scout run has neither worktree nor gate. */

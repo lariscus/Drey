@@ -1144,7 +1144,7 @@ the format, the order, the upload rules and the migration.
   (never the owner's): `curl -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/api/personas/<id>/skills`.
   A `code` in the answer is what failed (`no_skill`, `exists`, `path_escape`, …).
 
-## Persona chains (req-257, milestone 247)
+## Persona chains (req-257, milestones 247 and 248)
 
 On a **lifecycle store** (stages `inbox prioritized active running done`,
 claim `running` — after the owner's Migrate) the runner dispatches by the
@@ -1157,8 +1157,9 @@ keep the column dispatch (and its ring run) as before.
   the cursor. An agent entry runs — with that persona, nothing else: the
   ticket pin `x-persona`, the crew's `default-persona` and the ring run are
   retired. A `:shape` entry waits for the owner's Shape chat, a You entry
-  waits for the owner (Needs you, on Ready to try), a Pia entry waits for
-  milestone 248, an entry naming no readable persona stands at You — each
+  waits for the owner (Needs you, on Ready to try), a Pia entry gets an
+  engine-side Mission Control turn (below), an entry naming no readable
+  persona stands at You — each
   says so once in `runner.log` (`T-… stands at You: no persona for position
   2 ("bob" is not in the crew)`).
 - **Order.** Priority class, then the later cursor position first
@@ -1187,6 +1188,20 @@ keep the column dispatch (and its ring run) as before.
   ticket starts You's `commit`), Send back moves it to the nearest earlier
   agent position, a move into a working column moves it to the position
   that stands there.
+- **What a chain run may say** (milestone 248). Its brief ends with *The
+  chain:* (the positions, its own marked `— you, now`). `SEND-BACK: 3 <reason>`
+  as the last line: no gate; the first send-back moves `x-at` to 3 and writes
+  `x-sent-back: 5>3` with the invalidation line as the release comment
+  (`sent back 5>3 — … positions 3–6 run again`); a second goes to the owner
+  (`x-awaiting: you`, `needs-decision: [second-send-back]`); a position that
+  is not an earlier one ends the run red (`send-back refused — …`). A
+  `QUESTION:` writes `x-awaiting: you` before the claim is given up and the
+  answer's reclaim removes it. A plan's `### Chain` becomes `x-chain` at the
+  green end when the guard holds (else the hand-on comment says why).
+- **Pia's entry** (milestone 248) never reaches the runner: the engine runs
+  one Mission Control turn per entry (a chat session `Pia — T-0123, position
+  2 of 4`), then parks the ticket for the owner (`x-awaiting: you`,
+  `needs-decision: [pia-turn]`); a confirmed card of hers moves the cursor on.
 - **Migrate** turns the old column of a ticket into its cursor (and offers
   the same for an `active` ticket a milestone-239 migration left with
   `x-phase`); without chain and flow the old pin stays.
@@ -1196,7 +1211,7 @@ keep the column dispatch (and its ring run) as before.
 A board starts with five personas — **Pia** (Mission Control's own persona, `kind: mission`, req-269), **Paul** (planner), **Ben** (builder), **Ralf** (reviewer), **Tessa** (tester) — shipped as files in the package (`packages/tickets-engine/personas/<id>/`) and seeded by `CrewSeeder` (`services/crew-seeder.ts`): with "Initialize board" after the pipeline and the prompts, and once at the engine's start for a board that lacks them. What to know when reading a run, a Crew card or a log:
 
 - **Idempotent by id.** `tickets/_meta/crew.md` carries `seeded-crew: [pia, paul, ben, ralf, tessa]` after a seeding; an id in it is never seeded again (delete a persona and it stays deleted), and a persona whose folder exists is never touched. A board seeded before req-269 gets Pia alone at the next start, in front of its `order:`. One commit `personas: the default crew (req-256)` holds the persona files and `crew.md`; the engine logs one `crew: seeded the default crew (…)` line with the worker and the models.
-- **Pia runs nothing.** Her `prompt.md` opens every Mission Control turn (read from the vault on each turn — an edit applies on the next message); she has no worker, models, 1:1, free session, slot or budget. In a chain she is an entry like any persona (`entryWorkOf` → `mission-turn`); her turn on a ticket arrives with milestone 248 — until then the ticket waits at her position.
+- **Pia runs nothing.** Her `prompt.md` opens every Mission Control turn (read from the vault on each turn — an edit applies on the next message); she has no worker, models, 1:1, free session, slot or budget. In a chain she is an entry like any persona (`entryWorkOf` → `mission-turn`): the engine runs her turn on the ticket (*Persona chains* above), never the runner.
 - **Worker and models.** The worker is `default-worker` of `crew.md`, else `opencode`. The models are read from the **model table in `service.json`** (`<service home>/service.json`, the file the runner reads — a sleeping runner does not matter): the worker's provider rows, strongest class first, the first is `models.default`, all are the `pool`. A worker the table has no model for (no table yet, `api`) leaves the parser's default and the log line says so — set it on the Persona page.
 - **The seeding changes no run.** On a chain board (*Persona chains* above) the chain's entry at the cursor says who runs; on the phase board the column's `persona:` (the ticket pin and the crew's `default-persona` retired with req-257), and the seeding sets none of them, so a phase-board column without one still runs the ring with the step prompt. A run takes Ben when a ticket's chain names him at the cursor or a phase-board column (`persona: ben` on the phase in `_meta/pipeline.md`) does; Paul, Ralf and Tessa the same, and each answers a 1:1 or a free session at once. A persona-pinned run uses the persona's `prompt.md` **instead of** the step prompt, which is why the seeded prompts end in the role's shipped step (`plan-default`, `build-default`, `review-default`, `qa-default`) — and why a Shape-mode (interactive) plan step must not be pinned to Paul yet (req-258).
 - **A persona you delete stays deleted; a persona you edit stays edited.** Delete it from its page (*Delete persona…*, confirmed by typing its name; req-261): `personas/<id>/` goes in one commit `personas: <id> removed`, refused for `you`, for Pia (`mission` — Mission Control speaks with her prompt), for a persona with a live or held run, 1:1 or session, and for one a column (`persona:` in `pipeline.md`) pins (the crew's `default-persona` pins nobody since req-257). Nothing re-seeds, resets or updates a seeded persona; the shipped texts are in `specs/classifier-spec.md` ("The default crew's persona prompts").

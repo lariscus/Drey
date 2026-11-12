@@ -291,6 +291,12 @@ export interface ChatBridge {
     readonly planDelta?: string;
     /** Read-only reference text for this turn (the desktop's Vault chip, E13-9); never written to the session. */
     readonly reference?: string;
+    /**
+     * req-257: a Mission Control turn on one ticket — Pia's entry in its chain:
+     * the ticket's id and file text take the board digest's place in the
+     * system message. Absent = an ordinary mission turn.
+     */
+    readonly missionTicket?: { readonly id: string; readonly text: string };
     /** D-7a: the tickets the owner named (T-0091, t-91, #91) read on demand — the full file and thread, a block of its own after the digest; never written to the session. */
     readonly named?: string;
     /**

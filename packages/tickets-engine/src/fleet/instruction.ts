@@ -7,7 +7,7 @@ import { expandFragments } from '../core/prompt-fragments';
 import type { FleetCaps, InteractiveMode } from './protocol';
 import type { DisciplineTexts } from './discipline-texts';
 import { briefHead, headParts, personaLine, type ComposedInstruction, type Truncation } from './instruction-parts';
-import { changingParts, whoAndWhere } from './instruction-sections';
+import { chainSection, changingParts, whoAndWhere } from './instruction-sections';
 import { isReadOnlyRun } from './review-run';
 
 export interface InstructionInput {
@@ -112,6 +112,12 @@ export interface InstructionInput {
    * of the writing rules. Absent = a writing run (unless it is a review).
    */
   readonly readOnly?: boolean;
+  /**
+   * req-257: the chain entry a chain run works — its position, the chain's
+   * length and the entries — so the brief lists the positions and the
+   * `SEND-BACK:` marker. Absent = a column run, no section.
+   */
+  readonly chain?: { readonly at: number; readonly length: number; readonly entries: readonly string[] };
 }
 
 /**
@@ -191,6 +197,10 @@ function closingParts(input: InstructionInput): string[] {
     parts.push(lead + input.acceptance.map((command) => `- \`${command}\``).join('\n'));
   }
   parts.push(input.interactive !== undefined ? input.disciplines.interactive : input.disciplines.completion, input.disciplines.signals);
+  const chain = input.interactive === undefined ? chainSection(input) : null;
+  if (chain !== null) {
+    parts.push(chain);
+  }
   return parts;
 }
 

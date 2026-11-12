@@ -106,6 +106,12 @@ export interface RunDkTarget {
 export interface RunCursor {
   readonly at: number;
   readonly length: number;
+  /** The chain's entries as written (`paul:shape`, `ralf(notify)`): the brief lists them, a send-back names their personas. Absent on older senders. */
+  readonly entries?: readonly string[];
+  /** The one send-back the ticket already used (`x-sent-back`); absent = none yet. */
+  readonly sentBack?: { readonly from: number; readonly to: number };
+  /** Who a plan run's `### Chain` may name (the crew, `you` included) and who takes no mode; absent = the plan's chain is not applied. */
+  readonly crew?: { readonly personas: readonly string[]; readonly modeless: readonly string[] };
 }
 
 export interface RunRequest {
@@ -395,6 +401,14 @@ export const QUESTION_MARKER = 'QUESTION:';
  * incomplete).
  */
 export const BLOCKED_MARKER = 'BLOCKED:';
+
+/**
+ * req-257: a chain run's verdict that the work of an EARLIER position must be
+ * done again — `SEND-BACK: <position> <reason>` at a line start of the message
+ * the turn ends with. No gate runs; the runner moves the cursor back (the
+ * first send-back of a ticket) or hands the ticket to the owner (the second).
+ */
+export const SEND_BACK_MARKER = 'SEND-BACK:';
 
 // req-169: the closing round's request half and the friction line live beside this file.
 export { DEFAULT_CLOSING_SPEC, FRICTION_MARKER, FRICTION_MAX } from './protocol-closing';
