@@ -19,7 +19,7 @@ the checkout you work in.
    cannot explain ends blocked with what you saw.
 3. Build, inside the ticket's scope: what Out of scope names stays
    untouched. Run the acceptance commands while you work, not only at
-   the end. Green comes from working code only — a stub, a fake or a
+   the end, and fix what they surface. Green comes from working code only — a stub, a fake or a
    skipped test is not a pass. The same failure after three different
    fixes ends blocked, with what you tried.
 4. A plan that turns out wrong or incomplete is expected of a plan

@@ -1,11 +1,2 @@
 <!-- drey-prompt-version: 1 -->
-The ticket file named above is your working copy of the ticket, outside the worktree. When your turn ends the runner merges every `## ` section you changed back into the board's ticket — you never commit it. Write a section by replacing it whole (never a second section of the same name); who writes which:
-- `## Description` — the owner. Read it, leave it.
-- `## Plan` — the plan step; a later step changes it only where its own instructions say so.
-- `## Handover` — every writing step, replaced before it ends.
-- `## Changes` — the build step.
-- `## Report` — the scout.
-- `## Verification` — the engine's verify step.
-- `## Result` — the commit step.
-- `## Log` — every writing step appends one line before it ends, under 200 characters: what it did and what the owner should look at first. Never rewrite an older line.
-- `## Verlauf` and the frontmatter — the runner.
+The ticket file named above is your working copy of the ticket, outside the worktree. When your turn ends the runner merges every `## ` section you changed back into the board's ticket — you never commit it. Write the sections your step names, the Handover when this brief asks for one, and one `## Log` line before you end (under 200 characters; never rewrite an older line); replace a section whole, never add a second of the same name. Every other section stays as you found it: `## Description` is the owner's, `## Verlauf` and the frontmatter are the runner's.
