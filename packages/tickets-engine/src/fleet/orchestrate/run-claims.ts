@@ -67,12 +67,18 @@ export class RunClaims {
 
   /** The trailer block for the worker's instruction, once the claim gave an epoch. */
   trailerBlock(run: LiveRun): string | null {
+    const trailers = this.trailers(run, 'work');
+    return trailers === null ? null : trailerInstruction(trailers);
+  }
+
+  /** The claim's trailer lines for a commit made in it (`op`: the worker's `work`, a leaving action's own); null without trailers. */
+  trailers(run: LiveRun, op: string): readonly string[] | null {
     const target = run.request.dk;
     const lease = run.lease;
     if (target === undefined || !target.trailers || lease === undefined || lease.epoch === null) {
       return null;
     }
     const id = toDricketId(run.request.ticketId);
-    return id === null ? null : trailerInstruction(dricketTrailers({ dricketId: id, epoch: lease.epoch, actor: lease.actor, op: 'work' }));
+    return id === null ? null : dricketTrailers({ dricketId: id, epoch: lease.epoch, actor: lease.actor, op });
   }
 }

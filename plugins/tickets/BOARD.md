@@ -33,13 +33,18 @@ supported; nothing renames them. Tickets move to the six stages once, with
 the dricket import (mapping below), never by renaming folders.
 
 Plan, build, review and test are phases of the chain inside Building, not
-stages. **Accept on Ready to try is the sign-off:** it starts the commit step
-(`commit-default`, an owner-started run under the stop ladder) on the **target
-repository**, the one the ticket's work went into, never the tickets store: it
-merges the ticket's branch and pushes. On a green end the ticket lands in Done,
-as bookkeeping. A `BLOCKED:` or red end leaves it on Ready to try; Accept again
-starts the step again, and it completes at once when the work is already on the
-remote (a protected repository's merged pull request). A ticket with no `repo:`
+stages. **Accept on Ready to try is the sign-off:** it starts the human
+persona's `commit` leaving action (req-267) on the **target repository**, the
+one the ticket's work went into, never the tickets store — a machine run of the
+Crew runner (claim, record, stream; no worker, no model): the ticket's branch
+merged into the integration branch in a scratch worktree and pushed to that
+branch's git upstream. On a green end the ticket lands in Done, as bookkeeping.
+A protected repository blocks for the owner's merge, a conflict or a failed push
+ends red with git's output, and either leaves it on Ready to try — the machine
+resolves no conflict; Accept again starts it again, and it completes at once
+when the work is already on the remote (a protected repository's merged pull
+request). A sign-off whose You persona lists no `commit` in `leaving:` is
+refused with the way to add it. A ticket with no `repo:`
 has nothing to merge, and its Accept is the plain move. Send back goes to Building.
 
 On a store, `dk` never lets an agent release into a terminal stage: the commit
@@ -271,7 +276,8 @@ board ticket simply never blocks (the dependency pass's tolerance).
   Note the terminal phase itself never dispatches (it has nothing to
   move into); moving **into** `done` is humans, or — since the owner
   ruling of 2026-10-19 — the commit column's agent: its
-  `commit-default` prompt is the push step (branch onto the
+  `commit-default` prompt (no longer shipped since req-267; a board's own copy
+  still serves such a column) is the push step (branch onto the
   integration branch and the remote; a `policy:`-protected repo
   waits for the owner's merge), and on completion the machine moves
   the ticket `commit -> done`.

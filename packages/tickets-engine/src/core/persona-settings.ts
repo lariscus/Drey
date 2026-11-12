@@ -16,7 +16,7 @@ export type PersonaGate = 'commands' | 'structural';
 
 export const PERSONA_GATES: readonly PersonaGate[] = ['commands', 'structural'];
 
-/** `leaving:` — machine work done when a ticket leaves the persona (req-267 runs them; recorded here). */
+/** `leaving:` — machine work done when a ticket leaves the persona: `sync-main` at a run's green end, `commit` after the owner's sign-off (req-267). */
 export type PersonaLeavingAction = 'sync-main' | 'commit';
 
 export const PERSONA_LEAVING_ACTIONS: readonly PersonaLeavingAction[] = ['sync-main', 'commit'];
@@ -135,8 +135,11 @@ export interface PersonaRunSettings {
   readonly gate: PersonaGate;
   readonly maxTurns: number | null;
   readonly maxWorkMin: number | null;
+  /** `leaving:` — the machine actions done when a ticket leaves the persona (req-267). */
+  readonly leaving: readonly PersonaLeavingAction[];
 }
 
 export function personaRunSettingsOf(persona: { readonly role: string; readonly settings: PersonaSettings }): PersonaRunSettings {
-  return { readOnly: personaReadOnly(persona), gate: personaGate(persona), maxTurns: persona.settings.maxTurns, maxWorkMin: persona.settings.maxWorkMin };
+  const { maxTurns, maxWorkMin, leaving } = persona.settings;
+  return { readOnly: personaReadOnly(persona), gate: personaGate(persona), maxTurns, maxWorkMin, leaving };
 }

@@ -1058,8 +1058,9 @@ describe('EngineBoardService default pipeline (req-99a)', () => {
     expect(personaFile).toMatch(/title: ['"]?You['"]?\s/);
     // Ready to try is the owner's checkpoint; the columns before the first agent column are plain queues.
     expect([...snap.checkpoints]).toEqual(['ready', 'done']);
-    // The commit step's prompt is seeded with the board.
-    await expect(fsp.stat(path.join(vaultDir, 'tickets', '_meta', 'prompts', 'commit-default.md'))).resolves.toBeDefined();
+    // req-267: the sign-off's merge is You's commit leaving action, no prompt.
+    expect(personaFile).toContain('leaving: [commit]');
+    await expect(fsp.stat(path.join(vaultDir, 'tickets', '_meta', 'prompts', 'commit-default.md'))).rejects.toThrow();
   });
 
   it('renames the human persona: one title on the persona file, blank goes back to You', async () => {

@@ -22,9 +22,6 @@ export const READY_STATE = 'ready';
 /** The only stage an agent claims: Plan, Build, review and test are phases of the chain inside it (Q6). */
 export const CLAIM_STATE_IDS: readonly string[] = [BUILDING_STATE];
 
-/** The prompt of the commit step that Accept on Ready to try starts (Q8): merge and push on the target repository. */
-export const COMMIT_STEP_PROMPT = 'commit-default';
-
 /**
  * What a new board's `_meta/pipeline.md` says besides its phases. Prose for
  * humans; the board reads only the frontmatter.

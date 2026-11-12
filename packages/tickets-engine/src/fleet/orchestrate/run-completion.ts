@@ -1,14 +1,16 @@
 import { hasScoutReport } from '../../core/scout';
+import { capTail, SANITY_CAP } from '../capping';
 import type { RunRequest } from '../protocol';
 import type { RunStateMachine } from '../run/run-state-machine';
 import { shortGateLine } from '../run/run-summary';
 import { exitVerdict } from './exit-verdict';
 import type { GateRunner } from './gate-runner';
-import type { LiveRun } from './live-run';
+import { messageOf, type LiveRun } from './live-run';
 import type { ProcessSupervisor } from './process-supervisor';
 import type { RunBookkeeper } from './run-bookkeeper';
 import type { RunRepository } from './run-repository';
 import type { RunSettler } from './run-settler';
+import { syncMainLine, type SyncMainOutcome } from './sync-main-action';
 
 export interface RunCompletionDeps {
   readonly machine: RunStateMachine;
@@ -25,6 +27,8 @@ export interface RunCompletionDeps {
   readonly secondOpinion?: (request: RunRequest) => Promise<string | null>;
   /** req-169: the closing round after the gate verdict (a noteworthy run only); absent = none (a spec). */
   readonly closing?: { afterGate(run: LiveRun): Promise<void> };
+  /** req-267: the persona's leaving actions before the hand-on (Ben's `sync-main`); absent = none (a spec). */
+  readonly leaving?: { afterGreen(run: LiveRun): Promise<SyncMainOutcome | null> };
 }
 
 /** The exit code as the notes say it. */
@@ -119,6 +123,12 @@ export class RunCompletion {
       return;
     }
     await this.deps.closing?.afterGate(run); // before the move: the round runs while the run still holds its ticket
+    const left = await this.leave(run);
+    if (left !== null) {
+      run.info = { ...run.info, gateFailure: left, gateResult: 'red' };
+      await this.deps.bookkeeper.note(run, `the ticket stays with ${run.info.persona ?? 'the persona'} — ${shortGateLine(left)}`);
+      return this.deps.settler.finish(run, 'failed');
+    }
     const handedOn = await this.handOn(run);
     if (handedOn !== null) {
       await this.deps.bookkeeper.note(run, handedOn);
@@ -126,6 +136,23 @@ export class RunCompletion {
     }
     await this.deps.bookkeeper.note(run, `run finished (${exitWord(code)})`);
     await this.deps.settler.finish(run, 'done');
+  }
+
+  /**
+   * req-267 (owner 2026-11-12): the leaving actions inside the claim. A
+   * `sync-main` conflict is the persona's own — the run ends red with the
+   * conflict as its gate failure, so the next run of the same persona gets it
+   * as its task (the autopilot retries, the breaker caps it); it is no
+   * send-back. Null when nothing ran or it went through.
+   */
+  private async leave(run: LiveRun): Promise<string | null> {
+    const outcome = await this.deps.leaving?.afterGreen(run).catch((error: unknown) => ({ kind: 'failed' as const, reason: messageOf(error) }));
+    if (outcome === undefined || outcome === null || outcome.kind === 'current' || outcome.kind === 'merged') {
+      return null;
+    }
+    return outcome.kind === 'conflict'
+      ? `${syncMainLine(outcome)} — merge ${outcome.main} into the branch and resolve it\n\n${capTail(outcome.output, SANITY_CAP).text}`
+      : syncMainLine(outcome);
   }
 
   /** The move or the park after a green gate; null when it went through, else the note of its failure. */

@@ -971,8 +971,7 @@ ticket stands:
   column>**, and **Send back…** (one note, then the ticket goes back to
   the nearest agent column with the note in its log).
 - **In Done** it is the final report: **What was delivered** first (the
-  commit step's `## Result`: the merge commit, what landed, anything
-  left over), then the changes. The only button is **Archive**, which
+  ticket's `## Result`, when a run wrote one), then the changes. The only button is **Archive**, which
   files the ticket away and removes its worktree when clean (a dirty
   one stays and says so).
 - While an agent works the ticket, there is no card.
@@ -1505,8 +1504,8 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   **Parallel · max** and **Parallel · min** — the most runs of the persona at
   once, and how many it may start when the big pool is full (recorded for the
   per-persona pool that comes next); **Leaving actions** — machine work when a
-  ticket leaves the persona, `sync-main` or `commit` (recorded; the runner
-  does them in a later release); the daily budget) and **Allowed to** (which vaults the persona
+  ticket leaves the persona, `sync-main` or `commit` (see *Leaving actions*
+  below); the daily budget) and **Allowed to** (which vaults the persona
   may change, whether its runs ask before running commands, whether it may
   reach the network, whether it may spend past a ticket's allowance — hover a
   row for what it means; the vault and allowance choices apply to runs now,
@@ -2024,7 +2023,7 @@ and reload it. Pick one on the left and edit it on the right, in the same
 Markdown editor as your notes. It is saved and committed when you leave
 the editor or press **Save**; the circular arrow discards unsaved
 changes, and the clock button resets a prompt Drey ships
-(`plan-default`, `build-default`, `review-default`, `commit-default`) to
+(`plan-default`, `build-default`, `review-default`) to
 Drey's version after you confirm — your text stays in the git history.
 If the file changes outside Drey while you have unsaved text, a notice
 offers **Load from disk**. An empty folder offers **Add Drey's
@@ -2075,9 +2074,33 @@ default is **Inbox · Shaping · Prioritized · Building · Ready to try · Done
 Inbox, Shaping and Prioritized are your columns and the machine takes nothing
 from them; you move a ticket into **Building**, the one worker column. **Ready
 to try** is your checkpoint: *Send back* returns the ticket to Building with a
-note, and *Accept* is the sign-off. It starts the commit step on the program's
-repository (the ticket's branch is merged and pushed), and when that is green
-the ticket lands in **Done**, which asks nothing more of you. Boards that existed
+note, and *Accept* is the sign-off. It starts the commit on the program's
+repository (the ticket's branch is merged and pushed — see *Leaving actions*
+below), and when that is green the ticket lands in **Done**, which asks nothing
+more of you.
+
+**Leaving actions.** Some work happens without a model when a ticket leaves a
+persona; the persona page lists it under **Leaving actions**, and the card
+shows it while it runs.
+
+- **`sync-main`** (Ben's, by default): when Ben's run is green, Drey merges
+  `main` into the ticket's branch before the review sees it — the card says
+  *merging main*. "main" is your integration branch as it is on its remote,
+  fetched first. If the merge conflicts, Drey undoes it and Ben's run ends red
+  with the conflicting files as the reason; the next Ben run gets the conflict
+  as its task. This does not count as a send-back.
+- **`commit`** (yours): *Accept* on Ready to try merges the ticket's branch
+  into `main` and pushes it — the card says *committing*. It never touches
+  your own checkout of the repository. A protected repository (`policy:` in
+  the repository settings) only gets the branch pushed and waits for your
+  merge on the host. **A conflict is not resolved for you**: Drey undoes the
+  merge, the ticket stays on Ready to try with git's message, and you resolve
+  it (or send the ticket back) and accept again.
+
+If your own persona does not list `commit`, *Accept* on a ticket with a
+repository says so instead of finishing it unmerged: open the Crew tab →
+**You** → **Work**, choose **Leaving actions → Add action… → commit**, and
+accept again. A new board sets this up for you. Boards that existed
 before keep the columns they have. Add a manual
 column between two worker columns and it becomes a checkpoint too. A
 manual column *before* the first worker column is your queue — the

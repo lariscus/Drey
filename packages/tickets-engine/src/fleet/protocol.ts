@@ -198,6 +198,20 @@ export interface RunRequest {
    */
   readonly parkFor?: string;
   /**
+   * req-267: the persona's leaving actions done at this run's green end,
+   * inside the claim, before the hand-on — `sync-main` merges the integration
+   * branch (`baseRef`) into the ticket's branch. Absent = none.
+   */
+  readonly leaving?: readonly 'sync-main'[];
+  /**
+   * req-267: a machine run — no worker, no slot, no model. `commit` is the
+   * human persona's leaving action after the owner's sign-off: the ticket's
+   * branch merged into the integration branch (`baseRef`), pushed to its
+   * upstream; `policy` is `repos.md`'s (set = protected, the merge is the
+   * owner's). Absent = an ordinary run.
+   */
+  readonly machine?: { readonly action: 'commit'; readonly persona: string; readonly policy: string | null };
+  /**
    * The column's own run ceilings (`max-turns:` / `max-work:` in
    * pipeline.md); absent keys fall back to the runner's defaults.
    */

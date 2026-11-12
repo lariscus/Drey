@@ -93,7 +93,10 @@ export interface ComposeRunInput {
    * holds the worker from turn one and never gates or moves.
    */
   readonly interactive?: InteractiveMode;
-  /** Accept's run on Ready to try (req-99a): the one run a manual column may carry, besides the owner's dialog (D-29). */
+  /**
+   * Accept's run on Ready to try (req-99a): the one run a manual column may carry, besides the owner's
+   * dialog (D-29). Since req-267 a machine run — You's `commit` leaving action, no worker, no brief.
+   */
   readonly commitStep?: boolean;
   /** E14-5: the ticket lives in a dricket store - the run claims and releases it through `dk`. */
   readonly dk?: RunDkTarget;

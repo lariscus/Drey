@@ -241,7 +241,10 @@ export function isAgentPersona(persona: Pick<Persona, 'kind'> | null | undefined
   return persona?.kind === 'agent';
 }
 
-/** A fresh human persona: the owner as a team member; the model fields are inert placeholders. */
+/**
+ * A fresh human persona: the owner as a team member; the model fields are inert placeholders.
+ * It carries the `commit` leaving action (req-267): the owner's sign-off merges the ticket.
+ */
 export function humanPersona(title: string, id: string = HUMAN_PERSONA_ID): Persona {
   return {
     id,
@@ -255,7 +258,7 @@ export function humanPersona(title: string, id: string = HUMAN_PERSONA_ID): Pers
     skills: [],
     budget: null,
     allowed: { spendAboveAllowance: false },
-    settings: EMPTY_PERSONA_SETTINGS,
+    settings: { ...EMPTY_PERSONA_SETTINGS, leaving: ['commit'] },
   };
 }
 
