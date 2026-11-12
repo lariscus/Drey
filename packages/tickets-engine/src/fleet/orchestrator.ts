@@ -217,6 +217,8 @@ export class Orchestrator {
       this.parts.log(`persona "${id}" paused — its tickets hold until the persona is played again`);
     } else {
       set.delete(id);
+      delete this.parts.state.personaTripped[id]; // req-257: playing a tripped persona resets its breaker
+      this.parts.state.personaRedStreak[id] = 0;
       this.parts.log(`persona "${id}" played again — its tickets dispatch normally`);
     }
     await this.persist();

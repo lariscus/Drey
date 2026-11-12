@@ -372,3 +372,25 @@ dricket only, owner 2026-11-11; E14-9b removes it). Specs: `core/lifecycle-stage
 two commits, a crash between them and the resume, `dk validate` over the whole history),
 `fleet/run-lease-dk.spec.ts` (real `dk`: claim to `running`, the pin in the claim, one release),
 the claim specs in `fleet/orchestrate/`.
+
+## Later change — the cursor replaces the pin (req-257, milestone 247, 2026-11-12)
+
+**Decision (owner, 2026-11-12: "Ja, so").** On a lifecycle store the column of an `active` /
+`running` ticket is **derived from its holder** — the persona of the chain's entry at the cursor
+`x-at` — and never stored. The interim pin `x-phase` is **retired**: `placementOfPhase` writes
+no pin any more (every board write and run move removes it), and `resolvePhase` reads it only on
+a ticket the migration has not converted (and variant B). A run's green end writes the next
+position into `x-at` inside the claim (the same in-claim `put` that carries the Verlauf line)
+and makes **one** `release --stage active`; past the last entry the cursor stands one beyond it
+and the engine moves the ticket to `done` with `put --claim` (an agent may not release into a
+terminal stage). **Until req-270/271** the board keeps the pipeline's columns and places a
+holder by an interim rule (`core/chain-placement.ts`): the agent column whose `persona:` names
+it, else the first agent column; a `:shape` entry in the queue column before it; You in the
+first checkpoint. **The migration** now writes a ticket's old column as its **cursor**
+(`cursorForPin`; the standard flow copied onto a chainless ticket) and offers the same for an
+`active` ticket that milestones 239–246 left with a pin; without chain and flow the pin stays.
+Rejected: holder columns in the board snapshot now (they pull req-270 into this row and break the
+phase-keyed surfaces until req-271), a stored holder (`x-holder`, the concept's option A — two
+truths). Specs: `core/chain-placement.spec.ts`, `store/chain-move.spec.ts`,
+`store/stage-migration-plan.spec.ts`, `store/store-stage-migration.spec.ts`,
+`fleet/orchestrate/claim-release.spec.ts`, `services/board-service-chain.spec.ts` (real `dk`).

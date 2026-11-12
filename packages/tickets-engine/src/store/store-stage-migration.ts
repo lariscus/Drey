@@ -2,7 +2,7 @@ import type { StoreStageMigrationOffer, StoreStageMigrationResult } from '../con
 import { PHASE_PIN_KEY } from '../core/lifecycle-stages';
 import type { PutOptions, TicketDetail } from '../ports/ticket-store';
 import { setDocumentField } from './document-fields';
-import { MOVE_TARGET_STAGE, planStageMigration, type StageMigrationPlan, type StageMove } from './stage-migration-plan';
+import { MOVE_TARGET_STAGE, planStageMigration, type PinCursorOf, type StageMigrationPlan, type StageMove } from './stage-migration-plan';
 import { parseStoreStages, renderStageTable, withStageTable, type StoreStageSet } from './store-stages';
 
 /** What the migration reads and writes of the store (production: {@link StoreBoardSource} and a {@link StoreConfigWriter}). */
@@ -13,11 +13,20 @@ export interface StageMigrationStore {
   show(id: string): Promise<TicketDetail>;
   /** `dk put --claim --if-version`; `ok: false` = the ticket changed meanwhile (exit 12). */
   write(id: string, text: string, options: PutOptions): Promise<{ readonly ok: boolean }>;
+  /** req-257: what a ticket's old column becomes on its chain (the board's pipeline, crew and flow); absent = the pin stays. */
+  readonly pinCursor?: PinCursorOf;
 }
 
 export interface StageConfigCommitter {
   refusal(): Promise<string | null>;
   commit(text: string, message: string): Promise<string>;
+}
+
+/** A document with the cursor `x-at` (and the copied chain), the old pin removed; null when it is not a ticket document. */
+function withCursor(text: string, at: number, chain: string | null): string | null {
+  const withChain = chain === null ? text : setDocumentField(text, 'x-chain', chain);
+  const withAt = withChain === null ? null : setDocumentField(withChain, 'x-at', String(at));
+  return withAt === null ? null : setDocumentField(withAt, PHASE_PIN_KEY, null);
 }
 
 /** The ref a local store's config sits on; any other (dk's private ref, `origin/main`) is a remote store's. */
@@ -59,7 +68,7 @@ export class StoreStageMigration {
     return {
       mode: reason === null ? 'local' : 'manual',
       legacy: plan.legacy,
-      moves: plan.moves.length,
+      moves: plan.moves.length + plan.conversions.length,
       configCommits: (plan.add === null ? 0 : 1) + (plan.remove === null ? 0 : 1),
       toml: target === null ? '' : renderStageTable(target),
       reason,
@@ -96,6 +105,13 @@ export class StoreStageMigration {
       }
       moved.push(move.id);
     }
+    for (const conversion of plan.conversions) {
+      const error = await this.convert(conversion);
+      if (error !== null) {
+        return { ok: false, error, moved };
+      }
+      moved.push(conversion.id);
+    }
     return this.finish(commits, moved);
   }
 
@@ -117,14 +133,24 @@ export class StoreStageMigration {
     return { ok: true, configCommits: commits + 1, moved };
   }
 
-  /** One ticket to `active` with its column pinned; null when written, else why not. */
-  private async move(move: StageMove): Promise<string | null> {
+  /** One ticket to `active`, its old column become its cursor (req-257); null when written, else why not. */
+  private move(move: StageMove): Promise<string | null> {
+    return this.rewrite(move, (text) => setDocumentField(text, 'stage', MOVE_TARGET_STAGE), `${move.from} -> ${MOVE_TARGET_STAGE}`);
+  }
+
+  /** req-257: an `active` ticket's leftover pin become its cursor; null when written, else why not. */
+  private convert(conversion: StageMove): Promise<string | null> {
+    return this.rewrite(conversion, (text) => text, 'pin');
+  }
+
+  private async rewrite(move: StageMove, staged: (text: string) => string | null, what: string): Promise<string | null> {
     const record = await this.store.show(move.id);
     if (record.rev === null) {
       return `${move.id} has no rev: the store did not report one`;
     }
-    const staged = setDocumentField(record.text, 'stage', MOVE_TARGET_STAGE);
-    const text = staged === null ? null : setDocumentField(staged, PHASE_PIN_KEY, move.pin);
+    const cursor = this.store.pinCursor?.(record, move.pin) ?? null;
+    const base = staged(record.text);
+    const text = base === null ? null : cursor === null ? setDocumentField(base, PHASE_PIN_KEY, move.pin) : withCursor(base, cursor.at, cursor.chain);
     if (text === null) {
       return `${move.id} is not a ticket document`;
     }
@@ -132,7 +158,7 @@ export class StoreStageMigration {
     if (!outcome.ok) {
       return `${move.id} changed meanwhile - run Migrate again`;
     }
-    this.log(`stage migration: ${move.id} ${move.from} -> ${MOVE_TARGET_STAGE} (pinned to ${move.pin})`);
+    this.log(`stage migration: ${move.id} ${what} (${cursor === null ? `pinned to ${move.pin}` : `${move.pin} -> position ${cursor.at}`})`);
     return null;
   }
 
@@ -143,7 +169,7 @@ export class StoreStageMigration {
     }
     const stages = parseStoreStages(config.text);
     const records = await this.store.records();
-    return { ref: config.ref, text: config.text, stages, plan: planStageMigration(stages, records) };
+    return { ref: config.ref, text: config.text, stages, plan: planStageMigration(stages, records, this.store.pinCursor) };
   }
 
   /** Null when the config commits this plan needs can be made here. */

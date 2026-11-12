@@ -157,6 +157,10 @@ export class RunCompletion {
 
   /** The move or the park after a green gate; null when it went through, else the note of its failure. */
   private async handOn(run: LiveRun): Promise<string | null> {
+    if (run.request.cursor !== undefined) {
+      const advanced = await this.deps.bookkeeper.advanceOnSuccess(run);
+      return advanced.ok ? null : `the gate passed but handing the ticket on failed — ${advanced.error}`;
+    }
     if (run.request.nextPhase !== null) {
       const moved = await this.deps.bookkeeper.moveOnSuccess(run, run.request.nextPhase);
       return moved.ok ? null : `the gate passed but the move failed — ${moved.error}`;

@@ -13,6 +13,7 @@ function record(id: string, stage: string): TicketDetail {
 class Scripted implements StageMigrationStore, StageConfigCommitter {
   readonly writes: string[] = [];
   readonly commits: string[] = [];
+  pinCursor?: StageMigrationStore['pinCursor'];
   constructor(
     public config: { ref: string; text: string },
     public tickets: TicketDetail[],
@@ -55,6 +56,29 @@ describe('the store stage migration (req-265)', () => {
     expect(s.commits[1]).toContain('values = ["inbox", "prioritized", "active", "running", "done"]');
     expect(s.writes[0]).toContain('stage: active');
     expect(s.writes[0]).toContain('x-phase: building');
+    expect(await migration(s).offer()).toBeNull();
+  });
+
+  it('req-257: with the cursor rule a moved ticket gets its cursor and the standard flow instead of the pin', async () => {
+    const s = new Scripted({ ref: 'main', text: OLD }, [record('t-1', 'building')]);
+    s.pinCursor = (_record, pin) => (pin === 'building' ? { at: 3, chain: 'paul:shape;paul;ben;you' } : null);
+    expect(await migration(s).run()).toEqual({ ok: true, configCommits: 2, moved: ['t-1'] });
+    expect(s.writes[0]).toContain('stage: active');
+    expect(s.writes[0]).toMatch(/^x-at: 3$/m);
+    expect(s.writes[0]).toMatch(/^x-chain: paul:shape;paul;ben;you$/m);
+    expect(s.writes[0]).not.toContain('x-phase');
+    expect(await migration(s).offer()).toBeNull();
+  });
+
+  it('req-257: a pin a milestone-239 migration left on an active ticket becomes its cursor', async () => {
+    const LIFE = '[stages]\nvalues = ["inbox", "prioritized", "active", "running", "done"]\ninitial = "inbox"\nterminal = ["done"]\nclaim = ["running"]\n';
+    const pinned = { ...record('t-2', 'active'), extensions: { 'x-phase': 'ready' }, text: '---\nid: t-2\nstage: active\nx-phase: ready\nrev: 1\n---\nbody\n' } as TicketDetail;
+    const s = new Scripted({ ref: 'main', text: LIFE }, [pinned]);
+    s.pinCursor = () => ({ at: 6, chain: null });
+    expect(await migration(s).offer()).toMatchObject({ moves: 1, configCommits: 0 });
+    expect(await migration(s).run()).toEqual({ ok: true, configCommits: 0, moved: ['t-2'] });
+    expect(s.writes[0]).toMatch(/^x-at: 6$/m);
+    expect(s.writes[0]).not.toContain('x-phase');
     expect(await migration(s).offer()).toBeNull();
   });
 

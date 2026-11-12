@@ -6,13 +6,13 @@ describe('the lifecycle stages (req-265)', () => {
     expect(LIFECYCLE_STAGE_IDS).toEqual(['inbox', 'prioritized', 'active', 'running', 'done']);
   });
 
-  it('place an edge column as its own stage and every other column as active with the pin', () => {
+  it('place an edge column as its own stage and every other column as active, with no pin (req-257)', () => {
     expect(placementOfPhase('inbox')).toEqual({ stage: 'inbox', pin: null });
     expect(placementOfPhase('prioritized')).toEqual({ stage: 'prioritized', pin: null });
     expect(placementOfPhase('done')).toEqual({ stage: 'done', pin: null });
-    expect(placementOfPhase('shaping')).toEqual({ stage: 'active', pin: 'shaping' });
-    expect(placementOfPhase('building')).toEqual({ stage: 'active', pin: 'building' });
-    expect(placementOfPhase('ready')).toEqual({ stage: 'active', pin: 'ready' });
+    expect(placementOfPhase('shaping')).toEqual({ stage: 'active', pin: null });
+    expect(placementOfPhase('building')).toEqual({ stage: 'active', pin: null });
+    expect(placementOfPhase('ready')).toEqual({ stage: 'active', pin: null });
   });
 
   it('recognise a lifecycle store only with active, running and running as the one claim stage', () => {

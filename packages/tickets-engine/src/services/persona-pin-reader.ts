@@ -12,9 +12,10 @@ export interface PersonaPinPort {
 
 /**
  * Reads `_meta/pipeline.md` (the columns that pin a persona with
- * `persona: <id>`) and `_meta/crew.md` (`default-persona`). A file that is
- * absent or does not parse pins nobody — a deletion is not blocked by a
- * board file the engine cannot read.
+ * `persona: <id>`). The crew's `default-persona` pins nobody any more
+ * (req-257: retired, never used). A file that is absent or does not parse
+ * pins nobody — a deletion is not blocked by a board file the engine
+ * cannot read.
  */
 export class PersonaPinReader implements PersonaPinPort {
   constructor(
@@ -23,9 +24,8 @@ export class PersonaPinReader implements PersonaPinPort {
   ) {}
 
   async pinsOf(vault: EngineVault, personaId: string): Promise<PersonaPins> {
-    const [pipeline, crew] = await Promise.all([this.host.read(vault.id, PIPELINE_FILE).catch(() => null), this.crew.read(vault)]);
+    const pipeline = await this.host.read(vault.id, PIPELINE_FILE).catch(() => null);
     const phases = pipeline === null ? [] : parsePipeline(pipeline).phases;
-    const crewDefault = crew.parse.config.values.defaultPersona;
-    return pinsOf(personaId, phases, typeof crewDefault === 'string' ? crewDefault : null);
+    return pinsOf(personaId, phases, null);
   }
 }

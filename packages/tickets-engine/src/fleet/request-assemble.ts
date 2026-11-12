@@ -28,7 +28,7 @@ type WorkParts = Pick<
   RunRequest,
   'provider' | 'model' | 'permissionMode' | 'instruction' | 'continuationInstruction' | 'briefDigest' | 'acceptance' | 'gate' | 'git'
 >;
-type MoveParts = Pick<RunRequest, 'nextPhase' | 'nextPhaseDir' | 'pushRemote' | 'claimIdentity'>;
+type MoveParts = Pick<RunRequest, 'nextPhase' | 'nextPhaseDir' | 'pushRemote' | 'claimIdentity' | 'cursor'>;
 type OptionalParts = Pick<RunRequest, 'limits' | 'recordWorker' | 'column' | 'handover' | 'interactive' | 'dk' | 'parkFor' | 'leaving' | 'machine' | 'profile' | 'reviewCheckout' | 'closing'>;
 
 /** The wire request, its keys in the order the runner's log and record have always shown them. */
@@ -82,6 +82,7 @@ function moveParts(plan: RunPlan): MoveParts {
     nextPhaseDir: !moves || input.nextPhaseId === null ? null : input.nextPhaseDir,
     pushRemote: input.pushRemote,
     claimIdentity: moves && input.nextPhaseClaims && input.nextPhaseId !== null ? agentIdentity() : null,
+    ...(moves && input.cursor !== undefined ? { cursor: input.cursor } : {}),
   };
 }
 

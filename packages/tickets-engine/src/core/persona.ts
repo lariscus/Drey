@@ -291,70 +291,27 @@ export function personaFileText(persona: Persona, body?: string): string {
 }
 
 /**
- * THE ladder (concept §4.2): ticket pin > phase persona > engine default.
- * Returns the winning persona id and which level decided — the Verlauf
- * and the cost attribution need the provenance as much as the id.
+ * Who works a ticket and why (req-257, the persona board): on a lifecycle
+ * store the chain's entry at the cursor (`chain`); on the phase board (the
+ * files backend, a store not migrated) the column's `persona:` (`phase`).
+ * The ticket pin `x-persona` and the crew's `default-persona` were retired
+ * with the ladder's other levels (owner 2026-11-11: no role fallback, no
+ * persona -> no run, `decisions.md`).
  */
 export interface PersonaResolution {
   readonly persona: string | null;
-  readonly source: 'ticket' | 'phase' | 'default' | 'none';
+  readonly source: 'chain' | 'phase' | 'none';
 }
 
-export function resolvePersona(input: {
-  readonly ticketPersona: string | null;
-  readonly phasePersona: string | null;
-  readonly defaultPersona: string | null;
-}): PersonaResolution {
-  if (input.ticketPersona !== null && input.ticketPersona.trim() !== '') {
-    return { persona: input.ticketPersona.trim(), source: 'ticket' };
-  }
+/** The phase board's resolution: the column's persona, else none. */
+export function resolvePersona(input: { readonly phasePersona: string | null }): PersonaResolution {
   if (input.phasePersona !== null && input.phasePersona.trim() !== '') {
     return { persona: input.phasePersona.trim(), source: 'phase' };
-  }
-  if (input.defaultPersona !== null && input.defaultPersona.trim() !== '') {
-    return { persona: input.defaultPersona.trim(), source: 'default' };
   }
   return { persona: null, source: 'none' };
 }
 
 export { splitPoolEntry } from './pool-entry';
 export { EMPTY_PERSONA_SETTINGS, type PersonaSettings } from './persona-settings';
-
-/**
- * The migration reader (concept §4.2): one pipeline column's legacy
- * `worker:`/`model:`/`prompt:` keys become a persona candidate. The
- * caller (the dispatcher) persists the generated personas and rewrites
- * the pipeline; this function stays pure.
- */
-export interface PersonaMigration {
-  /** The suggested persona id (the prompt ref, slugified, deduped by the caller). */
-  readonly id: string;
-  readonly title: string;
-  readonly worker: string;
-  readonly model: string | null;
-  /** The prompt file content: the column's `prompt:` ref content lives in _meta/prompts. */
-  readonly promptRef: string | null;
-}
-
-export function personaMigrationFor(input: {
-  readonly phaseId: string;
-  readonly worker: string | null;
-  readonly model: string | null;
-  readonly prompt: string | null;
-}): PersonaMigration | null {
-  if (input.worker === null && input.model === null && input.prompt === null) {
-    return null;
-  }
-  const id = input.prompt?.trim() !== '' && input.prompt !== null
-    ? input.prompt!.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64)
-    : `${input.phaseId}-default`;
-  return {
-    id: id === '' ? `${input.phaseId}-default` : id,
-    title: id.replace(/-/g, ' '),
-    worker: input.worker ?? 'opencode',
-    model: input.model ?? null,
-    promptRef: input.prompt,
-  };
-}
 
 export { loadPersonaSkills, type LoadedSkills, type PersonaSkill } from './skill-load';

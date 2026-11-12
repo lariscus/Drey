@@ -34,9 +34,9 @@ describe('PersonaPinReader', () => {
     expect(await reader({ pipeline: PIPELINE }).pinsOf(VAULT, 'ralf')).toEqual({ columns: [], crewDefault: false });
   });
 
-  it('knows the crew\'s default-persona', async () => {
+  it("req-257: the crew's default-persona is retired and pins nobody", async () => {
     const crew = '---\ndefault-persona: paul\n---\n';
-    expect(await reader({ pipeline: PIPELINE, crew }).pinsOf(VAULT, 'paul')).toEqual({ columns: [], crewDefault: true });
+    expect(await reader({ pipeline: PIPELINE, crew }).pinsOf(VAULT, 'paul')).toEqual({ columns: [], crewDefault: false });
     expect(await reader({ pipeline: PIPELINE, crew }).pinsOf(VAULT, 'ben')).toEqual({ columns: ['Build', 'Review'], crewDefault: false });
   });
 

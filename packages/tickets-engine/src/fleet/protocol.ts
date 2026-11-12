@@ -102,6 +102,12 @@ export interface RunDkTarget {
  * context rides along because the runner composes the instruction and
  * runs the machine gate in the worker's checkout.
  */
+/** req-257: the position a run works and the chain's length (see {@link RunRequest.cursor}). */
+export interface RunCursor {
+  readonly at: number;
+  readonly length: number;
+}
+
 export interface RunRequest {
   /** The ticket this run works on (schema id = filename stem). */
   readonly ticketId: string;
@@ -197,6 +203,14 @@ export interface RunRequest {
    * working column only): it parks with `awaiting: <human persona id>`.
    */
   readonly parkFor?: string;
+  /**
+   * req-257: the chain entry this run works on a lifecycle store — its position and the chain's
+   * length. A green end writes the next position as the cursor (`x-at`) inside the claim and
+   * releases into `active`; past the last entry the chain is through and the engine moves the
+   * ticket to `done`. Present = `nextPhase` is null (the column follows the holder). Absent = a
+   * column run (the files backend, a store on phase stages).
+   */
+  readonly cursor?: RunCursor;
   /**
    * req-267: the persona's leaving actions done at this run's green end,
    * inside the claim, before the hand-on — `sync-main` merges the integration

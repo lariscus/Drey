@@ -59,7 +59,7 @@ describe('the store stage vocabulary (req-265)', () => {
   });
 
   it('places a board write: lifecycle store by column, phase store by the phase id (a pin kept in step)', () => {
-    expect(writePlacement('building', LIFECYCLE, '')).toEqual({ stage: 'active', pin: 'building' });
+    expect(writePlacement('building', LIFECYCLE, '')).toEqual({ stage: 'active', pin: null });
     expect(writePlacement('prioritized', LIFECYCLE, '')).toEqual({ stage: 'prioritized', pin: null });
     expect(writePlacement('building', parseStoreStages(OLD), '---\nstage: inbox\n---\n')).toEqual({ stage: 'building' });
     expect(writePlacement('building', null, '---\nstage: open\nx-phase: inbox\n---\n')).toEqual({ stage: 'building', pin: 'building' });

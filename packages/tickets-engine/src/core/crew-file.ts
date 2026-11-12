@@ -130,6 +130,9 @@ export function parseCrewFile(text: string | null): CrewParse {
       values[field.key] = value;
     }
   }
+  if (values.defaultPersona !== undefined) {
+    warnings.push('crew.md: default-persona is retired (req-257) — it is read and never used; a chain entry says who works a ticket');
+  }
   const [compact, cap] = CREW_OVERRIDE_MAPS.map((map) => overridesOf(root, map, warnings));
   return { config: { values, overrides: { compactAboveTokensBy: compact!, contextCapTokensBy: cap! } }, error: null, warnings };
 }

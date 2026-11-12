@@ -39,16 +39,19 @@ export interface ResolvedPersona {
   readonly resolution: PersonaResolution;
 }
 
-/** The ladder plus the load: null persona when nothing resolves or the file is gone. */
+/**
+ * Who works the ticket plus the load (req-257): the chain's holder when the board runs on chains,
+ * else the column's persona; null persona when nothing resolves or the file is gone.
+ */
 export async function resolvePersonaForTicket(
   loader: PersonaLoader,
   input: {
-    readonly ticketPersona: string | null;
+    readonly chainPersona?: string | null;
     readonly phasePersona: string | null;
-    readonly defaultPersona: string | null;
   },
 ): Promise<ResolvedPersona> {
-  const resolution = resolvePersona(input);
+  const chain = input.chainPersona ?? null;
+  const resolution: PersonaResolution = chain !== null ? { persona: chain, source: 'chain' } : resolvePersona({ phasePersona: input.phasePersona });
   if (resolution.persona === null) {
     return { persona: null, resolution };
   }

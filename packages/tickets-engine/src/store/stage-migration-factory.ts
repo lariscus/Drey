@@ -2,6 +2,7 @@ import type { StoreBoardSource } from './store-board-source';
 import { readStoreConfigText } from './store-config-text';
 import { StoreConfigWriter } from './store-config-writer';
 import { checkoutOf, type StoreSettings } from './store-settings';
+import type { PinCursorOf } from './stage-migration-plan';
 import { StoreStageMigration, type StageConfigCommitter } from './store-stage-migration';
 
 /** The store's own directory when `dk.store` is a local directory; null for a remote store. */
@@ -20,7 +21,7 @@ const REMOTE_COMMITTER: StageConfigCommitter = {
  * config is read from and committed to the LOCAL store directory (its `main`), the tickets are read
  * from the checkout and written through `dk put`, like every board write.
  */
-export function stageMigrationFor(source: StoreBoardSource, settings: StoreSettings, actor: string, log: (message: string) => void): StoreStageMigration {
+export function stageMigrationFor(source: StoreBoardSource, settings: StoreSettings, env: { readonly actor: string; readonly log: (message: string) => void; readonly pinCursor?: PinCursorOf }): StoreStageMigration {
   const local = localStoreDir(settings);
   const checkout = checkoutOf(settings);
   const configDir = local ?? checkout;
@@ -30,9 +31,10 @@ export function stageMigrationFor(source: StoreBoardSource, settings: StoreSetti
       records: () => source.records(settings),
       show: (id) => source.record(settings, id),
       write: (id, text, options) => source.write(settings, id, text, options),
+      ...(env.pinCursor !== undefined ? { pinCursor: env.pinCursor } : {}),
     },
     local === null ? REMOTE_COMMITTER : new StoreConfigWriter(local),
-    actor,
-    log,
+    env.actor,
+    env.log,
   );
 }

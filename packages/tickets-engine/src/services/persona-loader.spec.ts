@@ -45,21 +45,23 @@ describe('personaLoader', () => {
 });
 
 describe('resolvePersonaForTicket', () => {
-  it('resolves the ladder end to end', async () => {
+  it('resolves the chain entry, else the column, end to end', async () => {
     const loader = loaderWith({ 'tickets/_meta/personas/pia/persona.md': PIA });
-    const hit = await resolvePersonaForTicket(loader, { ticketPersona: null, phasePersona: 'pia', defaultPersona: 'ben' });
+    const hit = await resolvePersonaForTicket(loader, { phasePersona: 'pia' });
     expect(hit.persona!.id).toBe('pia');
     expect(hit.resolution.source).toBe('phase');
-    const miss = await resolvePersonaForTicket(loader, { ticketPersona: 'ghost', phasePersona: null, defaultPersona: null });
+    const chain = await resolvePersonaForTicket(loader, { chainPersona: 'pia', phasePersona: 'ben' });
+    expect(chain.resolution).toEqual({ persona: 'pia', source: 'chain' });
+    const miss = await resolvePersonaForTicket(loader, { chainPersona: 'ghost', phasePersona: null });
     expect(miss.persona).toBeNull();
-    expect(miss.resolution.source).toBe('ticket');
+    expect(miss.resolution.source).toBe('chain');
   });
 });
 
 describe('deriveWorkerModel', () => {
   it('feeds the worker and the model from the persona', async () => {
     const loader = loaderWith({ 'tickets/_meta/personas/pia/persona.md': PIA });
-    const { persona } = await resolvePersonaForTicket(loader, { ticketPersona: 'pia', phasePersona: null, defaultPersona: null });
+    const { persona } = await resolvePersonaForTicket(loader, { phasePersona: 'pia' });
     expect(deriveWorkerModel(persona!)).toEqual({ workerChoice: 'claude-code', model: 'opus' });
   });
 });

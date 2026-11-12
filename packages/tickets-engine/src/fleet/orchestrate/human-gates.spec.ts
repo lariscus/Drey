@@ -23,7 +23,8 @@ describe('HumanGates (E10-6)', () => {
 
   it('a gate the human persona works parks the ticket: no run, no worktree, awaiting set', async () => {
     await h.writeHuman();
-    h.io.seed('T-0200', 'plan', { persona: 'you' });
+    await h.write('tickets/_meta/pipeline.md', pipelineWithPlan('persona: you'));
+    h.io.seed('T-0200', 'plan');
     const { orch, fleet } = h.build();
     await orch.configure(h.config());
     await orch.setMaster('run');
@@ -53,9 +54,20 @@ describe('HumanGates (E10-6)', () => {
     expect(h.io.textOf('T-0201')).toMatch(/^x-awaiting: you$/m);
   });
 
+  it('the ticket pin is retired (req-257): persona: you on a ticket parks nothing', async () => {
+    await h.writeHuman();
+    h.io.seed('T-0205', 'plan', { persona: 'you' });
+    const { orch, fleet } = h.build();
+    await orch.configure(h.config());
+    await orch.setMaster('run');
+
+    expect(fleet.records.map((r) => r.request.ticketId)).toEqual(['T-0205']);
+    expect(h.io.textOf('T-0205')).not.toMatch(/^x-awaiting:/m);
+  });
+
   it('an awaiting ticket is never dispatched, and the human never takes a pool slot', async () => {
     await h.writeHuman();
-    h.io.seed('T-0202', 'plan', { persona: 'you' });
+    h.io.seed('T-0202', 'plan', { extensions: { awaiting: 'you' } });
     h.io.seed('T-0203', 'plan');
     const { orch, fleet } = h.build();
     await orch.configure(h.config({ pools: ONE }));

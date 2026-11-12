@@ -46,6 +46,10 @@ function restoreMaps(state: ChainState, parsed: ChainFile): void {
   for (const persona of (parsed.pausedPersonas ?? []).filter((p) => typeof p === 'string' && p.trim() !== '')) {
     state.pausedPersonas.add(persona.trim());
   }
+  copyValid(parsed.personaRedStreak, state.personaRedStreak, isCount);
+  copyValid(parsed.personaCooldownUntil, state.personaCooldownUntil, isStamp);
+  const trippedPersonas = Object.fromEntries(Object.entries(parsed.personaTripped ?? {}).filter(([persona]) => state.pausedPersonas.has(persona)));
+  copyValid(trippedPersonas, state.personaTripped, isTrip, (t) => ({ reason: t.reason, at: t.at }));
 }
 
 /**

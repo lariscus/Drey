@@ -72,7 +72,7 @@ describe('BoardPersonas at dispatch (E3, ADR-0088)', () => {
     expect(logs.filter((line) => line.includes('no text for skill gone'))).toHaveLength(1);
   });
 
-  it('the ladder: the ticket pin beats the phase persona', async () => {
+  it('req-257: the ticket pin is retired — the phase persona works the column', async () => {
     await writePersonaPipeline();
     await h.writePersona('pia', { worker: 'opencode', model: 'gpt-5' });
     await h.writePersona('tessa', { worker: 'claude-code', model: 'haiku' });
@@ -82,20 +82,18 @@ describe('BoardPersonas at dispatch (E3, ADR-0088)', () => {
     await orch.setMaster('run');
 
     const started = fleet.records[0]!;
-    expect(started.request.provider).toBe('claude-code'); // tessa's harness, not pia's
-    expect(started.request.model).toBe('haiku');
-    expect(fleet.start.mock.calls[0]![1]).toEqual({ persona: 'tessa' });
+    expect(started.request.provider).toBe('opencode'); // pia's harness — tessa's pin is read by nothing
+    expect(fleet.start.mock.calls[0]![1]).toEqual({ persona: 'pia' });
   });
 
-  it('the ladder: the engine default persona applies when nothing else names one', async () => {
+  it('req-257: the engine default persona is retired — nothing names one, the ring runs', async () => {
     await h.writePersona('pia', { worker: 'claude-code', model: 'sonnet' }); // no persona anywhere in the pipeline
     h.io.seed('T-0102', 'plan');
     const { orch, fleet } = h.build();
     await orch.configure(h.config({ defaultPersona: 'pia' }));
     await orch.setMaster('run');
 
-    expect(fleet.records[0]!.request.provider).toBe('claude-code');
-    expect(fleet.start.mock.calls[0]![1]).toEqual({ persona: 'pia' });
+    expect(fleet.start.mock.calls[0]![1]).toEqual({ persona: null });
   });
 
   it('a missing persona file falls back to the ring — byte for byte', async () => {

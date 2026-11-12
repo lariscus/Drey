@@ -34,14 +34,14 @@ const NOW = new Date('2026-11-11T12:00:00Z');
 const card = { id: 'T-0007', phase: 'building' } as unknown as TicketCard;
 
 describe('the chain door on a lifecycle store (req-265)', () => {
-  it("a chain move to the next column writes active + the pin, and moved() sees a pin change as a move", async () => {
+  it('a chain move to the next column writes active and drops the pin (req-257), and moved() sees a pin change as a move', async () => {
     const io = new MemoryIo();
     const door = new StoreChainBoard(io, () => undefined, true);
     await door.board('C:/nowhere', 'opencode').catch(() => undefined); // reads the placements (the meta vault is absent here)
     expect(await door.patch(card, { toStage: 'ready', now: NOW, actor: 'chain@host' }, 'chain@host')).toBe(true);
     const written = detailFromContent(io.writes[0]!);
     expect(written.stage).toBe('active');
-    expect(written.extensions['x-phase']).toBe('ready');
+    expect(written.extensions['x-phase']).toBeUndefined();
     expect(await door.moved(card)).toBe(false); // its own write is where it now stands
 
     io.text = DOC.replace('x-phase: building', 'x-phase: shaping'); // someone else moved it on the board

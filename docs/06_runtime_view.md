@@ -5892,3 +5892,32 @@ sequenceDiagram
 ```
 
 The seeder ships Pia first: a fresh board gets `order: [pia, paul, ben, ralf, tessa, you]`; a board seeded before req-269 is offered her alone at the next start and she goes to the front of its existing `order:`. Her record is `kind: mission` — no worker, no models; the free sessions, the 1:1, capacity and the budgets skip her, and the delete refuses her (`mission`). **In a chain** she is an entry like any persona (`pia; you`); `validateChain` refuses a mode on her, and `entryWorkOf` answers `mission-turn` for her position — today nothing walks the cursor, req-257's dispatch turns that answer into a ticket-scoped Mission Control turn with no session, no slot and no budget.
+
+## 6.123 The runner on persona chains — the holder runs, the cursor walks (req-257, milestone 247)
+
+```mermaid
+sequenceDiagram
+    actor Owner
+    participant D as Dispatcher + HolderPass
+    participant BP as BoardPersonas
+    participant TD as TicketDispatch
+    participant R as run (RunCompletion / ClaimRelease)
+    participant S as dricket store
+    participant BS as BoardService
+    D->>S: read the board (StoreChainBoard: x-chain, x-at → the holder's column)
+    D->>BP: resolveHolders — holderOf over chain + cursor, the agent holder's persona loaded
+    D->>D: planHolderDispatch — priority, later position first, rank; persona pool (parallel / min) inside the big pool
+    D->>TD: dispatch {cursor: at of length, nextPhase: null}
+    TD->>R: start (dk claim: active → running)
+    R->>R: gate green → closing round → leaving (Ben's sync-main)
+    R->>S: in-claim put x-at = at + 1 (+ the Verlauf line), then ONE release → active
+    Note over D,S: next pass: the next entry's persona holds it — an agent runs, You waits on Ready to try
+    Owner->>BS: Accept (a You entry)
+    BS->>S: put x-at + 1 — or, at the last entry of a repository ticket, You's commit machine run
+    Owner->>BS: Send back
+    BS->>S: put x-at = the nearest earlier agent position (+ the note as a comment)
+    R->>S: (the last entry ended green) x-at = length + 1, release → active
+    BS->>S: settleFinishedChains — put --claim stage done
+```
+
+On a lifecycle store the dispatch asks **who holds the ticket** instead of which column it sits in: the holder rule (`core/chain-holder.ts`) reads the chain's entry at the cursor; an agent entry runs with that persona alone (no ticket pin, no crew default, no ring run), a `:shape` entry waits for the Shape chat, a You entry for the owner, a Pia entry for milestone 248, an entry naming no readable persona stands at You with the reason. A run needs room in the big pool **and** in the persona's own pool; a persona below its `min:` overruns a full big pool. A red gate counts against the persona (`PersonaBreaker`): its streak, a minute's breather, the trip into the pause. Until req-270/271 the board keeps the pipeline's columns and places an `active` ticket in its holder's column (`core/chain-placement.ts`); an owner's move into a working column moves the cursor to the position that stands there (`store/chain-move.ts`). The stage migration turns a ticket's old column into its cursor (`cursorForPin`) and converts the pins a milestone-239 migration left.

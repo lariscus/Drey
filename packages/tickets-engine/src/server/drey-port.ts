@@ -76,7 +76,7 @@ import { openStatusItems } from '../core/status-log';
 import type { StatusLine } from '../core/status-log';
 import { parseScoutReportSection } from '../core/scout';
 import { parseLedger, personaDailyCosts } from '../core/ledger';
-import { needsOf, reportNeedOf, statusNeedOf, STATUS_NEEDS_CAP } from './needs';
+import { needsOf, notifyNeedsOf, reportNeedOf, statusNeedOf, STATUS_NEEDS_CAP } from './needs';
 
 /** The board service's part the remote uses (`BoardService` fits it). */
 export interface RemoteBoard {
@@ -354,6 +354,8 @@ export class DreyTicketsPort implements TicketsRemotePort {
     // E8: the scout tickets' report cards — a `form: scout` ticket whose
     // file carries a `## Report` waits for the owner's promotion decision.
     items.push(...(await this.reportNeeds(board)));
+    // E9 / req-257: the Bescheid cards — a `(notify)` entry the cursor just passed. Pure over the snapshot.
+    items.push(...notifyNeedsOf(board));
     return items;
   }
 

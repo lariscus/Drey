@@ -13,7 +13,7 @@ import type { PersonaRunSettings } from '../core/persona-settings';
 import { acceptanceCommands } from '../core/ticket-files';
 import type { Truncation } from './assignment';
 import type { DisciplineTexts } from './discipline-texts';
-import type { FleetCaps, HandoverMode, InteractiveMode, PermissionMode, RunDkTarget, RunRequest } from './protocol';
+import type { FleetCaps, HandoverMode, InteractiveMode, PermissionMode, RunCursor, RunDkTarget, RunRequest } from './protocol';
 import { assembleRunRequest } from './request-assemble';
 import { composeRunInstruction } from './request-instruction';
 import { planRun } from './request-plan';
@@ -43,6 +43,8 @@ export interface ComposeRunInput {
   readonly pushRemote: string | null;
   /** E10-6: park the ticket for this human persona after a green gate instead of moving it on. */
   readonly parkFor?: string | null;
+  /** req-257: the chain entry the run works (a lifecycle store); a green end advances the cursor instead of moving. */
+  readonly cursor?: RunCursor;
   /** Whether `nextPhaseId` claims (claim: true) — stamps the agent identity. */
   readonly nextPhaseClaims: boolean;
   readonly repo: RepoRef | null;

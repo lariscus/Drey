@@ -879,10 +879,12 @@ flow editor like any persona, each with a short prompt of its own, your default
 worker and — when the machine's model table names models for that worker — the
 strongest of them first. A board you created earlier gets the four once, the
 next time the service starts; if you delete one of them it stays deleted, and
-nothing you have changed is touched. Seeding does not move any work to them:
-a column that names no persona keeps running as it did. To let Ben build, open
-a ticket's **Flow** tab, click the gate and choose Ben under *who works it*;
-to make him the builder of every ticket, give the column `persona: ben` in
+nothing you have changed is touched. Seeding does not move any work to them
+by itself. On a board whose store runs on the new stages (after **Migrate**),
+a ticket's **chain** says who works it — whoever stands at the ticket's
+current step runs; change it on the **Flow** tab (click the step, choose Ben
+under *who works it*). On a board that has not migrated yet, a column runs
+with the persona it names: give it `persona: ben` in
 `tickets/_meta/pipeline.md`. A persona's prompt replaces the step's own prompt
 for the runs it takes — Edit persona opens it (its first lines say who the
 persona is; below them stands the step it works).
@@ -1087,10 +1089,24 @@ run is live on the ticket.
 ticket's own — changing the standard flow later leaves existing tickets alone.
 Paul may write a chain into the plan (`### Chain`); when the shaped plan is
 saved it becomes the ticket's chain. A plan's parts carry their own; a part
-without one gets the standard flow. For now the chain is what a ticket
-*will* go through: the board and the runner still move tickets column by
-column, and nothing steps along the chain yet — that comes with the persona
-board's runner.
+without one gets the standard flow.
+
+**How a ticket walks its chain** (on a migrated store). The persona at the
+ticket's current step works it: when the run ends green, the ticket goes on
+to the next step and the next persona. Until the board draws a column per
+persona, a ticket stands in the column of whoever holds it — Paul's shaping
+step in Shaping, an agent's step in its column (or the first working
+column), your own steps on **Ready to try**. There, **Accept** finishes your
+step and hands the ticket on; at the last step of a repository ticket it is
+the sign-off and merges the branch (You's *commit*). **Send back** returns it
+to the nearest earlier agent step. Moving a ticket into a working column
+moves it to the step that stands there. A step whose persona no longer
+exists, or a step marked *Tell me when it is done* that just finished, shows
+in **Needs you**. A step of **Pia** waits — her turn on a ticket comes next.
+How many tickets one persona runs at once is its **Parallel · max** (the
+Persona page's Work block); *min* lets it start one even when the pool is
+full. Three red gates in a row hold that persona until you play it again on
+the Crew tab.
 
 **By voice.** On Windows the dialog's Description label carries a
 **mic button**: it starts Windows dictation (Win+H — Windows' own;
