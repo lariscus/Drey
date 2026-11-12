@@ -449,7 +449,7 @@ describe('createChatBridge', () => {
     expect(system).toContain('insert <phase>[(<persona>[, notify] | notify)] after|before <anchor>');
     expect(system).toContain('skip <phase>');
     expect(system).toContain('notify <phase>');
-    expect(system).toContain('An empty list returns the ticket to the standard flow');
+    expect(system).toContain('an empty list means the standard flow');
     expect(system).toContain('{"kind":"setChain","id":"T-0086","chain":["insert security(ralf, notify) after review","skip verify"]}');
   });
 

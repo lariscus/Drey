@@ -7,6 +7,7 @@
 
 import type { InteractiveMode } from './protocol';
 import type { DisciplineTexts } from './discipline-texts';
+import { expandFragments } from '../core/prompt-file';
 import { briefHead, headParts, memoryOf, optional, personaLine, trimmed, type ComposedInstruction } from './instruction-parts';
 
 /**
@@ -80,18 +81,23 @@ export interface ScoutInstructionInput {
  * failure: a scout run has no branch and no gate to fail.
  */
 export function composeScoutInstruction(input: ScoutInstructionInput): ComposedInstruction {
-  const head = briefHead(input);
+  const head = briefHead({ ...input, prompt: expandFragments(input.prompt, input.disciplines.fragments) });
   const description = input.description.trim();
   const changing = optional(memoryOf(input.memorySection));
   const signedBy = trimmed(input.personaId);
   const discipline = input.interactive !== undefined ? input.disciplines.interactive : input.disciplines.scout;
+  const d = input.disciplines;
   const parts = [
     ...headParts(head),
     ...scoutWhoAndWhere(input, description),
+    d.working,
+    d.language,
+    d.precedence,
     ...changing,
     scoutReportShape(signedBy !== '' ? signedBy : 'scout'),
     discipline,
-    input.disciplines.asking,
+    d.signals,
+    d.asking,
   ];
   const continuation = [
     `You are resuming the exploration of ticket ${input.ticketId} — ${input.title}, the scout run, in this same session. ` +
@@ -101,6 +107,7 @@ export function composeScoutInstruction(input: ScoutInstructionInput): ComposedI
     'The report\'s shape stands: `## Report` with the Written-on line, `### Summary`, `### Decisions` of ' +
       '`- [ ] Dn: <question> — Recommendation: <yours>` — unchecked, in the order the owner should decide them.',
     discipline,
+    d.signals,
   ].join('\n\n');
   const stable = JSON.stringify([
     head.repoInstructions,

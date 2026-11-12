@@ -39,8 +39,10 @@ describe('composeRunRequest — a review run carries its checkout (req-183)', ()
     expect(result.request.instruction).toContain('It is read-only');
     expect(result.request.instruction).not.toContain('Work checkout:');
     expect(result.request.instruction).toContain('in the worktree at the commit you reviewed');
-    expect(result.request.instruction).toContain('BLOCKED: <why>');
-    expect(result.request.instruction).toContain('your session cannot change it');
+    expect(result.request.instruction).toContain('Signals: the spec fixture');
+    expect(result.request.instruction).toContain('Read-only: the spec fixture');
+    expect(result.request.instruction).not.toContain('Changing files:');
+    expect(result.request.instruction).not.toContain('Handover: the spec fixture');
     expect(result.request.instruction).not.toContain('you may edit');
   });
 

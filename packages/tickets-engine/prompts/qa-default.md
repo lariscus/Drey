@@ -25,7 +25,7 @@ section, you never edit the ticket file yourself.
 - Set a verdict for every criterion you are given. One you skip stays
   unproven, and the owner reads the section as the run's proof.
 
-How to work:
+Judging:
 - One look decides a shot. Judge what is on it; do not re-read a
   screenshot you already judged.
 - Batch the reads: open the criteria and their shots together, then
@@ -34,8 +34,3 @@ How to work:
   a finding, never a guess.
 - Keep every note to one line. Your reader saw none of this: lead with
   the verdict, then what matters, in plain prose without filler.
-- Friction is a gift (the owner's improvement loop reads it): when you
-  lacked context, had to guess a convention, or hit the same obstacle
-  twice, say so in ONE line of your final message, on its own line —
-  `FRICTION: <what was missing>`, plain words, before a `BLOCKED:` line
-  if you send the step back. Nothing to report: no line.

@@ -42,15 +42,15 @@ describe('composeRunRequest — a store ticket has no file (D-30)', () => {
     if (!result.ok) {
       throw new Error(result.error);
     }
-    expect(result.request.instruction).toMatch(/The ticket file: \S*_workcopy[\\/]T-0001\.ticket\.md — your working copy/);
-    expect(result.request.instruction).toContain('the runner takes your changes back');
+    expect(result.request.instruction).toMatch(/The ticket file: \S*_workcopy[\\/]T-0001\.ticket\.md\. Use this path directly/);
+    expect(result.request.instruction).toContain('The ticket file named above: the spec fixture');
     expect(result.request.instruction).not.toMatch(/prioritized[\\/]T-0001\.md/);
     expect(result.request.ticketRelPath).toBe('tickets/prioritized/T-0001.md'); // the card's virtual path stays its identity
   });
 
   it('a file board keeps the real path', () => {
     const result = composeRunRequest(base());
-    expect(result.ok && result.request.instruction).toMatch(/The ticket file: \S*prioritized[\\/]T-0001\.md — it lives in the tickets repo/);
+    expect(result.ok && result.request.instruction).toMatch(/The ticket file: \S*prioritized[\\/]T-0001\.md\. Use this path directly/);
   });
 });
 

@@ -17,6 +17,14 @@ export const DISCIPLINES: DisciplineTexts = {
   interactive: 'Dialog discipline: the spec fixture of the dialog text.',
   asking: 'Asking the owner: the spec fixture of the asking text. QUESTION: <the question>.',
   scout: 'Scout discipline: the spec fixture of the scout text. BLOCKED: <reason in one line>.',
+  signals: 'Signals: the spec fixture of the signals text. BLOCKED: <reason in one line>.',
+  working: 'How to work: the spec fixture of the working text.',
+  writing: 'Changing files: the spec fixture of the writing text.',
+  readOnly: 'Read-only: the spec fixture of the read-only text.',
+  ticketFile: 'The ticket file named above: the spec fixture of the ticket-file text.',
+  language: 'Language: the spec fixture of the language text.',
+  precedence: 'Precedence: the spec fixture of the precedence text.',
+  fragments: { planFormat: 'The plan format: the spec fixture.', chainGrammar: 'The chain grammar: the spec fixture.' },
 };
 
 

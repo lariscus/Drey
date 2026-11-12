@@ -7,6 +7,7 @@
 import type { InstructionInput } from './instruction';
 import { capHead, capTail } from './capping';
 import { memoryOf, optional, trimmed, type Truncation } from './instruction-parts';
+import { isReadOnlyRun } from './review-run';
 
 /** The most of an earlier handover the brief carries. */
 const HANDOVER_CAP = 2_000;
@@ -40,11 +41,10 @@ function checkoutLine(input: InstructionInput): string {
   if (input.reviewCheckout !== undefined) {
     return (
       `Review checkout: ${input.reviewCheckout} (branch ${input.branch} at the commit the builder handed over, detached${repo}). ` +
-      `It is read-only, and so is your session: you judge this tree, you change no file — the ticket file included. ` +
-      `Give your verdict in your final message; end it with \`BLOCKED: <why>\` to send the step back.`
+      'It is read-only, and so is your session.'
     );
   }
-  return `Work checkout: ${input.worktreePath} (branch ${input.branch}${repo}). Stay on that branch; it and the worktree are your only writable places.`;
+  return `Work checkout: ${input.worktreePath} (branch ${input.branch}${repo}). Stay on that branch.`;
 }
 
 function extraReposPart(input: InstructionInput): string | null {
@@ -77,17 +77,12 @@ function ticketFileParts(input: InstructionInput, plan: string): string[] {
   if (ticketFile === undefined || ticketFile === '') {
     return [];
   }
-  if (input.reviewCheckout !== undefined) {
-    // req-183: a review's session is read-only — the ticket file is there to read, never to edit.
-    return [`The ticket file: ${ticketFile} — read it if you need more than this brief quotes; your session cannot change it.`];
+  if (isReadOnlyRun(input)) {
+    // req-183/req-280: a read-only run's ticket file is there to read, never to edit (the read-only discipline says so).
+    return [`The ticket file: ${ticketFile} — read it if you need more than this brief quotes.`];
   }
-  const fileLine =
-    input.ticketFileIsCopy === true
-      ? `The ticket file: ${ticketFile} — your working copy of the ticket, outside the worktree, and the one ` +
-        `file besides the worktree you may edit (the plan, the handover and the Log go there). The board keeps the ticket in a ` +
-        `store you do not touch: the runner takes your changes back when your turn ends. Use this path directly; do not search the disk for another ticket file.`
-      : `The ticket file: ${ticketFile} — it lives in the tickets repo, outside the worktree, and is the one ` +
-        `file besides the worktree you may edit (the plan and the Log go there). Use this path directly; do not search the disk for it.`;
+  // req-280: what the file is and who writes which section is the ticket-file discipline's; this line is the path.
+  const fileLine = `The ticket file: ${ticketFile}. Use this path directly; do not search the disk for another ticket file.`;
   // The worker re-read the whole ticket file first thing in every run
   // (req-55): a second copy of what this brief already carries, paid
   // again by every model call of the run.

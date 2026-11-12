@@ -28,3 +28,11 @@ export function isReviewRun(input: ReviewRunInput): boolean {
   }
   return input.phaseId === REVIEW_PHASE_ID || input.personaRole === REVIEWER_ROLE;
 }
+
+/** The persona role whose runs judge and change nothing, like a review (req-280). */
+export const TESTER_ROLE = 'tester';
+
+/** A run that changes no file: a review (its checkout and session are read-only) or a tester's run. */
+export function isReadOnlyRun(input: { readonly reviewCheckout?: string; readonly personaRole?: string | null }): boolean {
+  return input.reviewCheckout !== undefined || input.personaRole === TESTER_ROLE;
+}

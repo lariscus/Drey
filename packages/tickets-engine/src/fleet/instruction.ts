@@ -3,10 +3,12 @@
 // parts first so the prompt prefix stays identical across runs, variable
 // parts last).
 
+import { expandFragments } from '../core/prompt-file';
 import type { FleetCaps, InteractiveMode } from './protocol';
 import type { DisciplineTexts } from './discipline-texts';
 import { briefHead, headParts, personaLine, type ComposedInstruction, type Truncation } from './instruction-parts';
 import { changingParts, whoAndWhere } from './instruction-sections';
+import { isReadOnlyRun } from './review-run';
 
 export interface InstructionInput {
   /**
@@ -115,17 +117,21 @@ export interface InstructionInput {
  * 2. the phase instruction template (a resolved persona's prompt rides
  *    here — it IS the template for its runs);
  * 3. `## Plan` verbatim;
- * 4. the variable parts: who/where, the description, the persona's
- *    `## Memory` slice (E3), the earlier step's handover, the diff stat
- *    (head-capped), the previous run's gate failure on a retry
- *    (tail-capped), the gate commands, the completion discipline and
- *    how to ask the owner.
+ * 4. who/where, the description, then the shared rules of the run kind
+ *    (req-280, `ruleParts`);
+ * 5. the variable parts: the persona's `## Memory` slice (E3), the
+ *    earlier step's handover, the diff stat (head-capped), the previous
+ *    run's gate failure on a retry (tail-capped), the gate commands, the
+ *    completion discipline, the signals and how to ask the owner.
+ *
+ * The step prompt's fragment placeholders (`{{plan-format}}`) are
+ * expanded first, whichever source the prompt came from.
  *
  * Deterministic text — no model involved; the capping is reported, never
  * marked inside the text (bookkeeping the model does not need).
  */
 export function composeInstruction(input: InstructionInput): ComposedInstruction {
-  const head = briefHead(input);
+  const head = briefHead({ ...input, prompt: expandFragments(input.prompt, input.disciplines.fragments) });
   const persona = personaLine(input.personaId, input.personaRole);
   const description = input.description.trim();
   const truncations: Truncation[] = [];
@@ -133,7 +139,8 @@ export function composeInstruction(input: InstructionInput): ComposedInstruction
   // brief and the whole of a resume's continuation (req-80).
   const changing = changingParts(input, truncations);
   const closing = closingParts(input);
-  const parts = [...headParts(head), ...whoAndWhere(input, { persona, plan: head.plan, description }), ...changing, ...closing, input.disciplines.asking];
+  const rules = ruleParts(input);
+  const parts = [...headParts(head), ...whoAndWhere(input, { persona, plan: head.plan, description }), ...rules, ...changing, ...closing, input.disciplines.asking];
   const continuation = [resumeLine(input), ...changing, ...closing].join('\n\n');
   const stable = JSON.stringify([
     head.repoInstructions,
@@ -151,21 +158,32 @@ export function composeInstruction(input: InstructionInput): ComposedInstruction
   return { text: parts.join('\n\n'), truncations, continuation, stable };
 }
 
-/** The gate commands (when any), the discipline and — outside a dialog — the handover discipline. */
+/**
+ * The shared rules (req-280, T2), each from its one discipline file: how to
+ * work for every run; then either the read-only rule, or the writing rules,
+ * the ticket file's section duties and — outside a dialog — the handover;
+ * then language and precedence. They sit in the stable part of the brief,
+ * so a resume does not repeat them.
+ */
+function ruleParts(input: InstructionInput): string[] {
+  const d = input.disciplines;
+  if (isReadOnlyRun(input)) {
+    return [d.working, d.readOnly, d.language, d.precedence];
+  }
+  return [d.working, d.writing, d.ticketFile, ...(input.interactive === undefined ? [d.handover] : []), d.language, d.precedence];
+}
+
+/** The gate commands (when any), what ends the turn (the completion or the dialog discipline) and the signals. */
 function closingParts(input: InstructionInput): string[] {
   const parts: string[] = [];
   if (input.acceptance.length > 0) {
     const lead =
       input.reviewCheckout !== undefined
         ? 'The machine gate runs exactly these after you finish, in the worktree at the commit you reviewed:\n'
-        : 'The machine gate runs exactly these after you finish — keep them green, and commit your work on the branch before you end:\n';
+        : 'The machine gate runs exactly these after you finish:\n';
     parts.push(lead + input.acceptance.map((command) => `- \`${command}\``).join('\n'));
   }
-  if (input.interactive !== undefined) {
-    parts.push(input.disciplines.interactive);
-  } else {
-    parts.push(input.disciplines.completion, input.disciplines.handover);
-  }
+  parts.push(input.interactive !== undefined ? input.disciplines.interactive : input.disciplines.completion, input.disciplines.signals);
   return parts;
 }
 

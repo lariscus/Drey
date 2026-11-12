@@ -1,54 +1,79 @@
 /**
- * The run brief's fixed closing texts (req-279): the five disciplines as
- * real files in `packages/tickets-engine/prompts/disciplines/`, shipped
- * beside the compiled engine — beside the pipeline and crew prompts, one
- * obvious place to edit them. Stable strings: the prompt cache prefix
- * and the brief digest depend on the composed bytes, so an edit here
- * changes every brief (M85, ADR-0077). `{{question}}` and `{{blocked}}`
- * are the placeholders for the protocol markers; the loader substitutes
- * them and drops exactly the one trailing newline the files carry, so
- * the composed briefs stay byte-identical to the constants they
- * replaced. A missing or empty file throws, naming the file.
+ * The run brief's fixed texts (req-279, req-280): the disciplines as real
+ * files in `packages/tickets-engine/prompts/disciplines/`, shipped beside
+ * the compiled engine — beside the pipeline and crew prompts, one obvious
+ * place to edit them. Each says one thing once; the composer appends the
+ * ones a run kind needs (`instruction.ts`, `scout-instruction.ts`), so a
+ * step prompt carries its role only (req-280, T1/T2). Stable strings: the
+ * prompt cache prefix and the brief digest depend on the composed bytes,
+ * so an edit here changes every brief (M85, ADR-0077). `{{question}}` and
+ * `{{blocked}}` are the placeholders for the protocol markers; the loader
+ * substitutes them (`prompt-file.ts` folds CRLF, drops the version marker
+ * and the one trailing newline). A missing or empty file throws.
  */
-import { promises as fsp } from 'node:fs';
 import path from 'node:path';
 import { SHIPPED_PROMPTS_DIR } from '../core/default-prompts';
+import { loadPromptFragments, readPromptFile, type PromptFragments } from '../core/prompt-file';
 import { BLOCKED_MARKER, QUESTION_MARKER } from './protocol';
 
-/** The discipline texts every run brief ends with (completion, handover, dialog, asking, scout). */
+/** The discipline texts a run brief is composed from, plus the shared fragments a step prompt pulls in. */
 export interface DisciplineTexts {
+  /** Gated, non-interactive runs: what "done" means. */
   readonly completion: string;
+  /** Writing, non-interactive runs: the `## Handover` the next step reads. */
   readonly handover: string;
+  /** Interactive dialogs: the turn ends nothing. */
   readonly interactive: string;
+  /** Every brief, last: the `QUESTION:` shape. */
   readonly asking: string;
+  /** Scout runs: the end of an exploration. */
   readonly scout: string;
+  /** Every brief's closing: the markers the runner acts on. */
+  readonly signals: string;
+  /** Every brief: reading, context, verification, the final message. */
+  readonly working: string;
+  /** Writing runs: writable places, the smallest change, criteria kept, commits. */
+  readonly writing: string;
+  /** Review and tester runs: no file changes, findings in the final message. */
+  readonly readOnly: string;
+  /** Writing runs: where the ticket lives and who writes which section. */
+  readonly ticketFile: string;
+  /** Every brief: the language of what the owner reads. */
+  readonly language: string;
+  /** Every brief: this brief beats the repo's instructions. */
+  readonly precedence: string;
+  /** The shared fragments (`{{plan-format}}`, `{{chain-grammar}}`). */
+  readonly fragments: PromptFragments;
 }
 
-const DISCIPLINE_FILES: readonly (keyof DisciplineTexts)[] = ['completion', 'handover', 'interactive', 'asking', 'scout'];
+type DisciplineName = Exclude<keyof DisciplineTexts, 'fragments'>;
 
-/** Reads one discipline file: CRLF folded, the trailing newline dropped, the marker placeholders substituted. */
-async function readDiscipline(dir: string, name: keyof DisciplineTexts): Promise<string> {
-  const rel = path.join('disciplines', `${name}.md`);
-  const text = await fsp.readFile(path.join(dir, rel), 'utf8').catch(() => null);
-  if (text === null) {
-    throw new Error(`the discipline ${rel} is missing from ${dir}`);
-  }
-  const stripped = text
-    .replace(/\r\n/g, '\n')
-    .replace(/\n$/, '')
-    .replaceAll('{{question}}', QUESTION_MARKER)
-    .replaceAll('{{blocked}}', BLOCKED_MARKER);
-  if (stripped === '') {
-    throw new Error(`the discipline ${rel} in ${dir} is empty`);
-  }
-  return stripped;
+const DISCIPLINE_FILES: Readonly<Record<DisciplineName, string>> = {
+  completion: 'completion.md',
+  handover: 'handover.md',
+  interactive: 'interactive.md',
+  asking: 'asking.md',
+  scout: 'scout.md',
+  signals: 'signals.md',
+  working: 'working.md',
+  writing: 'writing.md',
+  readOnly: 'read-only.md',
+  ticketFile: 'ticket-file.md',
+  language: 'language.md',
+  precedence: 'precedence.md',
+};
+
+/** Reads one discipline file with the marker placeholders substituted. */
+async function readDiscipline(dir: string, file: string): Promise<string> {
+  const text = await readPromptFile(dir, path.join('disciplines', file), 'discipline');
+  return text.replaceAll('{{question}}', QUESTION_MARKER).replaceAll('{{blocked}}', BLOCKED_MARKER);
 }
 
-/** Every discipline text, from the shipped prompts dir by default. */
+/** Every discipline text and fragment, from the shipped prompts dir by default. */
 export async function loadDisciplineTexts(dir: string = SHIPPED_PROMPTS_DIR): Promise<DisciplineTexts> {
-  const texts: Record<keyof DisciplineTexts, string> = { completion: '', handover: '', interactive: '', asking: '', scout: '' };
-  for (const name of DISCIPLINE_FILES) {
-    texts[name] = await readDiscipline(dir, name);
+  const texts: Partial<Record<DisciplineName, string>> = {};
+  for (const [name, file] of Object.entries(DISCIPLINE_FILES) as [DisciplineName, string][]) {
+    texts[name] = await readDiscipline(dir, file);
   }
-  return texts;
+  return { ...(texts as Record<DisciplineName, string>), fragments: await loadPromptFragments(dir) };
 }

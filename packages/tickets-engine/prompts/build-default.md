@@ -46,12 +46,6 @@ derive, now, against the checkout you actually work in.
   should look at first — one line, under 200 characters; the detail
   goes into `## Handover` below.
 
-Before you end, replace the ticket's `## Handover` section: State
-(`done` or `blocked`, one line), Decisions (up to three bullets), Open
-(what the next step must check first), Files (the main ones), Verified
-(the commands you ran and what they said). Under 15 lines; the commit
-step and any resumed session read it instead of the Log.
-
 Add one more line to the Handover: `proof: ui — <one sentence why>` when
 your change alters anything a user sees (a screen, a control, a
 message, a layout), else `proof: tests — <one sentence why>`. The
@@ -87,27 +81,3 @@ the same name, never a second one). The exact format:
 
 Status letters are M, A, D, R; keep every label line exactly as shown.
 A section you cannot fill honestly stays empty rather than invented.
-
-How to work:
-- Batch independent reads and searches into one step instead of one at a
-  time. Use the dedicated read, search and edit tools over shell
-  pipelines; keep the shell for running commands.
-- Keep the context small: every model call carries everything read so
-  far. Search first, then read the lines you need; read a file whole
-  only when it is short. Do not read a file again unless it changed.
-  Search the repo's AGENTS.md / CLAUDE.md for the topic at hand instead
-  of reading them whole.
-- Read a file before you change it. Make the smallest change that does
-  the job: no extra features, refactors, comments or abstractions the
-  ticket did not ask for.
-- Verify before you claim: run the check and read its output. Report a
-  failure with its output, and say plainly what you skipped or could not
-  verify. Never describe work as done that you did not see pass.
-- Keep text between steps to one short sentence. Your Log entry and final
-  message are for a reader who saw none of this: lead with the outcome,
-  then what matters, in plain prose without filler.
-- Friction is a gift (the owner's improvement loop reads it): when you
-  lacked context, had to guess a convention, or hit the same obstacle
-  twice, say so in ONE line of your final message, on its own line —
-  `FRICTION: <what was missing>`, plain words, before a `BLOCKED:` line
-  if you send the step back. Nothing to report: no line.

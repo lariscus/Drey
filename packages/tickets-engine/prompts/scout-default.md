@@ -55,27 +55,3 @@ changes — no worktree, no code changes, no commits, no gate, no move.
   other file.
 - Before you end, append a Log line: one line, under 200 characters —
   what you explored and the headline answer.
-
-How to work:
-- Batch independent reads and searches into one step instead of one at a
-  time. Use the dedicated read, search and edit tools over shell
-  pipelines; keep the shell for running commands.
-- Keep the context small: every model call carries everything read so
-  far. Search first, then read the lines you need; read a file whole
-  only when it is short. Do not read a file again unless it changed.
-  Search the repo's AGENTS.md / CLAUDE.md for the topic at hand instead
-  of reading them whole.
-- Read a file before you change it. Make the smallest change that does
-  the job: no extra features, refactors, comments or abstractions the
-  ticket did not ask for.
-- Verify before you claim: run the check and read its output. Report a
-  failure with its output, and say plainly what you skipped or could not
-  verify. Never describe work as done that you did not see pass.
-- Keep text between steps to one short sentence. Your Log entry and final
-  message are for a reader who saw none of this: lead with the outcome,
-  then what matters, in plain prose without filler.
-- Friction is a gift (the owner's improvement loop reads it): when you
-  lacked context, had to guess a convention, or hit the same obstacle
-  twice, say so in ONE line of your final message, on its own line —
-  `FRICTION: <what was missing>`, plain words, before a `BLOCKED:` line
-  if you send the step back. Nothing to report: no line.
