@@ -398,6 +398,14 @@ Firstmate's strongest infrastructure idea: **supervising the running fleet costs
 
 ---
 
+> **Later change (2026-11-13,** [project-handling-draft.md](project-handling-draft.md)**).** §4.1, §4.6 and §4.7: a persona no
+> longer names a `worker:` and a model pool; it names a capability **class** and
+> may pin one **model** of it, and the harness follows from the model (the
+> class request of ADR-0095 does the rest). The models come from what the
+> installed harnesses offer. Projects (name, purpose, repositories, folders,
+> vault grants) are a new vault-layer record; one board holds them all, with a
+> global filter. Roadmap rows req-282 – req-291.
+
 ## 5. The verify step — proof before approval
 
 ### 5.1 Pipeline placement
@@ -637,7 +645,7 @@ The boards of the design canvas "Drey Tickets — Workflow redesign" are authori
 - **States with action:** a stuck worker offers Nudge, Hand to Claude Code, Stop (§4.3); a running part is locked (§5.9).
 
 **Settings (core screen, v2).** So that nothing has to be set on the desktop:
-- *Appearance* (stored only on this device, takes effect immediately — **D10**): **Theme** (Anthrazit, Drey, Cyberpunk), **highlight colour** (theme default or blue, turquoise, violet, pink, orange, yellow; status colours green, amber, red stay fixed), **text size** a slider with five steps S / M / L / XL / XXL = 15 / 16 / 17 / 19 / 21 px body, L (17 px) the default, with live preview, *Compact lists*, *Reduce motion*. Everything else is stored per vault.
+- *Appearance* (stored only on this device, takes effect immediately — **D10**): **Theme** (Anthrazit, Drey, Cyberpunk), **highlight colour** (theme default or blue, turquoise, violet, pink, orange, yellow; status colours green, amber, red stay fixed), **text size** a slider with five steps S / M / L / XL / XXL = 15 / 16 / 17 / 19 / 21 px body, L (17 px) the default, with live preview, *Compact lists*, *Reduce motion*. Everything else is stored per vault. *Later change (2026-11-13):* the desktop Settings tab has no scopes — settings are global; a phone or iPad keeps its own appearance on the device, as D10 says, and the desktop does not configure it.
 - further categories: *Chat* (thinking trace, new chat, attachments), *Away and alerts* (away posture, what notifies), *Devices* (pair, revoke, read only, §3.6), *Repositories* (launch command for verify, default branch), *Engine* (runner status, tickets vault, version). *(Built in part: E12-3b lists what is missing.)*
 - On the phone the menu leads to the list "Settings", on the iPad it is the Settings entry of the same menu list.
 

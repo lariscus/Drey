@@ -1,12 +1,17 @@
-# Projects — a draft for project handling (2026-11-13)
+# Projects, Persona v3, Models v3 — the concept of the design round of 2026-11-13
 
-Status: **draft accepted in its direction (owner, 2026-11-13: "Ja, A"); the
-answers to §9 are recorded in §10. Nothing built.**
-Stage 1 of the design round the owner opened on 2026-11-13 after verifying
-milestones 242–251. Stage 2 (boards in Claude Design: project settings, the
-Persona page revised, Settings → Models) waits for his OK on this draft; stage 3
-(concept documents and roadmap rows) waits for his OK on the boards. Whatever is
-built from it goes **after the finish line** unless the owner says otherwise.
+Status: **accepted by the owner on 2026-11-13** — the draft ("Ja, A"), his answers
+(§10) and the stage 2 boards ("Passt", §11). Nothing built; the build items are
+roadmap rows req-282 – req-291 (§12), placed **after the finish line**.
+
+The file keeps its first name (`project-handling-draft.md`) because the canvas note
+and the boards index point at it. §0 – §9 are the stage 1 draft as the owner read
+it; where §10 and §11 differ from them, §10 and §11 hold.
+
+The round ran in three stages: the draft (stage 1), boards in Claude Design
+(stage 2: `DeskProjects`, `DeskProjectFilter`, `DeskPersonaV3`, `DeskModelsV3`,
+`DeskSkillsLibrary`, exported to [boards/](boards/README.md)), and this concept with
+the roadmap rows (stage 3).
 
 The owner's findings this draft answers (2026-11-13, paraphrased in English):
 readable vaults belong to a project, not to a persona; a project scope with
@@ -100,7 +105,7 @@ on the app itself; product decisions live in "Drey notes".
 | **Vault MCP (ADR-0094)** | The run's token carries the ticket's project. **Read** = the project's `read` + `write` vaults (no longer every registered vault). **Write** = the project's `write` vaults, **and** the persona may write notes at all (§3), **and** the run is not read-only. `vault_list` lists only what the project lets the run see. Every refusal keeps today's `Error: …` wording and audit line. |
 | **Persona `allowed:`** | `write-vaults: [ids]` leaves the persona. What remains is a yes/no — `allowed: write-notes: true` ("may change notes where the project allows it"). A reviewer stays read-only as today. The Persona page's "Allowed to" loses its vault list. |
 | **1:1 and free sessions (R12)** | A free session takes a project (picked, or derived when its folder is a project repo's checkout) and gets that project's vaults. A 1:1 has no ticket: it reads the vaults of **every** project, read-only — the persona's coach should see what the persona works on. (Open question 4.) |
-| **Pool, slots, quotas, routing** | **Unchanged and cross-project**, as the owner ruled. Ben's `2/2` in a column header counts all his runs whatever the filter shows. A run's profile still comes from its repo's `profile`. Report and Cost may *group* by project (display only, no fourth ledger). |
+| **Pool, slots, quotas, routing** | **Unchanged and cross-project**, as the owner ruled. Ben's `2/2` in a column header counts all his runs whatever the filter shows. (The repository `profile` of req-177 is retired — §10.) Report and Cost may *group* by project (display only, no fourth ledger). |
 | **Personas, crew, pipeline, skills** | Board-wide, unchanged. One crew works every project of the board. |
 | **Mission Control / Pia** | Pia knows the projects: a capture lands in the current filter's project (or asks when the filter is "All"); a ticket card names its project. |
 
@@ -315,3 +320,133 @@ Given in German in the session; English here.
   implementation detail the page does not show. Stage 3 turns this into an
   ADR-0010 later change and a roadmap item that removes the scope tabs from the
   built Settings tab (board 7g, milestone 197).
+
+## 11. What the boards settle (stage 2, accepted 2026-11-13)
+
+The boards are the reference for the look; this section is the behaviour they
+show, so the rows of §12 can be built from it.
+
+### Projects — board 7m `DeskProjects`, board 7n `DeskProjectFilter`
+
+- **Settings → Projects**, a top-level category: the projects listed left (colour
+  dot, name, ticket count, *New project*), the project right — Name, Colour (six
+  presets **and a free colour picker**, the highlight colour's control in
+  Settings → Appearance), **Purpose in Drey's Markdown editor** (formatting strip,
+  Live | Source; its token count beside the title), Repositories (chips from
+  `repos.md`, the first marked `primary`; *Add repository* opens an inline picker
+  of the registered repos plus *From folder…*), Folders (plain folders, read-only,
+  *Add folder*), Vaults (one row per registered vault, segmented None | Read |
+  Write; a vault the record names that this device has not registered is greyed
+  with *not on this device*). No profile, no Save — every change is one commit,
+  applied as made.
+- **The global project filter** sits in the title bar right of the view
+  switcher: a colour dot, the project name (or *All projects*) and a chevron. Its
+  menu: All projects · each project · Unassigned (with its count) · *Manage
+  projects…*. Files, the Tickets panel, the board, the Review tab and Find follow
+  it; it is saved with the View. Under one project the Files panel lists that
+  project's vaults and folders (a `read` tag on the read-only ones) with the line
+  `Drey · 2 vaults, 1 folder` under its header; the board shows only that
+  project's cards. **Columns and load stay global** — `Ben · 2/2 · 1 waiting` and
+  the `4/5 · 1 queued` chip count every project (tooltip *Counts every project*).
+  Under *All projects* each card carries a small project chip.
+
+### Persona v3 — board 7k v3 `DeskPersonaV3`
+
+- **No harness choice.** The **Model** block picks a **class** (super heavy ·
+  heavy · standard · light — the classes the owner keeps in Settings → Models)
+  and a **Model**: `Next free in class` (the default) or one model of that class
+  pinned (the listbox names the discovered models of the class with their
+  harness, e.g. `claude-opus-5-5 · Claude Code`, `kimi-k3.1-pro · Kimi CLI`;
+  under it `2 heavy models · 1 free now`). A pinned model means the router never
+  grants another model of the class to this persona — heavy with Opus pinned is
+  never served Kimi K3.1 Pro. The harness follows from the model. The persona
+  record carries `class:` and an optional `model:` instead of `worker:` and
+  `models:` (default + pool); the class floor `min-class` folds into `class` (a
+  ticket's `class:` / `size` may still raise a run above it, never below).
+- **Profile**: the picture with a camera button — *Upload picture…* and *Remove
+  picture* (D-67, req-235's desktop half); Name, Role, One line for the crew list.
+- **Work**: Parallel max / min, Read-only, Leaving actions, Daily budget, Tell
+  me when (req-258's settings, without the model pool and the class floor).
+- **Allowed to**: Run commands (Accept edits | Bypass), Reach the network,
+  **Change notes where the project allows** (`allowed: write-notes`, §3), Spend
+  above allowance; a link *Vaults are set per project*. No vault list.
+- **Skills**: *Add from library* opens a searchable list of the library's skills
+  with their source (`shared`, `own`, `github.com/…`); each of the persona's skill
+  rows has its switch, its source line (`github.com/acme/skills ·
+  go-conventions@v1.4`, an *update available* tag when the source has a newer
+  ref), its token count and a remove button.
+- **Instructions** is Drey's Markdown editor (formatting strip, Live | Source,
+  Live Preview) and **fills all the space** the right side has; *Preview full
+  prompt* and `≈ N tokens at start` above it.
+- **Proposals** as today; footer Discard · Save.
+
+### Models v3 — board 7l v3 `DeskModelsV3`
+
+- **Harnesses**: one row per harness the machine has — name, version, state
+  (`signed in`, the providers it is configured for, or `not installed` with
+  *Install…*), and how many models it offers. *Checked 2 min ago* and a refresh
+  button (*Find models again*) beside the page title. **Models are discovered,
+  never typed in**: from what each installed harness has configured and available
+  (an ACP harness lists its models in the `session/new` reply's config options —
+  opencode, Kimi CLI, Copilot CLI; Claude Code's from its own model list and
+  settings), the capabilities (context, tools, images) filled from the model
+  registry import of milestone 217. A model found for the first time appears as a
+  card above the classes with a class choice, *Add* and *Ignore*.
+- **Classes**: a list the owner keeps — shipped as **super heavy · heavy ·
+  standard · light** (today's A · B · C become heavy · standard · light; super
+  heavy is new, for Fable-class models), *Add class* for more. Each class is a
+  group with its models and **at most N sessions at once** — the slots live at
+  class level. A model row: drag handle, model id, harness · account chip,
+  capability icons, context, cost factor, **its class as a menu**, and a switch
+  (the router may use it). A model moves to another class by **dragging the row
+  into the class or picking the class in the menu**.
+- **Accounts** (the slots of req-177, now an optional extra cap per account):
+  label, harness, **cost** — Subscription per month, Credits per credit, or Per
+  token, with the amount, edited in place — the account's own session cap, its
+  quota windows where known, and remove. *Add account* opens an inline row
+  (label, harness, cost, sessions; Add / Cancel); remove asks in the row (*Remove
+  Claude B? 1 model uses only this account.* Remove / Keep). No file dialog
+  (milestone 252 built in-place add and remove for today's slots).
+- Global cap one line under the title; Routing as one folded row.
+
+### Skills library — board 7o `DeskSkillsLibrary`
+
+- **Settings → Skills library** (`_meta/skills/` of the tickets vault): *Add from
+  GitHub* opens an inline row — Repository, Path, Ref, *Fetch* — and *Upload
+  skill…* stays (the zip upload of milestone 232). **Sources**: each GitHub source
+  with its ref, skill count, last fetch, *Update to <newer ref>* and remove.
+  **Skills**: search, a filter All | Shared | GitHub | Own, and one row per skill —
+  name, source, *Used by* (the personas' initials), size in tokens, a `⋯` menu.
+- A fetched skill stays files (R8): its folder lands in `_meta/skills/<name>/`
+  as an Agent Skills folder, its source (`repo`, `path`, `ref`, fetched commit)
+  recorded beside it, one commit per fetch or update.
+
+### Settings without scopes
+
+- The Settings tab loses the scope tabs All devices · This device · This vault
+  (milestone 197's frame). **Settings are global.** The one exception: a phone or
+  iPad sets its own appearance (theme, text size) in Mission Control on that
+  device, and the desktop does not configure it. Where a value is stored — the
+  tickets vault's `_meta/`, the machine's `service.json`, the app config — is the
+  implementation's business, not the page's. Models and accounts stay per
+  machine (`service.json`); a second desktop sharing them would be a later sync
+  item, not part of this round.
+
+## 12. The build items (roadmap rows req-282 – req-291)
+
+After the finish line, frozen until the merge into `main`, in this order.
+Models: Opus where the engine or data changes, Sonnet for the boards-to-screen
+rows (the owner's rule for delegation).
+
+| Row | What | Touches |
+|---|---|---|
+| req-282 | **Projects: the record and the migration** — `_meta/projects/<id>.md` (name, colour, purpose, repos, folders, vaults), `project:` / `x-project` on tickets, the default project written once, `write-vaults` → project grants + `write-notes`, the board issue for a working ticket without a project, `## Project` in the run brief | `core/`, `store/extension-keys.ts`, ticket schema, ADR-0097 |
+| req-283 | **Vault rights per project** — the worker's token carries the project; read = the project's vaults and folders, write = project Write ∧ `write-notes` ∧ not read-only; a 1:1 reads every project's vaults and folders read-only; plain folders served read-only | `service/vault-mcp/`, ADR-0094 later change, R5 |
+| req-284 | **Settings → Projects** (board 7m) | tickets plugin settings, the colour control, the Markdown editor |
+| req-285 | **The global project filter** (board 7n) — title bar, saved per View; Files, Tickets panel, board, Review, Find; the card chip; capture into the filtered project; Mission Control's own filter and Pia's projects | base (title bar slot, Views), Files panel, tickets plugin, Mission Control |
+| req-286 | **Model discovery from the harnesses** — the harness rows, the model lists, *Find models again*, the new-model card | `fleet/harness/`, `fleet/routing/`, `service.json` |
+| req-287 | **Classes and accounts** (board 7l v3) — the owner's class list (A/B/C migrated, super heavy, Add class), at most N per class, move by drag or menu, the router switch, account cost in place | `fleet/routing/`, Settings → Models, ADR-0095 later change |
+| req-288 | **Persona v3** (board 7k v3) — `class:` + optional `model:` instead of `worker:` / `models:` (migrated), `min-class` folded in, the picture (D-67, req-235), Allowed to without vaults, skills from the library, Instructions filling the rest | `core/persona.ts`, dispatch, Persona page |
+| req-289 | **Skills library with GitHub sources** (board 7o) — fetch, update, source record, Used by, the persona's *Add from library* | `services/` skills routes, Settings, R8 |
+| req-290 | **Retire the slot profile** — `profile:` in `repos.md`, the slots' `profile`, the refusal; old keys read and ignored | `fleet/routing/`, `repos.md` parser, FLEET.md |
+| req-291 | **Settings without scopes** — the scope tabs leave the Settings tab; the mobile appearance stays device-local | `src/app/settings/`, ADR-0010 later change |
