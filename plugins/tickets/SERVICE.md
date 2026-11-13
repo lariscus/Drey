@@ -108,6 +108,7 @@ each parsed by its owner (`fleet/routing/service-config-schema.ts`):
 | Key | Owner | Holds |
 |---|---|---|
 | `slots` | req-177, `routing/slot-config.ts` | the accounts per provider: id, label, provider, profile, login folder, sessions |
+| `impliedOff` | D-69, `routing/slot-config.ts` | the providers whose implied slot the owner removed (Settings → Models) |
 | `quota` | req-177 | the quota sources (Claude Code, Kimi, z.ai) and their refresh |
 | `models` | req-170, `routing/pool-config.ts` | the model table: model, provider, category, class, cost factor, capabilities |
 | `capacity` | req-170 | the capacity cap, global and per provider |

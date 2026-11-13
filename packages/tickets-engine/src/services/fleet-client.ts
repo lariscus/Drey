@@ -371,6 +371,12 @@ export class FleetClient {
     return this.slotWrite<SlotsReply>('/slots/config', { slots });
   }
 
+  /** D-69: adds one slot entry to `service.json`, every other entry kept as written. */
+  addSlot = (slot: unknown): Promise<SlotsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<SlotsReply>('/slots/add', { slot });
+
+  /** D-69: removes one slot — a configured entry, or an implied slot (its provider then has no slot here). */
+  removeSlot = (id: string): Promise<SlotsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<SlotsReply>('/slots/remove', { id });
+
   // --- the capacity pool (req-170, board 7l) ----------------------------------
 
   /** The model table, the caps, the ledger defaults, the live load and the queue; null when no runner is awake. Never wakes one. */

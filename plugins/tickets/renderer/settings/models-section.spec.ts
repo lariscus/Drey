@@ -225,11 +225,54 @@ describe('Settings → Models page', () => {
     expect(section.root.querySelector('.tset-models-draft')).toBeNull();
   });
 
-  it('opens the folder of service.json for Add slot…', async () => {
+  it('Add slot… adds a row that Enter sends as one slot, and draws the slots the engine answers (D-69)', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    invoke.mockImplementationOnce(() => Promise.resolve({ ok: true, slots: [slot('a', 'Claude A'), slot('claude-b', 'Claude B', { profile: 'work' })] }));
+    [...section.root.querySelectorAll('button')].find((b) => b.textContent === 'Add slot…')!.click();
+    expect(invoke).not.toHaveBeenCalledWith('serviceOpenLogFolder');
+    const draft = section.root.querySelector('.tset-models-slotdraft')!;
+    const name = draft.querySelector<HTMLInputElement>('input[aria-label="Name"]')!;
+    const [provider, profile] = draft.querySelectorAll('select');
+    name.value = 'Claude B';
+    provider!.value = 'claude-code';
+    profile!.value = 'work';
+    name.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await settle();
+    expect(invoke).toHaveBeenCalledWith('slotAdd', { slot: { id: 'claude-b', label: 'Claude B', provider: 'claude-code', profile: 'work' } });
+    expect([...section.root.querySelectorAll('.tset-models-cardname')].map((n) => n.textContent)).toEqual(['Claude A', 'Claude B']);
+    expect(section.root.querySelector('.tset-models-slotdraft')).toBeNull();
+  });
+
+  it('every slot card has a remove control that sends its id; a refusal shows under the slots (D-69)', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    const removes = [...section.root.querySelectorAll<HTMLButtonElement>('.tset-models-card .tset-models-slotremove')];
+    expect(removes.map((b) => b.getAttribute('aria-label'))).toEqual(['Remove Claude A', 'Remove Copilot']);
+    invoke.mockImplementationOnce(() => Promise.resolve({ ok: false, error: 'slot "a" runs claude-opus-4-1 in the model table: move or remove those rows first' }));
+    removes[0]!.click();
+    await settle();
+    expect(invoke).toHaveBeenCalledWith('slotRemove', { id: 'a' });
+    expect(section.root.querySelector('.tset-models-addslot .tset-error')?.textContent).toContain('runs claude-opus-4-1');
+    invoke.mockImplementationOnce(() => Promise.resolve({ ok: true, slots: [slot('a', 'Claude A')] }));
+    section.root.querySelectorAll<HTMLButtonElement>('.tset-models-slotremove')[1]!.click();
+    await settle();
+    expect(invoke).toHaveBeenCalledWith('slotRemove', { id: 'w' });
+    expect([...section.root.querySelectorAll('.tset-models-cardname')].map((n) => n.textContent)).toEqual(['Claude A']);
+  });
+
+  it('a name with nothing an id can hold is not sent', async () => {
     const { section, invoke } = setup();
     await section.refresh();
     [...section.root.querySelectorAll('button')].find((b) => b.textContent === 'Add slot…')!.click();
-    expect(invoke).toHaveBeenCalledWith('serviceOpenLogFolder');
+    const name = section.root.querySelector<HTMLInputElement>('.tset-models-slotdraft input')!;
+    name.value = ' ** ';
+    name.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await settle();
+    expect(name.getAttribute('aria-invalid')).toBe('true');
+    expect(invoke.mock.calls.some(([method]) => method === 'slotAdd')).toBe(false);
+    name.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(section.root.querySelector('.tset-models-slotdraft')).toBeNull();
   });
 
   it('says so when no runner is awake and leaves every field disabled', async () => {

@@ -1649,8 +1649,14 @@ below the share kept in reserve), when the window resets (a time today, a
 weekday and time within the week, else the date), and whether the reading is *measured*, *estimated* or *unknown*;
 `q` on the right says whether the account has surplus to let a lighter
 class upgrade onto it (*upgrade allowed*) or only serves its own classes
-(*class B only*). **Add slot…** opens the folder of `service.json`, where the
-accounts are listed — the slots are edited there for now. **Routing:**
+(*class B only*). **Add slot…** opens a row: type the account's name, pick
+its provider and profile, and Enter adds the slot (Esc drops the row). The
+cross at a card's head removes the slot — an account you configured, or
+the stand-in account Drey assumes for a provider you never set up, which
+then gets no runs on this machine until you add a slot for it again. A slot
+the model table still names is not removed; the reason shows under the
+slots. A login folder or a quota limit is still set in `service.json`.
+**Routing:**
 *Upgrade above q* (empty: never upgrade), *Reserve per window* and *Burn
 rate* (both in percent; 0 switches them off) show the values the crew works
 with; change one and leave the field (or press Enter) and it is saved —

@@ -122,6 +122,8 @@ Invoke-RestMethod "http://127.0.0.1:$($d.port)/health" -Headers $h
 | `POST /slots/refresh` `{id?}` | read the quotas now (one slot, or all), the config reloaded first |
 | `POST /slots/login-done` `{id}` | the owner signed the slot's account in again: `needs-login` clears, its quota is read |
 | `POST /slots/config` `{slots: [...]}` | write the `slots` of `service.json` (every other key kept) and reload; a broken entry refuses the whole list (422), a file that does not parse refuses the write (409) |
+| `POST /slots/add` `{slot}` | D-69: append one slot entry, every other entry kept as written, and reload; takes its provider off `impliedOff`; an entry that does not parse or a taken id refuses (422), a file that does not parse refuses (409) |
+| `POST /slots/remove` `{id}` | D-69: remove one slot — a configured entry leaves `slots`, an implied slot's provider joins `impliedOff` — and reload; refused (422) while a model row names the slot, or for an unknown id |
 | `GET /models` | the capacity pool (req-170): `{ok, models: [{model, slot, provider, category, class, cost, sessions, input?, tools?, context?, output?}], capacity: {global, perSlot}, ledgers: {ticketAllowance, personaPerDay, providerPerDay}, routing: {upgradeAboveQ, reservePerWindow, burnRate}, now: <the live load>, queue: [...], providerDay: [{id, spent, limit}], errors, configPath}` — see "The capacity pool" below |
 | `POST /models/config` `{models?, capacity?, ledgers?, routing?}` | replace the pool keys it sends in `service.json` (the others, and every other key, kept) and reload; a broken row refuses the whole write (422), a file that does not parse refuses it (409) |
 | `POST /models/import` | req-178: fill the model table's **undeclared** capability columns from `https://models.dev/api.json` — the one network call of the routes, only when the owner asks; what a row declares stays (the local override). The `GET /models` reply plus `imported: {filled: [{model, where, fields}], unmatched: [model]}`; 502 when the registry does not answer (nothing written) |
@@ -591,7 +593,9 @@ then works with the implied slots and logs why.
 
 A provider no slot names runs on an **implied** `private` slot on its
 default login (ids `claude-code`, `opencode`, `kimi`, `copilot`; `implied: true`) —
-a machine without slots runs as before. An implied slot makes no network
+a machine without slots runs as before — unless the root key `impliedOff`
+(D-69, written by Settings → Models' remove) names the provider: then it
+has no slot on this machine. An implied slot makes no network
 call: Claude Code's windows come from its runs and cache, Kimi,
 OpenCode and Copilot CLI are counted. The z.ai and Kimi endpoints are read only for a
 slot `service.json` names.

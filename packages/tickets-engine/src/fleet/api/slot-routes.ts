@@ -12,9 +12,15 @@ export interface SlotDesk {
 }
 
 /** What the routes need of `service.json`. */
+type Written = { readonly ok: true } | { readonly ok: false; readonly error: string };
+/** A one-slot edit: `invalid` when the edit itself does not stand (422), else the file refused it (409). */
+type Edited = Written | { readonly ok: false; readonly error: string; readonly invalid: true };
+
 export interface SlotConfigStore {
   readonly path: string;
-  writeSlots(slots: readonly unknown[]): Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
+  writeSlots(slots: readonly unknown[]): Promise<Written>;
+  addSlot(entry: unknown): Promise<Edited>;
+  removeSlot(id: string): Promise<Edited>;
 }
 
 /** Checks a `slots` list before it is written: the reasons the parse would leave entries out. */
@@ -25,7 +31,9 @@ export type SlotListCheck = (slots: readonly unknown[]) => readonly string[];
  * its windows, q, state and last fetch; `POST /slots/refresh` reads the
  * quotas now; `POST /slots/login-done` clears a `needs login` after the
  * owner signed in again; `POST /slots/config` writes the `slots` of
- * `service.json` (every other key kept) and reloads.
+ * `service.json` (every other key kept) and reloads; `POST /slots/add` and
+ * `POST /slots/remove` change one slot, every other entry kept as written
+ * (D-69, Settings → Models).
  */
 export class SlotRoutes implements RouteGroup {
   constructor(
@@ -45,6 +53,10 @@ export class SlotRoutes implements RouteGroup {
         return this.loginDone(ctx);
       case 'POST /slots/config':
         return this.configure(ctx);
+      case 'POST /slots/add':
+        return this.edit(ctx, (body) => this.config.addSlot(body['slot']));
+      case 'POST /slots/remove':
+        return this.edit(ctx, (body) => (typeof body['id'] === 'string' ? this.config.removeSlot(body['id']) : Promise.resolve({ ok: false, error: 'a slot to remove needs its id', invalid: true } as const)));
       default:
         return false;
     }
@@ -93,6 +105,20 @@ export class SlotRoutes implements RouteGroup {
     const written = await this.config.writeSlots(body.slots);
     if (!written.ok) {
       ctx.respond(409, written);
+      return true;
+    }
+    await this.desk.load();
+    await this.desk.refresh(undefined, true);
+    ctx.respond(200, this.reply());
+    return true;
+  }
+
+  /** One slot added or removed: refused while `service.json` does not parse or the edit does not stand. */
+  private async edit(ctx: RouteContext, change: (body: Record<string, unknown>) => Promise<Edited>): Promise<boolean> {
+    const raw = (await ctx.body()) as unknown;
+    const edited = await change(raw !== null && typeof raw === 'object' ? (raw as Record<string, unknown>) : {});
+    if (!edited.ok) {
+      ctx.respond('invalid' in edited ? 422 : 409, { ok: false, error: edited.error });
       return true;
     }
     await this.desk.load();

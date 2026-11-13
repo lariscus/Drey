@@ -620,6 +620,20 @@
   overflow: auto;
 }
 
+/* D-68: the brief's view takes its text's height and the panel scrolls; the editor frame's flex rules above (D-66) would collapse it to nothing. */
+.persona-ed-preview .persona-ed-view {
+  flex: none;
+}
+
+.persona-ed-preview .persona-ed-view > .host {
+  display: block;
+}
+
+.persona-ed-preview .persona-ed-view .cm-editor {
+  flex: none;
+  height: auto;
+}
+
 .persona-preview-parts {
   display: flex;
   flex-wrap: wrap;

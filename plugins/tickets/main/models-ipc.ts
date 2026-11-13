@@ -2,14 +2,14 @@
  * The Settings → Models page's IPC (req-170, board 7l; the slots of req-177
  * beside it; req-178's routing keys and the models.dev import): the renderer reads and writes the capacity pool and the slots
  * over the engine's fleet proxy, which asks the runner's `/models` and
- * `/slots` routes. A read while no runner is awake answers null (it never
+ * `/slots` routes (D-69 added one slot's add and remove). A read while no runner is awake answers null (it never
  * wakes one); a write wakes it.
  */
 import type { ModelsReply } from '../../../packages/tickets-engine/src/fleet/protocol';
 import type { FleetClient, SlotsReply } from '../../../packages/tickets-engine/src/services/fleet-client';
 
 /** What the handlers need of the fleet proxy. */
-export type ModelsFleet = Pick<FleetClient, 'models' | 'writeModels' | 'importModelCapabilities' | 'slots' | 'writeSlots' | 'refreshSlots' | 'slotLoginDone'>;
+export type ModelsFleet = Pick<FleetClient, 'models' | 'writeModels' | 'importModelCapabilities' | 'slots' | 'writeSlots' | 'addSlot' | 'removeSlot' | 'refreshSlots' | 'slotLoginDone'>;
 
 type Handle = (channel: string, handler: (payload: unknown) => unknown) => void;
 type Refusal = { readonly ok: false; readonly error: string };
@@ -41,6 +41,14 @@ export function registerModelsIpc(handle: Handle, fleet: ModelsFleet): void {
   handle('slotsConfig', (payload): Promise<SlotsReply | Refusal> | Refusal => {
     const slots = objectOf(payload)['slots'];
     return Array.isArray(slots) ? fleet.writeSlots(slots) : { ok: false, error: 'the slot config needs a slots list' };
+  });
+  handle('slotAdd', (payload): Promise<SlotsReply | Refusal> | Refusal => {
+    const slot = objectOf(payload)['slot'];
+    return slot !== null && typeof slot === 'object' && !Array.isArray(slot) ? fleet.addSlot(slot) : { ok: false, error: 'which slot?' };
+  });
+  handle('slotRemove', (payload): Promise<SlotsReply | Refusal> | Refusal => {
+    const id = objectOf(payload)['id'];
+    return typeof id === 'string' ? fleet.removeSlot(id) : { ok: false, error: 'which slot?' };
   });
   handle('slotsRefresh', (payload) => {
     const id = objectOf(payload)['id'];

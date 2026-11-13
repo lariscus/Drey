@@ -85,6 +85,25 @@ describe('mcComposerFit (D-57)', () => {
     delete (HTMLTextAreaElement.prototype as unknown as Record<string, unknown>)['scrollHeight'];
   });
 
+  it('refits on the input event itself, before any render (no frame with a stale height)', async () => {
+    let needed = 24;
+    Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', { configurable: true, get: () => needed });
+    const fixture = TestBed.createComponent(Host);
+    const el = fixture.nativeElement.querySelector('textarea') as HTMLTextAreaElement;
+    el.style.cssText = 'box-sizing: border-box; padding: 0; border: 0; font-size: 16px; line-height: 24px';
+    document.body.append(fixture.nativeElement);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    needed = 120;
+    el.dispatchEvent(new Event('input'));
+    expect(el.style.height).toBe('120px');
+    needed = 24;
+    el.dispatchEvent(new Event('input'));
+    expect(el.style.height).toBe('24px');
+    fixture.nativeElement.remove();
+  });
+
   it('refits after the draft changes, not only on input events', async () => {
     let needed = 24;
     Object.defineProperty(HTMLTextAreaElement.prototype, 'scrollHeight', { configurable: true, get: () => needed });
