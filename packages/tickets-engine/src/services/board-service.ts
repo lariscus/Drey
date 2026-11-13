@@ -63,7 +63,7 @@ import { parseTicketChainFields } from '../core/ticket-chain-fields';
 import type { PinCursorOf } from '../store/stage-migration-plan';
 import { crewLookupOf, holderOf } from '../core/chain-holder';
 import { lanesOf, withPersonaBoard } from '../core/persona-board';
-import { builderOf, crewMigrationOf, defaultsMigrationOf, flowOrderOf, pipelineMigrationOf } from '../core/board-migration';
+import { builderOf, crewMigrationOf, defaultsMigrationOf, flowOrderOf, pipelineMigrationOf, type PipelineMigration } from '../core/board-migration';
 import { LEGACY_DEFAULT_PERSONAS, type BoardMigrationOffer, type BoardMigrationResult, type BoardMigrationStep, type CrewMigrationPlan } from '../contracts/board-migration';
 import type { TicketDetail } from '../ports/ticket-store';
 import { ARCHIVED_LABEL } from '../store/legacy-bridge';
@@ -267,7 +267,7 @@ export interface BoardServiceOptions {
 /** req-268: the next migration step and what running it writes. */
 interface BoardMigrationPlan {
   readonly offer: BoardMigrationOffer;
-  readonly pipeline?: NonNullable<ReturnType<typeof pipelineMigrationOf>>;
+  readonly pipeline?: PipelineMigration;
 }
 
 /** What `dk add` writes as the description of a ticket nobody has filled yet. */
@@ -557,7 +557,7 @@ export class EngineBoardService {
   }
 
   /** Step 3's files: `pipeline.md`, and the builder's record when keys move onto it. */
-  private async writePipelineStep(vault: EngineVault, crew: readonly Persona[], step: NonNullable<ReturnType<typeof pipelineMigrationOf>>): Promise<string[]> {
+  private async writePipelineStep(vault: EngineVault, crew: readonly Persona[], step: PipelineMigration): Promise<string[]> {
     await this.host.write(vault.id, PIPELINE_PATH, step.text);
     const touched = [PIPELINE_PATH];
     const builder = crew.find((persona) => persona.id === step.builder);

@@ -25,6 +25,7 @@
  * it in from the fleet's runs and chain status. Wording is each surface's
  * (the i18n catalog) — the helpers here return kinds, never sentences.
  */
+import type { BoardMigrationOffer } from './board-migration';
 import type { ChainSendBack } from './chain';
 import type { BoardSnapshot, TicketCard } from './tickets';
 
@@ -75,6 +76,20 @@ export interface TicketHold {
   readonly sentBack: ChainSendBack | null;
   /** Open questions the owner has not answered (`why: question`); 0 otherwise. */
   readonly questions: number;
+}
+
+/** The card's persona board field (`TicketCard` extends it). */
+export interface TicketHoldField {
+  /** req-270: an active ticket's holder, position n of m, chain and why it stands there; absent on the phase board and in the lifecycle columns. */
+  readonly hold?: TicketHold;
+}
+
+/** The snapshot's persona board fields (`BoardSnapshot` extends them). */
+export interface PersonaBoardFields {
+  /** req-270: the holder columns in the crew's order, You included — present exactly on a persona board (a lifecycle store). */
+  readonly lanes?: readonly BoardLane[];
+  /** req-268: the next step of the live board migration the owner may confirm (steps 3–5); absent = none. */
+  readonly boardMigration?: BoardMigrationOffer;
 }
 
 /** True when the snapshot is a persona board (it carries holder lanes). */
@@ -200,39 +215,36 @@ export function holdDotOf(status: HoldStatus): 'run' | 'wait' | 'need' {
 /** The leaving action's activity while the builder merges `main` (fleet/orchestrate/run-leaving.ts). */
 const MERGING_MAIN = 'merging main';
 
-/**
- * The card's status from its hold, the kinds of the crew and what the fleet
- * says. `kindOf` answers a persona id's kind (null = not in the crew).
- */
-export function holdStatusOf(hold: TicketHold, live: HoldLive, kindOf: (persona: string) => BoardLane['kind'] | null): HoldStatus {
-  if (hold.why === 'question') {
-    return { kind: 'asks', persona: hold.named, questions: hold.questions };
+/** What stands at You for want of an answer: a question, the second send-back, no persona; null = an entry. */
+function ownerStatusOf(hold: TicketHold): HoldStatus | null {
+  switch (hold.why) {
+    case 'question':
+      return { kind: 'asks', persona: hold.named, questions: hold.questions };
+    case 'second-send-back':
+      return { kind: 'decide' };
+    case 'no-persona':
+      return { kind: 'no-persona', position: hold.position };
+    default:
+      return null;
   }
-  if (hold.why === 'second-send-back') {
-    return { kind: 'decide' };
-  }
-  if (hold.why === 'no-persona') {
-    return { kind: 'no-persona', position: hold.position };
-  }
-  const human = hold.holder === YOU_LANE || kindOf(hold.holder) === 'human';
-  if (live.running) {
-    if (human) {
-      return { kind: 'committing' };
-    }
-    if ((live.activity ?? '').startsWith(MERGING_MAIN)) {
-      return { kind: 'merging-main' };
-    }
-    const from = hold.sentBack !== null && hold.position === hold.sentBack.to ? (hold.chain[hold.sentBack.from - 1] ?? null) : null;
-    return { kind: 'running', minutes: live.minutes, from };
-  }
+}
+
+/** A live run's status: You's commit, the builder's sync-main, or the run (from the persona that sent it back). */
+function runStatusOf(hold: TicketHold, live: HoldLive, human: boolean): HoldStatus {
   if (human) {
-    return hold.position >= hold.length ? { kind: 'ready' } : { kind: 'your-step' };
+    return { kind: 'committing' };
   }
+  if ((live.activity ?? '').startsWith(MERGING_MAIN)) {
+    return { kind: 'merging-main' };
+  }
+  const from = hold.sentBack !== null && hold.position === hold.sentBack.to ? (hold.chain[hold.sentBack.from - 1] ?? null) : null;
+  return { kind: 'running', minutes: live.minutes, from };
+}
+
+/** An agent entry without a run: the Shape chat, a held persona, its own pool, the big pool. */
+function idleAgentStatusOf(hold: TicketHold, live: HoldLive): HoldStatus {
   if (hold.mode === 'shape') {
     return { kind: 'shaping' };
-  }
-  if (kindOf(hold.holder) === 'mission') {
-    return { kind: 'mission-turn' };
   }
   if (live.held) {
     return { kind: 'held' };
@@ -241,6 +253,25 @@ export function holdStatusOf(hold: TicketHold, live: HoldLive, kindOf: (persona:
     return { kind: 'waits-for', persona: live.waitsFor };
   }
   return live.queued !== null ? { kind: 'queued', line: live.queued } : { kind: 'waiting' };
+}
+
+/**
+ * The card's status from its hold, the kinds of the crew and what the fleet
+ * says. `kindOf` answers a persona id's kind (null = not in the crew).
+ */
+export function holdStatusOf(hold: TicketHold, live: HoldLive, kindOf: (persona: string) => BoardLane['kind'] | null): HoldStatus {
+  const owner = ownerStatusOf(hold);
+  if (owner !== null) {
+    return owner;
+  }
+  const human = hold.holder === YOU_LANE || kindOf(hold.holder) === 'human';
+  if (live.running) {
+    return runStatusOf(hold, live, human);
+  }
+  if (human) {
+    return hold.position >= hold.length ? { kind: 'ready' } : { kind: 'your-step' };
+  }
+  return kindOf(hold.holder) === 'mission' && hold.mode !== 'shape' ? { kind: 'mission-turn' } : idleAgentStatusOf(hold, live);
 }
 
 /** A column head's load (`Ben · 2/2 · 1 waiting`): runs now, the cap, what waits; You shows none. */
@@ -277,22 +308,22 @@ export type PersonaBoardMove =
   | { readonly kind: 'hand'; readonly id: string; readonly persona: string }
   | { readonly kind: 'park'; readonly id: string; readonly stage: 'prioritized' | 'inbox' };
 
+const TICKET_ID = /^T-\d{4,}$/;
+const PERSONA_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
+
+function textMatching(raw: unknown, pattern: RegExp): string | null {
+  return typeof raw === 'string' && pattern.test(raw) ? raw : null;
+}
+
 /** The move a `personaBoardMove` payload carries; null when it is no valid move. */
 export function parsePersonaBoardMove(payload: unknown): PersonaBoardMove | null {
-  if (typeof payload !== 'object' || payload === null) {
-    return null;
+  const raw = typeof payload === 'object' && payload !== null ? (payload as Record<string, unknown>) : {};
+  const id = textMatching(raw['id'], TICKET_ID);
+  const persona = textMatching(raw['persona'], PERSONA_ID);
+  const kind = raw['kind'];
+  if (id !== null && persona !== null && (kind === 'start' || kind === 'hand')) {
+    return { kind, id, persona };
   }
-  const raw = payload as Record<string, unknown>;
-  const id = typeof raw['id'] === 'string' && /^T-\d{4,}$/.test(raw['id']) ? raw['id'] : null;
-  if (id === null) {
-    return null;
-  }
-  const persona = typeof raw['persona'] === 'string' && /^[a-z0-9][a-z0-9-]{0,63}$/.test(raw['persona']) ? raw['persona'] : null;
-  if ((raw['kind'] === 'start' || raw['kind'] === 'hand') && persona !== null) {
-    return { kind: raw['kind'], id, persona };
-  }
-  if (raw['kind'] === 'park' && (raw['stage'] === 'prioritized' || raw['stage'] === 'inbox')) {
-    return { kind: 'park', id, stage: raw['stage'] };
-  }
-  return null;
+  const stage = raw['stage'];
+  return id !== null && kind === 'park' && (stage === 'prioritized' || stage === 'inbox') ? { kind: 'park', id, stage } : null;
 }

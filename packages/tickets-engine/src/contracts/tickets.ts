@@ -11,7 +11,7 @@
  * reachable; the plugin renderer bundle may not import packages).
  */
 import type { ChainEntry, TicketChainFields } from './chain';
-import type { BoardLane, TicketHold } from './persona-board';
+import type { PersonaBoardFields, TicketHoldField } from './persona-board';
 import type { PhasePoolMeta, TicketPoolMeta } from './ticket-pool-meta';
 import type { RepoRef } from './repo-ref';
 import type { PriorityConfig, TicketPriority } from './ticket-priority';
@@ -204,7 +204,7 @@ export interface TicketUsage {
 }
 
 /** One ticket as the board renders it — meta plus derived/board context. */
-export interface TicketCard {
+export interface TicketCard extends TicketHoldField {
   readonly id: string;
   /** Current vault-relative path (`tickets/<phase>/<id>.md`). */
   readonly path: string;
@@ -227,12 +227,6 @@ export interface TicketCard {
   /** The derived inverse: ids currently blocked by this card (open edges). */
   readonly blocks: readonly string[];
   readonly issues: readonly TicketIssue[];
-  /**
-   * req-270: on a persona board, an `active` / `running` ticket's holder, its
-   * position n of m, the chain and why it stands there (`contracts/persona-board.ts`).
-   * Absent on the phase board and in the lifecycle columns.
-   */
-  readonly hold?: TicketHold;
 }
 
 /** One pipeline phase from `tickets/_meta/pipeline.md`. */
@@ -382,7 +376,7 @@ export interface RecentDone {
 }
 
 /** The whole board, rebuilt from files on every fetch — no stored state. */
-export interface BoardSnapshot {
+export interface BoardSnapshot extends PersonaBoardFields {
   readonly vaultId: string | null;
   readonly vaultName: string | null;
   /** Display name of the active vault — the empty state's initialize hint. */
@@ -427,14 +421,6 @@ export interface BoardSnapshot {
   readonly checkpoints: readonly string[];
   /** Tickets archived within the last 7 days, newest first (req-75 W1b). */
   readonly recentDone: readonly RecentDone[];
-  /**
-   * req-270: the persona board's holder columns in the crew's order, You
-   * included — present exactly when the board runs on a lifecycle store
-   * (`contracts/persona-board.ts`). Absent = the phase board.
-   */
-  readonly lanes?: readonly BoardLane[];
-  /** req-268: the next step of the live board migration the owner may confirm (steps 3–5); absent = none. */
-  readonly boardMigration?: import('./board-migration').BoardMigrationOffer;
 }
 
 /** `true` when the id parses AND matches the file stem it came from. */

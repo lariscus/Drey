@@ -39,26 +39,31 @@ function whyOf(holder: TicketHolder, decisions: readonly OpenTicketStatus[]): Ho
   return holder.kind === 'no-persona' ? 'no-persona' : 'entry';
 }
 
+/** The open questions of a ticket that waits for the owner's answer (at least the one that parked it). */
+function questionsOf(decisions: readonly OpenTicketStatus[]): number {
+  return Math.max(1, decisions.filter((item) => item.key === null || !NOT_A_QUESTION.includes(item.key)).length);
+}
+
 /** The hold of one active card; null in a lifecycle column. */
 export function holdOf(card: TicketCard, lookup: PersonaLookup, decisions: readonly OpenTicketStatus[]): TicketHold | null {
   const holder = holderOf({ stage: 'active', chain: card.meta.chain, at: card.meta.at, awaiting: card.meta.awaiting }, lookup);
   if (holder.kind === 'none') {
     return null;
   }
-  const chain = card.meta.chain ?? [];
-  const entry = holder.entry;
+  const chain = (card.meta.chain ?? []).map((item) => item.persona);
+  const entry = holder.entry ?? { position: 1, length: chain.length, named: null, mode: null };
   const why = whyOf(holder, decisions);
   return {
     holder: holder.persona,
     why,
-    position: entry?.position ?? 1,
-    length: entry?.length ?? chain.length,
-    chain: chain.map((item) => item.persona),
-    mode: entry?.mode ?? null,
-    named: entry?.named ?? null,
+    position: entry.position,
+    length: entry.length,
+    chain,
+    mode: entry.mode,
+    named: entry.named,
     claimed: card.meta.claimedBy !== null,
     sentBack: card.meta.sentBack ?? null,
-    questions: why === 'question' ? Math.max(1, decisions.filter((item) => item.key === null || !NOT_A_QUESTION.includes(item.key)).length) : 0,
+    questions: why === 'question' ? questionsOf(decisions) : 0,
   };
 }
 

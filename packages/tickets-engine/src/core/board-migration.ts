@@ -5,7 +5,7 @@
  * BoardService reads the files, offers the next step and writes it on the
  * owner's confirmation.
  */
-import { isMap, isSeq, parseDocument, type YAMLMap } from 'yaml';
+import { isMap, isSeq, parseDocument, type Document, type YAMLMap, type YAMLSeq } from 'yaml';
 import { splitFrontmatter } from '../../../../shared/frontmatter';
 import { LEGACY_DEFAULT_PERSONAS, type CrewMigrationPlan, type DefaultsMigrationPlan, type PipelineMigrationPlan } from '../contracts/board-migration';
 import type { PersonaSettingsPatch } from '../contracts/persona-settings-patch';
@@ -46,23 +46,30 @@ function scalar(map: YAMLMap, key: string): unknown {
   return typeof value === 'object' && value !== null && 'toJSON' in value ? (value as { toJSON(): unknown }).toJSON() : value;
 }
 
-/** The builder's settings patch for the moved keys — only those its record does not set already. */
-function movedPatch(found: ReadonlyMap<string, unknown>, builder: Pick<Persona, 'settings'> | null): { readonly patch: PersonaSettingsPatch; readonly keys: readonly string[] } {
-  if (builder === null) {
-    return { patch: {}, keys: [] };
-  }
-  const patch: { -readonly [K in keyof PersonaSettingsPatch]: PersonaSettingsPatch[K] } = {};
-  const keys: string[] = [];
+type MutablePatch = { -readonly [K in keyof PersonaSettingsPatch]: PersonaSettingsPatch[K] };
+
+/** `min-class` and `needs` onto the patch, where the builder sets neither. */
+function moveClassAndNeeds(found: ReadonlyMap<string, unknown>, settings: Persona['settings'], patch: MutablePatch, keys: string[]): void {
   const minClass = found.get('min-class');
-  if (typeof minClass === 'string' && (PERSONA_CLASSES as readonly string[]).includes(minClass) && builder.settings.minClass === null) {
+  if (typeof minClass === 'string' && (PERSONA_CLASSES as readonly string[]).includes(minClass) && settings.minClass === null) {
     patch.minClass = minClass as PersonaSettingsPatch['minClass'];
     keys.push('min-class');
   }
   const needs = found.get('needs');
-  if (needs !== undefined && builder.settings.needs === null) {
+  if (needs !== undefined && settings.needs === null) {
     patch.needs = Array.isArray(needs) ? needs.join(', ') : String(needs);
     keys.push('needs');
   }
+}
+
+/** The builder's settings patch for the moved keys — only those its record does not set already. */
+function movedPatch(found: ReadonlyMap<string, unknown>, builder: Pick<Persona, 'settings'> | null): { readonly patch: PersonaSettingsPatch; readonly keys: readonly string[] } {
+  const patch: MutablePatch = {};
+  const keys: string[] = [];
+  if (builder === null) {
+    return { patch, keys };
+  }
+  moveClassAndNeeds(found, builder.settings, patch, keys);
   for (const [key, field] of [['max-turns', 'maxTurns'], ['max-work', 'maxWorkMin']] as const) {
     const value = found.get(key);
     if (typeof value === 'number' && Number.isInteger(value) && value > 0 && builder.settings[field] === null) {
@@ -73,69 +80,95 @@ function movedPatch(found: ReadonlyMap<string, unknown>, builder: Pick<Persona, 
   return { patch, keys };
 }
 
-/** Step 3 over `pipeline.md`; null when the file holds only the lifecycle columns and a `flow:` already. */
-export function pipelineMigrationOf(
-  pipelineText: string,
-  personas: readonly Pick<Persona, 'id' | 'kind' | 'settings'>[],
-): { readonly plan: PipelineMigrationPlan; readonly text: string; readonly builder: string | null; readonly patch: PersonaSettingsPatch } | null {
-  const { yamlText, body, hadFence } = splitFrontmatter(pipelineText);
-  const doc = parseDocument(yamlText ?? '');
-  const phases = doc.get('phases');
-  if (!hadFence || !isSeq(phases)) {
-    return null;
+/** The run keys, the token budget and the homeless keys the removed columns carried (the first column's value wins). */
+function removedKeysOf(removed: readonly YAMLMap[]): { readonly found: ReadonlyMap<string, unknown>; readonly dropped: readonly string[] } {
+  const found = new Map<string, unknown>();
+  const dropped: string[] = [];
+  for (const item of removed) {
+    for (const key of [...MOVED_KEYS, 'token-budget', ...HOMELESS_KEYS]) {
+      const value = scalar(item, key);
+      if (value === undefined || value === null || found.has(key)) {
+        continue;
+      }
+      found.set(key, value);
+      if (HOMELESS_KEYS.includes(key)) {
+        dropped.push(`${key}: ${String(value)}`);
+      }
+    }
   }
+  return { found, dropped };
+}
+
+/** The pipeline document with only the kept columns (their `persona:` gone), the flow and the board's token budget. */
+function rewritten(doc: Document, phases: YAMLSeq, kept: readonly YAMLMap[], adds: { readonly flowLine: string | null; readonly tokenBudget: number | null }): void {
+  const { flowLine, tokenBudget } = adds;
+  for (const item of kept) {
+    item.delete('persona'); // the chain says who; a column persona is gone (concept §8)
+  }
+  phases.items = [...kept];
+  if (flowLine === null) {
+    doc.set('flow', STANDARD_FLOW_LINE);
+  }
+  if (tokenBudget !== null && !doc.has('token-budget')) {
+    doc.set('token-budget', tokenBudget);
+  }
+}
+
+/** The columns of a pipeline split into the lifecycle ones it keeps and the rest. */
+function splitColumns(phases: YAMLSeq): { readonly kept: readonly YAMLMap[]; readonly removed: readonly YAMLMap[] } {
   const items = phases.items.filter((item): item is YAMLMap => isMap(item));
   const terminal = items.length > 0 ? String(scalar(items[items.length - 1]!, 'id')) : null;
   const keep = (item: YAMLMap): boolean => {
     const id = String(scalar(item, 'id'));
     return EDGE_STAGES.includes(id) || id === terminal;
   };
-  const removed = items.filter((item) => !keep(item));
+  return { kept: items.filter(keep), removed: items.filter((item) => !keep(item)) };
+}
+
+function budgetOf(raw: unknown): number | null {
+  return typeof raw === 'number' && raw > 0 ? raw : null;
+}
+
+/** What step 3 writes and offers. */
+export interface PipelineMigration {
+  readonly plan: PipelineMigrationPlan;
+  readonly text: string;
+  readonly builder: string | null;
+  readonly patch: PersonaSettingsPatch;
+}
+
+/** Step 3 over `pipeline.md`; null when the file holds only the lifecycle columns and a `flow:` already. */
+export function pipelineMigrationOf(pipelineText: string, personas: readonly Pick<Persona, 'id' | 'kind' | 'settings'>[]): PipelineMigration | null {
+  const { yamlText, body, hadFence } = splitFrontmatter(pipelineText);
+  const doc = parseDocument(yamlText ?? '');
+  const phases = doc.get('phases');
+  if (!hadFence || !isSeq(phases)) {
+    return null;
+  }
+  const { kept, removed } = splitColumns(phases);
   const flowLine = typeof doc.get('flow') === 'string' ? String(doc.get('flow')) : null;
   if (removed.length === 0 && flowLine !== null) {
     return null;
   }
-  const found = new Map<string, unknown>();
-  const dropped: string[] = [];
-  for (const item of removed) {
-    for (const key of [...MOVED_KEYS, 'token-budget', ...HOMELESS_KEYS]) {
-      const value = scalar(item, key);
-      if (value !== undefined && value !== null && !found.has(key)) {
-        found.set(key, value);
-        if (HOMELESS_KEYS.includes(key)) {
-          dropped.push(`${key}: ${String(value)}`);
-        }
-      }
-    }
-  }
+  const { found, dropped } = removedKeysOf(removed);
   const builder = builderOf(flowLine ?? STANDARD_FLOW_LINE, personas);
   const moved = movedPatch(found, personas.find((persona) => persona.id === builder) ?? null);
-  for (const item of items.filter(keep)) {
-    item.delete('persona'); // the chain says who; a column persona is gone (concept §8)
-  }
-  phases.items = items.filter(keep);
-  if (flowLine === null) {
-    doc.set('flow', STANDARD_FLOW_LINE);
-  }
-  const budget = found.get('token-budget');
-  const tokenBudget = typeof budget === 'number' && budget > 0 ? budget : null;
-  if (tokenBudget !== null && !doc.has('token-budget')) {
-    doc.set('token-budget', tokenBudget);
-  }
+  const tokenBudget = budgetOf(found.get('token-budget'));
+  rewritten(doc, phases, kept, { flowLine, tokenBudget });
   const prose = body.trim() === PIPELINE_PROSE.trim() ? LIFECYCLE_PIPELINE_PROSE : body;
-  return {
-    plan: {
-      step: 'pipeline',
-      removed: removed.map((item) => String(scalar(item, 'title') ?? scalar(item, 'id'))),
-      flow: flowLine === null ? STANDARD_FLOW_LINE : null,
-      moved: moved.keys.length > 0 && builder !== null ? { persona: builder, keys: moved.keys } : null,
-      tokenBudget,
-      dropped,
-    },
-    text: `---\n${doc.toString({ lineWidth: 0 })}---\n${prose}`,
-    builder,
-    patch: moved.patch,
+  const plan: PipelineMigrationPlan = {
+    step: 'pipeline',
+    removed: removed.map((item) => String(scalar(item, 'title') ?? scalar(item, 'id'))),
+    flow: flowLine === null ? STANDARD_FLOW_LINE : null,
+    moved: movedOf(builder, moved.keys),
+    tokenBudget,
+    dropped,
   };
+  return { plan, text: `---\n${doc.toString({ lineWidth: 0 })}---\n${prose}`, builder, patch: moved.patch };
+}
+
+function movedOf(builder: string | null, keys: readonly string[]): PipelineMigrationPlan['moved'] {
+  return keys.length > 0 && builder !== null ? { persona: builder, keys } : null;
 }
 
 /** The persona ids of a flow line in their first order (the team's order the standard flow implies). */
