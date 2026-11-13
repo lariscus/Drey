@@ -6,6 +6,7 @@
  */
 import { CREW_OVERRIDE_MAPS, crewFieldOf, type CrewOverrideMap, type CrewOverridePatch, type CrewPatch } from '../contracts/crew-config';
 import { SESSION_PERMISSIONS, type FreeSessionAsk, type SessionPermission } from '../contracts/free-session';
+import { classNameOf } from '../contracts/capability-class';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -48,12 +49,11 @@ function overrideOf(entry: unknown): CrewOverridePatch | null {
   return name === null || !valid ? null : { map: entry['map'] as CrewOverrideMap, name, value: typeof value === 'number' ? value : undefined };
 }
 
-const CLASSES = ['A', 'B', 'C'] as const;
-
 /** The optional fields of an ask, each checked; the error of the first wrong one. */
 function optionalsOf(payload: Record<string, unknown>): Omit<FreeSessionAsk, 'persona' | 'directory'> | string {
   const poolClass = payload['poolClass'];
-  if (poolClass !== undefined && poolClass !== null && !(CLASSES as readonly unknown[]).includes(poolClass)) {
+  const className = poolClass === undefined || poolClass === null ? null : classNameOf(poolClass);
+  if (poolClass !== undefined && poolClass !== null && className === null) {
     return `unknown class "${String(poolClass)}"`;
   }
   const permission = payload['permissionMode'];
@@ -63,7 +63,7 @@ function optionalsOf(payload: Record<string, unknown>): Omit<FreeSessionAsk, 'pe
   const model = text(payload['model']);
   const firstLine = text(payload['firstLine']);
   return {
-    ...(poolClass !== undefined && poolClass !== null ? { poolClass: poolClass as (typeof CLASSES)[number] } : {}),
+    ...(className !== null ? { poolClass: className } : {}),
     ...(permission !== undefined ? { permissionMode: permission as SessionPermission } : {}),
     ...(model !== null ? { model } : {}),
     ...(firstLine !== null ? { firstLine } : {}),

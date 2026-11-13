@@ -32,7 +32,11 @@ export const FLEET_METHODS = [
   'writeSlots',
   'addSlot',
   'removeSlot',
+  'updateSlot',
   'models',
   'writeModels',
   'importModelCapabilities',
+  'discoverModels',
+  'addDiscoveredModel',
+  'ignoreDiscoveredModel',
 ] as const;

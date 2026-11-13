@@ -8,7 +8,7 @@ import { CrewSeederRig, modelRow } from './crew-seeder-rig.fake';
 
 const DIR = 'tickets/_meta/personas';
 const CREW = 'tickets/_meta/crew.md';
-const TABLE = [modelRow('opus-x', 'claude-code', 'A'), modelRow('glm-big', 'opencode', 'A'), modelRow('glm-small', 'opencode', 'C'), modelRow('glm-mid', 'opencode', 'B')];
+const TABLE = [modelRow('opus-x', 'claude-code', 'heavy'), modelRow('glm-big', 'opencode', 'heavy'), modelRow('glm-small', 'opencode', 'light'), modelRow('glm-mid', 'opencode', 'standard')];
 
 describe('CrewSeeder — the default crew Pia, Paul, Ben, Ralf, Tessa (req-256, req-269)', () => {
   let rig: CrewSeederRig;

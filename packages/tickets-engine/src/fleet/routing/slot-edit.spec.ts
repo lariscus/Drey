@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseServiceSlots } from './slot-config';
-import { slotAdded, slotRemoved } from './slot-edit';
+import { slotAdded, slotRemoved, slotUpdated } from './slot-edit';
 
 /** One slot added or removed in `service.json` (D-69): the other entries stay as written, an implied slot is removed through `impliedOff`. */
 describe('slot edits', () => {
@@ -43,3 +43,28 @@ describe('slot edits', () => {
     expect(slotRemoved({ slots: [kept] }, 'nope')).toEqual({ ok: false, error: 'unknown slot "nope"' });
   });
 });
+
+/** req-287: an account edited in place, and removed with the model rows only it serves once the owner confirmed. */
+describe('slot edits — the accounts of board 7l v3', () => {
+  const kept = { id: 'claude-a', label: 'Claude A', provider: 'claude-code', login: { claudeConfigDir: 'C:/a' }, sessions: 2 };
+
+  it('changes the label, the cost and the sessions; keeps every other key; null removes a key', () => {
+    const edit = slotUpdated({ slots: [kept] }, 'claude-a', { billing: { kind: 'token', pricePerMillion: 3 }, sessions: null, login: { claudeConfigDir: 'C:/evil' } });
+    expect(edit).toEqual({ ok: true, root: { slots: [{ id: 'claude-a', label: 'Claude A', provider: 'claude-code', login: { claudeConfigDir: 'C:/a' }, billing: { kind: 'token', pricePerMillion: 3 } }] } });
+    expect(parseServiceSlots((edit as { root: Record<string, unknown> }).root).slots[0]?.billing).toEqual({ kind: 'token', pricePerMillion: 3 });
+  });
+
+  it('a change of an implied slot writes it out; an unknown id or a broken value is refused', () => {
+    const edit = slotUpdated({ slots: [] }, 'kimi', { billing: { kind: 'subscription', pricePerMonth: 19 } });
+    expect(edit).toMatchObject({ ok: true, root: { slots: [{ id: 'kimi', label: 'Kimi', provider: 'kimi', billing: { kind: 'subscription', pricePerMonth: 19 } }] } });
+    expect(slotUpdated({ slots: [kept] }, 'nope', { sessions: 1 })).toEqual({ ok: false, error: 'unknown slot "nope"' });
+    expect(slotUpdated({ slots: [kept] }, 'claude-a', { label: 5 })).toMatchObject({ ok: true });
+  });
+
+  it('removes a slot a model row names only when withModels: the rows naming it leave too', () => {
+    const root = { slots: [kept], models: [{ model: 'opus', slot: 'claude-a', class: 'heavy' }, { model: 'glm', provider: 'opencode', class: 'light' }] };
+    expect(slotRemoved(root, 'claude-a')).toMatchObject({ ok: false });
+    expect(slotRemoved(root, 'claude-a', true)).toEqual({ ok: true, root: { slots: [], models: [{ model: 'glm', provider: 'opencode', class: 'light' }] } });
+  });
+});
+

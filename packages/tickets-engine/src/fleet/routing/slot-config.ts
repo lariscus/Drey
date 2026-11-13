@@ -38,6 +38,9 @@ function billingOf(raw: unknown): SlotBilling | null {
   if (entry['kind'] === 'credits') {
     return { kind: 'credits', pricePerCredit: price(entry['pricePerCredit']), ...extra };
   }
+  if (entry['kind'] === 'token') {
+    return { kind: 'token', pricePerMillion: price(entry['pricePerMillion']), ...extra };
+  }
   return entry['kind'] === 'subscription' ? { kind: 'subscription', pricePerMonth: price(entry['pricePerMonth']), ...extra } : null;
 }
 

@@ -27,6 +27,7 @@ import { EventHub } from './api/event-hub';
 import { EventStream } from './api/event-stream';
 import { GovernorRoutes } from './api/governor-routes';
 import { LifecycleRoutes } from './api/lifecycle-routes';
+import { DiscoveryRoutes } from './api/discovery-routes';
 import { ModelRoutes } from './api/model-routes';
 import { RunReadRoutes } from './api/run-read-routes';
 import { RunWriteRoutes } from './api/run-write-routes';
@@ -334,7 +335,7 @@ export async function startRunner(args: Args, deps: RunnerDeps = {}): Promise<Ru
   const exit = new RunnerExit({ exit: exitProcess, log, orchestrator, supervisors, idle, idleMs: args.idleMs, descriptorPath: writesDescriptor ? descriptorPath : null, closeStreams });
   const api = new RunnerHttpApi(
     descriptor.token,
-    [new LifecycleRoutes(exit, supervisors, log, { version: VERSION, build }), new ChainRoutes(orchestrator, supervisors, exit, ledger.setVault), new RunReadRoutes(supervisors, { chainVault: ledger.vault }), new RunWriteRoutes(supervisors), new SlotRoutes(routing.registry, routing.config, routing.check), new ModelRoutes(routing.poolDesk, routing.config), new GovernorRoutes(governor.governor), stream],
+    [new LifecycleRoutes(exit, supervisors, log, { version: VERSION, build }), new ChainRoutes(orchestrator, supervisors, exit, ledger.setVault), new RunReadRoutes(supervisors, { chainVault: ledger.vault }), new RunWriteRoutes(supervisors), new SlotRoutes(routing.registry, routing.config, routing.check), new ModelRoutes(routing.poolDesk, routing.config), new DiscoveryRoutes(routing.poolDesk, routing.config), new GovernorRoutes(governor.governor), stream],
     { exit, idle },
   );
   const server = api.server();

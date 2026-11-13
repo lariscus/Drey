@@ -393,10 +393,10 @@ describe('patchClass (req-186)', () => {
   const now = new Date('2026-11-09T09:00:00Z');
 
   it('pins the class, keeps everything else and logs the value', () => {
-    const out = patchClass(CANONICAL, 'B', now, 'owner@desk');
-    expect(out).toContain('class: B');
-    expect(out).toContain("- '2026-11-09T09:00:00Z' owner@desk — class B");
-    expect(parseTicketFile(out, 'tickets/inbox/T-0042.md').meta.class).toBe('B');
+    const out = patchClass(CANONICAL, 'super heavy', now, 'owner@desk');
+    expect(out).toContain('class: super heavy');
+    expect(out).toContain("- '2026-11-09T09:00:00Z' owner@desk — class super heavy");
+    expect(parseTicketFile(out, 'tickets/inbox/T-0042.md').meta.class).toBe('super heavy');
     expect(out).toContain('title: "Fix the palette race in CI"');
   });
 
@@ -408,7 +408,7 @@ describe('patchClass (req-186)', () => {
   });
 
   it('refuses a file without a parseable fence', () => {
-    expect(() => patchClass('no fence', 'A', now, 'owner@desk')).toThrow('no frontmatter fence');
+    expect(() => patchClass('no fence', 'heavy', now, 'owner@desk')).toThrow('no frontmatter fence');
   });
 });
 

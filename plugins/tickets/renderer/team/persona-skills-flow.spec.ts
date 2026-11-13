@@ -243,7 +243,7 @@ describe('the head’s commit age and the models’ busy count (req-239)', () =>
   it('counts the live runs and sessions on a model against the sessions its slots allow', async () => {
     fx.runs = [run({ id: 'a' }), run({ id: 'b', model: 'claude-code/opus', kind: '1:1' }), run({ id: 'c', state: 'done' }), run({ id: 'd', model: null, grant: { model: 'sonnet' } as RunInfo['grant'] }), run({ id: 'e', provider: 'kimi' })];
     await mount();
-    expect(busy('opus')).toBe('2 / 2 busy'); // a and b; the finished run and the Kimi run are not on it
+    expect(busy('opus')).toBe('2 / 3 busy'); // a and b; the finished run and the Kimi run are not on it
     expect(busy('sonnet')).toBe('1 / 3 busy'); // d, by the model the pool granted
   });
 });

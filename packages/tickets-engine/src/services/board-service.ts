@@ -7,6 +7,7 @@
  * Drey plugin supplies both over its plugin context (main/engine-host.ts),
  * the standalone engine process (E2b) over plain fs.
  */
+import type { ClassName } from '../contracts/capability-class';
 import { randomBytes } from 'node:crypto';
 import { promises as fsp, existsSync } from 'node:fs';
 import * as path from 'node:path';
@@ -1263,7 +1264,7 @@ export class EngineBoardService {
    * `class:` pin (`patchClass`), one Log line, one commit
    * `tickets: <id> class <value>`. A live run refuses like every header edit.
    */
-  setClass(input: { id: string; class: 'A' | 'B' | 'C' | null; actor?: string }): Promise<BoardMutationResult> {
+  setClass(input: { id: string; class: ClassName | null; actor?: string }): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
       const found = await this.findCard(input.id);
       if (found === null) {

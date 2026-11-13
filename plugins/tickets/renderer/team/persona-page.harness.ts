@@ -31,7 +31,7 @@ export const view: PersonaView = {
   phases: ['build'],
   summary: 'Builds one part of a ticket, test first.',
   allowed: { spendAboveAllowance: false, writeVaults: ['notes'] },
-  settings: { minClass: 'B', needs: null, maxTurns: null, maxWorkMin: null, gate: null, parallel: 2, min: 0, leaving: ['sync-main'], readOnly: false },
+  settings: { minClass: 'standard', needs: null, maxTurns: null, maxWorkMin: null, gate: null, parallel: 2, min: 0, leaving: ['sync-main'], readOnly: false },
   readOnly: false,
 };
 
@@ -39,10 +39,15 @@ export const OPEN_PROPOSAL = { id: 'imp-1', state: 'open', target: 'prompt.md', 
 
 export const TABLE = {
   ok: true,
+  classes: [
+    { name: 'heavy', sessions: null },
+    { name: 'standard', sessions: null },
+    { name: 'light', sessions: null },
+  ],
   models: [
-    { model: 'opus', slot: null, provider: 'claude-code', category: 'frontier', class: 'A', cost: 3, sessions: 2 },
-    { model: 'sonnet', slot: null, provider: 'claude-code', category: 'everyday', class: 'B', cost: 1, sessions: 3 },
-    { model: 'haiku', slot: null, provider: 'claude-code', category: 'bulk', class: 'C', cost: 0.2, sessions: 3 },
+    { model: 'opus', slot: null, provider: 'claude-code', category: 'frontier', class: 'heavy', cost: 3, enabled: true },
+    { model: 'sonnet', slot: null, provider: 'claude-code', category: 'everyday', class: 'standard', cost: 1, enabled: true },
+    { model: 'haiku', slot: null, provider: 'claude-code', category: 'bulk', class: 'light', cost: 0.2, enabled: true },
   ],
 };
 const SLOTS = { ok: true, slots: [{ id: 'claude-a', label: 'Claude A', provider: 'claude-code', busy: 1, total: 3 }] };

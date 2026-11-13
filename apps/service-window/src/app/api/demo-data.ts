@@ -111,7 +111,7 @@ export function demoSessionOptions(): NewSessionOptionsReply {
       { id: 'ben', title: 'Ben', worker: 'claude-code' },
       { id: 'tessa', title: 'Tessa', worker: 'opencode' },
     ],
-    classes: ['A', 'B', 'C'],
+    classes: ['heavy', 'standard', 'light'],
     ticketsVault: 'E:\\projects\\drey-tickets',
     repos: [
       { name: 'drey', path: 'E:\\projects\\Drey' },

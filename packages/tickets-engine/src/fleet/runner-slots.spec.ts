@@ -48,7 +48,12 @@ describe('the runner serves the slots (req-177)', () => {
   };
 
   it('creates service.json in the service home and serves the implied slots without a network call', async () => {
-    expect(JSON.parse(await fsp.readFile(path.join(tmp, 'service.json'), 'utf8'))).toEqual({ slots: [] });
+    // req-287: the class migration ran on the fresh file — the shipped four, no class capped.
+    expect(JSON.parse(await fsp.readFile(path.join(tmp, 'service.json'), 'utf8'))).toEqual({
+      slots: [],
+      classes: [{ name: 'super heavy' }, { name: 'heavy' }, { name: 'standard' }, { name: 'light' }],
+      migrations: ['classes.v3'],
+    });
     const { status, body } = await call('GET', '/slots');
     expect(status).toBe(200);
     expect((body['slots'] as SlotView[]).map((s) => [s.id, s.implied])).toEqual([

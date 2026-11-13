@@ -1,4 +1,5 @@
-import { CAPABILITY_CLASSES, type CapabilityClass, type ClassRequest, type ModelRow, type SlotView } from '../protocol';
+import type { ClassRequest, ModelRow, SlotView } from '../protocol';
+import type { ClassOrder } from './class-config';
 import type { ModelTable } from './model-table';
 import type { RoutingSettingsView } from './reserve-guard';
 import type { RouteCandidate } from './route-candidate';
@@ -7,9 +8,9 @@ import type { SlotFit } from './slot-fit';
 /** What the step up reads of the settings: the threshold and the table. */
 export interface StepUpSettings extends RoutingSettingsView {
   table(): ModelTable;
+  /** req-287: the owner's class list ranks the step. */
+  order(): ClassOrder;
 }
-
-const rank = (c: CapabilityClass): number => CAPABILITY_CLASSES.indexOf(c);
 
 /**
  * The model step up within the slot (req-178, board 7l's `Upgrade above
@@ -47,10 +48,12 @@ export class StepUp {
   /** The pool's rows on this slot above the granted class, lightest class first, then pool order. */
   private stronger(granted: ModelRow, view: SlotView, request: ClassRequest): { row: ModelRow; order: number }[] {
     const table = this.settings.table();
+    const order = this.settings.order();
+    const rank = (name: string): number => order.rank(name);
     const found: { row: ModelRow; order: number }[] = [];
     request.pool.forEach((entry, order) => {
       const row = entry.model === null ? null : table.rowOn(entry.model, view);
-      if (row !== null && (entry.provider === null || entry.provider === view.provider) && rank(row.class) < rank(granted.class)) {
+      if (row !== null && row.enabled && (entry.provider === null || entry.provider === view.provider) && rank(row.class) < rank(granted.class)) {
         found.push({ row, order });
       }
     });

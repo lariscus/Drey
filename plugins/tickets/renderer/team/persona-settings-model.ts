@@ -8,6 +8,8 @@
  * in the file.
  */
 import type { PersonaSettingsPatch } from '../../../../packages/tickets-engine/src/contracts/persona-settings-patch';
+import { DEFAULT_CLASS_NAMES } from '../../../../packages/tickets-engine/src/contracts/capability-class';
+import type { ModelsReply } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { PERSONA_LEAVING_ACTIONS, type PersonaClass, type PersonaLeavingAction } from '../../../../packages/tickets-engine/src/core/persona-settings';
 import type { PersonaView } from '../../shared/remote-protocol';
 
@@ -25,7 +27,11 @@ export interface SettingsDraft {
   readonly leaving: readonly PersonaLeavingAction[];
 }
 
-export const CLASS_FLOOR_CHOICES: readonly ('' | PersonaClass)[] = ['', 'A', 'B', 'C'];
+/** The class floor's choices: not set, then the owner's class names (strongest first) from the model table, else the shipped list; a stored name the list lacks stays selectable. */
+export function classFloorChoices(table: ModelsReply | null, current: '' | PersonaClass): readonly ('' | PersonaClass)[] {
+  const names = table === null ? DEFAULT_CLASS_NAMES : table.classes.map((entry) => entry.name);
+  return ['', ...names, ...(current !== '' && !names.includes(current) ? [current] : [])];
+}
 
 export function settingsDraftOf(view: PersonaView): SettingsDraft {
   const settings = view.settings;

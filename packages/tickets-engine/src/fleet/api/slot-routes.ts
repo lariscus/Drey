@@ -20,7 +20,8 @@ export interface SlotConfigStore {
   readonly path: string;
   writeSlots(slots: readonly unknown[]): Promise<Written>;
   addSlot(entry: unknown): Promise<Edited>;
-  removeSlot(id: string): Promise<Edited>;
+  removeSlot(id: string, withModels?: boolean): Promise<Edited>;
+  updateSlot(id: string, patch: Readonly<Record<string, unknown>>): Promise<Edited>;
 }
 
 /** Checks a `slots` list before it is written: the reasons the parse would leave entries out. */
@@ -33,7 +34,9 @@ export type SlotListCheck = (slots: readonly unknown[]) => readonly string[];
  * owner signed in again; `POST /slots/config` writes the `slots` of
  * `service.json` (every other key kept) and reloads; `POST /slots/add` and
  * `POST /slots/remove` change one slot, every other entry kept as written
- * (D-69, Settings → Models).
+ * (D-69, Settings → Models; req-287: `withModels` removes the model rows that
+ * name it too); `POST /slots/update` changes one account's label, cost or
+ * sessions in place (req-287).
  */
 export class SlotRoutes implements RouteGroup {
   constructor(
@@ -56,7 +59,9 @@ export class SlotRoutes implements RouteGroup {
       case 'POST /slots/add':
         return this.edit(ctx, (body) => this.config.addSlot(body['slot']));
       case 'POST /slots/remove':
-        return this.edit(ctx, (body) => (typeof body['id'] === 'string' ? this.config.removeSlot(body['id']) : Promise.resolve({ ok: false, error: 'a slot to remove needs its id', invalid: true } as const)));
+        return this.edit(ctx, (body) => (typeof body['id'] === 'string' ? this.config.removeSlot(body['id'], body['withModels'] === true) : Promise.resolve({ ok: false, error: 'a slot to remove needs its id', invalid: true } as const)));
+      case 'POST /slots/update':
+        return this.edit(ctx, (body) => this.update(body));
       default:
         return false;
     }
@@ -111,6 +116,14 @@ export class SlotRoutes implements RouteGroup {
     await this.desk.refresh(undefined, true);
     ctx.respond(200, this.reply());
     return true;
+  }
+
+  private update(body: Record<string, unknown>): Promise<Edited> {
+    const patch = body['patch'];
+    if (typeof body['id'] !== 'string' || patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
+      return Promise.resolve({ ok: false, error: 'a slot change needs its id and a patch', invalid: true } as const);
+    }
+    return this.config.updateSlot(body['id'], patch as Record<string, unknown>);
   }
 
   /** One slot added or removed: refused while `service.json` does not parse or the edit does not stand. */

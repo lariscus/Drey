@@ -38,7 +38,9 @@ export interface QuotaWindow {
 /** What a slot costs: a monthly subscription, or credits used. Prices are display data, never billing. */
 export type SlotBilling =
   | { readonly kind: 'subscription'; readonly pricePerMonth: number | null; readonly currency?: string }
-  | { readonly kind: 'credits'; readonly pricePerCredit: number | null; readonly currency?: string };
+  | { readonly kind: 'credits'; readonly pricePerCredit: number | null; readonly currency?: string }
+  /** req-287: billed per token, the price of one million tokens. */
+  | { readonly kind: 'token'; readonly pricePerMillion: number | null; readonly currency?: string };
 
 /** A slot's state as the 7l card and the 7e chip show it. */
 export type SlotStateName = 'ready' | 'busy' | 'exhausted' | 'needs-login' | 'unknown';

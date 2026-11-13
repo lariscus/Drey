@@ -1,3 +1,4 @@
+import type { ClassName } from './capability-class';
 /**
  * The free session's wire shapes (req-173, R12): what the owner asks for
  * ("New session… persona, folder, class" — service window, Crew tab, or
@@ -15,7 +16,7 @@ export interface FreeSessionAsk {
   /** Absolute: the folder the session works in. */
   readonly directory: string;
   /** The class asked of the pool; absent/null = the model table's class of the persona's model. */
-  readonly poolClass?: 'A' | 'B' | 'C' | null;
+  readonly poolClass?: ClassName | null;
   /** The session's permission override; absent = the vault's `permission-mode` (`_meta/crew.md`). */
   readonly permissionMode?: SessionPermission;
   /** A model pin for this session; absent = the persona's. */
@@ -38,7 +39,7 @@ export type SessionOptionsReply =
       readonly ok: true;
       readonly personas: readonly SessionPersonaOption[];
       /** The classes the model table knows, strongest first. */
-      readonly classes: readonly ('A' | 'B' | 'C')[];
+      readonly classes: readonly (ClassName)[];
       /** The tickets repository — offered first: it is an allowed directory (R12). */
       readonly ticketsVault: string;
       /** The work repositories' local checkouts (`_meta/repos.md` `path:`), by name. */

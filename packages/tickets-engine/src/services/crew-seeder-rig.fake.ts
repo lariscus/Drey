@@ -12,7 +12,7 @@ import { ShippedCrewFiles } from './shipped-crew-files';
 
 /** One row of a model table, the way `service.json` would parse it. */
 export function modelRow(model: string, provider: ModelRow['provider'], cls: ModelRow['class']): ModelRow {
-  return { model, slot: null, provider, category: 'everyday', class: cls, cost: 1, sessions: 1 };
+  return { model, slot: null, provider, category: 'everyday', class: cls, cost: 1, enabled: true };
 }
 
 export interface CrewSeederRigOptions {

@@ -1,6 +1,6 @@
 import { parseNeeds } from '../core/model-needs';
+import { classNameOf } from './capability-class';
 import {
-  PERSONA_CLASSES,
   PERSONA_GATES,
   PERSONA_LEAVING_ACTIONS,
   type PersonaClass,
@@ -49,7 +49,7 @@ const positiveOrNull = (value: unknown): boolean => value === null || (typeof va
 const inList = (list: readonly string[]) => (value: unknown): boolean => value === null || (typeof value === 'string' && list.includes(value));
 
 const CHECKS: readonly Check[] = [
-  ['minClass', inList(PERSONA_CLASSES)],
+  ['minClass', (value) => value === null || classNameOf(value) !== null],
   ['needs', (value) => typeof value === 'string' && parseNeeds(value).unknown.length === 0],
   ['maxTurns', positiveOrNull],
   ['maxWorkMin', positiveOrNull],

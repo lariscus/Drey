@@ -11,6 +11,7 @@
  * methods the invoke channel exposes, never a second write path.
  */
 import type { PriorityConfig, TicketPriority } from './tickets';
+import type { ClassName } from './capability-class';
 
 export type ChatRole = 'owner' | 'mission';
 export type ChatProposalState = 'pending' | 'confirmed' | 'dismissed';
@@ -117,7 +118,7 @@ export type ChatCommand =
    * persona's and the provider's ledgers, the vault's permission mode —
    * Pia never sets one).
    */
-  | { readonly kind: 'startSession'; readonly persona: string; readonly directory: string; readonly poolClass: 'A' | 'B' | 'C' | null; readonly brief: string };
+  | { readonly kind: 'startSession'; readonly persona: string; readonly directory: string; readonly poolClass: ClassName | null; readonly brief: string };
 
 /** One chat session = one file under `tickets/_meta/chat/`. */
 export interface ChatSession {

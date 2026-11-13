@@ -1,6 +1,8 @@
 import type { WorkerProviderId } from './protocol';
 import type { CapabilityImportReport, ModelCapabilities, RouteRecord, RoutingSettings } from './protocol-routing';
 import type { ModelNeeds } from '../contracts/ticket-pool-meta';
+import { classNameOf, DEFAULT_CLASS_NAMES, SIZE_CLASS_NAMES, type ClassName } from '../contracts/capability-class';
+import type { DiscoveryReport } from './protocol-discovery';
 
 // ---------------------------------------------------------------------------
 // The capacity pool (req-170, ADR-0095): the model table, the capacity cap,
@@ -8,20 +10,31 @@ import type { ModelNeeds } from '../contracts/ticket-pool-meta';
 // `GET /models`, `POST /models/config`, the chain status and the run record
 // carry; the runner's `fleet/routing/` computes them from `service.json`.
 
-/** A model's capability class: A strongest, C lightest (board 7l). */
-export type CapabilityClass = 'A' | 'B' | 'C';
+/**
+ * A model's capability class (req-287): a name of the owner's class list,
+ * strongest first — shipped `super heavy` · `heavy` · `standard` · `light`;
+ * the letters of req-170 read as heavy · standard · light.
+ */
+export type CapabilityClass = ClassName;
 
-/** Strongest first — the order a persona's pool is read in. */
-export const CAPABILITY_CLASSES: readonly CapabilityClass[] = ['A', 'B', 'C'];
+/** The shipped class list, strongest first — the order a machine without a `classes` key ranks in. */
+export const CAPABILITY_CLASSES: readonly CapabilityClass[] = DEFAULT_CLASS_NAMES;
 
-export function isCapabilityClass(value: unknown): value is CapabilityClass {
-  return typeof value === 'string' && (CAPABILITY_CLASSES as readonly string[]).includes(value);
+/** A value that reads as a class name (an old letter included). */
+export function isCapabilityClass(value: unknown): boolean {
+  return classNameOf(value) !== null;
 }
 
-/** A plan part's size (S/M/L) as the class it asks for: S → C, M → B, L → A. */
+/** One class of the owner's list (`service.json` → `classes`, board 7l v3): at most `sessions` of its runs at once; null = no cap of its own. */
+export interface ClassConfig {
+  readonly name: CapabilityClass;
+  readonly sessions: number | null;
+}
+
+/** A plan part's size (S/M/L) as the class it asks for: S → light, M → standard, L → heavy. */
 export type PartSize = 'S' | 'M' | 'L';
 
-export const PART_SIZE_CLASS: Readonly<Record<PartSize, CapabilityClass>> = { S: 'C', M: 'B', L: 'A' };
+export const PART_SIZE_CLASS: Readonly<Record<PartSize, CapabilityClass>> = SIZE_CLASS_NAMES;
 
 export function isPartSize(value: unknown): value is PartSize {
   return value === 'S' || value === 'M' || value === 'L';
@@ -40,15 +53,15 @@ export interface ModelRow extends ModelCapabilities {
   readonly class: CapabilityClass;
   /** What one active session of this model weighs against the caps. */
   readonly cost: number;
-  /** Concurrent sessions of this model one slot serves. */
-  readonly sessions: number;
+  /** The router may grant it (board 7l v3's switch); false = it stays in its class, unused. */
+  readonly enabled: boolean;
 }
 
 /** The capacity cap: the summed cost factors of the active sessions may not exceed it. */
 export interface CapacityConfig {
   /** Over every slot; null = no global cap. */
   readonly global: number | null;
-  /** Per slot id, explicit; a slot not named here takes its derived cap (its largest row's cost × sessions). */
+  /** Per slot id, explicit; a slot not named here has no cost cap of its own (req-287: its sessions and its class's cap count). */
   readonly perSlot: Readonly<Record<string, number>>;
 }
 
@@ -64,6 +77,8 @@ export interface LedgerDefaults {
 
 /** The pool's machine-scope settings as `GET /models` answers and `POST /models/config` takes them. */
 export interface PoolSettings {
+  /** req-287: the owner's class list, strongest first, each with its session cap. */
+  readonly classes: readonly ClassConfig[];
   readonly models: readonly ModelRow[];
   readonly capacity: CapacityConfig;
   readonly ledgers: LedgerDefaults;
@@ -77,10 +92,15 @@ export interface SlotLoad {
   readonly label: string;
   /** Summed cost factors of the slot's active sessions. */
   readonly used: number;
-  /** The slot's cap; null = none (no row serves it and none is set). */
+  /** The slot's cap; null = none set. */
   readonly cap: number | null;
-  /** True when the cap is derived from the rows, not set. */
-  readonly derived: boolean;
+}
+
+/** One class's live sessions against its cap (`1/2 busy`). */
+export interface ClassLoad {
+  readonly name: CapabilityClass;
+  readonly busy: number;
+  readonly cap: number | null;
 }
 
 /** The live sum — "Now: 2.4 of 6 · Claude A 2 of 5 · z.ai 0.4 of 1.2". */
@@ -88,6 +108,8 @@ export interface PoolLoad {
   readonly used: number;
   readonly global: number | null;
   readonly slots: readonly SlotLoad[];
+  /** req-287: the sessions per class. */
+  readonly classes: readonly ClassLoad[];
 }
 
 /** Why a queued task waits: capacity (a slot of its class frees), a full ledger, or a configuration the owner must fix. */
@@ -128,6 +150,8 @@ export interface ModelsReply extends PoolSettings {
   readonly configPath: string;
   /** req-178: on the answer of `POST /models/import` only. */
   readonly imported?: CapabilityImportReport;
+  /** req-286: what the harnesses offer — their rows, the models found and not yet in the table. */
+  readonly discovery: DiscoveryReport;
 }
 
 /** The pool's decision on a run record and in the stream: the class asked for, the model that ran, why. */

@@ -123,10 +123,14 @@ Invoke-RestMethod "http://127.0.0.1:$($d.port)/health" -Headers $h
 | `POST /slots/login-done` `{id}` | the owner signed the slot's account in again: `needs-login` clears, its quota is read |
 | `POST /slots/config` `{slots: [...]}` | write the `slots` of `service.json` (every other key kept) and reload; a broken entry refuses the whole list (422), a file that does not parse refuses the write (409) |
 | `POST /slots/add` `{slot}` | D-69: append one slot entry, every other entry kept as written, and reload; takes its provider off `impliedOff`; an entry that does not parse or a taken id refuses (422), a file that does not parse refuses (409) |
-| `POST /slots/remove` `{id}` | D-69: remove one slot — a configured entry leaves `slots`, an implied slot's provider joins `impliedOff` — and reload; refused (422) while a model row names the slot, or for an unknown id |
-| `GET /models` | the capacity pool (req-170): `{ok, models: [{model, slot, provider, category, class, cost, sessions, input?, tools?, context?, output?}], capacity: {global, perSlot}, ledgers: {ticketAllowance, personaPerDay, providerPerDay}, routing: {upgradeAboveQ, reservePerWindow, burnRate}, now: <the live load>, queue: [...], providerDay: [{id, spent, limit}], errors, configPath}` — see "The capacity pool" below |
-| `POST /models/config` `{models?, capacity?, ledgers?, routing?}` | replace the pool keys it sends in `service.json` (the others, and every other key, kept) and reload; a broken row refuses the whole write (422), a file that does not parse refuses it (409) |
+| `POST /slots/remove` `{id, withModels?}` | D-69: remove one slot — a configured entry leaves `slots`, an implied slot's provider joins `impliedOff` — and reload; refused (422) while a model row names the slot (req-287: unless `withModels: true`, the owner's confirmed *Remove Claude B? 1 model uses only this account.* — then those rows leave too), or for an unknown id |
+| `POST /slots/update` `{id, patch}` | req-287: change one account in place — `patch` takes `label`, `billing` (`{kind: subscription, pricePerMonth}` · `{kind: credits, pricePerCredit}` · `{kind: token, pricePerMillion}`, each with an optional `currency`) and `sessions`; `null` removes a key; every other key of the entry (its login folder, limits) kept; an implied slot is written out with the change; a changed entry that does not parse refuses (422) |
+| `GET /models` | the capacity pool (req-170): `{ok, classes: [{name, sessions}], models: [{model, slot, provider, category, class, cost, enabled, input?, tools?, context?, output?}], capacity: {global, perSlot}, ledgers: {ticketAllowance, personaPerDay, providerPerDay}, routing: {upgradeAboveQ, reservePerWindow, burnRate}, now: <the live load, with now.classes: [{name, busy, cap}]>, queue: [...], providerDay: [{id, spent, limit}], errors, configPath, discovery: {checkedAt, running, harnesses: [{provider, label, version, state, providers, models, error}], found: [{model, provider, slot, name, capabilities, suggested}], ignored}}` — see "The capacity pool" and "Model discovery" below |
+| `POST /models/config` `{classes?, models?, capacity?, ledgers?, routing?}` | replace the pool keys it sends in `service.json` (the others, and every other key, kept) and reload; a broken row refuses the whole write (422), a file that does not parse refuses it (409) |
 | `POST /models/import` | req-178: fill the model table's **undeclared** capability columns from `https://models.dev/api.json` — the one network call of the routes, only when the owner asks; what a row declares stays (the local override). The `GET /models` reply plus `imported: {filled: [{model, where, fields}], unmatched: [model]}`; 502 when the registry does not answer (nothing written) |
+| `POST /models/discover` `{registry?}` | req-286, *Find models again*: ask every harness what it offers (see "Model discovery"), then — unless `registry: false` (the page's first look on a machine never checked: no network call) — fill the found models' and the table rows' undeclared capability columns from models.dev. The `GET /models` reply plus `registryError` (null, or why the registry did not answer — the harnesses' answer stands) |
+| `POST /models/add` `{provider, model, class}` | req-286: take a model the last check found into the table under the class the card picked — its account (opencode's provider entry), capabilities and cost factor 1; a model the last check did not find refuses (404 — no model is typed in), a class not in the list refuses (422) |
+| `POST /models/ignore` `{provider, model}` | req-286: keep a found model's card away — its `<provider>:<model>` joins `discovery.ignored` |
 | `GET /report` | token telemetry grouped by ticket, phase and model, sorted by total desc: `{ok, groups: [{ticket, phase, model, runs, total, input, cacheRead, cacheCreation, output, beforeFirstWrite, beforeFirstWriteShare}]}` — a counter the provider never reports counts 0 into the sums; pre-T-0048 records fall back to their cumulative `tokensIn`+`tokensOut` (T-0048). Also `byPersona` — per persona `{persona, runs, total, input, cacheRead, cacheCreation, output, costUsd, redGates, heldMs}`, a persona that only held tickets (`you`) with zero runs; `byPosition` — per chain position `{position, runs, costUsd, busyMs, heldMs, waitingMs}` (busy = the runs' working time from the record's `chainPosition`, held = the ledger's `hold` lines, waiting = held − busy); and `byModel` (req-169). Absent stays null (req-274) |
 | `POST /stop` `{runId, reason}` | stop one run |
 | `POST /send` `{runId, text}` | steer a live run (rung: inject/resume/refused); while the run waits on a question it is the answer, not a takeover. To an ended run (done/stopped/failed) with a session it reopens that session under a new held run, the text as its first prompt — the reply carries the new `runId` |
@@ -589,7 +593,7 @@ then works with the implied slots and logs why.
 | `label` | what the boards show; default the id |
 | `provider` | `claude-code`, `opencode`, `kimi` or `copilot` — the harness the slot's runs use |
 | `sessions` | concurrent runs the account serves; absent = no cap of its own. Req-63's `fleet.pool.<provider>.size` moved here once (req-170): see "The capacity pool" |
-| `billing` | `{kind: "subscription", pricePerMonth}` or `{kind: "credits", pricePerCredit}`, optional `currency` — display data |
+| `billing` | the account's cost (req-287, edited in place on Settings → Models): `{kind: "subscription", pricePerMonth}`, `{kind: "credits", pricePerCredit}` or `{kind: "token", pricePerMillion}` (per million tokens), optional `currency` — display data, and the routing's last tie-break (the cheaper slot) |
 | `login` | the harness login, **never a key**: `claudeConfigDir` (spawned as `CLAUDE_CONFIG_DIR`; absent = the default login), `opencodeAuthEntry` / `opencodeAuthFile` (the entry of opencode's `auth.json` the z.ai quota is read with), `kimiCredentials` / `kimiHome` (the Kimi CLI's credentials file; `kimiHome` is spawned as `KIMI_HOME`), `copilotHome` (a Copilot CLI account's config folder, spawned as `COPILOT_HOME`; req-182) |
 | `quota` | where the windows come from — `claude-code`, `zai`, `kimi` or `counting`; absent = by provider (`opencode` with a `zai…` auth entry → `zai`, other `opencode` → `counting`) |
 | `limits` | budgets the counting measures against: `{window: "5h" \| "7d" \| "month", budget, unit: "tokens" \| "runs"}` |
@@ -635,14 +639,50 @@ slot the resumed session lives on first, else the first in
 restarted runner re-reserves the slots of the runs it adopts. The run's
 own `failed` card is the Needs-you card of an expired login.
 
-## The capacity pool — model table, cap, class requests, ledgers (req-170)
+## Model discovery — what the harnesses offer (req-286)
+
+No model is typed in (board 7l v3). The runner asks each harness on the
+machine what it offers and keeps the answer; Settings → Models shows it
+and writes the model table from it. Code: `fleet/harness/probe-*.ts` (one
+probe per harness), `fleet/routing/model-discovery.ts` (`ModelDiscovery`),
+`fleet/compose-discovery.ts`, the routes in `fleet/api/discovery-routes.ts`.
+
+| Harness | How it is asked | Signed in | Models |
+|---|---|---|---|
+| Claude Code | `claude -p --input-format stream-json --output-format stream-json --verbose`, one stream-json `control_request` `initialize` — answered before any turn, so no token is spent; stdin closed, the process ended | `account.tokenSource` ≠ `none` | each distinct `models[].resolvedModel` of its `/model` list (`opus` → `claude-opus-5-5`), named by its description's head (`Opus 5.5`); `claude_code_version` is the version |
+| opencode, Kimi CLI, Copilot CLI | the ACP launch (`opencode acp`, `kimi acp`, `copilot --acp --stdio`): `initialize` (`agentInfo.version`), then `session/new` in `<service home>/discovery/`; the probe's session is deleted again where the agent offers `session/delete` | a `session/new` refused for authentication = signed out | the config option of id or category `model` (`options[].value`), or ACP's `models.availableModels[].modelId` |
+
+A harness whose command is on no folder of `PATH` (with `PATHEXT` on
+Windows) is *not installed* — nothing is spawned. A probe that does not
+answer within 45 s, or exits first, is a *failed* row with its reason.
+The probes run in parallel, only when asked: `POST /models/discover`
+(*Find models again* — then also the capability import from models.dev,
+the one network call) or, without the network, the page's first look on a
+machine never checked. The last check is `<service home>/discovery.json`
+(`checkedAt`, the harness rows, every model offered with its
+capabilities), so the page shows it after a restart.
+
+A harness row: version, state (`signed-in`, `signed-out`,
+`not-installed`, `failed`), the model providers it serves through (the
+prefixes of its ids — opencode's `zai-coding-plan`, `github-copilot`) and
+how many models it offers. A model offered that the table does not hold
+and the owner did not ignore is a **new-model card**: its harness, its
+account (an opencode id whose prefix is a slot's `opencodeAuthEntry` runs
+on that slot; any other runs on every slot of its harness), its
+capabilities and a proposed class (a guess from the name — Fable the
+strongest, Opus / Pro the second, Haiku / Air / Mini / Flash the lightest,
+else standard). *Add* (`POST /models/add`) writes the row under the class
+the owner picked; *Ignore* (`POST /models/ignore`) keeps the card away.
+
+## The capacity pool — classes, model table, caps, class requests, ledgers (req-170, req-287)
 
 Every start asks the pool before a worker spawns (ADR-0095, R10). The
 pool grants a model of **exactly the class the start asked for**, on a
 free slot, while the caps and the ledgers
 have room — or the start waits: no process, no slot. **Never a smaller
 class.** Code: `fleet/routing/` (`ModelTable`, `CapacityCap`, `Ledgers`,
-`PoolGrant`, `PoolGate`, `RequestQueue`, `PoolMigration`; req-178's
+`PoolGrant`, `PoolGate`, `RequestQueue`, `PoolMigration`, req-287's
+`ClassOrder` / `classesOf` and `ClassMigration`; req-178's
 `SlotFit`, `CapabilityFilter`, `ReserveGuard`, `SurplusChoice`, `StepUp`,
 `RouteRecorder`, `CostEstimate`, `RunShareTracker`, `ModelsDevImport`),
 wired in `fleet/compose-routing.ts` and `fleet/compose-pool.ts`; the chain asks it through
@@ -653,17 +693,19 @@ wired in `fleet/compose-routing.ts` and `fleet/compose-pool.ts`; the chain asks 
 ```json
 {
   "slots": [ … ],
+  "classes": [{ "name": "super heavy", "sessions": 1 }, { "name": "heavy", "sessions": 2 }, { "name": "standard", "sessions": 4 }, { "name": "light", "sessions": 6 }],
   "models": [
-    { "model": "claude-opus-4-1",   "slot": "claude-a", "category": "frontier", "class": "A", "cost": 5,   "sessions": 1,
-      "input": ["text", "image"], "tools": true, "context": 200000, "output": 32000 },
-    { "model": "claude-sonnet-4-5", "slot": "claude-a", "category": "everyday", "class": "B", "cost": 1,   "sessions": 2 },
-    { "model": "glm-5.3",           "slot": "zai",      "category": "everyday", "class": "B", "cost": 0.4, "sessions": 3 },
-    { "model": "kimi-k2.5",     "provider": "kimi",     "category": "bulk",     "class": "C", "cost": 0.3, "sessions": 2 }
+    { "model": "claude-opus-5-5",   "slot": "claude-a", "category": "", "class": "heavy", "cost": 5,
+      "input": ["text", "image"], "tools": true, "context": 1000000, "output": 128000 },
+    { "model": "claude-sonnet-5-5", "slot": "claude-a", "category": "", "class": "standard", "cost": 1 },
+    { "model": "zai-coding-plan/glm-5.3", "slot": "zai", "category": "", "class": "standard", "cost": 0.4 },
+    { "model": "kimi-k2.5",     "provider": "kimi",     "category": "", "class": "light", "cost": 0.3, "enabled": false }
   ],
+  "discovery": { "ignored": ["opencode:github-copilot/gpt-5.4-mini"] },
   "capacity": { "global": 6, "perSlot": {} },
   "ledgers": { "ticketAllowance": 2.5, "personaPerDay": 5, "providerPerDay": 15 },
   "routing": { "upgradeAboveQ": 1.3, "reservePerWindow": 0.1, "burnRate": 0.2 },
-  "migrations": ["fleet.pool.size"]
+  "migrations": ["classes.v3", "fleet.pool.size"]
 }
 ```
 
@@ -672,17 +714,19 @@ wired in `fleet/compose-routing.ts` and `fleet/compose-pool.ts`; the chain asks 
 | `models[].model` | the model id the harness is started with |
 | `models[].slot` / `.provider` | the slot (account) that serves it, or a harness provider — then every slot of that provider serves it |
 | `models[].category` | free text (`frontier`, `everyday`, `bulk`) — display |
-| `models[].class` | `A`, `B` or `C`, A strongest |
+| `classes` | req-287: the owner's class list, **strongest first** — a name (`"heavy"`) or `{name, sessions}`; `sessions` = **at most N runs of the class at once**, over every slot (the slots at class level); absent = no class cap. No key = the shipped four, `super heavy` · `heavy` · `standard` · `light`. A name is lower case (letters, digits, single spaces, `-`) |
+| `models[].class` | a name of `classes`; a row naming a class the list does not hold is left out with its reason. The letters of req-170 are read as their names — `A` heavy, `B` standard, `C` light — and never written again |
 | `models[].cost` | the cost factor: what one active session weighs against the caps (default 1) |
-| `models[].sessions` | concurrent sessions of this model one slot serves (default 1) |
+| `models[].enabled` | req-287, board 7l v3's switch: `false` = the router never grants it (nor steps up to it); the row keeps its class. Stored only when `false` |
 | `models[].input` / `.tools` / `.context` / `.output` | req-178, optional: the declared capabilities — inputs (`text`, `image`; others are dropped), tool calls (`false` keeps every agent session off the model), the context window and the output limit in tokens. Absent = not declared: a step that needs it does not take the model. `POST /models/import` fills what is absent from models.dev |
 | `capacity.global` | the summed cost factors of every active session may not exceed it; `null` = no global cap |
-| `capacity.perSlot` | a slot's cap by id; a slot not named takes its **derived cap** — its largest row at full sessions (board 7l: Claude A 5 = opus 5 × 1) |
+| `capacity.perSlot` | a slot's cost cap by id; a slot not named has none (req-287 retired the derived cap — the class caps and the account's `sessions` bound it) |
+| `discovery.ignored` | req-286: the `<provider>:<model>` keys of the new-model cards the owner ignored |
 | `ledgers.*` | USD defaults: a ticket's allowance when its frontmatter sets none, a persona's day when its `persona.md` sets no `budget:`, every slot's day |
 | `routing.upgradeAboveQ` | req-178, board 7l's `Upgrade above q` (default `1.3`): above this surplus the chosen slot runs the next stronger model of the persona's pool it serves; `null` = never step up |
 | `routing.reservePerWindow` | req-178, board 7l's `Reserve per window` as a share (default `0.1` = 10 %): a start whose estimated share would take any window of the slot below it waits; `0` = no reserve |
 | `routing.burnRate` | req-181, board 7l's `Burn rate` as a share (default `0.2` = 20 %): at most this much of the weekly quota per day over all slots; reached = no new run starts until the day turns (see *The burn rate* below); `0` = off. A value outside 0 to below 1 is refused (422) and read as the default |
-| `migrations` | `fleet.pool.size` once req-63's sizes moved into the slots (below) |
+| `migrations` | `fleet.pool.size` once req-63's sizes moved into the slots (below); `classes.v3` once req-287 moved A · B · C into the class list — each row's letter became its name and its old `sessions` left the row, the class list was written as the shipped four with each class capped at the sessions its old rows served together (a row's `sessions` is no longer read) |
 
 Only **active sessions** count: runs and held 1:1 sessions from their
 start until they settle (a worker waiting for the owner still holds its
@@ -699,11 +743,16 @@ ticket with a persona:
 
 1. a ticket pin `model:` asks for that model (its row's class), `class:`
    for exactly that class — a pin beats everything below;
-2. else the plan part's `size:` — **S → C, M → B, L → A** — or, unsized,
+2. else the plan part's `size:` — **S → light, M → standard, L → heavy** — or, unsized,
    the class of the persona's `models.default`;
 3. raised to the phase's floor `min-class:` (`pipeline.md`);
 4. raised, if the persona's `models.pool` holds no model of that class, to
    the lightest stronger class it does hold — raised, never lowered.
+
+"Stronger" is the order of the owner's class list (req-287); a class the
+list does not hold ranks below every listed one. A ticket's `class:`, a
+phase's or persona's `min-class:` and Pia's session card name a class
+(the old letters read as their names).
 
 The request also carries the step's `needs:` (the phase's and the
 ticket's, merged — `specs/ticket-schema.md`), the slot of the ticket's
@@ -723,8 +772,9 @@ persona's pool on every slot that serves it:
 1. **The filter** (hard; `SlotFit`): the
    step's needs against the row's declared capabilities (`no image input`,
    `image input not declared`, `context 128k < 200k`, `no tool calls`); the
-   slot's state (`needs-login`, `exhausted`, `busy n/n`); the row's
-   sessions; the provider's pause or throttle (req-63); the slot's and the
+   slot's state (`needs-login`, `exhausted`, `busy n/n` — the account's
+   own `sessions`); the class's cap (req-287: `heavy runs 2 of at most 2
+   sessions`, short `class full`); a switched-off row never gets here; the provider's pause or throttle (req-63); the slot's and the
    global cap; the slot's day ledger; **the reserve per window** — a start
    whose estimated share would take any window below
    `routing.reservePerWindow` waits. The share is learned per slot and
@@ -748,8 +798,8 @@ persona's pool on every slot that serves it:
 Every decision is one line in the runner log and the run's stream:
 
 ```
-route T-0121 → claude-a/sonnet: class B, q 1.4, est $0.40 · filtered: kimi (no image input)
-route T-0130 → claude-a/opus: class A (step up from sonnet, B), q 1.6, est $1.80
+route T-0121 → claude-a/sonnet: class standard, q 1.4, est $0.40 · filtered: kimi (no image input)
+route T-0130 → claude-a/opus: class heavy (step up from sonnet, standard), q 1.6, est $1.80
 ```
 
 `est` is the median cost of the most similar ended runs (the ticket on

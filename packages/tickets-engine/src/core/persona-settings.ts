@@ -1,3 +1,4 @@
+import { classNameOf, type ClassName } from '../contracts/capability-class';
 import type { ModelNeeds } from '../contracts/ticket-pool-meta';
 import { needsText, parseNeeds } from './model-needs';
 
@@ -21,10 +22,8 @@ export type PersonaLeavingAction = 'sync-main' | 'commit';
 
 export const PERSONA_LEAVING_ACTIONS: readonly PersonaLeavingAction[] = ['sync-main', 'commit'];
 
-/** A capability class of the model table (req-170). */
-export type PersonaClass = 'A' | 'B' | 'C';
-
-export const PERSONA_CLASSES: readonly PersonaClass[] = ['A', 'B', 'C'];
+/** A capability class of the model table (req-170; a name of the owner's list since req-287). */
+export type PersonaClass = ClassName;
 
 export interface PersonaSettings {
   /** `min-class:` — no run of the persona asks the pool for a lighter class; null = the column's floor. */
@@ -101,7 +100,7 @@ function minOf(raw: unknown): number {
 export function personaSettingsOf(get: (key: string) => unknown): PersonaSettings {
   const readOnly = get('readonly');
   return {
-    minClass: oneOf(get('min-class'), PERSONA_CLASSES),
+    minClass: classNameOf(get('min-class')),
     needs: parseNeeds(get('needs')).needs,
     maxTurns: positiveInt(get('max-turns')),
     maxWorkMin: positiveInt(get('max-work')),

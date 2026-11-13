@@ -42,7 +42,8 @@ interface Sweep {
  * largest surplus wins (same surplus → cheaper), and above `Upgrade above q`
  * the slot runs the next stronger model of the pool. Never a smaller class;
  * a model the table does not hold runs only on a request without a class (a
- * pinned model) or while the table is empty.
+ * pinned model) or while the table is empty. A row the owner switched off
+ * (req-287) is never granted.
  */
 export class PoolGrant {
   constructor(private readonly deps: PoolGrantDeps) {}
@@ -68,6 +69,11 @@ export class PoolGrant {
     return this.grantOf(stepped ?? chosen, request, route);
   }
 
+  /** req-287: the rank of a class in the owner's list (0 = strongest). */
+  rankOf(name: CapabilityClass): number {
+    return this.deps.settings.order().rank(name);
+  }
+
   /** The class the model table gives a pool entry (its first row); null when the table does not hold it. */
   classOf(entry: PoolEntry): CapabilityClass | null {
     return entry.model === null ? null : (this.deps.settings.table().rowsOf(entry.model, entry.provider)[0]?.class ?? null);
@@ -79,7 +85,7 @@ export class PoolGrant {
     return request.pool.flatMap((entry): RouteOption[] => {
       const rows = entry.model === null ? [] : table.rowsOf(entry.model, entry.provider);
       if (rows.length > 0) {
-        return rows.filter((row) => request.class === null || row.class === request.class).map((row) => ({ row, entry, provider: row.provider }));
+        return rows.filter((row) => row.enabled && (request.class === null || row.class === request.class)).map((row) => ({ row, entry, provider: row.provider }));
       }
       const untabledAllowed = request.class === null || table.empty;
       return untabledAllowed ? [{ row: null, entry, provider: entry.provider ?? request.provider }] : [];

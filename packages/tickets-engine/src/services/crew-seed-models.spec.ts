@@ -3,7 +3,7 @@ import { CrewSeedModels } from './crew-seed-models';
 import { modelRow } from './crew-seeder-rig.fake';
 
 const rule = new CrewSeedModels();
-const TABLE = [modelRow('small', 'opencode', 'C'), modelRow('big', 'opencode', 'A'), modelRow('mid', 'opencode', 'B'), modelRow('other', 'claude-code', 'A'), modelRow('mid2', 'opencode', 'B'), modelRow('big', 'opencode', 'A')];
+const TABLE = [modelRow('small', 'opencode', 'light'), modelRow('big', 'opencode', 'heavy'), modelRow('mid', 'opencode', 'standard'), modelRow('other', 'claude-code', 'heavy'), modelRow('mid2', 'opencode', 'standard'), modelRow('big', 'opencode', 'heavy')];
 
 describe('CrewSeedModels — the models a seeded persona gets (req-256)', () => {
   it('takes the worker\'s provider rows, strongest class first, the table\'s order within a class, each model once', () => {

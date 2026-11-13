@@ -1,10 +1,11 @@
 import type { ModelNeeds } from '../contracts/ticket-pool-meta';
 import type { TicketIssue, TicketMeta } from '../contracts/tickets';
+import { classNameOf } from '../contracts/capability-class';
 import { parseNeeds } from './model-needs';
 
 /**
  * The ticket keys the capacity pool reads (req-170, specs/ticket-schema.md):
- * `class:` (A | B | C) and `model:` pin what the run asks for, `size:`
+ * `class:` (a class name of Settings → Models; req-287 reads the old A | B | C as heavy | standard | light) and `model:` pin what the run asks for, `size:`
  * (S | M | L — a plan part's size) asks for its class, `allowance:` is the
  * ticket's ledger in USD, `needs:` (req-178) the capabilities its model
  * must have. Tolerant like the rest of the reader: a value outside the
@@ -23,10 +24,11 @@ function classOf(raw: string | null, issues: TicketIssue[]): TicketPoolKeys['cla
   if (raw === null) {
     return null;
   }
-  if (raw === 'A' || raw === 'B' || raw === 'C') {
-    return raw;
+  const name = classNameOf(raw);
+  if (name !== null) {
+    return name;
   }
-  issues.push({ level: 'warning', message: 'class must be A, B or C — read as no class pin' });
+  issues.push({ level: 'warning', message: 'class must be a class name such as heavy or light — read as no class pin' });
   return null;
 }
 

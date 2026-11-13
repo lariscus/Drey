@@ -7,11 +7,12 @@ export interface TableSlot {
 }
 
 /**
- * The model table (req-170, board 7l): one row per model and slot with its
- * category, capability class, cost factor and sessions. A row names a slot
- * or a provider — a provider row is served by every slot of that provider.
- * A model the table does not hold is *untabled*: it has no class, and a
- * start on it weighs {@link UNTABLED_COST}.
+ * The model table (req-170, board 7l v3): one row per model and slot with its
+ * category, capability class, cost factor and the router switch (req-287). A
+ * row names a slot or a provider — a provider row is served by every slot of
+ * that provider. A model the table does not hold is *untabled*: it has no
+ * class, and a start on it weighs {@link UNTABLED_COST}. A switched-off row
+ * keeps its class but is never granted.
  */
 export class ModelTable {
   constructor(readonly rows: readonly ModelRow[]) {}
@@ -35,11 +36,6 @@ export class ModelTable {
     return this.rows.find((row) => row.model === model && this.serves(row, slot)) ?? null;
   }
 
-  /** A slot's derived cap: its largest row at full sessions (board 7l: Claude A 5 = opus 5 × 1); null without a row. */
-  derivedCap(slot: TableSlot): number | null {
-    const loads = this.rows.filter((row) => this.serves(row, slot)).map((row) => row.cost * row.sessions);
-    return loads.length === 0 ? null : Math.round(Math.max(...loads) * 100) / 100;
-  }
 }
 
 /** What one session of a model the table does not hold weighs against the caps. */

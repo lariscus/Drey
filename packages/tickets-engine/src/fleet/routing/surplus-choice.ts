@@ -6,7 +6,7 @@ import type { RouteCandidate } from './route-candidate';
 export const NEUTRAL_Q = 1;
 
 const priceOf = (billing: SlotBilling | null): number => {
-  const price = billing === null ? null : billing.kind === 'subscription' ? billing.pricePerMonth : billing.pricePerCredit;
+  const price = billing === null ? null : billing.kind === 'subscription' ? billing.pricePerMonth : billing.kind === 'credits' ? billing.pricePerCredit : billing.pricePerMillion;
   return price ?? Number.POSITIVE_INFINITY;
 };
 

@@ -3,278 +3,270 @@ import { describe, expect, it, vi } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- the spec stands in for the host, which owns the catalog at runtime
 import { i18n } from '../../../../shared/i18n';
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
-import type { ModelsReply, SlotView } from '../../../../packages/tickets-engine/src/fleet/protocol';
+import type { ModelsReply } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { createModelsSection } from './models-section';
-
-const slot = (id: string, label: string, extra: Partial<SlotView> = {}): SlotView => ({
-  id,
-  label,
-  provider: 'claude-code',
-  billing: { kind: 'subscription', pricePerMonth: 90, currency: 'EUR' },
-  quota: 'claude-code',
-  state: 'ready',
-  busy: 0,
-  total: 2,
-  windows: [{ name: '5h', spanMs: null, remaining: 0.78, resetsAt: null, reliability: 'measured', fetchedAt: null }],
-  q: 1.4,
-  reason: null,
-  lastFetch: null,
-  lastFetchError: null,
-  implied: false,
-  ...extra,
-});
-
-const models: ModelsReply = {
-  ok: true,
-  models: [
-    { model: 'claude-opus-4-1', slot: 'a', provider: 'claude-code', category: 'frontier', class: 'A', cost: 5, sessions: 1 },
-    { model: 'gpt-5.4', slot: 'w', provider: 'opencode', category: 'everyday', class: 'B', cost: 1, sessions: 2 },
-  ],
-  capacity: { global: 6, perSlot: {} },
-  routing: { upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 0.2 },
-  ledgers: { ticketAllowance: 2.5, personaPerDay: 5, providerPerDay: 15 },
-  now: { used: 2.4, global: 6, slots: [{ id: 'a', label: 'Claude A', used: 2, cap: 5, derived: true }] },
-  queue: [],
-  providerDay: [],
-  errors: [],
-  configPath: 'service.json',
-};
+import { pool, slots } from './models-fixtures';
 
 const settle = async (): Promise<void> => {
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 12; i++) {
     await Promise.resolve();
   }
 };
 
-function setup(poolReply: ModelsReply | null = models) {
+function setup(poolReply: ModelsReply | null = pool) {
   const invoke = vi.fn((method: string, payload?: unknown): Promise<unknown> => {
-    if (method === 'poolModels') {
-      return Promise.resolve(poolReply);
+    switch (method) {
+      case 'poolModels':
+        return Promise.resolve(poolReply);
+      case 'slots':
+        return Promise.resolve({ ok: true, slots, configPath: '' });
+      case 'poolModelsConfig':
+        return Promise.resolve({ ...pool, ...(payload as object) });
+      case 'slotAdd':
+      case 'slotRemove':
+      case 'slotUpdate':
+        return Promise.resolve({ ok: true, slots, configPath: '' });
+      default:
+        return Promise.resolve(pool);
     }
-    if (method === 'slots') {
-      return Promise.resolve({ ok: true, slots: [slot('a', 'Claude A'), slot('w', 'Copilot', { provider: 'opencode', windows: [] })], configPath: '' });
-    }
-    if (method === 'poolModelsConfig') {
-      return Promise.resolve({ ...models, ...(payload as object) });
-    }
-    return Promise.resolve(undefined);
   });
-  const api = { i18n, backend: { invoke }, ui: { icon: () => document.createElement('span') } } as unknown as DreyPluginApi;
+  const api = { i18n, backend: { invoke } } as unknown as DreyPluginApi;
   const section = createModelsSection(api);
   document.body.replaceChildren(section.root);
   return { section, invoke };
 }
 
-const writes = (invoke: ReturnType<typeof vi.fn>): unknown[] => invoke.mock.calls.filter(([method]) => method === 'poolModelsConfig').map(([, payload]) => payload);
+const calls = (invoke: ReturnType<typeof vi.fn>, method: string): unknown[] => invoke.mock.calls.filter(([name]) => name === method).map(([, payload]) => payload);
+const byLabel = <T extends Element>(root: ParentNode, label: string): T => root.querySelector<T>(`[aria-label="${label}"]`)!;
+const text = (root: ParentNode, selector: string): string[] => [...root.querySelectorAll(selector)].map((node) => node.textContent ?? '');
 
 describe('Settings → Models page', () => {
-  it('draws the five groups in the board order under the section anchor', async () => {
+  it('draws the title, the cap line, then Harnesses, Classes, Accounts and Routing in the board order', async () => {
     const { section } = setup();
     await section.refresh();
     expect(section.root.querySelector('[data-settings-section="models"] h3')?.textContent).toBe('Models');
-    expect([...section.root.querySelectorAll('h4')].map((h) => h.textContent)).toEqual(['Model table', 'Capacity', 'Slots', 'Routing', 'Ledgers']);
+    expect(text(section.root, 'h2')).toEqual(['Harnesses', 'Classes', 'Accounts', 'Routing']);
+    expect(section.root.querySelector('.mdl-caprow')?.textContent).toContain('Now 2.4 of 6');
+    expect(section.root.textContent).toContain('Checked');
   });
 
-  it('fills the table', async () => {
+  it('lists the harnesses, a missing one greyed with a disabled Install', async () => {
     const { section } = setup();
     await section.refresh();
-    const rows = [...section.root.querySelectorAll('tbody tr')];
-    expect(rows.map((r) => [...r.querySelectorAll('td')].map((td) => td.textContent).join('|'))).toEqual(['claude-opus-4-1|Claude A|frontier|A|5|1', 'gpt-5.4|Copilot|everyday|B|1|2']);
-    expect(section.root.querySelectorAll('thead th')).toHaveLength(6);
+    expect(text(section.root, '.mdl-harnesses .mdl-row')[1]).toContain('zai-coding-plan, github-copilot');
+    const missing = section.root.querySelectorAll('.mdl-harnesses .mdl-row')[2]!;
+    expect(missing.textContent).toContain('not installed');
+    expect(missing.querySelector('button')?.disabled).toBe(true);
   });
 
-  it('shows the caps, the live line and the ledger defaults', async () => {
+  it('groups the models under their class, the new-model card above the groups', async () => {
     const { section } = setup();
     await section.refresh();
-    const input = (label: string): HTMLInputElement => section.root.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
-    expect(input('Global cap').value).toBe('6');
-    expect(section.root.textContent).toContain('Now: 2.4 of 6 · Claude A 2 of 5');
-    expect(input('Ticket allowance').value).toBe('$2.50');
-    expect(input('Persona per day').value).toBe('$5.00');
-    expect(input('Provider per day').value).toBe('$15.00');
+    expect(text(section.root, '.mdl-classname')).toEqual(['heavy', 'standard', 'light']);
+    expect(text(section.root, '.mdl-modelid')).toEqual(['claude-opus-5-5', 'claude-sonnet-5-5', 'zai-coding-plan/glm-5.3']);
+    expect(section.root.querySelector('.mdl-found')?.textContent).toContain('zai-coding-plan/glm-5.3-air');
+    expect([...section.root.querySelectorAll<HTMLInputElement>('.mdl-sw')].map((s) => s.checked)).toEqual([true, true, false]);
   });
 
-  it('follows the chain status for the live load', async () => {
-    const { section } = setup();
+  it('looks for models once on first paint, without the network, when never checked', async () => {
+    const never = { ...pool, discovery: { ...pool.discovery, checkedAt: null } };
+    const { section, invoke } = setup(never);
     await section.refresh();
-    section.update({ pool: { used: 3, global: 6, slots: [{ id: 'a', label: 'Claude A', used: 3, cap: 5, derived: true }] } } as never);
-    expect(section.root.textContent).toContain('Now: 3 of 6 · Claude A 3 of 5');
+    await settle();
+    expect(calls(invoke, 'poolModelsDiscover')).toEqual([{ registry: false }]);
   });
 
-  it('draws one card per slot, and the routing fields with the engine values', async () => {
-    const { section } = setup({ ...models, routing: { upgradeAboveQ: 1.5, reservePerWindow: 0.15, burnRate: 0.25 } });
-    await section.refresh();
-    expect([...section.root.querySelectorAll('.tset-models-cardname')].map((n) => n.textContent)).toEqual(['Claude A', 'Copilot']);
-    expect(section.root.querySelector('.tset-models-card')?.textContent).toContain('78 % left');
-    const routing = ['Upgrade above q', 'Reserve per window', 'Burn rate'].map((label) => section.root.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!);
-    expect(routing.map((i) => [i.value, i.readOnly, i.disabled])).toEqual([['1.5', false, false], ['15', false, false], ['25', false, false]]);
-    expect(section.root.textContent).toContain('A session gets exactly its class or waits. Never a smaller class.');
-    expect(section.root.querySelectorAll<HTMLElement>('.tset-models-error')[1]?.hidden).toBe(true);
-  });
-
-  it('writes a routing field on change (blur or Enter) as the whole routing key', async () => {
+  it('does not look when it was checked before; Find models again asks the registry too', async () => {
     const { section, invoke } = setup();
     await section.refresh();
-    const burn = section.root.querySelector<HTMLInputElement>('input[aria-label="Burn rate"]')!;
-    burn.value = '30';
+    expect(calls(invoke, 'poolModelsDiscover')).toEqual([]);
+    byLabel<HTMLButtonElement>(section.root, 'Find models again').click();
+    await settle();
+    expect(calls(invoke, 'poolModelsDiscover')).toEqual([{ registry: true }]);
+  });
+
+  it('moves a model by the class menu: the whole table with the row in its new class', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    byLabel<HTMLButtonElement>(section.root, 'Class of claude-sonnet-5-5').click();
+    const items = [...section.root.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')];
+    expect(items.map((i) => [i.textContent, i.getAttribute('aria-checked')])).toEqual([['heavy', 'false'], ['standard', 'true'], ['light', 'false']]);
+    items[2]!.click();
+    await settle();
+    const [write] = calls(invoke, 'poolModelsConfig') as { models: { model: string; class: string }[] }[];
+    expect(write!.models.map((m) => [m.model, m.class])).toEqual([
+      ['claude-opus-5-5', 'heavy'],
+      ['claude-sonnet-5-5', 'light'],
+      ['zai-coding-plan/glm-5.3', 'standard'],
+    ]);
+  });
+
+  it('moves a model by dragging its handle onto another class', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    const grip = section.root.querySelectorAll<HTMLElement>('.mdl-grip')[0]!;
+    grip.dispatchEvent(new Event('dragstart', { bubbles: true }));
+    const light = section.root.querySelectorAll<HTMLElement>('.mdl-class')[2]!;
+    light.dispatchEvent(new Event('dragover', { bubbles: true, cancelable: true }));
+    light.dispatchEvent(new Event('drop', { bubbles: true, cancelable: true }));
+    await settle();
+    const [write] = calls(invoke, 'poolModelsConfig') as { models: { class: string }[] }[];
+    expect(write!.models[0]!.class).toBe('light');
+  });
+
+  it('writes the switch, a class cap and the global cap', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    section.root.querySelectorAll<HTMLInputElement>('.mdl-sw')[2]!.click();
+    await settle();
+    expect((calls(invoke, 'poolModelsConfig')[0] as { models: { enabled?: boolean }[] }).models[2]!.enabled).toBeUndefined();
+    const steppers = section.root.querySelectorAll<HTMLElement>('.mdl-classhead .mdl-step');
+    steppers[2]!.querySelectorAll('button')[0]!.click();
+    await settle();
+    expect(calls(invoke, 'poolModelsConfig')[1]).toEqual({ classes: [{ name: 'heavy', sessions: 2 }, { name: 'standard', sessions: null }, { name: 'light', sessions: 5 }] });
+    section.root.querySelector<HTMLElement>('.mdl-caprow .mdl-step')!.querySelectorAll('button')[1]!.click();
+    await settle();
+    expect(calls(invoke, 'poolModelsConfig')[2]).toEqual({ capacity: { global: 7, perSlot: {} } });
+  });
+
+  it('adds a found model to the picked class, or ignores it', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    const card = section.root.querySelector<HTMLElement>('.mdl-found')!;
+    expect(card.querySelector('select')?.value).toBe('light');
+    card.querySelectorAll('button')[0]!.click();
+    await settle();
+    expect(calls(invoke, 'poolModelAdd')).toEqual([{ provider: 'opencode', model: 'zai-coding-plan/glm-5.3-air', class: 'light' }]);
+    section.root.querySelectorAll<HTMLElement>('.mdl-found')[0]!.querySelectorAll('button')[1]!.click();
+    await settle();
+    expect(calls(invoke, 'poolModelIgnore')).toEqual([{ provider: 'opencode', model: 'zai-coding-plan/glm-5.3-air' }]);
+  });
+
+  it('adds a class above another, writing the whole class list', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    [...section.root.querySelectorAll<HTMLButtonElement>('.mdl-grouphead button')].find((b) => b.textContent === 'Add class')!.click();
+    const box = section.root.querySelector<HTMLElement>('.mdl-addbox')!;
+    const name = box.querySelector<HTMLInputElement>('input')!;
+    name.value = 'Super Heavy';
+    name.dispatchEvent(new Event('input'));
+    const where = box.querySelector<HTMLSelectElement>('select')!;
+    where.value = 'heavy';
+    where.dispatchEvent(new Event('change'));
+    [...box.querySelectorAll('button')].find((b) => b.textContent === 'Add')!.click();
+    await settle();
+    expect(calls(invoke, 'poolModelsConfig')[0]).toEqual({ classes: [{ name: 'super heavy', sessions: null }, { name: 'heavy', sessions: 2 }, { name: 'standard', sessions: null }, { name: 'light', sessions: 6 }] });
+  });
+
+  it('edits an account cost in place: one slotUpdate with the billing', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    const first = section.root.querySelector<HTMLElement>('.mdl-account')!;
+    const amount = first.querySelector<HTMLInputElement>('.mdl-amountfield')!;
+    amount.value = '95';
+    amount.dispatchEvent(new Event('change'));
+    await settle();
+    expect(calls(invoke, 'slotUpdate')).toEqual([{ id: 'a', patch: { billing: { kind: 'subscription', pricePerMonth: 95, currency: 'EUR' } } }]);
+    const kind = first.querySelector<HTMLSelectElement>('select')!;
+    kind.value = 'credits';
+    kind.dispatchEvent(new Event('change'));
+    await settle();
+    expect(calls(invoke, 'slotUpdate')[1]).toEqual({ id: 'a', patch: { billing: { kind: 'credits', pricePerCredit: 95, currency: 'EUR' } } });
+  });
+
+  it('sets the sessions of an account with the stepper', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    section.root.querySelector<HTMLElement>('.mdl-account .mdl-step')!.querySelectorAll('button')[1]!.click();
+    await settle();
+    expect(calls(invoke, 'slotUpdate')).toEqual([{ id: 'a', patch: { sessions: 3 } }]);
+  });
+
+  it('asks inside the row before removing an account, and takes the models along that run only on it', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    byLabel<HTMLButtonElement>(section.root.querySelectorAll<HTMLElement>('.mdl-account')[0]!, 'Remove account').click();
+    const ask = section.root.querySelector<HTMLElement>('.mdl-confirm')!;
+    expect(ask.textContent).toContain('Remove Claude A? 2 models use only this account.');
+    [...ask.querySelectorAll('button')].find((b) => b.textContent === 'Keep')!.click();
+    expect(section.root.querySelector('.mdl-confirm')).toBeNull();
+    byLabel<HTMLButtonElement>(section.root.querySelectorAll<HTMLElement>('.mdl-account')[0]!, 'Remove account').click();
+    [...section.root.querySelector('.mdl-confirm')!.querySelectorAll('button')].find((b) => b.textContent === 'Remove')!.click();
+    await settle();
+    expect(calls(invoke, 'slotRemove')).toEqual([{ id: 'a', withModels: true }]);
+  });
+
+  it('adds an account from the inline row', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    [...section.root.querySelectorAll<HTMLButtonElement>('.mdl-grouphead button')].find((b) => b.textContent === 'Add account')!.click();
+    const box = section.root.querySelector<HTMLElement>('.mdl-addbox')!;
+    const label = box.querySelector<HTMLInputElement>('input')!;
+    label.value = 'Claude C';
+    label.dispatchEvent(new Event('input'));
+    const amount = box.querySelector<HTMLInputElement>('.mdl-amountfield')!;
+    amount.value = '90';
+    amount.dispatchEvent(new Event('change'));
+    [...box.querySelectorAll('button')].find((b) => b.textContent === 'Add')!.click();
+    await settle();
+    expect(calls(invoke, 'slotAdd')).toEqual([
+      { slot: { id: 'claude-c', label: 'Claude C', provider: 'claude-code', billing: { kind: 'subscription', pricePerMonth: 90, currency: 'EUR' }, sessions: 1 } },
+    ]);
+  });
+
+  it('folds the routing: the summary line closed, the fields and ledgers open', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    const fold = section.root.querySelector<HTMLButtonElement>('.mdl-fold')!;
+    expect(fold.textContent).toContain('step up above q 1.3 · reserve 10 % · burn rate 80 %');
+    expect(section.root.querySelector('.mdl-fields')).toBeNull();
+    fold.click();
+    const burn = byLabel<HTMLInputElement>(section.root, 'Burn rate');
+    expect(burn.value).toBe('80');
+    burn.value = '60';
     burn.dispatchEvent(new Event('change'));
     await settle();
-    expect(writes(invoke)).toEqual([{ routing: { upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 0.3 } }]);
-    expect(burn.value).toBe('30');
-    const q = section.root.querySelector<HTMLInputElement>('input[aria-label="Upgrade above q"]')!;
-    q.value = '';
-    q.dispatchEvent(new Event('change'));
-    await settle();
-    expect(writes(invoke)[1]).toEqual({ routing: { upgradeAboveQ: null, reservePerWindow: 0.1, burnRate: 0.3 } });
+    expect(calls(invoke, 'poolModelsConfig')).toEqual([{ routing: { ...pool.routing, burnRate: 0.6 } }]);
+    expect(byLabel<HTMLInputElement>(section.root, 'Ticket allowance').value).toBe('$2.50');
   });
 
-  it('refuses a value the engine would refuse, says why under the group and writes nothing', async () => {
-    const { section, invoke } = setup();
-    await section.refresh();
-    const reserve = section.root.querySelector<HTMLInputElement>('input[aria-label="Reserve per window"]')!;
-    reserve.value = '120';
-    reserve.dispatchEvent(new Event('change'));
-    await settle();
-    expect(writes(invoke)).toEqual([]);
-    expect(reserve.getAttribute('aria-invalid')).toBe('true');
-    const note = section.root.querySelectorAll<HTMLElement>('.tset-models-error')[1]!;
-    expect([note.hidden, note.textContent]).toEqual([false, 'A share from 0 to below 100 %.']);
-  });
-
-  it('shows the engine refusal (422) under the Routing group', async () => {
-    const { section, invoke } = setup();
-    invoke.mockImplementation((method: string) => {
-      if (method === 'poolModelsConfig') {
-        return Promise.resolve({ ok: false, error: 'routing.burnRate must be a share from 0 to below 1 (0.2 = 20 % of the weekly quota per day; 0 = off)' });
-      }
-      return method === 'poolModels' ? Promise.resolve(models) : Promise.resolve({ ok: true, slots: [] });
-    });
-    await section.refresh();
-    const burn = section.root.querySelector<HTMLInputElement>('input[aria-label="Burn rate"]')!;
-    burn.value = '50';
-    burn.dispatchEvent(new Event('change'));
-    await settle();
-    const note = section.root.querySelectorAll<HTMLElement>('.tset-models-error')[1]!;
-    expect(note.textContent).toBe('routing.burnRate must be a share from 0 to below 1 (0.2 = 20 % of the weekly quota per day; 0 = off)');
-    expect(burn.getAttribute('aria-invalid')).toBe('true');
-    expect(section.root.querySelector<HTMLElement>('.tset-models-error')?.hidden).toBe(true);
-  });
-
-  it('writes the global cap, keeping the per-slot caps', async () => {
-    const { section, invoke } = setup();
-    await section.refresh();
-    const cap = section.root.querySelector<HTMLInputElement>('input[aria-label="Global cap"]')!;
-    cap.value = '8';
-    cap.dispatchEvent(new Event('change'));
-    await settle();
-    expect(writes(invoke)).toEqual([{ capacity: { global: 8, perSlot: {} } }]);
-  });
-
-  it('refuses a cap that is not a number and writes nothing', async () => {
-    const { section, invoke } = setup();
-    await section.refresh();
-    const cap = section.root.querySelector<HTMLInputElement>('input[aria-label="Global cap"]')!;
-    cap.value = 'many';
-    cap.dispatchEvent(new Event('change'));
-    await settle();
-    expect(cap.getAttribute('aria-invalid')).toBe('true');
-    expect(writes(invoke)).toEqual([]);
-  });
-
-  it('writes one ledger default and keeps the others; an empty field clears it', async () => {
-    const { section, invoke } = setup();
-    await section.refresh();
-    const field = section.root.querySelector<HTMLInputElement>('input[aria-label="Provider per day"]')!;
-    field.value = '';
-    field.dispatchEvent(new Event('change'));
-    await settle();
-    expect(writes(invoke)).toEqual([{ ledgers: { ticketAllowance: 2.5, personaPerDay: 5, providerPerDay: null } }]);
-  });
-
-  it('edits a cell in place and sends the whole table', async () => {
-    const { section, invoke } = setup();
-    await section.refresh();
-    const cost = section.root.querySelectorAll('tbody tr')[0]!.querySelector<HTMLElement>('.tset-models-c-cost')!;
-    cost.click();
-    const field = cost.querySelector<HTMLInputElement>('input')!;
-    field.value = '4';
-    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-    await settle();
-    const sent = writes(invoke)[0] as { models: { model: string; cost: number }[] };
-    expect(sent.models.map((m) => [m.model, m.cost])).toEqual([['claude-opus-4-1', 4], ['gpt-5.4', 1]]);
-  });
-
-  it('adds a model through a draft row and drops it on Escape', async () => {
-    const { section, invoke } = setup();
-    await section.refresh();
-    const add = [...section.root.querySelectorAll('button')].find((b) => b.textContent === 'Add model…')!;
-    add.click();
-    const draft = section.root.querySelector('.tset-models-draft')!;
-    const [name] = draft.querySelectorAll<HTMLInputElement>('input');
-    name!.value = 'kimi-k2.5';
-    name!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-    await settle();
-    const sent = writes(invoke)[0] as { models: { model: string }[] };
-    expect(sent.models.map((m) => m.model)).toEqual(['claude-opus-4-1', 'gpt-5.4', 'kimi-k2.5']);
-
-    add.click();
-    section.root.querySelector('.tset-models-draft input')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    expect(section.root.querySelector('.tset-models-draft')).toBeNull();
-  });
-
-  it('Add slot… adds a row that Enter sends as one slot, and draws the slots the engine answers (D-69)', async () => {
-    const { section, invoke } = setup();
-    await section.refresh();
-    invoke.mockImplementationOnce(() => Promise.resolve({ ok: true, slots: [slot('a', 'Claude A'), slot('claude-b', 'Claude B')] }));
-    [...section.root.querySelectorAll('button')].find((b) => b.textContent === 'Add slot…')!.click();
-    expect(invoke).not.toHaveBeenCalledWith('serviceOpenLogFolder');
-    const draft = section.root.querySelector('.tset-models-slotdraft')!;
-    const name = draft.querySelector<HTMLInputElement>('input[aria-label="Name"]')!;
-    const [provider] = draft.querySelectorAll('select');
-    name.value = 'Claude B';
-    provider!.value = 'claude-code';
-    name.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-    await settle();
-    expect(invoke).toHaveBeenCalledWith('slotAdd', { slot: { id: 'claude-b', label: 'Claude B', provider: 'claude-code' } });
-    expect([...section.root.querySelectorAll('.tset-models-cardname')].map((n) => n.textContent)).toEqual(['Claude A', 'Claude B']);
-    expect(section.root.querySelector('.tset-models-slotdraft')).toBeNull();
-  });
-
-  it('every slot card has a remove control that sends its id; a refusal shows under the slots (D-69)', async () => {
-    const { section, invoke } = setup();
-    await section.refresh();
-    const removes = [...section.root.querySelectorAll<HTMLButtonElement>('.tset-models-card .tset-models-slotremove')];
-    expect(removes.map((b) => b.getAttribute('aria-label'))).toEqual(['Remove Claude A', 'Remove Copilot']);
-    invoke.mockImplementationOnce(() => Promise.resolve({ ok: false, error: 'slot "a" runs claude-opus-4-1 in the model table: move or remove those rows first' }));
-    removes[0]!.click();
-    await settle();
-    expect(invoke).toHaveBeenCalledWith('slotRemove', { id: 'a' });
-    expect(section.root.querySelector('.tset-models-addslot .tset-error')?.textContent).toContain('runs claude-opus-4-1');
-    invoke.mockImplementationOnce(() => Promise.resolve({ ok: true, slots: [slot('a', 'Claude A')] }));
-    section.root.querySelectorAll<HTMLButtonElement>('.tset-models-slotremove')[1]!.click();
-    await settle();
-    expect(invoke).toHaveBeenCalledWith('slotRemove', { id: 'w' });
-    expect([...section.root.querySelectorAll('.tset-models-cardname')].map((n) => n.textContent)).toEqual(['Claude A']);
-  });
-
-  it('a name with nothing an id can hold is not sent', async () => {
-    const { section, invoke } = setup();
-    await section.refresh();
-    [...section.root.querySelectorAll('button')].find((b) => b.textContent === 'Add slot…')!.click();
-    const name = section.root.querySelector<HTMLInputElement>('.tset-models-slotdraft input')!;
-    name.value = ' ** ';
-    name.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-    await settle();
-    expect(name.getAttribute('aria-invalid')).toBe('true');
-    expect(invoke.mock.calls.some(([method]) => method === 'slotAdd')).toBe(false);
-    name.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    expect(section.root.querySelector('.tset-models-slotdraft')).toBeNull();
-  });
-
-  it('says so when no runner is awake and leaves every field disabled', async () => {
+  it('says so when the runner is not awake', async () => {
     const { section } = setup(null);
     await section.refresh();
-    expect(section.root.querySelector('.tset-models-error')?.textContent).toBe('The runner is not awake, so the model table cannot be read.');
-    expect(section.root.querySelector<HTMLInputElement>('input[aria-label="Global cap"]')!.disabled).toBe(true);
+    expect(section.root.textContent).toContain('The runner is not awake');
+    expect(section.root.querySelector('.mdl-class')).toBeNull();
+  });
+
+  it('a sleeping runner: Find models again stays on, wakes it, and the accounts are read then', async () => {
+    let awake = false;
+    const invoke = vi.fn((method: string): Promise<unknown> => {
+      if (method === 'poolModelsDiscover') {
+        awake = true;
+        return Promise.resolve({ ...pool, registryError: 'the registry answered nothing' });
+      }
+      if (method === 'slots') {
+        return Promise.resolve(awake ? { ok: true, slots, configPath: '' } : null);
+      }
+      return Promise.resolve(awake ? pool : null);
+    });
+    const section = createModelsSection({ i18n, backend: { invoke } } as unknown as DreyPluginApi);
+    document.body.replaceChildren(section.root);
+    await section.refresh();
+    const again = byLabel<HTMLButtonElement>(section.root, 'Find models again');
+    expect(again.disabled).toBe(false);
+    again.click();
+    await settle();
+    await settle();
+    expect(section.root.querySelectorAll('.mdl-account').length).toBe(slots.length);
+    expect(section.root.querySelector('.mdl-note')?.textContent).toBe('the registry answered nothing');
+  });
+
+  it('shows the engine refusal of a write', async () => {
+    const { section, invoke } = setup();
+    await section.refresh();
+    invoke.mockImplementationOnce(() => Promise.resolve({ ok: false, error: 'classes needs a name' }));
+    section.root.querySelectorAll<HTMLInputElement>('.mdl-sw')[0]!.click();
+    await settle();
+    expect(section.root.querySelector('.mdl-note')?.textContent).toBe('classes needs a name');
   });
 });
