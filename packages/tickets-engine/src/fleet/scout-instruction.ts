@@ -8,7 +8,7 @@
 import type { InteractiveMode } from './protocol';
 import type { DisciplineTexts } from './discipline-texts';
 import { expandFragments } from '../core/prompt-fragments';
-import { briefHead, headParts, memoryOf, optional, personaLine, trimmed, type ComposedInstruction } from './instruction-parts';
+import { briefHead, headParts, memoryOf, optional, personaLine, trimmed, type BriefProject, type ComposedInstruction } from './instruction-parts';
 
 /**
  * The report chapter's exact shape — the strict writer's grammar of
@@ -59,6 +59,8 @@ export interface ScoutInstructionInput {
   readonly extraRepos?: readonly { readonly name: string; readonly path: string }[];
   /** The resolved persona's `## Skills` section (D-46); absent = no section. */
   readonly skillsSection?: string | null;
+  /** req-282: the ticket's project — its purpose rides the head as `## Project`. */
+  readonly project?: BriefProject | null;
   /** The resolved persona's `## Memory` slice (E3); absent = no section. */
   readonly memorySection?: string | null;
   /** The persona id the Written-on line signs with; null/'' = `scout`. */
@@ -117,6 +119,7 @@ export function composeScoutInstruction(input: ScoutInstructionInput): ComposedI
     'scout',
     input.readGround,
     ...(head.skills !== '' ? [head.skills] : []),
+    ...(head.project !== '' ? [head.project] : []),
   ]);
   return { text: parts.join('\n\n'), truncations: [], continuation, stable };
 }

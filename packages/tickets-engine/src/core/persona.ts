@@ -60,6 +60,13 @@ export interface PersonaAllowed {
   /** `network: true` (req-171, "Reach the network"): recorded, not yet enforced (req-142's remainder). */
   readonly network?: boolean;
   /**
+   * `write-notes: true` (req-282, concept §3): the persona may change notes
+   * where its ticket's project grants Write — the yes/no that stays on the
+   * persona once the vaults moved to the project. The vault MCP reads it
+   * from req-283 on; until then `write-vaults` below still governs writes.
+   */
+  readonly writeNotes?: boolean;
+  /**
    * `write-vaults: [<vault id>, …]` — the registered vaults its runs may
    * change through Drey Service's vault MCP (req-167, R5); absent or empty =
    * it reads every vault and writes none.
@@ -171,7 +178,7 @@ function budgetOf(raw: unknown): number | null {
   return Number.isFinite(amount) && amount >= 0 ? amount : null;
 }
 
-/** `allowed:` — `spend-above-allowance: true` (req-170), `write-vaults:` (req-167), `run-commands:` and `network:` (req-171). */
+/** `allowed:` — `spend-above-allowance: true` (req-170), `write-vaults:` (req-167), `run-commands:` and `network:` (req-171), `write-notes: true` (req-282). */
 function allowedOf(raw: unknown): PersonaAllowed {
   const map = raw !== null && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   const vaults = asStringList(typeof map['write-vaults'] === 'string' ? [map['write-vaults']] : map['write-vaults']);
@@ -180,6 +187,7 @@ function allowedOf(raw: unknown): PersonaAllowed {
     spendAboveAllowance: map['spend-above-allowance'] === true,
     ...(commands !== null && (PERSONA_RUN_COMMANDS as readonly string[]).includes(commands) ? { runCommands: commands as PersonaRunCommands } : {}),
     ...(map['network'] === true ? { network: true } : {}),
+    ...(map['write-notes'] === true ? { writeNotes: true } : {}),
     ...(vaults.length > 0 ? { writeVaults: [...new Set(vaults)] } : {}),
   };
 }
@@ -191,6 +199,7 @@ function allowedLines(allowed: PersonaAllowed): string[] {
     ...(allowed.spendAboveAllowance ? ['  spend-above-allowance: true'] : []),
     ...(allowed.runCommands !== undefined ? [`  run-commands: ${allowed.runCommands}`] : []),
     ...(allowed.network === true ? ['  network: true'] : []),
+    ...(allowed.writeNotes === true ? ['  write-notes: true'] : []),
     ...(vaults.length > 0 ? [`  write-vaults: [${vaults.join(', ')}]`] : []),
   ];
   return lines.length > 0 ? ['allowed:', ...lines] : [];

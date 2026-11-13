@@ -1,5 +1,6 @@
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
+import { PROJECTS_DIR } from '../contracts/projects';
 import type { BoardSnapshot, TicketCard } from '../contracts/tickets';
 import { PHASE_PIN_KEY, placementOfPhase } from '../core/lifecycle-stages';
 import { patchTicketFile, type TransitionPatch } from '../core/ticket-files';
@@ -61,6 +62,14 @@ function placementKey(record: TicketDetail): string {
   return `${record.stage}|${record.extensions[PHASE_PIN_KEY] ?? ''}`;
 }
 
+/** req-282: the project records of the meta vault (`tickets/_meta/projects/*.md`), vault-relative paths. */
+async function projectFilesOf(metaVaultPath: string): Promise<{ path: string; text: string }[]> {
+  const dir = path.join(metaVaultPath, ...PROJECTS_DIR.split('/'));
+  const names = (await fsp.readdir(dir).catch((): string[] => [])).filter((name) => name.endsWith('.md'));
+  const files = await Promise.all(names.map(async (name) => ({ path: `${PROJECTS_DIR}/${name}`, text: await fsp.readFile(path.join(dir, name), 'utf8').catch(() => null) })));
+  return files.filter((file): file is { path: string; text: string } => file.text !== null);
+}
+
 export class StoreChainBoard {
   /** Where each ticket stood when the board was last read (id -> stage + pin), for {@link moved}. */
   private readonly stages = new Map<string, string>();
@@ -75,8 +84,8 @@ export class StoreChainBoard {
   /** The board of this pass: pipeline + repos from the meta vault, tickets from the store. */
   async board(metaVaultPath: string, defaultWorker: string): Promise<BoardSnapshot> {
     const read = (rel: string): Promise<string | null> => fsp.readFile(path.join(metaVaultPath, rel), 'utf8').catch(() => null);
-    const [pipelineText, reposText] = await Promise.all([read('tickets/_meta/pipeline.md'), read('tickets/_meta/repos.md')]);
-    const input = { vaultId: null, vaultName: null, activeVaultName: null, isGitRepo: false, defaultWorker, pipelineText, reposText };
+    const [pipelineText, reposText, projectFiles] = await Promise.all([read('tickets/_meta/pipeline.md'), read('tickets/_meta/repos.md'), projectFilesOf(metaVaultPath)]);
+    const input = { vaultId: null, vaultName: null, activeVaultName: null, isGitRepo: false, defaultWorker, pipelineText, reposText, projectFiles };
     if (this.io === null) {
       throw new Error('no ticket checkout configured (tickets.dk.checkout, or a local tickets.dk.store)');
     }

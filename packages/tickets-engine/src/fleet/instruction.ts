@@ -6,7 +6,7 @@
 import { expandFragments } from '../core/prompt-fragments';
 import type { FleetCaps, InteractiveMode } from './protocol';
 import type { DisciplineTexts } from './discipline-texts';
-import { briefHead, headParts, personaLine, type ComposedInstruction, type Truncation } from './instruction-parts';
+import { briefHead, headParts, personaLine, type BriefProject, type ComposedInstruction, type Truncation } from './instruction-parts';
 import { chainSection, changingParts, whoAndWhere } from './instruction-sections';
 import { isReadOnlyRun } from './review-run';
 
@@ -86,6 +86,12 @@ export interface InstructionInput {
    */
   readonly skillsSection?: string | null;
   /**
+   * The ticket's project (req-282): its purpose rides the stable head as
+   * `## Project`, behind the skills (ADR-0097 later change). Null/absent or a
+   * project without a purpose = no section, byte-identical briefs.
+   */
+  readonly project?: BriefProject | null;
+  /**
    * The resolved persona's curated memory, already sliced by
    * `context-pack`'s `personaMemorySection` (E3, ADR-0088): carried as the
    * first of the instruction's variable parts — the stable prefix
@@ -127,7 +133,8 @@ export interface InstructionInput {
  *
  * 1. the repo's agent instructions, verbatim;
  * 2. the phase instruction template (a resolved persona's prompt rides
- *    here — it IS the template for its runs);
+ *    here — it IS the template for its runs), the persona's skills and the
+ *    ticket's `## Project` (req-282);
  * 3. `## Plan` verbatim;
  * 4. who/where, the description, then the shared rules of the run kind
  *    (req-280, `ruleParts`);
@@ -166,6 +173,7 @@ export function composeInstruction(input: InstructionInput): ComposedInstruction
     ...(input.reviewCheckout !== undefined ? [input.reviewCheckout] : []),
     ...(input.readOnly === true ? ['read-only'] : []),
     ...(head.skills !== '' ? [head.skills] : []),
+    ...(head.project !== '' ? [head.project] : []),
     ...(persona !== null ? [persona] : []),
   ]);
   return { text: parts.join('\n\n'), truncations, continuation, stable };

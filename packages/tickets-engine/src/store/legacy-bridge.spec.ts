@@ -78,6 +78,13 @@ describe('legacyToDricketDocument', () => {
     expect(back.extensions['x-persona']).toBe('ben');
   });
 
+  it('carries the project as x-project both ways (req-282)', () => {
+    const doc = DOC.replace('x-persona: paul', 'x-persona: paul\nx-project: drey');
+    expect(legacyOf(doc)).toContain('project: drey');
+    const back = detailFromContent(legacyToDricketDocument(doc, legacyOf(doc).replace('project: drey', 'project: lariscus'), { stage: 'build' }));
+    expect(back.extensions['x-project']).toBe('lariscus');
+  });
+
   it('drops a managed extension the legacy header no longer has, keeps others', () => {
     const legacy = legacyOf(DOC).replace(/^persona: paul\n/m, '').replace(/^chain:\n.*\n.*\n/m, '');
     const back = detailFromContent(legacyToDricketDocument(DOC, legacy, { stage: 'build' }));

@@ -889,6 +889,17 @@ creates the configuration files under `tickets/_meta/`:
   folder…** picks a folder and registers every git repository found
   inside (the folder itself and its subfolders) with clone URL, branch
   and local path prefilled.
+- `projects/` — one file per project: a name, a colour, the repositories
+  of `repos.md` it works in, plain folders and the vaults a worker may read
+  or write, and a few sentences on what the project is (the file's text).
+  Those sentences reach every agent run on the project's tickets. A ticket
+  names its project in `project:`. The first time the service starts on a
+  board without projects it writes one, named after your first repository,
+  with every repository and every registered vault (readable) — so nothing
+  changes until you add a second project. From then on a ticket without
+  `project:` counts as *Unassigned*: fine in the inbox, a badge once it
+  is being worked, and so is a repository that does not belong to the
+  ticket's project.
 **The crew a new board starts with.** The same step adds four crew members next
 to *You*: **Paul** (plans), **Ben** (builds), **Ralf** (reviews) and **Tessa**
 (tests). They appear on the Crew tab, in Mission Control's team list and in the

@@ -12,6 +12,7 @@ import type { ClosingSignal } from '../core/closing-signals';
 import type { PersonaRunSettings } from '../core/persona-settings';
 import { acceptanceCommands } from '../core/ticket-files';
 import type { Truncation } from './assignment';
+import type { BriefProject } from './instruction-parts';
 import type { DisciplineTexts } from './discipline-texts';
 import type { FleetCaps, HandoverMode, InteractiveMode, PermissionMode, RunCursor, RunDkTarget, RunRequest } from './protocol';
 import { assembleRunRequest } from './request-assemble';
@@ -116,6 +117,8 @@ export interface ComposeRunInput {
   readonly disciplines: DisciplineTexts;
   /** req-169: the vault's closing-round signals (pipeline.md `closing-signals:`); absent = all five. */
   readonly closingSignals?: readonly ClosingSignal[];
+  /** req-282: the ticket's project (`ticketProject` over the snapshot's records); null/absent = Unassigned. */
+  readonly project?: BriefProject | null;
 }
 
 /**

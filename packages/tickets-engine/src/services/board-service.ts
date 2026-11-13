@@ -11,6 +11,7 @@ import { randomBytes } from 'node:crypto';
 import { promises as fsp, existsSync } from 'node:fs';
 import * as path from 'node:path';
 import { archivedTicketIds, nextTicketId, TICKETS_ARCHIVE_DIR, TICKET_ID_PATTERN, type BoardSnapshot, type RecentDone, type StoreStageMigrationOffer, type StoreStageMigrationResult, FolderStatus, PipelinePhase, ProjectRef, PromptEntry, PromptListing, RepoCandidate, RepoRef, ReposListing, TicketCard, TicketForm, TicketPriority, TicketTrack } from '../contracts/tickets';
+import { PROJECTS_DIR, ticketProject } from '../contracts/projects';
 import { parseChanges, parseResult, planApprovedOf, storyOf, type ChangesReply } from '../contracts/changes';
 import { type RefineReply, TicketReply, AttachmentReply, type DocumentSaveReply, type TicketDocumentLocation } from '../contracts/replies';
 import { documentRelPath, idOfDocumentPath } from '../store/document-paths';
@@ -378,6 +379,11 @@ export class EngineBoardService {
     }
   }
 
+  /** These vault files with their texts, in the order given. */
+  private readFiles(vault: EngineVault, paths: readonly string[]): Promise<{ path: string; text: string }[]> {
+    return Promise.all(paths.map(async (path) => ({ path, text: await this.host.read(vault.id, path) })));
+  }
+
   /** A registered, existing vault containing the pipeline marker file. */
   async detect(): Promise<EngineVault | null> {
     const vault = await this.probeVaults();
@@ -450,13 +456,7 @@ export class EngineBoardService {
       this.readOptional(vault.id, LEDGER_FILE),
     ]);
     await this.applyCrew(vault);
-    const paths = mdFiles.filter((p) => p.startsWith('tickets/') && !p.startsWith('tickets/_meta/'));
-    const files = await Promise.all(
-      paths.map(async (path) => ({
-        path,
-        text: await this.host.read(vault.id, path),
-      })),
-    );
+    const files = await this.readFiles(vault, mdFiles.filter((p) => p.startsWith('tickets/') && !p.startsWith('tickets/_meta/')));
     const common = {
       vaultId: vault.id,
       vaultName: vault.name,
@@ -465,6 +465,8 @@ export class EngineBoardService {
       defaultWorker: this.defaultWorker,
       pipelineText,
       reposText,
+      // req-282: the project records beside repos.md.
+      projectFiles: await this.readFiles(vault, mdFiles.filter((p) => p.startsWith(`${PROJECTS_DIR}/`))),
       // The settled runs' usage (concept §4.3): one vault-file read, the
       // pure assembly only attaches the sums to the matching cards.
       ticketUsage: settledUsageByTicket(parseLedger(ledgerText ?? '')),
@@ -3562,6 +3564,7 @@ export class EngineBoardService {
       diffStat,
       gateFailure,
       caps: this.caps,
+      project: ticketProject(card.meta.project, snap.projects ?? []), // req-282: its purpose rides the brief
       ...(personaDispatch !== null ? { persona: personaDispatch } : {}),
       ...(input.handover !== null ? { handover: input.handover } : input.interactive !== null ? { handover: 'auto' } : {}),
       ...(input.interactive !== null ? { interactive: input.interactive } : {}),

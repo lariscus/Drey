@@ -30,8 +30,10 @@ import { checkpointPhaseIds } from '../fleet/chain';
 import { withTerminalTickets } from './normalize';
 import { READY_STATE } from './pipeline-states';
 import { runDependencyPass } from './blocked';
+import { parseProjects } from './project-record';
 import { parseRepos } from './repos-file';
 import { parseTicketFile, ticketPathParts } from './ticket-files';
+import { ticketProjectIssues } from './ticket-project';
 import { pipelinePhaseOf } from './pipeline-phase';
 import { CLOSING_SIGNALS_KEY, parseClosingSignals, type ClosingSignal } from './closing-signals';
 import { FLOW_KEY, parsePipelineFlow } from './pipeline-flow';
@@ -472,6 +474,8 @@ export interface AssembleInput {
   readonly isGitRepo: boolean;
   readonly pipelineText: string | null;
   readonly reposText: string | null;
+  /** The project records (`tickets/_meta/projects/*.md`, req-282); other paths are skipped. Default: none. */
+  readonly projectFiles?: readonly BoardFile[];
   readonly files: readonly BoardFile[];
   /** The plugin's configured default worker (M84) — what cards show when
    *  nothing above them pins one. */
@@ -521,6 +525,10 @@ export function assembleBoard(input: AssembleInput): BoardSnapshot {
     issues.push({ level: 'warning', message: warning });
   }
   const repoNames = new Set(reposParse.repos.map((r) => r.name));
+  // req-282: the projects, and per ticket the project checks (a working ticket outside the first and last column).
+  const projectsParse = parseProjects(input.projectFiles ?? []);
+  issues.push(...projectsParse.warnings.map((message): TicketIssue => ({ level: 'warning', message })));
+  const edgePhases = new Set([phases[0]?.id, phases[phases.length - 1]?.id]);
 
   // Parse every ticket; group by directory. Cards stay mutable through
   // the duplicate and dependency passes, then flow into columns as-is
@@ -560,6 +568,7 @@ export function assembleBoard(input: AssembleInput): BoardSnapshot {
         parsed.issues.push({ level: 'warning', message: `repo "${name}" is not in _meta/repos.md` });
       }
     }
+    parsed.issues.push(...ticketProjectIssues(parsed.meta, !edgePhases.has(parts.phase), projectsParse.projects));
     if (parsed.meta.parkedReason !== null && parts.phase !== 'inbox') {
       parsed.issues.push({ level: 'noise', message: 'parked ticket outside inbox — the fields are ignored here' });
     }
@@ -673,6 +682,7 @@ export function assembleBoard(input: AssembleInput): BoardSnapshot {
     priorities: pipelineParse.priorities,
     repos: reposParse.repos,
     reposError: reposParse.error,
+    ...(projectsParse.projects.length > 0 ? { projects: projectsParse.projects } : {}),
     columns,
     issues,
     checkpoints: [...checkpointPhaseIds(columns)],

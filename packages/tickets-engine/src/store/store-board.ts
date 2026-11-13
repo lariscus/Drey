@@ -36,6 +36,7 @@ import { parseTicketChainFields } from '../core/ticket-chain-fields';
  *   x-form x-proof x-awaiting      -> form proof awaiting
  *   x-class x-model x-size         -> class model size     (req-170)
  *   x-allowance                    -> allowance            (req-170)
+ *   x-project                      -> project              (req-282)
  *   x-interactive                  -> interactive          ("true")
  *   x-chain                        -> chain                (entries separated by `;`)
  *   x-references                   -> references           (separated by `,`)
