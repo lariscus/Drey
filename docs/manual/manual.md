@@ -1611,9 +1611,10 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   prompt** opens that brief below the editor, read-only, with the four parts
   and each skill marked with its tokens, and follows a skill you switch.
   The editor takes the room the blocks below it leave and scrolls its own
-  text; drag the bar under it to give it a height of your own (Arrow Up /
-  Down on the focused bar steps it), double-click the bar to let it fill
-  again. The column scrolls only when the window is too small for the
+  text; drag the bar under it to make it taller than the room it has (Arrow
+  Up / Down on the focused bar steps it) — the dragged height is a minimum,
+  so the editor still fills a larger window — and double-click the bar to
+  forget it. The column scrolls only when the window is too small for the
   editor's minimum.
   **Skills** lists every skill of the persona's own folder and of the shared
   pool — the ones that are off too — with where it lives, `own` or `shared`

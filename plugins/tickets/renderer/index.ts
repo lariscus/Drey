@@ -1799,7 +1799,18 @@ function openTeamDoc(api: DreyPluginApi): void {
 
 /** The Persona page (board 7k) opens in the view it is asked from: Work or Crew. */
 function openPersonaDoc(api: DreyPluginApi, id: string): void {
-  api.documents.addDoc(PERSONA_KIND, personaKeyOf(id), api.i18n.t('persona.page.tab', { name: teamStore(api).nameOf(id) }), { stayInView: true });
+  const store = teamStore(api);
+  const title = (): string => api.i18n.t('persona.page.tab', { name: store.nameOf(id) });
+  api.documents.addDoc(PERSONA_KIND, personaKeyOf(id), title(), { stayInView: true });
+  // D-71: a tab restored at start opens before the crew has loaded and would keep the bare id ("tessa"); it takes the title once the list is there.
+  if (!store.loaded()) {
+    const off = store.subscribe(() => {
+      if (store.loaded()) {
+        off();
+        api.documents.rename(personaKeyOf(id), title());
+      }
+    });
+  }
 }
 
 function threadTitle(api: DreyPluginApi, ticketId: string): string {

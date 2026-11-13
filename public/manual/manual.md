@@ -1611,9 +1611,10 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   prompt** opens that brief below the editor, read-only, with the four parts
   and each skill marked with its tokens, and follows a skill you switch.
   The editor takes the room the blocks below it leave and scrolls its own
-  text; drag the bar under it to give it a height of your own (Arrow Up /
-  Down on the focused bar steps it), double-click the bar to let it fill
-  again. The column scrolls only when the window is too small for the
+  text; drag the bar under it to make it taller than the room it has (Arrow
+  Up / Down on the focused bar steps it) — the dragged height is a minimum,
+  so the editor still fills a larger window — and double-click the bar to
+  forget it. The column scrolls only when the window is too small for the
   editor's minimum.
   **Skills** lists every skill of the persona's own folder and of the shared
   pool — the ones that are off too — with where it lives, `own` or `shared`
@@ -1840,6 +1841,12 @@ A terminal can read the cost overview the same way the board does:
 `GET /report` on the runner (see `plugins/tickets/FLEET.md`) groups the
 runs' tokens by ticket, phase and model, and shows how much of each
 run's input was spent before its first write — the exploration cost.
+The same report groups by persona — runs, tokens, cost, red gates and
+how long the persona held tickets — and by position in the chain:
+how long the runs at position 1, 2, … worked, how long tickets sat
+there, and the difference, the waiting time. The held times come from
+the board's ledger, which notes each time a ticket moves to another
+persona or position.
 
 **When a worker needs you.** A worker that cannot go on without a
 decision of yours asks: its run stops at the question instead of ending,
