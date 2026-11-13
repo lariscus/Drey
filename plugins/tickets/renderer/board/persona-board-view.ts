@@ -26,6 +26,9 @@ const LANE_DRAG_TYPE = 'application/x-drey-lane';
 const SHOWN = 3;
 const DONE_SHOWN = 2;
 
+/** The Done column's id (its "<n> more" tail key). */
+const DONE_COLUMN = 'done';
+
 function loadNode(lane: BoardLane, load: LaneLoad, i18n: I18n): HTMLElement {
   const node = h('span', 'pb-load');
   node.title = load.cap === null ? i18n.t('board.load.title_open', { name: lane.title, running: load.running, waiting: load.waiting }) : i18n.t('board.load.title', { name: lane.title, running: load.running, cap: load.cap, waiting: load.waiting });
@@ -132,17 +135,17 @@ function moreNode(ctx: PersonaBoardContext, key: string, hidden: number): HTMLEl
   return more;
 }
 
-function columnNode(ctx: PersonaBoardContext, spec: { readonly key: string; readonly cls: string; readonly head: HTMLElement; readonly cards: readonly PersonaCardModel[]; readonly limit: number | null; readonly extra?: number }, actions: CardActions, nameOf: (id: string) => string, done = false): HTMLElement {
+function columnNode(ctx: PersonaBoardContext, spec: { readonly column: string; readonly cls: string; readonly head: HTMLElement; readonly cards: readonly PersonaCardModel[]; readonly limit: number | null; readonly extra?: number }, actions: CardActions, nameOf: (id: string) => string, done = false): HTMLElement {
   const col = h('section', `pb-col ${spec.cls}`);
-  col.dataset['column'] = spec.key;
-  const body = cardsNode(ctx, spec.key, spec.cards, spec.limit, actions, nameOf, done);
+  col.dataset['column'] = spec.column;
+  const body = cardsNode(ctx, spec.column, spec.cards, spec.limit, actions, nameOf, done);
   const total = spec.cards.length + (spec.extra ?? 0);
-  const shown = spec.limit === null || ctx.state.more.has(spec.key) ? total : Math.min(spec.cards.length, spec.limit);
+  const shown = spec.limit === null || ctx.state.more.has(spec.column) ? total : Math.min(spec.cards.length, spec.limit);
   if (total > shown) {
-    body.append(moreNode(ctx, spec.key, total - shown));
+    body.append(moreNode(ctx, spec.column, total - shown));
   }
   col.append(spec.head, body);
-  acceptCards(ctx, col, spec.key);
+  acceptCards(ctx, col, spec.column);
   return col;
 }
 
@@ -201,8 +204,8 @@ export function personaBoardNodes(ctx: PersonaBoardContext, snap: BoardSnapshot)
 
   const cols = h('div', 'pb-cols');
   cols.append(
-    columnNode(ctx, { key: 'inbox', cls: 'pb-col-edge', head: headNode(i18n.t('board.column.inbox'), model.inbox.length, null, null), cards: model.inbox, limit: SHOWN }, actions, nameOf),
-    columnNode(ctx, { key: 'prioritized', cls: 'pb-col-edge', head: headNode(i18n.t('board.column.prioritized'), model.prioritized.length, null, null), cards: model.prioritized, limit: SHOWN }, actions, nameOf),
+    columnNode(ctx, { column: 'inbox', cls: 'pb-col-edge', head: headNode(i18n.t('board.column.inbox'), model.inbox.length, null, null), cards: model.inbox, limit: SHOWN }, actions, nameOf),
+    columnNode(ctx, { column: 'prioritized', cls: 'pb-col-edge', head: headNode(i18n.t('board.column.prioritized'), model.prioritized.length, null, null), cards: model.prioritized, limit: SHOWN }, actions, nameOf),
   );
   if (model.folded.length > 0 && !state.unfolded) {
     cols.append(foldChipNode(ctx, model.folded));
@@ -212,12 +215,12 @@ export function personaBoardNodes(ctx: PersonaBoardContext, snap: BoardSnapshot)
     const laneHead = headNode(lane.lane.title, lane.cards.length, right, avatarNode(lane));
     laneHead.dataset['persona'] = lane.lane.persona;
     reorderLanes(ctx, laneHead, lane.lane.persona, snap);
-    cols.append(columnNode(ctx, { key: lane.lane.persona, cls: 'pb-col-lane', head: laneHead, cards: lane.cards, limit: lane.lane.kind === 'human' ? null : SHOWN }, actions, nameOf));
+    cols.append(columnNode(ctx, { column: lane.lane.persona, cls: 'pb-col-lane', head: laneHead, cards: lane.cards, limit: lane.lane.kind === 'human' ? null : SHOWN }, actions, nameOf));
   }
   const doneHead = headNode(i18n.t('board.column.done'), model.done.length + model.archive.length, model.doneCost === null ? null : h('span', 'pb-col-cost', usd(model.doneCost)), null);
-  const doneCol = columnNode(ctx, { key: 'done', cls: 'pb-col-done', head: doneHead, cards: model.done, limit: DONE_SHOWN, extra: model.archive.length }, actions, nameOf, true);
+  const doneCol = columnNode(ctx, { column: DONE_COLUMN, cls: 'pb-col-done', head: doneHead, cards: model.done, limit: DONE_SHOWN, extra: model.archive.length }, actions, nameOf, true);
   const doneBody = doneCol.querySelector<HTMLElement>('.pb-col-body')!;
-  const room = state.more.has('done') ? model.archive.length : Math.max(0, DONE_SHOWN - model.done.length);
+  const room = state.more.has(DONE_COLUMN) ? model.archive.length : Math.max(0, DONE_SHOWN - model.done.length);
   const more = doneBody.querySelector('.pb-more');
   for (const entry of model.archive.slice(0, room)) {
     const card = h('article', 'pb-card pb-card-archived');

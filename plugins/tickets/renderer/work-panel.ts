@@ -216,6 +216,9 @@ export function workListLivePaint(
     const id = node.dataset['id'] ?? '';
     const row = rows.get(id);
     if (row !== undefined) {
+      if (row.card.hold !== undefined) {
+        continue; // a persona board row (req-271): holder and position only, nothing that ticks
+      }
       if (row.need !== null) {
         // Needs you: the age follows the need, the line may turn shaped.
         setAge(node, ageWords(row.need.since, nowMs));
@@ -562,7 +565,8 @@ function holdParts(deps: WorkPanelDeps, snap: BoardSnapshot, row: WorkRow): HTML
   if (badge === 'sent-back-once') {
     parts.push(el('span', 'work-kind', i18n.t('work.hold.sent_back')));
   }
-  if (row.need !== null && row.need.kind !== 'checkpoint') {
+  // A question or the second send-back already says why; another need (a red gate, a failed run) is named.
+  if (row.need !== null && row.need.kind !== 'checkpoint' && hold.why === 'entry') {
     parts.push(el('span', 'work-kind', needKindLabel(row.need, snap).toLowerCase()));
   }
   return parts;
@@ -578,7 +582,8 @@ function rowNode(_deps: WorkPanelDeps, snap: BoardSnapshot, row: WorkRow): HTMLE
   node.append(richTop(card, more));
   const held = holdParts(_deps, snap, row);
   if (held !== null) {
-    node.append(richSub(row, held, need === null ? '' : ageWords(need.since, Date.now())));
+    // Board 7a v2: a persona board row carries no age.
+    node.append(richSub(row, held, ''));
   } else if (need !== null) {
     const kind = needKindLabel(need, snap);
     // The phase word is dropped when the kind already says it (*Ready to try* in Ready to try).
@@ -630,7 +635,7 @@ function runningRowNode(deps: WorkPanelDeps, snap: BoardSnapshot, row: WorkRow):
   node.append(richTop(card, more));
   const held = holdParts(deps, snap, row);
   if (held !== null) {
-    node.append(richSub(row, held, step.live ? ageWords(row.run?.startedAt ?? null, Date.now()) : '', { deps }));
+    node.append(richSub(row, held, '', { deps }));
     return node;
   }
   // The step word is dropped when it only repeats the phase (board 7a: "Building · queued").

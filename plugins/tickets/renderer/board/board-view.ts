@@ -17,6 +17,7 @@ import { usd } from '../team/team-model';
 import type { BoardSnapshot } from '../../shared/tickets';
 import type { PersonaBoardContext, PersonaBoardState } from './persona-board-drop';
 import { personaBoardNodes } from './persona-board-view';
+import { poolChipNode } from './pool-chip';
 import {
   boardModelOf,
   columnCostText,
@@ -251,7 +252,14 @@ export function mountBoard(deps: DeskDeps, store: TeamStore, host: HTMLElement):
       root.replaceChildren(head, h('div', 'desk-note', snap === null ? 'Loading…' : 'No tickets repository yet - set one up in the Work panel.'));
       return;
     }
-    head.append(textButton('New idea', 'desk-btn desk-btn-primary', 'Capture a new idea', () => deps.newIdea()));
+    // req-271: the big pool's chip on the phase board too (the Capacity band is gone); its popover holds slots, tranche, queue.
+    head.append(
+      poolChipNode(deps, [], personaState.poolOpen, (open) => {
+        personaState.poolOpen = open;
+        schedule();
+      }),
+      textButton('New idea', 'desk-btn desk-btn-primary', 'Capture a new idea', () => deps.newIdea()),
+    );
     const model = boardModelOf(snap, deps.runs(), parts, deps.chain()?.queue ?? []);
     const cols = h('div', 'desk-cols');
     for (const column of model.columns) {

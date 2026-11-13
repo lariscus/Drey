@@ -262,7 +262,7 @@ async function openFile(page: Page, name: string): Promise<void> {
 const WORK_DOCKS = {
   left: ['Calendar', 'Files', 'Backlinks', 'Source control', 'Outline', 'Tickets'],
   right: ['Find', 'Assistant'],
-  bottom: ['Capacity'],
+  bottom: [],
   folded: ['Find'],
   rightW: 380,
   bottomH: 168,
@@ -297,7 +297,7 @@ test('boards 7a 7e 7f 7h 7i: the desk screens', async ({ page, electronApp }) =>
   // The Work view: 7a with the T-0121 tab, the Board and a note beside it.
   await page.keyboard.press('Control+2');
   await page.waitForTimeout(500);
-  await arrangeDocks(page, { ...WORK_DOCKS, shown: ['Tickets', 'Assistant', 'Capacity'] });
+  await arrangeDocks(page, { ...WORK_DOCKS, shown: ['Tickets', 'Assistant'] });
   await reloadSized(page, electronApp);
   const panel = page.locator('.tickets-panel').filter({ visible: true });
   await expect(panel.locator('.work-row[data-id="T-0121"]')).toBeVisible({ timeout: 30_000 });
@@ -323,28 +323,8 @@ test('boards 7a 7e 7f 7h 7i: the desk screens', async ({ page, electronApp }) =>
   // Boards 7e and 7f work with the right dock folded away.
   await page.keyboard.press('Control+Alt+B');
   await page.locator('app-tab-bar .tab', { hasText: 'Board' }).first().click();
-  await expect(page.locator('.desk-capacity').filter({ visible: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.desk-board').filter({ visible: true })).toBeVisible({ timeout: 15_000 });
   await shoot(page, 'DeskBoard');
-  // The band's rects, to set against the board's own markup (milestone 217).
-  const geometry = await page.evaluate(() => {
-    const rect = (e: Element): number[] => {
-      const b = e.getBoundingClientRect();
-      return [b.left, b.top, b.width, b.height].map((n) => Math.round(n * 10) / 10);
-    };
-    const band = document.querySelector('.desk-capacity:not([hidden])');
-    return {
-      dock: rect(document.querySelector('app-dock[side="bottom"]')!),
-      frame: rect(band!.closest('app-panel-frame')!),
-      band: rect(band!),
-      rows: [...band!.children].map(rect),
-      chips: [...band!.querySelectorAll('.desk-slot')].map(rect),
-      persons: [...band!.querySelectorAll('.desk-cap-person')].map(rect),
-      tail: ['.desk-cap-sep', '.desk-cap-budget', '.desk-cap-crew'].map((sel) => rect(band!.querySelector(sel)!)),
-      head: rect(band!.closest('app-panel-frame')!.querySelector('.head')!),
-      queue: [...band!.querySelectorAll('.desk-cap-queuerow > *')].map(rect),
-    };
-  });
-  fs.writeFileSync(path.join(OUT, 'DeskBoard.measure.json'), JSON.stringify(geometry, null, 1));
 
   await openFromMenu('Crew');
   await expect(page.locator('.desk-team').filter({ visible: true })).toBeVisible({ timeout: 15_000 });
@@ -368,7 +348,7 @@ test('boards 7a 7e 7f 7h 7i: the desk screens', async ({ page, electronApp }) =>
   // Board 7f's cards with the Assistant open: they wrap (fidelity ruling O7), the frame stays put (D-48).
   await page.keyboard.press('Control+2');
   await page.waitForTimeout(500);
-  await arrangeDocks(page, { ...WORK_DOCKS, shown: ['Tickets', 'Assistant', 'Capacity'] });
+  await arrangeDocks(page, { ...WORK_DOCKS, shown: ['Tickets', 'Assistant'] });
   await reloadSized(page, electronApp);
   await expect(panel.locator('.work-row[data-id="T-0121"]')).toBeVisible({ timeout: 30_000 });
   await pushFleet(electronApp);

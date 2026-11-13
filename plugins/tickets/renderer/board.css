@@ -3834,6 +3834,10 @@ button.tickets-statusbar-fleet:focus-visible {
   flex-wrap: wrap;
 }
 
+.tickets-board-migration:has(.tickets-board-migration-list) .tickets-warn-text {
+  white-space: normal;
+}
+
 .tickets-board-migration-list {
   flex-basis: 100%;
   margin: 2px 0 0;
