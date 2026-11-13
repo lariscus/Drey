@@ -30,9 +30,12 @@ const DONE_SHOWN = 2;
 /** The Done column's id (its "<n> more" tail key). */
 const DONE_COLUMN = 'done';
 
-function loadNode(lane: BoardLane, load: LaneLoad, i18n: I18n): HTMLElement {
+function loadNode(lane: BoardLane, load: LaneLoad, i18n: I18n, filtered: boolean): HTMLElement {
   const node = h('span', 'pb-load');
-  node.title = load.cap === null ? i18n.t('board.load.title_open', { name: lane.title, running: load.running, waiting: load.waiting }) : i18n.t('board.load.title', { name: lane.title, running: load.running, cap: load.cap, waiting: load.waiting });
+  // req-285: under a project filter the load still counts every project's runs (the pool is cross-project).
+  node.title = filtered
+    ? i18n.t('board.load.every_project')
+    : load.cap === null ? i18n.t('board.load.title_open', { name: lane.title, running: load.running, waiting: load.waiting }) : i18n.t('board.load.title', { name: lane.title, running: load.running, cap: load.cap, waiting: load.waiting });
   const count = load.cap === null ? i18n.t('board.load.running', { n: load.running }) : i18n.t('board.load.count', { running: load.running, cap: load.cap });
   node.append(h('span', load.atCap ? 'pb-load-full' : 'pb-load-count', count));
   if (load.waiting > 0) {
@@ -189,7 +192,12 @@ export function personaBoardNodes(ctx: PersonaBoardContext, snap: BoardSnapshot)
   const { deps, state } = ctx;
   const i18n = deps.api.i18n;
   const chain = deps.chain();
-  const model = personaBoardModelOf(snap, { runs: deps.runs(), chain, queueWords: (id) => queueWordsFor(chain?.queue, id, i18n)?.short ?? null, now: Date.now() }, state.unfolded);
+  const scope = deps.scope?.() ?? null;
+  const model = personaBoardModelOf(
+    snap,
+    { runs: deps.runs(), chain, queueWords: (id) => queueWordsFor(chain?.queue, id, i18n)?.short ?? null, now: Date.now(), ...(scope === null ? {} : { shows: (card) => scope.shows(card), chip: (card) => scope.chip(card) }) },
+    state.unfolded,
+  );
   const lanes = snap.lanes ?? [];
   const nameOf = (id: string): string => lanes.find((lane) => lane.persona === id)?.title ?? id;
   const actions = cardActions(ctx);
@@ -213,7 +221,7 @@ export function personaBoardNodes(ctx: PersonaBoardContext, snap: BoardSnapshot)
     cols.append(foldChipNode(ctx, model.folded));
   }
   for (const lane of model.lanes) {
-    const right = lane.load === null ? null : loadNode(lane.lane, lane.load, i18n);
+    const right = lane.load === null ? null : loadNode(lane.lane, lane.load, i18n, scope?.filtered === true);
     const laneHead = headNode(lane.lane.title, lane.cards.length, right, avatarNode(lane));
     laneHead.dataset['persona'] = lane.lane.persona;
     reorderLanes(ctx, laneHead, lane.lane.persona, snap);

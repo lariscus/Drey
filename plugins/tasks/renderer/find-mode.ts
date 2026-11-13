@@ -58,11 +58,15 @@ export function groupByDue(tasks: readonly TaskRecord[], today: string = todayIs
     .map((id) => ({ id, tasks: groups[id] }));
 }
 
-/** The open-count status line for a query's scope. */
+/**
+ * The open-count status line for a query's scope; `project` names the title
+ * bar's choice (`projectLabel`, SDK 1.59).
+ */
 export function statusFor(
   api: DreyPluginApi,
   openCount: number,
   scope: FindQuery['scope'],
+  projectLabel: string | null = null,
 ): string | null {
   if (openCount === 0) {
     return null;
@@ -72,7 +76,9 @@ export function statusFor(
     ? t('find.status.open_note', { count: openCount })
     : scope === 'all'
       ? t('find.status.open_all', { count: openCount })
-      : t('find.status.open', { count: openCount });
+      : scope === 'project'
+        ? t('find.status.open_project', { count: openCount, project: projectLabel ?? '' })
+        : t('find.status.open', { count: openCount });
 }
 
 const sortLabelKey = {
@@ -361,7 +367,8 @@ export function createTasksFindMode(api: DreyPluginApi, host: TasksModeHost): Fi
     id: 'tasks',
     label: t('find.mode.tasks'),
     order: 20,
-    status: (query) => statusFor(api, openCount(query), query.scope),
+    status: (query) =>
+      statusFor(api, openCount(query), query.scope, api.ui.workspaceScope()?.label ?? null),
     menu,
     mount,
   };

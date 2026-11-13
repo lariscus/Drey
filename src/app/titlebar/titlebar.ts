@@ -6,6 +6,7 @@ import { ThemeService } from '../services/theme.service';
 import { KeybindingService } from '../keybindings';
 import { TitlebarActionsService } from '../plugin-host';
 import { Icon } from '../icons/icon';
+import { ScopeFilter } from './scope-filter';
 import { ViewSwitcher } from './view-switcher';
 import { MenuBar } from './menu-bar';
 import { WindowChromeService } from './window-chrome.service';
@@ -20,7 +21,7 @@ import { WindowChromeService } from './window-chrome.service';
 @Component({
   selector: 'app-titlebar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, MenuBar, NgTemplateOutlet, ViewSwitcher],
+  imports: [Icon, MenuBar, NgTemplateOutlet, ScopeFilter, ViewSwitcher],
   templateUrl: './titlebar.html',
   styleUrl: './titlebar.css',
 })

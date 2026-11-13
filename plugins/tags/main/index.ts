@@ -175,6 +175,8 @@ const plugin: MainPluginModule = {
       scope?: SectionSearchScope;
       /** Narrow the operation to these files (per-hit / per-file replace). */
       files?: readonly { vaultId: string; path: string }[];
+      /** Narrow the operation to these vaults (the Find panel's project scope, SDK 1.59). */
+      vaults?: readonly string[];
       /**
        * Leave chat notes alone — the panel's "Include chats" toggle is off,
        * so a replace must not rewrite files the result list never showed.
@@ -212,6 +214,7 @@ const plugin: MainPluginModule = {
         request.excludeChats !== true,
       );
       const wanted = new Set((request.files ?? []).map((f) => `${f.vaultId} ${f.path}`));
+      const vaults = Array.isArray(request.vaults) ? new Set(request.vaults) : null;
 
       const groups = new Map<string, { vaultId: string; path: string }>();
       for (const hit of hits) {
@@ -219,6 +222,9 @@ const plugin: MainPluginModule = {
           continue;
         }
         if (request.files !== undefined && !wanted.has(`${hit.vaultId} ${hit.path}`)) {
+          continue;
+        }
+        if (vaults !== null && !vaults.has(hit.vaultId)) {
           continue;
         }
         groups.set(`${hit.vaultId} ${hit.path}`, { vaultId: hit.vaultId, path: hit.path });

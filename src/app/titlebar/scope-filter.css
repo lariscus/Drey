@@ -1,0 +1,132 @@
+/* The scope filter (req-285, board 7n): its own group beside the view switcher's. */
+:host {
+  display: flex;
+  align-items: center;
+  flex: none;
+  margin-left: 6px;
+  -webkit-app-region: no-drag;
+}
+
+.sf-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-editor);
+}
+
+.sf-btn {
+  height: 26px;
+  padding: 0 6px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sf-btn:hover,
+.sf-btn.open {
+  background: var(--active-bg);
+}
+
+.sf-label {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sf-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sf-dot-10 {
+  width: 10px;
+  height: 10px;
+}
+
+.sf-dot.none {
+  border: 1.5px dashed var(--field-border);
+  box-sizing: border-box;
+  background: transparent;
+}
+
+.sf-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 7;
+}
+
+.sf-menu {
+  position: absolute;
+  top: 34px;
+  left: 0;
+  z-index: 8;
+  width: 224px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-control);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-sizing: border-box;
+}
+
+.sf-item {
+  width: 100%;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-chip);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.sf-item:hover {
+  background: var(--border);
+}
+
+.sf-check {
+  width: 16px;
+  display: flex;
+  flex-shrink: 0;
+}
+
+.sf-name {
+  flex-grow: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sf-count {
+  color: var(--text-4);
+  font-size: 13px;
+}
+
+.sf-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}

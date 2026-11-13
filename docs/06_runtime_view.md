@@ -6278,3 +6278,54 @@ At the engine's start `ProjectMigrator` drops the retired `allowed:
 write-vaults` from every persona file once a project exists (one commit);
 while a board's first project still waits for a readable `repos.md`, the
 key stays for that migration.
+
+## 6.134 A change on Settings → Projects — one commit (req-284, milestone 266)
+
+Every control of the page writes at once; there is no Save. The page keeps
+the latest record it wrote or read and sends the whole draft, so the engine
+always writes a complete, canonical file.
+
+```mermaid
+sequenceDiagram
+    participant P as Settings → Projects (plugin renderer)
+    participant M as Plugin main
+    participant S as ProjectService (engine)
+    participant V as Tickets vault
+    participant G as git
+    P->>P: a click, a field left, the editor blurred: patch over the latest record
+    P->>M: projectSave {id, project} (or projectAddRepo / projectRemove)
+    M->>S: invoke (PROJECT_METHODS)
+    S->>S: queue; checkDraft; a new record: mintProjectId(name)
+    S->>V: write projects/<id>.md (and repos.md for From folder…) when the text changed
+    S->>G: one commit of exactly those files "projects: <name> … (req-284)"
+    S-->>P: {ok, id} — the status line says Saved · committed just now
+    V-->>P: board-changed → reload (the detail is rebuilt only if what it shows changed)
+```
+
+## 6.135 The project filter: a choice per view, followed by Files, the board and Find (req-285, milestone 267)
+
+The tickets plugin registers the filter once and hands it the projects after
+every board read; the base keeps which choice each view shows. A pick (or a
+view switch) fires one change, and every follower repaints from
+`ui.workspaceScope()`.
+
+```mermaid
+sequenceDiagram
+    participant T as Tickets plugin (project-filter.ts)
+    participant W as WorkspaceScopeService (base)
+    participant F as Title bar ScopeFilter
+    participant V as ViewService
+    participant P as Files panel
+    participant B as Board / Tickets panel
+    participant S as Find (tags plugin)
+    T->>W: registerWorkspaceScope({label, allLabel, manageLabel, manage})
+    T->>W: setOptions(projects + Unassigned) after each board read
+    F->>W: pick(id) for the active view
+    W->>W: drey.views.scope[viewId] = id (persisted)
+    V-->>W: switchTo(view) → active() reads that view's choice
+    W-->>P: active() → list the sources' vaults (read tag) and folders
+    W-->>T: onWorkspaceScopeChange → notifyViews
+    T-->>B: shows(card) / chip(card); load and folding from every project
+    W-->>S: onWorkspaceScopeChange → This project re-runs over the project's vaults
+    B->>T: New idea → create {…, project: the filtered project}
+```

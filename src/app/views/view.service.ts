@@ -94,6 +94,8 @@ export class ViewService {
   readonly prompt = signal<ViewNamePrompt | null>(null);
 
   private readonly activeListeners = new Set<() => void>();
+  private readonly copiedListeners = new Set<(from: string, to: string) => void>();
+  private readonly removedListeners = new Set<(id: string) => void>();
 
   constructor() {
     effect(() => {
@@ -145,6 +147,18 @@ export class ViewService {
   onActiveChange(listener: () => void): Unsubscribe {
     this.activeListeners.add(listener);
     return () => this.activeListeners.delete(listener);
+  }
+
+  /** A new view was made as a copy of `from` ("Save current layout as a view…"): what else a view owns follows (req-285, the scope filter). */
+  onViewCopied(listener: (from: string, to: string) => void): Unsubscribe {
+    this.copiedListeners.add(listener);
+    return () => this.copiedListeners.delete(listener);
+  }
+
+  /** A user view was deleted. */
+  onViewRemoved(listener: (id: string) => void): Unsubscribe {
+    this.removedListeners.add(listener);
+    return () => this.removedListeners.delete(listener);
   }
 
   // --- plugin presets (SDK 1.39) ---------------------------------------------
@@ -388,8 +402,12 @@ export class ViewService {
    */
   saveCurrentAs(label: string): string {
     const id = `view-${Date.now().toString(36)}-${this.views().length}`;
+    const from = this._activeId();
     this.dock.copyActiveTo(id);
     this.panes.cloneActiveViewTo(id);
+    for (const listener of [...this.copiedListeners]) {
+      listener(from, id);
+    }
     this.user.update((views) => [...views, { id, label: label.trim(), builtin: false }]);
     this.persist();
     this.switchTo(id);
@@ -425,6 +443,9 @@ export class ViewService {
     this.dock.dropView(id);
     this.panes.dropView(id);
     this.user.update((views) => views.filter((v) => v.id !== id));
+    for (const listener of [...this.removedListeners]) {
+      listener(id);
+    }
     this.baselines.update(({ [id]: _gone, ...rest }) => rest);
     this.persistBaselines();
     this.persist();

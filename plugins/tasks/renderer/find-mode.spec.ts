@@ -55,4 +55,14 @@ describe('statusFor', () => {
     expect(statusFor(api, 14, 'all')).toBe('find.status.open_all:14');
     expect(statusFor(api, 0, 'vault')).toBeNull();
   });
+
+  it('names the project in the project scope', () => {
+    const named = {
+      i18n: {
+        t: (key: string, params?: { count: number; project?: string }) =>
+          `${key}:${params?.count}:${params?.project}`,
+      },
+    } as unknown as DreyPluginApi;
+    expect(statusFor(named, 3, 'project', 'Drey')).toBe('find.status.open_project:3:Drey');
+  });
 });

@@ -15,7 +15,7 @@ import type {
 } from '../../../shared/plugin-api/renderer';
 import { formatSearchResultsDoc } from '../shared/search.js';
 import { el, iconButton } from './dom.js';
-import { openFindMenu, type FindMenuRow } from './find-menu.js';
+import { lookInRows, openFindMenu, type FindMenuRow } from './find-menu.js';
 import { groupHits, snippetParts, splitPath } from './hit-list.js';
 import type { Scope } from './search-prefs.js';
 import type { SearchReplace } from './search-replace.js';
@@ -88,7 +88,8 @@ export function createFindPanel(
   const query = (): FindQuery => ({
     tags: [...state.queryTags],
     text: state.queryText,
-    scope: prefs.scope,
+    // The scope a run uses: a stored project scope without a narrowing choice reads as vault.
+    scope: session.scope(),
   });
 
   // -- header: the mode as the title, the status, ⋯ -------------------------
@@ -123,24 +124,16 @@ export function createFindPanel(
   };
 
   const buildMenu = (): FindMenuRow[] => {
-    const lookIn = (scope: Scope, label: string): FindMenuRow => ({
-      kind: 'check',
-      label,
-      checked: prefs.scope === scope,
-      run: () => {
-        prefs.scope = scope;
-        session.persistPrefs();
-        session.notify();
-        if (currentMode() === SEARCH_MODE && session.hasQuery()) {
-          void session.run();
-        }
-      },
-    });
+    const pick = (scope: Scope): void => {
+      prefs.scope = scope;
+      session.persistPrefs();
+      session.notify();
+      if (currentMode() === SEARCH_MODE && session.hasQuery()) {
+        void session.run();
+      }
+    };
     const rows: FindMenuRow[] = [
-      { kind: 'label', label: t('find.menu.look_in') },
-      lookIn('file', t('find.scope.file')),
-      lookIn('vault', t('find.scope.vault')),
-      lookIn('all', t('find.scope.all')),
+      ...lookInRows(t, session.scope(), session.projectLabel(), pick),
       { kind: 'separator' },
     ];
     const contrib = activeContrib();
@@ -226,11 +219,15 @@ export function createFindPanel(
       return null;
     }
     const hits = state.hits.length;
-    if (prefs.scope === 'file') {
+    const scope = session.scope();
+    if (scope === 'file') {
       return t('find.status.hits_note', { hits });
     }
-    if (prefs.scope === 'all') {
+    if (scope === 'all') {
       return t('find.status.hits_all', { hits });
+    }
+    if (scope === 'project') {
+      return t('find.status.hits_project', { hits, project: session.projectLabel() ?? '' });
     }
     return t('find.status.hits', { hits, files: groupHits(state.hits).length });
   };
@@ -417,7 +414,7 @@ export function createFindPanel(
       }
       replaceInput.value = state.replacement;
       replaceAll.disabled =
-        !session.hasQuery() || (prefs.scope === 'file' && session.activeTextDoc() === null);
+        !session.hasQuery() || (session.scope() === 'file' && session.activeTextDoc() === null);
       const message = inSearch ? (state.error ?? state.summaryError) : null;
       errorRow.textContent = message ?? '';
       errorRow.hidden = message === null;

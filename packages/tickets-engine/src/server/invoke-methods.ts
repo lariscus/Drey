@@ -38,3 +38,6 @@ export const TEAM_METHODS = [
 // payload, so both get explicit adapters (the generic register would hand
 // the whole payload where a string is expected).
 export const REMOTE_METHODS = ['status', 'configure', 'init', 'localClient', 'cancelPairing'] as const;
+
+// req-284: Settings → Projects' writes (ProjectService), one commit each.
+export const PROJECT_METHODS = ['projectSave', 'projectRemove', 'projectAddRepo'] as const;

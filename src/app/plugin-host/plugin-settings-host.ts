@@ -36,13 +36,15 @@ import { LogService } from '../services/log.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { style: 'display: block' },
   template: `
-    <header class="pane-head">
-      <h2>{{ contrib().label }}</h2>
-      @if (contrib().description; as description) {
-        <p class="pane-description">{{ description }}</p>
-      }
-    </header>
-    <div #body class="pane plugin-settings-body"></div>
+    @if (!contrib().bare) {
+      <header class="pane-head">
+        <h2>{{ contrib().label }}</h2>
+        @if (contrib().description; as description) {
+          <p class="pane-description">{{ description }}</p>
+        }
+      </header>
+    }
+    <div #body class="pane plugin-settings-body" [class.bare]="contrib().bare === true"></div>
   `,
 })
 export class PluginSettingsHost {

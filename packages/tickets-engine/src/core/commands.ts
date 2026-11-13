@@ -44,6 +44,8 @@ export interface CreateCommand {
   /** The owner's raw words a tidied create came from (req-75 W5c);
    *  present only when tidy-up changed the fields. */
   readonly raw?: string;
+  /** The project the capture lands in (req-285: the filter's project); absent = none named. */
+  readonly project?: string;
 }
 
 /**
@@ -72,6 +74,7 @@ export function parseCreate(payload: unknown, priorities: PriorityConfig = DEFAU
   // The raw words travel with a tidied create (req-75 W5c) — kept
   // only when a non-empty string, dropped otherwise.
   const raw = typeof p['raw'] === 'string' && p['raw'].trim() !== '' ? p['raw'] : undefined;
+  const project = typeof p['project'] === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(p['project'].trim()) ? p['project'].trim() : undefined;
   return ok({
     title,
     priority,
@@ -79,6 +82,7 @@ export function parseCreate(payload: unknown, priorities: PriorityConfig = DEFAU
     ...(Array.isArray(repos) && repos.every((r): r is string => typeof r === 'string') ? { repos } : {}),
     description,
     ...(raw !== undefined ? { raw } : {}),
+    ...(project !== undefined ? { project } : {}),
   });
 }
 

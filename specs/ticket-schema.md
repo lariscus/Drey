@@ -1795,6 +1795,23 @@ vaults and folders, read-only; a vault no project names is read by no
 worker. Settings → Projects (req-284) and the global project filter
 (req-285) build on the same records.
 
+**Who writes it.** Besides the first project's migration, Settings →
+Projects (req-284) writes the records through the engine's `projectSave`,
+`projectRemove` and `projectAddRepo` (`ProjectService`): every change is
+one commit of exactly the files it touched — `projects: <name> created`,
+`… changed`, `… removed`, `… — repository <repo> added (req-284)`. A new
+record's id is minted from its name (`-2`, `-3` when taken) and never
+changes afterwards, so a rename keeps every ticket's `project:` valid.
+*From folder…* registers the repository in `repos.md` (when no entry of
+that name exists) and lists it in the project in the same commit. A
+removed project's tickets keep its id; the board reports it as unknown.
+
+**Capture into a project** (req-285): a create (`create` on the invoke
+channel, `POST /api/tickets`) may carry `project: <id>`; the new ticket is
+written with `project:` (`x-project` on a store). Drey sends the title
+bar filter's project; under *All projects* or *Unassigned* it sends none and
+the ticket starts Unassigned. A value that is not a project id is dropped.
+
 **The first project (migration at the engine's start).** A board whose
 `_meta/projects/` holds no file gets one project, written by the engine
 when it starts (`ProjectMigrator`): named after the first repository of

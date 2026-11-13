@@ -901,6 +901,34 @@ creates the configuration files under `tickets/_meta/`:
   is being worked, and so is a repository that does not belong to the
   ticket's project.
 
+**Settings → Projects.** The projects have a Settings category of their
+own: the list on the left (each with its colour and how many open tickets
+it has; **+** adds one), the selected project on the right. Change its
+**Name**, pick a **Colour** (six presets or any colour from the picker),
+write its **Purpose** in the same Markdown editor as a persona's
+instructions (the figure beside the title is what it adds to every run),
+add **Repositories** — *Add repository* lists the other entries of
+`repos.md`, and *From folder…* registers a repository found in a folder
+and adds it in one step — plain **Folders** a worker may read, and set
+each **Vault** to None, Read or Write. A vault the project names that this
+computer has not registered shows greyed, *not on this device*. Every
+change is saved and committed at once; *Project actions* (⋯) deletes a
+project after asking — its tickets keep the name and show as an unknown
+project.
+
+**The project filter.** Right of the view switcher in the title bar sits
+the project filter: *All projects*, each project, *Unassigned* (with how
+many tickets have no project) and *Manage projects…* (Settings →
+Projects). Pick a project and the window follows it: the Files panel lists
+only that project's vaults and folders (a `read` tag on the ones its runs
+may only read, and a line like *Drey · 2 vaults, 1 folder* under the
+header), the Board and the Tickets panel show only its tickets, Find offers
+*This project* among the places to look, and a new idea lands in it. The
+persona columns, their load and the capacity chip still count every
+project — the Crew and its quotas are shared. Under *All projects* each
+card names its project. Every view remembers its own choice, so a view you
+save while a project is picked opens filtered.
+
 **The crew a new board starts with.** The same step adds **Pia** (Mission
 Control's own persona, below) and four crew members next to *You*: **Paul**
 (plans), **Ben** (builds), **Ralf** (reviews) and **Tessa** (tests). They appear on the Crew tab, in Mission Control's team list and in the

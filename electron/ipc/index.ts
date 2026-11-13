@@ -25,6 +25,7 @@ import { ExitBridge } from './exit-bridge';
 import { registerExitHandlers } from './exit-handlers';
 import { registerExternalHandlers } from './external-handlers';
 import { registerExportHandlers } from './export-handlers';
+import { registerFolderHandlers } from './folder-handlers';
 import { registerLlmHandlers } from './llm-handlers';
 import { registerMcpHandlers } from './mcp-handlers';
 import { McpWriteBridge } from './mcp-write-bridge';
@@ -86,6 +87,7 @@ export function registerIpcHandlers(deps: IpcHandlerDeps): void {
   registerVaultHandlers(deps);
   registerExitHandlers(deps);
   registerExternalHandlers(deps);
+  registerFolderHandlers(deps);
   registerQueryHandlers(deps);
   registerLlmHandlers(deps);
   registerConfigHandlers(deps);

@@ -16,8 +16,9 @@ import {
   runTagSearch,
 } from '../shared/search.js';
 import { sectionRecordsFor } from '../shared/section-records.js';
+import { scopeNarrows, scopeVaultIds, type NamedVault } from '../../../shared/workspace-scope';
 import { mergeOpenBufferHits } from './hit-list.js';
-import { loadPrefs, savePrefs, type SearchPrefs } from './search-prefs.js';
+import { loadPrefs, savePrefs, type Scope, type SearchPrefs } from './search-prefs.js';
 
 /** Files under here are kept out of the tag index (mirrors the main-side index). */
 const TEMPLATES_PREFIX = 'templates/';
@@ -46,6 +47,16 @@ export interface SearchSession {
   subscribe(listener: () => void): () => void;
   notify(): void;
   activeVaultId(): string | null;
+  /**
+   * The scope a run uses: `prefs.scope`, except that a stored `project`
+   * reads as `vault` while the title bar's choice does not narrow (none, or
+   * one without sources) -- the pref is kept, so it comes back with one.
+   */
+  scope(): Scope;
+  /** The title bar's choice's name while it narrows (This project is offered), else null. */
+  projectLabel(): string | null;
+  /** Project scope: the ids of the registered vaults the choice names, else null. */
+  projectVaultIds(): ReadonlySet<string> | null;
   hasQuery(): boolean;
   currentQuery(): TagSearchQuery;
   /** The focused document when it is a text tab, else null. */
@@ -66,17 +77,28 @@ export function createSearchSession(api: DreyPluginApi): SearchSession {
 
   // Hits of another vault are labelled with it, so a switch re-renders.
   let activeVaultId: string | null = null;
+  let vaults: readonly NamedVault[] = [];
   const refreshVaults = (): void => {
     void api.vault
       .listVaults()
-      .then((vaults) => {
-        activeVaultId = vaults.find((v) => v.active)?.id ?? null;
+      .then((list) => {
+        vaults = list;
+        activeVaultId = list.find((v) => v.active)?.id ?? null;
         notify();
       })
       .catch(() => undefined);
   };
   refreshVaults();
   api.vault.onChanged(refreshVaults);
+
+  const scope = (): Scope =>
+    prefs.scope === 'project' && !scopeNarrows(api.ui.workspaceScope()) ? 'vault' : prefs.scope;
+  const projectLabel = (): string | null => {
+    const option = api.ui.workspaceScope();
+    return option !== null && scopeNarrows(option) ? option.label : null;
+  };
+  const projectVaultIds = (): ReadonlySet<string> | null =>
+    scope() === 'project' ? scopeVaultIds(api.ui.workspaceScope(), vaults) : null;
 
   const state: SearchState = {
     queryTags: [],
@@ -105,8 +127,13 @@ export function createSearchSession(api: DreyPluginApi): SearchSession {
     return doc !== null && doc.kind === 'text' ? doc : null;
   };
 
-  /** The open tabs whose unsaved text takes part in a vault / all search. */
-  const dirtyDocs = (): ReturnType<typeof api.documents.list> =>
+  /**
+   * The open tabs whose unsaved text takes part in a vault / all / project
+   * search; `inScope` narrows them to the scope's vaults (null = every vault).
+   */
+  const dirtyDocs = (
+    inScope: ReadonlySet<string> | null,
+  ): ReturnType<typeof api.documents.list> =>
     api.documents
       .list()
       .filter(
@@ -116,8 +143,7 @@ export function createSearchSession(api: DreyPluginApi): SearchSession {
           d.vaultId !== null &&
           !d.path.startsWith(TEMPLATES_PREFIX) &&
           d.name !== 'search-results.md' &&
-          // In vault scope a dirty tab of another vault is out of scope.
-          (prefs.scope !== 'vault' || d.vaultId === activeVaultId),
+          (inScope === null || inScope.has(d.vaultId)),
       );
 
   /** Ends a run that cannot search: the reason shows instead of an empty list. */
@@ -141,7 +167,8 @@ export function createSearchSession(api: DreyPluginApi): SearchSession {
       refuse(matcher.error);
       return;
     }
-    if (prefs.scope === 'file' && activeTextDoc() === null) {
+    const runScope = scope();
+    if (runScope === 'file' && activeTextDoc() === null) {
       refuse('Open a text document to search the file scope.');
       return;
     }
@@ -149,7 +176,7 @@ export function createSearchSession(api: DreyPluginApi): SearchSession {
     state.error = null;
     notify();
     try {
-      if (prefs.scope === 'file') {
+      if (runScope === 'file') {
         const doc = activeTextDoc();
         state.hits =
           doc === null
@@ -160,17 +187,30 @@ export function createSearchSession(api: DreyPluginApi): SearchSession {
               }));
         state.ran = true;
       } else {
-        const scope: SectionSearchScope | undefined =
-          prefs.scope === 'all'
+        // Project scope: every vault searched, the hits kept to the vaults the
+        // title bar's choice names (resolved by name against a fresh registry).
+        let inScope: ReadonlySet<string> | null = null;
+        if (runScope === 'project') {
+          vaults = await api.vault.listVaults();
+          inScope = scopeVaultIds(api.ui.workspaceScope(), vaults) ?? new Set<string>();
+        } else if (runScope === 'vault') {
+          inScope = new Set(activeVaultId !== null ? [activeVaultId] : []);
+        }
+        const searchScope: SectionSearchScope | undefined =
+          runScope === 'all' || runScope === 'project'
             ? { kind: 'all' }
             : activeVaultId !== null
               ? { kind: 'vault', vaultId: activeVaultId }
               : undefined;
         const query = currentQuery();
-        const diskHits = await api.search.searchSections(query, scope);
+        const found = await api.search.searchSections(query, searchScope);
+        const diskHits =
+          runScope === 'project'
+            ? found.filter((h) => h.vaultId !== undefined && inScope?.has(h.vaultId) === true)
+            : found;
         // Chats stay indexed; the panel lists them only on request.
         state.hits = filterChatHits(
-          mergeOpenBufferHits(diskHits, dirtyDocs(), query),
+          mergeOpenBufferHits(diskHits, dirtyDocs(inScope), query),
           prefs.includeChats,
         );
         state.ran = true;
@@ -186,6 +226,15 @@ export function createSearchSession(api: DreyPluginApi): SearchSession {
     }
   };
 
+  // The title bar's choice changed: a stored project scope now searches other
+  // vaults (or, without sources, the active vault) -- re-run what is shown.
+  api.ui.onWorkspaceScopeChange(() => {
+    notify();
+    if (prefs.scope === 'project' && state.ran && hasQuery()) {
+      void run();
+    }
+  });
+
   return {
     prefs,
     state,
@@ -199,6 +248,9 @@ export function createSearchSession(api: DreyPluginApi): SearchSession {
     },
     notify,
     activeVaultId: () => activeVaultId,
+    scope,
+    projectLabel,
+    projectVaultIds,
     hasQuery,
     currentQuery,
     activeTextDoc,

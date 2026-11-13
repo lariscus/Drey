@@ -1,6 +1,6 @@
 /**
  * Replace (milestone 33). In file scope the open buffer is patched -- an
- * unsaved, undoable edit. In vault / all scope the backend previews the
+ * unsaved, undoable edit. In vault / all / project scope the backend previews the
  * patch per file and writes only after ONE bundled confirmation.
  */
 import type { DreyPluginApi, TagSearchHit } from '../../../shared/plugin-api/renderer';
@@ -48,7 +48,11 @@ export function createSearchReplace(api: DreyPluginApi, session: SearchSession):
     void session.run();
   };
 
-  const showConfirmation = (ops: ReplaceOp[], onDone: () => void): void => {
+  const showConfirmation = (
+    ops: ReplaceOp[],
+    target: Record<string, unknown>,
+    onDone: () => void,
+  ): void => {
     const totalOccurrences = ops.reduce((n, op) => n + op.occurrences, 0);
     // `showModal` returns the programmatic close — the Cancel/Apply
     // closures below close over it.
@@ -72,7 +76,9 @@ export function createSearchReplace(api: DreyPluginApi, session: SearchSession):
       for (const op of ops) {
         const details = el('details', 'tag-search-modal-file');
         const summary = el('summary', 'tag-search-modal-file-head');
-        const foreign = prefs.scope === 'all' && op.vaultId !== session.activeVaultId();
+        const scope = session.scope();
+        const foreign =
+          (scope === 'all' || scope === 'project') && op.vaultId !== session.activeVaultId();
         summary.appendChild(el('span', 'tag-search-modal-path', op.path));
         if (foreign) {
           summary.appendChild(el('span', 'tag-search-modal-vault', op.vaultId));
@@ -110,8 +116,8 @@ export function createSearchReplace(api: DreyPluginApi, session: SearchSession):
             const result = (await api.backend.invoke('replace-apply', {
               query: session.currentQuery(),
               replacement: state.replacement,
-              scope: prefs.scope === 'all' ? { kind: 'all' } : undefined,
-              excludeChats: !prefs.includeChats,
+              // The same target the preview showed (one file, the scope's vaults).
+              ...target,
             })) as { error?: string };
             if (result?.error !== undefined) {
               state.error = result.error;
@@ -147,7 +153,7 @@ export function createSearchReplace(api: DreyPluginApi, session: SearchSession):
       if (preview.ops.length === 0) {
         return;
       }
-      showConfirmation(preview.ops, () => void session.run());
+      showConfirmation(preview.ops, target, () => void session.run());
     } catch (error) {
       state.error = error instanceof Error ? error.message : String(error);
       session.notify();
@@ -156,22 +162,30 @@ export function createSearchReplace(api: DreyPluginApi, session: SearchSession):
 
   return {
     replaceAll: () => {
-      if (prefs.scope === 'file') {
+      const scope = session.scope();
+      if (scope === 'file') {
         applyInFileScope();
         return;
       }
+      // Project scope: the all-vaults replace, kept to the project's vaults.
+      const project = scope === 'project' ? [...(session.projectVaultIds() ?? [])] : null;
       void previewAndConfirm({
-        scope: prefs.scope === 'all' ? { kind: 'all' } : undefined,
+        scope: scope === 'all' || scope === 'project' ? { kind: 'all' } : undefined,
+        ...(project !== null ? { vaults: project } : {}),
         excludeChats: !prefs.includeChats,
       });
     },
     replaceInFile: (hit) => {
-      if (prefs.scope === 'file') {
+      if (session.scope() === 'file') {
         applyInFileScope();
         return;
       }
       // Vault/all: one file's bundled confirmation.
-      void previewAndConfirm({ files: [{ vaultId: hit.vaultId, path: hit.path }] });
+      void previewAndConfirm({
+        scope: { kind: 'all' },
+        files: [{ vaultId: hit.vaultId, path: hit.path }],
+        excludeChats: !prefs.includeChats,
+      });
     },
   };
 }

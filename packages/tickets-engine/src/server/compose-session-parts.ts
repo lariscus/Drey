@@ -11,6 +11,7 @@ import { PersonaPinReader } from '../services/persona-pin-reader';
 import { PersonaProseMigrator } from '../services/persona-prose-migrator';
 import { ProjectMigrator } from '../services/project-migrator';
 import { PersonaRemoveService } from '../services/persona-remove-service';
+import { ProjectService } from '../services/project-service';
 import { PersonaRecords } from '../services/persona-records';
 import { PersonaSessionService } from '../services/persona-session-service';
 import { FilePlanShadowStore } from '../services/plan-shadow';
@@ -29,6 +30,8 @@ export interface SessionParts {
   readonly skills: SkillService;
   /** req-261: deleting a persona. */
   readonly personaRemoval: PersonaRemoveService;
+  /** req-284: Settings → Projects' writes, one commit each. */
+  readonly projects: ProjectService;
   /** The start's own work (req-256: seeding the default crew): `ready` of the engine awaits it, and so does `close`. */
   readonly startupWork: Promise<void>;
 }
@@ -93,6 +96,7 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
   const personaRecords = new PersonaRecords({ board, host, git, log });
   const skills = new SkillService({ board, host, git });
   const personaRemoval = new PersonaRemoveService({ board, fleet, host, git, pins: new PersonaPinReader(host, parts.crew.crewFiles) });
+  const projects = new ProjectService({ board, host, git, changed: () => board.announceChanged() });
   const startupWork = migrateOnce(log, {
     personaRecords,
     skills,
@@ -100,7 +104,7 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
     crew: { board, seeder: parts.crewSeeder, pictures: parts.crewPictures },
     projects: (opts.migrateProjects ?? opts.seedDefaultCrew !== false) ? new ProjectMigrator({ board, host, git, log }) : null,
   });
-  return { chat, personaSessions, personaRecords, skills, personaRemoval, startupWork };
+  return { chat, personaSessions, personaRecords, skills, personaRemoval, projects, startupWork };
 }
 
 /** The one-time migrations of the engine's start. */

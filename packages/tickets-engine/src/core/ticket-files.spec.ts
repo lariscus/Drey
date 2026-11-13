@@ -283,6 +283,14 @@ describe('newTicketFileText', () => {
     expect(text).toContain('- \'2026-10-17T14:32:00Z\' owner@desk — created in inbox');
   });
 
+  it('names the project a capture lands in (req-285), and nothing without one', () => {
+    const base = { id: 'T-0003', title: 'In a project', repo: null, priority: 'normal' as const, rank: 5000, firstPhase: 'inbox', now: new Date('2026-10-17T14:32:00Z'), actor: 'owner@desk', description: '' };
+    const text = newTicketFileText({ ...base, project: 'drey' });
+    expect(text.split(/\r?\n/)).toContain('project: drey');
+    expect(parseTicketFile(text, 'tickets/inbox/T-0003.md').meta.project).toBe('drey');
+    expect(newTicketFileText(base)).not.toContain('project:');
+  });
+
   it('adds one raw capture Log line right after created in (req-75 W5c)', () => {
     const withRaw = newTicketFileText({
       id: 'T-0002',
