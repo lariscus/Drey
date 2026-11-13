@@ -20,6 +20,9 @@ describe('the req-173 invoke payloads', () => {
       origin: 'service-window',
     });
     expect(parseFreeSessionAsk({ persona: 'ben', directory: 'E:\\T' })).toMatchObject({ ok: true, origin: 'drey' });
+    // req-283: the project picked rides the ask; a blank one is none.
+    expect(parseFreeSessionAsk({ persona: 'ben', directory: 'E:\\T', project: ' drey ' })).toMatchObject({ ok: true, value: { project: 'drey' } });
+    expect(parseFreeSessionAsk({ persona: 'ben', directory: 'E:\\T', project: ' ' })).toEqual({ ok: true, value: { persona: 'ben', directory: 'E:\\T' }, origin: 'drey' });
     expect(parseFreeSessionAsk({ persona: 'ben' })).toMatchObject({ ok: false });
     expect(parseFreeSessionAsk({ persona: 'ben', directory: 'E:\\T', poolClass: 'Z' })).toMatchObject({ ok: false });
     expect(parseFreeSessionAsk({ persona: 'ben', directory: 'E:\\T', permissionMode: 'yolo' })).toMatchObject({ ok: false });

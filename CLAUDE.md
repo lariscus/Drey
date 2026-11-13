@@ -319,8 +319,10 @@ toolchain is removable by deleting `.tools/`). Never assume a bare `node`,
   implementation over the `ToolVault` port for programs on Drey's MCP
   server and for the assistant (built in main over `VaultManager`), and
   for the Crew's workers through **Drey Service's vault MCP** (built over
-  the registered vaults on disk, ADR-0094: a token per worker, reads
-  every vault, writes where the persona's `allowed: write-vaults` says,
+  the registered vaults on disk, ADR-0094: a token per worker carrying
+  its project — it reads the project's vaults and plain folders, writes
+  where the project says Write and the persona has `allowed:
+  write-notes`, a 1:1 reads every project read-only (req-283);
   no `vault_delete`, every call audited on the run's stream). Every call carries what it may do (`VaultCallOptions`):
   **the Vault chip is the scope of reading and writing**, enforced where
   the tool runs (chip off = no vault tools); `tools.vault.write`

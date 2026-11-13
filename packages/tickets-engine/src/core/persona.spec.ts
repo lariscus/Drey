@@ -193,11 +193,12 @@ describe('allowed: and the pool entries (req-170)', () => {
     expect(personaFileText(parsePersonaFile('pia', PIA))).not.toContain('allowed:');
   });
 
-  it('reads and writes allowed: write-vaults (req-167, R5); one id reads as a list, duplicates drop', () => {
-    const writer = parsePersonaFile('ben', `---\ntitle: Ben\nallowed:\n  write-vaults: [work, notes, work]\n---\n`);
-    expect(writer.allowed).toEqual({ spendAboveAllowance: false, writeVaults: ['work', 'notes'] });
-    expect(personaFileText(writer)).toContain('allowed:\n  write-vaults: [work, notes]');
-    expect(parsePersonaFile('ben', personaFileText(writer))).toEqual(writer);
+  it('reads the retired allowed: write-vaults for the migration only and never writes it back (req-283); write-notes round-trips', () => {
+    const writer = parsePersonaFile('ben', `---\ntitle: Ben\nallowed:\n  write-notes: true\n  write-vaults: [work, notes, work]\n---\n`);
+    expect(writer.allowed).toEqual({ spendAboveAllowance: false, writeNotes: true, writeVaults: ['work', 'notes'] });
+    expect(personaFileText(writer)).toContain('allowed:\n  write-notes: true');
+    expect(personaFileText(writer)).not.toContain('write-vaults');
+    expect(parsePersonaFile('ben', personaFileText(writer)).allowed).toEqual({ spendAboveAllowance: false, writeNotes: true });
     expect(parsePersonaFile('ben', `---\nallowed:\n  write-vaults: work\n---\n`).allowed.writeVaults).toEqual(['work']);
     expect(parsePersonaFile('ben', `---\nallowed:\n  write-vaults: []\n---\n`).allowed.writeVaults).toBeUndefined();
   });

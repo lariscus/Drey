@@ -90,7 +90,7 @@ describe('ProcessSupervisor and the vault (req-167)', () => {
     expect(ONE_ON_ONE_VAULT_TOOLS).toEqual(['vault_list', 'vault_search', 'vault_read']);
   });
 
-  it("a free session keeps its persona's rights: the full set, read-only only when its mode says so (req-217)", () => {
+  it("a free session gets the full set, read-only only when its mode says so (req-217)", () => {
     const h = harness(true, { ticketId: 'free', permissionMode: 'accept-edits', session: { kind: 'free', persona: 'ben', workingDirectory: 'W:/x' } });
     h.supervisor.spawn(h.run, { instruction: 'x', resumeRef: null });
     expect(h.requests[0]!.readOnly).toBe(false);
@@ -101,5 +101,23 @@ describe('ProcessSupervisor and the vault (req-167)', () => {
     const h = harness(true, { permissionMode: 'accept-edits' });
     h.supervisor.spawn(h.run, { instruction: 'x', resumeRef: null });
     expect(h.requests[0]!.tools).toBeUndefined();
+  });
+});
+
+describe('ProcessSupervisor — the token carries the project (req-283)', () => {
+  const scopeOf = (request: Record<string, unknown>): VaultGrantRequest['scope'] => {
+    const h = harness(true, request);
+    h.supervisor.spawn(h.run, { instruction: 'x', resumeRef: null });
+    return h.requests[0]!.scope;
+  };
+
+  it("a ticket run and a free session reach their request's project; none named = no project", () => {
+    expect(scopeOf({ projectId: 'drey' })).toEqual({ kind: 'project', project: 'drey' });
+    expect(scopeOf({ ticketId: 'free', projectId: 'lariscus', session: { kind: 'free', persona: 'ben', workingDirectory: 'W:/x' } })).toEqual({ kind: 'project', project: 'lariscus' });
+    expect(scopeOf({})).toEqual({ kind: 'project', project: null });
+  });
+
+  it('a 1:1 reads every project, whatever its request names', () => {
+    expect(scopeOf({ ticketId: '1:1', projectId: 'drey', session: { kind: '1:1', persona: 'ben', workingDirectory: 'W:/kt', chatFile: 'c.md' } })).toEqual({ kind: 'every-project' });
   });
 });

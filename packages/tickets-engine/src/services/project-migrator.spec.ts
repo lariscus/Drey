@@ -120,7 +120,8 @@ describe('ProjectMigrator over a temp vault and home (req-282)', () => {
     expect(project).toMatchObject({ name: 'drey', repos: ['drey', 'lariscus'], vaults: { 'Drey notes': 'write', 'Work notes': 'read' }, purpose: '' });
 
     const ben = parsePersonaFile('ben', await fsp.readFile(path.join(vaultDir(), 'tickets/_meta/personas/ben/persona.md'), 'utf8'));
-    expect(ben.allowed).toMatchObject({ writeNotes: true, writeVaults: ['vnotes', 'vgone'] });
+    // req-283: the rewrite that adds write-notes drops the retired write-vaults.
+    expect(ben.allowed).toEqual({ spendAboveAllowance: false, writeNotes: true });
     const ralf = await fsp.readFile(path.join(vaultDir(), 'tickets/_meta/personas/ralf/persona.md'), 'utf8');
     expect(ralf).toBe(RALF);
 
@@ -144,11 +145,30 @@ describe('ProjectMigrator over a temp vault and home (req-282)', () => {
     await put('tickets/_meta/repos.md', '---\nrepos: [drey]\n---\n');
     expect(await m.migrate()).toBeNull();
     expect(logs.some((line) => line.includes('waits for a readable repos.md'))).toBe(true);
+    // No project carries the rights yet: write-vaults stays for the migration that waits.
+    expect(await fsp.readFile(path.join(vaultDir(), 'tickets/_meta/personas/ben/persona.md'), 'utf8')).toBe(BEN);
 
     await put('tickets/_meta/repos.md', REPOS);
     const result = await m.migrate();
     expect(result?.plan.project.vaults).toEqual({});
     expect(result?.plan.writeNotes).toEqual(['ben']);
     expect(result?.plan.unresolved.map((u) => u.vaultId)).toEqual(['vnotes', 'vgone']);
+  });
+
+  it('req-283: on a board that already has a project, drops write-vaults from every persona file in a commit of its own, once', async () => {
+    await put('tickets/_meta/projects/drey.md', '---\nname: Drey\nvaults:\n  Drey notes: write\n---\n');
+    await put('tickets/_meta/personas/ben/persona.md', BEN.replace('allowed:\n', 'allowed:\n  write-notes: true\n'));
+    git('add', '-A');
+    git('commit', '-q', '-m', 'project');
+    const { migrator: m } = await migrator(REGISTERED);
+    expect(await m.migrate()).toBeNull();
+    const ben = await fsp.readFile(path.join(vaultDir(), 'tickets/_meta/personas/ben/persona.md'), 'utf8');
+    expect(ben).not.toContain('write-vaults');
+    expect(parsePersonaFile('ben', ben).allowed).toEqual({ spendAboveAllowance: false, writeNotes: true });
+    const shown = git('show', '--name-only', '--format=%s', 'HEAD').split('\n').filter((line) => line !== '');
+    expect(shown).toEqual(["personas: drop write-vaults — the vault rights are the project's (req-283)", 'board/tickets/_meta/personas/ben/persona.md']);
+    const head = git('rev-parse', 'HEAD');
+    await m.migrate();
+    expect(git('rev-parse', 'HEAD')).toBe(head);
   });
 });

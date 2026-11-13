@@ -5283,8 +5283,8 @@ sequenceDiagram
     else
         H->>C: call(session, vault_edit, args)
         C->>D: the registered vaults now (vaults.registered, Drey's registry)
-        C->>R: grantFor(persona, readOnly) — allowed: write-vaults
-        R-->>C: {who: ben, vaults: [work]} (read-only run / no persona: [])
+        C->>R: reachOf(persona, readOnly, scope) — since milestone 264 the token's project (§6.132)
+        R-->>C: {sites: the project's vaults + folders, grant: {who: ben, vaults: [work]}} (read-only run / no write-notes: [])
         alt the vault is not in the grant
             C->>VT: call(…, {write: auto, grant, exclude: [vault_delete, tasks_list]})
             VT-->>C: Error: ben may not write vault "notes" (allowed: read)
@@ -6187,3 +6187,49 @@ A ticket without `project:` reads as the board's only project; once a second
 project exists it reads as Unassigned, and only outside the first and the
 last column is that a badge. A project without a purpose adds no section, so
 the first project changes no brief.
+
+## 6.132 A worker's vault calls reach its project (req-283, milestone 264)
+
+The token a worker's spawn mints carries a scope: the run's project (a
+ticket run's is the ticket's, a free session's the one picked or its
+folder's), or every project for a 1:1. Every call then reads the project
+records and the persona through the engine and builds the tool vault over
+exactly what the project reaches — §6.111's call path otherwise unchanged.
+
+```mermaid
+sequenceDiagram
+    participant D as TicketDispatch / FreeSessionService
+    participant PS as ProcessSupervisor
+    participant G as VaultMcpComponent (gate)
+    participant C as VaultMcpCalls
+    participant R as ProjectRights
+    participant E as Engine (projectRecords, listPersonas)
+    participant VT as shared vault set
+    D->>D: ticketProject(card) / SessionProjectRule(picked, folder, repos.md)
+    D->>PS: start(RunRequest{projectId})
+    PS->>G: open({persona, readOnly, scope: project projectId | every-project for a 1:1})
+    G->>G: mint token {…, scope}
+    Note over C: a call with the token
+    C->>R: reachOf(grant, vaults.registered)
+    R->>E: projectRecords(), listPersonas() — at every call
+    R->>R: projectAccess(scope): vault names read/write, absolute folders
+    R->>R: registered vaults by name + folder-<name> sites (read-only)
+    R->>R: write = project Write ∧ write-notes ∧ not read-only (never for a 1:1 or a folder)
+    R-->>C: {sites, grant}
+    alt no project / unknown / unreadable board
+        C->>VT: call over no sites
+        VT-->>C: Error: no vault is available to this call.
+    else a vault outside the reach
+        VT-->>C: Error: vault "<id>" is not available to this call. Pass one of: …
+    else a write the grant leaves read-only
+        VT-->>C: Error: <who> may not write vault "<id>" (allowed: read)
+    else
+        VT-->>C: the result
+    end
+    C-->>C: audit line on the run stream (refusals: verdict refused + service log)
+```
+
+At the engine's start `ProjectMigrator` drops the retired `allowed:
+write-vaults` from every persona file once a project exists (one commit);
+while a board's first project still waits for a readable `repos.md`, the
+key stays for that migration.

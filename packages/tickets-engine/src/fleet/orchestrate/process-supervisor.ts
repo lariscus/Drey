@@ -151,13 +151,16 @@ export class ProcessSupervisor {
       return null;
     }
     const describe = adapter.mcpLaunch === undefined ? null : adapter.mcpLaunch.bind(adapter);
+    const oneOnOne = isOneOnOne(run.request);
     const request: VaultGrantRequest = {
       runId: run.info.id,
       ticketId: run.request.ticketId,
       persona: run.info.persona ?? null,
       readOnly: run.request.permissionMode === 'read-only',
+      // req-283: a 1:1 reads every project's vaults; a run and a free session reach their own project's.
+      scope: oneOnOne ? { kind: 'every-project' } : { kind: 'project', project: run.request.projectId ?? null },
       // A 1:1 is offered the read cut only (req-217); a free session has its persona's rights, a run the full set.
-      ...(isOneOnOne(run.request) ? { tools: ONE_ON_ONE_VAULT_TOOLS } : {}),
+      ...(oneOnOne ? { tools: ONE_ON_ONE_VAULT_TOOLS } : {}),
       runDir: run.dir,
       harness: adapter.label,
       emit: (event) => this.deps.events.onEvent(run, event),

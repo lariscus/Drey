@@ -4,7 +4,7 @@ import { ChangeHub } from '../../../packages/tickets-engine/src/server/drey-port
 import { InvokeServer } from '../../../packages/tickets-engine/src/server/invoke-server';
 import { InvokeTable } from '../../../packages/tickets-engine/src/server/invoke-table';
 import { MemoryVaultDisk } from '../../../packages/tickets-engine/src/service/vault-mcp/memory-vault-disk.fake';
-import { PersonaRights } from '../../../packages/tickets-engine/src/service/vault-mcp/persona-rights';
+import { ProjectRights } from '../../../packages/tickets-engine/src/service/vault-mcp/project-rights';
 import { RunTokens } from '../../../packages/tickets-engine/src/service/vault-mcp/run-tokens';
 import { VaultCallAuditor } from '../../../packages/tickets-engine/src/service/vault-mcp/vault-call-auditor';
 import { VaultMcpCalls } from '../../../packages/tickets-engine/src/service/vault-mcp/vault-mcp-calls';
@@ -63,12 +63,19 @@ beforeEach(async () => {
       ],
     },
     disk,
-    rights: new PersonaRights({ writeVaultsOf: async () => ['work'] }),
+    // req-283: the token's project gives Work to write and Notes to read; ben may change notes.
+    rights: new ProjectRights(
+      {
+        projects: async () => [{ id: 'drey', name: 'Drey', color: '', repos: [], folders: [], vaults: { Work: 'write', Notes: 'read' }, purpose: '' }],
+        writesNotes: async () => true,
+      },
+      disk,
+    ),
     auditor: new VaultCallAuditor({ now: () => new Date(), log: () => undefined }),
     changed: (change) => hub.emitPaths(change), // exactly what the service host wires to `engine.emitPaths`
   });
   const tokens = new RunTokens({ token: () => 'wtok', hash: (t) => t });
-  const session = tokens.resolve(tokens.mint({ runId: 'run-1', ticketId: 'T-1', persona: 'ben', readOnly: false, emit: () => undefined }))!;
+  const session = tokens.resolve(tokens.mint({ runId: 'run-1', ticketId: 'T-1', persona: 'ben', readOnly: false, scope: { kind: 'project', project: 'drey' }, emit: () => undefined }))!;
   call = (name, args) => calls.call(session, name, args);
 });
 

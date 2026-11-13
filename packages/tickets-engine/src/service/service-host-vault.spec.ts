@@ -6,7 +6,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { NormalizedEvent, WorkerMcpServer } from '../fleet/harness/contract';
 import { ONE_ON_ONE_VAULT_TOOLS } from '../fleet/one-on-one-toolset';
-import type { WorkerVaultGate } from '../fleet/orchestrate/worker-vault';
+import type { VaultScope, WorkerVaultGate } from '../fleet/orchestrate/worker-vault';
 import type { Args, RunnerDeps, RunnerHandle } from '../fleet/runner';
 import type { PathsChange } from '../server/drey-port';
 import type { Engine, EngineOptions } from '../server/engine';
@@ -46,7 +46,13 @@ describe('ServiceHost — what a worker does in the vault', () => {
         set: async () => undefined,
       } as never,
       ready: Promise.resolve(),
-      invoke: async (method: string) => (method === 'listPersonas' ? [{ id: 'ben', allowed: { spendAboveAllowance: false, writeVaults: ['work'] } }] : null),
+      // req-283: the project drey gives Notes to read and Work to write; ben may change notes.
+      invoke: async (method: string) =>
+        method === 'listPersonas'
+          ? [{ id: 'ben', allowed: { spendAboveAllowance: false, writeNotes: true } }]
+          : method === 'projectRecords'
+            ? [{ id: 'drey', name: 'Drey', color: '', repos: [], folders: [], vaults: { Notes: 'read', Work: 'write' }, purpose: '' }]
+            : null,
       onEvent: () => () => undefined,
       onPaths: () => () => undefined,
       emitPaths: (change: PathsChange) => emitted.push(change),
@@ -68,11 +74,11 @@ describe('ServiceHost — what a worker does in the vault', () => {
   };
 
   /** Opens a worker's access the way the spawn path does and connects the SDK client with its token. */
-  const worker = async (request: { persona: string | null; readOnly: boolean; tools?: readonly string[] }): Promise<{ client: Client; events: NormalizedEvent[] }> => {
+  const worker = async (request: { persona: string | null; readOnly: boolean; tools?: readonly string[]; scope?: VaultScope }): Promise<{ client: Client; events: NormalizedEvent[] }> => {
     let server: WorkerMcpServer | null = null;
     const events: NormalizedEvent[] = [];
     const access = gate!.open(
-      { runId: 'run-1', ticketId: 'T-1', runDir: path.join(home, 'run-1'), harness: 'Claude Code', emit: (event) => events.push(event), ...request },
+      { runId: 'run-1', ticketId: 'T-1', runDir: path.join(home, 'run-1'), harness: 'Claude Code', emit: (event) => events.push(event), scope: { kind: 'project', project: 'drey' }, ...request },
       (offered) => {
         server = offered;
         return { files: [], args: [], acpServers: [] };
@@ -139,7 +145,7 @@ describe('ServiceHost — what a worker does in the vault', () => {
     expect(await fsp.readFile(path.join(work, 'w.md'), 'utf8')).toBe('work two\n');
   });
 
-  it('announces nothing for a write the persona may not make (req-213)', async () => {
+  it('announces nothing for a write the project leaves read-only (req-213)', async () => {
     const { client } = await worker({ persona: 'ben', readOnly: false });
     const refused = await client.callTool({ name: 'vault_write', arguments: { path: 'x.md', content: 'x', mode: 'create', vault: 'notes' } });
     expect(refused.isError).toBe(true);
@@ -147,7 +153,7 @@ describe('ServiceHost — what a worker does in the vault', () => {
   });
 
   it("a 1:1's token offers the three read tools, reads, and changes nothing (req-217)", async () => {
-    const { client, events } = await worker({ persona: 'ben', readOnly: true, tools: ONE_ON_ONE_VAULT_TOOLS });
+    const { client, events } = await worker({ persona: 'ben', readOnly: true, tools: ONE_ON_ONE_VAULT_TOOLS, scope: { kind: 'every-project' } });
     expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(['vault_list', 'vault_search', 'vault_read']);
     expect(textOf(await client.callTool({ name: 'vault_read', arguments: { path: 'w.md', vault: 'work' } }))).toContain('1: work one');
     const refused = await client.callTool({ name: 'vault_write', arguments: { path: 'z.md', content: 'z', mode: 'create', vault: 'work' } });
@@ -157,7 +163,7 @@ describe('ServiceHost — what a worker does in the vault', () => {
     expect(events.map((event) => event.tool)).toEqual(['mcp__drey__vault_read', 'mcp__drey__vault_write']);
   });
 
-  it("a free session's token has its persona's rights: it may write where the persona may (req-217 decision)", async () => {
+  it("a free session's token reaches its project: it writes where the project says Write and the persona may change notes (req-283)", async () => {
     const { client } = await worker({ persona: 'ben', readOnly: false });
     expect((await client.listTools()).tools).toHaveLength(6);
     const written = await client.callTool({ name: 'vault_write', arguments: { path: 'free.md', content: 'f\n', mode: 'create', vault: 'work' } });

@@ -7,14 +7,24 @@
  */
 import type { NormalizedEvent, WorkerMcpLaunch, WorkerMcpServer } from '../harness/contract';
 
+/**
+ * Which project's vaults and folders a worker reaches (req-283, concept §2,
+ * §10): a ticket run and a free session take one project — the ticket's, or
+ * the one the session was started in (null = none: no vault); a 1:1 reads
+ * every project's vaults and folders, read-only.
+ */
+export type VaultScope = { readonly kind: 'project'; readonly project: string | null } | { readonly kind: 'every-project' };
+
 /** Whose access is opened, and where its calls are logged. */
 export interface VaultGrantRequest {
   readonly runId: string;
   readonly ticketId: string;
-  /** The persona whose `allowed: write-vaults` decides (R5); null = it writes no vault. */
+  /** The persona whose `allowed: write-notes` takes part in a write (req-283); null = it writes no vault. */
   readonly persona: string | null;
-  /** A read-only run (a review, req-183) writes no vault, whatever its persona may. */
+  /** A read-only run (a review, req-183) writes no vault, whatever its persona and project may. */
   readonly readOnly: boolean;
+  /** The project whose vaults and folders the token reaches (req-283). */
+  readonly scope: VaultScope;
   /** The vault tools offered (a 1:1: the read cut, req-217); absent = all the service serves workers. */
   readonly tools?: readonly string[];
   /** The run's own folder: a harness's config file lands here, never in the worktree. */

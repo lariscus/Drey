@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ProjectRecord } from '../contracts/projects';
 import type { Persona } from '../core/persona';
 import { LayeredConfigResolver } from '../fleet/config/layered-config-resolver';
 import type { ModelsReply, RunInfo, RunRequest } from '../fleet/protocol';
@@ -9,6 +10,10 @@ import type { EngineVault } from './host';
 const VAULT: EngineVault = { id: 'v', name: 'tickets', path: 'E:\\T', exists: true, active: true };
 const BEN = { id: 'ben', kind: 'agent', title: 'Ben', role: 'build', worker: 'claude-code', models: { default: 'claude-code/sonnet', pool: [] }, color: '#fff', skills: [], budget: null, allowed: {} } as unknown as Persona;
 const PIA = { ...BEN, id: 'pia', title: 'Pia', worker: 'api' } as Persona;
+const PROJECTS: ProjectRecord[] = [
+  { id: 'drey', name: 'Drey', color: '', repos: ['drey'], folders: [], vaults: {}, purpose: '' },
+  { id: 'lariscus', name: 'Lariscus', color: '', repos: ['lariscus'], folders: [], vaults: {}, purpose: '' },
+];
 
 function world(crewText: string | null = null, personas: readonly Persona[] = [BEN, PIA]): { service: FreeSessionService; starts: RunRequest[]; sends: [string, string][]; runs: RunInfo[] } {
   const starts: RunRequest[] = [];
@@ -17,7 +22,7 @@ function world(crewText: string | null = null, personas: readonly Persona[] = [B
   const crew = new LayeredConfigResolver().crew(parseCrewFile(crewText).config);
   const models = { models: [{ provider: 'claude-code', model: 'sonnet', class: 'B' }] } as unknown as ModelsReply;
   const service = new FreeSessionService({
-    board: { detect: async () => VAULT, listPersonas: async () => personas, listRepos: async () => ({ repos: [{ name: 'drey', url: 'x', path: 'E:\\projects\\drey' } as never] }) },
+    board: { detect: async () => VAULT, listPersonas: async () => personas, listRepos: async () => ({ repos: [{ name: 'drey', url: 'x', path: 'E:\\projects\\drey' } as never] }), projectRecords: async () => PROJECTS },
     fleet: {
       runs: async () => runs,
       start: async (request) => (starts.push(request), { ok: true, run: { id: `R-${starts.length}` } as RunInfo }),
@@ -79,7 +84,18 @@ describe('FreeSessionService (req-173, R12)', () => {
       repos: [{ name: 'drey', path: 'E:\\projects\\drey' }],
       permissionMode: 'accept-edits',
       defaultPersona: null,
+      projects: [{ id: 'drey', name: 'Drey' }, { id: 'lariscus', name: 'Lariscus' }],
     });
     expect(await world().service.promptContext()).toBe('## Sessions you may propose\n\npersonas: ben (claude-code)\nfolders: E:\\T (the tickets repository); E:\\projects\\drey (drey)');
+  });
+
+  it('req-283: a session takes the project picked, else its folder\'s; an unknown pick starts nothing; the tickets vault has none', async () => {
+    const w = world();
+    await w.service.start({ persona: 'ben', directory: 'E:\\T', project: 'lariscus' }, 'drey:crew');
+    await w.service.start({ persona: 'ben', directory: 'E:\\projects\\drey\\docs' }, 'drey:crew');
+    await w.service.start({ persona: 'ben', directory: 'E:\\T' }, 'drey:crew');
+    expect(w.starts.map((r) => r.projectId)).toEqual(['lariscus', 'drey', undefined]);
+    expect(await w.service.start({ persona: 'ben', directory: 'E:\\T', project: 'gone' }, 'drey:crew')).toEqual({ ok: false, error: 'project "gone" not found' });
+    expect(w.starts).toHaveLength(3);
   });
 });

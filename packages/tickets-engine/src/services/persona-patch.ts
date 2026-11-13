@@ -29,12 +29,11 @@ function allowedBroken(allowed: PersonaAllowedPatch): boolean {
     return true;
   }
   const commands = allowed.runCommands;
-  const vaults = allowed.writeVaults;
   return (
     !isBool(allowed.spendAboveAllowance) ||
     !isBool(allowed.network) ||
-    !(commands === undefined || commands === null || (PERSONA_RUN_COMMANDS as readonly string[]).includes(commands)) ||
-    !(vaults === undefined || (Array.isArray(vaults) && vaults.every((v) => typeof v === 'string' && v.trim() !== '')))
+    !isBool(allowed.writeNotes) ||
+    !(commands === undefined || commands === null || (PERSONA_RUN_COMMANDS as readonly string[]).includes(commands))
   );
 }
 
@@ -55,7 +54,7 @@ const RULES: readonly Rule[] = [
   [(i) => i.summary !== undefined && (typeof i.summary !== 'string' || i.summary.length > 200), 'the one line for the crew list is text of at most 200 characters'],
   [(i) => i.budget !== undefined && i.budget !== null && !(typeof i.budget === 'number' && Number.isFinite(i.budget) && i.budget >= 0), 'the daily budget is a number of dollars, zero or more, or null'],
   [(i) => i.chatModel !== undefined && i.chatModel !== null && (typeof i.chatModel !== 'string' || i.chatModel.length > 200), 'the chat model is a model id of at most 200 characters, or null for the assistant\'s model'],
-  [(i) => i.allowed !== undefined && allowedBroken(i.allowed), 'allowed is { spendAboveAllowance?, runCommands?, network?, writeVaults? } with run-commands accept-edits or bypass'],
+  [(i) => i.allowed !== undefined && allowedBroken(i.allowed), 'allowed is { spendAboveAllowance?, runCommands?, network?, writeNotes? } with run-commands accept-edits or bypass'],
 ];
 
 /** The PATCH body's validation (U4): only the listed rules reject; null = the patch is writable. */

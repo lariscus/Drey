@@ -50,10 +50,9 @@ export interface PersonaReads {
 }
 
 export async function readBeside(deps: DeskDeps, id: string, mission = false): Promise<PersonaReads> {
-  const [table, slotReply, vaults, memory, journal, chatModels] = await Promise.all([
+  const [table, slotReply, memory, journal, chatModels] = await Promise.all([
     quiet(async () => (await deps.invoke('poolModels')) as ModelsReply | null),
     quiet(async () => (await deps.invoke('slots')) as { readonly slots?: readonly SlotView[] } | null),
-    quiet(() => deps.api.vault.listVaults()),
     quiet(() => deps.invoke('personaMemory', { persona: id })),
     quiet(() => deps.invoke('personaJournal', { persona: id })),
     mission ? quiet(async () => (await deps.invoke('chatModels')) as ChatModelsReply | null) : Promise.resolve(null),
@@ -63,7 +62,6 @@ export async function readBeside(deps: DeskDeps, id: string, mission = false): P
       chatModels,
       table: table?.ok === true ? table : null,
       slots: slotReply?.slots ?? [],
-      vaults: (vaults ?? []).map((vault) => ({ id: vault.id, name: vault.name })),
     },
     memory: countOf(memory),
     journal: countOf(journal),

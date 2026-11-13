@@ -31,10 +31,12 @@ beforeEach(async () => {
     { id: 'notes', name: 'Notes', path: path.join(root, 'notes'), active: true },
     { id: 'work', name: 'Work', path: path.join(root, 'work'), active: false },
   ];
-  const personas = [{ id: 'ben', allowed: { spendAboveAllowance: false, writeVaults: ['work'] } }];
+  // req-283: the project gives Notes to read and Work to write; ben may change notes.
+  const personas = [{ id: 'ben', allowed: { spendAboveAllowance: false, writeNotes: true } }];
+  const projects = [{ id: 'drey', name: 'Drey', color: '', repos: [], folders: [], vaults: { Notes: 'read', Work: 'write' }, purpose: '' }];
   component = composeVaultMcp({
     config: { get: async <T>(key: string) => (key === 'vaults.registered' ? (vaults as T) : undefined) },
-    invoke: () => async () => personas,
+    invoke: () => async (method) => (method === 'projectRecords' ? projects : personas),
     hostedVault: path.join(root, 'notes'),
     build: 'spec',
     log: () => undefined,
@@ -57,10 +59,10 @@ async function connect(url: string, token: string): Promise<Client> {
 const textOf = (result: Awaited<ReturnType<Client['callTool']>>): string => (result.content as { text: string }[]).map((c) => c.text).join('\n');
 
 describe('the vault MCP endpoint over the MCP SDK (req-167)', () => {
-  it('serves a worker with its own token: reads everywhere, a refused write comes back as the Error the model acts on', async () => {
+  it("serves a worker with its own token: reads its project's vaults, a refused write comes back as the Error the model acts on", async () => {
     const runDir = path.join(root, 'runs', 'run-1');
     const access = component.open(
-      { runId: 'run-1', ticketId: 'T-1', persona: 'ben', readOnly: false, runDir, harness: 'Claude Code', emit: (e) => events.push(e) },
+      { runId: 'run-1', ticketId: 'T-1', persona: 'ben', readOnly: false, scope: { kind: 'project', project: 'drey' }, runDir, harness: 'Claude Code', emit: (e) => events.push(e) },
       claudeCodeMcpLaunch,
     )!;
     const config = JSON.parse(await fsp.readFile(path.join(runDir, 'mcp.json'), 'utf8')) as { mcpServers: { drey: { url: string; headers: { Authorization: string } } } };

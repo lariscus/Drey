@@ -89,15 +89,15 @@ describe('small helpers', () => {
 });
 
 describe('the v2 fields (R11, req-171)', () => {
-  const rich: PersonaView = { ...view, summary: 'Builds one part.', allowed: { spendAboveAllowance: false, writeVaults: ['notes'], runCommands: 'bypass', network: true } };
+  const rich: PersonaView = { ...view, summary: 'Builds one part.', allowed: { spendAboveAllowance: false, writeNotes: true, runCommands: 'bypass', network: true } };
   const base = draftOf(rich, 'P');
 
   it('reads the one line, the harness, the budget and the allowed keys off the record', () => {
     expect(base.summary).toBe('Builds one part.');
     expect(base.worker).toBe('opencode');
     expect(base.budget).toBe('5');
-    expect(base.allowed).toEqual({ writeVaults: ['notes'], runCommands: 'bypass', network: true, spend: false });
-    expect(draftOf(view, '').allowed).toEqual({ writeVaults: [], runCommands: '', network: false, spend: false });
+    expect(base.allowed).toEqual({ writeNotes: true, runCommands: 'bypass', network: true, spend: false });
+    expect(draftOf(view, '').allowed).toEqual({ writeNotes: false, runCommands: '', network: false, spend: false });
   });
 
   it('sends the one line, the harness and the budget only when they changed', () => {
@@ -113,7 +113,7 @@ describe('the v2 fields (R11, req-171)', () => {
   it('sends only the allowed keys that differ; a cleared mode is null', () => {
     expect(patchOf(base, { ...base, allowed: { ...base.allowed, network: false } })).toEqual({ allowed: { network: false } });
     expect(patchOf(base, { ...base, allowed: { ...base.allowed, runCommands: '' } })).toEqual({ allowed: { runCommands: null } });
-    expect(patchOf(base, { ...base, allowed: { ...base.allowed, spend: true, writeVaults: ['notes', 'work'] } })).toEqual({ allowed: { spendAboveAllowance: true, writeVaults: ['notes', 'work'] } });
+    expect(patchOf(base, { ...base, allowed: { ...base.allowed, spend: true, writeNotes: false } })).toEqual({ allowed: { spendAboveAllowance: true, writeNotes: false } });
     expect(isDirty(base, { ...base, allowed: { ...base.allowed } })).toBe(false);
   });
 

@@ -1698,10 +1698,11 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   once, and how many it may start when the big pool is full (both are
   enforced: a run needs room in the persona's pool and in the big one); **Leaving actions** — machine work when a
   ticket leaves the persona, `sync-main` or `commit` (see *Leaving actions*
-  below); the daily budget) and **Allowed to** (which vaults the persona
-  may change, whether its runs ask before running commands, whether it may
+  below); the daily budget) and **Allowed to** (**Change notes where the
+  project allows** — the project names the vaults, see *The crew's vault* —,
+  whether its runs ask before running commands, whether it may
   reach the network, whether it may spend past a ticket's allowance — hover a
-  row for what it means; the vault and allowance choices apply to runs now,
+  row for what it means; the notes and allowance choices apply to runs now,
   the commands and network choices are recorded for the runner). On the right,
   **Instructions** is the persona's `prompt.md` in the same editor your notes
   use — Live Preview or **Source**, with the formatting buttons above it — and
@@ -2115,23 +2116,26 @@ Closing it keeps the service running. Three tabs:
 Every agent the Crew runner starts can use your notes: Drey Service hands it
 the vault tools — list, search, read, edit, write and move, never delete — as
 an MCP server of its own, whether Drey is open or not. Each agent gets its own
-key for as long as it runs, and the service decides what it may do:
+key for as long as it runs, and that key belongs to the **project** it works
+for — the ticket's project, or for a free session the project you picked (or
+the one whose repository holds its folder). The service decides what it may
+do:
 
-- **It reads every registered vault.** The `tickets/` folder, `chats/` and
-  hidden folders stay out of reach.
-- **It writes only where its persona allows.** By default a persona writes
-  nowhere. To let it write a vault, add the vault's id to its
-  `persona.md` (in `tickets/_meta/personas/<persona>/`):
-
-  ```yaml
-  allowed:
-    write-vaults: [notes]
-  ```
-
-  Moving a note counts as writing. A review run writes nowhere, whatever its
-  persona may. When an agent tries anyway it is told
+- **It reads the project's vaults and folders.** Those the project marks
+  *Read* or *Write* (`vaults:` in `tickets/_meta/projects/<project>.md`, by the
+  vault's name), and the plain folders it lists (`folders:`), which it can
+  read but never change. Other vaults do not exist for it, and a run without
+  a project reaches none. The `tickets/` folder, `chats/` and hidden folders
+  stay out of reach.
+- **It writes only where the project says Write and its persona may change
+  notes.** The persona's switch is **Change notes where the project allows**
+  on its page (`allowed: write-notes: true` in its `persona.md`). Moving a
+  note counts as writing. A review run writes nowhere, whatever its project
+  and persona say. When an agent tries anyway it is told
   `ben may not write vault "notes" (allowed: read)` and carries on without
   it — nobody is asked.
+- **A 1:1 reads every project's vaults and folders, and changes nothing.** A
+  vault that no project names is not read at all.
 - **It does not overwrite your edits.** If you changed a note after the agent
   read it, its overwrite or edit is refused and it has to read the note again.
 

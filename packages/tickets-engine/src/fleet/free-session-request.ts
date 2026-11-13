@@ -23,6 +23,8 @@ export interface FreeSessionInput {
   /** The model table's class of a model on a provider; null when the table holds no row for it. */
   readonly classOf?: (provider: WorkerProviderId, model: string | null) => CapabilityClass | null;
   readonly git?: string;
+  /** req-283: the project the session works in (`SessionProjectRule`); null/absent = none, no vault. */
+  readonly projectId?: string | null;
 }
 
 export type FreeSessionRequestResult = { readonly ok: true; readonly request: RunRequest } | { readonly ok: false; readonly error: string };
@@ -89,6 +91,7 @@ export class FreeSessionRequestBuilder {
       poolWhy: `free session of ${persona.id}: ${session.model ?? `${provider}'s default`}`,
       ledger: { allowance: null, personaBudget: persona.budget, spendAboveAllowance: false, noTicket: true },
       session: { kind: 'free', persona: persona.id, workingDirectory: directory },
+      ...(input.projectId !== undefined && input.projectId !== null ? { projectId: input.projectId } : {}),
     };
   }
 }

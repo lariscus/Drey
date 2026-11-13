@@ -22,6 +22,13 @@ export interface FreeSessionAsk {
   readonly model?: string | null;
   /** What the owner wants done first: sent as the first line (with the brief). Absent = the session waits. */
   readonly firstLine?: string;
+  /**
+   * req-283: the project the session works in — its vaults and folders are
+   * what the session's vault token reaches. Absent = the folder's: the one
+   * project whose repository's checkout holds the directory (none when no
+   * project, or more than one, names such a repository: no vault).
+   */
+  readonly project?: string;
 }
 
 /** The persona as the form lists it. */
@@ -46,6 +53,8 @@ export type SessionOptionsReply =
       /** The vault's permission mode — the form's default. */
       readonly permissionMode: SessionPermission;
       readonly defaultPersona: string | null;
+      /** req-283: the board's projects a session may be started in, by id. */
+      readonly projects?: readonly { readonly id: string; readonly name: string }[];
     }
   | { readonly ok: false; readonly error: string };
 

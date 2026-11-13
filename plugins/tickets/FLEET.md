@@ -1451,20 +1451,33 @@ token for the worker and hands its harness the configuration the adapter's
 | Kimi 2.5.2 | the same | fakes + live |
 | Copilot CLI | the same, as documented | fakes (req-208) |
 
-A worker **reads every registered vault** (Drey keeps the engine key
-`vaults.registered` on its registry) and **writes only where its persona's
-`allowed: write-vaults` names the vault** — none for a run without a persona
-and for a read-only run. A refused write is `Error: <persona> may not write
-vault "<id>" (allowed: read)` to the model, an audit line on the stream and a
-warning in the service log; a write from a read the disk has moved past is
-refused too (ADR-0060). No `tickets/`, `chats/` or dot-folder is reachable.
-A **1:1's token** is read-only in the grant itself and carries a tool cut
+A worker's token **carries its project** (milestone 264, req-283): a ticket
+run's is the ticket's (`ticketProject`, as `RunRequest.projectId`), a free
+session's the one picked or its folder's. It **reads that project's vaults**
+(`tickets/_meta/projects/<id>.md` `vaults:` Read or Write, matched by the
+registered **name** of `vaults.registered`) **and its plain folders**
+(`folders:`, absolute paths, served read-only as `folder-<name>` under the
+same path rules), and **writes a vault only where all three hold**: the
+project says Write, its persona has `allowed: write-notes`, and the run is
+not read-only. `vault_list` shows only those; any other vault is `Error:
+vault "<id>" is not available to this call. Pass one of: …`. No project, an
+unknown one or an unreadable board: no vault (`Error: no vault is available
+to this call.`) — never every vault. The records and personas are read at
+every call (the engine's `projectRecords` and `listPersonas`). A refused
+write is `Error: <persona> may not write vault "<id>" (allowed: read)` to
+the model; every refusal is an audit line on the stream (verdict `refused`)
+and a warning in the service log; a write from a read the disk has moved
+past is refused too (ADR-0060). No `tickets/`, `chats/` or dot-folder is
+reachable. The retired `allowed: write-vaults` grants nothing; the engine's
+start drops it from the persona files once a project exists.
+A **1:1's token** reads **every project's** vaults and folders (a vault no
+project names is not read), is read-only in the grant itself and carries a tool cut
 (`VaultGrant.tools`): the list offers `vault_list`, `vault_search`,
 `vault_read` and nothing else is callable (`Error: there is no tool
 "vault_write".`), whatever its persona may write; its calls are audited like
-any other. A **free session** shares the starter but not the cut: its token is
-its persona's (the full set, writes where `allowed: write-vaults` says —
-read-only only when the session's permission mode is). A worker's successful
+any other. A **free session** shares the starter but not the cut: its token
+reaches its project like a run's (the full set; read-only only when the
+session's permission mode is). A worker's successful
 `vault_write` / `vault_edit` / `vault_move` is **announced** (milestone 234,
 req-213): the service host hands `VaultMcpCalls` the engine's `emitPaths`, the
 hub's paths channel a phone's note save uses, so the tickets plugin's

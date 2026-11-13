@@ -8,6 +8,7 @@
  * attaches since req-182), so nothing needs to survive a restart.
  */
 import type { NormalizedEvent } from '../../fleet/harness/contract';
+import type { VaultScope } from '../../fleet/orchestrate/worker-vault';
 import { StaleWriteGuard } from './stale-writes';
 
 /** Random token and its hash: crypto is an adapter ({@link NodeTokenCrypto}). */
@@ -22,6 +23,8 @@ export interface VaultGrant {
   readonly ticketId: string;
   readonly persona: string | null;
   readonly readOnly: boolean;
+  /** req-283: the project whose vaults and folders the token reaches (a 1:1: every project's). */
+  readonly scope: VaultScope;
   /**
    * The vault tools this worker is offered and may call (a 1:1: the read
    * cut, req-217); absent = every tool the service serves workers. A second

@@ -27,6 +27,13 @@ describe('FreeSessionRequestBuilder (req-173)', () => {
     });
   });
 
+  it('req-283: carries the project the session works in; none = no projectId', () => {
+    const named = builder.build({ ...base, projectId: 'drey' });
+    const none = builder.build({ ...base, projectId: null });
+    expect(named.ok && named.request.projectId).toBe('drey');
+    expect(none.ok && 'projectId' in none.request).toBe(false);
+  });
+
   it('the session record wins: permission, model pin and class over the vault and the persona', () => {
     const built = builder.build({ ...base, overrides: { permissionMode: 'read-only', model: 'opus', poolClass: 'A' }, classOf: () => 'C' });
     expect(built.ok && built.request).toMatchObject({ permissionMode: 'read-only', model: 'opus', poolClass: 'A' });
