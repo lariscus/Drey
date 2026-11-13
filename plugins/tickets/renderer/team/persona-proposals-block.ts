@@ -4,13 +4,13 @@
  * improvement proposal — raised from the journal's findings and the 1:1 —
  * with Show diff / Dismiss / Apply over the existing improvements routes
  * (`personaImprovementDecide`), and under it the links to the Crew detail's
- * Memory and 1:1 tabs, which stay where they are.
+ * Memory and 1:1 tabs, which are the page's own tabs.
  */
 import type { ImprovementProposal } from '../../../../packages/tickets-engine/src/core/improvements';
 import { h } from '../desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { blockHead, outlineButton } from './persona-dom';
-import { CREW_TABS, type CrewLinkTab } from './team-focus';
+import type { PersonaTab } from './persona-tabs';
 
 export interface ProposalsView {
   /** The first open proposal, if any. */
@@ -20,7 +20,7 @@ export interface ProposalsView {
   /** Applying a prompt proposal rewrites `prompt.md`: not while the page holds unsaved text. */
   readonly promptDirty: boolean;
   decide(proposal: ImprovementProposal, decision: 'accepted' | 'dismissed'): void;
-  openCrew(tab: CrewLinkTab): void;
+  openTab(tab: PersonaTab): void;
 }
 
 /** Applying a prompt proposal rewrites `prompt.md`: the Apply button waits while the page holds unsaved instructions. The page calls this on every edit. */
@@ -63,9 +63,9 @@ function links(ctx: BlockContext, view: ProposalsView): HTMLElement {
   const link = (text: string, run: () => void): void => {
     row.append(outlineButton(text, 'persona-link', run));
   };
-  link(view.memory === null ? t('persona.links.memory') : t('persona.links.memory_count', { count: view.memory }), () => view.openCrew(CREW_TABS.memory));
-  link(view.journal === null ? t('persona.links.journal') : t('persona.links.journal_count', { count: view.journal }), () => view.openCrew(CREW_TABS.memory));
-  link(t('persona.links.talk', { name: ctx.draft().title }), () => view.openCrew(CREW_TABS.talk));
+  link(view.memory === null ? t('persona.links.memory') : t('persona.links.memory_count', { count: view.memory }), () => view.openTab('memory'));
+  link(view.journal === null ? t('persona.links.journal') : t('persona.links.journal_count', { count: view.journal }), () => view.openTab('memory'));
+  link(t('persona.links.talk', { name: ctx.draft().title }), () => view.openTab('talk'));
   return row;
 }
 

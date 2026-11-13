@@ -5,7 +5,7 @@
         <mc-ph-avatar [persona]="openId()" [name]="title()" [color]="color()" [size]="40" />
         <span class="pd-who">
           <b>{{ title() }}</b>
-          <span class="pd-role">{{ role() }}</span>
+          <span class="pd-role">{{ headLine() }}</span>
         </span>
         @if (canPause()) {
           <button type="button" class="pd-pause" [attr.aria-label]="(paused() ? 'crew.pad.resume_x' : 'crew.pad.pause_x') | t: { name: title() }" [attr.title]="(paused() ? 'crew.pad.resume_x' : 'crew.pad.pause_x') | t: { name: title() }" (click)="togglePause()">
@@ -19,10 +19,14 @@
         <button type="button" role="tab" [class.on]="tab() === 'setup'" [attr.aria-selected]="tab() === 'setup'" (click)="setTab('setup')">{{ 'crew.pad.tab_setup' | t }}</button>
       </div>
     } @else {
-      <mc-app-bar [title]="title()" [sub]="role() || null" back="Crew" (backed)="close()">
-        <span bar-end class="avatar" [style.background-color]="color()" aria-hidden="true">{{
-          initialsOf(title())
-        }}</span>
+      <mc-app-bar [title]="title()" [sub]="isMission() ? null : (role() || null)" back="Crew" (backed)="close()">
+        @if (isMission()) {
+          <mc-ph-avatar bar-end [persona]="openId()" [name]="title()" [color]="color()" [size]="32" />
+        } @else {
+          <span bar-end class="avatar" [style.background-color]="color()" aria-hidden="true">{{
+            initialsOf(title())
+          }}</span>
+        }
       </mc-app-bar>
 
       <div class="seg" role="tablist" aria-label="Persona tabs">
@@ -428,7 +432,75 @@
       }
       <!-- ============ PANE: SETUP ============ -->
       @case ('setup') {
-        @if (pad() && !editing()) {
+        @if (isMission()) {
+          <div class="pia-setup pd-setup">
+            @if (!pad() && headLine() !== '') {
+              <span class="pia-line">{{ headLine() }}</span>
+            }
+            <span class="pia-cap">{{ 'crew.pia.model' | t }}</span>
+            <button type="button" class="pia-model" aria-haspopup="dialog" [disabled]="readOnly()" (click)="mission.openSheet()">
+              <span class="pia-model-text">
+                <span class="pia-model-title">{{ mission.modelRow().title }}</span>
+                @if (mission.modelRow().line; as line) {
+                  <span class="pia-mono">{{ line }}</span>
+                }
+              </span>
+              <mc-ph-icon name="chev" [size]="18" />
+            </button>
+            @if (mission.skills().length > 0) {
+              <span class="pia-cap">{{ 'crew.pia.skills' | t }}</span>
+              <div class="pia-skills">
+                @for (skill of mission.skills(); track skill.name) {
+                  <div class="pia-skill">
+                    <span class="pia-skill-text">
+                      <span>{{ skill.name }}</span>
+                      @if (skill.line; as line) {
+                        <span class="pia-mono">{{ line }}</span>
+                      }
+                    </span>
+                    <button
+                      type="button"
+                      class="pia-switch"
+                      [class.on]="skill.on"
+                      role="switch"
+                      [attr.aria-checked]="skill.on"
+                      [attr.aria-label]="skill.name"
+                      [disabled]="readOnly() || mission.busy()"
+                      (click)="mission.toggleSkill(skill.name)"
+                    >
+                      <i aria-hidden="true"></i>
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+            <span class="pia-cap">{{ 'crew.pia.instructions' | t }}</span>
+            <div class="pia-editor">
+              @if (mission.base() !== null) {
+                <mc-markdown
+                  [text]="mission.text()"
+                  surface="persona-instructions"
+                  [label]="'crew.pia.instructions_for' | t: { name: title() }"
+                  mode="live"
+                  [modeBar]="false"
+                  [editable]="mission.editable()"
+                  (textChange)="mission.onText($event)"
+                />
+              } @else {
+                <p class="pane-empty">{{ 'crew.pia.loading' | t }}</p>
+              }
+            </div>
+            @if (mission.error(); as error) {
+              <p class="pane-error" role="alert">{{ error }}</p>
+            }
+            @if (!readOnly()) {
+              <div class="pia-acts">
+                <button type="button" class="pia-btn" [disabled]="!mission.dirty() || mission.busy()" (click)="mission.discard()">{{ 'crew.pia.discard' | t }}</button>
+                <button type="button" class="pia-btn pia-primary" [disabled]="!mission.canSave()" (click)="mission.save()">{{ (mission.busy() ? 'crew.pia.saving' : 'crew.pia.save') | t }}</button>
+              </div>
+            }
+          </div>
+        } @else if (pad() && !editing()) {
           <div class="pd-setup">
             @if (poolRows(); as rows) {
               <div class="pd-sec">
@@ -591,6 +663,44 @@
           </div>
         }
       }
+    }
+
+    @if (mission.sheetOpen()) {
+      <div class="sheet-backdrop" (click)="mission.closeSheet()"></div>
+      <div class="sheet" role="dialog" aria-modal="true" [attr.aria-label]="'crew.pia.model' | t">
+        <div class="grab" aria-hidden="true"></div>
+        <div class="sheet-head">
+          <h2 class="sheet-title">{{ 'crew.pia.model' | t }}</h2>
+          <button type="button" class="sheet-close" [attr.aria-label]="'crew.pia.close' | t" (click)="mission.closeSheet()">×</button>
+        </div>
+        <button type="button" class="opt" [class.sel]="mission.pinned() === ''" (click)="mission.pick(null)">
+          <span class="dot" aria-hidden="true"></span>{{ 'crew.pia.same' | t }}
+        </button>
+        @for (model of mission.modelChoices(); track model) {
+          <button type="button" class="opt" [class.sel]="mission.pinned() === model" (click)="mission.pick(model)">
+            <span class="dot" aria-hidden="true"></span>{{ model }}
+          </button>
+        }
+        @if (mission.otherOpen()) {
+          <div class="pia-other">
+            <input
+              type="text"
+              class="pia-other-input"
+              [value]="mission.otherDraft()"
+              (input)="mission.onOtherInput($event)"
+              (keydown.enter)="mission.useOther()"
+              [attr.aria-label]="'crew.pia.other_id' | t"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="button" class="pia-btn pia-primary" [disabled]="mission.otherDraft().trim() === ''" (click)="mission.useOther()">{{ 'crew.pia.other_use' | t }}</button>
+          </div>
+        } @else {
+          <button type="button" class="opt" (click)="mission.otherOpen.set(true)">
+            <span class="dot" aria-hidden="true"></span>{{ 'crew.pia.other' | t }}
+          </button>
+        }
+      </div>
     }
 
     @if (sheet(); as which) {

@@ -10,7 +10,7 @@ describe('the Persona page v2 (R11, board 7k)', () => {
   it('draws every block of the mockup from the record and what lies beside it', async () => {
     await mount();
     expect(q('.persona-head-name').textContent).toBe('Ben');
-    expect(q('.persona-head').textContent).toContain('Builder · personas/ben/ · Memory 3 · Journal 2 · Proposals 1');
+    expect(q('.persona-head-names').textContent).toBe('BenBuilder');
     expect(q<HTMLInputElement>('[data-field="title"]').value).toBe('Ben');
     expect(q<HTMLSelectElement>('[data-field="role"]').value).toBe('Builder');
     expect(q<HTMLInputElement>('[data-field="summary"]').value).toBe('Builds one part of a ticket, test first.');
@@ -159,16 +159,17 @@ describe('the Persona page v2 (R11, board 7k)', () => {
     expect(patches()).toEqual([]);
   });
 
-  it('req-269: Mission Control\'s persona shows her profile and her prompt only — no work, rights, skills, proposals, preview or Delete', async () => {
+  it('req-269 (v4): Mission Control\'s persona has no work, rights, proposals or Delete; her model and skills are covered in persona-page-tabs.spec.ts', async () => {
     fx.view = { kind: 'mission', role: 'custom', worker: '', model: '', pool: [], phases: [], budget: null };
     fx.prompt = { text: '## Who Pia is\n\nMission Control.' };
     await mount();
     expect(q<HTMLInputElement>('[data-field="title"]').value).toBe('Ben');
     expect(editor().text).toBe('## Who Pia is\n\nMission Control.');
-    for (const selector of ['[data-field="worker"]', '[data-field="min-class"]', '[data-field="budget"]', '.persona-allow-row', '.persona-skill', '[data-proposal]', '.persona-delete-open']) {
+    for (const selector of ['[data-field="worker"]', '[data-field="min-class"]', '[data-field="budget"]', '.persona-allow-row', '[data-proposal]', '.persona-delete-open']) {
       expect(fx.host.querySelector(selector), selector).toBeNull();
     }
-    expect([...fx.host.querySelectorAll('button')].some((entry) => entry.textContent === 'Preview full prompt')).toBe(false);
+    // req-296 / req-293: her skills ride her prompt, so the page counts it and previews it like any persona's.
+    expect([...fx.host.querySelectorAll('button')].some((entry) => entry.textContent === 'Preview full prompt')).toBe(true);
     typeInEditor('## Who Pia is\n\nShorter answers.');
     buttonOf('Save').click();
     await settle();

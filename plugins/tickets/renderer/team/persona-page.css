@@ -23,8 +23,7 @@
   box-sizing: border-box;
 }
 
-.persona-page :focus-visible,
-.persona-edit-btn:focus-visible {
+.persona-page :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -119,8 +118,7 @@
 .persona-link,
 .persona-mode,
 .persona-sel,
-.persona-menu-item,
-.persona-edit-btn {
+.persona-menu-item {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -130,15 +128,13 @@
   cursor: default;
 }
 
-.persona-btn,
-.persona-edit-btn {
+.persona-btn {
   background: transparent;
   color: var(--text-primary);
   border: 1px solid var(--field-border);
 }
 
-.persona-btn:hover,
-.persona-edit-btn:hover {
+.persona-btn:hover {
   background: var(--hover-bg);
 }
 
@@ -204,12 +200,6 @@
   font-weight: 600;
 }
 
-.persona-edit-btn {
-  height: 30px;
-  padding: 0 14px;
-  border-radius: var(--radius-control);
-}
-
 .persona-icon-btn {
   flex-shrink: 0;
   display: flex;
@@ -227,6 +217,138 @@
 .persona-icon-btn:hover {
   background: var(--active-bg);
   color: var(--text-primary);
+}
+
+/* The head's facts: the state dot, the word with today's cost, the Pause icon (board 7k v4, req-295) */
+.persona-facts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.persona-state-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--field-border);
+}
+
+.persona-facts[data-state='running'] .persona-state-dot {
+  background: var(--accent);
+}
+
+.persona-facts[data-state='waiting'] .persona-state-dot {
+  background: var(--status-added);
+}
+
+.persona-facts[data-state='stuck'] .persona-state-dot {
+  background: var(--accent-peach);
+}
+
+.persona-facts-text {
+  white-space: nowrap;
+}
+
+/* The right column's tabs: Instructions · Memory · 1:1, the token figure and Preview at the end of the row */
+.persona-tabrow {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+  margin-bottom: 10px;
+}
+
+.persona-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.persona-tab {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-4);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.persona-tab:hover {
+  color: var(--text-primary);
+}
+
+.persona-tab-on,
+.persona-tab-on:hover {
+  background: var(--active-bg);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.persona-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Memory and 1:1 fill the column below the tabs */
+.persona-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+/* Mission Control's persona: the Model block (board 7k v4 `DeskPersonaPia`) */
+.persona-readonly-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-control);
+  font-size: 14px;
+}
+
+.persona-link-inline {
+  height: 26px;
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+.persona-model-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.persona-model-row .persona-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.persona-model-assistant {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.persona-model-problem {
+  margin-top: 6px;
+}
+
+.persona-block > input.persona-input {
+  margin-top: 6px;
 }
 
 /* The two columns */

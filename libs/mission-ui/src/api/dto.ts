@@ -297,6 +297,8 @@ export interface PersonaView {
    * when the desk omits them — the setup tab's skills group hides then.
    */
   readonly skills?: readonly string[];
+  /** req-293: Mission Control's persona's pinned chat model (`model:`); absent = the assistant's own. */
+  readonly chatModel?: string;
 }
 
 export interface TeamView {
@@ -447,6 +449,67 @@ export interface PersonaPatch {
   readonly color?: string;
   readonly skills?: readonly string[];
   readonly prompt?: string;
+  /** req-293: Mission Control's persona's chat model; null = the assistant's own. */
+  readonly chatModel?: string | null;
+}
+
+/** `GET /api/chat/models` (req-293): the assistant's connection and the models its endpoint lists. */
+export interface ChatModelsView {
+  readonly providerLabel: string;
+  /** The assistant's own model: what *Same as the assistant* means. */
+  readonly assistantModel: string;
+  readonly models: readonly string[];
+}
+
+/** The chat-models answer tolerantly mapped; a refusal or junk is null (the sheet then offers the two fixed rows). */
+export function parseChatModels(json: unknown): ChatModelsView | null {
+  const body = rec(json);
+  if (body === null || body['ok'] !== true) {
+    return null;
+  }
+  return {
+    providerLabel: str(body['providerLabel']),
+    assistantModel: str(body['assistantModel']),
+    models: strArray(body['models']),
+  };
+}
+
+/** The persona's instructions answer (`{ok, text}`); null on a refusal or junk. */
+export function parsePersonaInstructions(json: unknown): string | null {
+  const body = rec(json);
+  return body !== null && body['ok'] === true && typeof body['text'] === 'string' ? body['text'] : null;
+}
+
+/** One skill row of the persona's skill list (`GET /api/personas/<id>/skills`): name, origin, switch and tokens. */
+export interface PersonaSkillRowView {
+  readonly name: string;
+  readonly origin: 'own' | 'shared';
+  readonly on: boolean;
+  readonly tokens: number;
+}
+
+/** The skills answer (`{ok, list: {skills}}`) tolerantly mapped; a refusal or junk is null. */
+export function parsePersonaSkills(json: unknown): readonly PersonaSkillRowView[] | null {
+  const body = rec(json);
+  const list = body === null || body['ok'] !== true ? null : rec(body['list']);
+  if (list === null) {
+    return null;
+  }
+  const rows: PersonaSkillRowView[] = [];
+  for (const raw of arr(list['skills'])) {
+    const skill = rec(raw);
+    const name = skill === null ? '' : str(skill['name']);
+    if (skill !== null && name !== '') {
+      const tokens = skill['tokens'];
+      rows.push({
+        name,
+        origin: skill['origin'] === 'shared' ? 'shared' : 'own',
+        on: skill['on'] === true,
+        tokens: typeof tokens === 'number' && Number.isFinite(tokens) ? tokens : 0,
+      });
+    }
+  }
+  return rows;
 }
 
 /** One thread message off the wire; null when the desk sent no usable text. */
@@ -1205,6 +1268,7 @@ function personaOf(raw: unknown): PersonaView | null {
   const skills = strArray(persona['skills']);
   const paused = personasPausedOf(persona['paused']);
   const summary = str(persona['summary']).trim();
+  const chatModel = str(persona['chatModel']).trim();
   const avatarVersion = str(persona['avatarVersion']);
   return {
     id,
@@ -1224,6 +1288,7 @@ function personaOf(raw: unknown): PersonaView | null {
     ...(phases.length > 0 ? { phases } : {}),
     ...(paused !== undefined ? { paused } : {}),
     ...(skills.length > 0 ? { skills } : {}),
+    ...(chatModel !== '' ? { chatModel } : {}),
   };
 }
 

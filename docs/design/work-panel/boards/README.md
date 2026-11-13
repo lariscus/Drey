@@ -31,6 +31,12 @@ line step 5); they sit in their own row at the bottom of the canvas, with the pe
 **Accepted by the owner on 2026-11-13** (row req-297): for Work he chose `DeskViewWorkMC` (Mission Control open);
 `DeskViewWork` (the board alone at full width) was declined and stays only as history.
 
+The Mission Control crew boards of req-281 (`DeskTeamV2`, `DeskPersonaV4`, `DeskPersonaPia`, `PadTeamV2`, `MPhoneTeamV2`,
+`MPhonePia`) with the owner's corrections req-293 – req-296 were drawn from the 7f, 7k v3, 5d and 10i boards and exported from
+canvas version `1794596137-e214` (their own bottom row, title *Mission Control on the crew boards, the Persona page from the
+card*). **Accepted by the owner on 2026-11-13** (*"Yes, build it"*). The boards draw every circle as the silhouette; the app
+paints the persona pictures (milestone 253).
+
 A session that builds or changes a screen reads the board's HTML for the exact
 measures, colours, spacing and strings, opens the PNG to see it, and compares
 its own screenshot against the PNG before it reports done (see
@@ -68,6 +74,7 @@ above.
 | 5b · Shape: Mission Control shapes with Paul, plan in the middle | `PadShape` | 1194×834 | iPad |
 | 5c · Plan to accept: one persona per part | `PadPlan` | 1194×834 | iPad |
 | 5d · Crew: personas, what they run, stuck workers, Paul 1:1 | `PadTeam` | 1194×834 | iPad |
+| 5d v2 · Crew with Pia selected: her card (no budget), her detail Chat · Memory · Setup; Setup holds her model, her skills and her instructions in the Markdown editor, Discard and Save, no pause — **req-281/293/294/296, canvas `1794596137-e214`, accepted 2026-11-13** | `PadTeamV2` | 1194×834 | iPad |
 | 5f · Settings: theme, text size, and what else you need away from the desk | `PadSettings` | 1194×834 | iPad |
 | 5h · Review a file, comment like a pull request | `PadReview` | 1194×834 | iPad |
 | 5i · Shape the flow: standard by default, edit by hand or let Paul do it | `PadFlow` | 1194×834 | iPad |
@@ -80,6 +87,7 @@ above.
 | 7e v2 · Board, persona columns: Inbox · Prioritized · the team in team order · You · Done, the position in the chain on the card (`Ben · 3 of 6`, the chain as initials), `running` / `waits for a slot` / `waits for Ben` / `merging main`, no persona for position 4, a run's question, Accept / Send back, sent back once and twice, an empty persona folded into `+ 1 persona`, each agent persona's load in its column header (`2/2 · 1 waiting` on Ben, the count emphasized at the cap), the Capacity band replaced by a `4/5 · 1 queued` chip in the toolbar with its popover open (slots per class, tranche, queue, Open in Service window) — **req-264, canvas `1794422747-c161`** | `DeskBoardV2` | 1440×900 | desktop |
 | 7e v2 · the same board with the personas named Plan · Build · Review · Test (the phase board as a special case), the load in each column header and the Capacity chip closed — **req-264, canvas `1794422747-c161`** | `DeskBoardV2Phases` | 1440×900 | desktop |
 | 7f · Crew tab: personas, stuck worker, setup and cost | `DeskTeam` | 1440×900 | desktop |
+| 7f v2 · Crew tab: the cards alone, Pia's first (idle, her one line, no runs, no cost); a click on a card opens that persona's page, the detail pane is gone — **req-281/295, canvas `1794596137-e214`, accepted 2026-11-13** | `DeskTeamV2` | 1440×900 | desktop |
 | 7g · Settings like VS Code: search, collapsible sections, scope tabs | `DeskSettings` | 1440×900 | desktop |
 | 7h · Views: Notes · Work · Crew, Layout menu with save, reset, rename, delete | `DeskViews` | 1440×900 | desktop |
 | 7i · Tabs belong to views: hidden elsewhere, added with Show here | `DeskTabs` | 1440×900 | desktop |
@@ -87,6 +95,8 @@ above.
 | 7k · Persona setup: profile, picture, work, permissions, prompt blocks — **superseded 2026-11-08 by the R11 mockup [`../crew-internals/persona-page-mockup.html`](../crew-internals/persona-page-mockup.html); built as milestone 231 (req-171), screenshot [`../crew-internals/persona-page-built.png`](../crew-internals/persona-page-built.png), retaken with the real skill routes, the prompt preview and the commit age as milestone 233 (req-237/238/239; [`persona-page-built-preview.png`](../crew-internals/persona-page-built-preview.png) with Preview full prompt open)** | `DeskPersona` | 1440×900 | desktop |
 | 7k v2 · Persona setup, Work block of the persona board: model pool, class floor, parallel max and min, leaving actions (`sync-main`), read-only; no steps chips — **req-264, canvas `1794411563-4786`** | `DeskPersonaV2` | 1440×900 | desktop |
 | 7k v3 · Persona: a class (super heavy · heavy · standard · light) and an optional pinned model instead of a harness, the picture changed and removed (D-67), Allowed to without vaults, skills from the library with a GitHub source, Instructions in the Markdown editor fill the rest — **2026-11-13, canvas `1794584833-df73`, accepted 2026-11-13** | `DeskPersonaV3` | 1440×2000 | desktop |
+| 7k v4 · Persona page as a Crew card opens it (Ben): state, today's cost and Pause in the head, the right pane tabbed Instructions · Memory · 1:1 (1:1 shown) — **req-295, canvas `1794596137-e214`, accepted 2026-11-13** | `DeskPersonaV4` | 1440×900 | desktop |
+| 7k v4 · Pia's page: Profile, Model (the assistant's provider shown, model *Same as the assistant*, one of the endpoint's models or *Other model…*), Skills, Instructions · Memory · 1:1; no harness, Work or Allowed to — **req-281/293/294/296, accepted 2026-11-13** | `DeskPersonaPia` | 1440×1200 | desktop |
 | 7l v3 · Settings → Models: harnesses and the models they offer, discovered; four classes (super heavy · heavy · standard · light, Add class), a model moves by drag or its class menu; slots per class; accounts with their cost, added and removed in place; routing folded — **2026-11-13, accepted 2026-11-13** | `DeskModelsV3` | 1440×1700 | desktop |
 | 7m · Settings → Projects: name, colour (presets and a free colour picker), purpose in the Markdown editor, repositories, folders, vault access None / Read / Write (no profile: the owner needs no work / private distinction) — **2026-11-13, accepted 2026-11-13** | `DeskProjects` | 1440×960 | desktop |
 | 7n · The global project filter in the title bar: Files and the board filtered to Drey, the load in the column headers counts every project — **2026-11-13, accepted 2026-11-13** | `DeskProjectFilter` | 1440×900 | desktop |
@@ -116,6 +126,8 @@ above.
 | 10g · Settings: search and groups, same rows as the menu | `MPhoneSettings` | 390×844 | phone |
 | 10h · Appearance: theme, text size, switches | `MPhoneAppearance` | 390×844 | phone |
 | 10i · Crew: personas with picture, stuck worker, setup cards | `MPhoneTeam` | 390×844 | phone |
+| 10i v2 · Crew with Pia's tile first: her one line, idle, no budget, no runs; a tap opens her — **req-281, canvas `1794596137-e214`, accepted 2026-11-13** | `MPhoneTeamV2` | 390×844 | phone |
+| 10i v2 · Pia: 1:1 · Memory · Setup, Setup open — her one line, her model, her skills, her instructions, Discard and Save (drawn 1100 tall; the pane scrolls) — **req-281/293/294/296, accepted 2026-11-13** | `MPhonePia` | 390×1100 | phone |
 | 10j · Plan to accept: question card, Parts, Accept | `MPhonePlan` | 390×844 | phone |
 | 10k · Notes: search, recent, folders of the vault | `MPhoneNotes` | 390×844 | phone |
 | 10l · a note in View mode, pencil icon to edit, linked ticket, ask about it | `MPhoneNote` | 390×844 | phone |

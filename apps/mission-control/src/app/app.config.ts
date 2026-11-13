@@ -266,6 +266,9 @@ export const appConfig: ApplicationConfig = {
               model?: string;
               pool?: readonly string[];
               skills?: readonly string[];
+              kind?: 'agent' | 'human' | 'mission';
+              summary?: string;
+              chatModel?: string;
               liveSessions?: readonly LiveSessionView[];
             }[]
           ).find((p) => p.id === open.id);
@@ -334,6 +337,9 @@ export const appConfig: ApplicationConfig = {
             }
             return state.personaPatch(open.id, patch);
           },
+          chatModels: () => state.chatModels(),
+          instructions: () => state.personaInstructions(),
+          personaSkills: () => state.personaSkills(),
           prefillChat: (text) => state.prefillChat(text),
           toast: (message, kind) => state.toast(message, kind),
         };

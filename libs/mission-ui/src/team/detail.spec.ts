@@ -8,6 +8,8 @@ import { signal, type Signal, type WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
+  ChatModelsView,
+  PersonaSkillRowView,
   ImprovementProposalView,
   PersonaImprovementsView,
   PersonaMemoryView,
@@ -1121,3 +1123,215 @@ describe('the Memory pane: author and evidence, the journal, removal per line (r
   });
 });
 
+
+describe("Mission Control's persona: Setup (req-281, req-293, req-296; boards PadTeamV2, MPhonePia)", () => {
+  const MISSION_FACTS: PersonaFacts = {
+    id: 'pia',
+    title: 'Pia',
+    role: 'custom',
+    color: '#d9cff5',
+    kind: 'mission',
+    summary: "Mission Control: the owner's one contact — steers the board and the crew.",
+  };
+  const MODELS: ChatModelsView = { providerLabel: 'LM Studio', assistantModel: 'qwen3-coder-30b', models: ['qwen3-coder-30b', 'gpt-oss-20b'] };
+  const SKILLS: readonly PersonaSkillRowView[] = [
+    { name: 'Board triage', origin: 'own', on: true, tokens: 280 },
+    { name: 'Release notes', origin: 'shared', on: false, tokens: 190 },
+  ];
+
+  interface MissionSurface {
+    isMission: Signal<boolean>;
+    headLine: Signal<string>;
+    canPause: Signal<boolean>;
+    mission: {
+      modelRow: Signal<{ title: string; line: string | null }>;
+      modelChoices: Signal<readonly string[]>;
+      pinned: Signal<string>;
+      skills: Signal<readonly { name: string; on: boolean; line: string | null }[]>;
+      text: Signal<string>;
+      base: Signal<string | null>;
+      dirty: Signal<boolean>;
+      canSave: Signal<boolean>;
+      error: Signal<string | null>;
+      otherDraft: WritableSignal<string>;
+      pick(model: string | null): Promise<void>;
+      useOther(): Promise<void>;
+      toggleSkill(name: string): Promise<void>;
+      onText(next: string): void;
+      discard(): void;
+      save(): Promise<void>;
+    };
+  }
+
+  function missionVm(extra: Partial<FakeVm> = {}): FakeVm {
+    return makeVm({
+      facts: MISSION_FACTS,
+      chatModels: () => MODELS,
+      instructions: () => '# Who Pia is\n',
+      personaSkills: () => SKILLS,
+      ...extra,
+    });
+  }
+
+  function mission(vm: FakeVm): MissionSurface {
+    return setup(vm) as unknown as MissionSurface;
+  }
+
+  it('is told apart from an agent: her one line heads the page and no Pause is offered', () => {
+    const pia = mission(missionVm());
+    expect(pia.isMission()).toBe(true);
+    expect(pia.headLine()).toBe(MISSION_FACTS.summary);
+    expect(pia.canPause()).toBe(false);
+
+    const agent = setup(makeVm()) as unknown as MissionSurface;
+    expect(agent.isMission()).toBe(false);
+    expect(agent.headLine()).toBe('Planner');
+  });
+
+  it('shows Same as the assistant with the provider and the model in effect', () => {
+    const row = mission(missionVm()).mission.modelRow();
+    expect(row).toEqual({ title: 'Same as the assistant', line: 'LM Studio · qwen3-coder-30b' });
+  });
+
+  it('shows a pinned model as the title and as the model in effect', () => {
+    const pia = mission(missionVm({ facts: { ...MISSION_FACTS, chatModel: 'gpt-oss-20b' } }));
+    expect(pia.mission.modelRow()).toEqual({ title: 'gpt-oss-20b', line: 'LM Studio · gpt-oss-20b' });
+    expect(pia.mission.modelChoices()).toEqual(['qwen3-coder-30b', 'gpt-oss-20b']);
+  });
+
+  it('keeps the row usable when the endpoint lists no models and when the reply is missing', () => {
+    const pia = mission(missionVm({ chatModels: () => null }));
+    expect(pia.mission.modelRow()).toEqual({ title: 'Same as the assistant', line: null });
+    expect(pia.mission.modelChoices()).toEqual([]);
+    const empty = mission(missionVm({ chatModels: () => ({ ...MODELS, models: [] }) }));
+    expect(empty.mission.modelChoices()).toEqual([]);
+  });
+
+  it('lists a pinned id the endpoint does not list, first', () => {
+    const pia = mission(missionVm({ facts: { ...MISSION_FACTS, chatModel: 'hand-typed-1' } }));
+    expect(pia.mission.modelChoices()).toEqual(['hand-typed-1', 'qwen3-coder-30b', 'gpt-oss-20b']);
+  });
+
+  it('Same as the assistant PATCHes chatModel null; a listed model PATCHes its id', async () => {
+    const fake = missionVm({ facts: { ...MISSION_FACTS, chatModel: 'gpt-oss-20b' } });
+    const pia = mission(fake);
+    await pia.mission.pick(null);
+    expect(fake.patched).toEqual([{ chatModel: null }]);
+    expect(pia.mission.pinned()).toBe('');
+    await pia.mission.pick('qwen3-coder-30b');
+    expect(fake.patched[1]).toEqual({ chatModel: 'qwen3-coder-30b' });
+    expect(pia.mission.pinned()).toBe('qwen3-coder-30b');
+  });
+
+  it('Other model… takes a typed id and PATCHes it', async () => {
+    const fake = missionVm();
+    const pia = mission(fake);
+    await pia.mission.useOther();
+    expect(fake.patched).toEqual([]);
+    pia.mission.otherDraft.set('  vendor/some-model  ');
+    await pia.mission.useOther();
+    expect(fake.patched).toEqual([{ chatModel: 'vendor/some-model' }]);
+  });
+
+  it("a refused model change folds back and shows the desk's words", async () => {
+    const fake = missionVm({ patchReplies: [{ ok: false, error: 'chatModel is a model id or null' }] });
+    const pia = mission(fake);
+    await pia.mission.pick('x');
+    expect(pia.mission.pinned()).toBe('');
+    expect(pia.mission.error()).toBe('chatModel is a model id or null');
+  });
+
+  it('draws one skill row per listed skill with origin and tokens, and switches by PATCHing the list', async () => {
+    const fake = missionVm({ facts: { ...MISSION_FACTS, skills: ['Board triage'] } });
+    const pia = mission(fake);
+    expect(pia.mission.skills()).toEqual([
+      { name: 'Board triage', on: true, line: 'own · 280 tokens' },
+      { name: 'Release notes', on: false, line: 'shared · 190 tokens' },
+    ]);
+    await pia.mission.toggleSkill('Release notes');
+    expect(fake.patched).toEqual([{ skills: ['Board triage', 'Release notes'] }]);
+    expect(pia.mission.skills().map((row) => row.on)).toEqual([true, true]);
+    await pia.mission.toggleSkill('Board triage');
+    expect(fake.patched[1]).toEqual({ skills: ['Release notes'] });
+  });
+
+  it('a refused skill switch flips back', async () => {
+    const fake = missionVm({ facts: { ...MISSION_FACTS, skills: ['Board triage'] }, patchReplies: [{ ok: false, error: 'no' }] });
+    const pia = mission(fake);
+    await pia.mission.toggleSkill('Board triage');
+    expect(pia.mission.skills().map((row) => row.on)).toEqual([true, false]);
+  });
+
+  it('prefills the instructions editor with the current prompt; Save is disabled until the text changes', () => {
+    const pia = mission(missionVm());
+    expect(pia.mission.text()).toBe('# Who Pia is\n');
+    expect(pia.mission.dirty()).toBe(false);
+    expect(pia.mission.canSave()).toBe(false);
+    pia.mission.onText('# Who Pia is\n');
+    expect(pia.mission.canSave()).toBe(false);
+    pia.mission.onText('# Who Pia is\nShe is brief.');
+    expect(pia.mission.dirty()).toBe(true);
+    expect(pia.mission.canSave()).toBe(true);
+  });
+
+  it('Save PATCHes the prompt and settles on the saved text; Discard restores the prompt', async () => {
+    const fake = missionVm();
+    const pia = mission(fake);
+    pia.mission.onText('Changed');
+    pia.mission.discard();
+    expect(pia.mission.text()).toBe('# Who Pia is\n');
+    expect(pia.mission.dirty()).toBe(false);
+
+    pia.mission.onText('Changed');
+    await pia.mission.save();
+    expect(fake.patched).toEqual([{ prompt: 'Changed' }]);
+    expect(pia.mission.dirty()).toBe(false);
+    expect(pia.mission.base()).toBe('Changed');
+    expect(pia.mission.canSave()).toBe(false);
+  });
+
+  it('an empty prompt is never saved, and a refused save keeps the draft', async () => {
+    const fake = missionVm({ patchReplies: [{ ok: false, error: 'the desk refused' }] });
+    const pia = mission(fake);
+    pia.mission.onText('   ');
+    expect(pia.mission.canSave()).toBe(false);
+    pia.mission.onText('Changed');
+    await pia.mission.save();
+    expect(pia.mission.error()).toBe('the desk refused');
+    expect(pia.mission.dirty()).toBe(true);
+    expect(pia.mission.text()).toBe('Changed');
+  });
+
+  it("an agent's Setup keeps its own prompt editor", async () => {
+    const fake = makeVm();
+    const vm = surface(setup(fake));
+    vm.promptDraft.set('You are the planner.');
+    await vm.savePrompt();
+    expect(fake.patched).toEqual([{ prompt: 'You are the planner.' }]);
+  });
+
+  it('renders her Setup: model row, skill switches, the instructions and the Discard/Save pair', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [{ provide: MC_TEAM_DETAIL, useValue: missionVm({ facts: { ...MISSION_FACTS, skills: ['Board triage'] } }) }],
+    });
+    const fixture = TestBed.createComponent(PersonaDetail);
+    fixture.detectChanges();
+    surface(fixture.componentInstance).setTab('setup');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.pia-model')!.textContent).toContain('Same as the assistant');
+    expect(el.querySelector('.pia-model')!.textContent).toContain('LM Studio · qwen3-coder-30b');
+    const switches = Array.from(el.querySelectorAll<HTMLElement>('.pia-switch'));
+    expect(switches.map((s) => s.getAttribute('aria-checked'))).toEqual(['true', 'false']);
+    const buttons = Array.from(el.querySelectorAll<HTMLButtonElement>('.pia-acts button'));
+    expect(buttons.map((b) => b.textContent!.trim())).toEqual(['Discard', 'Save']);
+    expect(buttons.every((b) => b.disabled)).toBe(true);
+    expect(el.querySelector('.pia-line')!.textContent).toContain('Mission Control');
+
+    el.querySelector<HTMLButtonElement>('.pia-model')!.click();
+    fixture.detectChanges();
+    const options = Array.from(el.querySelectorAll('.sheet .opt')).map((o) => o.textContent!.trim());
+    expect(options).toEqual(['Same as the assistant', 'qwen3-coder-30b', 'gpt-oss-20b', 'Other model…']);
+  });
+});

@@ -34,7 +34,7 @@
                   <span class="pd-sdot" [attr.data-tone]="stateToneOf(persona)"></span>{{ phoneStateOf(persona) }}
                 </span>
               </button>
-              @if (dayCostFootOf(persona); as foot) {
+              @if (!isMission(persona) && dayCostFootOf(persona); as foot) {
                 <div class="pd-budget">
                   <div class="pd-budget-line">
                     <span class="pd-grey">{{ 'crew.phone.today' | t }}</span>
@@ -124,12 +124,8 @@
       @if (personas(); as list) {
         @for (persona of list; track persona.id) {
           <article class="ph-card">
-            <button type="button" class="ph-head" [attr.aria-expanded]="setupOf()?.id === persona.id" (click)="selectSetup(persona)">
-              <svg class="ph-ava" role="img" [attr.aria-label]="persona.title" width="36" height="36" viewBox="0 0 24 24">
-                <rect width="24" height="24" [attr.fill]="persona.color" />
-                <circle cx="12" cy="9.5" r="4.2" fill="var(--on-pastel)" fill-opacity="0.78" />
-                <path d="M3.5 24c0-5 3.8-8 8.5-8s8.5 3 8.5 8z" fill="var(--on-pastel)" fill-opacity="0.78" />
-              </svg>
+            <button type="button" class="ph-head" [attr.aria-expanded]="isMission(persona) ? null : setupOf()?.id === persona.id" (click)="tapCard(persona)">
+              <mc-ph-avatar [persona]="persona.id" [name]="persona.title" [color]="persona.color" [size]="36" />
               <span class="ph-who">
                 <b class="ph-ellipsis">{{ persona.title }}</b>
                 <span class="ph-role ph-ellipsis">{{ roleLineOf(persona) }}</span>
@@ -138,7 +134,7 @@
                 <span class="ph-sdot" [attr.data-tone]="stateToneOf(persona)"></span>{{ phoneStateOf(persona) }}
               </span>
             </button>
-            @if (dayCostFootOf(persona); as foot) {
+            @if (!isMission(persona) && dayCostFootOf(persona); as foot) {
               <div class="ph-budget">
                 <div class="ph-budget-line">
                   <span class="ph-grey">{{ 'crew.phone.today' | t }}</span>
@@ -302,7 +298,7 @@
                 <span class="pstat-label">{{ stateWords(persona) }}</span>
               </span>
             </div>
-            @if (dayCostFootOf(persona); as foot) {
+            @if (!isMission(persona) && dayCostFootOf(persona); as foot) {
               <div class="budget">
                 <div class="budget-line">
                   <span>Today</span>
@@ -352,7 +348,7 @@
             </div>
           }
 
-          @if (canPause() && persona.kind !== 'human') {
+          @if (canPause() && persona.kind !== 'human' && persona.kind !== 'mission') {
             <div class="pacts">
               <button type="button" class="btn ghost" (click)="togglePause(persona)">
                 {{ isPaused(persona) ? 'Resume' : 'Pause' }}

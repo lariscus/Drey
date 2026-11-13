@@ -1,20 +1,24 @@
 // i18n: catalog
 /**
  * The Persona page (board 7k, milestone 201; rebuilt to the R11 mockup in
- * milestone 231, req-171): a tab of its own, opened by `Edit persona` on the
- * Crew tab. Head, two columns — Profile, Work, Allowed to | Instructions
- * (Drey's Markdown editor), Skills, Proposals — and one Save: what the form
+ * milestone 231, req-171; v4, req-295): a tab of its own, opened by a click on
+ * a persona's card on the Crew tab. Head (state, today's cost, Pause), two
+ * columns — Profile, Work, Allowed to | tabs Instructions (Drey's Markdown
+ * editor, Skills, Proposals) · Memory · 1:1; for Mission Control's persona
+ * Profile, Model, Skills | the same tabs — and one Save: what the form
  * changed goes as one `personaPatch`, one commit to `personas/<id>/`. Plain
  * DOM; each block is a file of its own over `persona-model.ts`, the page
- * composes them and owns the load and the repaint, `persona-page-actions.ts`
- * the Save and the decisions.
+ * composes them (`persona-page-columns.ts`) and owns the load and the
+ * repaint, `persona-page-actions.ts` the Save and the decisions.
  */
 import type { PersonaImprovementsReply, PersonaView } from '../../shared/remote-protocol';
 import { h, type DeskDeps } from '../desk-deps';
-import { allowedBlock } from './persona-allowed-block';
 import type { BlockContext } from './persona-block-context';
 import { askPersonaDelete } from './persona-delete-action';
-import { personaHead, savedTextOf } from './persona-head';
+import { personaHead, savedTextOf, type PersonaHead } from './persona-head';
+import { columnsOf } from './persona-page-columns';
+import type { PersonaTab } from './persona-tabs';
+import { teamModelOf } from './team-model';
 import { createInstructionsBlock } from './persona-instructions-block';
 import { draftOf, isDirty, personaPathsOf, wordsOf, type PersonaDraft } from './persona-model';
 import { decideProposal, openProposalOf, savePersona, type ActionEnv } from './persona-page-actions';
@@ -22,15 +26,12 @@ import { blockContextOf, viewKeyOf } from './persona-page-context';
 import { readBeside, readPromptFile, type PromptRead } from './persona-page-load';
 import { pageFoot, type PageFoot } from './persona-page-foot';
 import { drafts, newSession, wordCounts } from './persona-page-state';
-import { profileBlock } from './persona-profile-block';
-import { proposalsBlock, syncApply } from './persona-proposals-block';
+import { syncApply } from './persona-proposals-block';
 import { PersonaPreviewState } from './persona-preview-state';
 import { previewRequestOf } from './persona-preview-model';
 import { enginePromptPreviewSeam, engineSkillsSeam, type PersonaSkillsSeam, type PromptPreviewSeam } from './persona-seams';
 import { createSkillsBlock } from './persona-skills-block';
 import { PersonaSkillsState } from './persona-skills-state';
-import type { CrewLinkTab } from './team-focus';
-import { workBlock } from './persona-work-block';
 import type { TeamStore } from './team-store';
 
 /** How soon a failed load tries again: the engine may be restarting, and the board may stay quiet meanwhile. */
@@ -48,8 +49,6 @@ export interface PersonaPageHost {
   back(): void;
   /** The persona's name changed: the tab follows. */
   retitle(title: string): void;
-  /** Opens the Crew tab on this persona's Memory or 1:1 tab. */
-  openCrew(persona: string, tab: CrewLinkTab): void;
   /** The persona was deleted (req-261): the tab leaves for Crew. */
   removed(): void;
 }
@@ -75,6 +74,9 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let stateNode: HTMLElement | null = null;
   let foot: PageFoot | null = null;
+  let head: PersonaHead | null = null;
+  // The tab survives a repaint (a Save, a decision): it is the page's, not the DOM's.
+  let tab: PersonaTab = 'instructions';
 
   const vaultId = (): string | null => deps.snapshot()?.vaultId ?? null;
   const readPrompt = (): Promise<PromptRead> => {
@@ -105,12 +107,25 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
     syncState();
   };
 
+  /** The head's state, cost and Pause follow the engine's events without a repaint of the page. */
+  const syncFacts = (): void => {
+    const card = teamModelOf(store.personas(), deps.runs(), deps.chain(), deps.titleOf, Date.now()).personas.find((entry) => entry.id === id);
+    head?.facts.sync(card);
+  };
+  const pause = (paused: boolean): void => {
+    void deps.mutate(t(paused ? 'persona.head.pausing' : 'persona.head.resuming'), () => deps.invoke('personaPause', { persona: id, paused })).then(() => store.refresh());
+  };
+  const selectTab = (next: PersonaTab): void => {
+    tab = next;
+    render();
+  };
+
   const render = (): void => {
     if (disposed) {
       return;
     }
     const scrolls = ['.persona-left', '.persona-right'].map((selector) => root.querySelector(selector)?.scrollTop ?? 0);
-    stateNode = foot = null;
+    stateNode = foot = head = null;
     const loaded = session.loaded;
     if (loaded === null) {
       const missing = store.loaded() && store.personas().every((entry) => entry.id !== id);
@@ -118,34 +133,23 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
       return;
     }
     const { ctx, reads } = loaded;
-    const head = personaHead(ctx, { memory: reads.memory, journal: reads.journal, proposals: loaded.proposal === null ? 0 : 1 }, () => host.back());
+    head = personaHead(ctx, () => host.back(), pause);
     stateNode = head.state;
-    const left = h('div', 'persona-left');
-    const right = h('div', 'persona-right');
-    if (ctx.persona.kind === 'mission') {
-      // req-269: Mission Control's persona has no harness, run settings, skills or run proposals — her profile and her prompt.
-      left.append(profileBlock(ctx));
-      right.append(loaded.instructions.element);
-    } else {
-      left.append(profileBlock(ctx), workBlock(ctx), allowedBlock(ctx));
-      right.append(
-        loaded.instructions.element,
-        loaded.skills.element,
-        proposalsBlock(ctx, {
-          proposal: loaded.proposal,
-          memory: reads.memory,
-          journal: reads.journal,
-          promptDirty: loaded.draft.prompt !== loaded.base.prompt,
-          decide: (proposal, decision) => void decideProposal(env, proposal, decision),
-          openCrew: (tab) => host.openCrew(id, tab),
-        }),
-      );
-    }
-    const cols = h('div', 'persona-cols');
-    cols.append(left, right);
+    const { element: cols, left, right } = columnsOf({
+      ctx,
+      reads,
+      instructions: loaded.instructions,
+      skills: loaded.skills,
+      proposal: loaded.proposal,
+      promptDirty: loaded.draft.prompt !== loaded.base.prompt,
+      tab,
+      selectTab,
+      decide: (proposal, decision) => void decideProposal(env, proposal, decision),
+    });
     foot = pageFoot(t, t('persona.page.save_title', { path: paths.dirShort }), { discard, save: () => void savePersona(env), ...(ctx.persona.kind === 'mission' ? {} : { remove: () => askPersonaDelete(env, () => host.removed()) }) });
     root.replaceChildren(head.element, cols, foot.element);
     [left, right].forEach((column, at) => (column.scrollTop = scrolls[at] ?? 0));
+    syncFacts();
     syncState();
   };
 
@@ -213,7 +217,7 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
       const draft = drafts.get(id) ?? base;
       const skills = new PersonaSkillsState(seams.skills ?? engineSkillsSeam(invoke), id);
       const preview = new PersonaPreviewState(seams.preview ?? enginePromptPreviewSeam(invoke), id, () => previewRequestOf(session.loaded?.view.phases ?? persona.phases, (session.loaded?.draft ?? draft).pool));
-      const [reads] = await Promise.all([readBeside(deps, id), skills.load(), preview.ensure()]);
+      const [reads] = await Promise.all([readBeside(deps, id, persona.kind === 'mission'), skills.load(), preview.ensure()]);
       if (disposed) {
         return;
       }
@@ -247,6 +251,9 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
       return;
     }
     const loaded = session.loaded;
+    if (loaded !== null) {
+      syncFacts();
+    }
     if (loaded === null) {
       // The tab may be restored before the snapshot or the directory arrive; a failed load tries again on the next change.
       if (!loading && vaultId() !== null) {

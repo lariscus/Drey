@@ -10,33 +10,8 @@ import { mountBoard } from '../board/board-view';
 import { bandHeaderStatusOf, bandStatusOf } from './capacity-model';
 import { trancheNodes } from './capacity-view';
 import { poolChipNode } from '../board/pool-chip';
-import { focusCrew, resetCrewFocus } from './team-focus';
 import type { TeamStore } from './team-store';
 import { mountTeam } from './team-view';
-
-describe('Edit persona (board 7f -> 7k)', () => {
-  it('is drawn when the page can be opened, and opens the selected persona', async () => {
-    const opens: string[] = [];
-    const host = document.createElement('div');
-    const dispose = mountTeam(
-      {
-        api: { i18n },
-        runs: () => [],
-        chain: () => null,
-        titleOf: () => null,
-        subscribe: () => () => undefined,
-        openPersona: (id: string) => opens.push(id),
-      } as unknown as DeskDeps,
-      { personas: () => [persona({})], loaded: () => true, error: () => '', subscribe: () => () => undefined, refresh: async () => undefined, nameOf: () => 'Ben' } as TeamStore,
-      host,
-    );
-    const button = host.querySelector<HTMLButtonElement>('.desk-detail-head .persona-edit-btn');
-    expect(button?.textContent).toBe('Edit persona');
-    button?.click();
-    expect(opens).toEqual(['ben']);
-    dispose();
-  });
-});
 
 const persona = (patch: Partial<PersonaView>): PersonaView => ({
   id: 'ben',
@@ -158,24 +133,6 @@ describe('the Crew tab', () => {
     expect(host.querySelector('[data-persona="tessa"] .desk-persona-role')!.textContent).toBe('Tester · $0.36 today');
   });
 
-  it("opens on the persona and tab the Persona page's link asked for, waiting or while open", () => {
-    resetCrewFocus();
-    const host = document.body.appendChild(document.createElement('div'));
-    focusCrew({ persona: 'tessa', tab: '1:1' });
-    mountTeam(deps(), store(personas), host);
-    expect(host.querySelector('[data-persona="tessa"]')!.classList.contains('desk-persona-selected')).toBe(true);
-    expect(host.querySelector('.desk-tab-on')!.textContent).toBe('1:1');
-    focusCrew({ persona: 'ben', tab: 'Memory' });
-    return new Promise<void>((resolve) => {
-      window.requestAnimationFrame(() => {
-        expect(host.querySelector('[data-persona="ben"]')!.classList.contains('desk-persona-selected')).toBe(true);
-        expect(host.querySelector('.desk-tab-on')!.textContent).toBe('Memory');
-        resetCrewFocus();
-        resolve();
-      });
-    });
-  });
-
   it('draws the Autopilot chip between the budget and Pause all, and a click opens the popover (board 7f)', () => {
     const host = document.body.appendChild(document.createElement('div'));
     mountTeam(deps(), store(personas), host);
@@ -239,34 +196,37 @@ describe('the Crew tab', () => {
     expect(invoked).toEqual([['chainAbort', {}]]);
   });
 
-  it('selects the first persona, lists Setup, Memory and 1:1, and asks the thread on 1:1', async () => {
+  it('shows only the cards: no detail pane, no tabs, no Edit persona (board 7f v2, req-295)', () => {
     const host = document.body.appendChild(document.createElement('div'));
     mountTeam(deps(), store(personas), host);
-    expect(host.querySelector('.desk-detail .desk-persona-title')!.textContent).toBe('Ben');
-    expect([...host.querySelectorAll('.desk-tab')].map((t) => t.textContent)).toEqual(['Setup', 'Memory', '1:1']);
-    expect(host.querySelector('.desk-tab-on')!.textContent).toBe('Setup');
-    expect(host.querySelector('.desk-pool-model')!.textContent).toBe('qwen3-coder');
-    [...host.querySelectorAll<HTMLElement>('.desk-tab')].find((t) => t.textContent === '1:1')!.click();
-    await nextFrame();
-    expect(invoked).toContainEqual(['personaThread', { persona: 'ben' }]);
-    host.querySelector<HTMLElement>('[data-persona="tessa"]')!.click();
-    await nextFrame();
-    expect(host.querySelector('.desk-detail .desk-persona-title')!.textContent).toBe('Tessa');
+    expect(host.querySelector('.desk-detail')).toBeNull();
+    expect(host.querySelector('.desk-tab')).toBeNull();
+    expect(host.querySelector('.persona-edit-btn')).toBeNull();
+    expect(host.querySelectorAll('.desk-persona')).toHaveLength(2);
   });
 
-  it('req-269: Mission Control\'s persona has a card that opens her page; she is never selected and not counted', async () => {
+  it('a click or Enter on any card opens that persona\'s page, Mission Control\'s persona included; she is not counted', () => {
     const host = document.body.appendChild(document.createElement('div'));
     const opens: string[] = [];
-    const pia = persona({ id: 'pia', title: 'Pia', kind: 'mission', role: 'custom', worker: '', model: '', pool: [], budget: null, dailyCost: undefined, phases: [] });
+    const pia = persona({ id: 'pia', title: 'Pia', kind: 'mission', role: 'custom', worker: '', model: '', pool: [], budget: null, dailyCost: undefined, phases: [], summary: 'Mission Control' });
     mountTeam({ ...deps(), openPersona: (id: string) => opens.push(id) } as DeskDeps, store([pia, ...personas]), host);
-    expect(host.querySelector('[data-persona="pia"]')).not.toBeNull();
-    expect(host.querySelector('.desk-detail .desk-persona-title')!.textContent).toBe('Ben');
+    expect([...host.querySelectorAll<HTMLElement>('.desk-persona')].map((card) => card.dataset['persona'])).toEqual(['pia', 'ben', 'tessa']);
+    expect(host.querySelector('[data-persona="pia"] .desk-persona-state')!.textContent).toBe('idle');
     expect(host.querySelector('.desk-head-sub')!.textContent).toBe('2 personas · 1 stuck');
     host.querySelector<HTMLElement>('[data-persona="pia"]')!.click();
-    await nextFrame();
-    expect(opens).toEqual(['pia']);
-    expect(host.querySelector('.desk-detail .desk-persona-title')!.textContent).toBe('Ben');
+    host.querySelector<HTMLElement>('[data-persona="ben"]')!.click();
+    const tessa = host.querySelector<HTMLElement>('[data-persona="tessa"]')!;
+    tessa.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(opens).toEqual(['pia', 'ben', 'tessa']);
     expect(invoked.some(([method]) => method === 'personaThread')).toBe(false);
+  });
+
+  it('the stuck-run controls stay on the card and do not open the page', () => {
+    const host = document.body.appendChild(document.createElement('div'));
+    const opens: string[] = [];
+    mountTeam({ ...deps(), openPersona: (id: string) => opens.push(id) } as DeskDeps, store(personas), host);
+    host.querySelector<HTMLButtonElement>('[data-persona="tessa"] .desk-persona-controls button')!.click();
+    expect(opens).toEqual([]);
   });
 
   it('leaves the owner out of the cards', () => {

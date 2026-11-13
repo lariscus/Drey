@@ -61,6 +61,8 @@ export interface PersonaDraft {
   readonly allowed: AllowedDraft;
   /** The Work block's run settings (req-258). */
   readonly settings: SettingsDraft;
+  /** Mission Control's persona only (req-293): the model id her turns use; '' = the same as the assistant. */
+  readonly chatModel: string;
 }
 
 /** The keys a Save sends. */
@@ -74,6 +76,8 @@ export interface PersonaPatchKeys {
   pool?: readonly string[];
   allowed?: PersonaAllowedPatch;
   settings?: PersonaSettingsPatch;
+  /** null = back to the assistant's model. */
+  chatModel?: string | null;
 }
 
 function allowedOf(view: PersonaView): AllowedDraft {
@@ -96,6 +100,7 @@ export function draftOf(view: PersonaView, prompt: string): PersonaDraft {
     pool: view.pool.length > 0 ? view.pool : view.model === '' ? [] : [view.model],
     allowed: allowedOf(view),
     settings: settingsDraftOf(view),
+    chatModel: view.chatModel ?? '',
   };
 }
 
@@ -165,6 +170,9 @@ export function patchOf(base: PersonaDraft, draft: PersonaDraft): PersonaPatchKe
   if (settings !== null) {
     patch.settings = settings;
   }
+  if (draft.chatModel.trim() !== base.chatModel.trim()) {
+    patch.chatModel = draft.chatModel.trim() === '' ? null : draft.chatModel.trim();
+  }
   return patch;
 }
 
@@ -174,7 +182,7 @@ export function isDirty(base: PersonaDraft, draft: PersonaDraft): boolean {
 
 /** The base after a Save of `draft`: what the form now shows is what the record holds. */
 export function savedBaseOf(draft: PersonaDraft): PersonaDraft {
-  return { ...draft, title: draft.title.trim(), role: roleLabel(draft.role.trim().toLowerCase()), summary: draft.summary.trim(), worker: draft.worker.trim(), budget: draft.budget.trim().replace(/^\$/, ''), settings: savedSettingsOf(draft.settings) };
+  return { ...draft, title: draft.title.trim(), role: roleLabel(draft.role.trim().toLowerCase()), summary: draft.summary.trim(), worker: draft.worker.trim(), budget: draft.budget.trim().replace(/^\$/, ''), settings: savedSettingsOf(draft.settings), chatModel: draft.chatModel.trim() };
 }
 
 /** The instructions' length as the status bar shows it. */

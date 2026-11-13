@@ -52,6 +52,8 @@ export interface McPersonaView {
   readonly paused?: boolean;
   /** The skill files the persona carries; absent when the desk omits them. */
   readonly skills?: readonly string[];
+  /** req-293: Mission Control's persona's pinned chat model; absent = the assistant's own. */
+  readonly chatModel?: string;
 }
 
 /** The fleet run states (packages/tickets-engine/src/fleet/protocol.ts), duplicated locally. */
@@ -394,7 +396,11 @@ export class Team {
   private readonly state = inject(MC_TEAM_STATE);
 
   /** Null while the first fetch is still in flight. */
-  protected readonly personas = computed(() => this.state.team());
+  protected readonly personas = computed(() => {
+    const team = this.state.team();
+    // Pia, Mission Control's persona, leads the list on the boards (10i, 5d); the rest keep the desk's order.
+    return team === null ? null : [...team.filter((p) => p.kind === 'mission'), ...team.filter((p) => p.kind !== 'mission')];
+  });
 
   /** The personas exist but the pool is empty — the settings hint shows. */
   protected readonly poolEmpty = computed(() => {
@@ -474,12 +480,26 @@ export class Team {
     this.setupId.set(persona.id);
   }
 
+  /** Mission Control's persona (req-269): a card without runs, budget or pause. */
+  protected isMission(persona: Pick<McPersonaView, 'kind'>): boolean {
+    return persona.kind === 'mission';
+  }
+
+  /** The phone card's tap: Pia opens her own detail, every other card selects the Setup block below. */
+  protected tapCard(persona: McTeamPersona): void {
+    if (this.isMission(persona)) {
+      this.state.openPersona?.(persona.id);
+    } else {
+      this.selectSetup(persona);
+    }
+  }
+
   protected readonly summaryLine = computed(() => {
     const list = this.personas() ?? [];
     const runs = list.flatMap((persona) => persona.liveRuns ?? []);
     const t = this.teamI18n;
     return [
-      t.t('crew.phone.n_personas', { n: list.length }),
+      t.t('crew.phone.n_personas', { n: list.filter((persona) => persona.kind !== 'human' && persona.kind !== 'mission').length }),
       t.t('crew.phone.n_running', { n: runs.filter((run) => !run.stuck).length }),
       t.t('crew.phone.n_stuck', { n: runs.filter((run) => run.stuck).length }),
     ].join(' · ');
@@ -575,6 +595,9 @@ export class Team {
   }
 
   protected rowsOf(persona: McTeamPersona): readonly RunRowVm[] {
+    if (this.isMission(persona)) {
+      return [];
+    }
     const now = Date.now();
     return (persona.liveRuns ?? []).map((run) =>
       runRowOf(run, this.state.ticketTitleOf?.(run.ticketId) ?? null, now),

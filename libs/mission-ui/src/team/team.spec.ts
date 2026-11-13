@@ -1,6 +1,7 @@
 import { signal, type Signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import type { LiveRunView } from '../api/dto';
+import { PAD_QUERY, TOUCH_FACE_QUERY } from '../phone/phone';
 import {
   MC_TEAM_STATE,
   Team,
@@ -548,5 +549,88 @@ describe('the persona one-liner on the crew card (req-144, R11)', () => {
     expect(cardText({ ...PIA, summary: 'Plans one part at a time.' })).toContain('Plans one part at a time.');
     expect(cardText({ ...PIA, summary: 'Plans one part at a time.' })).not.toContain('Planner');
     expect(cardText(PIA)).toContain('Planner');
+  });
+});
+
+describe('Mission Control\'s persona on the touch faces (req-281, boards MPhoneTeamV2 and PadTeamV2)', () => {
+  const realMatchMedia = window.matchMedia;
+  const MISSION_PIA: McTeamPersona = {
+    ...PIA,
+    id: 'pia',
+    kind: 'mission',
+    title: 'Pia',
+    role: 'custom',
+    summary: "Mission Control: the owner's one contact.",
+    dailyCost: 1.2,
+    budget: 5,
+  };
+  const BEN: McTeamPersona = { ...PIA, id: 'ben', title: 'Ben', dailyCost: 2.67, budget: 5 };
+
+  afterEach(() => {
+    window.matchMedia = realMatchMedia;
+  });
+
+  function render(face: 'phone' | 'pad', opened: string[]): HTMLElement {
+    window.matchMedia = ((query: string) => ({
+      matches: query === TOUCH_FACE_QUERY || (face === 'pad' && query === PAD_QUERY),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })) as unknown as typeof window.matchMedia;
+    TestBed.resetTestingModule();
+    const state: McTeamState = {
+      // Pia arrives last on the wire; the boards list her first.
+      team: signal([BEN, MISSION_PIA]),
+      openPersona: (id) => void opened.push(id),
+      personaPause: () => undefined,
+    };
+    TestBed.configureTestingModule({ providers: [{ provide: MC_TEAM_STATE, useValue: state }] });
+    const fixture = TestBed.createComponent(Team);
+    fixture.detectChanges();
+    return fixture.nativeElement as HTMLElement;
+  }
+
+  it('the phone lists her first, without budget bar or runs, and counts her out', () => {
+    const el = render('phone', []);
+    const cards = Array.from(el.querySelectorAll<HTMLElement>('.ph-card'));
+    expect(cards.map((card) => card.querySelector('.ph-who b')?.textContent)).toEqual(['Pia', 'Ben']);
+    expect(cards[0]!.querySelector('.ph-budget')).toBeNull();
+    expect(cards[0]!.querySelector('.ph-run')).toBeNull();
+    expect(cards[0]!.textContent).toContain('idle');
+    expect(cards[1]!.querySelector('.ph-budget')).not.toBeNull();
+    expect(el.querySelector('.ph-summary')!.textContent).toContain('1 persona');
+  });
+
+  it('a tap on her phone tile opens her detail; an agent tile selects the Setup block instead', () => {
+    const opened: string[] = [];
+    const el = render('phone', opened);
+    const heads = Array.from(el.querySelectorAll<HTMLButtonElement>('.ph-head'));
+    heads[0]!.click();
+    expect(opened).toEqual(['pia']);
+    heads[1]!.click();
+    expect(opened).toEqual(['pia']);
+  });
+
+  it('the iPad list card has no budget bar and its summary does not count her', () => {
+    const opened: string[] = [];
+    const el = render('pad', opened);
+    const cards = Array.from(el.querySelectorAll<HTMLElement>('.pd-card'));
+    expect(cards.map((card) => card.querySelector('.pd-who b')?.textContent)).toEqual(['Pia', 'Ben']);
+    expect(cards[0]!.querySelector('.pd-budget')).toBeNull();
+    expect(cards[1]!.querySelector('.pd-budget')).not.toBeNull();
+    expect(el.querySelector('.pd-sum')!.textContent).toContain('1 persona');
+    cards[0]!.querySelector<HTMLButtonElement>('.pd-head')!.click();
+    expect(opened).toEqual(['pia']);
+  });
+
+  it('the wide face draws her without Pause and without the budget bar', () => {
+    TestBed.resetTestingModule();
+    const state: McTeamState = { team: signal([MISSION_PIA]), openPersona: () => undefined, personaPause: () => undefined };
+    TestBed.configureTestingModule({ providers: [{ provide: MC_TEAM_STATE, useValue: state }] });
+    const fixture = TestBed.createComponent(Team);
+    fixture.detectChanges();
+    const card = (fixture.nativeElement as HTMLElement).querySelector('.card')!;
+    expect(card.textContent).not.toContain('Pause');
+    expect(card.querySelector('.budget')).toBeNull();
   });
 });

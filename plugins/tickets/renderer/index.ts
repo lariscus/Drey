@@ -91,7 +91,6 @@ import { createConversationProvider } from './conversation/targets';
 import { mountTeam } from './team/team-view';
 import { PERSONA_KIND, personaIdOfKey, personaKeyOf } from './team/persona-model';
 import { mountPersonaPage, personaWordCountOf } from './team/persona-page';
-import { focusCrew } from './team/team-focus';
 import { bandStatusOf } from './team/capacity-model';
 import { queueWordsFor } from './queue-line';
 import { mountBoard } from './board/board-view';
@@ -3403,10 +3402,6 @@ const plugin: { activate(api: DreyPluginApi): void } = {
         mountPersonaPage(deskDeps(api), teamStore(api), host, personaIdOfKey(path), {
           back: () => openTeamDoc(api),
           removed: () => openTeamDoc(api),
-          openCrew: (persona, tab) => {
-            focusCrew({ persona, tab });
-            openTeamDoc(api);
-          },
           retitle: (title) => api.documents.rename(path, api.i18n.t('persona.page.tab', { name: title })),
         }),
       statusText: (path) => {

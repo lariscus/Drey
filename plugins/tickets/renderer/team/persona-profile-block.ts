@@ -25,7 +25,8 @@ export function profileBlock(ctx: BlockContext): HTMLElement {
     blockHead(t('persona.page.profile')),
     picture,
     labelled(t('persona.page.name'), textInput(draft.title, (value) => ctx.edit({ title: value }), 'title')),
-    labelled(t('persona.page.role'), role),
+    // Mission Control's persona has no role to choose (board 7k v4 `DeskPersonaPia`).
+    ...(ctx.persona.kind === 'mission' ? [] : [labelled(t('persona.page.role'), role)]),
     labelled(t('persona.page.summary'), summary),
   );
   return block;

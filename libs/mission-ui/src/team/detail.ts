@@ -10,6 +10,8 @@ import {
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import type {
+  ChatModelsView,
+  PersonaSkillRowView,
   ImprovementProposalView,
   LiveSessionView,
   PersonaImprovementsView,
@@ -31,7 +33,9 @@ import { journalRows, memoryMeta, memoryText, type JournalRowView } from './memo
 import { McI18n } from '../i18n/i18n.service';
 import { PhoneAvatar } from '../phone/avatar';
 import { PhoneIcon } from '../phone/icon';
+import { Markdown } from '../markdown/markdown';
 import { padSignal } from '../phone/phone';
+import { MissionSetup } from './mission-setup';
 import { dayCostFootOf, initialsOf, isPersonaPaused, MC_TEAM_STATE } from './team';
 
 // --- pure logic ----------------------------------------------------------------
@@ -201,6 +205,12 @@ export interface PersonaFacts {
   readonly skills?: readonly string[];
   /** req-173: the live sessions that are not ticket runs; absent when the adapter omits them. */
   readonly liveSessions?: readonly LiveSessionView[];
+  /** `mission` = Mission Control's persona (Pia): her Setup is the model, skills and instructions block. Absent = an agent. */
+  readonly kind?: 'agent' | 'human' | 'mission';
+  /** The persona's one line (`summary:`); the mission persona's head and phone Setup draw it in full. */
+  readonly summary?: string;
+  /** req-293: the mission persona's pinned chat model; absent = the assistant's own. */
+  readonly chatModel?: string;
 }
 
 /** The persona detail's tabs — the conversation (`chat`, labelled 1:1) carries the improvement drafts, the thread and the composer in one place (D8). */
@@ -272,6 +282,12 @@ export interface TeamDetailVm {
   removeJournal?(index: number, at: string): Promise<DetailActionReply>;
   /** PATCH `/api/personas/<id>` — the setup tab's every change, one commit each. */
   patchPersona?(patch: PersonaPatch): Promise<DetailActionReply>;
+  /** req-293: the assistant's connection and the models its endpoint lists (the mission persona's Model sheet); null while loading or refused. */
+  chatModels?(): ChatModelsView | null;
+  /** req-281: the mission persona's instructions as text (the editor's start); null while loading or refused. */
+  instructions?(): string | null;
+  /** req-296: the mission persona's skills with origin, switch and tokens; null while loading or refused. */
+  personaSkills?(): readonly PersonaSkillRowView[] | null;
   /** Hands the wording to Mission Control's chat composer (the create intent). */
   prefillChat?(text: string): void;
   /** A transient status note (the toast pill); absent = silent. */
@@ -315,12 +331,31 @@ export const MC_TEAM_DETAIL = new InjectionToken<TeamDetailVm>('mc-team-detail',
   templateUrl: './detail.html',
   styleUrls: ['../seg.css', './detail.css', './detail-pad.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, AppBar, McI18nPipe, PhoneAvatar, PhoneIcon],
+  imports: [NgTemplateOutlet, AppBar, McI18nPipe, Markdown, PhoneAvatar, PhoneIcon],
 })
 export class PersonaDetail {
   private readonly vm = inject(MC_TEAM_DETAIL);
   private readonly team = inject(MC_TEAM_STATE);
   private readonly i18n = inject(McI18n);
+
+  /** Mission Control's persona (Pia): the Setup block's model, skills and instructions (req-281/293/296). */
+  protected readonly mission = new MissionSetup({
+    vm: this.vm,
+    i18n: this.i18n,
+    persona: () => this.persona(),
+    readOnly: () => this.readOnly(),
+  });
+
+  protected readonly isMission = computed(() => this.persona()?.kind === 'mission');
+
+  /** The head's line under the name: her one line in full for Pia, the role for an agent. */
+  protected readonly headLine = computed(() => {
+    const persona = this.persona();
+    if (persona === null) {
+      return '';
+    }
+    return this.isMission() ? ((persona.summary ?? '').trim() || persona.role) : persona.role;
+  });
 
   // --- the iPad's right part (board 5d) -----------------------------------------------
 
@@ -330,7 +365,9 @@ export class PersonaDetail {
   private readonly teamPersona = computed(() => this.team.team()?.find((p) => p.id === this.vm.open()?.id) ?? null);
 
   /** The head's Pause is offered when the desk can pause and the device may act. */
-  protected readonly canPause = computed(() => this.team.personaPause !== undefined && !this.vm.readOnly());
+  protected readonly canPause = computed(
+    () => this.team.personaPause !== undefined && !this.vm.readOnly() && this.persona()?.kind !== 'mission',
+  );
 
   protected readonly paused = computed(() => {
     const persona = this.teamPersona();
@@ -439,6 +476,7 @@ export class PersonaDetail {
         this.setupError.set(null);
         this.sheet.set(null);
         this.editing.set(false);
+        this.mission.reset();
       }
     });
   }

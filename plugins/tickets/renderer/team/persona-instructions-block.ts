@@ -12,7 +12,7 @@
 import type { MarkdownFormatAction, MarkdownViewHandle } from '../../../../shared/plugin-api/renderer';
 import { h } from '../desk-deps';
 import type { BlockContext } from './persona-block-context';
-import { blockHead, iconButton, outlineButton } from './persona-dom';
+import { iconButton, outlineButton } from './persona-dom';
 import { createEditorGrip } from './persona-ed-grip';
 import { createPreviewPanel, type PreviewPanel } from './persona-preview-panel';
 import { atStartTokensOf } from './persona-preview-model';
@@ -30,6 +30,8 @@ const STRIP: readonly { readonly action: MarkdownFormatAction; readonly icon: st
 
 export interface InstructionsBlock {
   readonly element: HTMLElement;
+  /** The token figure and Preview full prompt: they sit in the page's tab row while Instructions is the tab (board 7k v4). */
+  readonly controls: readonly HTMLElement[];
   /** Puts the saved or discarded text back, keeping the caret where the text allows. */
   setText(text: string): void;
   /** False while the file could not be read: nothing may be typed over text that was never loaded. */
@@ -43,12 +45,10 @@ export function createInstructionsBlock(ctx: BlockContext, initial: string, edit
   block.setAttribute('aria-label', t('persona.page.instructions'));
   const tokens = h('small', 'persona-muted persona-tokens');
   let current = initial;
-  // req-269: Mission Control's persona starts no run — her prompt rides Mission Control's turns, so no run brief applies.
-  const mission = ctx.persona.kind === 'mission';
-  /** At the start of a run once the engine has counted the brief; the instructions alone until then (or when it cannot). */
+  /** At the start of a run (for her, of a Mission Control turn) once the engine has counted the brief; the instructions alone until then (or when it cannot). */
   const countTokens = (text: string): void => {
     current = text;
-    const preview = mission ? null : ctx.preview.preview;
+    const preview = ctx.preview.preview;
     const own = ctx.draft();
     tokens.textContent = preview === null ? t('persona.page.tokens', { count: estimateTokens(text.trim(), tokenizerFor(own.worker, own.pool[0] ?? null)) }) : t('persona.page.tokens_at_start', { count: atStartTokensOf(preview, text) });
   };
@@ -132,9 +132,10 @@ export function createInstructionsBlock(ctx: BlockContext, initial: string, edit
   });
 
   const grip = createEditorGrip(frame, t('persona.page.resize_instructions'));
-  block.append(blockHead(t('persona.page.instructions'), tokens, mission ? null : previewButton), problem, frame, grip.element);
+  block.append(problem, frame, grip.element);
   return {
     element: block,
+    controls: [tokens, previewButton],
     setText: (text) => {
       view?.setContent(text);
       countTokens(text);

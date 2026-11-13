@@ -1849,6 +1849,52 @@ describe('the persona thread, memory and patch (prototype convergence)', () => {
     expect(reply).toEqual({ ok: false, error: 'bad persona payload' });
   });
 
+  it("opening Mission Control's persona also reads her models, instructions and skills (req-281, req-293, req-296)", async () => {
+    const { desk, state } = await bootOpen((desk) => {
+      desk.on('GET', '/api/personas', () => [{ id: 'pia', kind: 'mission', title: 'Pia', chatModel: 'gpt-oss-20b', skills: ['Board triage'] }]);
+      desk.on('GET', '/api/personas/pia/thread', () => ({ messages: [] }));
+      desk.on('GET', '/api/personas/pia/memory', () => ({ entries: [] }));
+      desk.on('GET', '/api/chat/models', () => ({ ok: true, provider: 'lmstudio', providerLabel: 'LM Studio', assistantModel: 'qwen3-coder-30b', models: ['qwen3-coder-30b', 'gpt-oss-20b'] }));
+      desk.on('GET', '/api/personas/pia/instructions', () => ({ ok: true, text: '# Who Pia is\n' }));
+      desk.on('GET', '/api/personas/pia/skills', () => ({
+        ok: true,
+        list: { skills: [{ name: 'Board triage', origin: 'own', on: true, tokens: 280 }, { name: 'Release notes', origin: 'shared', on: false, tokens: 190 }] },
+      }));
+    });
+    // The team is known by the time the owner taps her card; open her again from there.
+    await waitFor(() => expect(state.team().personas).toHaveLength(1));
+    state.openPersona('pia');
+    await waitFor(() => expect(state.personaSkills()).not.toBeNull());
+    expect(state.team().personas[0]).toMatchObject({ chatModel: 'gpt-oss-20b', skills: ['Board triage'] });
+    expect(state.chatModels()).toEqual({ providerLabel: 'LM Studio', assistantModel: 'qwen3-coder-30b', models: ['qwen3-coder-30b', 'gpt-oss-20b'] });
+    expect(state.personaInstructions()).toBe('# Who Pia is\n');
+    expect(state.personaSkills()!.map((row) => [row.name, row.origin, row.on, row.tokens])).toEqual([
+      ['Board triage', 'own', true, 280],
+      ['Release notes', 'shared', false, 190],
+    ]);
+
+    desk.on('PATCH', '/api/personas/pia', () => ({ ok: true }));
+    await state.personaPatch('pia', { prompt: 'New text', skills: ['Release notes'] });
+    expect(state.personaInstructions()).toBe('New text');
+    expect(state.personaSkills()!.map((row) => row.on)).toEqual([false, true]);
+
+    state.closePersona();
+    expect(state.chatModels()).toBeNull();
+    expect(state.personaInstructions()).toBeNull();
+    expect(state.personaSkills()).toBeNull();
+  });
+
+  it('an agent opens without the mission persona reads, and a refused read leaves the fallback', async () => {
+    const { desk, state } = await bootOpen((desk) => {
+      desk.on('GET', '/api/personas', () => [{ id: 'pia', title: 'Pia' }]);
+      desk.on('GET', '/api/personas/pia/thread', () => ({ messages: [] }));
+      desk.on('GET', '/api/personas/pia/memory', () => ({ entries: [] }));
+    });
+    expect(desk.callsOf('GET', '/api/chat/models')).toHaveLength(0);
+    expect(desk.callsOf('GET', '/api/personas/pia/instructions')).toHaveLength(0);
+    expect(state.chatModels()).toBeNull();
+  });
+
   it('sendPersonaThread and the memory mutations refuse without an open persona', async () => {
     const { desk } = makeDesk();
     desk.storage.setItem('drey.remote.token', 'tok');
