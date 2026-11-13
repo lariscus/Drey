@@ -59,6 +59,7 @@
           </div>
         }
         <p class="pd-fexplain">{{ explain() }}</p>
+        <p class="pd-fexplain flow-sendback-rule">{{ 'flow.pad.send_back_rule' | t }}</p>
       </div>
 
       @if (reason(); as why) {
@@ -218,7 +219,7 @@
           </div>
         }
 
-        <ol class="fe-list" aria-label="Gates">
+        <ol class="fe-list" aria-label="Positions">
           @for (row of rows(); track row.step.index) {
             <li class="fe-item">
               <button
@@ -228,7 +229,7 @@
                 [class.running]="row.step.state === 'current'"
                 [class.sel]="selected() === row.step.index"
                 [attr.aria-pressed]="selected() === row.step.index"
-                [attr.aria-label]="row.step.title + ', ' + row.who + (row.step.state === 'current' ? ', current gate' : '')"
+                [attr.aria-label]="row.step.title + ', ' + row.who + (row.step.state === 'current' ? ', current position' : '')"
                 (click)="select(row.step)"
               >
                 <span class="fe-dot" [style.background]="row.tint || 'var(--text-3)'"></span>
@@ -267,6 +268,7 @@
             </li>
           }
         </ol>
+        <p class="fe-hint flow-sendback-rule">{{ 'flow.pad.send_back_rule' | t }}</p>
       } @else if (error(); as e) {
         <p class="fe-note" role="alert">{{ e }}</p>
       } @else {
@@ -275,19 +277,19 @@
     </div>
 
     @if (inspector(); as ins) {
-      <aside class="fe-inspector" role="dialog" aria-label="Gate settings">
+      <aside class="fe-inspector" role="dialog" aria-label="Position settings">
         <div class="fe-ins-head">
           <h2>{{ ins.step.title }}</h2>
           <button type="button" class="fe-x" aria-label="Close" (click)="select(ins.step)">×</button>
         </div>
 
         @if (ins.running) {
-          <p class="fe-hint">This is the current gate. It stays as it is; changes reach the gates after it.</p>
+          <p class="fe-hint">This is the current position. It stays as it is; changes reach the positions after it.</p>
         } @else if (!ins.editable) {
           <p class="fe-hint">This flow cannot change.</p>
         }
 
-        <section class="fe-sec" aria-label="Who works this gate">
+        <section class="fe-sec" aria-label="Who takes this position">
           <h3>Who</h3>
           @if (ins.owner) {
             <p class="fe-val">You</p>
@@ -343,7 +345,7 @@
         <div class="fe-actions">
           <button type="button" class="fe-btn" [disabled]="readOnly() || busy()" (click)="toggleAdding(ins.step.index)">Add a persona after</button>
           <span class="grow"></span>
-          <button type="button" class="fe-btn danger" [disabled]="!ins.editable || busy()" (click)="remove(ins.step)">Remove gate</button>
+          <button type="button" class="fe-btn danger" [disabled]="!ins.editable || busy()" (click)="remove(ins.step)">Remove position</button>
         </div>
       </aside>
     }

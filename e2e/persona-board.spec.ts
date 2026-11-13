@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test, expect, type ElectronApplication, type Page } from './fixtures/drey';
+import { SEEDS, byTitle, dkIdOf, fieldOf, idOf, liveRun, seedStore, seedVaultOf } from './fixtures/persona-board-seed';
 
 /**
  * req-270/271: the persona board in the RUNNING app over the real engine, on a
@@ -43,11 +44,8 @@ process.env['GIT_AUTHOR_EMAIL'] = 'board@test.invalid';
 process.env['GIT_COMMITTER_NAME'] = 'Board Test';
 process.env['GIT_COMMITTER_EMAIL'] = 'board@test.invalid';
 
-const dk = (args: string[], owner = 'henrik'): string =>
-  execFileSync(bin, args, { cwd: fs.existsSync(storeDir) ? storeDir : root, env: { ...process.env, DK_OWNER: owner, DK_STORE: storeDir, DK_DATA_DIR: dataDir }, encoding: 'utf8', windowsHide: true, stdio: 'pipe' });
-const git = (...args: string[]): string => execFileSync('git', args, { cwd: storeDir, encoding: 'utf8', windowsHide: true, stdio: 'pipe' });
-const shown = (id: string): string => (JSON.parse(dk(['show', id, '--json'])) as { data: { content: string } }).data.content;
-const field = (id: string, key: string): string | null => new RegExp(`^${key}: (.*)$`, 'm').exec(shown(id))?.[1]?.trim() ?? null;
+const dirs = { bin, root, storeDir, dataDir };
+const field = fieldOf(dirs);
 
 function stopEngine(): void {
   try {
@@ -63,103 +61,12 @@ function stopEngine(): void {
 test.skip(!haveDk, 'dk >= 0.6.2 not found');
 
 const OUT = path.resolve(__dirname, '..', 'test-results', 'fidelity');
-const STANDARD = 'paul:shape;paul;ben;ralf;tessa;you';
-
-/** One seeded ticket: its title, stage and the chain fields; `T-000n` follows the creation order. */
-interface Seed {
-  readonly title: string;
-  readonly stage: 'inbox' | 'prioritized' | 'active' | 'done';
-  readonly chain?: string;
-  readonly at?: number;
-  readonly extra?: Record<string, string>;
-  readonly priority?: string;
-  readonly comment?: string;
-  readonly cost?: number;
-}
-
-const SEEDS: readonly Seed[] = [
-  { title: 'Sync status in the title bar', stage: 'inbox' },
-  { title: 'Backlinks: unlinked mentions', stage: 'inbox' },
-  { title: 'Calendar week numbers', stage: 'inbox' },
-  { title: 'Dark mode for the PDF export', stage: 'inbox' },
-  { title: 'Spell-check the commit message', stage: 'inbox' },
-  { title: 'Daily note template picker', stage: 'inbox' },
-  { title: 'Spellcheck: add French dictionary', stage: 'prioritized', priority: 'high' },
-  { title: 'Tag rename keeps pill colors', stage: 'prioritized', chain: 'ben;tessa;you' },
-  { title: 'Pin tabs to the left', stage: 'prioritized' },
-  { title: 'Voice capture for tickets', stage: 'active', at: 1, cost: 0.18 },
-  { title: 'Weekly security audit run', stage: 'active', chain: 'paul;you', at: 1, cost: 0.46 },
-  { title: 'Export the vault as a zip', stage: 'active', at: 3, extra: { 'x-sent-back': '5>3' }, cost: 0.74 },
-  { title: 'Palette: recent commands', stage: 'active', at: 3, cost: 0.88 },
-  { title: 'Win+H dictation hand-off', stage: 'active', at: 3, cost: 0.3 },
-  { title: 'Settings search across plugins', stage: 'active', at: 4, cost: 0.9 },
-  { title: 'PDF export keeps callout colors', stage: 'active', at: 5, cost: 1.05 },
-  { title: 'Outline: drag headings to reorder', stage: 'active', at: 3, extra: { 'x-awaiting': 'you' }, comment: 'needs-decision: [drag-body] Should dragging a heading also move the text below it?', cost: 1.2 },
-  { title: 'Theme picker in the status bar', stage: 'active', chain: 'paul:shape;paul;ben;ghost;tessa;you', at: 4 },
-  { title: 'Tag field: paste a list', stage: 'active', at: 4, extra: { 'x-awaiting': 'you', 'x-sent-back': '5>4' }, comment: 'needs-decision: [second-send-back] Sent back a second time: the paste drops the last tag.', cost: 1.96 },
-  { title: 'Palette opens twice on slow CI', stage: 'active', at: 6, cost: 1.84 },
-  { title: 'Tag rename keeps descendants', stage: 'done', cost: 2.1 },
-  { title: 'Spellcheck: German dictionary', stage: 'done', cost: 1.45 },
-  { title: 'Pin a note to the calendar', stage: 'done' },
-  { title: 'Calendar week starts on Monday', stage: 'done' },
-  { title: 'Find: remember the scope', stage: 'done' },
-];
-
-const idOf = (index: number): string => `T-${String(index + 1).padStart(4, '0')}`;
-const dkIdOf = (index: number): string => `t-${index + 1}`;
-const byTitle = (title: string): string => idOf(SEEDS.findIndex((seed) => seed.title === title));
-
-function seedStore(): void {
-  dk(['init', storeDir, 't']);
-  git('config', 'core.autocrlf', 'false');
-  git('checkout', '-q', 'main');
-  const toml = path.join(storeDir, 'dricket.toml');
-  fs.writeFileSync(toml, `${fs.readFileSync(toml, 'utf8').replace(/\[transitions\.agent\][\s\S]*?(?=\n\[|$)/, '')}\n[stages]\nvalues = ["inbox", "prioritized", "active", "running", "done"]\ninitial = "inbox"\nterminal = ["done"]\nclaim = ["running"]\ncancelled = "cancelled"\n`);
-  git('commit', '-q', '-am', 'the lifecycle stages');
-  git('checkout', '-q', 'tickets');
-  SEEDS.forEach((seed, index) => {
-    const id = dk(['add', '--unclaimed', '-m', seed.title]).trim();
-    const text = shown(id);
-    const fields = ['x-entered-inbox: 2026-11-10T09:00:00Z', `x-chain: ${seed.chain ?? STANDARD}`, ...(seed.at === undefined ? [] : [`x-at: ${seed.at}`]), ...Object.entries(seed.extra ?? {}).map(([k, v]) => `${k}: ${v}`)];
-    // Every ticket names the work repository but the one You accepts at the end (a repository ticket's sign-off would start the commit run).
-    const repo = seed.title === 'Palette opens twice on slow CI' ? '' : 'repos: drey\n';
-    let header = text.replace(/^repos:.*\n/m, '').replace(/^stage: .*$/m, `${repo}stage: ${seed.stage}\n${fields.join('\n')}`);
-    if (seed.priority !== undefined) {
-      header = /^priority: .*$/m.test(header) ? header.replace(/^priority: .*$/m, `priority: ${seed.priority}`) : header.replace(/^stage: /m, `priority: ${seed.priority}\nstage: `);
-    }
-    const file = path.join(root, `${id}.md`);
-    fs.writeFileSync(file, `${header.replace(/\s*$/, '\n')}`);
-    dk(['put', id, '-F', file, '--claim', '--if-version', /^rev: (\d+)$/m.exec(text)?.[1] ?? '1']);
-    if (seed.comment !== undefined) {
-      dk(['comment', id, '-m', seed.comment]);
-    }
-    void index;
-  });
-}
-
-const persona = (title: string, kind: string, color: string, extra: string[] = []): string =>
-  ['---', `title: ${title}`, ...(kind === 'agent' ? [] : [`kind: ${kind}`]), 'role: custom', 'worker: opencode', 'models:', '  default: qwen3-coder', '  pool: [qwen3-coder]', `color: '${color}'`, ...extra, '---', `Who ${title} is.`, ''].join('\n');
-
 const now = new Date();
-const settled = (ticket: string, who: string, cost: number): string =>
-  JSON.stringify({ v: 1, ts: now.toISOString(), event: 'run_settled', ticket, persona: who, model: 'qwen3-coder', tokensIn: 40_000, tokensOut: 3_000, cost });
-
-const SEED_VAULT: Record<string, string> = {
-  'tickets/_meta/pipeline.md': ['---', 'phases:', '  - { id: inbox, title: Inbox, handover: manual }', '  - { id: prioritized, title: Prioritized, handover: manual }', '  - { id: done, title: Done, handover: none }', 'flow: paul:shape; paul; ben; ralf; tessa; you', '---', 'The lifecycle columns.', ''].join('\n'),
-  'tickets/_meta/repos.md': ['---', 'repos:', '  drey:', '    url: https://example.invalid/drey.git', '    branch: main', '---', ''].join('\n'),
-  'tickets/_meta/crew.md': ['---', 'order: [pia, paul, ben, ralf, tessa, you]', '---', ''].join('\n'),
-  'tickets/_meta/personas/pia/persona.md': persona('Pia', 'mission', '#f2d3e2'),
-  'tickets/_meta/personas/paul/persona.md': persona('Paul', 'agent', '#f2d3e2', ['parallel: 1']),
-  'tickets/_meta/personas/ben/persona.md': persona('Ben', 'agent', '#8ecbef', ['parallel: 2', 'leaving: [sync-main]']),
-  'tickets/_meta/personas/ralf/persona.md': persona('Ralf', 'agent', '#bfe3cd', ['parallel: 1']),
-  'tickets/_meta/personas/tessa/persona.md': persona('Tessa', 'agent', '#f2cfae', ['parallel: 1']),
-  'tickets/_meta/personas/you/persona.md': persona('You', 'human', '#e0bb6e', ['leaving: [commit]']),
-  'tickets/_meta/ledger.jsonl': [...SEEDS.flatMap((seed, index) => (seed.cost === undefined ? [] : [settled(idOf(index), 'ben', seed.cost)])), ''].join('\n'),
-};
+const SEED_VAULT = seedVaultOf(now);
 
 test.beforeAll(() => {
   if (haveDk) {
-    seedStore();
+    seedStore(dirs);
   }
 });
 
@@ -188,11 +95,6 @@ test.beforeEach(({ userDataDir }) => {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ backend: 'dricket', 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0 }, null, 2));
 });
-
-function liveRun(ticket: string, who: string, minutes: number, extra: Record<string, unknown> = {}): Record<string, unknown> {
-  const at = new Date(Date.now() - minutes * 60_000).toISOString();
-  return { id: `r-${ticket}`, ticketId: ticket, persona: who, provider: 'opencode', model: 'qwen3-coder', state: 'running', pid: 4242, startedAt: at, endedAt: null, sessionRef: 'ses', tokensIn: 0, tokensOut: 0, costUsd: null, lastActivity: at, ...extra };
-}
 
 function nextMonday(): string {
   const reset = new Date();

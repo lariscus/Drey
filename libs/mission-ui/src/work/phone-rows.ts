@@ -34,6 +34,10 @@ export interface PhoneWorkGroup {
   /** The folded groups show head and count only until tapped; the live ones start open. */
   readonly startsOpen: boolean;
   readonly rows: readonly PhoneWorkRow[];
+  /** req-273: a holder group's persona (the head's circle); absent on Needs you and the lifecycle groups. */
+  readonly persona?: { readonly id: string; readonly title: string; readonly color: string };
+  /** req-273: the holder's load (`Ben · 2/2 · 1 waiting`); absent for You, Mission Control and the other groups. */
+  readonly load?: string;
 }
 
 /** The state list's words decide the groups (canvas decision 15). */

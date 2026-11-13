@@ -65,6 +65,7 @@ export interface PersonaSessionPort {
   decide(personaId: string, proposalId: string, decision: PersonaProposalDecision): Promise<PersonaThreadReply>;
 }
 import type { BoardSnapshot, CreateResult, MutationResult, RecentDone } from '../contracts/tickets';
+import type { PersonaBoardMove } from '../contracts/persona-board';
 import type { EstimateKey, RunEstimate } from '../core/estimate';
 import type { PromptPreviewCommand, PromptPreviewReply, SkillListReply, SkillRemoveCommand, SkillsPort, SkillToggleCommand, SkillUploadCommand, SkillUploadReply } from '../contracts/skills';
 import type { PlanPartsEdit, PlanPartsReply, PlanReleaseReply, PlanReleaseScope } from '../contracts/plan-approval';
@@ -121,6 +122,8 @@ export interface RemoteBoard {
   acceptTicket(input: { id: string; actor?: string }): Promise<MutationResult>;
   /** The owner's answer to a Needs-you decision: a `resolved` status line / comment (E14-6). */
   answerNeed(input: { id: string; key?: string; text?: string; actor?: string }): Promise<MutationResult>;
+  /** req-273: the persona board's moves (start, hand, park); a fake without it refuses the hand-over. */
+  personaBoardMove?(move: PersonaBoardMove): Promise<MutationResult>;
   /** The proof card's send-back with a mandatory note (E5c). */
   sendBack(input: { id: string; note: string; actor?: string; comments?: readonly ReviewComment[]; position?: number }): Promise<MutationResult>;
   /** The E6 improvements card: one persona's proposals and counts. */
@@ -225,6 +228,8 @@ export interface DreyPortOptions {
   readonly allowBypass: () => boolean;
   /** req-292: the persona pictures — the list's `avatarVersion`, the `personaAvatar` read; absent = no pictures. */
   readonly avatars?: BoardAvatarsPort;
+  /** req-273: writes the crew's order (`order:` in crew.md); absent = Mission Control cannot reorder the crew. */
+  readonly crewOrder?: (order: readonly string[]) => Promise<MutationResult>;
 }
 
 /** The run states that still hold the ticket (the hand-off waits them out). */
@@ -661,6 +666,18 @@ export class DreyTicketsPort implements TicketsRemotePort {
 
   ticketSendBack(cmd: { id: string; note: string; comments?: readonly ReviewComment[]; position?: number }, actor: string): Promise<MutationResult> {
     return this.boardService.sendBack({ ...cmd, actor });
+  }
+
+  async ticketHand(cmd: { id: string; persona: string }, actor: string): Promise<MutationResult> {
+    if (this.boardService.personaBoardMove === undefined) {
+      return { ok: false, error: 'this desk cannot hand a ticket to a persona' };
+    }
+    void actor;
+    return this.boardService.personaBoardMove({ kind: 'hand', id: cmd.id, persona: cmd.persona });
+  }
+
+  crewOrderSet(order: readonly string[]): Promise<MutationResult> {
+    return this.options.crewOrder === undefined ? Promise.resolve({ ok: false, error: 'this desk cannot set the crew order' }) : this.options.crewOrder(order);
   }
 
   ticketAnswerNeed(cmd: { id: string; key?: string; text?: string }, actor: string): Promise<MutationResult> {

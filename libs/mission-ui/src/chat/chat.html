@@ -244,6 +244,7 @@
       }
       <mc-tranche-card />
       <mc-burn-rate-card />
+      <mc-persona-cards />
       @if (streaming()) {
         <div class="msg mission">
           <p class="bubble pending" aria-label="Mission Control is thinking">
@@ -490,6 +491,41 @@
   @if (padCard(); as card) {
     @if (card.done(); as line) {
       <p class="pd-carddone" role="status">{{ line }}</p>
+    } @else if (card.hold; as hold) {
+      <!-- req-273: the decision on a persona board ticket held by You (10e v2). -->
+      <div class="pd-hold">
+        <div class="pd-hold-lead">
+          <span class="pd-hold-who">{{ hold.who }}</span>
+          {{ hold.lead }}
+        </div>
+        <div class="pd-hold-card" role="group" [attr.aria-label]="card.question">
+          <span class="pd-hold-title"><b>{{ card.question }}</b></span>
+          <button type="button" class="pd-hold-accept" [disabled]="card.busy()" (click)="hold.accept()">{{ hold.acceptLabel }}</button>
+          @if (hold.targets.length > 0) {
+            <span class="pd-hold-label">{{ hold.targetsLabel }}</span>
+            <div class="pd-hold-targets" role="radiogroup" [attr.aria-label]="hold.targetsLabel">
+              @for (target of hold.targets; track target.position) {
+                <button type="button" role="radio" class="pd-hold-target" [class.sel]="hold.target() === target.position" [attr.aria-checked]="hold.target() === target.position" [disabled]="card.busy()" (click)="hold.pickTarget(target.position)">
+                  <span class="pd-hold-radio" aria-hidden="true">
+                    @if (hold.target() === target.position) {
+                      <span class="pd-hold-dot"></span>
+                    }
+                  </span>
+                  <span class="pd-hold-name">{{ target.label }}</span>
+                  <span class="pd-hold-word">{{ target.word }}</span>
+                </button>
+              }
+            </div>
+            <textarea class="pd-hold-note" rows="2" [attr.aria-label]="hold.noteLabel" [attr.placeholder]="hold.noteLabel" [value]="hold.note()" (input)="hold.setNote($any($event.target).value)"></textarea>
+            @if (card.error(); as message) {
+              <p class="pd-hold-err" role="alert">{{ message }}</p>
+            }
+            <button type="button" class="pd-hold-sendback" [disabled]="card.busy()" (click)="hold.sendBack()">{{ hold.sendBackLabel() }}</button>
+          } @else if (card.error(); as message) {
+            <p class="pd-hold-err" role="alert">{{ message }}</p>
+          }
+        </div>
+      </div>
     } @else {
       <mc-answer-card [question]="card.question" [why]="card.why" [options]="card.options" [selected]="card.selected()" [busy]="card.busy()" [error]="card.error()" (pick)="card.pick($event)" (send)="card.send()">
         @if (card.noteOpen?.()) {

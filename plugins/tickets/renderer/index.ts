@@ -88,6 +88,7 @@ import { teamModelOf, usd } from './team/team-model';
 import { createTeamStore, type TeamStore } from './team/team-store';
 import { personaPictures } from './team/persona-pictures';
 import { createConversationProvider } from './conversation/targets';
+import { createPersonaCardsBinding } from './conversation/persona-cards';
 import { mountTeam } from './team/team-view';
 import { PERSONA_KIND, personaIdOfKey, personaKeyOf } from './team/persona-model';
 import { mountPersonaPage, personaWordCountOf } from './team/persona-page';
@@ -3243,6 +3244,22 @@ const plugin: { activate(api: DreyPluginApi): void } = {
             return () => fleetListeners.delete(listener);
           },
         },
+        personaCards: createPersonaCardsBinding({
+          snapshot: () => snapshot,
+          runs: () => fleetRuns,
+          format: () => ({ t: (key, params) => api.i18n.t(key, params), time: (date) => api.i18n.formatTime(date), money: usd }),
+          invoke: (method, payload) => api.backend.invoke(method, payload),
+          openTicket: (id, path) => openTicket(api, id, path),
+          revealComposer: () => api.ui.revealWidget('assistant'),
+          subscribe: (listener) => {
+            fleetListeners.add(listener);
+            deskListeners.add(listener);
+            return () => {
+              fleetListeners.delete(listener);
+              deskListeners.delete(listener);
+            };
+          },
+        }),
         shape: createShapeBinding({
           api,
           snapshot: () => snapshot,

@@ -205,6 +205,42 @@
     font-size: var(--ph-15);
     color: var(--text-2);
   }
+  /* req-273: the cost by position (10e v2): the board's five columns, a total under a rule. */
+  .pd-poscost {
+    display: grid;
+    grid-template-columns: 1.3fr 1.2fr 0.7fr 0.6fr 0.7fr;
+    gap: 6px 10px;
+    align-items: center;
+  }
+  .pd-poscost-row {
+    display: contents;
+  }
+  .pd-poscost-row > span {
+    min-width: 0;
+    overflow: hidden;
+    font-size: var(--ph-15);
+    color: var(--text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pd-poscost-head > span {
+    font-size: var(--ph-13);
+    color: var(--text-2);
+  }
+  .pd-poscost-row > .pd-poscost-dim {
+    color: var(--text-2);
+  }
+  .pd-poscost-num {
+    text-align: right;
+  }
+  .pd-poscost-total > span {
+    padding-top: 6px;
+    font-weight: 600;
+    border-top: 1px solid var(--line);
+  }
+  .pd-poscost-bad > .pd-poscost-label {
+    color: var(--warn);
+  }
   /* The ⋯ list hangs under its button, not over the whole width. */
   .ph-sheet-scrim {
     z-index: 26;

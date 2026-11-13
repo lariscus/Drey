@@ -193,12 +193,12 @@ export class FlowEditor {
 
   /** The personas a position can be given: the whole crew. */
   protected personasFor(_step: McFlowStep): readonly McFlowPersona[] {
-    return this.flow()?.personas ?? [];
+    return this.addable();
   }
 
   protected readonly addable = computed(() => {
     const flow = this.flow();
-    return flow === null ? [] : addablePersonasOf(flow);
+    return flow === null ? [] : addablePersonasOf(flow, this.state.crewOrder?.() ?? []);
   });
 
   protected select(step: McFlowStep): void {

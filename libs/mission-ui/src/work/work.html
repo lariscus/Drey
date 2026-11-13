@@ -35,12 +35,15 @@
     }
     <div class="ph-scroll ph-list">
       @for (group of phoneGroups(); track group.key) {
-        <button type="button" class="ph-ghead" [attr.aria-expanded]="isGroupOpen(group)" (click)="toggleGroup(group)">
+        <button type="button" class="ph-ghead" [class.ph-ghead-holder]="group.persona !== undefined" [attr.data-holder]="group.persona?.id ?? null" [attr.aria-expanded]="isGroupOpen(group)" [attr.title]="group.load ?? null" (click)="toggleGroup(group)">
+          @if (group.persona; as persona) {
+            <mc-ph-avatar class="ph-gava" [name]="persona.title" [persona]="persona.id" [color]="persona.color || 'var(--text-2)'" [size]="pad() ? 22 : 24" />
+          }
           <span class="ph-gtitle">{{ group.title }}</span>
           @if (group.hot) {
             <span class="ph-hot" role="img" [attr.aria-label]="group.title"></span>
           }
-          <span class="ph-gcount">{{ group.rows.length }}</span>
+          <span class="ph-gcount" [attr.aria-label]="group.load ?? null">{{ group.rows.length }}</span>
         </button>
         @if (isGroupOpen(group)) {
           @for (row of group.rows; track row.key) {

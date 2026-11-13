@@ -1195,3 +1195,140 @@ details.think .step-body {
   padding: 10px 16px;
   font-size: calc(13px * var(--mc-text, 1));
 }
+
+/* req-273: the decision on a persona board ticket held by You, in the iPad's Assistant (board 10e v2). */
+.pd-hold {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+}
+.pd-hold-lead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--ph-16);
+  line-height: 24px;
+}
+.pd-hold-who {
+  font-size: var(--ph-13);
+  color: var(--text-2);
+}
+.pd-hold-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-dialog);
+}
+.pd-hold-title {
+  font-size: var(--ph-17);
+  line-height: 24px;
+}
+.pd-hold-accept,
+.pd-hold-sendback {
+  height: 48px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: var(--ph-16);
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: var(--radius-control);
+}
+.pd-hold-accept {
+  font-weight: 600;
+  color: var(--on-accent);
+  background: var(--accent);
+  border: 0;
+}
+.pd-hold-sendback {
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--control-border);
+}
+.pd-hold-accept:disabled,
+.pd-hold-sendback:disabled,
+.pd-hold-target:disabled {
+  opacity: 0.55;
+}
+.pd-hold-label {
+  margin-top: 4px;
+  font-size: var(--ph-13);
+  line-height: 18px;
+  color: var(--text-2);
+}
+.pd-hold-targets {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pd-hold-target {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: var(--ph-16);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+}
+.pd-hold-target.sel {
+  background: var(--panel-2);
+  border-color: var(--text);
+}
+.pd-hold-radio {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--control-border);
+  border-radius: 50%;
+}
+.pd-hold-target.sel .pd-hold-radio {
+  border-color: var(--text);
+}
+.pd-hold-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--text);
+  border-radius: 50%;
+}
+.pd-hold-name {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.pd-hold-word {
+  flex-shrink: 0;
+  font-size: var(--ph-13);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.pd-hold-note {
+  min-height: 56px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: var(--ph-16);
+  line-height: 22px;
+  color: var(--text);
+  resize: none;
+  background: var(--panel);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+}
+.pd-hold-err {
+  margin: 0;
+  font-size: var(--ph-15);
+  line-height: 20px;
+  color: var(--danger);
+}

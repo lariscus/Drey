@@ -1228,19 +1228,68 @@ export class McState {
     return body['ok'] === true ? { ok: true } : refusal(body, 'the desk did not accept the step');
   }
 
-  /** A manual step's Send back (E10-6): the note is mandatory. */
-  async sendBackManualStep(id: string, note: string): Promise<McReply> {
+  /** A manual step's Send back (E10-6): the note is mandatory. req-273: `position` is the persona board's target. */
+  async sendBackManualStep(id: string, note: string, position?: number): Promise<McReply> {
     const text = note.trim();
     if (text === '') {
       return { ok: false, error: 'a send-back needs a note' };
     }
     const body = await this.client
-      .request<Record<string, unknown>>('POST', `/api/tickets/${encodeURIComponent(id)}/send-back`, { note: text })
+      .request<Record<string, unknown>>('POST', `/api/tickets/${encodeURIComponent(id)}/send-back`, { note: text, ...(position === undefined ? {} : { position }) })
       .catch(fail);
     if (isFailure(body)) {
       return body;
     }
     return body['ok'] === true ? { ok: true } : refusal(body, 'the desk did not send the ticket back');
+  }
+
+  /** req-273: hands a persona board ticket to a persona (`POST …/hand`); the entry at the cursor becomes that persona. */
+  async handTicket(id: string, persona: string): Promise<McReply> {
+    const body = await this.client
+      .request<Record<string, unknown>>('POST', `/api/tickets/${encodeURIComponent(id)}/hand`, { persona })
+      .catch(fail);
+    if (isFailure(body)) {
+      return body;
+    }
+    return body['ok'] === true ? { ok: true } : refusal(body, 'the desk did not hand the ticket over');
+  }
+
+  /** req-273: the owner's answer to a ticket's open decision (`POST …/answer {key, text}`); no key = the ticket's only open one. */
+  async answerTicketDecision(id: string, key: string | null, text: string): Promise<McReply> {
+    const trimmed = text.trim();
+    if (trimmed === '') {
+      return { ok: false, error: 'the answer is empty' };
+    }
+    const body = await this.client
+      .request<Record<string, unknown>>('POST', `/api/tickets/${encodeURIComponent(id)}/answer`, { ...(key === null ? {} : { key }), text: trimmed })
+      .catch(fail);
+    if (isFailure(body)) {
+      return body;
+    }
+    return body['ok'] === true ? { ok: true } : refusal(body, 'the desk did not take the answer');
+  }
+
+  /** req-273: starts the ticket's run again (`POST /api/runs`), the holder's own run. */
+  async startTicketRun(id: string): Promise<McReply> {
+    const body = await this.client.request<Record<string, unknown>>('POST', '/api/runs', { id }).catch(fail);
+    if (isFailure(body)) {
+      return body;
+    }
+    return body['ok'] === true ? { ok: true } : refusal(body, 'the desk did not start the run');
+  }
+
+  /** req-273: the crew's order (`POST /api/crew/order`), the whole list — the Crew list's drag. */
+  async setCrewOrder(order: readonly string[]): Promise<McReply> {
+    const body = await this.client.request<Record<string, unknown>>('POST', '/api/crew/order', { order }).catch(fail);
+    if (isFailure(body)) {
+      return body;
+    }
+    if (body['ok'] !== true) {
+      return refusal(body, 'the desk did not change the crew order');
+    }
+    // The lanes carry the order: read the board again so the list stands on the desk's answer.
+    void this.refreshWork();
+    return { ok: true };
   }
 
   /** Sends the open ticket back to the agent; the note is mandatory (an empty one refuses). */

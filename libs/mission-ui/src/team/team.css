@@ -789,3 +789,41 @@ button.run-title {
   line-height: 22px;
   white-space: nowrap;
 }
+
+/* req-273: the crew's order — a handle per row, what a row holds after its role */
+.crew-headrow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.crew-headrow > .pd-head {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.crew-handle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--text-2);
+  cursor: grab;
+  touch-action: none;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+}
+.crew-handle:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.crew-row.crew-dragging {
+  background: var(--panel-2);
+}
+.crew-row.crew-dragging .crew-handle {
+  cursor: grabbing;
+}
+.crew-holds {
+  color: var(--text-2);
+}

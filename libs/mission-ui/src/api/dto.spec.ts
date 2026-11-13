@@ -324,6 +324,8 @@ describe('parseNeeds', () => {
             { key: 'D2', question: 'Migrate existing data?', recommendation: null, resolved: true },
           ],
         },
+        // req-273: the need's time rides along (the persona board cards' time line).
+        since: '2026-11-02T14:32:00Z',
       },
     ]);
   });

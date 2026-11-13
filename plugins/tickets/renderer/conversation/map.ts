@@ -11,6 +11,7 @@ import type {
   ConversationThreadMeta,
 } from '../../../../shared/plugin-api/renderer';
 import type { BurnRateCard } from '../../../../shared/burn-rate';
+import type { PersonaCard } from '../../../../shared/persona-cards';
 import type { TrancheCard } from '../../../../shared/tranche';
 import type { ChatModelFailure, ChatProposal, ChatSession, ChatSessionMeta } from '../../../../packages/tickets-engine/src/contracts/chat';
 
@@ -195,4 +196,42 @@ export function errorMessageOf(failure: ChatModelFailure | undefined, error: str
     return { id: 'error', role: 'agent', text: '', error: { title: `${failure.providerLabel} could not answer`, lines } };
   }
   return { id: 'error', role: 'agent', text: '', error: { title: 'Mission Control could not answer', lines: [error ?? 'unknown error'] } };
+}
+
+/** The action id of a persona card's button on the desktop: its position in the card, so two options never clash. */
+export const personaCardActionId = (index: number): string => String(index);
+
+/** The action id of one entry of the Assign… picker. */
+export const ASSIGN_PREFIX = 'assign:';
+
+/**
+ * One of the persona board's four Mission Control cards (req-273, board
+ * MCCardsV2) as the agent message in the Mission Control thread. The SDK
+ * card has no chain strip: the chain's initials, the position line and its
+ * right half ride as chips. `picker` (the Assign… choice) adds one button
+ * per agent persona.
+ */
+export function personaCardMessageOf(card: PersonaCard, picker: readonly { readonly persona: string; readonly title: string }[] | null): ConversationMessage {
+  const text = card.lines.map((line) => (line.style === 'strong' ? `**${line.text}**` : line.text)).join('\n\n');
+  const chain = card.cells.map((cell) => cell.initials).join(' ');
+  const buttons = card.actions.map((action, index) => ({ id: personaCardActionId(index), label: action.label, tone: action.primary ? ('primary' as const) : ('quiet' as const) }));
+  const choices = (picker ?? []).map((agent) => ({ id: `${ASSIGN_PREFIX}${agent.persona}`, label: agent.title, tone: 'quiet' as const }));
+  return {
+    id: card.id,
+    role: 'agent',
+    text: '',
+    cards: [
+      {
+        id: card.id,
+        kind: 'card',
+        title: card.title,
+        dot: card.tone,
+        text,
+        chips: [chain, card.who, ...(card.side === '' ? [] : [card.side])],
+        ...(card.rows.length > 0 ? { rows: card.rows.map((row) => ({ text: row.text, ...(row.mark === 'C' ? { dot: 'negative' as const } : {}) })) } : {}),
+        actions: [...buttons, ...choices],
+        meta: card.meta,
+      },
+    ],
+  };
 }
