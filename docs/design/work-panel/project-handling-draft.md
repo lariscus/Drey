@@ -240,7 +240,14 @@ owner whether such a need exists today (Lariscus).
 - **decisions.md** at the end of the round: Option B (and F2/S2) as weighed and
   not taken, with today's date.
 
-## 8. Open questions for the owner
+## 8. Carried into stages 2 and 3
+
+- **The persona picture (D-67, owner 2026-11-13):** change and remove the
+  picture — req-235's desktop half — is part of the Persona page v3 board and
+  of the concept and roadmap items stage 3 writes. D-67's defect row has left
+  the roadmap (commit 8503f298) and is not added back.
+
+## 9. Open questions for the owner
 
 1. **Separation need:** must any project's tickets live outside the private
    store today — Lariscus (`profile: work`)? If yes, A+ for that project; if no,
