@@ -2,7 +2,7 @@
 
 Status: **Approved by the owner on 2026-11-11** (all questions answered the
 same day). Built as roadmap rows req-264 … req-275, req-257 and req-258, in
-the order of §15. Nothing is built yet. Roadmap row req-257 asked for *"a concept with a
+the order of §15. Since built (milestones 237 – 261); [ADR-0098](../../09_architecture_decisions/0098-the-persona-board.md) records the result and, under "As built", where the code differs from this text — the code wins. Roadmap row req-257 asked for *"a concept with a
 board draft on the dricket store … then the owner's approval, then rows and
 sessions."* This note is the concept in its final form: the first version was
 corrected by the owner in three rounds on 2026-11-11, and this rewrite folds

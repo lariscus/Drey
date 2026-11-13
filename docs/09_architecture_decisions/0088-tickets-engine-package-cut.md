@@ -623,3 +623,24 @@ req-257, thrown away when the persona columns arrive; the owner chose no
 interim step. Keeping the delta on the files backend beside the list on the
 store — one grammar for both; the files backend keeps its phase board until
 E14-9b, and its chain is the same data. Recorded in `specs/decisions.md`.
+
+## Later change — the persona ladder is gone (the persona board, ADR-0098, milestones 247 – 248)
+
+E3's three-level ladder (ticket `persona:` pin > phase `persona:` key > engine
+default `personas.default`, then the legacy assignment ring) no longer decides
+who works a ticket. On a lifecycle store the **chain's entry at the cursor**
+does — the holder, derived, never stored; on the phase board (the files backend,
+a store not yet migrated) the phase's `persona:` key alone. The ticket pin
+`x-persona`, `crew.md`'s `default-persona` and `personas.default` are read by
+nothing any more (the first is still shown on a card, the second read with a
+warning), the ring run is gone for chain entries ("no persona, no run": the
+ticket stands at You with the reason), and `migrateLegacyPersonas` /
+`personaMigrationFor` — the migration of a column's `worker:` / `model:` /
+`prompt:` keys onto a `<phase>-default` persona — is retired; the owner's
+`build-default` and `commit-default` go with the live board migration. `role:`
+is a free label: it sorts nothing and picks no persona. A persona record gains
+the run settings that sat on columns (`min-class`, `needs`, `max-turns`,
+`max-work`, `gate`, `parallel`, `min`, `leaving`, `readonly`) and a third
+`kind`, `mission` (Pia). Per-persona cost grouping stays; the report adds the
+persona's held time and a grouping by chain position. See
+[ADR-0098](0098-the-persona-board.md).

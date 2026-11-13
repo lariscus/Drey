@@ -394,3 +394,19 @@ phase-keyed surfaces until req-271), a stored holder (`x-holder`, the concept's 
 truths). Specs: `core/chain-placement.spec.ts`, `store/chain-move.spec.ts`,
 `store/stage-migration-plan.spec.ts`, `store/store-stage-migration.spec.ts`,
 `fleet/orchestrate/claim-release.spec.ts`, `services/board-service-chain.spec.ts` (real `dk`).
+
+## Later change — the persona board's stages (ADR-0098, milestones 239, 247, 254)
+
+The summary of the three changes above and the persona board's own: a store's
+stages are the lifecycle — `inbox prioritized active running done`
+(`cancelled` reserved), `claim = ["running"]` — never the columns; the six
+phase stages (`inbox shaping prioritized building ready done`, the req-99a
+default) are the old vocabulary the **Migrate** offer moves a store away from.
+The holder of an `active` ticket is derived from `x-chain` and `x-at` (never
+a stored `x-holder`; `x-phase` retired), a send-back adds `x-sent-back`, a
+question or a second send-back `x-awaiting: you`; the persona board's lanes
+are Drey's, so the store's `dricket.toml` never names a persona. The board's
+own migration steps (`pipeline.md`, `crew.md`, the two default personas) are
+Drey's files, not the store's. "Initialize board" still writes the phase
+pipeline; creating a store on the lifecycle stages is E14-9b. See
+[ADR-0098](0098-the-persona-board.md).

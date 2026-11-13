@@ -132,11 +132,15 @@ save-before-exit prompt.
 ## Ticket repositories (separate repo, own format)
 
 A vault can be a dedicated **tickets repository** (ADR-0076): one
-Markdown file per kanban ticket, phase = directory, transitions as git
-moves, configured through `tickets/_meta/pipeline.md`. That format has
-its own complete specification in [`ticket-schema.md`](ticket-schema.md);
-only the YAML conventions above (quoted dates, LF) carry over — ticket
-files are not notes, and none of the note frontmatter fields apply.
+Markdown file per kanban ticket, configured through
+`tickets/_meta/pipeline.md`. On the files backend the phase is the
+directory and transitions are git moves; on a dricket store (ADR-0090) the
+store's stage is the ticket's life (`inbox prioritized active running done`)
+and who works it follows from the ticket's chain and cursor — the persona
+board (ADR-0098). That format has its own complete specification in
+[`ticket-schema.md`](ticket-schema.md); only the YAML conventions above
+(quoted dates, LF) carry over — ticket files are not notes, and none of the
+note frontmatter fields apply.
 
 ## Structural folders
 
