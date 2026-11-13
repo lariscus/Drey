@@ -1,3 +1,13 @@
+### Milestone 251 — D-66: the Persona page fits, its Instructions editor scrolls and has a splitter (owner's interim verification, 2026-11-13)
+
+**Not yet manually verified by the owner.** A defect from the owner's interim verification round, outside the list (the finish line allows it: broken). The Instructions editor held `min-height: 300px; max-height: 60vh` while its CodeMirror sized itself to the text, so a long prompt was clipped by the frame's `overflow: hidden` with no scrollbar, and the right column scrolled as a whole.
+
+- **Fit:** the right column is a flex column; the Instructions block takes what Skills and Proposals leave (`.persona-block-fill`), the editor frame fills it down to a 160 px minimum, and only below that does the column scroll (`plugins/tickets/renderer/team/persona-page.css`). Below 900 px (one column) the editor gets 60vh.
+- **Scroll:** the surface's host and `.cm-editor` flex inside the frame, so the editor's own scroller scrolls the text once it no longer fits.
+- **Splitter:** a 6 px bar under the editor (`persona-ed-grip.ts`, `role="separator"`, label from the catalog `persona.page.resize_instructions`): drag sets the editor's height (never under 160 px), Arrow Up / Down steps 32 px, a double-click hands the height back to the page; the height is one value per machine (`drey.tickets.personaInstructionsHeight`), like the Ready card's splitter.
+- **Specs:** new `plugins/tickets/renderer/team/persona-ed-grip.spec.ts` (drag, minimum, keys, reset, remembered height); new e2e `e2e/persona-page-layout.spec.ts` (the column does not scroll, the editor scrolls its text, a drag makes it taller, a double-click restores it; screenshots attached).
+- **Docs:** the manual's Persona page passage. Left out: in a narrow pane the right column can still scroll sideways when the editor's format bar does not fit — seen in the e2e window, not part of the defect.
+
 ### Milestone 250 — D-55 and D-57: the formatting bar above the keyboard, and the Mission Control composer
 
 **Not yet manually verified by the owner.** Two known defects of the owner's first verification round (2026-11-07), outside the list. Evidence, repro and fix per defect; both are for the phone and iPad clients of Mission Control (`apps/mission-control`, `libs/mission-ui`).

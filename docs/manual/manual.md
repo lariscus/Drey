@@ -1541,6 +1541,11 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   rest of the brief — an estimate that follows what you type); **Preview full
   prompt** opens that brief below the editor, read-only, with the four parts
   and each skill marked with its tokens, and follows a skill you switch.
+  The editor takes the room the blocks below it leave and scrolls its own
+  text; drag the bar under it to give it a height of your own (Arrow Up /
+  Down on the focused bar steps it), double-click the bar to let it fill
+  again. The column scrolls only when the window is too small for the
+  editor's minimum.
   **Skills** lists every skill of the persona's own folder and of the shared
   pool — the ones that are off too — with where it lives, `own` or `shared`
   and its tokens, and a switch each (a skill that is on is part of every run's

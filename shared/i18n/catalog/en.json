@@ -718,6 +718,7 @@
   "persona.page.budget": "Daily budget",
   "persona.page.instructions": "Instructions",
   "persona.page.instructions_for": "Instructions for {name}",
+  "persona.page.resize_instructions": "Resize the instructions",
   "persona.page.skills": "Skills",
   "persona.page.show_diff": "Show diff",
   "persona.page.diff_now": "Now",

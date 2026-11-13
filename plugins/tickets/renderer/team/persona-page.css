@@ -248,6 +248,20 @@
   border-right: 1px solid var(--border);
 }
 
+/* D-66: the right column fits the page; the Instructions block takes what the other blocks leave, the column scrolls only below the editor's minimum. */
+.persona-right {
+  display: flex;
+  flex-direction: column;
+}
+
+.persona-right > .persona-block {
+  flex: none;
+}
+
+.persona-right > .persona-block-fill {
+  flex: 1 0 auto;
+}
+
 .persona-block {
   display: flex;
   flex-direction: column;
@@ -521,6 +535,8 @@
 .persona-ed {
   display: flex;
   flex-direction: column;
+  flex: 1 1 0;
+  min-height: 160px;
   border: 1px solid var(--border);
   border-radius: var(--radius-dialog);
   background: var(--bg-input);
@@ -555,13 +571,49 @@
   color: var(--text-primary);
 }
 
+.persona-ed.persona-ed-sized {
+  flex: none;
+}
+
 .persona-ed-view {
-  min-height: 300px;
-  max-height: 60vh;
+  flex: 1 1 0;
+  min-height: 0;
   padding: 8px 4px;
 }
 
+/* The surface's own scroller scrolls the text once it no longer fits (D-66). */
+.persona-ed-view > .host {
+  display: flex;
+  flex-direction: column;
+}
+
+.persona-ed-view .cm-editor {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+}
+
+.persona-ed-view .cm-scroller {
+  overflow: auto;
+}
+
+.persona-ed-grip {
+  flex: 0 0 6px;
+  margin-top: 2px;
+  border-radius: var(--radius-chip);
+  cursor: row-resize;
+  background: transparent;
+}
+
+.persona-ed-grip:hover,
+.persona-ed-grip:focus-visible {
+  background: var(--border);
+  outline: none;
+}
+
 .persona-ed-preview {
+  flex: none;
+  min-height: 0;
   margin-top: 10px;
   padding: 8px 12px;
   max-height: 40vh;
@@ -742,5 +794,10 @@
 
   .persona-right {
     overflow: visible;
+  }
+
+  .persona-ed:not(.persona-ed-sized):not(.persona-ed-preview) {
+    flex: none;
+    height: 60vh;
   }
 }

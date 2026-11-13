@@ -13,6 +13,7 @@ import type { MarkdownFormatAction, MarkdownViewHandle } from '../../../../share
 import { h } from '../desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { blockHead, iconButton, outlineButton } from './persona-dom';
+import { createEditorGrip } from './persona-ed-grip';
 import { createPreviewPanel, type PreviewPanel } from './persona-preview-panel';
 import { atStartTokensOf } from './persona-preview-model';
 import { estimateTokens, tokenizerFor } from '../../../../packages/tickets-engine/src/core/token-count';
@@ -38,7 +39,7 @@ export interface InstructionsBlock {
 
 export function createInstructionsBlock(ctx: BlockContext, initial: string, editable: boolean): InstructionsBlock {
   const { t, api } = ctx;
-  const block = h('section', 'persona-block');
+  const block = h('section', 'persona-block persona-block-fill');
   block.setAttribute('aria-label', t('persona.page.instructions'));
   const tokens = h('small', 'persona-muted persona-tokens');
   let current = initial;
@@ -130,7 +131,8 @@ export function createInstructionsBlock(ctx: BlockContext, initial: string, edit
     }
   });
 
-  block.append(blockHead(t('persona.page.instructions'), tokens, mission ? null : previewButton), problem, frame);
+  const grip = createEditorGrip(frame, t('persona.page.resize_instructions'));
+  block.append(blockHead(t('persona.page.instructions'), tokens, mission ? null : previewButton), problem, frame, grip.element);
   return {
     element: block,
     setText: (text) => {
