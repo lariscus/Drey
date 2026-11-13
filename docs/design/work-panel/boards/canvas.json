@@ -441,7 +441,7 @@
       "y": 28860,
       "w": 1440,
       "h": 900,
-      "title": "7m · Drey — Settings → Projects: name, colour, purpose, repositories, folders, vault access per project, profile (2026-11-13)"
+      "title": "7m · Drey — Settings → Projects: name, colour, purpose, repositories, folders, vault access per project (2026-11-13)"
     },
     "DeskProjectFilter.dc.html": {
       "x": 1520,
@@ -662,7 +662,7 @@
       "y": 28860,
       "w": 420,
       "fill": "blue",
-      "text": "Design round 2026-11-13 (owner's findings after verifying 242–251). Concept: docs/design/work-panel/project-handling-draft.md.\n\n1. Projects live in the tickets vault (_meta/projects/<id>.md): name, colour, purpose, repos, plain folders (read), vault access None/Read/Write, profile.\n2. One board holds every project (option A); one global project filter in the title bar filters Files, Tickets, board, Review and Find, saved with the View. Capacity stays cross-project.\n3. Write = project grants Write AND the persona may change notes AND the run is not read-only. A 1:1 reads every project's vaults, read-only.\n4. A persona picks a class (heavy · standard · light) and may pin a model of it; default: next free in class. The harness follows from the model.\n5. Models are discovered from the installed harnesses; slots per class, optional caps per account; accounts added and removed in place."
+      "text": "Design round 2026-11-13 (owner's findings after verifying 242–251). Concept: docs/design/work-panel/project-handling-draft.md.\n\n1. Projects live in the tickets vault (_meta/projects/<id>.md): name, colour, purpose, repos, plain folders (read), vault access None/Read/Write.\n2. One board holds every project (option A); one global project filter in the title bar filters Files, Tickets, board, Review and Find, saved with the View. Capacity stays cross-project.\n3. Write = project grants Write AND the persona may change notes AND the run is not read-only. A 1:1 reads every project's vaults, read-only.\n4. A persona picks a class (heavy · standard · light) and may pin a model of it; default: next free in class. The harness follows from the model.\n5. Models are discovered from the installed harnesses; slots per class, optional caps per account; accounts added and removed in place.\n6. No private / work distinction (owner, 2026-11-13): the slot profile of req-177 goes."
     }
   },
   "order": [

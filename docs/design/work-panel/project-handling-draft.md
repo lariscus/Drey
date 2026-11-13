@@ -290,9 +290,10 @@ Given in German in the session; English here.
   drive). The workers' vault MCP serves them read-only beside the vaults, under
   the same path rules (no dot-folders, no `.git`, links resolved inside the
   folder). They never host a run: runs still need a repository's worktree.
-- **Profile:** the owner asked what it is. It is req-177's `profile: private |
-  work` on a repository: which accounts (slots) may serve runs on that
-  repository — a work repo runs only on work slots (Copilot at work), never on a
-  private Claude account, and is refused rather than served by the other kind.
-  Recommendation sent: move it to the **project** (repos inherit it; a repo in
-  two projects of different profiles is a board issue). Waiting for his word.
+- **Profile: dropped.** Asked what it is (req-177's `profile: private | work` on a
+  repository: which accounts may serve runs on it), the owner answered that he
+  needs **no distinction between work and private**. So a project carries no
+  profile, and stage 3 retires the profile altogether: every slot may serve every
+  repository (the `profile:` key of `repos.md`, the slots' `profile` in
+  `service.json`, the refusal "no slot of this profile" and the Private / Work tags
+  in Settings go; an old key is read and ignored). A `decisions.md` entry records it.
