@@ -1,0 +1,60 @@
+@for (card of model.cards(); track card.id) {
+  <section class="pcard" [class.phone]="phone()" [attr.data-kind]="card.kind" [attr.data-ticket]="card.ticketId" [attr.aria-label]="card.title">
+    <h3 class="pc-title">
+      <span class="pc-dot" [class.negative]="card.tone === 'negative'" aria-hidden="true"></span>
+      <span class="pc-title-text">{{ card.title }}</span>
+    </h3>
+    @for (line of card.lines; track $index) {
+      <p class="pc-line" [class.strong]="line.style === 'strong'" [class.muted]="line.style === 'muted'">{{ line.text }}</p>
+    }
+    <span class="pc-chain">
+      @for (cell of card.cells; track $index) {
+        <span
+          class="pc-cell"
+          [attr.data-state]="cell.state"
+          [class.missing]="cell.missing"
+          [style.background]="cell.state === 'now' ? (cell.color ?? 'var(--accent-peach)') : null"
+          [title]="cell.title"
+          >{{ cell.initials }}</span
+        >
+      }
+    </span>
+    <div class="pc-who">
+      <span class="pc-who-text">{{ card.who }}</span>
+      <span class="pc-gap"></span>
+      @if (card.side !== '') {
+        <span class="pc-side">{{ card.side }}</span>
+      }
+    </div>
+    @if (card.rows.length > 0) {
+      <div class="pc-rows">
+        @for (row of card.rows; track $index) {
+          <div class="pc-row">
+            <span class="pc-mark">{{ row.mark }}</span>
+            <span class="pc-row-text" [class.mono]="row.mono">{{ row.text }}</span>
+          </div>
+        }
+      </div>
+    }
+    @if (!model.readOnly()) {
+      <div class="pc-actions">
+        @for (action of card.actions; track $index) {
+          <button type="button" class="pc-btn" [class.primary]="action.primary" [attr.data-action]="action.id" (click)="act(card, action)">
+            {{ action.label }}
+          </button>
+        }
+      </div>
+      @if (model.picking() === card.id) {
+        <div class="pc-picker" role="group" [attr.aria-label]="'mc.pcard.assign_to' | t">
+          @for (agent of model.agents(); track agent.persona) {
+            <button type="button" class="pc-btn" [attr.data-persona]="agent.persona" (click)="assign(card, agent.persona)">{{ agent.title }}</button>
+          }
+        </div>
+      }
+    }
+    @if (model.errors()[card.id]; as words) {
+      <p class="pc-err" role="alert">{{ words }}</p>
+    }
+    <span class="pc-meta">{{ card.meta }}</span>
+  </section>
+}

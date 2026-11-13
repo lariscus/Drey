@@ -176,6 +176,8 @@ export interface NeedView {
   readonly questions?: readonly WaitQuestionView[];
   /** A `QUESTION:` turn's parsed fixed shape (req-75 W2); absent otherwise. */
   readonly shaped?: ShapedQuestionView;
+  /** req-273: when the need arose (ISO); absent when the desk names no time — a card's time line then reads now. */
+  readonly since?: string;
 }
 
 // --- Chain (req-266): the persona list --------------------------------------------
@@ -303,8 +305,10 @@ export interface PersonaView {
 
 export interface TeamView {
   readonly personas: readonly PersonaView[];
-  /** The fleet's runs with their raw state — the work tab counts the live ones. */
-  readonly runs: readonly { readonly state: string | null; readonly ticketId?: string }[];
+  /** The fleet's runs with their raw state — the work tab counts the live ones; req-273: the persona, the activity line and the start ride along for the persona board's status. */
+  readonly runs: readonly { readonly state: string | null; readonly ticketId?: string; readonly persona?: string; readonly activity?: string | null; readonly startedAt?: string }[];
+  /** req-273: the chain block's per-ticket waits — the persona a ticket waits for, the pool's queue line; absent when the desk sends neither. */
+  readonly waits?: { readonly personaWaits: Readonly<Record<string, string>>; readonly queued: Readonly<Record<string, string>> };
   /**
    * The chain master switch off the fleet snapshot (`run` dispatches,
    * `halted` lets running work finish); null = unknown — the team's
@@ -1228,6 +1232,7 @@ export function parseNeeds(json: unknown): NeedView[] {
       ...(runId !== null ? { runId } : {}),
       ...(questions.length > 0 ? { questions } : {}),
       ...(shaped !== null ? { shaped } : {}),
+      ...(typeof item['since'] === 'string' && item['since'] !== '' ? { since: item['since'] } : {}),
     };
     needs.push(need);
   }
@@ -1318,6 +1323,7 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
   const hold = burnRateHoldOf(chain);
   const pausedPersonas = strArray(fleet['pausedPersonas']);
   const capacity = capacityOf(chain, runs);
+  const waits = chainWaitsOf(chain);
   const personas: PersonaView[] = [];
   for (const raw of arr(personasJson)) {
     const persona = personaOf(raw);
@@ -1358,7 +1364,11 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
       .map((run) => ({
         state: run !== null && typeof run['state'] === 'string' ? run['state'] : null,
         ...(run !== null && typeof run['ticketId'] === 'string' ? { ticketId: run['ticketId'] } : {}),
+        ...(run !== null && typeof run['persona'] === 'string' ? { persona: run['persona'] } : {}),
+        ...(run !== null && typeof run['activity'] === 'string' ? { activity: run['activity'] } : {}),
+        ...(run !== null && typeof run['startedAt'] === 'string' ? { startedAt: run['startedAt'] } : {}),
       })),
+    ...(waits !== null ? { waits } : {}),
     ...(chainMaster !== null ? { chainMaster } : {}),
     ...(autopilot !== null ? { autopilot } : {}),
     ...(tranche !== null ? { tranche } : {}),
@@ -1366,6 +1376,29 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
     ...(pausedPersonas.length > 0 ? { pausedPersonas } : {}),
     ...(capacity.length > 0 ? { capacity } : {}),
   };
+}
+
+/**
+ * req-273: the chain block's per-ticket waits — `personaWaits` (ticket → the
+ * persona at its cap) and the queue's lines (ticket → `waits for a B slot`);
+ * null when the block carries neither.
+ */
+function chainWaitsOf(chain: Record<string, unknown> | null): TeamView['waits'] | null {
+  const personaWaits: Record<string, string> = {};
+  for (const [ticket, persona] of Object.entries(rec(chain?.['personaWaits']) ?? {})) {
+    if (typeof persona === 'string' && persona !== '') {
+      personaWaits[ticket] = persona;
+    }
+  }
+  const queued: Record<string, string> = {};
+  for (const raw of arr(chain?.['queue'])) {
+    const entry = rec(raw);
+    const ticket = str(entry?.['ticket']);
+    if (ticket !== '' && queued[ticket] === undefined) {
+      queued[ticket] = str(entry?.['line']);
+    }
+  }
+  return Object.keys(personaWaits).length === 0 && Object.keys(queued).length === 0 ? null : { personaWaits, queued };
 }
 
 /** The session kinds that are not a ticket run (R12). */

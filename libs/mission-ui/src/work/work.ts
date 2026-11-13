@@ -4,6 +4,11 @@ import { AppBar } from '../app-bar/app-bar';
 import { McI18nPipe } from '../i18n/i18n.pipe';
 import { PhoneIcon } from '../phone/icon';
 import { padSignal, touchFaceSignal } from '../phone/phone';
+import type { MessageKey, MessageParams } from '../../../../shared/i18n';
+import { PhoneAvatar } from '../phone/avatar';
+import { YOU_LANE, holdOf, lanesOf, laneTitleOf } from './hold';
+import { personaDeskGroupsOf } from './holder-desk';
+import { holderGroupsOf } from './holder-rows';
 import { phoneGroupsFiltered, phoneGroupsOf, todayCostTextOf, type PhoneWorkGroup, type PhoneWorkRow } from './phone-rows';
 import { McI18n } from '../i18n/i18n.service';
 import {
@@ -59,7 +64,7 @@ import {
   selector: 'mc-work',
   templateUrl: './work.html',
   styleUrls: ['../phone/kit.css', './work.css', './pad.css'],
-  imports: [AppBar, McI18nPipe, NgTemplateOutlet, PhoneIcon],
+  imports: [AppBar, McI18nPipe, NgTemplateOutlet, PhoneAvatar, PhoneIcon],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Work {
@@ -77,8 +82,37 @@ export class Work {
   /** One row per ticket: a ticket asked about under Needs you is not listed again. */
   protected readonly groups = computed<WorkGroup[]>(() => {
     const state = this.state;
-    return state === null ? [] : withoutNeedCopies(groupsOf(state.needs, state.board, state.personas));
+    if (state === null) {
+      return [];
+    }
+    const all = groupsOf(state.needs, state.board, state.personas);
+    const holders = this.holderGroups(all);
+    return holders === null ? withoutNeedCopies(all) : personaDeskGroupsOf(all, holders, laneTitleOf(lanesOf(state.board), YOU_LANE) || this.i18n.t('flow.pad.you'));
   });
+
+  /** req-273: a held ticket's row words without the id (`3/6 · merging main`), for the desk's cards. */
+  private readonly holdMeta = computed<ReadonlyMap<string, string>>(() => {
+    const state = this.state;
+    const holders = state === null ? null : this.holderGroups(groupsOf(state.needs, state.board, state.personas));
+    const out = new Map<string, string>();
+    for (const row of (holders ?? []).flatMap((group) => group.rows)) {
+      if (row.ticketId !== null && row.meta.startsWith(`${row.ticketId} · `)) {
+        out.set(row.ticketId, row.meta.slice(row.ticketId.length + 3));
+      }
+    }
+    return out;
+  });
+
+  /** req-273: the persona board's holder groups (boards 10c v2, 10e v2); null on the phase board. */
+  private holderGroups(all: readonly WorkGroup[]): readonly PhoneWorkGroup[] | null {
+    const state = this.state;
+    const lanes = lanesOf(state?.board);
+    if (state === null || lanes === null) {
+      return null;
+    }
+    const t = (key: MessageKey, params?: MessageParams): string => this.i18n.t(key, params);
+    return holderGroupsOf({ lanes, groups: all, done: this.doneThisWeek(), runs: state.runs ?? [], waits: state.waits ?? null, paused: state.pausedPersonas ?? [], now: this.now() }, t);
+  }
 
   // --- the phone's list (board 10c): rows only; a decision is taken in the ticket ---
 
@@ -99,10 +133,9 @@ export class Work {
       return [];
     }
     const all = groupsOf(state.needs, state.board, state.personas);
-    return phoneGroupsFiltered(
-      phoneGroupsOf(all, withoutNeedCopies(all), this.doneThisWeek(), state.liveRuns ?? [], this.now(), (key, params) => this.i18n.t(key, params)),
-      this.query(),
-    );
+    // req-273: a persona board lists by holder (boards 10c v2, 10e v2).
+    const groups = this.holderGroups(all) ?? phoneGroupsOf(all, withoutNeedCopies(all), this.doneThisWeek(), state.liveRuns ?? [], this.now(), (key, params) => this.i18n.t(key, params));
+    return phoneGroupsFiltered(groups, this.query());
   });
 
   protected isGroupOpen(group: PhoneWorkGroup): boolean {
@@ -144,6 +177,11 @@ export class Work {
   protected detailOf(vm: TicketVm): string {
     if (vm.blocked && vm.blockers.length > 0) {
       return this.i18n.t('work.row.waiting_for', { ids: vm.blockers.join(', ') });
+    }
+    // req-273: a persona board card says its position and what it stands for (`3/6 · merging main`).
+    const held = this.holdMeta().get(vm.id);
+    if (held !== undefined) {
+      return held;
     }
     if (vm.parkedReason !== null) {
       return vm.parkedReason;
@@ -249,9 +287,16 @@ export class Work {
     return this.state?.openTicketSendBack !== undefined;
   }
 
-  /** The forward-swipe's target: the next pipeline phase; null = the card has none. */
-  private forwardTargetOf(vm: TicketVm): { phaseId: string; title: string } | null {
-    return nextPhaseOf((this.state?.board ?? null) as McBoard | null, vm.phaseId);
+  /**
+   * The forward-swipe's target: the next pipeline phase; null = the card has none.
+   * req-273: on a persona board the only forward swipe is You's Accept (concept §11).
+   */
+  private forwardTargetOf(vm: TicketVm): { phaseId: string; title: string; accept?: true } | null {
+    const board = (this.state?.board ?? null) as McBoard | null;
+    if (lanesOf(board) !== null) {
+      return holdOf(vm.ticket)?.holder === YOU_LANE && this.state?.finishManual !== undefined ? { phaseId: '', title: this.i18n.t('board.accept'), accept: true } : null;
+    }
+    return nextPhaseOf(board, vm.phaseId);
   }
 
   /** Whether the card takes swipes at all: writable, and one side has an action. */
@@ -335,7 +380,7 @@ export class Work {
       }
       return {
         side: 'forward',
-        label: `Move to ${target.title} →`,
+        label: target.accept === true ? `${target.title} →` : `Move to ${target.title} →`,
         progress,
         widthPercent: Math.round(progress * 38),
       };
@@ -378,7 +423,7 @@ export class Work {
     this.flashSwipe(vm.id, action);
     let result: McMoveResult;
     try {
-      result = await state.moveTicket(vm.id, target.phaseId);
+      result = target.accept === true && state.finishManual !== undefined ? await state.finishManual(vm.id) : await state.moveTicket(vm.id, target.phaseId);
     } catch {
       result = { ok: false, error: 'The move failed.' };
     }

@@ -39,6 +39,8 @@ export async function composeRemoteParts(opts: EngineOptions, config: FileConfig
       avatars: new BoardAvatars(board.board, board.avatars),
       // req-293: the assistant's connection and its models, for Mission Control's persona's Model choice.
       chatModels: () => listChatModels(config),
+      // req-273: Mission Control's Crew drag, the same write as Drey's Crew tab.
+      crewOrder: async (order) => board.crew.setOrder(await board.board.detect(), order),
     },
     sessions.chat,
     sessions.personaSessions,

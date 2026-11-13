@@ -29,11 +29,13 @@
           </button>
         </mc-app-bar>
         }
-        <div class="ph-scroll ph-page" [class.ph-no-safe]="decisionNeed() !== null">
+        <div class="ph-scroll ph-page" [class.ph-no-safe]="decisionNeed() !== null || holdFace.targets() !== null">
           <div class="ph-headrow">
             <span class="ph-id">{{ id() }}</span>
             @if (shapeFace()) {
               <span class="ph-needs"><span class="ph-needs-dot" aria-hidden="true"></span>{{ phaseTitle() }}</span>
+            } @else if (holdFace.active()) {
+              <span class="ph-status ph-hold-chip">{{ pad() ? holdFace.padChip() : holdFace.phoneChip() }}</span>
             } @else {
               <span class="ph-status">{{ phaseTitle() }}</span>
             }
@@ -45,7 +47,29 @@
           </div>
           <h1 class="ph-h1">{{ title() }}</h1>
           <div class="ph-grid">
-            @if (steps().length > 0) {
+            @if (holdFace.flow(); as hflow) {
+              <span class="ph-grey">{{ 'ticket.phone.flow' | t }}</span>
+              <span class="ph-flow ph-hold-flow">
+                @if (pad()) {
+                  @for (cell of hflow.done; track $index) {
+                    <span class="ph-grey">{{ cell.label }}</span>
+                  }
+                } @else if (holdFace.phoneDone() !== '') {
+                  <span class="ph-grey">{{ holdFace.phoneDone() }}</span>
+                }
+                @if (hflow.now !== null) {
+                  <span class="ph-flow-now">{{ hflow.now }}</span>
+                }
+                <span class="ph-grey">{{ hflow.note }}</span>
+                @if (pad()) {
+                  @for (cell of hflow.rest; track $index) {
+                    <span class="ph-grey">{{ cell.label }}</span>
+                  }
+                } @else if (holdFace.phoneRest() !== '') {
+                  <span class="ph-grey">{{ holdFace.phoneRest() }}</span>
+                }
+              </span>
+            } @else if (steps().length > 0) {
               <span class="ph-grey">{{ 'ticket.phone.flow' | t }}</span>
               <span class="ph-flow">
                 @if (flow().past !== '') {
@@ -66,7 +90,14 @@
               <span class="ph-grey">{{ 'ticket.pad.type' | t }}</span>
               <span>{{ formWord() }}</span>
             }
-            @if (workerName(); as worker) {
+            @if (holdFace.holder(); as holder) {
+              <span class="ph-grey">{{ 'ticket.hold.holder' | t }}</span>
+              @if (pad()) {
+                <span class="pd-worker ph-hold-holder"><mc-ph-avatar [name]="holder.name" [persona]="holder.persona" [color]="holder.color" [size]="22" />{{ holder.name }}</span>
+              } @else {
+                <span class="ph-hold-holder">{{ holder.name }}</span>
+              }
+            } @else if (workerName(); as worker) {
               <span class="ph-grey">{{ 'ticket.phone.worker' | t }}</span>
               @if (pad()) {
                 <span class="pd-worker"><mc-ph-avatar [name]="worker" [color]="workerColor()" />{{ worker }}</span>
@@ -237,11 +268,15 @@
             </div>
           }
 
-          @if (costTable(); as table) {
+          @if (holdFace.active()) {
+            @if (holdFace.costs(); as costs) {
+              <ng-container [ngTemplateOutlet]="positionCost" [ngTemplateOutletContext]="{ $implicit: costs }" />
+            }
+          } @else if (costTable(); as table) {
             @if (pad()) {
               <div class="pd-costhead">
                 <h2 class="ph-h2 pd-h2-0">{{ 'cost.table.label' | t }}</h2>
-                <span class="pd-costword">{{ (decisionNeed() !== null && proofStrip() !== null ? 'ticket.pad.cost_total' : 'ticket.pad.cost_so_far') | t }}</span>
+                <span class="pd-costword">{{ (costSettled() ? 'ticket.pad.cost_total' : 'ticket.pad.cost_so_far') | t }}</span>
               </div>
             } @else {
             <h2 class="ph-h2">{{ 'cost.table.label' | t }}</h2>
@@ -276,7 +311,9 @@
           }
         </div>
 
-        @if (!pad() && decisionNeed(); as need) {
+        @if (!pad() && holdFace.targets(); as targets) {
+          <ng-container [ngTemplateOutlet]="holdBar" [ngTemplateOutletContext]="{ $implicit: targets }" />
+        } @else if (!pad() && decisionNeed(); as need) {
           <div class="ph-decision">
             @if (sendBackOpen()) {
               <label class="ph-decision-text" for="ph-sendback">{{ 'ticket.phone.sendback_why' | t }}</label>
@@ -1387,6 +1424,109 @@
       >
         {{ item.label }}
       </button>
+    }
+  </div>
+</ng-template>
+
+<!-- req-273: the cost by chain position on a persona board ticket (10e v2: the iPad's table, 10o v2: the phone's rows). -->
+<ng-template #positionCost let-costs>
+  @if (pad()) {
+    <div class="pd-costhead">
+      <h2 class="ph-h2 pd-h2-0">{{ 'ticket.hold.cost_title' | t }}</h2>
+      <span class="pd-costword">{{ (costSettled() ? 'ticket.pad.cost_total' : 'ticket.pad.cost_so_far') | t }}</span>
+    </div>
+    <div class="pd-poscost" role="table" [attr.aria-label]="'ticket.hold.cost_title' | t">
+      <div class="pd-poscost-row pd-poscost-head" role="row">
+        <span role="columnheader">{{ 'ticket.hold.cost_position' | t }}</span>
+        <span role="columnheader">{{ 'cost.table.model' | t }}</span>
+        <span role="columnheader" class="pd-poscost-num">{{ 'cost.table.tokens' | t }}</span>
+        <span role="columnheader" class="pd-poscost-num">{{ 'cost.table.time' | t }}</span>
+        <span role="columnheader" class="pd-poscost-num">{{ 'cost.table.cost' | t }}</span>
+      </div>
+      @for (row of costs.rows; track $index) {
+        <div class="pd-poscost-row" role="row" [class.pd-poscost-bad]="row.bad">
+          <span role="cell" class="pd-poscost-label">{{ row.label }}</span>
+          <span role="cell" class="pd-poscost-dim">{{ row.model }}</span>
+          <span role="cell" class="pd-poscost-dim pd-poscost-num">{{ row.tokens }}</span>
+          <span role="cell" class="pd-poscost-dim pd-poscost-num">{{ row.time }}</span>
+          <span role="cell" class="pd-poscost-num pd-poscost-cost">{{ row.cost }}</span>
+        </div>
+      }
+      <div class="pd-poscost-row pd-poscost-total" role="row">
+        <span role="cell">{{ 'cost.table.total' | t }}</span>
+        <span role="cell"></span>
+        <span role="cell" class="pd-poscost-num">{{ costs.total.tokens }}</span>
+        <span role="cell" class="pd-poscost-num">{{ costs.total.time }}</span>
+        <span role="cell" class="pd-poscost-num pd-poscost-cost">{{ costs.total.cost }}</span>
+      </div>
+    </div>
+  } @else {
+    <h2 class="ph-h2">{{ 'ticket.hold.cost_title' | t }}</h2>
+    <div class="ph-poscost" role="list" [attr.aria-label]="'ticket.hold.cost_title' | t">
+      @for (row of costs.rows; track $index) {
+        <div class="ph-poscost-row" role="listitem" [class.ph-poscost-bad]="row.bad">
+          <span class="ph-poscost-body">
+            <span class="ph-poscost-title">{{ row.label }}</span>
+            @if (row.sub !== '') {
+              <span class="ph-poscost-sub">{{ row.sub }}</span>
+            }
+          </span>
+          <span class="ph-poscost-cost">{{ row.cost }}</span>
+        </div>
+      }
+      <div class="ph-poscost-row ph-poscost-total" role="listitem">
+        <span class="ph-poscost-body">
+          <span class="ph-poscost-title">{{ (costSettled() ? 'cost.table.total' : 'cost.table.total_so_far') | t }}</span>
+          @if (costs.total.sub !== '') {
+            <span class="ph-poscost-sub">{{ costs.total.sub }}</span>
+          }
+        </span>
+        <span class="ph-poscost-cost">{{ costs.total.cost }}</span>
+      </div>
+    </div>
+  }
+</ng-template>
+
+<!-- req-273: the phone's decision bar on a ticket held by You (10o v2): the target picker, Send back… and Accept and merge. -->
+<ng-template #holdBar let-targets>
+  <div class="ph-decision ph-hold-bar">
+    @if (holdFace.done(); as done) {
+      <span class="ph-decision-text">{{ done }}</span>
+    } @else {
+      @if (holdFace.noteOpen()) {
+        <label class="ph-decision-text" for="ph-hold-note">{{ 'ticket.phone.sendback_why' | t }}</label>
+      } @else {
+        <span class="ph-decision-text"><b>{{ holdFace.head() }}</b> {{ holdFace.body() }}</span>
+      }
+      @if (targets.length > 0) {
+        <label class="ph-hold-select">
+          <span class="ph-hold-select-label">{{ 'ticket.hold.send_back_to' | t }}</span>
+          <span class="ph-hold-select-value">{{ holdFace.targetRow()?.label }}</span>
+          <mc-ph-icon name="chev-down" [size]="18" class="ph-grey" />
+          <select class="ph-hold-select-native" [attr.aria-label]="'ticket.hold.send_back_to' | t" [disabled]="holdFace.busy()" (change)="holdFace.pickTarget($any($event.target).value)">
+            @for (target of targets; track target.position) {
+              <option [value]="target.position" [selected]="target.position === holdFace.target()">{{ target.label }}</option>
+            }
+          </select>
+        </label>
+      }
+      @if (holdFace.noteOpen()) {
+        <textarea id="ph-hold-note" class="ph-sendback ph-hold-note" rows="3" [value]="holdFace.note()" (input)="holdFace.setNote($any($event.target).value)"></textarea>
+      }
+      @if (holdFace.error(); as error) {
+        <p class="ph-err" role="alert">{{ error }}</p>
+      }
+      <div class="ph-decision-row">
+        @if (holdFace.noteOpen()) {
+          <button type="button" class="ph-outline ph-flex1" [disabled]="holdFace.busy()" (click)="holdFace.toggleNote()">{{ 'ticket.phone.cancel' | t }}</button>
+          <button type="button" class="ph-primary ph-flex14 ph-hold-send" [disabled]="holdFace.note().trim() === '' || holdFace.busy()" (click)="holdFace.sendBack()">{{ holdFace.sendBackLabel() }}</button>
+        } @else {
+          @if (targets.length > 0) {
+            <button type="button" class="ph-outline ph-flex1 ph-hold-sendback" [disabled]="holdFace.busy()" (click)="holdFace.toggleNote()">{{ 'ticket.phone.send_back' | t }}</button>
+          }
+          <button type="button" class="ph-primary ph-flex14 ph-hold-accept" [disabled]="holdFace.busy()" (click)="holdFace.accept()">{{ 'ticket.phone.accept' | t }}</button>
+        }
+      </div>
     }
   </div>
 </ng-template>

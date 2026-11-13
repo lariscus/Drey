@@ -2141,3 +2141,55 @@ describe('TicketView default face (E13-20)', () => {
     expect(view.mode()).toBe('ticket');
   });
 });
+
+describe('TicketView on a persona board (req-273)', () => {
+  interface HoldSurface {
+    needsYou(): boolean;
+    cost(): string | null;
+    costSettled(): boolean;
+    holdFace: { active(): boolean; targets(): readonly unknown[] | null };
+  }
+
+  function open(holder: string, lanes: unknown): HoldSurface {
+    TestBed.resetTestingModule();
+    const hold = { holder, why: 'entry', position: holder === 'you' ? 3 : 2, length: 3, chain: ['ben', 'ralf', 'you'] };
+    const work = {
+      needs: [],
+      board: { columns: [{ phase: { id: 'active', title: 'Active' }, tickets: [{ id: 'T-0042', meta: {}, hold }] }], lanes },
+      personas: [{ id: 'ben', title: 'Ben', color: '#9fd0f0', role: 'builder' }],
+      readOnly: false,
+      moveTicket: () => Promise.resolve({ ok: true }),
+      finishManual: () => Promise.resolve({ ok: true }),
+      sendBackManual: () => Promise.resolve({ ok: true }),
+    };
+    const doc: TicketDoc = { ...DOC, usage: { tokensIn: 1000, tokensOut: 100, cost: 1.84, runs: 3 } };
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: MC_TICKET, useValue: makeFake({ docValue: doc }) },
+        { provide: MC_WORK_STATE, useValue: work },
+      ],
+    });
+    return TestBed.runInInjectionContext(() => new TicketView()) as unknown as HoldSurface;
+  }
+
+  const LANES = [{ persona: 'ben', title: 'Ben' }, { persona: 'ralf', title: 'Ralf' }, { persona: 'you', title: 'You', kind: 'human' }];
+
+  it('needs you and costs in total while the ticket waits at You, with no need naming it', () => {
+    const view = open('you', LANES);
+    expect(view.holdFace.active()).toBe(true);
+    expect(view.needsYou()).toBe(true);
+    expect(view.costSettled()).toBe(true);
+    expect(view.cost()).toBe('$1.84 in total');
+    expect(view.holdFace.targets()?.length).toBe(2);
+  });
+
+  it('keeps today’s face on a phase board ticket and while an agent holds it', () => {
+    const phase = open('you', undefined);
+    expect(phase.holdFace.active()).toBe(false);
+    expect(phase.needsYou()).toBe(false);
+    expect(phase.cost()).toBe('$1.84 so far');
+    const agent = open('ralf', LANES);
+    expect(agent.needsYou()).toBe(false);
+    expect(agent.holdFace.targets()).toBeNull();
+  });
+});

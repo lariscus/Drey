@@ -41,6 +41,8 @@ export interface McFlowState {
   /** "Save flow": writes the draft; the editor closes on success. */
   save(): Promise<McFlowReply>;
   close(): void;
+  /** The crew's order (the board's lanes, persona ids); absent or empty = the desk's own order. */
+  crewOrder?(): readonly string[];
 }
 
 export const MC_FLOW_STATE = new InjectionToken<McFlowState>('mc-flow-state');
@@ -146,7 +148,20 @@ export function moveRoomOf(flow: McFlow, step: McFlowStep): { readonly earlier: 
   return { earlier: above !== undefined && above.state === 'future' && !above.locked, later: below !== undefined };
 }
 
-/** The personas a position can be added for or given to: the whole crew. */
-export function addablePersonasOf(flow: McFlow): readonly McFlowPersona[] {
-  return flow.personas;
+/**
+ * The personas a position can be added for or given to, in the crew's order:
+ * the agents as `order:` lists them (one the list does not name follows, in
+ * the desk's order), Mission Control's persona when the desk offers her, You
+ * last.
+ */
+export function addablePersonasOf(flow: McFlow, order: readonly string[] = []): readonly McFlowPersona[] {
+  const rank = (persona: McFlowPersona): number => (persona.kind === 'human' ? 2 : persona.kind === 'mission' ? 1 : 0);
+  const at = (persona: McFlowPersona): number => {
+    const found = order.indexOf(persona.id);
+    return found === -1 ? Number.MAX_SAFE_INTEGER : found;
+  };
+  return flow.personas
+    .map((persona, index) => ({ persona, index }))
+    .sort((a, b) => rank(a.persona) - rank(b.persona) || at(a.persona) - at(b.persona) || a.index - b.index)
+    .map((entry) => entry.persona);
 }

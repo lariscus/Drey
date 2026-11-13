@@ -244,8 +244,12 @@ export interface TicketsRemotePort extends SkillsPort, PersonaRemovePort {
   ticketSave(cmd: { id: string; text: string; baseRevision?: string }, actor: string): Promise<RefineReply>;
   /** The proof card's accept — merges/archives per the pipeline (E5c). */
   ticketAccept(cmd: TicketIdCommand, actor: string): Promise<MutationResult>;
-  /** The proof card's send-back; the note is mandatory (E5c). */
-  ticketSendBack(cmd: { id: string; note: string; comments?: readonly ReviewComment[] }, actor: string): Promise<MutationResult>;
+  /** The proof card's send-back; the note is mandatory (E5c). req-273: `position` sends a persona board ticket back to that position of its chain. */
+  ticketSendBack(cmd: { id: string; note: string; comments?: readonly ReviewComment[]; position?: number }, actor: string): Promise<MutationResult>;
+  /** req-273: a persona board ticket handed to another persona (the no-persona card's Assign…, Do it myself); the entry at the cursor becomes that persona. */
+  ticketHand(cmd: { id: string; persona: string }, actor: string): Promise<MutationResult>;
+  /** req-273: the crew's order (`order:` in crew.md), the whole list of persona ids — Mission Control's Crew drag. */
+  crewOrderSet(order: readonly string[]): Promise<MutationResult>;
   /** The owner's answer to a Needs-you decision (E14-6): closes its key; the text rides as a comment on a store. */
   ticketAnswerNeed(cmd: { id: string; key?: string; text?: string }, actor: string): Promise<MutationResult>;
   /** The proof card's file stat list (E5c). */

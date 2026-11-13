@@ -23,6 +23,8 @@ function port(): TicketsRemotePort {
     ticketSave: vi.fn(async () => ({ ok: true, revision: '0123456789abcdef' })),
     ticketAccept: vi.fn(ok),
     ticketSendBack: vi.fn(ok),
+    ticketHand: vi.fn(ok),
+    crewOrderSet: vi.fn(ok),
     ticketAnswerNeed: vi.fn(ok),
     ticketWorktreeChanges: vi.fn(async () => []),
     ticketDiff: vi.fn(async () => ({ files: [], truncated: false })),
@@ -259,6 +261,22 @@ describe('route', () => {
       deps,
     );
     expect(onlyJunk.body).toEqual({ ok: false, error: 'a send-back needs a note' });
+
+    // req-273: a persona board send-back names its target position; a bad one is refused before the port.
+    await route(req({ method: 'POST', path: '/api/tickets/T-0052/send-back', authorization: auth, body: { note: 'Dark callouts', position: 3 } }), deps);
+    expect(remote.ticketSendBack).toHaveBeenLastCalledWith({ id: 'T-0052', note: 'Dark callouts', position: 3 }, 'owner@iphone-15');
+    const badPosition = await route(req({ method: 'POST', path: '/api/tickets/T-0052/send-back', authorization: auth, body: { note: 'x', position: 0 } }), deps);
+    expect(badPosition.body).toEqual({ ok: false, error: 'a send-back position is a whole number from 1' });
+
+    // req-273: the hand-over to a persona and the crew's order.
+    await route(req({ method: 'POST', path: '/api/tickets/T-0052/hand', authorization: auth, body: { persona: 'ralf' } }), deps);
+    expect(remote.ticketHand).toHaveBeenCalledWith({ id: 'T-0052', persona: 'ralf' }, 'owner@iphone-15');
+    const badHand = await route(req({ method: 'POST', path: '/api/tickets/T-0052/hand', authorization: auth, body: { persona: 'Not An Id' } }), deps);
+    expect(badHand.body).toEqual({ ok: false, error: 'a hand-over needs a persona id' });
+    await route(req({ method: 'POST', path: '/api/crew/order', authorization: auth, body: { order: ['paul', 'ben', 'you'] } }), deps);
+    expect(remote.crewOrderSet).toHaveBeenCalledWith(['paul', 'ben', 'you']);
+    const emptyOrder = await route(req({ method: 'POST', path: '/api/crew/order', authorization: auth, body: { order: [] } }), deps);
+    expect(emptyOrder.body).toEqual({ ok: false, error: 'a crew order needs persona ids' });
 
     expect((await route(req({ path: '/api/tickets/T-0052/diff', authorization: auth }), deps)).status).toBe(200);
     expect(remote.ticketDiff).toHaveBeenCalledWith('T-0052');

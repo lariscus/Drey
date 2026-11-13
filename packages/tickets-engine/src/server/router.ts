@@ -36,6 +36,8 @@ import { parsePersonaPatch } from './persona-patch-body';
 import { parsePersonaRemove } from './persona-remove-body';
 import { parseSkillRemove, parseSkillToggle, parseSkillUpload } from './skill-bodies';
 import { TICKET_ID_PATTERN } from '../contracts/tickets';
+import { parsePersonaBoardMove } from '../contracts/persona-board';
+import { parseCrewOrder } from './session-payloads';
 import { parseRevoke, parseSettingsPatch, type SettingsAccess } from './settings';
 import type { DeviceRegistry, DeviceView, FailureLimiter, PairingCodes, RemoteDevice } from './auth';
 import type { PairingView } from './service';
@@ -180,9 +182,14 @@ function parseTicketSave(body: unknown): Parsed<{ id: string; text: string; base
  * Send-back: a send-back never goes without why (E5c) — a note, or (E11-3)
  * line comments, which then stand in for the note.
  */
-function parseSendBack(body: unknown): Parsed<{ id: string; note: string; comments?: readonly ReviewComment[] }> {
+function parseSendBack(body: unknown): Parsed<{ id: string; note: string; comments?: readonly ReviewComment[]; position?: number }> {
   const obj = asObject(body);
   const comments = parseReviewComments(obj?.['comments']);
+  // req-273: the target position of a persona board send-back — a whole number from 1, else the request is refused.
+  const position = obj?.['position'];
+  if (position !== undefined && !(typeof position === 'number' && Number.isInteger(position) && position >= 1)) {
+    return { ok: false, error: 'a send-back position is a whole number from 1' };
+  }
   let note = typeof obj?.['note'] === 'string' ? obj['note'].trim() : '';
   if (obj === null || (note === '' && comments.length === 0)) {
     return { ok: false, error: 'a send-back needs a note' };
@@ -190,8 +197,14 @@ function parseSendBack(body: unknown): Parsed<{ id: string; note: string; commen
   if (note === '') {
     note = sendBackNoteOf('', comments.length);
   }
-  const { comments: _raw, ...rest } = obj as { id: string; comments?: unknown };
-  return { ok: true, value: { ...rest, note, ...(comments.length > 0 ? { comments } : {}) } };
+  const { id } = obj as { id: string };
+  return { ok: true, value: { id, note, ...(comments.length > 0 ? { comments } : {}), ...(typeof position === 'number' ? { position } : {}) } };
+}
+
+/** req-273: the persona a ticket is handed to — the persona board's `hand` move. */
+function parseHand(body: unknown): Parsed<{ id: string; persona: string }> {
+  const move = parsePersonaBoardMove({ ...(asObject(body) ?? {}), kind: 'hand' });
+  return move !== null && move.kind === 'hand' ? { ok: true, value: { id: move.id, persona: move.persona } } : { ok: false, error: 'a hand-over needs a persona id' };
 }
 
 /** The answer to a Needs-you decision (E14-6): the key it closes (optional when one is open) and the answer text. */
@@ -535,7 +548,7 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
   if (req.path === '/api/attachments') {
     return write('attachment', parseAttachment(body), (cmd) => port.saveAttachment(cmd, actor));
   }
-  const ticket = /^\/api\/tickets\/([^/]+)\/(move|claim|archive|refine|save|accept|send-back|answer|parts|release|flow-edit|flow-save|flow-draft)$/.exec(req.path);
+  const ticket = /^\/api\/tickets\/([^/]+)\/(move|claim|archive|refine|save|accept|send-back|hand|answer|parts|release|flow-edit|flow-save|flow-draft)$/.exec(req.path);
   if (ticket !== null) {
     const id = decodeURIComponent(ticket[1]!);
     if (!TICKET_ID_PATTERN.test(id)) {
@@ -559,6 +572,8 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
         return write(`accept ${id}`, { ok: true, value: { id } }, (cmd) => port.ticketAccept(cmd, actor));
       case 'send-back':
         return write(`send-back ${id}`, parseSendBack(withId), (cmd) => port.ticketSendBack(cmd, actor));
+      case 'hand':
+        return write(`hand ${id}`, parseHand(withId), (cmd) => port.ticketHand(cmd, actor));
       case 'answer':
         return write(`answer ${id}`, parseAnswerNeed(withId), (cmd) => port.ticketAnswerNeed(cmd, actor));
       case 'parts':
@@ -574,6 +589,11 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
       default:
         return write(`archive ${id}`, { ok: true, value: { id } }, (cmd) => port.archive(cmd, actor));
     }
+  }
+  if (req.path === '/api/crew/order') {
+    // req-273: Mission Control's Crew drag writes the crew's order, the whole list.
+    const order = parseCrewOrder(body);
+    return write('crew order', order.length > 0 ? { ok: true, value: order } : { ok: false, error: 'a crew order needs persona ids' }, (cmd) => port.crewOrderSet(cmd));
   }
   if (req.path === '/api/runs') {
     // D-41: a device's start names the device the token proved, whatever its body says.

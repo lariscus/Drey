@@ -18,6 +18,7 @@ import {
   type McPriorityConfig,
   type McTicketUsage,
 } from '../api/dto';
+import type { McChainWaits } from './hold';
 
 // --- the consumed device-state surface ---------------------------------------
 
@@ -46,6 +47,8 @@ export interface McNeed {
   readonly questions?: readonly McWaitQuestion[];
   /** A `QUESTION:` turn's parsed fixed shape (req-75 W2); absent otherwise. */
   readonly shaped?: McShapedQuestion;
+  /** req-273: when the need arose (ISO); absent = no time named. */
+  readonly since?: string;
 }
 
 /** One option of a worker's question form (the engine's WaitQuestion option). */
@@ -158,6 +161,8 @@ export interface McTicket {
    */
   readonly ctx?: number | null;
   readonly meta: McTicketMeta;
+  /** req-273: the persona board's hold, raw — `holdOf` (work/hold.ts) reads it. */
+  readonly hold?: unknown;
 }
 
 /** One pipeline phase (`/api/board` columns' phase head). */
@@ -205,6 +210,8 @@ export interface McBoard {
   readonly vaultName?: string | null;
   /** The active vault folder's name; the sub's fallback when `vaultName` is blank. */
   readonly activeVaultName?: string | null;
+  /** req-273: the persona board's holder lanes, raw — `lanesOf` (work/hold.ts) reads them; absent = the phase board. */
+  readonly lanes?: unknown;
 }
 
 /** The team tab's persona slice; work cards only need id/title/color. */
@@ -232,6 +239,12 @@ export interface McRun {
   readonly state?: string | null;
   /** The ticket the run works on (E13-20: the ticket opens on the run while it is live). */
   readonly ticketId?: string;
+  /** req-273: the persona the run runs as (a holder group's load counts it); absent = unknown. */
+  readonly persona?: string;
+  /** req-273: the run's activity line (`merging main` during the builder's sync-main); absent = none. */
+  readonly activity?: string | null;
+  /** req-273: when the run started (ISO). */
+  readonly startedAt?: string;
 }
 
 /** A live run as the phone's Work row words it (`stuck 9 min`, the run's age). */
@@ -268,6 +281,10 @@ export interface McWorkState {
    * degrades to its idle face instead of guessing a count.
    */
   readonly runs?: readonly McRun[] | null;
+  /** req-273: the chain block's per-ticket waits (`waits for Ben`, the pool's queue line); absent = none known. */
+  readonly waits?: McChainWaits | null;
+  /** req-273: the personas the owner paused (a held card says so); absent = none known. */
+  readonly pausedPersonas?: readonly string[];
   moveTicket(ticketId: string, phaseId: string): Promise<McMoveResult>;
   /** The archive of any age, newest first, for "Show older" (E13-21); absent = no such list. */
   loadArchive?(): Promise<readonly McDoneEntry[]>;
@@ -315,8 +332,14 @@ export interface McWorkState {
    * along its chain. Absent = the manual card shows no actions.
    */
   finishManual?(ticketId: string): Promise<McAnswerReply>;
-  /** A manual step's Send back (E10-6); the note is mandatory. */
-  sendBackManual?(ticketId: string, note: string): Promise<McAnswerReply>;
+  /** A manual step's Send back (E10-6); the note is mandatory. req-273: `position` sends a persona board ticket back to that position. */
+  sendBackManual?(ticketId: string, note: string, position?: number): Promise<McAnswerReply>;
+  /** req-273: hands a persona board ticket to a persona (the no-persona card's Assign…, Do it myself = `you`). */
+  handTicket?(ticketId: string, persona: string): Promise<McAnswerReply>;
+  /** req-273: starts the ticket's run again (the merge conflict card's Let Ben resolve). */
+  startTicketRun?(ticketId: string): Promise<McAnswerReply>;
+  /** req-273: answers a ticket's open `needs-decision` (the question card of a status line, no run behind it); `key` null = its only open one. */
+  answerDecision?(ticketId: string, key: string | null, text: string): Promise<McAnswerReply>;
 }
 
 /** What an answer hands back (`McReply` in the app's api layer, restated). */

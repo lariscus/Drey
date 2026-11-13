@@ -19,6 +19,7 @@ import type {
 } from '../../../../packages/tickets-engine/src/contracts/chat';
 import type { PersonaView } from '../../shared/remote-protocol';
 import { BURN_RATE_CARD_PREFIX, burnRateCardOf, type BurnRateCard, type BurnRateFormat, type BurnRateHoldView } from '../../../../shared/burn-rate';
+import { PERSONA_CARD_PREFIX } from '../../../../shared/persona-cards';
 import { trancheCardOf, type TrancheCard, type TrancheFormat, type TrancheView } from '../../../../shared/tranche';
 import type { ShapeTarget } from '../ticket-document/shape';
 import {
@@ -26,11 +27,14 @@ import {
   PLANNER_NAME,
   errorMessageOf,
   burnRateMessageOf,
+  personaCardMessageOf,
+  ASSIGN_PREFIX,
   trancheMessageOf,
   withTrancheMessage,
   historyOfSessions,
   threadOfSession,
 } from './map';
+import type { PersonaCardsBinding } from './persona-cards';
 import { ACCEPT, DISMISS, followsFleet, threadOfPersona, type PersonaWords } from './persona-map';
 
 /** The id a view preset names as its `assistantTarget` (the Work view: Mission Control). */
@@ -54,6 +58,8 @@ export interface ConversationDeps {
   tranche?: TrancheBinding;
   /** The burn rate's hold (req-181); absent = Mission Control carries no burn-rate card. */
   hold?: HoldBinding;
+  /** req-273: the persona board's four cards (no persona, a question, sent back twice, a merge conflict); absent = Mission Control carries none. */
+  personaCards?: PersonaCardsBinding;
   /** req-168: the 1:1's words (catalog, clock); absent = the keys themselves (a spec). */
   words?: PersonaWords;
   /** req-168: fires on every board and fleet change; returns the unsubscribe. Absent = the 1:1 is read on calls only. */
@@ -122,6 +128,8 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
   let reportOpenFor: string | null = null;
   /** The burn-rate card the owner answered with "Wait" (one per day: its id carries the resume time). */
   let holdDismissed: string | null = null;
+  /** The persona card whose Assign… picker is open. */
+  let assigning: string | null = null;
 
   const holdCard = (): BurnRateCard | null => {
     const view = deps.hold?.view() ?? null;
@@ -147,7 +155,18 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
     const meta = card.at === null ? '' : f.t('checkpoint.meta', { time: f.time(new Date(card.at)) });
     return withTrancheMessage(thread, burnRateMessageOf(card, meta));
   };
-  const decorated = (thread: ConversationThread): ConversationThread => {
+  /** The persona board's cards close the thread after the hold; the Assign… picker is open on at most one. */
+  const withPersonaCards = (thread: ConversationThread): ConversationThread => {
+    const binding = deps.personaCards;
+    if (binding === undefined) {
+      return thread;
+    }
+    const agents = binding.agents();
+    const messages = binding.cards().map((card) => personaCardMessageOf(card, card.id === assigning ? agents : null));
+    return messages.length === 0 ? thread : { ...thread, messages: [...thread.messages, ...messages] };
+  };
+  const decorated = (thread: ConversationThread): ConversationThread => withPersonaCards(decoratedBase(thread));
+  const decoratedBase = (thread: ConversationThread): ConversationThread => {
     const binding = deps.tranche;
     const card = trancheCard();
     if (binding === undefined || card === null) {
@@ -256,6 +275,31 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
     return read();
   };
 
+  /** A button of a persona card: Assign… opens the picker, a picked persona hands the ticket over, the rest is the card's own action. */
+  const actOnPersonaCard = async (cardId: string, actionId: string): Promise<ConversationThread> => {
+    const binding = deps.personaCards;
+    const card = binding?.cards().find((candidate) => candidate.id === cardId);
+    if (binding === undefined || card === undefined) {
+      return read();
+    }
+    let words: string | null = null;
+    if (actionId.startsWith(ASSIGN_PREFIX)) {
+      assigning = null;
+      words = await binding.assign(card, actionId.slice(ASSIGN_PREFIX.length));
+    } else {
+      const action = card.actions[Number(actionId)];
+      if (action?.id === 'assign') {
+        assigning = assigning === cardId ? null : cardId;
+      } else if (action !== undefined) {
+        words = await binding.act(card, action);
+      }
+    }
+    if (words !== null) {
+      lastError = errorMessageOf(undefined, words);
+    }
+    return read();
+  };
+
   return {
     id: MISSION_CONTROL_TARGET,
     label: 'Mission Control',
@@ -309,6 +353,9 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
       if (cardId.startsWith(TRANCHE_CARD_PREFIX)) {
         return decorated(await actOnCheckpoint(cardId, actionId));
       }
+      if (cardId.startsWith(PERSONA_CARD_PREFIX)) {
+        return decorated(await actOnPersonaCard(cardId, actionId));
+      }
       if (cardId.startsWith(BURN_RATE_CARD_PREFIX)) {
         return decorated(await actOnHold(cardId, actionId));
       }
@@ -352,15 +399,17 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
       lastError = null;
       return open(id, null);
     },
-    ...(deps.shape === undefined && deps.tranche === undefined && deps.hold === undefined
+    ...(deps.shape === undefined && deps.tranche === undefined && deps.hold === undefined && deps.personaCards === undefined
       ? {}
       : {
           // The thread changes with the ticket in focus, the checkpoint that waits and the burn rate's hold.
           onThreadChange: (listener: () => void) => {
-            const { shape, tranche, hold } = deps;
+            const { shape, tranche, hold, personaCards } = deps;
             let seenShape = shape?.current()?.id ?? null;
             let seenCard = trancheCard()?.id ?? null;
             let seenHold = holdCard()?.id ?? null;
+            const personaSignature = (): string => (personaCards?.cards() ?? []).map((card) => card.id).join();
+            let seenPersona = personaSignature();
             const offs = [
               shape?.subscribe(() => {
                 const now = shape.current()?.id ?? null;
@@ -373,6 +422,13 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
                 const now = trancheCard()?.id ?? null;
                 if (now !== seenCard) {
                   seenCard = now;
+                  listener();
+                }
+              }),
+              personaCards?.subscribe(() => {
+                const now = personaSignature();
+                if (now !== seenPersona) {
+                  seenPersona = now;
                   listener();
                 }
               }),

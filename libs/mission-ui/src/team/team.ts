@@ -2,6 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { AppBar } from '../app-bar/app-bar';
 import { McI18nPipe } from '../i18n/i18n.pipe';
 import { McI18n } from '../i18n/i18n.service';
+import { heldCountsOf, inOrderOf, laneIdsOf, movedBy, movedTo, sameOrder } from './crew-order';
 import { PhoneAvatar } from '../phone/avatar';
 import { PhoneIcon } from '../phone/icon';
 import { padSignal, touchFaceSignal } from '../phone/phone';
@@ -11,6 +12,7 @@ import {
   Component,
   computed,
   inject,
+  DestroyRef,
   InjectionToken,
   signal,
   type Signal,
@@ -124,6 +126,12 @@ export interface McTeamState {
   stopAll?(): void | Promise<unknown>;
   /** A transient status note (the prototype's toast pill); absent = silent. */
   toast?(message: string, kind?: 'ok' | 'warn' | 'error'): void;
+  /** The raw board (`/api/board`); on a persona board its `lanes` give the crew's order and its tickets' `hold` what each persona holds. Absent = the phase list. */
+  readonly board?: Signal<unknown>;
+  /** A read-only device cannot reorder the crew; absent = not read-only. */
+  readonly readOnly?: Signal<boolean>;
+  /** Writes the crew's whole order (`POST /api/crew/order`); absent = the list stays in the desk's order. */
+  setCrewOrder?(order: readonly string[]): Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
 }
 
 /**
@@ -397,10 +405,160 @@ export class Team {
 
   /** Null while the first fetch is still in flight. */
   protected readonly personas = computed(() => {
-    const team = this.state.team();
-    // Pia, Mission Control's persona, leads the list on the boards (10i, 5d); the rest keep the desk's order.
-    return team === null ? null : [...team.filter((p) => p.kind === 'mission'), ...team.filter((p) => p.kind !== 'mission')];
+    const list = this.state.team();
+    const order = this.shownOrder();
+    if (list === null) {
+      return null;
+    }
+    // On a persona board the crew's order rules (req-273; Pia stands first there as seeded); without one,
+    // Pia, Mission Control's persona, leads the list as the boards draw it (10i v2, 5d v2, req-281).
+    return order === null ? [...list.filter((p) => p.kind === 'mission'), ...list.filter((p) => p.kind !== 'mission')] : inOrderOf(list, order);
   });
+
+  // --- the crew's order on a persona board (req-273) -------------------------------
+
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly laneIds = computed(() => laneIdsOf(this.state.board?.() ?? null));
+  private readonly heldCounts = computed(() => heldCountsOf(this.state.board?.() ?? null));
+  /** The order just written, kept until the board's own order moves on (optimistic). */
+  private readonly pending = signal<{ readonly order: readonly string[]; readonly base: string } | null>(null);
+  /** The order while a drag is under way. */
+  private readonly dragOrder = signal<readonly string[] | null>(null);
+  /** The persona whose handle is held. */
+  protected readonly dragging = signal<string | null>(null);
+
+  private readonly shownOrder = computed<readonly string[] | null>(() => {
+    const lanes = this.laneIds();
+    if (lanes === null) {
+      return null;
+    }
+    const drag = this.dragOrder();
+    if (drag !== null) {
+      return drag;
+    }
+    const pending = this.pending();
+    return pending !== null && pending.base === lanes.join('\n') ? pending.order : lanes;
+  });
+
+  /** The crew list is the persona board's: ordered by lanes, holds instead of phases. */
+  protected readonly personaBoard = computed(() => this.laneIds() !== null);
+
+  /** The list can be reordered here: a persona board, a state that writes, a device that may. */
+  protected readonly canReorder = computed(
+    () => this.personaBoard() && this.state.setCrewOrder !== undefined && this.state.readOnly?.() !== true,
+  );
+
+  private currentIds(): readonly string[] {
+    return (this.personas() ?? []).map((persona) => persona.id);
+  }
+
+  /** What a persona holds now (and runs), as one line; null off a persona board. */
+  protected holdsLineOf(persona: McTeamPersona): string | null {
+    if (!this.personaBoard()) {
+      return null;
+    }
+    const parts = [this.teamI18n.t('crew.order.holds', { n: this.heldCounts().get(persona.id) ?? 0 })];
+    const running = this.liveCountOf(persona);
+    if (running > 0) {
+      parts.push(this.teamI18n.t('crew.phone.n_running', { n: running }));
+    }
+    return parts.join(' · ');
+  }
+
+  /** Whether a persona can move one place up (-1) or down (1): the owner's row never moves, nor past it. */
+  protected canMove(persona: McTeamPersona, dir: -1 | 1): boolean {
+    if (!this.canReorder() || persona.kind === 'human') {
+      return false;
+    }
+    const list = this.personas() ?? [];
+    const neighbour = list[list.findIndex((p) => p.id === persona.id) + dir];
+    return neighbour !== undefined && neighbour.kind !== 'human';
+  }
+
+  protected move(persona: McTeamPersona, dir: -1 | 1): void {
+    if (this.canMove(persona, dir)) {
+      void this.commitOrder(movedBy(this.currentIds(), persona.id, dir));
+    }
+  }
+
+  protected handleKey(event: KeyboardEvent, persona: McTeamPersona): void {
+    const dir = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : null;
+    if (dir !== null) {
+      event.preventDefault();
+      this.move(persona, dir);
+    }
+  }
+
+  private dragActive = false;
+
+  /** A handle pressed: the row follows the pointer over the others until the pointer lets go. */
+  protected handleDown(event: PointerEvent, persona: McTeamPersona): void {
+    if (!this.canReorder() || persona.kind === 'human' || this.dragActive) {
+      return;
+    }
+    event.preventDefault();
+    this.dragActive = true;
+    const root = (event.currentTarget as HTMLElement).closest('.crew-list');
+    const before = this.currentIds();
+    this.dragging.set(persona.id);
+    this.dragOrder.set(before);
+    const move = (e: PointerEvent): void => this.dragOver(e, root, persona.id);
+    const detach = (): void => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+    };
+    const end = (e: PointerEvent): void => {
+      detach();
+      this.dragActive = false;
+      const order = this.dragOrder();
+      this.dragging.set(null);
+      this.dragOrder.set(null);
+      if (e.type === 'pointerup' && order !== null && !sameOrder(order, before)) {
+        void this.commitOrder(order);
+      }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+    this.destroyRef.onDestroy(detach);
+  }
+
+  private dragOver(event: PointerEvent, root: Element | null, id: string): void {
+    const row = Array.from(root?.querySelectorAll<HTMLElement>('.crew-row') ?? []).find((candidate) => {
+      const box = candidate.getBoundingClientRect();
+      return event.clientY >= box.top && event.clientY <= box.bottom;
+    });
+    const over = row?.dataset['persona'];
+    const ids = this.dragOrder();
+    if (over === undefined || over === id || ids === null) {
+      return;
+    }
+    if ((this.personas() ?? []).find((persona) => persona.id === over)?.kind === 'human') {
+      return;
+    }
+    this.dragOrder.set(movedTo(ids, id, ids.indexOf(over)));
+  }
+
+  /** Optimistic: the list shows the new order at once; a refusal puts it back and says why. */
+  private async commitOrder(order: readonly string[]): Promise<void> {
+    const lanes = this.laneIds();
+    if (lanes === null) {
+      return;
+    }
+    this.pending.set({ order, base: lanes.join('\n') });
+    let error: string | null = null;
+    try {
+      const reply = await this.state.setCrewOrder?.(order);
+      error = reply !== undefined && !reply.ok ? reply.error || this.teamI18n.t('crew.order.failed') : null;
+    } catch {
+      error = this.teamI18n.t('crew.order.failed');
+    }
+    if (error !== null) {
+      this.pending.set(null);
+      this.state.toast?.(error, 'error');
+    }
+  }
 
   /** The personas exist but the pool is empty — the settings hint shows. */
   protected readonly poolEmpty = computed(() => {
@@ -534,7 +692,7 @@ export class Team {
   }
 
   protected roleLineOf(persona: McTeamPersona): string {
-    const phases = (persona.phases ?? []).join(', ');
+    const phases = this.personaBoard() ? '' : (persona.phases ?? []).join(', ');
     return [persona.summary ?? persona.role, phases].filter((bit) => bit !== '').join(' · ');
   }
 

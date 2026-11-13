@@ -174,6 +174,13 @@ function mount(
 }
 
 describe('FlowEditor', () => {
+  it('shows the send-back rule once, under the list (req-273)', () => {
+    const { el } = mount(flow());
+    const rules = el.querySelectorAll('.flow-sendback-rule');
+    expect(rules).toHaveLength(1);
+    expect(text(rules[0] as HTMLElement)).toContain('earlier position');
+  });
+
   it('shows no model for the owner and lists the whole crew for any position', () => {
     const { el, click } = mount(flow());
     click('.fe-gate', 3);
@@ -227,7 +234,7 @@ describe('FlowEditor', () => {
     expect(panel).toContain('↑ Earlier');
     expect(panel).toContain('↓ Later');
     expect(panel).toContain('Add a persona after');
-    expect(panel).toContain('Remove gate');
+    expect(panel).toContain('Remove position');
   });
 
   it('turns taps into edits on the position index', async () => {
@@ -263,7 +270,7 @@ describe('FlowEditor', () => {
   it('keeps the running position fixed', () => {
     const { el, click } = mount(flow());
     click('.fe-gate', 0);
-    expect(text(el.querySelector('.fe-inspector') as HTMLElement)).toContain('This is the current gate');
+    expect(text(el.querySelector('.fe-inspector') as HTMLElement)).toContain('This is the current position');
     expect((el.querySelector('.fe-switch') as HTMLButtonElement).disabled).toBe(true);
   });
 
