@@ -1,7 +1,6 @@
 import {
   activeSection,
   countSettings,
-  filterHitsByScope,
   searchSettings,
   type SettingsSearchSource,
 } from './settings-model';
@@ -53,23 +52,15 @@ describe('activeSection', () => {
   });
 });
 
-describe('scope tabs and counts', () => {
-  const scoped: SettingsSearchSource[] = [
-    { id: 'a', label: 'A', hint: '', entries: [
-      { key: 'x', label: 'X', scope: 'device', section: 's' },
-      { key: 'y', label: 'Y', scope: 'vault', section: 's' },
-      { key: 'z', label: 'Z', section: 't' },
-    ] },
+describe('counts', () => {
+  const entries = [
+    { key: 'x', label: 'X', section: 's' },
+    { key: 'y', label: 'Y', section: 's' },
+    { key: 'z', label: 'Z', section: 't' },
   ];
-  it('keeps every hit without a tab and only the tab’s scope with one', () => {
-    const all = searchSettings([{ ...scoped[0], label: 'q' }].map((s) => ({ ...s, entries: s.entries!.map((e) => ({ ...e, label: `q ${e.label}` })) })), 'q');
-    expect(filterHitsByScope(all, null)).toHaveLength(4);
-    expect(filterHitsByScope(all, 'device').map((h) => h.entry.key)).toEqual(['x']);
-    expect(filterHitsByScope(all, 'all-devices')).toEqual([]);
-  });
   it('counts a page’s settings and one section’s', () => {
-    expect(countSettings(scoped[0].entries)).toBe(3);
-    expect(countSettings(scoped[0].entries, 's')).toBe(2);
+    expect(countSettings(entries)).toBe(3);
+    expect(countSettings(entries, 's')).toBe(2);
     expect(countSettings(undefined)).toBe(0);
   });
 });

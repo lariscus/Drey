@@ -689,8 +689,7 @@ introduced silently.
     File → Settings, `Mod+,` and Help → About; it closes like any tab
     (its X, Escape while focus is inside it). Inside: a full-width
     search field (the one field that carries a placeholder, "Search
-    settings" — the board's), the scope tabs *All devices · This device
-    · This vault*, then master-detail (category list left with
+    settings" — the board's), then master-detail (category list left with
     collapsible sub-groups, detail pane right), core categories in
     alphabetical order, plugin-contributed categories (sorted by label)
     before "About" via `PluginSettingsHost`. Every page — core or

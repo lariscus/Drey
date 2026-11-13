@@ -33,9 +33,6 @@ describe('Settings -> Tickets, the board 7g sections and rows', () => {
     expect(rows.map((e) => e.label)).toEqual(['Autopilot', 'Resume paused autopilot at']);
     expect(rows.every((e) => e.section === 'autopilot')).toBe(true);
   });
-  it('gives every entry a scope', () => {
-    expect(TICKETS_ENTRIES.every((e) => e.scope !== undefined)).toBe(true);
-  });
 });
 
 describe('Settings -> Tickets, board 7l (req-186)', () => {

@@ -168,7 +168,7 @@ function fleetSection(api: DreyPluginApi, crew: CrewSettings): HTMLElement {
   const title = el('h3', undefined, 'Fleet');
   title.id = 'tset-fleet-head';
   // req-173 (R13): the section's keys live in the vault (tickets/_meta/crew.md) and apply on the next board round.
-  head.append(title, el('span', 'tset-chip', api.i18n.t('settings.scope.vault')));
+  head.append(title);
   const rows = el('div', 'tset-kv');
   rows.append(
     ...kv(

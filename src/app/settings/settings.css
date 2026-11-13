@@ -1,6 +1,6 @@
 /*
- * The Settings surface as board 7g draws it: a search block, the scope tabs,
- * then the section tree and the page -- the body of an editor tab, as wide
+ * The Settings surface as board 7g draws it: a search block, then the
+ * section tree and the page -- the body of an editor tab, as wide
  * as its pane (ADR-0010 later change, milestone 197).
  */
 .panel {
@@ -13,7 +13,7 @@
   overflow: hidden;
 }
 
-/* --- search block and scope tabs ------------------------------------------ */
+/* --- search block ----------------------------------------------------------- */
 
 .top {
   flex-shrink: 0;
@@ -86,46 +86,6 @@
 .clear:hover {
   background: var(--hover-bg);
   color: var(--text-primary);
-}
-
-.scope-tabs {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.scope-tab {
-  height: 34px;
-  padding: 0 12px;
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  font: inherit;
-  font-size: 14px;
-  color: var(--text-4);
-  cursor: pointer;
-}
-
-.scope-tab:hover {
-  color: var(--text-primary);
-}
-
-.scope-tab.active {
-  color: var(--text-primary);
-  font-weight: 600;
-  border-bottom-color: var(--text-primary);
-}
-
-.scope-note {
-  align-self: center;
-  color: var(--text-4);
-  font-size: 13px;
-  line-height: 18px;
-}
-
-.spacer {
-  flex: 1;
 }
 
 /* --- section tree ---------------------------------------------------------- */
@@ -214,7 +174,6 @@
 
 .category:focus-visible,
 .section-entry:focus-visible,
-.scope-tab:focus-visible,
 .clear:focus-visible,
 .result:focus-visible {
   outline: 2px solid var(--accent);

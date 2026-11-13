@@ -38,10 +38,6 @@
                 <mc-ph-icon name="x" [size]="20" />
               </button>
             </div>
-            <div class="pd-scope" role="group" [attr.aria-label]="'settings.pad.scope' | t">
-              <button type="button" class="pd-scope-btn" [class.on]="scope() === 'all'" [attr.aria-pressed]="scope() === 'all'" (click)="pickScope('all')">{{ 'settings.scope.all_devices' | t }}</button>
-              <button type="button" class="pd-scope-btn" [class.on]="scope() === 'device'" [attr.aria-pressed]="scope() === 'device'" (click)="pickScope('device')">{{ 'settings.scope.device' | t }}</button>
-            </div>
           </div>
           <div class="pd-list">
             @for (sec of padSections(); track sec.id) {

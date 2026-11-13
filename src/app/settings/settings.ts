@@ -13,7 +13,6 @@ import {
   viewChild,
 } from '@angular/core';
 import { NgComponentOutlet } from '@angular/common';
-import type { MessageKey } from '../../../shared/i18n';
 import { I18nPipe } from '../i18n';
 import { Icon } from '../icons/icon';
 import { EditorService } from '../services/editor.service';
@@ -21,10 +20,7 @@ import { SettingsService } from '../services/settings.service';
 import { SETTINGS_DOC_KEY } from './settings-doc';
 import { SettingsCategoryRegistry } from './settings-registry.service';
 import {
-  SETTINGS_SCOPES,
   activeSection,
-  filterHitsByScope,
-  type SettingsScope,
   searchSettings,
   type SettingsSearchEntry,
   type SettingsSearchHit,
@@ -112,30 +108,10 @@ export class Settings implements OnDestroy {
   private readonly detail = viewChild<ElementRef<HTMLElement>>('detail');
 
   protected readonly query = signal('');
-  protected readonly scopes = SETTINGS_SCOPES;
-  /** The scope tab chosen (board 7g); `null` = none, everything shows. */
-  protected readonly scope = signal<SettingsScope | null>(null);
   protected readonly hits = computed<readonly SettingsSearchHit[]>(() =>
-    this.query().trim() === ''
-      ? this.scope() === null
-        ? []
-        : this.scopeBrowse()
-      : filterHitsByScope(searchSettings(this.registry.searchSources(), this.query()), this.scope()),
+    this.query().trim() === '' ? [] : searchSettings(this.registry.searchSources(), this.query()),
   );
-  /** Every setting of the chosen scope, in page order (no query typed). */
-  private scopeBrowse(): SettingsSearchHit[] {
-    return this.registry.searchSources().flatMap((source) =>
-      (source.entries ?? [])
-        .filter((entry) => entry.scope === this.scope())
-        .map((entry) => ({
-          categoryId: source.id,
-          categoryLabel: source.label,
-          sectionLabel: source.sections?.find((s) => s.id === entry.section)?.label ?? null,
-          entry,
-        })),
-    );
-  }
-  protected readonly searching = computed(() => this.query().trim() !== '' || this.scope() !== null);
+  protected readonly searching = computed(() => this.query().trim() !== '');
 
   /** How many of the current hits a category holds (the tree shows it while searching). */
   protected categoryHits(id: string): number {
@@ -146,30 +122,8 @@ export class Settings implements OnDestroy {
     return this.hits().filter((hit) => hit.categoryId === categoryId && hit.entry.section === sectionId).length;
   }
 
-  /** The tab drawn as chosen: "All devices" until another is picked (board 7g). */
-  protected readonly shownScope = computed<SettingsScope>(() => this.scope() ?? 'all-devices');
-
-  protected readonly scopeNoteKey = computed<MessageKey>(() => {
-    const shown = this.shownScope();
-    return shown === 'device'
-      ? 'settings.scope.note_device'
-      : shown === 'vault'
-        ? 'settings.scope.note_vault'
-        : 'settings.scope.note_all_devices';
-  });
-
-  /**
-   * "All devices" is the page as it is (no filter); "This device" and "This
-   * vault" list the settings stored for that scope, a second click leaves
-   * the list again.
-   */
-  protected pickScope(scope: SettingsScope): void {
-    this.scope.update((current) => (scope === 'all-devices' || current === scope ? null : scope));
-  }
-
   protected clearSearch(): void {
     this.query.set('');
-    this.scope.set(null);
   }
 
   /** The section entry highlighted for the page's scroll position (E13-22). */

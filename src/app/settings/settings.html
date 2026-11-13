@@ -33,22 +33,6 @@
         <app-icon name="x" [size]="15" />
       </button>
     </div>
-    <div class="scope-tabs" role="tablist" aria-label="Setting scope">
-      @for (item of scopes; track item.id) {
-        <button
-          type="button"
-          role="tab"
-          class="scope-tab"
-          [class.active]="shownScope() === item.id"
-          [attr.aria-selected]="shownScope() === item.id"
-          (click)="pickScope(item.id)"
-        >
-          {{ item.labelKey | t }}
-        </button>
-      }
-      <span class="spacer"></span>
-      <span class="scope-note">{{ scopeNoteKey() | t }}</span>
-    </div>
   </div>
 
   <div class="body">
@@ -127,13 +111,7 @@
               </button>
             } @empty {
               <div class="no-match" role="status">
-                <p>
-                  @if (query().trim() !== '') {
-                    No setting matches "{{ query().trim() }}". Try another word, or clear the search.
-                  } @else {
-                    No setting has this scope
-                  }
-                </p>
+                <p>No setting matches "{{ query().trim() }}". Try another word, or clear the search.</p>
                 <button type="button" class="ghost" (click)="clearSearch()">Clear search</button>
               </div>
             }

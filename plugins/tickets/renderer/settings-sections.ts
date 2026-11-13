@@ -23,13 +23,12 @@ export const TICKETS_SECTIONS: readonly PluginSettingsSection[] = [
 /** The sections above, plus Models (board 7l, req-186): its words come from the catalog, so it joins through `ticketsSections` / `ticketsEntries`. */
 export type TicketsSectionId = (typeof TICKETS_SECTIONS)[number]['id'] | 'models';
 
-const e = (
-  section: TicketsSectionId,
-  key: string,
-  label: string,
-  description: string,
-  scope: PluginSettingsEntry['scope'] = 'vault',
-): PluginSettingsEntry => ({ key, label, description, section, scope });
+const e = (section: TicketsSectionId, key: string, label: string, description: string): PluginSettingsEntry => ({
+  key,
+  label,
+  description,
+  section,
+});
 
 /** What the Settings search finds on this page. */
 export const TICKETS_ENTRIES: readonly PluginSettingsEntry[] = [
@@ -45,12 +44,12 @@ export const TICKETS_ENTRIES: readonly PluginSettingsEntry[] = [
   e('budget', 'defaultWorker', 'Default worker', 'OpenCode, Claude Code, Kimi Code'),
   e('budget', 'fleet.resumePauseTtlMin', 'Resume pause TTL', 'Warm resume window in minutes'),
   e('budget', 'fleet.contextCapTokens', 'Context cap', 'Tokens before a worker compacts'),
-  e('budget', 'gitPath', 'Git executable', 'Only needed when git is not on PATH', 'device'),
-  e('devices', 'remote', 'Serve the phone and iPad app', 'Serve the phone and iPad app, port, Tailscale', 'all-devices'),
-  e('devices', 'pairing', 'Pair a device', 'Pairing code and QR, revoke devices', 'all-devices'),
+  e('budget', 'gitPath', 'Git executable', 'Only needed when git is not on PATH'),
+  e('devices', 'remote', 'Serve the phone and iPad app', 'Serve the phone and iPad app, port, Tailscale'),
+  e('devices', 'pairing', 'Pair a device', 'Pairing code and QR, revoke devices'),
   e('store', 'repository', 'Tickets repository', 'Path of the tickets folder'),
-  e('store', 'dk.checkout', 'Ticket store checkout', 'Working copy of the ticket branch', 'device'),
-  e('store', 'dk.syncSeconds', 'Sync interval', 'Seconds, remote stores only', 'device'),
+  e('store', 'dk.checkout', 'Ticket store checkout', 'Working copy of the ticket branch'),
+  e('store', 'dk.syncSeconds', 'Sync interval', 'Seconds, remote stores only'),
   e('store', 'repositories', 'Repositories', 'Launch command, default branch, found repositories'),
   e('pipeline', 'pipeline', 'Pipeline', 'Columns, handover mode, worker per column'),
   e('pipeline', 'prompts', 'Prompts', 'Prompt files of the agent columns'),
@@ -67,9 +66,9 @@ export function ticketsSections(i18n: I18n): readonly PluginSettingsSection[] {
 export function ticketsEntries(i18n: I18n): readonly PluginSettingsEntry[] {
   return [
     ...TICKETS_ENTRIES,
-    e('models', 'models.table', i18n.t('tickets.settings.models.entry.table'), i18n.t('tickets.settings.models.entry.table_desc'), 'device'),
-    e('models', 'models.cap', i18n.t('tickets.settings.models.cap.global'), i18n.t('tickets.settings.models.entry.cap_desc'), 'device'),
-    e('models', 'models.slots', i18n.t('tickets.settings.models.group.slots'), i18n.t('tickets.settings.models.entry.slots_desc'), 'device'),
-    e('models', 'models.ledgers', i18n.t('tickets.settings.models.group.ledgers'), i18n.t('tickets.settings.models.entry.ledgers_desc'), 'device'),
+    e('models', 'models.table', i18n.t('tickets.settings.models.entry.table'), i18n.t('tickets.settings.models.entry.table_desc')),
+    e('models', 'models.cap', i18n.t('tickets.settings.models.cap.global'), i18n.t('tickets.settings.models.entry.cap_desc')),
+    e('models', 'models.slots', i18n.t('tickets.settings.models.group.slots'), i18n.t('tickets.settings.models.entry.slots_desc')),
+    e('models', 'models.ledgers', i18n.t('tickets.settings.models.group.ledgers'), i18n.t('tickets.settings.models.entry.ledgers_desc')),
   ];
 }

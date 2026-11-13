@@ -2242,15 +2242,16 @@ other devices** you pair a phone or tablet and revoke it again (below). Fleet an
 workers follow *Budget and runners*; *Store and Git* and *Pipeline and
 prompts* close the page.
 
-**Where a setting lives.** The scope tabs at the top of Settings say it:
-*This vault* settings are stored in the tickets repository —
+**Where a setting lives.** Settings are global — one list, no per-device or
+per-vault tabs. Where a value is *stored* still follows its data. The Fleet
+values are stored in the tickets repository —
 `tickets/_meta/crew.md`, beside the pipeline and the personas — so every
 computer that works the same tickets uses the same values: the default
 worker, the permission of runs the crew starts by itself, the resume pause,
-the context cap and the compact thresholds (the *Fleet* group is marked
-*This vault*). Each change is one commit there. *This device* settings
-belong to this computer — the models, the capacity cap and the accounts
-(*Models*), the Git executable, the background service. After the update,
+the context cap and the compact thresholds. Each change is one commit there.
+The models, the capacity cap and the accounts
+(*Models*), the Git executable and the background service belong to this
+computer. After the update,
 the values you had set move into `crew.md` once, by themselves; nothing
 for you to do.
 
@@ -2600,10 +2601,7 @@ settings of **all** pages by name, description or key; click a result to open
 its page at that setting. `Esc` clears the search first and closes Settings on
 the second press. While you search, the list shows how many hits each page and
 section holds and dims the ones without. When nothing matches, the page says
-*No setting matches "…"* with a *Clear search* button. The tabs *All devices*, *This device* and *This vault* above the page
-narrow the list to the settings stored for that scope (the app on this computer,
-the vault you have open, or shared by every device); click the tab again, or
-*All devices*, to show everything.
+*No setting matches "…"* with a *Clear search* button.
 
 | Category | What lives there |
 | --- | --- |

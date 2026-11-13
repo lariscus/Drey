@@ -280,7 +280,10 @@ export interface PluginSettingsEntry {
   readonly key: string;
   readonly label: string;
   readonly description?: string;
-  /** Who the setting is stored for (board 7g's scope tabs); unset = under no tab. */
+  /**
+   * @deprecated Ignored since req-291 (settings are global, the scope tabs are gone). Kept so a
+   * plugin that still sets it compiles; minors stay additive.
+   */
   readonly scope?: 'all-devices' | 'device' | 'vault';
   readonly section?: string;
 }
