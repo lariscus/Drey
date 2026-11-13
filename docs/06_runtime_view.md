@@ -6104,7 +6104,7 @@ sequenceDiagram
     S-->>P: board changed -> the next step's line, or none
 ```
 
-## 6.130 Mission Control on the persona board: Send back to a position (req-273, milestone 259)
+## 6.130 Mission Control on the persona board: Send back to a position (req-273, milestone 260)
 
 The phone and the iPad read the same snapshot as the desktop Board: `/api/board`
 carries `lanes` and every active card's `hold`, `/api/fleet` the live runs and
