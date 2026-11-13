@@ -148,6 +148,14 @@ export interface PluginWidgetContrib {
   readonly defaultDock: PluginDockSide;
   readonly defaultOpen: boolean;
   readonly defaultFlex: number;
+  /**
+   * SDK 1.60: the panel's place in its default dock on a fresh layout and
+   * after `View → Reset layout` -- lower first, the built-in panels use
+   * steps of ten (Calendar 10, Files 20, Open windows 50). Absent: after
+   * every ordered panel, in registration order. Never moves a panel in a
+   * layout the user already has.
+   */
+  readonly order?: number;
   /** Size to content instead of a flex share (no splitters on its edges). */
   readonly contentHeight?: boolean;
   /** Body fills the frame instead of scrolling (no second scrollbar). */

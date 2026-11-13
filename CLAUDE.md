@@ -656,11 +656,14 @@ introduced silently.
     focus only). The chevron folds a panel to its header, its strip icon
     stays on; a click on a header does nothing, a drag moves, a
     right-click offers Move to left / right / bottom dock and Close. What
-    a panel inherits and may draw: the frame rule in ADR-0019. Default:
-    Calendar/Files/Templates/Find/Open windows/Outline/Backlinks/
-    Source control left, Assistant right, nothing in the bottom band,
-    Templates + Find + Outline + Backlinks + Source control
-    closed. Calendar takes its content height, not a
+    a panel inherits and may draw: the frame rule in ADR-0019. Default
+    (Notes, board 7p, req-297): left dock 300 with Calendar and Files
+    open and Find, Templates, Open windows, Source control, Tickets as
+    icons; right dock 380 with the Assistant open and Outline, Backlinks
+    as icons; nothing in the bottom band — the strip order is each
+    panel's `order` (SDK 1.60). Work and Crew open with their own
+    preset layouts (boards 7q, 7r), and `View → Reset layout` returns
+    the active view to its own default (ADR-0089 later change). Calendar takes its content height, not a
     flex share; its title is the **month/year dropdown**
     itself (no "Calendar" title) with **Today** (opens today's daily
     note) and the month arrows on hover.

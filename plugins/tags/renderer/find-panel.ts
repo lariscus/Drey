@@ -466,6 +466,7 @@ export function createFindPanel(
       defaultDock: 'left',
       defaultOpen: false,
       defaultFlex: 260,
+      order: 30,
       flush: true,
       status,
       headerTitle,

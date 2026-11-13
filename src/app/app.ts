@@ -431,11 +431,8 @@ export class App {
     keys.register({
       id: 'layout.reset',
       label: 'Reset layout',
-      run: () => {
-        // The active view only (ADR-0089).
-        this.dock.reset();
-        this.panes.resetRegions();
-      },
+      // The active view only, back to its own default (ADR-0089, req-297).
+      run: () => viewService.resetActive(),
     });
 
     // Views (ADR-0089): Ctrl+1…9 jump to the nth view, "Switch view" steps

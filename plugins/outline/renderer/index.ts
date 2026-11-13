@@ -198,9 +198,10 @@ const plugin: PluginRendererModule = {
       id: 'outline',
       title: api.i18n.t('outline.title'),
       icon: 'list',
-      defaultDock: 'left',
+      defaultDock: 'right',
       defaultOpen: false,
       defaultFlex: 220,
+      order: 20,
       flush: true,
       status: () => {
         const count = entriesNow().length;

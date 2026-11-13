@@ -25,9 +25,10 @@ describe('DockStrip', () => {
     expect(buttons().map((b) => b.getAttribute('aria-label'))).toEqual([
       'Hide Calendar',
       'Hide Files',
-      'Hide Open windows',
+      'Show Open windows',
     ]);
-    expect(buttons().every((b) => b.getAttribute('aria-pressed') === 'true')).toBe(true);
+    // Board 7p: Calendar and Files open, Open windows a strip icon.
+    expect(buttons().map((b) => b.getAttribute('aria-pressed'))).toEqual(['true', 'true', 'false']);
   });
 
   it('a press without movement toggles the panel and the button follows', () => {
@@ -47,7 +48,7 @@ describe('DockStrip', () => {
   });
 
   it('carries the status of a closed panel in its tooltip', () => {
-    dock.toggle('windows');
+    expect(dock.closed('windows')).toBe(true); // closed by default (board 7p)
     fixture.detectChanges();
     expect(buttons()[2].title).toBe('Open windows · 0');
   });

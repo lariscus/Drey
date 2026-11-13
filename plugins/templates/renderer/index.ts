@@ -61,6 +61,7 @@ const plugin: PluginRendererModule = {
       defaultDock: 'left',
       defaultOpen: false,
       defaultFlex: 200,
+      order: 40,
       headerActions: (actions) => {
         const refresh = button('icon-btn', 'Re-read the templates from disk', () =>
           void library.reload(),
