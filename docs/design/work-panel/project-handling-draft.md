@@ -2,7 +2,8 @@
 
 Status: **accepted by the owner on 2026-11-13** — the draft ("Ja, A"), his answers
 (§10) and the stage 2 boards ("Passt", §11). Nothing built; the build items are
-roadmap rows req-282 – req-291 (§12), placed **after the finish line**.
+roadmap rows req-282 – req-291 (§12), **step 5 of the finish line** — the owner needs
+them before the merge into `main` (2026-11-13).
 
 The file keeps its first name (`project-handling-draft.md`) because the canvas note
 and the boards index point at it. §0 – §9 are the stage 1 draft as the owner read
@@ -434,7 +435,8 @@ show, so the rows of §12 can be built from it.
 
 ## 12. The build items (roadmap rows req-282 – req-291)
 
-After the finish line, frozen until the merge into `main`, in this order.
+Step 5 of the finish line (owner, 2026-11-13: "die brauche ich alle vor dem merge nach main"), in this order;
+every correction the owner names before the merge joins them as a row.
 Models: Opus where the engine or data changes, Sonnet for the boards-to-screen
 rows (the owner's rule for delegation).
 

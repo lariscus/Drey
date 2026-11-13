@@ -96,11 +96,12 @@ The owner fixed the end of the current stretch ("ich habe das gefühl mit jedem 
 2. **The seven known defects** below — D-53, D-54, D-64, D-65 (milestone 249) and D-55, D-57 (milestone 250) run beside req-257; D-56 after the owner's decision on its settings half.
 3. **An interim verification round** by the owner after milestone 248, so the unverified pile stops growing.
 4. **req-270, req-271, req-272, req-273, req-274, req-281**, then **req-268** (the live board migration, together with req-270/271), then **req-275** (ADR and specs).
-5. **The owner's verification round** of everything since milestone 213, then the merge of `desktop-integration` into `main` on his word.
+5. **req-282 – req-291**, projects, Persona v3 and Models v3 (owner 2026-11-13: *"die brauche ich alle vor dem merge nach main … aktuell ist das nicht nutzbar"*), in the order of their section below — and **every correction the owner names before the merge**, each added as a row of that section.
+6. **The owner's verification round** of everything since milestone 213, then the merge of `desktop-integration` into `main` on his word.
 
 **Everything else on this page is frozen** — the rest of "Now", "Tickets on dricket" (E14-9b included, unless the owner starts it), "Later", the cleanup, the backlog and the 160 follow-up rows. Frozen rows stay where they are, are not worked and do not count; after the merge into `main` the owner picks what comes next.
 
-**No new rows while the finish line stands.** A session adds a roadmap row only when something is broken or blocks an item above. Anything else it leaves out is one sentence in its changelog entry, not a row.
+**No new rows while the finish line stands.** A session adds a roadmap row only when something is broken, blocks an item above, or is a correction the owner names for step 5. Anything else it leaves out is one sentence in its changelog entry, not a row.
 
 ### Known defects
 
@@ -721,9 +722,9 @@ checks use a scratch store and a second instance, never `drey-tickets`.
 | X-1 documentation hygiene | Stays valid for notes; skip the parts of `ticket-schema.md` that E14-9 supersedes. |
 | Mission Control UI, chat (Pia), personas (Paul, Ben, Ralf, Tessa, You), flows and chains, plans and parts, proof/verification/video, costs, views, Assistant targets | **Unchanged.** |
 
-### After the finish line — projects, Persona v3, Models v3 (designed 2026-11-13)
+### Finish line, step 5 — projects, Persona v3, Models v3 (designed 2026-11-13)
 
-_Owner request 2026-11-13, outside the list: the design round after his verification of milestones 242–251 — the draft, his answers and the boards 7k v3, 7l v3, 7m, 7n and 7o, accepted the same day ([the concept](../docs/design/work-panel/project-handling-draft.md), [boards](../docs/design/work-panel/boards/README.md)). Added on his word while the finish line stands; **frozen like every row outside it** until the merge into `main`, then in this order. Quotas, the capacity pool, the slots and the routing stay cross-project._
+_Owner request 2026-11-13, outside the list: the design round after his verification of milestones 242–251 — the draft, his answers and the boards 7k v3, 7l v3, 7m, 7n and 7o, accepted the same day ([the concept](../docs/design/work-panel/project-handling-draft.md), [boards](../docs/design/work-panel/boards/README.md)). **Part of the finish line** (step 5, owner 2026-11-13: needed before the merge into `main`), in this order; the corrections the owner names before the merge are added here as rows. Quotas, the capacity pool, the slots and the routing stay cross-project._
 
 - **req-282 — Projects: the record and the migration** (owner request 2026-11-13, outside the list; concept §1, §2, §6, §10). `tickets/_meta/projects/<id>.md` — frontmatter `name`, `color`, `repos` (names from `repos.md`, primary first), `folders` (plain folders, read-only), `vaults` (by registered **name**, `none | read | write`), the body the purpose; `project:` on a ticket (`x-project` on the store), an inbox ticket may have none (Unassigned), a working ticket without one is a board issue, its `repo:` / `repos:` must be its project's; the purpose rides the run brief as `## Project` (ADR-0097). Migration at the engine's start: one project from every `repos.md` entry and every registered vault as `read`; each persona's `allowed: write-vaults` becomes Write on that project plus `allowed: write-notes: true` (an id this device cannot resolve is reported); tickets are not rewritten (no `project:` reads as the only project, as Unassigned once there are two). `specs/ticket-schema.md`.
 - **req-283 — Vault rights per project** (owner request 2026-11-13, outside the list; concept §2, §3, §10; ADR-0094 later change, crew-internals R5). The worker's token carries the ticket's project: it reads the project's vaults and folders, writes where the project says Write **and** its persona has `write-notes` **and** the run is not read-only; `vault_list` shows only those. A 1:1 reads every project's vaults and folders, read-only (a vault no project names is not read); a free session takes a project (picked, or its folder's). Plain folders are served read-only under the vault path rules. Refusals keep the `Error: …` wording and the audit line.
