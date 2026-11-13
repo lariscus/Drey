@@ -38,6 +38,7 @@ import {
   type RoutingKey,
   type SlotCardView,
 } from './models-model';
+import { createSlotEditor } from './models-slot-edit';
 
 export interface ModelsSection {
   readonly root: HTMLElement;
@@ -98,10 +99,12 @@ export function createModelsSection(api: DreyPluginApi): ModelsSection {
 
   // --- Slots --------------------------------------------------------------------
   const slotCards = el('div', 'tset-models-slots');
-  const addSlot = el('button', 'tset-models-btn', t('tickets.settings.models.add_slot'));
-  addSlot.type = 'button';
-  addSlot.title = t('tickets.settings.models.add_slot_title');
-  addSlot.addEventListener('click', () => void api.backend.invoke('serviceOpenLogFolder').catch(() => undefined));
+  // D-69: Add slot… adds a row and every card can be removed, one slot per write.
+  const slotEditor = createSlotEditor(api, (next) => {
+    slots = next;
+    lastSlotRead = Date.now();
+    paintAll();
+  });
 
   // --- Routing (req-178 / req-181): the engine's values, written as they are made --
   const routingInputs = new Map<RoutingKey, HTMLInputElement>();
@@ -140,7 +143,7 @@ export function createModelsSection(api: DreyPluginApi): ModelsSection {
     capacity,
     group('tickets.settings.models.group.slots'),
     slotCards,
-    el('div', 'tset-models-addslot'),
+    slotEditor.element,
     group('tickets.settings.models.group.routing'),
     routingField('upgradeAboveQ', t('tickets.settings.models.routing.upgrade'), null),
     routingField('reservePerWindow', t('tickets.settings.models.routing.reserve'), t('tickets.settings.models.routing.reserve_unit')),
@@ -152,7 +155,6 @@ export function createModelsSection(api: DreyPluginApi): ModelsSection {
     ledger('personaPerDay', t('tickets.settings.models.ledgers.persona'), null),
     ledger('providerPerDay', t('tickets.settings.models.ledgers.provider'), null),
   );
-  root.querySelector('.tset-models-addslot')!.append(addSlot);
 
   // --- writing ------------------------------------------------------------------
   /** One write; its refusal lands under the table, or (`routing`) under the Routing group. */
@@ -445,7 +447,7 @@ export function createModelsSection(api: DreyPluginApi): ModelsSection {
   function cardOf(card: SlotCardView): HTMLElement {
     const box = el('div', 'tset-models-card');
     const head = el('div', 'tset-models-cardhead');
-    head.append(el('span', 'tset-models-cardname', card.name), el('span', 'tset-models-chip', card.profile), el('span', 'tset-models-billing', card.billing));
+    head.append(el('span', 'tset-models-cardname', card.name), el('span', 'tset-models-chip', card.profile), el('span', 'tset-models-billing', card.billing), slotEditor.removeButton(card));
     const rows = el('div', 'tset-models-windows');
     for (const window of card.windows) {
       const line = el('div', 'tset-models-window');

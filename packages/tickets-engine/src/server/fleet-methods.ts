@@ -30,6 +30,8 @@ export const FLEET_METHODS = [
   'refreshSlots',
   'slotLoginDone',
   'writeSlots',
+  'addSlot',
+  'removeSlot',
   'models',
   'writeModels',
   'importModelCapabilities',

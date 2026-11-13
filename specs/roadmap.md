@@ -47,7 +47,7 @@ Open work only. Everything implemented lives in
 lives in [`decisions.md`](decisions.md). When an item ships, move it to the
 changelog and delete it here — no shipped history on this page.
 
-**Status (2026-11-12):** version 0.8.1, milestones 1–151, 153–163, 165–169 and 171–251, plus req-98, req-101, req-104 (the desktop frame matches board 9a), req-126 (the frame follow-ups of wave 4.2: no strip on a one-panel bottom dock, a view badge, a view's own tabs), req-110 (the fleet runner leaves when deactivated or when Drey quits idle), req-102 (the i18n catalog, ADR-0091), req-99a, req-95a, req-95b, req-97, req-96 and req-99b built (109–111 are recorded in the changelog by the convergence audit backfill) — 1–83
+**Status (2026-11-13):** version 0.8.1, milestones 1–151, 153–163, 165–169 and 171–252, plus req-98, req-101, req-104 (the desktop frame matches board 9a), req-126 (the frame follow-ups of wave 4.2: no strip on a one-panel bottom dock, a view badge, a view's own tabs), req-110 (the fleet runner leaves when deactivated or when Drey quits idle), req-102 (the i18n catalog, ADR-0091), req-99a, req-95a, req-95b, req-97, req-96 and req-99b built (109–111 are recorded in the changelog by the convergence audit backfill) — 1–83
 owner-verified (milestone 82, auto-update from GitHub Releases ADR-0074,
 end-to-end on a real install, the 0.7.0 → 0.7.1 update round included
 docs/07 checklist; milestone 83, the tickets foundation ADR-0075/0076,
@@ -105,6 +105,7 @@ The owner fixed the end of the current stretch ("ich habe das gefühl mit jedem 
 ### Known defects
 
 
+- **D-67 — The persona picture cannot be changed** (S; owner request, outside the list; the owner's interim verification 2026-11-13). The Persona page's Profile block draws the initials circle and nothing that changes it: `Upload picture…` was never built (req-235, frozen). **Waits for the owner's choice** (milestone 252 asked): build req-235's desktop half now, or with the persona redesign after the finish line.
 - **D-56 — The owner's configured Flow and Crew settings are missing in his installation** (M; (owner request, outside the list; owner's first verification round on the integrated build, 2026-11-07); **needs the owner's detail: which page is empty, what was configured before the cut-over**). Facts: the store's `_meta/personas` holds only `build-default`, `commit-default` and `you`; the default crew (E12-9d) is shipped and seeded since milestone 235 (req-256) — a board without it gets it at the engine's next start, so that half is closed; milestone 230 moves the crew keys of `config.json` / `chain.json` into `crew.md` once and the pools live in `service.json`'s slots (req-177), which seeding does not touch; the chain config in `~/.drey-engine/fleet/chain.json` still points at `ticketsVaultPath E:\projects\drey-tickets` with three pools. Done when Settings → Tickets → Flow and Crew show what the owner configured, and a cut-over migrates those settings or says what it cannot carry.
 
 

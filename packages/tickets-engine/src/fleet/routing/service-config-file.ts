@@ -1,6 +1,9 @@
 import type { FileSystem } from '../ports/file-system';
+import { slotAdded, slotRemoved, type SlotEdit } from './slot-edit';
 
 export type WriteOutcome = { readonly ok: true } | { readonly ok: false; readonly error: string };
+/** A one-slot edit's outcome: `invalid` when the edit does not stand, else what the file said. */
+export type SlotEditOutcome = WriteOutcome | { readonly ok: false; readonly error: string; readonly invalid: true };
 
 /** What a fresh `service.json` holds: no slots yet — every provider runs on its implied slot. */
 export const FRESH_SERVICE_CONFIG = { slots: [] as unknown[] };
@@ -48,9 +51,28 @@ export class ServiceConfigFile {
     return this.update((root) => ({ ...root, slots }));
   }
 
+  /** D-69: appends one slot entry, every other entry kept as written. */
+  addSlot(entry: unknown): Promise<SlotEditOutcome> {
+    return this.edit((root) => slotAdded(root, entry));
+  }
+
+  /** D-69: removes one slot (an implied one through `impliedOff`); refused while a model row names it. */
+  removeSlot(id: string): Promise<SlotEditOutcome> {
+    return this.edit((root) => slotRemoved(root, id));
+  }
+
   /** Replaces the pool keys (`models`, `capacity`, `ledgers`, req-170), every other key kept. */
   writePool(keys: Readonly<Record<string, unknown>>): Promise<WriteOutcome> {
     return this.update((root) => ({ ...root, ...keys }));
+  }
+
+  private async edit(change: (root: Record<string, unknown>) => SlotEdit): Promise<SlotEditOutcome> {
+    const { root, error } = await this.read();
+    if (error !== null) {
+      return { ok: false, error };
+    }
+    const edited = change(root);
+    return edited.ok ? this.update(() => edited.root) : { ok: false, error: edited.error, invalid: true };
   }
 
   /** Rewrites the file from its parsed root; refused while the file does not parse, never a partial write. */

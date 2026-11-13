@@ -82,6 +82,22 @@ describe('the runner serves the slots (req-177)', () => {
     expect((await call('POST', '/slots/refresh', {})).status).toBe(200);
   });
 
+  it('adds one slot and removes one, every other entry kept as written (D-69)', async () => {
+    const kept = { id: 'claude-a', provider: 'claude-code', login: { claudeConfigDir: 'C:/a' }, limits: [{ window: '5h', budget: 9 }] };
+    await fsp.writeFile(path.join(tmp, 'service.json'), JSON.stringify({ slots: [kept], models: ['kept'] }), 'utf8');
+    const added = await call('POST', '/slots/add', { slot: { id: 'kimi-work', provider: 'kimi', profile: 'work' } });
+    expect(added.status).toBe(200);
+    expect((added.body['slots'] as SlotView[]).map((s) => s.id)).toEqual(['claude-a', 'kimi-work', 'opencode', 'copilot']);
+    expect((await call('POST', '/slots/add', { slot: { id: 'claude-a', provider: 'claude-code' } })).status).toBe(422);
+    // An implied slot: its provider leaves the machine's slots.
+    const removed = await call('POST', '/slots/remove', { id: 'copilot' });
+    expect(removed.status).toBe(200);
+    expect((removed.body['slots'] as SlotView[]).map((s) => s.id)).toEqual(['claude-a', 'kimi-work', 'opencode']);
+    expect((await call('POST', '/slots/remove', { id: 'kimi-work' })).status).toBe(200);
+    expect((await call('POST', '/slots/remove', { id: 'nope' })).status).toBe(422);
+    expect(JSON.parse(await fsp.readFile(path.join(tmp, 'service.json'), 'utf8'))).toEqual({ slots: [kept], models: ['kept'], impliedOff: ['copilot'] });
+  });
+
   it('clears a needs login on the owner’s word', async () => {
     const reply = await call('POST', '/slots/login-done', { id: 'claude-code' });
     expect(reply.body).toMatchObject({ ok: true, slot: { id: 'claude-code' } });

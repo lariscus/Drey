@@ -11,6 +11,8 @@ describe('registerModelsIpc', () => {
       importModelCapabilities: vi.fn(async () => ({ ok: false as const, error: 'v' })),
       slots: vi.fn(async () => null),
       writeSlots: vi.fn(async () => ({ ok: false as const, error: 'y' })),
+      addSlot: vi.fn(async () => ({ ok: false as const, error: 'a' })),
+      removeSlot: vi.fn(async () => ({ ok: false as const, error: 'r' })),
       refreshSlots: vi.fn(async () => ({ ok: false as const, error: 'z' })),
       slotLoginDone: vi.fn(async () => ({ ok: false as const, error: 'w' })),
     } satisfies ModelsFleet;
@@ -19,7 +21,7 @@ describe('registerModelsIpc', () => {
   }
 
   it('registers the pool and the slot channels', () => {
-    expect([...wired().handlers.keys()]).toEqual(['poolModels', 'poolModelsConfig', 'poolModelsImport', 'slots', 'slotsConfig', 'slotsRefresh', 'slotLoginDone']);
+    expect([...wired().handlers.keys()]).toEqual(['poolModels', 'poolModelsConfig', 'poolModelsImport', 'slots', 'slotsConfig', 'slotAdd', 'slotRemove', 'slotsRefresh', 'slotLoginDone']);
   });
 
   it('passes only the pool keys on; a models value that is no list never travels', async () => {
@@ -32,5 +34,15 @@ describe('registerModelsIpc', () => {
     expect(handlers.get('slotsConfig')!({})).toEqual({ ok: false, error: 'the slot config needs a slots list' });
     await handlers.get('slotsRefresh')!({ id: 'claude-a' });
     expect(fleet.refreshSlots).toHaveBeenCalledWith('claude-a');
+  });
+
+  it('adds and removes one slot (D-69); a payload without the slot or its id never travels', async () => {
+    const { handlers, fleet } = wired();
+    await handlers.get('slotAdd')!({ slot: { id: 'claude-b', provider: 'claude-code' } });
+    expect(fleet.addSlot).toHaveBeenCalledWith({ id: 'claude-b', provider: 'claude-code' });
+    await handlers.get('slotRemove')!({ id: 'kimi' });
+    expect(fleet.removeSlot).toHaveBeenCalledWith('kimi');
+    expect(handlers.get('slotAdd')!({})).toEqual({ ok: false, error: 'which slot?' });
+    expect(handlers.get('slotRemove')!({ id: 3 })).toEqual({ ok: false, error: 'which slot?' });
   });
 });
