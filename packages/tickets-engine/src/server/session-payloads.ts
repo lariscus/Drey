@@ -60,16 +60,23 @@ function optionalsOf(payload: Record<string, unknown>): Omit<FreeSessionAsk, 'pe
   if (permission !== undefined && !(SESSION_PERMISSIONS as readonly unknown[]).includes(permission)) {
     return `unknown permission mode "${String(permission)}"`;
   }
-  const model = text(payload['model']);
-  const firstLine = text(payload['firstLine']);
-  const project = text(payload['project']);
   return {
     ...(className !== null ? { poolClass: className } : {}),
     ...(permission !== undefined ? { permissionMode: permission as SessionPermission } : {}),
-    ...(model !== null ? { model } : {}),
-    ...(firstLine !== null ? { firstLine } : {}),
-    ...(project !== null ? { project } : {}),
+    ...textsOf(payload, ['model', 'firstLine', 'project'] as const),
   };
+}
+
+/** The optional text fields that are present (trimmed, non-empty). */
+function textsOf<K extends string>(payload: Record<string, unknown>, keys: readonly K[]): Partial<Record<K, string>> {
+  const out: Partial<Record<K, string>> = {};
+  for (const key of keys) {
+    const value = text(payload[key]);
+    if (value !== null) {
+      out[key] = value;
+    }
+  }
+  return out;
 }
 
 export type ParsedAsk = { readonly ok: true; readonly value: FreeSessionAsk; readonly origin: string } | { readonly ok: false; readonly error: string };
