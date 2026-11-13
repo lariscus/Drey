@@ -888,7 +888,10 @@ ones: an item leaves the roadmap exactly when it enters the changelog or
 - This file only when a *rule* or an architecture statement changed — never
   for status.
 - Last check: the roadmap lists nothing that shipped, the changelog's top
-  entry is the newest, ids are unique, links between the specs resolve.
+  entry is the newest, ids are unique, links between the specs resolve —
+  `node .claude/skills/drey-milestone-done/check-specs.mjs` checks these
+  and prints the next free ids (Claude Code: the `drey-milestone-done`
+  skill walks the whole list).
 
 A milestone that is code-complete but not yet verified by the owner is
 marked "**Not yet manually verified by the owner**" in its changelog
