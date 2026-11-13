@@ -1,6 +1,7 @@
 # Projects — a draft for project handling (2026-11-13)
 
-Status: **draft for the owner's review, nothing built, nothing decided.**
+Status: **draft accepted in its direction (owner, 2026-11-13: "Ja, A"); the
+answers to §9 are recorded in §10. Nothing built.**
 Stage 1 of the design round the owner opened on 2026-11-13 after verifying
 milestones 242–251. Stage 2 (boards in Claude Design: project settings, the
 Persona page revised, Settings → Models) waits for his OK on this draft; stage 3
@@ -264,3 +265,34 @@ owner whether such a need exists today (Lariscus).
    now — register such a folder as a vault and grant it `read`.
 6. **Profile:** stays per repository (today), or becomes the project's default
    for its repos (Lariscus = work)? Recommended: stays per repo.
+
+## 10. The owner's answers (2026-11-13)
+
+Given in German in the session; English here.
+
+- **Option A** — one board, several projects in it ("Ja, A"). A+ stays a later
+  option for a project that needs its own store.
+- **Write rights: both** — the project per vault **and** the persona's
+  `write-notes` switch (§3, the intersection).
+- **Filter:** the owner leans to **one global filter that filters the view** and
+  asked for a view on it. The session's answer: one **project filter in the
+  title bar**, beside the view switcher — Files, the Tickets panel, the board,
+  the Review tab and Find follow it; it is saved with each View (ADR-0089), so a
+  "Lariscus" view opens filtered. This replaces S1's "the same control in every
+  panel": the panels show the active filter as a quiet line, they do not each
+  carry a switch. Mission Control on the phone keeps its own filter. Drawn on the
+  stage 2 board.
+- **The 1:1 reads every project, but not every vault:** the union of the
+  vaults (and folders) that some project grants, read-only. A registered vault
+  no project names is not read by a 1:1.
+- **Folders without git are a source too:** a project lists plain folders
+  (`folders:` in the record, read-only — a spec folder, a copy of a shared
+  drive). The workers' vault MCP serves them read-only beside the vaults, under
+  the same path rules (no dot-folders, no `.git`, links resolved inside the
+  folder). They never host a run: runs still need a repository's worktree.
+- **Profile:** the owner asked what it is. It is req-177's `profile: private |
+  work` on a repository: which accounts (slots) may serve runs on that
+  repository — a work repo runs only on work slots (Copilot at work), never on a
+  private Claude account, and is refused rather than served by the other kind.
+  Recommendation sent: move it to the **project** (repos inherit it; a repo in
+  two projects of different profiles is a board issue). Waiting for his word.
