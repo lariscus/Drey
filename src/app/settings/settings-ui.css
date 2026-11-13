@@ -66,6 +66,11 @@
   max-width: var(--set-page-w);
 }
 
+/* SDK 1.58: a plugin page that draws its own head and layout takes the full width. */
+:where(.settings-ui) .pane.bare {
+  max-width: none;
+}
+
 /* ---- Sections ---- */
 
 :where(.settings-ui) section {

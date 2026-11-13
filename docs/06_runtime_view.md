@@ -6187,3 +6187,26 @@ A ticket without `project:` reads as the board's only project; once a second
 project exists it reads as Unassigned, and only outside the first and the
 last column is that a badge. A project without a purpose adds no section, so
 the first project changes no brief.
+
+## 6.132 A change on Settings → Projects — one commit (req-284, milestone 264)
+
+Every control of the page writes at once; there is no Save. The page keeps
+the latest record it wrote or read and sends the whole draft, so the engine
+always writes a complete, canonical file.
+
+```mermaid
+sequenceDiagram
+    participant P as Settings → Projects (plugin renderer)
+    participant M as Plugin main
+    participant S as ProjectService (engine)
+    participant V as Tickets vault
+    participant G as git
+    P->>P: a click, a field left, the editor blurred: patch over the latest record
+    P->>M: projectSave {id, project} (or projectAddRepo / projectRemove)
+    M->>S: invoke (PROJECT_METHODS)
+    S->>S: queue; checkDraft; a new record: mintProjectId(name)
+    S->>V: write projects/<id>.md (and repos.md for From folder…) when the text changed
+    S->>G: one commit of exactly those files "projects: <name> … (req-284)"
+    S-->>P: {ok, id} — the status line says Saved · committed just now
+    V-->>P: board-changed → reload (the detail is rebuilt only if what it shows changed)
+```

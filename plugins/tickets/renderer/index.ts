@@ -48,6 +48,7 @@ import { stuckOf } from './stuck';
 import type { WorktreeFile } from '../../../packages/tickets-engine/src/core/worktree-changes';
 import { createWorkFilterStore, filterPopover, isFilterActive, NO_WORK_FILTER, type WorkFilterState } from './work-filter';
 import { createTicketsSettingsPage } from './settings-page';
+import { createProjectsSettingsPage } from './projects/projects-page';
 import { createFilesOperationsHandler, ticketsContextMenuItems } from './files-guard';
 import { createTicketHeader, showsTicketDocument, ticketLogFold, ticketTabTitle } from './ticket-header';
 import { openTicketDocument, type TicketDocumentReply } from './open-ticket';
@@ -3281,6 +3282,8 @@ const plugin: { activate(api: DreyPluginApi): void } = {
         openAutopilot: () => toggleAutopilotPopover?.(),
       }),
     );
+    // req-284: Settings → Projects, a category of its own (board 7m).
+    api.ui.registerSettingsPage(createProjectsSettingsPage(api));
 
     // The Files-panel seam (T-0042, SDK 1.32): veto/takeover over the
     // board's ground, and the per-target context rows. Both read the

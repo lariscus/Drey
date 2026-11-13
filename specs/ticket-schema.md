@@ -1782,8 +1782,19 @@ and shows as a warning.
 
 What reads it today (req-282): the board (the snapshot's `projects`, the
 per-ticket checks under `project` above) and the run brief. The vault
-rights of a run (req-283), Settings → Projects (req-284) and the global
-project filter (req-285) build on the same records.
+rights of a run (req-283) and the global project filter (req-285) build on
+the same records.
+
+**Who writes it.** Besides the first project's migration, Settings →
+Projects (req-284) writes the records through the engine's `projectSave`,
+`projectRemove` and `projectAddRepo` (`ProjectService`): every change is
+one commit of exactly the files it touched — `projects: <name> created`,
+`… changed`, `… removed`, `… — repository <repo> added (req-284)`. A new
+record's id is minted from its name (`-2`, `-3` when taken) and never
+changes afterwards, so a rename keeps every ticket's `project:` valid.
+*From folder…* registers the repository in `repos.md` (when no entry of
+that name exists) and lists it in the project in the same commit. A
+removed project's tickets keep its id; the board reports it as unknown.
 
 **The first project (migration at the engine's start).** A board whose
 `_meta/projects/` holds no file gets one project, written by the engine

@@ -1,0 +1,621 @@
+/* Settings → Projects (req-284, board 7m `DeskProjects`): master-detail, measures from the board's HTML. */
+
+/* The body is the host's `.pane` column: the list beside the detail, then the status line. */
+.plugin-settings-body.prj {
+  gap: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-primary);
+}
+
+.prj-main {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+}
+
+.prj-grow {
+  flex-grow: 1;
+}
+
+.prj-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.prj-ib {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-chip);
+  color: var(--text-4);
+}
+
+.prj-ib:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.prj-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.prj-dot-14 {
+  width: 14px;
+  height: 14px;
+}
+
+/* ---- the list ---- */
+
+.prj-list {
+  width: 232px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.prj-list-head {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding-left: 8px;
+}
+
+.prj-list-head .prj-ib {
+  width: 28px;
+  height: 28px;
+}
+
+.prj-list-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.prj-item {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-chip);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+}
+
+.prj-item:hover {
+  background: var(--hover-bg);
+}
+
+.prj-item[aria-current='true'] {
+  background: var(--active-bg);
+  border-color: var(--border);
+  font-weight: 600;
+}
+
+.prj-item-name {
+  flex-grow: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prj-item-count {
+  color: var(--text-4);
+  font-size: 13px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.prj-empty {
+  margin: 8px 0 0;
+  color: var(--text-4);
+}
+
+/* ---- the detail ---- */
+
+.prj-detail-host {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.prj-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.prj-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 34px;
+}
+
+.prj .prj-title {
+  margin: 0;
+  font-size: 26px;
+  line-height: 34px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.prj-menu-wrap {
+  position: relative;
+}
+
+.prj-menu[hidden] {
+  display: none;
+}
+
+.prj-menu {
+  position: absolute;
+  top: 34px;
+  right: 0;
+  z-index: 8;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-control);
+}
+
+.prj-menu-item {
+  height: 32px;
+  padding: 0 8px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-chip);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+}
+
+.prj-menu-item:hover {
+  background: var(--border);
+}
+
+.prj-ask {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.prj-btn {
+  height: 28px;
+  padding: 0 10px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.prj-danger {
+  color: var(--status-deleted);
+}
+
+.prj-row {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+}
+
+.prj-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prj .prj-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Board 7m: 220 px of text, plus its padding and border. */
+.prj .prj-input {
+  width: 242px;
+  height: 32px;
+  padding: 0 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-chip);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.prj-swatches {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 32px;
+  padding-left: 3px;
+}
+
+.prj-swatch {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.prj-swatch[aria-checked='true'],
+.prj-swatch-custom.prj-swatch-on {
+  box-shadow:
+    0 0 0 2px var(--bg-editor),
+    0 0 0 4px var(--text-primary);
+}
+
+.prj-swatch-custom {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--field-border);
+  box-sizing: border-box;
+  background: conic-gradient(from 90deg, #c96442, #7d8f6e, #6e83a0, #8b7fa8, #c98a3c, #4f9a90, #c96442);
+}
+
+.prj-swatch-custom input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+}
+
+.prj-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prj .prj-h2 {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.prj-h2-note {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-4);
+}
+
+/* ---- Purpose: the host's Markdown editor ---- */
+
+.prj-ed {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-editor);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.prj-ed-bar {
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-dock);
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
+}
+
+.prj-ed-bar .prj-ib {
+  width: 26px;
+  height: 26px;
+}
+
+.prj-ed-modes {
+  display: flex;
+  gap: 2px;
+}
+
+.prj-mode {
+  height: 24px;
+  padding: 0 8px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-chip);
+  color: var(--text-4);
+  font: inherit;
+  font-size: 12px;
+}
+
+.prj-mode[aria-pressed='true'] {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.prj-ed-body {
+  padding: 14px 28px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.prj-ed-view {
+  min-height: 44px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+/* The surface's own text padding gives way to the frame's (board 7m: 14px 28px). */
+.prj-ed-view .cm-content {
+  padding: 0;
+}
+
+.prj-ed-view .cm-line {
+  padding: 0;
+}
+
+/* No fold column in a few sentences: the text starts at the frame's padding. */
+.prj-ed-view .cm-gutters {
+  display: none !important;
+}
+
+/* ---- Repositories and Folders ---- */
+
+.prj-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prj-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.prj-chip {
+  position: relative;
+  height: 28px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: var(--bg-dock);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.prj-chip-x {
+  display: none;
+  width: 18px;
+  height: 18px;
+}
+
+.prj-chip:hover .prj-chip-x,
+.prj-chip:focus-within .prj-chip-x {
+  display: flex;
+}
+
+.prj-tag {
+  height: 20px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  color: var(--text-4);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.prj-tag-accent {
+  color: var(--accent);
+  font-family: var(--font-mono);
+}
+
+.prj-add {
+  height: 28px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px dashed var(--field-border);
+  border-radius: var(--radius-chip);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.prj-add-accent[aria-expanded='true'] {
+  background: var(--bg-input);
+  border-color: var(--accent);
+}
+
+.prj-picker {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  background: var(--bg-dock);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.prj-picker[hidden] {
+  display: none;
+}
+
+.prj-picker-list {
+  flex-grow: 1;
+  min-width: 0;
+  height: 88px;
+  padding: 2px;
+  background: var(--bg-input);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-chip);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.prj-picker-list option {
+  padding: 3px 8px;
+}
+
+.prj-picker-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.prj-picker-actions .prj-ib {
+  width: 28px;
+  height: 28px;
+}
+
+.prj-folder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 4px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  background: var(--bg-dock);
+}
+
+.prj-folder .prj-ib {
+  width: 26px;
+  height: 26px;
+}
+
+.prj-muted-icon {
+  display: flex;
+  color: var(--text-4);
+}
+
+.prj-folder-path {
+  flex-grow: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Vaults ---- */
+
+.prj-vaults {
+  gap: 4px;
+  max-width: 560px;
+}
+
+.prj-vault-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.prj-vault {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 38px;
+  border-bottom: 1px solid var(--border);
+}
+
+.prj-vault:last-child {
+  border-bottom: 0;
+}
+
+.prj-vault-away {
+  opacity: 0.55;
+}
+
+.prj-vault-name {
+  font-size: 14px;
+}
+
+.prj-vault:not(.prj-vault-away) .prj-vault-name {
+  flex-grow: 1;
+}
+
+.prj-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 1px;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-chip);
+  flex-shrink: 0;
+}
+
+.prj-seg-btn {
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-chip);
+  background: transparent;
+  color: var(--text-4);
+  font: inherit;
+  font-size: 13px;
+}
+
+.prj-seg-btn[aria-checked='true'] {
+  background: var(--active-bg);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Board 7m: bottom right of the pane; it stays in sight while the page scrolls. */
+.prj-status {
+  position: sticky;
+  bottom: -22px;
+  align-self: flex-end;
+  margin-top: 8px;
+  color: var(--text-4);
+  font-size: 13px;
+}
+
+.prj-status-error {
+  color: var(--status-deleted);
+}

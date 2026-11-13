@@ -266,6 +266,13 @@ export interface PluginSettingsPageContrib {
    * `section`, else the first element with this exact `label`).
    */
   readonly entries?: readonly PluginSettingsEntry[];
+  /**
+   * SDK 1.58: the page draws its own head and layout (a master-detail page
+   * like Settings → Projects, board 7m) -- the host omits the title and the
+   * description and lets the body take the detail pane's full width
+   * instead of the one page width.
+   */
+  readonly bare?: boolean;
   mount(el: HTMLElement): () => void;
 }
 
