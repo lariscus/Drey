@@ -18,6 +18,7 @@ import {
   type McPriorityConfig,
   type McTicketUsage,
 } from '../api/dto';
+import type { McChainWaits } from './hold';
 
 // --- the consumed device-state surface ---------------------------------------
 
@@ -232,6 +233,12 @@ export interface McRun {
   readonly state?: string | null;
   /** The ticket the run works on (E13-20: the ticket opens on the run while it is live). */
   readonly ticketId?: string;
+  /** req-273: the persona the run runs as (a holder group's load counts it); absent = unknown. */
+  readonly persona?: string;
+  /** req-273: the run's activity line (`merging main` during the builder's sync-main); absent = none. */
+  readonly activity?: string | null;
+  /** req-273: when the run started (ISO). */
+  readonly startedAt?: string;
 }
 
 /** A live run as the phone's Work row words it (`stuck 9 min`, the run's age). */
@@ -268,6 +275,8 @@ export interface McWorkState {
    * degrades to its idle face instead of guessing a count.
    */
   readonly runs?: readonly McRun[] | null;
+  /** req-273: the chain block's per-ticket waits (`waits for Ben`, the pool's queue line); absent = none known. */
+  readonly waits?: McChainWaits | null;
   moveTicket(ticketId: string, phaseId: string): Promise<McMoveResult>;
   /** The archive of any age, newest first, for "Show older" (E13-21); absent = no such list. */
   loadArchive?(): Promise<readonly McDoneEntry[]>;
@@ -315,8 +324,12 @@ export interface McWorkState {
    * along its chain. Absent = the manual card shows no actions.
    */
   finishManual?(ticketId: string): Promise<McAnswerReply>;
-  /** A manual step's Send back (E10-6); the note is mandatory. */
-  sendBackManual?(ticketId: string, note: string): Promise<McAnswerReply>;
+  /** A manual step's Send back (E10-6); the note is mandatory. req-273: `position` sends a persona board ticket back to that position. */
+  sendBackManual?(ticketId: string, note: string, position?: number): Promise<McAnswerReply>;
+  /** req-273: hands a persona board ticket to a persona (the no-persona card's Assign…, Do it myself = `you`). */
+  handTicket?(ticketId: string, persona: string): Promise<McAnswerReply>;
+  /** req-273: starts the ticket's run again (the merge conflict card's Let Ben resolve). */
+  startTicketRun?(ticketId: string): Promise<McAnswerReply>;
 }
 
 /** What an answer hands back (`McReply` in the app's api layer, restated). */

@@ -197,6 +197,9 @@ export const appConfig: ApplicationConfig = {
           get runs() {
             return state.team().runs;
           },
+          get waits() {
+            return state.team().waits ?? null;
+          },
           get openTicketId() {
             return state.ticketOpen()?.id ?? state.approvalTicket();
           },
@@ -215,7 +218,9 @@ export const appConfig: ApplicationConfig = {
           promote: (ticketId) => state.prefillChat(`promote ${ticketId}`),
           answer: (runId, text) => state.answerRun(runId, text),
           finishManual: (ticketId) => state.finishManualStep(ticketId),
-          sendBackManual: (ticketId, note) => state.sendBackManualStep(ticketId, note),
+          sendBackManual: (ticketId, note, position) => state.sendBackManualStep(ticketId, note, position),
+          handTicket: (ticketId, persona) => state.handTicket(ticketId, persona),
+          startTicketRun: (ticketId) => state.startTicketRun(ticketId),
           openPersona: (titleOrId) => {
             const byTitle = (
               state.personas() as unknown as readonly { id: string; title: string }[]
