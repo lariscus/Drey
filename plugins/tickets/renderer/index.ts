@@ -90,9 +90,8 @@ import { mountTeam } from './team/team-view';
 import { PERSONA_KIND, personaIdOfKey, personaKeyOf } from './team/persona-model';
 import { mountPersonaPage, personaWordCountOf } from './team/persona-page';
 import { focusCrew } from './team/team-focus';
-import { bandHeaderStatusOf, bandStatusOf, queuedIdsOf } from './team/capacity-model';
+import { bandStatusOf } from './team/capacity-model';
 import { queueWordsFor } from './queue-line';
-import { bandShownFor, mountCapacity } from './team/capacity-view';
 import { mountBoard } from './board/board-view';
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -3224,35 +3223,8 @@ const plugin: { activate(api: DreyPluginApi): void } = {
         }),
       }),
     );
-    // The Capacity band (E13-8): a panel for the bottom dock - slots busy,
-    // what each persona does, today's cost, Pause all, Open Team.
-    api.ui.registerWidget({
-      id: 'tickets-capacity',
-      title: api.i18n.t('capacity.title'),
-      icon: 'rocket',
-      defaultDock: 'bottom',
-      defaultOpen: false,
-      defaultFlex: 120,
-      flush: true,
-      status: () => bandHeaderStatusOf(fleetRuns, chain, queuedIdsOf(snapshot, fleetRuns).length, api.i18n),
-      // SDK 1.52: off the Board tab the panel draws nothing, so the bottom dock takes no height (D-47).
-      shown: () => bandShownFor(api.documents.active()?.path ?? null),
-      // Board 7e: one hover action, Pause all (a second press lets the chain run again).
-      headerActions: (host) => {
-        const pause = el('button', 'icon-btn');
-        pause.type = 'button';
-        pause.title = api.i18n.t('capacity.pause_all_title');
-        pause.setAttribute('aria-label', api.i18n.t('capacity.pause_all'));
-        pause.append(api.ui.icon('pause', 14));
-        pause.addEventListener('click', () => void runChainAction('chainMaster', { mode: chain?.master === 'halted' ? 'run' : 'halted' }));
-        host.append(pause);
-        return () => pause.remove();
-      },
-      mount: (el) => mountCapacity(deskDeps(api), teamStore(api), el, () => openTeamDoc(api)),
-    });
     api.commands.register({ id: 'tickets.openBoard', label: 'Open the Board', run: () => openBoardDoc(api) });
     api.commands.register({ id: 'tickets.openTeam', label: 'Open the Crew', run: () => openTeamDoc(api) });
-    api.commands.register({ id: 'tickets.showCapacity', label: 'Show the Capacity band', run: () => api.ui.revealWidget('tickets-capacity') });
     api.ui.registerSettingsPage(
       createTicketsSettingsPage(api, {
         openTeam: () => openTeamDoc(api),

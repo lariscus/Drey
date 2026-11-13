@@ -1,11 +1,11 @@
 /*
- * The desk surfaces (E13-8): the Board and Team tabs and the Capacity band.
+ * The desk surfaces (E13-8): the Board and Team tabs (the Capacity band of
+ * E13-8 became the Board's pool chip, req-271).
  * Flat, sentence-case sans, theme tokens only (ADR-0057); every class is
  * scoped under `desk-`.
  */
 .desk-board,
-.desk-team,
-.desk-capacity {
+.desk-team {
   box-sizing: border-box;
   color: var(--text-2);
   font-family: var(--font-sans, inherit);
@@ -203,8 +203,7 @@
  * are the boards' own.
  */
 .desk-board,
-.desk-team,
-.desk-capacity {
+.desk-team {
   color: var(--text-primary);
   font-size: 13px;
   line-height: 18px;
@@ -254,8 +253,7 @@
 
 /* A button on the boards: h30, padding 0 14, radius 8, 13 px, hairline border. */
 .desk-board .desk-btn,
-.desk-team .desk-btn,
-.desk-capacity .desk-btn {
+.desk-team .desk-btn {
   height: 30px;
   padding: 0 14px;
   border: 1px solid var(--border);
@@ -470,115 +468,7 @@
   cursor: pointer;
 }
 
-/*
- * ---- Capacity band (the bottom dock, board 7e) ----
- * Measured from the board's rendered markup (its heights add the padding):
- * persona row 62 (56 + 6 under), Slots row 32, Tranche-and-queue row 34
- * (28 + 6 under); the board draws the band inside the board column's 16 px
- * gutter and 12 px above the status bar, so the root keeps both.
- */
-.desk-capacity {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: 0 16px 12px;
-  overflow: hidden;
-}
-
-.desk-cap-persons {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 4px;
-  box-sizing: border-box;
-  height: 62px;
-  padding: 0 8px 6px;
-}
-
-.desk-capacity[hidden] {
-  display: none;
-}
-
-/*
- * Outside the Board and Crew tabs the band's frame goes with its content and
- * the bottom dock falls back to its icon strip (board 7e). In CSS, not by
- * closing the panel: closing would mark the view's layout as changed on every
- * tab switch.
- */
-app-panel-frame:has(.desk-capacity[hidden]) {
-  display: none;
-}
-
-app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not(:has(.desk-capacity)))) {
-  height: auto !important;
-}
-
-.desk-cap-person {
-  display: flex;
-  flex: 1 1 0;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  height: 44px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--text-primary);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.desk-cap-person:hover {
-  background: var(--hover-bg);
-}
-
-.desk-cap-avatar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--persona-color, var(--border));
-  color: var(--on-pastel);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.desk-cap-stuckdot {
-  position: absolute;
-  right: -1px;
-  bottom: -1px;
-  box-sizing: content-box;
-  width: 9px;
-  height: 9px;
-  border: 2px solid var(--bg-dock);
-  border-radius: 50%;
-  background: var(--needs-you, var(--status-modified));
-  box-shadow: 0 0 6px color-mix(in srgb, var(--needs-you, var(--status-modified)) 70%, transparent);
-}
-
-.desk-cap-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 18px;
-}
-
-.desk-cap-nameline {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.desk-cap-name {
-  font-weight: 600;
-}
-
+/* The slot chips' busy dots (the pool chip's popover, req-271). */
 .desk-cap-slots {
   display: inline-flex;
   gap: 3px;
@@ -597,17 +487,6 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   background: var(--text-primary);
 }
 
-.desk-cap-slotrow {
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  align-content: center;
-  align-items: center;
-  gap: 6px;
-  box-sizing: border-box;
-  min-height: 32px;
-  padding: 0 8px;
-}
 
 .desk-slot {
   display: flex;
@@ -685,16 +564,6 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   flex: none;
 }
 
-.desk-cap-queuerow {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 12px;
-  box-sizing: border-box;
-  height: 34px;
-  padding: 0 8px 6px;
-  color: var(--text-4);
-}
 
 .desk-tranche-text {
   min-width: 0;
@@ -718,71 +587,15 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   background: var(--accent);
 }
 
-.desk-cap-queue-gap {
-  flex-grow: 1;
-}
 
-.desk-queue {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  white-space: nowrap;
-}
 
-.desk-queue svg {
-  flex: none;
-}
 
-.desk-queue-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
-.desk-cap-line {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-4);
-}
 
-.desk-cap-sep {
-  flex: none;
-  width: 1px;
-  height: 32px;
-  margin: 0 6px;
-  background: var(--border);
-}
 
-.desk-cap-budget {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: 6px;
-  width: 196px;
-  padding: 0 8px;
-}
 
-.desk-cap-budget-row {
-  display: flex;
-}
 
-.desk-cap-budget-label {
-  flex: 1;
-  color: var(--text-4);
-}
 
-.desk-cap-today {
-  font-variant-numeric: tabular-nums;
-}
-
-/* The board's link: 32 + border, padding 0 10, the control border (the generic .desk-btn is 30 high, padding 0 14). */
-.desk-capacity .desk-cap-crew {
-  flex: none;
-  height: 34px;
-  padding: 0 10px;
-  border-color: var(--field-border);
-}
 
 /* A thin bar, shared by the Crew head and the band. */
 .desk-bar {
@@ -793,17 +606,6 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   background: var(--bg-dock);
 }
 
-/* The board's budget bar: 4 high, the editor colour as track, the grey as fill. */
-.desk-cap-budget .desk-bar {
-  height: 4px;
-  margin-top: 0;
-  background: var(--bg-main);
-}
-
-.desk-cap-budget .desk-bar-fill {
-  height: 4px;
-  background: var(--text-4);
-}
 
 .desk-bar-fill {
   display: block;
@@ -1336,4 +1138,546 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
 .desk-btn-small {
   height: 24px !important;
   padding: 0 8px !important;
+}
+
+/*
+ * ---- The persona board (req-271, board 7e v2) ----
+ * Measured from DeskBoardV2.dc.html: the tab padding 8 16, a 30 px header
+ * row 4 above the columns, columns 10 apart (Inbox and Prioritized 140, the
+ * personas sharing the rest, Done this week 172), column heads 28 high, cards
+ * 6 apart with padding 8 10, radius 8, on the field surface.
+ */
+.desk-board.desk-pboard {
+  padding: 8px 16px;
+  gap: 4px;
+}
+
+.pb-grow {
+  flex-grow: 1;
+}
+
+.pb-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  position: relative;
+}
+
+.pb-h {
+  font-size: 18px;
+  line-height: 22px;
+  font-weight: 700;
+}
+
+.pb-btn {
+  box-sizing: border-box;
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control, 8px);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.pb-btn-primary {
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.pb-pool {
+  position: relative;
+  display: flex;
+}
+
+.pb-pool-chip-open {
+  background: var(--bg-input);
+}
+
+.pb-pool-pop {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  z-index: 6;
+  box-sizing: border-box;
+  width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--bg-dock);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.pb-pool-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pb-pool-title {
+  font-size: 14px;
+}
+
+.pb-pool-sub,
+.pb-pool-tranche,
+.pb-pool-queue {
+  color: var(--text-4);
+}
+
+.pb-pool-pause {
+  width: 24px;
+  height: 24px;
+}
+
+.pb-pool-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pb-pool-tranche {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pb-pool-tranche .desk-tranche-text {
+  white-space: normal;
+}
+
+.pb-pool-tranche .desk-tranche-bar {
+  width: auto;
+}
+
+.pb-pool-queue {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.pb-pool-queue svg {
+  flex: none;
+}
+
+.pb-pool-queue-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pb-pool-overrun {
+  color: var(--status-modified);
+}
+
+.pb-pool-link {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.pb-cols {
+  flex-grow: 1;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.pb-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pb-col-edge {
+  flex: 0 0 140px;
+}
+
+.pb-col-lane {
+  flex: 1 1 0;
+  min-width: 150px;
+}
+
+.pb-col-done {
+  flex: 0 0 172px;
+}
+
+.pb-col-over {
+  outline: 1px dashed var(--field-border);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.pb-fold {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pb-fold-gap {
+  height: 28px;
+}
+
+.pb-fold-chip {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  box-sizing: border-box;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px dashed var(--field-border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-4);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pb-col-head {
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pb-col-head[draggable="true"] {
+  cursor: grab;
+}
+
+.pb-col-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pb-col-count,
+.pb-col-cost {
+  color: var(--text-4);
+  white-space: nowrap;
+}
+
+.pb-avatar {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--persona-color, var(--border));
+  color: var(--on-pastel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.pb-load {
+  color: var(--text-4);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.pb-load-full {
+  color: var(--status-modified);
+  font-weight: 600;
+}
+
+.pb-col-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.pb-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.pb-card:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.pb-card-need {
+  border-color: var(--accent-peach);
+}
+
+.pb-card-emph {
+  border-color: var(--field-border);
+}
+
+.pb-card-archived {
+  cursor: default;
+}
+
+.pb-dragging {
+  opacity: 0.5;
+}
+
+.pb-card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pb-card-id {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 12px;
+  color: var(--text-4);
+}
+
+.pb-badge {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-4);
+}
+
+.pb-badge-sent-back-once,
+.pb-badge-sent-back-twice {
+  color: var(--status-conflict);
+}
+
+.pb-badge-question,
+.pb-badge-no-persona {
+  color: var(--accent-peach);
+}
+
+.pb-badge-accept {
+  color: var(--accent-mint);
+}
+
+.pb-card-title {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 17px;
+}
+
+.pb-chain {
+  display: flex;
+  gap: 2px;
+  flex-wrap: nowrap;
+}
+
+.pb-cell {
+  flex-shrink: 0;
+  padding: 0 3px;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 14px;
+  font-weight: 700;
+  color: var(--text-4);
+}
+
+.pb-cell-done {
+  color: var(--text-faint);
+}
+
+.pb-cell-now {
+  background: var(--accent);
+  color: var(--on-pastel);
+}
+
+.pb-cell-now.pb-cell-need {
+  background: var(--accent-peach);
+}
+
+.pb-cell-now.pb-cell-sent-back {
+  background: var(--status-conflict);
+}
+
+.pb-cell-again {
+  outline: 1px dashed var(--field-border);
+  outline-offset: -1px;
+}
+
+.pb-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.pb-card-who {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.pb-card-cost {
+  white-space: nowrap;
+  color: var(--text-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.pb-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--text-4);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.pb-status-text {
+  min-width: 0;
+}
+
+.pb-dot {
+  box-sizing: border-box;
+  width: 7px;
+  height: 7px;
+  margin-top: 4px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.pb-dot-run {
+  background: var(--status-added);
+}
+
+.pb-dot-wait {
+  border: 1.5px solid var(--text-4);
+}
+
+.pb-dot-need {
+  background: var(--needs-you);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--needs-you) 70%, transparent);
+}
+
+.pb-decide {
+  display: flex;
+  gap: 6px;
+}
+
+.pb-decide-accept,
+.pb-decide-back {
+  box-sizing: border-box;
+  height: 26px;
+  padding: 0 8px;
+  flex: 1 1 0;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pb-decide-accept {
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.pb-decide-accept:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pb-decide-back {
+  border: 1px solid var(--field-border);
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.pb-more {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--text-4);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pb-floating {
+  position: fixed;
+  z-index: 1000;
+}
+
+.pb-sendback {
+  box-sizing: border-box;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--bg-dock);
+  border: 1px solid var(--popover-border, var(--border));
+  border-radius: 8px;
+  box-shadow: var(--popover-shadow, none);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.pb-sendback-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pb-sendback-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.pb-sendback-note {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--field-border);
+  border-radius: 4px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font: inherit;
+  resize: vertical;
 }

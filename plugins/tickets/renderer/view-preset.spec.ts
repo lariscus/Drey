@@ -5,11 +5,11 @@ import { WORK_VIEW_ID, createWorkPreset, registerWorkView } from './view-preset'
 import type { DeskDeps } from './desk-deps';
 
 describe('the Work preset', () => {
-  it('arranges Tickets left, the Assistant right and the Capacity band below', () => {
+  it("arranges Tickets left, the Assistant right and nothing below (the Capacity band is the Board's pool chip, req-271)", () => {
     const preset = createWorkPreset();
     expect(preset.id).toBe(WORK_VIEW_ID);
     expect(preset.label).toBe('Work');
-    expect(preset.layout).toEqual({ left: ['tickets'], right: ['assistant'], bottom: ['tickets-capacity'], bottomH: 168 });
+    expect(preset.layout).toEqual({ left: ['tickets'], right: ['assistant'], bottom: [] });
   });
 
   it('names no Assistant target until E13-5 gives it one', () => {

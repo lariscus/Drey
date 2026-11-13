@@ -8,9 +8,9 @@ import type { BoardSnapshot, TicketCard } from '../../shared/tickets';
 import type { DeskDeps } from '../desk-deps';
 import { mountBoard } from '../board/board-view';
 import { bandHeaderStatusOf, bandStatusOf } from './capacity-model';
-import { bandShownFor, mountCapacity, personaLineOf, trancheNodes } from './capacity-view';
+import { trancheNodes } from './capacity-view';
+import { poolChipNode } from '../board/pool-chip';
 import { focusCrew, resetCrewFocus } from './team-focus';
-import { personaCardOf } from './team-model';
 import type { TeamStore } from './team-store';
 import { mountTeam } from './team-view';
 
@@ -277,35 +277,8 @@ describe('the Crew tab', () => {
   });
 });
 
-describe('the Capacity band', () => {
-  it('draws one button per persona with what it does, and the day against the budget', () => {
-    const host = document.body.appendChild(document.createElement('div'));
-    const personas = [persona({}), persona({ id: 'tessa', title: 'Tessa', role: 'Tester' })];
-    const open = vi.fn();
-    mountCapacity(deps(), store(personas), host, open);
-    expect([...host.querySelectorAll('.desk-cap-person .desk-cap-line')].map((p) => p.textContent)).toEqual(['idle', 'stuck on T-0126 · 9 min']);
-    expect(host.querySelector('.desk-cap-today')!.textContent).toBe('$5.34 of $10 today');
-    expect(host.querySelector('.desk-cap-stuckdot')).not.toBeNull();
-    host.querySelector<HTMLButtonElement>('.desk-cap-crew')!.click();
-    expect(open).toHaveBeenCalled();
-  });
-
-  it('shows the band only while the Board tab is active (7e)', () => {
-    expect(bandShownFor('board://all')).toBe(true);
-    expect(bandShownFor('team://all')).toBe(false);
-    expect(bandShownFor('notes/a.md')).toBe(false);
-    expect(bandShownFor(null)).toBe(false);
-    const host = document.body.appendChild(document.createElement('div'));
-    activePath = 'notes/a.md';
-    mountCapacity(deps(), store([persona({})]), host, vi.fn());
-    expect(host.querySelector<HTMLElement>('.desk-capacity')!.hidden).toBe(true);
-    activePath = 'board://all';
-  });
-
-  it('names a persona line and the header status', () => {
-    expect(personaLineOf(personaCardOf(persona({ id: 'tessa' }), [run({})], [], () => null, Date.now()), i18n)).toBe('stuck on T-0126 · 9 min');
-    expect(personaLineOf(personaCardOf(persona({ id: 'tessa' }), [run({ stuck: false }), run({ id: 'r2', stuck: false })], [], () => null, Date.now()), i18n)).toBe('works on T-0126 +1');
-    expect(personaLineOf(personaCardOf(persona({ id: 'tessa' }), [run({ stuck: false, waiting: { kind: 'question', text: '?', since: '' } as never })], [], () => null, Date.now()), i18n)).toBe('T-0126 waits for you');
+describe('the run counts the Crew tab and the pool chip read', () => {
+  it('says what runs, stuck first, and the sessions against the pool', () => {
     expect(bandStatusOf([run({})], i18n)).toBe('1 stuck');
     expect(bandStatusOf([run({ stuck: false })], i18n)).toBe('1 running');
     expect(bandStatusOf([], i18n)).toBeNull();
@@ -315,7 +288,7 @@ describe('the Capacity band', () => {
   });
 });
 
-describe('the Capacity band: Slots row and queue row (board 7e)', () => {
+describe("the pool chip's popover: slots, tranche and queue (board 7e v2, req-271)", () => {
   const inThreeDays = new Date(Date.now() + 3 * 86_400_000);
   inThreeDays.setHours(9, 0, 0, 0);
   const monday = inThreeDays.toISOString();
@@ -342,8 +315,7 @@ describe('the Capacity band: Slots row and queue row (board 7e)', () => {
 
   it('draws one chip per slot: dots, bar by reliability, share, q with the upgrade mark, the reset', () => {
     chain = slotsChain();
-    const host = document.body.appendChild(document.createElement('div'));
-    mountCapacity(deps(), store([persona({})]), host, vi.fn());
+    const host = document.body.appendChild(poolChipNode(deps(), [], true, vi.fn()));
     const chips = [...host.querySelectorAll<HTMLElement>('.desk-slot')];
     expect(chips.map((c) => c.querySelector('.desk-slot-name')!.textContent)).toEqual(['Claude A', 'z.ai', 'Kimi', 'Claude B']);
     const [a, z, kimi, login] = chips;
@@ -365,13 +337,25 @@ describe('the Capacity band: Slots row and queue row (board 7e)', () => {
     expect(login!.querySelector('.desk-slot-bar')).toBeNull();
   });
 
-  it('puts the first queued ticket on the right of the last row and leaves the tranche part empty', () => {
-    chain = slotsChain();
-    const host = document.body.appendChild(document.createElement('div'));
-    mountCapacity({ ...deps(), snapshot: () => queuedSnapshot }, store([persona({})]), host, vi.fn());
-    const row = host.querySelector('.desk-cap-queuerow')!;
-    expect(row.querySelector('.desk-queue-text')!.textContent).toBe('T-0123 queued · waits for a slot · 1st');
-    expect(row.querySelector('.desk-tranche-text')).toBeNull();
+  it("names the head of the pool's queue with its class and place, and leaves the tranche part out without one", () => {
+    chain = { ...slotsChain(), queue: [{ ticket: 'T-0129', persona: 'ralf', class: 'B', reason: 'capacity', line: 'waits for a B slot', detail: '', position: 1, since: '' }] } as unknown as ChainStatus;
+    const host = document.body.appendChild(poolChipNode(deps(), [], true, vi.fn()));
+    expect(host.querySelector('.pb-pool-chip')!.textContent).toBe('1/5 · 1 queued');
+    expect(host.querySelector('.pb-pool-sub')!.textContent).toBe('1 of 5 sessions · 1 queued');
+    expect(host.querySelector('.pb-pool-queue-text')!.textContent).toBe('T-0129 queued · waits for a B slot · 1st');
+    expect(host.querySelector('.desk-tranche-text')).toBeNull();
+  });
+
+  it('shows a minimum overrun and opens the Service window', () => {
+    chain = { master: 'run', poolSize: { opencode: 1 } } as unknown as ChainStatus;
+    runs = [run({ persona: 'ben', stuck: false }), run({ id: 'r2', persona: 'ben', stuck: false })];
+    const lanes = [{ persona: 'ben', title: 'Ben', kind: 'agent' as const, color: '', parallel: 2, min: 2 }];
+    const toggle = vi.fn();
+    const host = document.body.appendChild(poolChipNode(deps(), lanes, true, toggle));
+    expect(host.querySelector('.pb-pool-overrun')!.textContent).toBe('1 run over the pool · the minimum of Ben');
+    host.querySelector<HTMLButtonElement>('.pb-pool-link')!.click();
+    expect(toggle).toHaveBeenCalledWith(false);
+    expect(invoked).toContainEqual(['serviceControl', { target: 'window', action: 'open' }]);
   });
 
   it('draws the tranche part as board 7e does once the chain carries a tranche', () => {
@@ -393,11 +377,12 @@ describe('the Capacity band: Slots row and queue row (board 7e)', () => {
     expect(line({ size: null, runsLeft: null, budget: null, msLeft: null })).toBe('Tranche 2 · 3 runs · $4.10');
   });
 
-  it('draws no queue part while nothing is queued', () => {
-    const host = document.body.appendChild(document.createElement('div'));
-    mountCapacity(deps(), store([persona({})]), host, vi.fn());
-    expect(host.querySelector('.desk-queue')).toBeNull();
-    expect(host.querySelectorAll('.desk-cap-persons, .desk-cap-slotrow, .desk-cap-queuerow')).toHaveLength(3);
+  it('draws no queue part while nothing is queued, and no popover while closed', () => {
+    const host = document.body.appendChild(poolChipNode(deps(), [], true, vi.fn()));
+    expect(host.querySelector('.pb-pool-queue')).toBeNull();
+    const closed = document.body.appendChild(poolChipNode(deps(), [], false, vi.fn()));
+    expect(closed.querySelector('.pb-pool-pop')).toBeNull();
+    expect(closed.querySelector('.pb-pool-chip')!.getAttribute('aria-expanded')).toBe('false');
   });
 });
 
