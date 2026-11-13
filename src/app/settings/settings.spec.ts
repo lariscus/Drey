@@ -273,35 +273,15 @@ describe('Settings screen (E13-22)', () => {
     expect([...root.querySelectorAll('.category.dim')].length).toBeGreaterThan(0);
   });
 
-  it('draws "All devices" as the chosen tab until another is picked, with its note', () => {
-    const tabs = [...root.querySelectorAll<HTMLElement>('.scope-tab')];
-    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
-    expect(root.querySelector('.scope-note')?.textContent).toBe('Synced to every device you pair');
-    click(tabs[1]);
-    expect(tabs[0].getAttribute('aria-selected')).toBe('false');
-    expect(root.querySelector('.scope-note')?.textContent).toBe('Overrides for this computer only');
-    click(tabs[0]);
-    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
-  });
-
-  it('offers the three scope tabs, filters the hits by scope and toggles back', () => {
-    const tabs = [...root.querySelectorAll<HTMLElement>('.scope-tab')];
-    expect(tabs.map((t) => t.textContent?.trim())).toEqual(['All devices', 'This device', 'This vault']);
-    expect(tabs.every((t) => t.getAttribute('role') === 'tab')).toBe(true);
+  it('draws no scope tab row (req-291: settings are global) while search still finds a setting', () => {
+    expect(root.querySelector('.scope-tabs, .scope-tab, [role="tablist"]')).toBeNull();
+    expect(root.textContent).not.toContain('All devices');
+    expect(root.textContent).not.toContain('This vault');
+    // The search alone narrows the list; a hit opens its page (board 7g).
     typeQuery('watch');
-    click(tabs[1]);
-    expect(tabs[1].getAttribute('aria-selected')).toBe('true');
-    expect(root.querySelector('.no-match')).not.toBeNull();
-    click(tabs[2]);
-    expect(root.querySelector('.result-label')?.textContent).toBe('Watch the vault for external changes');
-    click(tabs[2]);
-    expect(tabs[2].getAttribute('aria-selected')).toBe('false');
-  });
-
-  it('lists every setting of a scope when a tab is chosen without a query', () => {
-    click(root.querySelectorAll('.scope-tab')[2]);
-    const labelsShown = [...root.querySelectorAll('.result-label')].map((r) => r.textContent);
-    expect(labelsShown).toContain('Watch the vault for external changes');
-    expect(labelsShown).not.toContain('Theme');
+    expect(root.querySelector('.results')).not.toBeNull();
+    expect([...root.querySelectorAll('.result-label')].map((r) => r.textContent)).toContain(
+      'Watch the vault for external changes',
+    );
   });
 });

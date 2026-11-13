@@ -55,9 +55,6 @@ interface PhoneSettingsRow {
 /** The iPad's sections (board 5f): the page groups plus Autopilot. */
 export type PadSectionId = SettingsPage | 'autopilot';
 
-/** The scopes the iPad's search zone offers; "This vault" waits for req-130. */
-export type PadScope = 'all' | 'device';
-
 interface PadRow {
   readonly id: 'theme' | 'text' | 'page' | 'pilot' | 'resume';
   readonly label: string;
@@ -74,7 +71,6 @@ interface PadBlock {
 interface PadSection {
   readonly id: PadSectionId;
   readonly label: string;
-  readonly group: PadScope;
   /** Every setting the section holds, searched or not (the count the board draws). */
   readonly count: number;
   readonly blocks: readonly PadBlock[];
@@ -158,11 +154,10 @@ export class Settings {
 
   // --- the iPad's sections (board 5f) ---------------------------------------------
 
-  protected readonly scope = signal<PadScope>('all');
   protected readonly padCat = signal<PadSectionId>('appearance');
   private readonly openSections = signal<ReadonlySet<PadSectionId>>(new Set<PadSectionId>(['appearance']));
 
-  /** Every section with its rows, before the query and the scope narrow them. */
+  /** Every section with its rows, before the query narrows them. */
   private readonly padAll = computed<readonly PadSection[]>(() => {
     const t = (key: MessageKey): string => this.i18n.t(key);
     const pageRow = (page: SettingsPage, descKey: MessageKey): PadRow => ({
@@ -176,7 +171,6 @@ export class Settings {
       {
         id: 'appearance',
         label: this.labelOf('appearance'),
-        group: 'device',
         count: 2,
         blocks: [
           {
@@ -197,15 +191,14 @@ export class Settings {
           },
         ],
       },
-      { id: 'chat', label: this.labelOf('chat'), group: 'device', count: 1, blocks: [{ sub: t('settings.pad.sub_model'), rows: [pageRow('chat', 'settings.pad.chat_desc')] }] },
-      { id: 'devices', label: this.labelOf('devices'), group: 'all', count: 1, blocks: [{ sub: t('settings.pad.sub_devices'), rows: [pageRow('devices', 'settings.pad.devices_desc')] }] },
-      { id: 'engine', label: this.labelOf('engine'), group: 'all', count: 1, blocks: [{ sub: t('settings.pad.sub_videos'), rows: [pageRow('engine', 'settings.pad.engine_desc')] }] },
+      { id: 'chat', label: this.labelOf('chat'), count: 1, blocks: [{ sub: t('settings.pad.sub_model'), rows: [pageRow('chat', 'settings.pad.chat_desc')] }] },
+      { id: 'devices', label: this.labelOf('devices'), count: 1, blocks: [{ sub: t('settings.pad.sub_devices'), rows: [pageRow('devices', 'settings.pad.devices_desc')] }] },
+      { id: 'engine', label: this.labelOf('engine'), count: 1, blocks: [{ sub: t('settings.pad.sub_videos'), rows: [pageRow('engine', 'settings.pad.engine_desc')] }] },
     ];
     if (this.autopilot() !== null) {
       sections.push({
         id: 'autopilot',
         label: t('autopilot.title'),
-        group: 'all',
         count: 2,
         blocks: [
           {
@@ -221,16 +214,14 @@ export class Settings {
     return sections;
   });
 
-  /** The category column: every section, whatever the scope. */
+  /** The category column: every section. */
   protected readonly padCats = computed(() => this.padAll().map((s) => ({ id: s.id, label: s.label, count: s.count })));
 
-  /** The sections the scope and the query leave; a section named by the query keeps all its rows. */
+  /** The sections the query leaves; a section named by the query keeps all its rows. */
   protected readonly padSections = computed<readonly PadSection[]>(() => {
     const needle = this.query().trim().toLowerCase();
-    const scope = this.scope();
     const has = (text: string): boolean => text.toLowerCase().includes(needle);
     return this.padAll()
-      .filter((s) => scope === 'all' || s.group === scope)
       .map((s) => {
         if (needle === '' || has(s.label)) {
           return s;
@@ -261,10 +252,6 @@ export class Settings {
     this.page.set(null);
     this.openSections.set(new Set(this.openSections()).add(id));
     setTimeout(() => this.host.nativeElement.querySelector(`#pd-sec-${id}`)?.scrollIntoView({ block: 'start' }), 0);
-  }
-
-  protected pickScope(scope: PadScope): void {
-    this.scope.set(scope);
   }
 
   protected clearQuery(): void {

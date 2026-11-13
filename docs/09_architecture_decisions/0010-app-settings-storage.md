@@ -307,3 +307,26 @@ overlay becomes a tab.
   Enter. `SettingsService.openScreen` / `closeScreen` now mark the tab's session (the draft preview of Appearance
   follows the tab being mounted); `closeScreen(session)` ignores a session that a newer open replaced.
 - **Views.** The tab belongs to the view it was opened in (ADR-0089), like any other tab.
+
+## Later change (2026-11-13, req-291) — settings without scopes
+
+Board 7g's scope tabs — *All devices · This device · This vault*, a filter
+row under the search field — are gone. **Settings are global**: one list, one
+search over it, no narrowing by who a setting is stored for.
+
+- **What the tabs were.** Only a filter over the settings list (and, without
+  a query, a browse list of one scope's settings). No setting ever moved or
+  was lost: storage was always this ADR's one `app-config.json` (plus the
+  plugin/tickets stores their pages write); removing the tabs changes no
+  stored value.
+- **What went with them.** The `scope` field of a search entry —
+  `SettingsSearchEntry` in the base, `PluginSettingsEntry` in the SDK
+  (1.58) — and the core pages' scope map (`PAGE_SCOPE`), the "No setting
+  has this scope" empty state, the catalog keys `settings.scope.*` and the
+  Settings → Tickets *Fleet* group's *This vault* chip. Mission Control's
+  iPad settings dropped their *All devices / This device* filter row for
+  the same reason.
+- **The one device-local exception.** A phone or iPad keeps its own
+  appearance (theme, text size, compact, reduce motion) in Mission Control
+  on that device — stored in the browser, editable there, not
+  configurable from the desktop.

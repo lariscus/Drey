@@ -1,4 +1,3 @@
-import type { MessageKey } from '../../../shared/i18n';
 /**
  * The pure halves of the Settings screen's section tree and search (E13-22):
  * what a page declares, how a query filters the declared entries, and which
@@ -19,8 +18,6 @@ export interface SettingsSearchEntry {
   readonly key: string;
   readonly label: string;
   readonly description?: string;
-  /** Who the setting is stored for; unset = not offered under a scope tab. */
-  readonly scope?: SettingsScope;
   /** The section of the page the setting sits in. */
   readonly section?: string;
 }
@@ -96,23 +93,6 @@ export function activeSection(
     }
   }
   return current;
-}
-
-/** Who a setting is stored for (board 7g's scope tabs). */
-export type SettingsScope = 'all-devices' | 'device' | 'vault';
-
-export const SETTINGS_SCOPES: readonly { readonly id: SettingsScope; readonly labelKey: MessageKey }[] = [
-  { id: 'all-devices', labelKey: 'settings.scope.all_devices' },
-  { id: 'device', labelKey: 'settings.scope.device' },
-  { id: 'vault', labelKey: 'settings.scope.vault' },
-];
-
-/** The hits of one scope tab; `null` (no tab chosen) keeps every hit. */
-export function filterHitsByScope(
-  hits: readonly SettingsSearchHit[],
-  scope: SettingsScope | null,
-): SettingsSearchHit[] {
-  return scope === null ? [...hits] : hits.filter((hit) => hit.entry.scope === scope);
 }
 
 /** How many settings a page, or one of its sections, holds (own page entry excluded). */

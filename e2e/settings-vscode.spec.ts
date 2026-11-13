@@ -2,7 +2,7 @@ import { test, expect, type Page } from './fixtures/drey';
 
 /**
  * E13-22 (board 7g): Settings like VS Code -- one page width, a section tree
- * with counts, a search across all pages, scope tabs.
+ * with counts, a search across all pages (no scope tabs since req-291).
  */
 const open = async (page: Page): Promise<void> => {
   await page.locator('app-status-bar .settings').click();
@@ -26,7 +26,7 @@ test('every page is the same width', async ({ page }) => {
   expect([...widths]).toHaveLength(1);
 });
 
-test('counts show, search says what is missing and clears, scope tabs list a scope', async ({ page }, info) => {
+test('counts show, search says what is missing and clears', async ({ page }, info) => {
   await open(page);
   await page.screenshot({ path: info.outputPath('settings.png') });
   await page.locator('app-settings input[type="search"]').fill('watch');
@@ -38,8 +38,7 @@ test('counts show, search says what is missing and clears, scope tabs list a sco
   await page.locator('app-settings .no-match button').click();
   await expect(page.locator('app-settings .no-match')).toHaveCount(0);
 
-  await page.locator('app-settings .scope-tab', { hasText: 'This vault' }).click();
-  await expect(page.locator('app-settings .result').first()).toBeVisible();
+  await expect(page.locator('app-settings .scope-tabs, app-settings .scope-tab')).toHaveCount(0);
 });
 
 test('Settings is one editor tab: the entry and Ctrl+, focus it, Escape closes it (board 7g)', async ({ page }) => {
