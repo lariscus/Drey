@@ -435,6 +435,41 @@
       "w": 1640,
       "x": 2214,
       "y": 27320
+    },
+    "DeskProjects.dc.html": {
+      "x": 0,
+      "y": 28860,
+      "w": 1440,
+      "h": 900,
+      "title": "7m · Drey — Settings → Projects: name, colour, purpose, repositories, folders, vault access per project, profile (2026-11-13)"
+    },
+    "DeskProjectFilter.dc.html": {
+      "x": 1520,
+      "y": 28860,
+      "w": 1440,
+      "h": 900,
+      "title": "7n · Drey — the global project filter in the title bar: Files and the board filtered to one project, capacity stays cross-project (2026-11-13)"
+    },
+    "DeskPersonaV3.dc.html": {
+      "x": 3040,
+      "y": 28860,
+      "w": 1440,
+      "h": 2000,
+      "title": "7k v3 · Drey — Persona: class and an optional pinned model instead of a harness, picture change/remove (D-67), skills from the library with GitHub sources, Allowed to without vaults, Instructions fill the rest (2026-11-13)"
+    },
+    "DeskModelsV3.dc.html": {
+      "x": 4560,
+      "y": 28860,
+      "w": 1440,
+      "h": 1640,
+      "title": "7l v3 · Drey — Settings → Models: discovered from the harnesses, slots per class, accounts added and removed in place (2026-11-13)"
+    },
+    "DeskSkillsLibrary.dc.html": {
+      "x": 6080,
+      "y": 28860,
+      "w": 1440,
+      "h": 900,
+      "title": "7o · Drey — Settings → Skills library: GitHub sources, shared and own skills, who uses them (2026-11-13)"
     }
   },
   "createdOnFiles": {
@@ -472,7 +507,9 @@
     "outlineNote",
     "rowCrew",
     "crewNote",
-    "rowPersona"
+    "rowPersona",
+    "rowProjects",
+    "projectsNote"
   ],
   "notes": {
     "alignMC": {
@@ -612,6 +649,20 @@
       "text": "Persona board (req-264)",
       "x": 0,
       "y": 26060
+    },
+    "rowProjects": {
+      "kind": "title1",
+      "x": 0,
+      "y": 28600,
+      "maxW": 7520,
+      "text": "Projects, Persona v3, Models v3 — design round of 2026-11-13"
+    },
+    "projectsNote": {
+      "x": 7640,
+      "y": 28860,
+      "w": 420,
+      "fill": "blue",
+      "text": "Design round 2026-11-13 (owner's findings after verifying 242–251). Concept: docs/design/work-panel/project-handling-draft.md.\n\n1. Projects live in the tickets vault (_meta/projects/<id>.md): name, colour, purpose, repos, plain folders (read), vault access None/Read/Write, profile.\n2. One board holds every project (option A); one global project filter in the title bar filters Files, Tickets, board, Review and Find, saved with the View. Capacity stays cross-project.\n3. Write = project grants Write AND the persona may change notes AND the run is not read-only. A 1:1 reads every project's vaults, read-only.\n4. A persona picks a class (heavy · standard · light) and may pin a model of it; default: next free in class. The harness follows from the model.\n5. Models are discovered from the installed harnesses; slots per class, optional caps per account; accounts added and removed in place."
     }
   },
   "order": [
@@ -675,7 +726,12 @@
     "MPadWorkV2.dc.html",
     "MPhoneWorkV2.dc.html",
     "MPhoneReadyV2.dc.html",
-    "MCCardsV2.dc.html"
+    "MCCardsV2.dc.html",
+    "DeskProjects.dc.html",
+    "DeskProjectFilter.dc.html",
+    "DeskPersonaV3.dc.html",
+    "DeskModelsV3.dc.html",
+    "DeskSkillsLibrary.dc.html"
   ],
   "pages": [],
   "title": "Drey Tickets — Workflow redesign"
