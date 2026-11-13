@@ -94,7 +94,7 @@ function button(label: string, className: string, onClick: () => void): HTMLButt
 export function boardMigrationBar(deps: BoardMigrationBarDeps): HTMLElement {
   const { i18n } = deps;
   const box = document.createElement('div');
-  box.className = 'tickets-warn tickets-store-migration tickets-board-migration';
+  box.className = 'tickets-warn tickets-board-migration';
   const text = document.createElement('span');
   text.className = 'tickets-warn-text';
   text.textContent = boardMigrationText(deps.offer, i18n);
