@@ -93,7 +93,9 @@ e2e isolation stay where they were (req-173 kept it there).
 ├── service-window/     the tray / window process's own userData (its single-instance lock)
 ├── service-start.log   stdout/stderr of the last start (a start that dies says why here)
 ├── start-service.vbs   the Windows sign-in launcher (only while start with Windows is on)
-├── service.json        the machine layer (req-173): slots, quota, the model table, the cap, ledgers, routing, governor — schema below
+├── service.json        the machine layer (req-173): slots, quota, the class list, the model table, the cap, ledgers, routing, governor — schema below
+├── discovery.json      req-286: the last check of the harnesses — their rows and every model offered (FLEET.md, "Model discovery")
+├── discovery/          req-286: the folder the harness probes start their sessions in
 ├── config.json         the engine's config (since req-173 no vault key is read from it — those live in the tickets repository's `tickets/_meta/crew.md`; the marker `crew.migrated` records the one-time move; added: `service.enabled`, `service.autostart`, `service.vaultPath`, `service.idleMinutes`; Drey writes every Settings → Background service key here too — `service.trayIcon`, `service.logLevel`, `service.load.*` — and the service applies them each tick; the Load group goes to the in-process runner's resource governor live, req-180)
 └── fleet/              the Crew runner's root (FLEET.md): runs/, chains/<vault key>/chain.json (one per tickets vault, req-173), chain-vault.json, runner.log
 ```
@@ -107,15 +109,17 @@ each parsed by its owner (`fleet/routing/service-config-schema.ts`):
 
 | Key | Owner | Holds |
 |---|---|---|
-| `slots` | req-177, `routing/slot-config.ts` | the accounts per provider: id, label, provider, login folder, sessions |
+| `slots` | req-177, `routing/slot-config.ts` | the accounts per provider: id, label, provider, login folder, sessions, cost (`billing`, req-287: subscription, credits or per token) |
 | `impliedOff` | D-69, `routing/slot-config.ts` | the providers whose implied slot the owner removed (Settings → Models) |
 | `quota` | req-177 | the quota sources (Claude Code, Kimi, z.ai) and their refresh |
-| `models` | req-170, `routing/pool-config.ts` | the model table: model, provider, category, class, cost factor, capabilities |
+| `classes` | req-287, `routing/class-config.ts` | the owner's class list, strongest first, each with at most N sessions at once |
+| `models` | req-170, `routing/pool-config.ts` | the model table: model, provider, category, class (a name of `classes`), cost factor, capabilities, the router switch `enabled` |
+| `discovery` | req-286, `routing/model-discovery.ts` | `ignored`: the discovered models the owner ignored |
 | `capacity` | req-170 | the capacity cap, global and per provider |
 | `ledgers` | req-170 | the default ticket allowance, persona day, provider day |
 | `routing` | req-178 / req-181 | surplus and step-up thresholds, the reserve, the burn rate |
 | `governor` | req-180 | the dev-port range (`devPorts`) |
-| `migrations` | req-170 | the one-time moves done on this machine |
+| `migrations` | req-170, req-287 | the one-time moves done on this machine (`fleet.pool.size`, `classes.v3`) |
 
 The three layers (machine `service.json` · vault `tickets/_meta/crew.md` ·
 the session record) and their precedence — session > vault > built-in

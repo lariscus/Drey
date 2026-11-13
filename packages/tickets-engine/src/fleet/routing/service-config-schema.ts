@@ -13,12 +13,14 @@ export const SERVICE_JSON_KEYS = {
   slots: 'req-177 · routing/slot-config.ts — the accounts per provider: id, label, provider, login folder, sessions',
   impliedOff: 'D-69 · routing/slot-config.ts — the providers whose implied stand-in slot the owner removed (Settings → Models)',
   quota: 'req-177 · routing/slot-config.ts — the quota sources per provider (Claude Code, Kimi, z.ai), their refresh',
-  models: 'req-170 · routing/pool-config.ts — the model table: model id, provider, category, class, cost factor, capabilities',
+  classes: 'req-287 · routing/class-config.ts — the owner\'s class list, strongest first, each with at most N sessions at once',
+  models: 'req-170 · routing/pool-config.ts — the model table: model id, provider, category, class (req-287: a name of `classes`), cost factor, capabilities, the router switch `enabled`',
+  discovery: 'req-286 · routing/model-discovery.ts — `ignored`: the discovered models the owner ignored; the last check itself is `discovery.json` beside this file',
   capacity: 'req-170 · routing/pool-config.ts — the capacity cap: global and per provider',
   ledgers: 'req-170 · routing/pool-config.ts — the ticket allowance, the persona day and provider day defaults',
   routing: 'req-178/181 · routing/pool-config.ts — the surplus and step-up thresholds, the reserve, the burn rate',
   governor: 'req-180 · governor/ — the dev-port range (`devPorts`); the load preferences are Settings → Background service, config.json service.load.*',
-  migrations: 'req-170 · routing/pool-migration.ts — the one-time moves already done on this machine',
+  migrations: 'req-170 · routing/pool-migration.ts, req-287 · routing/class-migration.ts — the one-time moves already done on this machine',
 } as const;
 
 export type ServiceJsonKey = keyof typeof SERVICE_JSON_KEYS;

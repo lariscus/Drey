@@ -230,12 +230,13 @@ describe('the plan to accept commands (E10-4)', () => {
 });
 
 describe('parseSetClass (req-186)', () => {
-  it('takes a ticket id and A, B, C or null', () => {
-    expect(parseSetClass({ id: 'T-0001', class: 'B' })).toEqual({ ok: true, value: { id: 'T-0001', class: 'B' } });
+  it('takes a ticket id and a class name or null; an old letter reads as its name (req-287)', () => {
+    expect(parseSetClass({ id: 'T-0001', class: 'super heavy' })).toEqual({ ok: true, value: { id: 'T-0001', class: 'super heavy' } });
+    expect(parseSetClass({ id: 'T-0001', class: 'B' })).toEqual({ ok: true, value: { id: 'T-0001', class: 'standard' } });
     expect(parseSetClass({ id: 'T-0001', class: null })).toEqual({ ok: true, value: { id: 'T-0001', class: null } });
   });
   it('refuses an unknown class or a missing id', () => {
-    expect(parseSetClass({ id: 'T-0001', class: 'D' }).ok).toBe(false);
+    expect(parseSetClass({ id: 'T-0001', class: '9!' }).ok).toBe(false);
     expect(parseSetClass({ class: 'A' }).ok).toBe(false);
   });
 });

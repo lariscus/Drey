@@ -42,15 +42,31 @@ describe('the runner serves the capacity pool (req-170)', () => {
     const empty = (await call('GET', '/models')).body as unknown as ModelsReply;
     expect(empty).toMatchObject({ ok: true, models: [], capacity: { global: null, perSlot: {} }, ledgers: { ticketAllowance: null, personaPerDay: null, providerPerDay: null }, queue: [], errors: [] });
     expect(empty.now).toMatchObject({ used: 0, global: null });
+    // req-287: the shipped class list, no class capped; no discovery check ran yet (req-286).
+    expect(empty.classes).toEqual([
+      { name: 'super heavy', sessions: null },
+      { name: 'heavy', sessions: null },
+      { name: 'standard', sessions: null },
+      { name: 'light', sessions: null },
+    ]);
+    expect(empty.now.classes).toEqual([
+      { name: 'super heavy', busy: 0, cap: null },
+      { name: 'heavy', busy: 0, cap: null },
+      { name: 'standard', busy: 0, cap: null },
+      { name: 'light', busy: 0, cap: null },
+    ]);
+    expect(empty.discovery).toEqual({ checkedAt: null, running: false, harnesses: [], found: [], ignored: [] });
 
+    // An old row: its letter reads as its name, its sessions are not read; neither is written back.
     const models = [{ model: 'claude-opus-4-1', provider: 'claude-code', category: 'frontier', class: 'A', cost: 5, sessions: 1 }];
     const written = await call('POST', '/models/config', { models, capacity: { global: 6, perSlot: {} } });
     expect(written.status).toBe(200);
-    expect(written.body['models']).toEqual([{ ...models[0], slot: null }]);
+    expect(written.body['models']).toEqual([{ model: 'claude-opus-4-1', slot: null, provider: 'claude-code', category: 'frontier', class: 'heavy', cost: 5, enabled: true }]);
     await call('POST', '/models/config', { ledgers: { ticketAllowance: 2.5, personaPerDay: 5, providerPerDay: 15 } });
     const file = await serviceJson();
     expect(file['slots']).toEqual([]);
-    expect(file['models']).toEqual(models);
+    expect(file['classes']).toEqual([{ name: 'super heavy' }, { name: 'heavy' }, { name: 'standard' }, { name: 'light' }]);
+    expect(file['models']).toEqual([{ model: 'claude-opus-4-1', provider: 'claude-code', category: 'frontier', class: 'heavy', cost: 5 }]);
     expect(file['capacity']).toEqual({ global: 6, perSlot: {} });
     expect(file['ledgers']).toEqual({ ticketAllowance: 2.5, personaPerDay: 5, providerPerDay: 15 });
 
@@ -72,18 +88,18 @@ describe('the runner serves the capacity pool (req-170)', () => {
 
   it('req-178: reads and writes the routing; fills the capability columns from models.dev only when asked', async () => {
     expect((await call('GET', '/models')).body['routing']).toEqual({ upgradeAboveQ: 1.3, reservePerWindow: 0.1, burnRate: 0.2 });
-    await call('POST', '/models/config', { routing: { upgradeAboveQ: 1.5, reservePerWindow: 0.2, burnRate: 0.25 }, models: [{ model: 'claude-sonnet-4-5', provider: 'claude-code', class: 'B', context: 100_000 }] });
+    await call('POST', '/models/config', { routing: { upgradeAboveQ: 1.5, reservePerWindow: 0.2, burnRate: 0.25 }, models: [{ model: 'claude-sonnet-4-5', provider: 'claude-code', class: 'standard', context: 100_000 }] });
     expect((await serviceJson())['routing']).toEqual({ upgradeAboveQ: 1.5, reservePerWindow: 0.2, burnRate: 0.25 });
     expect(http.calls.some((c) => c.url === MODELS_DEV_URL)).toBe(false);
     const imported = await call('POST', '/models/import', {});
     expect(imported.body['imported']).toEqual({ filled: [{ model: 'claude-sonnet-4-5', where: 'claude-code', fields: ['input', 'tools', 'output'] }], unmatched: [] });
-    expect((await serviceJson())['models']).toEqual([{ model: 'claude-sonnet-4-5', provider: 'claude-code', category: '', class: 'B', cost: 1, sessions: 1, input: ['text', 'image'], tools: true, context: 100_000, output: 64_000 }]);
+    expect((await serviceJson())['models']).toEqual([{ model: 'claude-sonnet-4-5', provider: 'claude-code', category: '', class: 'standard', cost: 1, input: ['text', 'image'], tools: true, context: 100_000, output: 64_000 }]);
   });
 
   it('refuses a broken row before anything is written', async () => {
     const before = await serviceJson();
     const refused = await call('POST', '/models/config', { models: [{ model: 'x', provider: 'claude-code', class: 'Z' }] });
-    expect(refused).toEqual({ status: 422, body: { ok: false, error: 'model "x": class must be A, B or C' } });
+    expect(refused).toEqual({ status: 422, body: { ok: false, error: 'model "x": class must be one of super heavy, heavy, standard, light' } });
     expect((await call('POST', '/models/config', {})).status).toBe(422);
     expect(await serviceJson()).toEqual(before);
   });
@@ -93,7 +109,7 @@ describe('the runner serves the capacity pool (req-170)', () => {
     await fsp.mkdir(vault, { recursive: true });
     await call('POST', '/chain/config', { ticketsVaultPath: vault, pools: { 'claude-code': { size: 2 } } });
     const file = await serviceJson();
-    expect(file['migrations']).toEqual(['fleet.pool.size']);
+    expect(file['migrations']).toEqual(['classes.v3', 'fleet.pool.size']);
     expect((file['slots'] as { id: string; sessions: number }[]).map((s) => [s.id, s.sessions])).toEqual([
       ['opencode', 1],
       ['claude-code', 2],

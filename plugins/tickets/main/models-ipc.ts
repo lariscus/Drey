@@ -9,20 +9,27 @@ import type { ModelsReply } from '../../../packages/tickets-engine/src/fleet/pro
 import type { FleetClient, SlotsReply } from '../../../packages/tickets-engine/src/services/fleet-client';
 
 /** What the handlers need of the fleet proxy. */
-export type ModelsFleet = Pick<FleetClient, 'models' | 'writeModels' | 'importModelCapabilities' | 'slots' | 'writeSlots' | 'addSlot' | 'removeSlot' | 'refreshSlots' | 'slotLoginDone'>;
+export type ModelsFleet = Pick<
+  FleetClient,
+  'models' | 'writeModels' | 'importModelCapabilities' | 'discoverModels' | 'addDiscoveredModel' | 'ignoreDiscoveredModel' | 'slots' | 'writeSlots' | 'addSlot' | 'removeSlot' | 'updateSlot' | 'refreshSlots' | 'slotLoginDone'
+>;
 
 type Handle = (channel: string, handler: (payload: unknown) => unknown) => void;
 type Refusal = { readonly ok: false; readonly error: string };
 
 const objectOf = (payload: unknown): Record<string, unknown> => (payload !== null && typeof payload === 'object' && !Array.isArray(payload) ? (payload as Record<string, unknown>) : {});
 
-/** The pool write's payload: only the four keys travel (req-178 added `routing`). */
-export function poolKeysOfPayload(payload: unknown): { models?: readonly unknown[]; capacity?: unknown; ledgers?: unknown; routing?: unknown } | Refusal {
+/** The pool write's payload: only the five keys travel (req-178 added `routing`, req-287 `classes`). */
+export function poolKeysOfPayload(payload: unknown): { classes?: readonly unknown[]; models?: readonly unknown[]; capacity?: unknown; ledgers?: unknown; routing?: unknown } | Refusal {
   const body = objectOf(payload);
   if (body['models'] !== undefined && !Array.isArray(body['models'])) {
     return { ok: false, error: 'models is a list of rows' };
   }
+  if (body['classes'] !== undefined && !Array.isArray(body['classes'])) {
+    return { ok: false, error: 'classes is a list' };
+  }
   return {
+    ...(body['classes'] !== undefined ? { classes: body['classes'] as readonly unknown[] } : {}),
     ...(body['models'] !== undefined ? { models: body['models'] as readonly unknown[] } : {}),
     ...(body['capacity'] !== undefined ? { capacity: body['capacity'] } : {}),
     ...(body['ledgers'] !== undefined ? { ledgers: body['ledgers'] } : {}),
@@ -37,6 +44,16 @@ export function registerModelsIpc(handle: Handle, fleet: ModelsFleet): void {
     return 'ok' in keys ? keys : fleet.writeModels(keys);
   });
   handle('poolModelsImport', (): Promise<ModelsReply | Refusal> => fleet.importModelCapabilities());
+  // req-286: Find models again, and a new-model card's Add / Ignore.
+  handle('poolModelsDiscover', (payload) => fleet.discoverModels(objectOf(payload)['registry'] !== false));
+  handle('poolModelAdd', (payload): Promise<ModelsReply | Refusal> | Refusal => {
+    const { provider, model, class: cls } = objectOf(payload);
+    return typeof provider === 'string' && typeof model === 'string' && typeof cls === 'string' ? fleet.addDiscoveredModel(provider, model, cls) : { ok: false, error: 'which model, which class?' };
+  });
+  handle('poolModelIgnore', (payload): Promise<ModelsReply | Refusal> | Refusal => {
+    const { provider, model } = objectOf(payload);
+    return typeof provider === 'string' && typeof model === 'string' ? fleet.ignoreDiscoveredModel(provider, model) : { ok: false, error: 'which model?' };
+  });
   handle('slots', (): Promise<SlotsReply | null> => fleet.slots());
   handle('slotsConfig', (payload): Promise<SlotsReply | Refusal> | Refusal => {
     const slots = objectOf(payload)['slots'];
@@ -47,8 +64,13 @@ export function registerModelsIpc(handle: Handle, fleet: ModelsFleet): void {
     return slot !== null && typeof slot === 'object' && !Array.isArray(slot) ? fleet.addSlot(slot) : { ok: false, error: 'which slot?' };
   });
   handle('slotRemove', (payload): Promise<SlotsReply | Refusal> | Refusal => {
-    const id = objectOf(payload)['id'];
-    return typeof id === 'string' ? fleet.removeSlot(id) : { ok: false, error: 'which slot?' };
+    const { id, withModels } = objectOf(payload);
+    return typeof id === 'string' ? fleet.removeSlot(id, withModels === true) : { ok: false, error: 'which slot?' };
+  });
+  // req-287: an account's label, cost or sessions edited in place.
+  handle('slotUpdate', (payload): Promise<SlotsReply | Refusal> | Refusal => {
+    const { id, patch } = objectOf(payload);
+    return typeof id === 'string' && patch !== null && typeof patch === 'object' && !Array.isArray(patch) ? fleet.updateSlot(id, patch as Record<string, unknown>) : { ok: false, error: 'which slot?' };
   });
   handle('slotsRefresh', (payload) => {
     const id = objectOf(payload)['id'];

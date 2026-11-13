@@ -65,6 +65,7 @@ import type { WorkRow } from './work-groups';
 import { boardIssuesChip, boardIssuesList, type BoardIssuesDeps } from './board-issues';
 import { boardMigrationBar } from './board-migration-bar';
 import { storeMigrationBar } from './store-migration-bar';
+import { DEFAULT_CLASS_NAMES } from '../../../packages/tickets-engine/src/contracts/capability-class';
 import type { ChainStatus, FleetHandoverConfig, RunInfo } from '../../../packages/tickets-engine/src/fleet/protocol';
 import type { NormalizedEvent } from '../../../packages/tickets-engine/src/fleet/harness/contract';
 import { DEFAULT_FLEET_HANDOVER, normalizeFleetHandover } from '../../../packages/tickets-engine/src/fleet/protocol';
@@ -2849,7 +2850,7 @@ function openCardMenu(
   card: TicketCard,
   at: { readonly x: number; readonly y: number },
   run: (label: string, invoke: () => Promise<unknown>) => Promise<MutationResult>,
-  actions: { setPriority(card: TicketCard, priority: TicketPriority): void; setTrack(card: TicketCard, track: TicketTrack | null): void; setClass(card: TicketCard, value: 'A' | 'B' | 'C' | null): void },
+  actions: { setPriority(card: TicketCard, priority: TicketPriority): void; setTrack(card: TicketCard, track: TicketTrack | null): void; setClass(card: TicketCard, value: string | null): void },
 ): void {
   for (const other of document.querySelectorAll('.tickets-menu')) {
     other.remove();
@@ -2940,7 +2941,7 @@ function openCardMenu(
       api.i18n.t('tickets.menu.class'),
       [
         { content: menuRadioRow(api.i18n.t('tickets.menu.class_auto'), (card.meta.class ?? null) === null), title: api.i18n.t('tickets.menu.class_auto_hint'), onClick: () => actions.setClass(card, null) },
-        ...(['A', 'B', 'C'] as const).map((value) => ({
+        ...DEFAULT_CLASS_NAMES.map((value) => ({
           content: menuRadioRow(value, card.meta.class === value),
           title: api.i18n.t('tickets.menu.class_pin', { class: value }),
           onClick: () => actions.setClass(card, value),

@@ -14,14 +14,14 @@ describe('the req-173 invoke payloads', () => {
   });
 
   it('a session ask: persona and directory required, class and permission checked, origin defaulted', () => {
-    expect(parseFreeSessionAsk({ persona: ' ben ', directory: 'E:\\T', poolClass: 'B', permissionMode: 'read-only', firstLine: ' go ', origin: 'service-window' })).toEqual({
+    expect(parseFreeSessionAsk({ persona: ' ben ', directory: 'E:\\T', poolClass: 'standard', permissionMode: 'read-only', firstLine: ' go ', origin: 'service-window' })).toEqual({
       ok: true,
-      value: { persona: 'ben', directory: 'E:\\T', poolClass: 'B', permissionMode: 'read-only', firstLine: 'go' },
+      value: { persona: 'ben', directory: 'E:\\T', poolClass: 'standard', permissionMode: 'read-only', firstLine: 'go' },
       origin: 'service-window',
     });
     expect(parseFreeSessionAsk({ persona: 'ben', directory: 'E:\\T' })).toMatchObject({ ok: true, origin: 'drey' });
     expect(parseFreeSessionAsk({ persona: 'ben' })).toMatchObject({ ok: false });
-    expect(parseFreeSessionAsk({ persona: 'ben', directory: 'E:\\T', poolClass: 'Z' })).toMatchObject({ ok: false });
+    expect(parseFreeSessionAsk({ persona: 'ben', directory: 'E:\\T', poolClass: '?' })).toMatchObject({ ok: false });
     expect(parseFreeSessionAsk({ persona: 'ben', directory: 'E:\\T', permissionMode: 'yolo' })).toMatchObject({ ok: false });
   });
 
@@ -34,7 +34,7 @@ describe('the req-173 invoke payloads', () => {
       brief: 'Look at the build.',
     });
     expect(validateChatCommand({ kind: 'startSession', persona: 'Ben!', directory: 'E:/x', brief: 'x' })).toBeNull();
-    expect(validateChatCommand({ kind: 'startSession', persona: 'ben', directory: 'E:/x', poolClass: 'Z', brief: 'x' })).toBeNull();
+    expect(validateChatCommand({ kind: 'startSession', persona: 'ben', directory: 'E:/x', poolClass: '?', brief: 'x' })).toBeNull();
     expect(validateChatCommand({ kind: 'startSession', persona: 'ben', directory: 'E:/x' })).toBeNull();
   });
 });

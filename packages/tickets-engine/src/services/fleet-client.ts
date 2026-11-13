@@ -374,8 +374,11 @@ export class FleetClient {
   /** D-69: adds one slot entry to `service.json`, every other entry kept as written. */
   addSlot = (slot: unknown): Promise<SlotsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<SlotsReply>('/slots/add', { slot });
 
-  /** D-69: removes one slot — a configured entry, or an implied slot (its provider then has no slot here). */
-  removeSlot = (id: string): Promise<SlotsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<SlotsReply>('/slots/remove', { id });
+  /** D-69: removes one slot — a configured entry, or an implied slot (its provider then has no slot here); req-287: `withModels` removes the model rows naming it too. */
+  removeSlot = (id: string, withModels = false): Promise<SlotsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<SlotsReply>('/slots/remove', withModels ? { id, withModels } : { id });
+
+  /** req-287: changes one account's label, cost (`billing`) or sessions in place; a `null` removes the key. */
+  updateSlot = (id: string, patch: Readonly<Record<string, unknown>>): Promise<SlotsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<SlotsReply>('/slots/update', { id, patch });
 
   // --- the capacity pool (req-170, board 7l) ----------------------------------
 
@@ -388,9 +391,24 @@ export class FleetClient {
     }
   }
 
-  /** Replaces the pool keys it is sent (`models`, `capacity`, `ledgers`, req-178's `routing`) in `service.json`; a broken row refuses the write. */
-  writeModels(keys: { readonly models?: readonly unknown[]; readonly capacity?: unknown; readonly ledgers?: unknown; readonly routing?: unknown }): Promise<ModelsReply | { readonly ok: false; readonly error: string }> {
+  /** Replaces the pool keys it is sent (req-287's `classes`, `models`, `capacity`, `ledgers`, req-178's `routing`) in `service.json`; a broken row refuses the write. */
+  writeModels(keys: { readonly classes?: readonly unknown[]; readonly models?: readonly unknown[]; readonly capacity?: unknown; readonly ledgers?: unknown; readonly routing?: unknown }): Promise<ModelsReply | { readonly ok: false; readonly error: string }> {
     return this.slotWrite<ModelsReply>('/models/config', keys);
+  }
+
+  /** req-286: asks every harness what it offers (*Find models again*); `registry` also fills the capabilities from models.dev — one network call, only on the owner's ask. */
+  discoverModels(registry: boolean): Promise<(ModelsReply & { readonly registryError?: string | null }) | { readonly ok: false; readonly error: string }> {
+    return this.slotWrite('/models/discover', { registry });
+  }
+
+  /** req-286: takes a model the last check found into the table, under the class the card picked. */
+  addDiscoveredModel(provider: string, model: string, cls: string): Promise<ModelsReply | { readonly ok: false; readonly error: string }> {
+    return this.slotWrite<ModelsReply>('/models/add', { provider, model, class: cls });
+  }
+
+  /** req-286: keeps a found model's card away (`discovery.ignored`). */
+  ignoreDiscoveredModel(provider: string, model: string): Promise<ModelsReply | { readonly ok: false; readonly error: string }> {
+    return this.slotWrite<ModelsReply>('/models/ignore', { provider, model });
   }
 
   /** req-178: fills the model table's undeclared capability columns from models.dev — one network call, only on the owner's ask; the reply's `imported` says what. */

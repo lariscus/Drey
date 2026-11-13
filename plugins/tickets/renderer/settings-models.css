@@ -1,23 +1,48 @@
 /*
- * Settings → Tickets → Models (board 7l, req-186): the model table, the
- * capacity group, the slot cards, routing and ledgers. The setting rows
- * themselves are the page's `.tset-set` (settings.css); only what the
- * board adds is here. Measures are the board's markup, colours are
- * tokens: #b3b7bc --text-4, #3b3d42 --border, #747980 --field-border,
- * #2c2d31 --bg-input, #222326 --bg-dock, #8ecbef --accent,
- * #f2cfae --accent-peach, #bfe3cd --accent-mint, #e0bb6e --status-modified.
+ * Settings → Tickets → Models (board 7l v3, req-286/287): harnesses, classes,
+ * accounts and the routing fold. Measures are the board's markup
+ * (DeskModelsV3.dc.html), colours are tokens: #b3b7bc --text-4,
+ * #3b3d42 --border, #747980 --field-border, #2c2d31 --bg-input,
+ * #222326 --bg-dock, #8ecbef --accent, #101113 --accent-contrast,
+ * #e8a25a --needs-you, #93c47f --status-added, #f2cfae --accent-peach.
  */
 
-/* The page title of the part (the board's h1) and its five group headings (h2). */
-.tset-models {
+.mdl {
   margin-top: 34px;
+  font-size: 13px;
+  line-height: 18px;
 }
 
-.tset-models-head {
+.mdl-grow {
+  flex-grow: 1;
+}
+
+.mdl-sec {
+  color: var(--text-4);
+}
+
+.mdl-small {
+  font-size: 12px;
+}
+
+.mdl-mono {
+  font-family: var(--font-mono);
+}
+
+.mdl-dim {
+  opacity: 0.55;
+}
+
+/* --- title, cap, group headings -------------------------------------------- */
+
+.mdl-titlerow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding-top: 6px;
 }
 
-.tset-models-title {
+.mdl-title {
   margin: 0 0 4px;
   font-family: var(--font-sans);
   font-size: 26px;
@@ -26,8 +51,21 @@
   color: var(--text-heading);
 }
 
-.tset-models-group {
-  margin: 22px 0 4px;
+.mdl-caprow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mdl-grouphead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0 6px;
+}
+
+.mdl-h2 {
+  margin: 0;
   font-family: var(--font-sans);
   font-size: 18px;
   font-weight: 600;
@@ -35,426 +73,578 @@
   color: var(--text-primary);
 }
 
-/* --- model table ------------------------------------------------------------ */
-
-.tset-models-tablebox {
-  position: relative;
+.mdl-note {
+  margin: 8px 0 0;
 }
 
-.tset-models-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-  font-size: 13px;
-  line-height: 18px;
-}
+/* --- shared controls --------------------------------------------------------- */
 
-.tset-models-table th,
-.tset-models-table td {
-  height: 32px;
-  padding: 0 10px;
-  text-align: left;
-  font-size: 13px;
-  border-bottom: 1px solid var(--border);
-}
-
-/* The board's header cell is border-box (32 high with its rule), a body cell content-box (32 + its 1 px rule). */
-.tset-models-table th {
-  box-sizing: border-box;
-  font-weight: 400;
-  color: var(--text-4);
-}
-
-.tset-models-table td {
-  box-sizing: content-box;
-}
-
-.tset-models-table td {
-  color: var(--text-primary);
-}
-
-.tset-models-table tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.tset-models-c-model {
-  width: 200px;
-}
-
-.tset-models-c-provider {
-  width: 190px;
-}
-
-.tset-models-c-category {
-  width: 110px;
-}
-
-.tset-models-c-class {
-  width: 70px;
-}
-
-.tset-models-c-cost {
-  width: 100px;
-  text-align: right !important;
-}
-
-.tset-models-c-sessions {
-  width: 90px;
-  text-align: right !important;
-}
-
-.tset-models-mono {
-  position: relative;
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 12px !important;
-}
-
-.tset-models-table td:focus-visible {
-  outline: 1px solid var(--field-border);
-  outline-offset: -1px;
-}
-
-.tset-models-chip {
-  display: inline-flex;
-  align-items: center;
-  box-sizing: content-box;
-  height: 22px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-chip);
-  font-size: 12px;
-  line-height: 18px;
-  white-space: nowrap;
+.mdl-ib {
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
-  color: var(--text-4);
-}
-
-/* In-place editing: the cell's own field, same type, no extra height. */
-.tset-models-cellfield {
-  box-sizing: border-box;
-  width: 100%;
-  height: 28px;
-  margin: 0;
-  padding: 0 6px;
-  background: var(--bg-input);
-  border: 1px solid var(--field-border);
-  border-radius: var(--radius-chip);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 13px;
-}
-
-.tset-models-cellfield[aria-invalid='true'] {
-  border-color: var(--status-deleted);
-}
-
-.tset-models-mono .tset-models-cellfield {
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 12px;
-}
-
-.tset-models-c-cost .tset-models-cellfield,
-.tset-models-c-sessions .tset-models-cellfield {
-  text-align: right;
-}
-
-/* A row's remove control: only on hover or focus, outside the table. */
-.tset-models-remove {
-  position: absolute;
-  right: -34px;
-  top: 50%;
-  width: 24px;
-  height: 24px;
-  margin-top: -12px;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.tset-models-table tr:hover .tset-models-remove,
-.tset-models-table tr:focus-within .tset-models-remove {
-  opacity: 1;
-}
-
-.tset-models-table tbody tr {
-  position: relative;
-}
-
-/* --- add rows --------------------------------------------------------------- */
-
-.tset-models-addrow {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 0;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text-4);
 }
 
-.tset-models-btn {
-  box-sizing: border-box;
+.mdl-ib-28 {
+  width: 28px;
+  height: 28px;
+}
+
+.mdl-ib:hover:not(:disabled) {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.mdl-bt {
   height: 30px;
   padding: 0 12px;
-  flex-shrink: 0;
-  background: transparent;
-  border: 1px solid var(--field-border);
-  border-radius: var(--radius-chip);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
   color: var(--text-primary);
   font: inherit;
   font-size: 13px;
-  line-height: 18px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.tset-models-btn:hover {
-  background: var(--hover-bg);
+.mdl-bt:hover:not(:disabled) {
+  border-color: var(--field-border);
 }
 
-.tset-models-note {
-  font-size: 14px;
-  line-height: 21px;
-  color: var(--text-4);
+.mdl-bt:disabled {
+  opacity: 0.55;
 }
 
-.tset-models-error,
-.tset-models-slotnote {
-  font-size: 14px;
-  line-height: 21px;
-  padding: 0 0 6px;
+.mdl-bt-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 600;
 }
 
-.tset-models-error[hidden],
-.tset-models-slotnote[hidden] {
-  display: none;
+.mdl-bt-warn {
+  background: transparent;
+  border-color: var(--needs-you);
+  color: var(--needs-you);
 }
 
-.tset-models-addslot {
-  padding: 8px 0 0;
+.mdl-bt-dashed {
+  background: transparent;
+  border: 1px dashed var(--field-border);
 }
 
-/* D-69: the new slot's row (name, provider) above Add slot…; a card's remove control at its head's end. */
-.tset-models-slotdraft {
-  display: grid;
-  grid-template-columns: minmax(0, 220px) minmax(0, 160px);
-  gap: 8px;
-  padding-bottom: 8px;
+.mdl-bs {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
 }
 
-.tset-models-slotdraft .tset-models-cellfield[aria-invalid='true'] {
-  border-color: var(--status-deleted);
-}
-
-.tset-models-slotremove {
-  flex: none;
-  width: 22px;
-  height: 22px;
-}
-
-/* --- capacity ----------------------------------------------------------------- */
-
-.tset-models-cols {
-  display: flex;
-  align-items: flex-start;
-  gap: 32px;
-}
-
-.tset-models-cols > .tset-set {
-  flex: 1 1 0;
+.mdl-fld {
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--field-border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
   min-width: 0;
 }
 
-.tset-models-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* The board's inputs: 80 or 100 wide content box, 32 high, 10 side padding. */
-.tset-models-field {
-  box-sizing: content-box;
-  height: 32px;
-  padding: 0 10px;
-  background: var(--bg-input);
-  border: 1px solid var(--field-border);
-  border-radius: var(--radius-chip);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 14px;
-}
-
-.tset-models-field-cap {
-  width: 80px;
-}
-
-.tset-models-field-money {
-  width: 100px;
-}
-
-.tset-models-field[aria-invalid='true'] {
+.mdl-fld[aria-invalid='true'],
+.mdl-amountfield[aria-invalid='true'] {
   border-color: var(--status-deleted);
 }
 
-.tset-models-unit {
+.mdl-fld-28 {
+  height: 28px;
+}
+
+.mdl-fld-80 {
+  width: 80px;
+}
+
+.mdl-fld-120 {
+  width: 120px;
+}
+
+.mdl-fld-130 {
+  width: 130px;
+}
+
+.mdl-chip {
+  height: 20px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-4);
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mdl-step {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.mdl-step-tall {
+  height: 30px;
+}
+
+.mdl-step button {
+  width: 22px;
+  height: 24px;
+  background: transparent;
+  border: 0;
+  color: var(--text-4);
+  font: inherit;
+  font-size: 14px;
+  padding: 0;
+}
+
+.mdl-step button:hover {
+  color: var(--text-primary);
+}
+
+.mdl-step b {
+  min-width: 20px;
+  text-align: center;
+  font-weight: 600;
   font-size: 13px;
-  line-height: 18px;
+}
+
+.mdl-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--needs-you);
+  flex-shrink: 0;
+}
+
+/* --- rows (harnesses, accounts, the fold) ---------------------------------------- */
+
+.mdl-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.mdl-row-34 {
+  min-height: 34px;
+}
+
+.mdl-row-52 {
+  min-height: 52px;
+  gap: 14px;
+}
+
+.mdl-harnesses {
+  border-top: 1px solid var(--border);
+}
+
+.mdl-harness {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-grow: 1;
   color: var(--text-4);
 }
 
-.tset-models-perprovider {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-rows: repeat(3, auto);
-  grid-template-columns: auto auto;
-  column-gap: 24px;
-  row-gap: 2px;
-  width: max-content;
+.mdl-harness-name {
+  width: 170px;
+  color: var(--text-primary);
 }
 
-.tset-models-pp {
-  font-size: 13px;
-  line-height: 18px;
+.mdl-harness-name b {
+  font-weight: 600;
 }
 
-.tset-models-ppname {
-  display: inline-block;
-  width: 64px;
-  color: var(--text-4);
+.mdl-harness-count {
+  min-width: 70px;
+  text-align: right;
 }
 
-/* --- slots ---------------------------------------------------------------------- */
+/* --- classes ------------------------------------------------------------------------ */
 
-.tset-models-slots {
+.mdl-found {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 4px;
-}
-
-.tset-models-card {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 12px;
   background: var(--bg-dock);
   border: 1px solid var(--border);
-  border-radius: var(--radius-control);
+  border-radius: 8px;
+  margin-bottom: 10px;
 }
 
-.tset-models-cardhead {
+.mdl-foundclass {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 22px;
+  font-size: 12px;
 }
 
-.tset-models-cardname {
-  line-height: 18px;
-  font-size: 14px;
-  font-weight: 700;
+.mdl-foundclass .mdl-fld {
+  width: 130px;
 }
 
-.tset-models-billing {
-  margin-left: auto;
-  font-size: 13px;
-  line-height: 18px;
-  color: var(--text-4);
+.mdl-class {
+  background: var(--bg-dock);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
 }
 
-.tset-models-cardbody {
-  display: flex;
-  align-items: flex-start;
+.mdl-class.mdl-drop {
+  border-color: var(--accent);
 }
 
-.tset-models-windows {
-  display: flex;
-  flex-direction: column;
-}
-
-.tset-models-window {
+.mdl-classhead {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 22px;
+  height: 40px;
+  padding: 0 10px 0 12px;
 }
 
-.tset-models-wlabel {
-  line-height: 18px;
-  width: 36px;
-  flex-shrink: 0;
+.mdl-classname {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.mdl-busy {
+  width: 56px;
+  text-align: right;
+}
+
+.mdl-modelrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 10px 0 4px;
+  border-top: 1px solid var(--border);
+}
+
+.mdl-grip {
+  display: flex;
+  color: var(--field-border);
+  cursor: grab;
+}
+
+.mdl-modelid {
   font-size: 13px;
+  width: 250px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mdl-abilities {
+  display: flex;
+  gap: 6px;
+  width: 40px;
+}
+
+.mdl-ability {
+  display: flex;
   color: var(--text-4);
 }
 
-.tset-models-bar {
-  display: flex;
-  width: 120px;
-  height: 6px;
-  flex-shrink: 0;
-  overflow: hidden;
-  /* The board draws radius 3; a 4 px token on a 6 px bar is clamped to 3 by the browser. */
-  border-radius: var(--radius-chip);
-  background: var(--bg-input);
+.mdl-context {
+  width: 44px;
+  text-align: right;
 }
 
-.tset-models-bar-none {
+.mdl-cost {
+  width: 40px;
+  padding: 0;
   background: transparent;
+  border: 0;
+  color: var(--text-4);
+  font: inherit;
+  text-align: right;
 }
 
-.tset-models-fill {
-  height: 6px;
+.mdl-costfield {
+  width: 52px;
+  height: 26px;
+  text-align: right;
+}
+
+.mdl-menuwrap {
+  position: relative;
+}
+
+.mdl-classbtn {
+  height: 26px;
+  width: 118px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.mdl-classbtn.mdl-open {
+  border-color: var(--accent);
+}
+
+.mdl-menu {
+  position: absolute;
+  right: 0;
+  top: 30px;
+  z-index: 3;
+  width: 160px;
+  padding: 4px;
+  box-sizing: border-box;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.mdl-menuitem {
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.mdl-menuitem:hover {
+  background: var(--border);
+}
+
+.mdl-menumark {
+  width: 14px;
+  display: flex;
+}
+
+.mdl-sw {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 36px;
+  height: 20px;
+  border-radius: 16px;
+  background: var(--border);
+  position: relative;
+  flex-shrink: 0;
+  margin: 0;
+  border: 1px solid var(--field-border);
+  transition: background 0.2s;
+}
+
+.mdl-sw::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  transition: left 0.2s;
+}
+
+.mdl-sw:checked {
   background: var(--accent);
+  border-color: var(--accent);
 }
 
-.tset-models-fill-low {
+.mdl-sw:checked::after {
+  left: 18px;
+  background: var(--accent-contrast);
+}
+
+/* --- add rows (class, account) --------------------------------------------------------- */
+
+.mdl-addbox {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 10px;
+  background: var(--bg-dock);
+  border: 1px solid var(--field-border);
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+.mdl-lab {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-4);
+}
+
+/* --- accounts ------------------------------------------------------------------------------ */
+
+.mdl-account-name {
+  font-weight: 600;
+  width: 70px;
+}
+
+.mdl-account-harness {
+  width: 84px;
+}
+
+.mdl-cost-cluster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mdl-amount {
+  display: flex;
+  align-items: center;
+  height: 28px;
+  box-sizing: border-box;
+  background: var(--bg-input);
+  border: 1px solid var(--field-border);
+  border-radius: 4px;
+  padding: 0 0 0 8px;
+}
+
+.mdl-amountfield {
+  width: 52px;
+  height: 26px;
+  background: transparent;
+  border: 0;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: right;
+  padding: 0 6px;
+}
+
+.mdl-unit {
+  font-size: 12px;
+  width: 70px;
+}
+
+.mdl-sessions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mdl-windows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 150px;
+}
+
+.mdl-window {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-4);
+  font-size: 12px;
+}
+
+.mdl-wlabel {
+  width: 20px;
+}
+
+.mdl-track {
+  width: 70px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+  display: block;
+}
+
+.mdl-fill {
+  display: block;
+  height: 6px;
+  background: var(--status-added);
+}
+
+.mdl-fill-low {
   background: var(--accent-peach);
 }
 
-.tset-models-wtext {
-  line-height: 18px;
-  width: 220px;
-  flex-shrink: 0;
-  font-size: 13px;
+.mdl-confirm {
+  background: var(--bg-input);
+  border: 1px solid var(--needs-you);
+  border-radius: 8px;
 }
 
-.tset-models-chip-small {
-  height: 20px;
-}
+/* --- the routing fold -------------------------------------------------------------------------- */
 
-.tset-models-rel-measured {
-  color: var(--accent-mint);
-}
-
-.tset-models-rel-estimated {
-  color: var(--status-modified);
-}
-
-.tset-models-rel-unknown {
-  color: var(--text-4);
-}
-
-.tset-models-unknownrow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 22px;
-  margin: -1px 0;
-  font-size: 13px;
-  color: var(--text-4);
-}
-
-.tset-models-q {
-  line-height: 18px;
-  display: flex;
-  align-items: center;
-  height: 22px;
-  margin-left: auto;
-  font-size: 13px;
-  color: var(--text-4);
-}
-
-/* --- routing -------------------------------------------------------------------- */
-
-.tset-models-rule {
-  padding: 12px 0 12px 14px;
-  margin-left: -14px;
-  border-left: 2px solid transparent;
-  font-size: 14px;
-  line-height: 21px;
+.mdl-fold {
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  border-width: 1px 0;
+  border-style: solid;
+  border-color: var(--border);
   color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+}
+
+.mdl-chevron {
+  display: flex;
+  color: var(--text-4);
+}
+
+.mdl-fields {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px 10px 36px;
+}
+
+.mdl-setting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 34px;
+}
+
+.mdl-setting > .mdl-sec:first-child {
+  width: 200px;
 }

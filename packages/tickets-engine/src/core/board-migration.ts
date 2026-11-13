@@ -13,7 +13,7 @@ import { chainItemsOf, parseChainItems } from './chain-list';
 import { crewOrderOf, inCrewOrder } from './crew-order';
 import { EDGE_STAGES } from './lifecycle-stages';
 import { HUMAN_PERSONA_ID, MISSION_PERSONA_ID, type Persona } from './persona';
-import { PERSONA_CLASSES } from './persona-settings';
+import { classNameOf } from '../contracts/capability-class';
 import { PIPELINE_PROSE, STANDARD_FLOW_LINE } from './pipeline-states';
 
 /** The run keys a working column carried that move onto the builder's record (concept §5). */
@@ -51,8 +51,9 @@ type MutablePatch = { -readonly [K in keyof PersonaSettingsPatch]: PersonaSettin
 /** `min-class` and `needs` onto the patch, where the builder sets neither. */
 function moveClassAndNeeds(found: ReadonlyMap<string, unknown>, settings: Persona['settings'], patch: MutablePatch, keys: string[]): void {
   const minClass = found.get('min-class');
-  if (typeof minClass === 'string' && (PERSONA_CLASSES as readonly string[]).includes(minClass) && settings.minClass === null) {
-    patch.minClass = minClass as PersonaSettingsPatch['minClass'];
+  const minName = classNameOf(minClass);
+  if (minName !== null && settings.minClass === null) {
+    patch.minClass = minName;
     keys.push('min-class');
   }
   const needs = found.get('needs');

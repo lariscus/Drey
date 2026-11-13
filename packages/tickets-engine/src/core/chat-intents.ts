@@ -13,6 +13,7 @@ import {
   type TicketPriority,
 } from '../contracts/tickets';
 import type { ChatCommand, ChatQuestionOption } from '../contracts/chat';
+import { classNameOf } from '../contracts/capability-class';
 
 /** The parsed envelope — what a mission turn amounted to. */
 export interface ChatEnvelope {
@@ -218,7 +219,7 @@ function startSessionOf(obj: Record<string, unknown>): ChatCommand | null {
   const directory = textOf(obj['directory']);
   const brief = textOf(obj['brief']);
   const raw = obj['poolClass'] ?? null;
-  const poolClass = raw === 'A' || raw === 'B' || raw === 'C' ? raw : null;
+  const poolClass = raw === null ? null : classNameOf(raw);
   if (persona === null || directory === null || brief === null || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(persona) || (raw !== null && poolClass === null)) {
     return null;
   }

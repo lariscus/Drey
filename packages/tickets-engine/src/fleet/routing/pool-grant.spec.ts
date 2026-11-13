@@ -19,13 +19,17 @@ const zai = slot({ id: 'zai', label: 'z.ai', provider: 'opencode' });
 const kimi = slot({ id: 'kimi', label: 'Kimi', provider: 'kimi' });
 const SLOTS: Slot[] = [claudeA, zai, kimi];
 
-/** Board 7l's table in small: opus A 5 × 1, sonnet B 1 × 2 on Claude A; glm B 0.4 × 3 on z.ai; kimi C 0.3 × 2 on any Kimi slot. */
+/** Board 7l's table in small: opus heavy 5, sonnet standard 1 on Claude A; glm standard 0.4 on z.ai; kimi light 0.3 on any Kimi slot (its letter C reads as light). */
 const TABLE = [
-  { model: 'opus', slot: 'claude-a', category: 'frontier', class: 'A', cost: 5, sessions: 1 },
-  { model: 'sonnet', slot: 'claude-a', category: 'everyday', class: 'B', cost: 1, sessions: 2 },
-  { model: 'glm', slot: 'zai', category: 'everyday', class: 'B', cost: 0.4, sessions: 3 },
-  { model: 'kimi-k2', provider: 'kimi', category: 'bulk', class: 'C', cost: 0.3, sessions: 2 },
+  { model: 'opus', slot: 'claude-a', category: 'frontier', class: 'heavy', cost: 5 },
+  { model: 'sonnet', slot: 'claude-a', category: 'everyday', class: 'standard', cost: 1 },
+  { model: 'glm', slot: 'zai', category: 'everyday', class: 'standard', cost: 0.4 },
+  { model: 'kimi-k2', provider: 'kimi', category: 'bulk', class: 'C', cost: 0.3 },
 ];
+
+/** req-287: the shipped class list with caps — at most N sessions of a class at once over every slot. */
+const capped = (caps: Readonly<Record<string, number>>): { name: string; sessions?: number }[] =>
+  ['super heavy', 'heavy', 'standard', 'light'].map((name) => (caps[name] !== undefined ? { name, sessions: caps[name] } : { name }));
 
 interface Rig {
   readonly pool: PoolGrant;
@@ -59,7 +63,7 @@ async function rig(config: Record<string, unknown> = { models: TABLE }, throttle
 const ask = (over: Partial<ClassRequest> = {}): ClassRequest => ({
   ticket: 'T-0001',
   persona: 'ben',
-  class: 'B',
+  class: 'standard',
   pool: [{ provider: null, model: 'opus' }, { provider: null, model: 'sonnet' }, { provider: null, model: 'glm' }, { provider: null, model: 'kimi-k2' }],
   provider: 'claude-code',
   contextTokens: null,
@@ -77,51 +81,83 @@ const run = (over: Partial<RunInfo>): RunInfo => ({ id: 'R-old', ticketId: 'T-00
 describe('PoolGrant — exactly the class asked for, or wait (req-170, R10)', () => {
   it('grants a model of exactly the class — never a stronger or a lighter one; same surplus → the cheaper (req-178)', async () => {
     const { pool } = await rig();
-    expect(pool.choose(ask())).toMatchObject({ kind: 'grant', model: 'glm', class: 'B', cost: 0.4, slot: { id: 'zai' }, reason: 'glm, class B, cost 0.4 on z.ai — part M' });
-    expect(pool.choose(ask({ pool: [{ provider: null, model: 'sonnet' }] }))).toMatchObject({ kind: 'grant', model: 'sonnet', class: 'B', cost: 1, slot: { id: 'claude-a' }, reason: 'sonnet, class B, cost 1 on Claude A — part M' });
-    expect(pool.choose(ask({ class: 'C' }))).toMatchObject({ kind: 'grant', model: 'kimi-k2', class: 'C', slot: { id: 'kimi' } });
-    expect(pool.choose(ask({ class: 'A' }))).toMatchObject({ kind: 'grant', model: 'opus', class: 'A' });
+    expect(pool.choose(ask())).toMatchObject({ kind: 'grant', model: 'glm', class: 'standard', cost: 0.4, slot: { id: 'zai' }, reason: 'glm, class standard, cost 0.4 on z.ai — part M' });
+    expect(pool.choose(ask({ pool: [{ provider: null, model: 'sonnet' }] }))).toMatchObject({ kind: 'grant', model: 'sonnet', class: 'standard', cost: 1, slot: { id: 'claude-a' }, reason: 'sonnet, class standard, cost 1 on Claude A — part M' });
+    expect(pool.choose(ask({ class: 'light' }))).toMatchObject({ kind: 'grant', model: 'kimi-k2', class: 'light', slot: { id: 'kimi' } });
+    expect(pool.choose(ask({ class: 'heavy' }))).toMatchObject({ kind: 'grant', model: 'opus', class: 'heavy' });
   });
 
-  it('waits, never downgrades: the A row is busy, the free B rows are not offered', async () => {
-    const { pool, gate } = await rig();
-    expect(gate.bind(start('opus', { poolClass: 'A' }), 'R-1', ctx)).toMatchObject({ id: 'claude-a', grant: { requested: 'A', class: 'A', model: 'opus', cost: 5 } });
-    expect(pool.choose(ask({ class: 'A' }))).toEqual({ kind: 'wait', reason: 'capacity', line: 'waits for a A slot', detail: 'Claude A: 1 of 1 opus sessions busy' });
+  it('waits, never downgrades: the heavy class is full, the free standard rows are not offered', async () => {
+    const { pool, gate } = await rig({ classes: capped({ heavy: 1 }), models: TABLE });
+    expect(gate.bind(start('opus', { poolClass: 'heavy' }), 'R-1', ctx)).toMatchObject({ id: 'claude-a', grant: { requested: 'heavy', class: 'heavy', model: 'opus', cost: 5 } });
+    expect(pool.choose(ask({ class: 'heavy' }))).toEqual({ kind: 'wait', reason: 'capacity', line: 'waits for a heavy slot', detail: 'heavy runs 1 of at most 1 sessions' });
     gate.release('R-1');
-    expect(pool.choose(ask({ class: 'A' }))).toMatchObject({ kind: 'grant', model: 'opus' });
+    expect(pool.choose(ask({ class: 'heavy' }))).toMatchObject({ kind: 'grant', model: 'opus' });
   });
 
-  it("the slot's derived cap (its largest row at full sessions) and the global cap bound the sum of the active sessions", async () => {
-    const { pool, gate, cap, registry } = await rig({ models: TABLE, capacity: { global: 6 } });
-    gate.bind(start('opus', { poolClass: 'A' }), 'R-1', ctx);
+  it('req-287: a class runs at most its N sessions over every slot; another class is not held by it', async () => {
+    const { pool, gate, cap } = await rig({ classes: capped({ standard: 2 }), models: TABLE });
+    gate.bind(start('glm', { poolClass: 'standard' }), 'R-1', ctx);
+    gate.bind(start('sonnet', { poolClass: 'standard' }), 'R-2', ctx);
+    expect(pool.choose(ask())).toEqual({
+      kind: 'wait',
+      reason: 'capacity',
+      line: 'waits for a standard slot',
+      detail: 'standard runs 2 of at most 2 sessions; standard runs 2 of at most 2 sessions',
+    });
+    expect(pool.choose(ask({ class: 'light' }))).toMatchObject({ kind: 'grant', model: 'kimi-k2' });
+    expect(cap.classLoad()).toEqual([
+      { name: 'super heavy', busy: 0, cap: null },
+      { name: 'heavy', busy: 0, cap: null },
+      { name: 'standard', busy: 2, cap: 2 },
+      { name: 'light', busy: 0, cap: null },
+    ]);
+    gate.release('R-1');
+    expect(pool.choose(ask())).toMatchObject({ kind: 'grant', model: 'glm', slot: { id: 'zai' } });
+  });
+
+  it("a slot's own cost cap and the global cap bound the sum of the active sessions; a slot without a cap answers to the global one only", async () => {
+    const { pool, gate, cap, registry } = await rig({ models: TABLE, capacity: { global: 6, perSlot: { 'claude-a': 5, zai: 1.2 } } });
+    gate.bind(start('opus', { poolClass: 'heavy' }), 'R-1', ctx);
     expect(pool.choose(ask({ pool: [{ provider: null, model: 'sonnet' }] }))).toMatchObject({ kind: 'wait', reason: 'capacity', detail: 'Claude A carries 5 of 5, 1 more does not fit' });
-    gate.bind(start('glm', { poolClass: 'B' }), 'R-2', ctx);
-    gate.bind(start('glm', { poolClass: 'B' }), 'R-3', ctx);
+    gate.bind(start('glm', { poolClass: 'standard' }), 'R-2', ctx);
+    gate.bind(start('glm', { poolClass: 'standard' }), 'R-3', ctx);
     expect(pool.choose(ask({ pool: [{ provider: null, model: 'glm' }] }))).toMatchObject({ kind: 'wait', detail: 'the global cap carries 5.8 of 6, 0.4 more does not fit' });
     expect(cap.load(registry.views())).toEqual({
       used: 5.8,
       global: 6,
       slots: [
-        { id: 'claude-a', label: 'Claude A', used: 5, cap: 5, derived: true },
-        { id: 'zai', label: 'z.ai', used: 0.8, cap: 1.2, derived: true },
-        { id: 'kimi', label: 'Kimi', used: 0, cap: 0.6, derived: true },
+        { id: 'claude-a', label: 'Claude A', used: 5, cap: 5 },
+        { id: 'zai', label: 'z.ai', used: 0.8, cap: 1.2 },
+        { id: 'kimi', label: 'Kimi', used: 0, cap: null },
+      ],
+      classes: [
+        { name: 'super heavy', busy: 0, cap: null },
+        { name: 'heavy', busy: 1, cap: null },
+        { name: 'standard', busy: 2, cap: null },
+        { name: 'light', busy: 0, cap: null },
       ],
     });
   });
 
   it('a weight above a cap can never fit: a configuration wait, not a capacity one', async () => {
     const { pool } = await rig({ models: TABLE, capacity: { perSlot: { 'claude-a': 2 } } });
-    expect(pool.choose(ask({ class: 'A' }))).toMatchObject({ kind: 'wait', reason: 'config', line: 'waits: opus costs 5, above the cap of Claude A or the global cap — raise it in Settings → Models' });
+    expect(pool.choose(ask({ class: 'heavy' }))).toMatchObject({ kind: 'wait', reason: 'config', line: 'waits: opus costs 5, above the cap of Claude A or the global cap — raise it in Settings → Models' });
   });
 
   it('a class the pool does not hold is a configuration wait', async () => {
     const { pool } = await rig();
-    expect(pool.choose(ask({ class: 'C', pool: [{ provider: null, model: 'opus' }, { provider: null, model: 'sonnet' }] }))).toEqual({
+    expect(pool.choose(ask({ class: 'light', pool: [{ provider: null, model: 'opus' }, { provider: null, model: 'sonnet' }] }))).toEqual({
       kind: 'wait',
       reason: 'config',
-      line: "waits: ben's pool holds no class C model — add one in Settings → Models",
-      detail: "ben's pool holds no class C model — add one in Settings → Models",
+      line: "waits: ben's pool holds no class light model — add one in Settings → Models",
+      detail: "ben's pool holds no class light model — add one in Settings → Models",
     });
+  });
+
+  it('req-287: a row the owner switched off is never granted', async () => {
+    const { pool } = await rig({ models: TABLE.map((row) => (row.model === 'opus' ? { ...row, enabled: false } : row)) });
+    expect(pool.choose(ask({ class: 'heavy' }))).toMatchObject({ kind: 'wait', reason: 'config', detail: "ben's pool holds no class heavy model — add one in Settings → Models" });
   });
 
   it('a model the table does not hold runs only on a pin without a class, or while the table is empty', async () => {

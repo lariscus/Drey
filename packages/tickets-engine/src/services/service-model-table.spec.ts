@@ -22,7 +22,7 @@ describe('ServiceModelTable — the model table read from service.json (req-256)
   it('reads the rows a provider serves, without a runner', async () => {
     await fsp.writeFile(file, JSON.stringify({ models: [{ model: 'glm-big', provider: 'opencode', category: 'frontier', class: 'A', cost: 2, sessions: 1 }, { model: 'bad row', provider: 'nowhere', class: 'A' }] }));
     const rows = await table().rows();
-    expect(rows?.map((r) => [r.model, r.provider, r.class])).toEqual([['glm-big', 'opencode', 'A']]);
+    expect(rows?.map((r) => [r.model, r.provider, r.class])).toEqual([['glm-big', 'opencode', 'heavy']]);
   });
 
   it('has no table when the file is absent, does not parse or holds no models key', async () => {

@@ -64,6 +64,15 @@ export class SlotReservations {
     return [...this.bySlot.keys()].reduce((sum, slotId) => sum + this.costOn(slotId), 0);
   }
 
+  /** req-287: how many sessions of a class run on every slot (the class's `at most N`). */
+  sessionsOfClass(name: CapabilityClass): number {
+    let count = 0;
+    for (const runs of this.bySlot.values()) {
+      count += [...runs.values()].filter((seat) => seat.class === name).length;
+    }
+    return count;
+  }
+
   /** How many sessions of a model run on the slot. */
   sessionsOf(slotId: string, model: string): number {
     return [...(this.bySlot.get(slotId)?.values() ?? [])].filter((seat) => seat.model === model).length;

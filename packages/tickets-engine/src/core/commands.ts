@@ -16,6 +16,7 @@ import {
 } from '../fleet/protocol';
 import type { PlanPartsEdit, PlanReleaseScope } from '../contracts/plan-approval';
 import type { FlowOp } from './flow-edit';
+import { classNameOf, type ClassName } from '../contracts/capability-class';
 import { DEFAULT_PRIORITY_CONFIG, titleFromDescription, type PriorityConfig, type TicketPriority, type TicketTrack } from '../contracts/tickets';
 
 export type Parsed<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: string };
@@ -144,7 +145,7 @@ export function parseSetTrack(payload: unknown): Parsed<SetTrackCommand> {
 /** The card's class control (req-186): the ticket's `class:` key, or null to remove the pin. */
 export interface SetClassCommand {
   readonly id: string;
-  readonly class: 'A' | 'B' | 'C' | null;
+  readonly class: ClassName | null;
 }
 
 export function parseSetClass(payload: unknown): Parsed<SetClassCommand> {
@@ -152,9 +153,9 @@ export function parseSetClass(payload: unknown): Parsed<SetClassCommand> {
   if (typeof p['id'] !== 'string') {
     return refuse('bad class payload');
   }
-  const value = p['class'];
-  if (value !== null && value !== 'A' && value !== 'B' && value !== 'C') {
-    return refuse('class must be A, B, C or null');
+  const value = p['class'] === null ? null : classNameOf(p['class']);
+  if (p['class'] !== null && value === null) {
+    return refuse('class must be a class name or null');
   }
   return ok({ id: p['id'], class: value });
 }

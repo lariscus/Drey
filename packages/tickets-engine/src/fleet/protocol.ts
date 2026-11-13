@@ -25,7 +25,11 @@ export { DEFAULT_FLEET_CAPS, DEFAULT_FLEET_HANDOVER, DEFAULT_FLEET_POOL, normali
 export type { FleetCaps, FleetHandoverConfig, FleetPool, FleetPools, HandoverMode } from './protocol-fleet-config';
 export { normalizeChainStore } from './protocol-chain';
 export { CAPABILITY_CLASSES, isCapabilityClass, isPartSize, PART_SIZE_CLASS } from './protocol-pool';
-export type { CapabilityClass, CapacityConfig, ClassRequest, FullLedger, LedgerDefaults, LedgerFigure, LedgerName, ModelRow, ModelsReply, PartSize, PoolDecision, PoolEntry, PoolGrantDecision, PoolGrantRecord, PoolLoad, PoolSettings, PoolWaitDecision, QueueEntry, QueueReason, RunLedgerInput, SlotLoad } from './protocol-pool';
+export { classNameOf, DEFAULT_CLASS_NAMES, LEGACY_CLASS_NAMES, SIZE_CLASS_NAMES } from '../contracts/capability-class';
+export type { ClassName } from '../contracts/capability-class';
+export { discoveryKeyOf } from './protocol-discovery';
+export type { DiscoveredModel, DiscoveryReport, HarnessReport, HarnessState, OfferedModel, ProbeOutcome } from './protocol-discovery';
+export type { CapabilityClass, CapacityConfig, ClassConfig, ClassLoad, ClassRequest, FullLedger, LedgerDefaults, LedgerFigure, LedgerName, ModelRow, ModelsReply, PartSize, PoolDecision, PoolEntry, PoolGrantDecision, PoolGrantRecord, PoolLoad, PoolSettings, PoolWaitDecision, QueueEntry, QueueReason, RunLedgerInput, SlotLoad } from './protocol-pool';
 export { DEFAULT_ROUTING, INPUT_MODALITIES } from './protocol-routing';
 export type { BurnRateBasis, BurnRateReading, BurnRateSlotReading, CapabilityImportReport, FilteredSlot, InputModality, ModelCapabilities, RouteRecord, RouteStepUp, RoutingSettings } from './protocol-routing';
 export type { ModelNeeds } from '../contracts/ticket-pool-meta';

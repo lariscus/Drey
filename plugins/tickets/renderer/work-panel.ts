@@ -83,7 +83,7 @@ export interface WorkPanelDeps {
   /** The ticket's allowance in USD (its own key, else the default of Settings → Models); null = none known. */
   allowanceOf?(card: TicketCard): number | null;
   /** The class pin of the row menu's Class › (req-186): A, B, C or null to drop the pin. */
-  setClass(card: TicketCard, value: 'A' | 'B' | 'C' | null): void;
+  setClass(card: TicketCard, value: string | null): void;
 }
 
 /** Which groups the owner folded — per viewer, never in the repo. */

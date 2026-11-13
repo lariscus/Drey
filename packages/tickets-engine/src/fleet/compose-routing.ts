@@ -12,7 +12,12 @@ import type { SlotListCheck } from './api/slot-routes';
 import { FetchQuotaHttp } from './fetch-quota-http';
 import type { Clock } from './ports/clock';
 import type { FileSystem } from './ports/file-system';
+import { composeDiscovery } from './compose-discovery';
 import { composePool, poolDeskOf, type Pool } from './compose-pool';
+import { nodeSpawnFn } from './procs';
+import { ClassMigration } from './routing/class-migration';
+import type { HarnessProbe } from './routing/model-discovery';
+import { ModelsDevImport } from './routing/models-dev-import';
 import type { PoolLoad, SlotView } from './protocol';
 import { ClaudeCodeQuotaSource } from './routing/claude-code-quota-source';
 import { CountingQuotaSource } from './routing/counting-quota-source';
@@ -36,6 +41,8 @@ import { SurplusCalculator } from './routing/surplus-calculator';
 import { ZaiQuotaSource } from './routing/zai-quota-source';
 
 export interface RoutingDeps {
+  /** req-286: the harness probes; the four real ones over `nodeSpawnFn` by default (a spec passes fakes). */
+  readonly probes?: readonly HarnessProbe[];
   /** The service home (`~/.drey-engine`): `service.json` lives there. */
   readonly home: string;
   /** The user's home: Claude's default login, opencode's and Kimi's default folders. */
@@ -130,6 +137,7 @@ function loadAnnouncer(pool: () => PoolLoad, publish: ((load: PoolLoad) => void)
 
 export function composeRouting(deps: RoutingDeps): Routing {
   const config = new ServiceConfigFile(deps.fs, path.join(deps.home, 'service.json'));
+  const classMigration = new ClassMigration(config, deps.log);
   const claude = new ClaudeCodeQuotaSource(deps.fs, deps.userHome);
   const counting = new CountingQuotaSource(deps.clock);
   const reservations = new SlotReservations();
@@ -170,6 +178,8 @@ export function composeRouting(deps: RoutingDeps): Routing {
     timeText: deps.timeText ?? localTimeText,
   });
   const loop = new QuotaRefreshLoop(registry, deps.schedule ?? nodeSchedule, deps.log);
+  const importer = new ModelsDevImport(http);
+  const discovery = composeDiscovery({ home: deps.home, env: deps.env, fs: deps.fs, clock: deps.clock, log: deps.log, settings, slots: () => registry.list(), registry: importer, spawnFn: nodeSpawnFn(), windows: process.platform === 'win32', ...(deps.probes !== undefined ? { probes: deps.probes } : {}) });
   return {
     registry,
     gate: new PoolGate(registry, reservations, pool.grant, pool.shares),
@@ -177,9 +187,11 @@ export function composeRouting(deps: RoutingDeps): Routing {
     config,
     check: (slots) => parseServiceSlots({ slots }).errors,
     pool,
-    poolDesk: poolDeskOf(pool, registry, http),
+    poolDesk: poolDeskOf(pool, registry, importer, discovery),
     start: async () => {
       await config.ensure().catch((error: unknown) => deps.log(`service.json could not be created: ${error instanceof Error ? error.message : String(error)}`));
+      await classMigration.run();
+      await discovery.load();
       await pool.burnBook.load();
       await loop.tick();
       announce();

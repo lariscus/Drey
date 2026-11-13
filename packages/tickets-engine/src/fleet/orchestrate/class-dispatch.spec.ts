@@ -14,10 +14,12 @@ import { PoolRig } from './pool.fake';
 
 const NOW = new Date('2026-10-18T12:00:00Z');
 const CLAUDE_A = slot({ id: 'claude-a', label: 'Claude A', sessions: 4 });
+/** req-287: at most one heavy session at once; the rows carry no sessions of their own. */
 const TABLE = {
+  classes: ['super heavy', { name: 'heavy', sessions: 1 }, 'standard', 'light'],
   models: [
-    { model: 'opus', slot: 'claude-a', category: 'frontier', class: 'A', cost: 5, sessions: 1 },
-    { model: 'sonnet', slot: 'claude-a', category: 'everyday', class: 'B', cost: 1, sessions: 2 },
+    { model: 'opus', slot: 'claude-a', category: 'frontier', class: 'heavy', cost: 5 },
+    { model: 'sonnet', slot: 'claude-a', category: 'everyday', class: 'standard', cost: 1 },
   ],
 };
 
@@ -42,18 +44,27 @@ describe('the class request at dispatch (req-170)', () => {
     await h.tearDown();
   });
 
-  it('waits, never downgrades: the second class-A ticket queues while the B model is free', async () => {
+  it('waits, never downgrades: the second heavy ticket queues while the standard model is free', async () => {
     h.io.seed('T-0001', 'plan', { rank: 1000 });
     h.io.seed('T-0002', 'plan', { rank: 2000 });
     const { built } = await setUp();
     await built.orch.configure(h.config());
     await built.orch.setMaster('run');
 
-    expect(built.fleet.records.map((r) => [r.request.ticketId, r.request.model, r.request.poolClass])).toEqual([['T-0001', 'opus', 'A']]);
-    expect(built.fleet.records[0]!.info.grant).toMatchObject({ requested: 'A', class: 'A', model: 'opus', cost: 5 });
-    expect(built.orch.status().queue).toMatchObject([{ ticket: 'T-0002', persona: 'ben', class: 'A', reason: 'capacity', line: 'waits for a A slot', position: 1 }]);
-    expect(built.orch.status().pool).toMatchObject({ used: 5, slots: [{ id: 'claude-a', used: 5, cap: 5 }] });
-    expect(built.logs.some((line) => line.startsWith('dispatch waits T-0002: queued · waits for a A slot'))).toBe(true);
+    expect(built.fleet.records.map((r) => [r.request.ticketId, r.request.model, r.request.poolClass])).toEqual([['T-0001', 'opus', 'heavy']]);
+    expect(built.fleet.records[0]!.info.grant).toMatchObject({ requested: 'heavy', class: 'heavy', model: 'opus', cost: 5 });
+    expect(built.orch.status().queue).toMatchObject([{ ticket: 'T-0002', persona: 'ben', class: 'heavy', reason: 'capacity', line: 'waits for a heavy slot', position: 1 }]);
+    expect(built.orch.status().pool).toMatchObject({
+      used: 5,
+      slots: [{ id: 'claude-a', used: 5, cap: null }],
+      classes: [
+        { name: 'super heavy', busy: 0, cap: null },
+        { name: 'heavy', busy: 1, cap: 1 },
+        { name: 'standard', busy: 0, cap: null },
+        { name: 'light', busy: 0, cap: null },
+      ],
+    });
+    expect(built.logs.some((line) => line.startsWith('dispatch waits T-0002: queued · waits for a heavy slot'))).toBe(true);
   });
 
   it('serves the queue front to back when capacity frees', async () => {
@@ -74,24 +85,24 @@ describe('the class request at dispatch (req-170)', () => {
     expect(built.orch.status().queue?.map((e) => [e.ticket, e.position])).toEqual([['T-0003', 1]]);
   });
 
-  it("asks for the part's size: M → class B, the reason rides the request", async () => {
+  it("asks for the part's size: M → class standard, the reason rides the request", async () => {
     h.io.seed('T-0004', 'plan', { extensions: { size: 'M' } });
     const { built } = await setUp();
     await built.orch.configure(h.config());
     await built.orch.setMaster('run');
-    expect(built.fleet.records.map((r) => [r.request.model, r.request.poolClass, r.request.poolWhy])).toEqual([['sonnet', 'B', 'size M → B']]);
-    expect(built.logs.find((line) => line.startsWith('dispatched T-0004'))).toContain('sonnet, class B, cost 1 on Claude A — size M → B');
+    expect(built.fleet.records.map((r) => [r.request.model, r.request.poolClass, r.request.poolWhy])).toEqual([['sonnet', 'standard', 'size M → standard']]);
+    expect(built.logs.find((line) => line.startsWith('dispatched T-0004'))).toContain('sonnet, class standard, cost 1 on Claude A — size M → standard');
   });
 
   it("req-178: the ticket's needs ride the start with the dispatch's route; a model without the capability is never taken", async () => {
     h.io.seed('T-0004', 'plan', { extensions: { size: 'M', needs: 'image' } });
-    const vision = { models: [TABLE.models[0], { ...TABLE.models[1], input: ['text', 'image'] }] };
+    const vision = { ...TABLE, models: [TABLE.models[0], { ...TABLE.models[1], input: ['text', 'image'] }] };
     const { built } = await setUp(vision);
     await built.orch.configure(h.config());
     await built.orch.setMaster('run');
     const started = built.fleet.records[0]?.request;
-    expect(started).toMatchObject({ model: 'sonnet', poolNeeds: { image: true }, poolRoute: { slot: 'claude-a', model: 'sonnet', class: 'B', requested: 'B' } });
-    expect(built.fleet.records[0]?.info.grant?.route?.line).toBe('route T-0004 → claude-a/sonnet: class B, q ?, est ?');
+    expect(started).toMatchObject({ model: 'sonnet', poolNeeds: { image: true }, poolRoute: { slot: 'claude-a', model: 'sonnet', class: 'standard', requested: 'standard' } });
+    expect(built.fleet.records[0]?.info.grant?.route?.line).toBe('route T-0004 → claude-a/sonnet: class standard, q ?, est ?');
   });
 
   it('req-178: no model of the class reads images — the ticket waits on the configuration, named', async () => {

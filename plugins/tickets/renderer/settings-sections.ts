@@ -66,9 +66,9 @@ export function ticketsSections(i18n: I18n): readonly PluginSettingsSection[] {
 export function ticketsEntries(i18n: I18n): readonly PluginSettingsEntry[] {
   return [
     ...TICKETS_ENTRIES,
-    e('models', 'models.table', i18n.t('tickets.settings.models.entry.table'), i18n.t('tickets.settings.models.entry.table_desc')),
+    e('models', 'models.classes', i18n.t('tickets.settings.models.classes.title'), i18n.t('tickets.settings.models.entry.table_desc')),
     e('models', 'models.cap', i18n.t('tickets.settings.models.cap.global'), i18n.t('tickets.settings.models.entry.cap_desc')),
-    e('models', 'models.slots', i18n.t('tickets.settings.models.group.slots'), i18n.t('tickets.settings.models.entry.slots_desc')),
-    e('models', 'models.ledgers', i18n.t('tickets.settings.models.group.ledgers'), i18n.t('tickets.settings.models.entry.ledgers_desc')),
+    e('models', 'models.accounts', i18n.t('tickets.settings.models.accounts.title'), i18n.t('tickets.settings.models.entry.slots_desc')),
+    e('models', 'models.routing', i18n.t('tickets.settings.models.routing.title'), i18n.t('tickets.settings.models.entry.ledgers_desc')),
   ];
 }

@@ -16,7 +16,8 @@ import { CapabilityFilter } from './routing/capability-filter';
 import type { CapacityCap } from './routing/capacity-cap';
 import { CostEstimate } from './routing/cost-estimate';
 import { Ledgers } from './routing/ledgers';
-import { ModelsDevImport, type RegistryHttp } from './routing/models-dev-import';
+import type { ModelDiscovery } from './routing/model-discovery';
+import type { ModelsDevImport } from './routing/models-dev-import';
 import { parsePoolSettings, poolKeysOf } from './routing/pool-config';
 import { PoolGrant, type ProviderThrottle } from './routing/pool-grant';
 import { PoolMigration } from './routing/pool-migration';
@@ -136,9 +137,8 @@ export function composePool(parts: PoolParts): Pool {
   };
 }
 
-/** The pool as the `/models` routes see it. */
-export function poolDeskOf(pool: Pool, registry: SlotRegistry, http: RegistryHttp): PoolDesk {
-  const importer = new ModelsDevImport(http);
+/** The pool as the `/models` routes see it; req-286's discovery beside it. */
+export function poolDeskOf(pool: Pool, registry: SlotRegistry, importer: ModelsDevImport, discovery: ModelDiscovery): PoolDesk {
   return {
     settings: () => pool.settings.settings(),
     errors: () => pool.settings.errors(),
@@ -149,5 +149,9 @@ export function poolDeskOf(pool: Pool, registry: SlotRegistry, http: RegistryHtt
     stored: poolKeysOf,
     reload: () => registry.load(),
     importCapabilities: () => importer.fill(pool.settings.settings().models),
+    discovery: () => discovery.report(),
+    discover: (withRegistry) => discovery.check(withRegistry),
+    offered: (provider, model) => discovery.offered(provider, model),
+    ignored: () => pool.settings.ignored(),
   };
 }

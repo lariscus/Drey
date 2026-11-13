@@ -55,7 +55,7 @@ export function modelLinesOf(pool: readonly string[], worker: string, table: Mod
     }
     const serving = slotsOf(row, slots);
     const busy = liveOn(row, runs);
-    const total = serving.length * row.sessions;
+    const total = serving.reduce((sum, slot) => sum + (slot.total ?? 0), 0);
     return {
       index: position + 1,
       entry,

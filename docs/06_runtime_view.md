@@ -6138,3 +6138,48 @@ The no-persona card's **Assign…** and **Do it myself** are `POST …/hand {per
 conflict card's **Let Ben resolve** starts the holder's run again (`POST
 /api/runs`); the Crew list's drag writes the whole order (`POST /api/crew/order`,
 `crew.md`'s `order:`, one commit) and the list reads the board again.
+
+## 6.131 Find models again → the harnesses' offers → a new model added to a class (req-286/287, milestone 262)
+
+No model is typed in. Settings → Models asks the runner to check the
+harnesses (on its first look without the network, on *Find models again*
+with the registry's capabilities); each probe asks its harness the one
+question that lists its models — Claude Code's stream-json `initialize`,
+an ACP agent's `session/new` — and a model the table does not hold comes
+back as a card. *Add* writes one row under the class the owner picked; the
+grant then counts it against that class's `at most N`.
+
+```mermaid
+sequenceDiagram
+    participant P as Settings → Models
+    participant R as Runner /models routes
+    participant D as ModelDiscovery
+    participant C as ClaudeCodeProbe
+    participant A as AcpProbe (opencode, Kimi, Copilot)
+    participant M as models.dev
+    participant F as service.json
+    P->>R: POST /models/discover {registry: true}
+    R->>D: check(withRegistry)
+    par every harness
+        D->>C: probe()
+        C->>C: claude on PATH? (BinaryLocator)
+        C-->>D: initialize reply: 2.1.319, signed in, 4 models
+    and
+        D->>A: probe()
+        A-->>D: initialize + session/new: version, model options
+    end
+    D->>M: capabilities of the models offered (one GET)
+    D->>D: discovery.json (rows, offers); cards = offers − table − ignored
+    R->>M: fill the table rows' undeclared columns
+    R-->>P: GET /models reply + discovery
+    P->>R: POST /models/add {provider: opencode, model: zai-coding-plan/glm-5.3-air, class: light}
+    R->>F: models += row (slot zai, capabilities, cost 1)
+    R-->>P: reply — the card is gone, the row sits in light
+    Note over R: a later start of class light: SlotFit refuses when light runs its at most N
+```
+
+A drag of a row into another class, the class menu, the switch and the
+cost factor write the whole `models` list (`POST /models/config`); *Add
+class* and a class's `at most` stepper write `classes`; an account's cost
+and sessions go through `POST /slots/update`, its removal through `POST
+/slots/remove {withModels}` once the owner confirmed it in the row.

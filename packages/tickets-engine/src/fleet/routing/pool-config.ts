@@ -1,13 +1,16 @@
 /**
- * The pool keys of `service.json` (req-170; machine scope, R13): `models`
- * (the model table, req-178 adds its capability columns), `capacity` (the
+ * The pool keys of `service.json` (req-170; machine scope, R13): `classes`
+ * (req-287: the owner's class list with its session caps), `models`
+ * (the model table, req-178 adds its capability columns, req-287 the
+ * router switch `enabled`), `capacity` (the
  * cap), `ledgers` (the defaults) and `routing` (req-178, board 7l; req-181
  * adds its `burnRate`). A
  * row is checked on its own — a broken one is left out with its reason,
  * the others stand — against the slots of req-177: a row names a slot, or
  * a harness provider whose every slot serves it.
  */
-import { DEFAULT_ROUTING, isWorkerProvider, WORKER_PROVIDERS, isCapabilityClass, type CapacityConfig, type LedgerDefaults, type ModelRow, type PoolSettings, type RoutingSettings } from '../protocol';
+import { classNameOf, DEFAULT_ROUTING, isWorkerProvider, WORKER_PROVIDERS, type CapacityConfig, type ClassConfig, type LedgerDefaults, type ModelRow, type PoolSettings, type RoutingSettings } from '../protocol';
+import { classesOf, classKeysOf } from './class-config';
 import { capabilitiesOf, capabilityKeysOf } from './model-capabilities';
 import type { Slot } from './slot';
 
@@ -35,21 +38,14 @@ function placeOf(entry: Entry, slots: readonly Slot[]): Pick<ModelRow, 'slot' | 
   return isWorkerProvider(provider) ? { slot: null, provider } : `needs a slot or a provider (${WORKER_PROVIDERS.join(', ')})`;
 }
 
-/** A row's cost factor (default 1) and sessions (default 1), or why they do not read. */
-function weightOf(entry: Entry, model: string): Pick<ModelRow, 'cost' | 'sessions'> | string {
+/** A row's cost factor (default 1), or why it does not read. req-287: the row's old `sessions` became its class's cap and is not read. */
+function weightOf(entry: Entry, model: string): Pick<ModelRow, 'cost'> | string {
   const cost = entry['cost'] === undefined ? 1 : amount(entry['cost']);
-  if (cost === null) {
-    return `model "${model}": the cost factor must be a number of 0 or more`;
-  }
-  const sessions = entry['sessions'] === undefined ? 1 : entry['sessions'];
-  if (typeof sessions !== 'number' || !Number.isInteger(sessions) || sessions < 1) {
-    return `model "${model}": sessions must be a whole number of 1 or more`;
-  }
-  return { cost, sessions };
+  return cost === null ? `model "${model}": the cost factor must be a number of 0 or more` : { cost };
 }
 
 /** One row of `models`, or the reason it is left out. */
-export function modelRowOf(raw: unknown, slots: readonly Slot[], seen: readonly ModelRow[]): ModelRow | string {
+export function modelRowOf(raw: unknown, slots: readonly Slot[], seen: readonly ModelRow[], classes: readonly ClassConfig[]): ModelRow | string {
   const entry = (raw !== null && typeof raw === 'object' ? raw : {}) as Entry;
   const model = text(entry['model']);
   if (model === null) {
@@ -59,9 +55,9 @@ export function modelRowOf(raw: unknown, slots: readonly Slot[], seen: readonly 
   if (typeof place === 'string') {
     return `model "${model}" ${place}`;
   }
-  const rowClass = entry['class'];
-  if (!isCapabilityClass(rowClass)) {
-    return `model "${model}": class must be A, B or C`;
+  const rowClass = classNameOf(entry['class']);
+  if (rowClass === null || !classes.some((c) => c.name === rowClass)) {
+    return `model "${model}": class must be one of ${classes.map((c) => c.name).join(', ')}`;
   }
   const weight = weightOf(entry, model);
   if (typeof weight === 'string') {
@@ -74,13 +70,13 @@ export function modelRowOf(raw: unknown, slots: readonly Slot[], seen: readonly 
   if (typeof capabilities === 'string') {
     return capabilities;
   }
-  return { model, ...place, category: text(entry['category']) ?? '', class: rowClass, ...weight, ...capabilities };
+  return { model, ...place, category: text(entry['category']) ?? '', class: rowClass, ...weight, enabled: entry['enabled'] !== false, ...capabilities };
 }
 
-function rowsOf(raw: unknown, slots: readonly Slot[], errors: string[]): ModelRow[] {
+function rowsOf(raw: unknown, slots: readonly Slot[], classes: readonly ClassConfig[], errors: string[]): ModelRow[] {
   const rows: ModelRow[] = [];
   for (const entry of Array.isArray(raw) ? (raw as unknown[]) : []) {
-    const row = modelRowOf(entry, slots, rows);
+    const row = modelRowOf(entry, slots, rows, classes);
     if (typeof row === 'string') {
       errors.push(row);
     } else {
@@ -166,8 +162,9 @@ function routingOf(raw: unknown, errors: string[]): RoutingSettings {
 export function parsePoolSettings(root: unknown, slots: readonly Slot[]): PoolConfigParse {
   const config = (root !== null && typeof root === 'object' && !Array.isArray(root) ? root : {}) as Entry;
   const errors: string[] = [];
-  const models = rowsOf(config['models'], slots, errors);
-  const settings = { models, capacity: capacityOf(config['capacity'], errors), ledgers: ledgersOf(config['ledgers']), routing: routingOf(config['routing'], errors) };
+  const classes = classesOf(config['classes'], errors);
+  const models = rowsOf(config['models'], slots, classes, errors);
+  const settings = { classes, models, capacity: capacityOf(config['capacity'], errors), ledgers: ledgersOf(config['ledgers']), routing: routingOf(config['routing'], errors) };
   return { settings, errors };
 }
 
@@ -179,8 +176,8 @@ export function poolKeysOf(settings: PoolSettings): Record<string, unknown> {
     category: row.category,
     class: row.class,
     cost: row.cost,
-    sessions: row.sessions,
+    ...(row.enabled ? {} : { enabled: false }),
     ...capabilityKeysOf(row),
   }));
-  return { models, capacity: settings.capacity, ledgers: settings.ledgers, routing: settings.routing };
+  return { classes: classKeysOf(settings.classes), models, capacity: settings.capacity, ledgers: settings.ledgers, routing: settings.routing };
 }

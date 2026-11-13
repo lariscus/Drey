@@ -9,7 +9,7 @@ import type { PersonaLeavingAction } from '../../../../packages/tickets-engine/s
 import { h } from '../desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { labelled, outlineButton, selectOf, textInput } from './persona-dom';
-import { addableActionsOf, CLASS_FLOOR_CHOICES, type SettingsDraft } from './persona-settings-model';
+import { addableActionsOf, classFloorChoices, type SettingsDraft } from './persona-settings-model';
 
 function setOf(ctx: BlockContext): (next: Partial<SettingsDraft>, repaint?: boolean) => void {
   return (next, repaint = false) => {
@@ -47,7 +47,7 @@ function readOnlySwitch(ctx: BlockContext): HTMLElement {
 
 function classFloor(ctx: BlockContext): HTMLElement {
   const { t } = ctx;
-  const options = CLASS_FLOOR_CHOICES.map((value) => ({ value, label: value === '' ? t('persona.page.class_floor_none') : value }));
+  const options = classFloorChoices(ctx.extras.table, ctx.draft().settings.minClass).map((value) => ({ value, label: value === '' ? t('persona.page.class_floor_none') : value }));
   const select = selectOf(options, ctx.draft().settings.minClass, (value) => setOf(ctx)({ minClass: value as SettingsDraft['minClass'] }));
   select.dataset['field'] = 'min-class';
   const field = labelled(t('persona.page.class_floor'), select);

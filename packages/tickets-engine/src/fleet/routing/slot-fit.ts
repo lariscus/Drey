@@ -37,8 +37,8 @@ function blocked(view: SlotView): SlotRefusal | null {
 
 /**
  * The routing's hard filter on one slot (req-178 over req-170's checks):
- * the step's required capabilities, the slot's state, the row's sessions,
- * the provider's throttle, the caps, the slot's ledger and the reserve per
+ * the step's required capabilities, the slot's state, the class's sessions
+ * (req-287: at most N of a class at once), the provider's throttle, the caps, the slot's ledger and the reserve per
  * window. The first refusal wins; the row's own slot is
  * settled before (`PoolGrant`), the choice among what passes after.
  */
@@ -55,11 +55,12 @@ export class SlotFit {
     return blocked(view) ?? this.room(option, view, providerViews) ?? this.spend(view, request);
   }
 
-  /** The row's sessions, the provider's throttle and the caps. */
+  /** The class's sessions, the provider's throttle and the caps. */
   private room(option: RouteOption, view: SlotView, providerViews: readonly SlotView[]): SlotRefusal | null {
     const row = option.row;
-    if (row !== null && this.deps.reservations.sessionsOf(view.id, row.model) >= row.sessions) {
-      return { reason: 'capacity', text: `${view.label}: ${row.sessions} of ${row.sessions} ${row.model} sessions busy`, short: `${row.model} ${row.sessions} of ${row.sessions} busy` };
+    const classFull = this.deps.cap.classRefusal(row?.class ?? null);
+    if (classFull !== null) {
+      return { reason: 'capacity', text: classFull, short: 'class full' };
     }
     const throttled = this.throttled(option.provider, providerViews);
     if (throttled !== null) {

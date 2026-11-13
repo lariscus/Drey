@@ -10,6 +10,8 @@ import type { StartHold } from './start-hold';
 export interface ClassPool {
   choose(request: ClassRequest): PoolDecision;
   classOf(entry: PoolEntry): CapabilityClass | null;
+  /** req-287: the rank of a class in the owner's list. */
+  rankOf(name: CapabilityClass): number;
 }
 
 export interface WaitQueue {

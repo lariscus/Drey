@@ -243,7 +243,8 @@ export interface NewSessionPersona {
 
 export type NewSessionPermission = 'read-only' | 'accept-edits' | 'bypass';
 
-export type NewSessionClass = 'A' | 'B' | 'C';
+/** A class name of the owner's list (req-287: `heavy`, `light`, …). */
+export type NewSessionClass = string;
 
 /** What the New session form offers (the engine's `sessionOptions`). */
 export type NewSessionOptionsReply =

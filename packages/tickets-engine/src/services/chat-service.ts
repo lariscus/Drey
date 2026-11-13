@@ -19,6 +19,7 @@
  * still running refuses politely instead of interleaving a second owner
  * line the file could not order honestly.
  */
+import type { ClassName } from '../contracts/capability-class';
 import { missionEntryOfTitle } from './mission-entry-turns';
 import { promises as fsp } from 'node:fs';
 import type {
@@ -157,7 +158,7 @@ export interface ChatServiceDeps {
   readonly voices?: ChatVoiceSource;
   /** req-173: the free sessions Pia's startSession card starts once confirmed; absent = the card refuses. */
   readonly sessions?: {
-    start(ask: { persona: string; directory: string; poolClass?: 'A' | 'B' | 'C' | null; firstLine?: string }, origin: string): Promise<{ ok: true; runId: string } | { ok: false; error: string }>;
+    start(ask: { persona: string; directory: string; poolClass?: ClassName | null; firstLine?: string }, origin: string): Promise<{ ok: true; runId: string } | { ok: false; error: string }>;
     /** The personas and folders Pia may name, as a block below the board digest; null = none. */
     promptContext(): Promise<string | null>;
   };

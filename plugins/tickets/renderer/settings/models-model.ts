@@ -1,96 +1,36 @@
 // i18n: catalog
 /**
- * Settings → Tickets → Models (board 7l, req-186): the pure half. What the
- * five groups say, read from the engine's two answers — `poolModels` (the
- * model table, the caps, the ledger defaults, the live load) and `slots`
- * (the accounts with their quota windows) — and what an edit sends back.
- * DOM-free, so the page and its spec share it.
+ * Settings → Tickets → Models (board 7l v3, req-286/287): the pure half of
+ * the harness rows, the class groups and the new-model cards. What the page
+ * says is read from the engine's two answers — `poolModels` (the classes, the
+ * model table, the caps, the live load, what the harnesses found) and `slots`
+ * (the accounts) — and what an edit sends back is built here. DOM-free, so
+ * the page and its specs share it. The accounts' half is `models-accounts-model.ts`,
+ * the routing fold's `models-routing-model.ts`.
  */
 import type {
   CapabilityClass,
-  LedgerDefaults,
+  ClassConfig,
+  DiscoveredModel,
+  DiscoveryReport,
+  HarnessReport,
   ModelRow,
   ModelsReply,
-  QuotaReliability,
-  QuotaWindow,
-  RoutingSettings,
-  SlotBilling,
   SlotView,
   WorkerProviderId,
 } from '../../../../packages/tickets-engine/src/fleet/protocol';
+import { classNameOf } from '../../../../packages/tickets-engine/src/contracts/capability-class';
 import type { I18n } from '../../../../shared/i18n/types';
 import { RUNNER_LABEL } from '../settings-workers';
 
-/** Width of the window bar, board 7l. */
-export const BAR_WIDTH = 120;
-
-const trimmedNumber = (i18n: I18n, value: number): string => i18n.formatNumber(value, { maximumFractionDigits: 2 });
-
-// --- the model table ---------------------------------------------------------
-
-export interface ModelRowView {
-  readonly index: number;
-  readonly row: ModelRow;
-  /** The provider column: the slot's name, else the runner's. */
-  readonly provider: string;
-  readonly cost: string;
-  readonly sessions: string;
-}
-
-export function providerLabelOf(row: ModelRow, slots: readonly SlotView[]): string {
-  if (row.slot !== null) {
-    return slots.find((slot) => slot.id === row.slot)?.label ?? row.slot;
-  }
-  return RUNNER_LABEL[row.provider];
-}
-
-export function modelRowsOf(reply: ModelsReply | null, slots: readonly SlotView[], i18n: I18n): readonly ModelRowView[] {
-  return (reply?.models ?? []).map((row, index) => ({
-    index,
-    row,
-    provider: providerLabelOf(row, slots),
-    cost: trimmedNumber(i18n, row.cost),
-    sessions: i18n.formatNumber(row.sessions),
-  }));
-}
-
-/** The value of the provider column's picker: a slot, or a runner the table names without one. */
-export type PlaceChoice = `slot:${string}` | `provider:${WorkerProviderId}`;
-
-export function placeChoiceOf(row: Pick<ModelRow, 'slot' | 'provider'>): PlaceChoice {
-  return row.slot !== null ? `slot:${row.slot}` : `provider:${row.provider}`;
-}
-
-export interface PlaceOption {
-  readonly value: PlaceChoice;
-  readonly label: string;
-}
-
-/** What the provider picker offers: every slot, then the runners no slot is named for. */
-export function placeOptionsOf(slots: readonly SlotView[]): readonly PlaceOption[] {
-  const named = new Set(slots.map((slot) => slot.provider));
-  const providers = (Object.keys(RUNNER_LABEL) as WorkerProviderId[]).filter((id) => !named.has(id));
-  return [
-    ...slots.map((slot): PlaceOption => ({ value: `slot:${slot.id}`, label: slot.label })),
-    ...providers.map((id): PlaceOption => ({ value: `provider:${id}`, label: RUNNER_LABEL[id] })),
-  ];
-}
-
-export function rowPlaced(row: ModelRow, choice: PlaceChoice, slots: readonly SlotView[]): ModelRow {
-  if (choice.startsWith('slot:')) {
-    const id = choice.slice('slot:'.length);
-    const slot = slots.find((s) => s.id === id);
-    return { ...row, slot: id, provider: slot?.provider ?? row.provider };
-  }
-  return { ...row, slot: null, provider: choice.slice('provider:'.length) as WorkerProviderId };
-}
+export const trimmedNumber = (i18n: I18n, value: number): string => i18n.formatNumber(value, { maximumFractionDigits: 2 });
 
 export type Parsed<T> = { readonly ok: true; readonly value: T } | { readonly ok: false };
 
-const invalid = { ok: false } as const;
+export const invalid = { ok: false } as const;
 
 /** A decimal typed in a field (`0.4`, `2,5`); empty = nothing. */
-function numberOf(text: string): number | null | 'invalid' {
+export function numberOf(text: string): number | null | 'invalid' {
   const trimmed = text.trim().replace(',', '.');
   if (trimmed === '') {
     return null;
@@ -104,271 +44,236 @@ export function parseCostFactor(text: string): Parsed<number> {
   return typeof value === 'number' ? { ok: true, value } : invalid;
 }
 
-export function parseSessions(text: string): Parsed<number> {
-  const value = numberOf(text);
-  return typeof value === 'number' && Number.isInteger(value) && value >= 1 ? { ok: true, value } : invalid;
-}
-
-/** The global cap; empty = no cap. */
-export function parseCap(text: string): Parsed<number | null> {
-  const value = numberOf(text);
-  return value === 'invalid' ? invalid : { ok: true, value };
-}
-
-/** A dollar amount (`$2.50`, `2.5`); empty = no limit. */
-export function parseMoney(text: string): Parsed<number | null> {
-  return parseCap(text.replace(/[$\s]/g, ''));
-}
-
-export function moneyText(value: number | null, i18n: I18n): string {
-  return value === null ? '' : i18n.formatCurrency(value);
-}
-
-export function capText(value: number | null, i18n: I18n): string {
-  return value === null ? '' : trimmedNumber(i18n, value);
-}
-
-/** What `poolModelsConfig` takes for a changed table. */
-export function modelsPayload(rows: readonly ModelRow[]): { models: readonly Record<string, unknown>[] } {
-  return {
-    models: rows.map((row) => ({
-      model: row.model,
-      ...(row.slot !== null ? { slot: row.slot } : { provider: row.provider }),
-      category: row.category,
-      class: row.class,
-      cost: row.cost,
-      sessions: row.sessions,
-    })),
-  };
-}
-
-// --- capacity ----------------------------------------------------------------
-
-export interface CapacityView {
-  readonly global: string;
-  /** The read-only per-slot list. */
-  readonly perProvider: readonly { readonly label: string; readonly cap: string }[];
-  /** `Now: 2.4 of 6 · Claude A 2 of 5 · z.ai 0.4 of 1.2`. */
-  readonly now: string;
-}
-
-export function capacityViewOf(reply: ModelsReply | null, i18n: I18n): CapacityView {
-  if (reply === null) {
-    return { global: '', perProvider: [], now: '' };
+/** A stepper's next value: `−` at 1 lifts the cap (null), `+` on no cap starts at 1. */
+export function stepOf(value: number | null, delta: 1 | -1): number | null {
+  if (value === null) {
+    return delta === 1 ? 1 : null;
   }
-  const load = reply.now;
-  const head =
-    load.global === null
-      ? i18n.t('tickets.settings.models.cap.now_open', { used: trimmedNumber(i18n, load.used) })
-      : i18n.t('tickets.settings.models.cap.now', { used: trimmedNumber(i18n, load.used), cap: trimmedNumber(i18n, load.global) });
-  const busy = load.slots
-    .filter((slot) => slot.used > 0)
-    .map((slot) =>
-      slot.cap === null
-        ? i18n.t('tickets.settings.models.cap.now_slot_open', { label: slot.label, used: trimmedNumber(i18n, slot.used) })
-        : i18n.t('tickets.settings.models.cap.now_slot', { label: slot.label, used: trimmedNumber(i18n, slot.used), cap: trimmedNumber(i18n, slot.cap) }),
-    );
+  return value + delta < 1 ? null : value + delta;
+}
+
+// --- the harnesses -----------------------------------------------------------
+
+export function harnessLabelOf(provider: WorkerProviderId, harnesses: readonly HarnessReport[]): string {
+  return harnesses.find((h) => h.provider === provider)?.label ?? RUNNER_LABEL[provider];
+}
+
+export interface HarnessView {
+  readonly provider: WorkerProviderId;
+  readonly label: string;
+  readonly version: string;
+  /** The model providers it is set up for, else its sign-in state. */
+  readonly state: string;
+  readonly models: string;
+  readonly installed: boolean;
+  /** The failed probe's own words; '' = none. */
+  readonly error: string;
+}
+
+const STATE_KEY: Readonly<Record<HarnessReport['state'], string>> = {
+  'signed-in': 'tickets.settings.models.harness.signed_in',
+  'signed-out': 'tickets.settings.models.harness.signed_out',
+  'not-installed': 'tickets.settings.models.harness.not_installed',
+  failed: 'tickets.settings.models.harness.failed',
+};
+
+export function harnessViewsOf(discovery: DiscoveryReport, i18n: I18n): readonly HarnessView[] {
+  return discovery.harnesses.map((harness) => ({
+    provider: harness.provider,
+    label: harness.label,
+    version: harness.version ?? '',
+    state: harness.providers.length > 0 && harness.state !== 'not-installed' ? harness.providers.join(', ') : i18n.lookup(STATE_KEY[harness.state]),
+    models: i18n.t('tickets.settings.models.harness.models', { count: harness.models }),
+    installed: harness.state !== 'not-installed',
+    error: harness.error ?? '',
+  }));
+}
+
+/** The title's `Checked 2 min ago`; while a probe runs, `Checking…`. */
+export function checkedWords(discovery: DiscoveryReport, now: Date, i18n: I18n): string {
+  if (discovery.running) {
+    return i18n.t('tickets.settings.models.checking');
+  }
+  const at = discovery.checkedAt === null ? Number.NaN : Date.parse(discovery.checkedAt);
+  if (Number.isNaN(at)) {
+    return i18n.t('tickets.settings.models.checked_never');
+  }
+  const minutes = Math.max(0, Math.floor((now.getTime() - at) / 60_000));
+  if (minutes < 1) {
+    return i18n.t('tickets.settings.models.checked_now');
+  }
+  if (minutes < 60) {
+    return i18n.t('tickets.settings.models.checked_minutes', { n: minutes });
+  }
+  const hours = Math.floor(minutes / 60);
+  return hours < 48 ? i18n.t('tickets.settings.models.checked_hours', { n: hours }) : i18n.t('tickets.settings.models.checked_days', { n: Math.floor(hours / 24) });
+}
+
+// --- accounts a model runs on --------------------------------------------------
+
+export function providerLabelOf(row: Pick<ModelRow, 'slot' | 'provider'>, slots: readonly SlotView[]): string {
+  if (row.slot !== null) {
+    return slots.find((slot) => slot.id === row.slot)?.label ?? row.slot;
+  }
+  return RUNNER_LABEL[row.provider];
+}
+
+/** `Claude Code · Claude A`: the harness and the account — a provider row names its one account, or `2 accounts`. */
+export function chipOf(place: Pick<ModelRow, 'slot' | 'provider'>, slots: readonly SlotView[], harnesses: readonly HarnessReport[], i18n: I18n): string {
+  const harness = harnessLabelOf(place.provider, harnesses);
+  const serving = slots.filter((slot) => slot.provider === place.provider);
+  if (place.slot === null && serving.length === 0) {
+    return harness;
+  }
+  const account = place.slot !== null ? providerLabelOf(place, slots) : serving.length === 1 ? serving[0]!.label : i18n.t('tickets.settings.models.accounts_count', { count: serving.length });
+  return i18n.t('tickets.settings.models.chip', { harness, account });
+}
+
+/** The context window as `1M`, `256k`; '' when the model declares none. */
+export function contextWords(tokens: number | undefined, i18n: I18n): string {
+  if (tokens === undefined || tokens <= 0) {
+    return '';
+  }
+  return tokens >= 1_000_000
+    ? i18n.t('tickets.settings.models.context_m', { n: trimmedNumber(i18n, Math.round(tokens / 100_000) / 10) })
+    : i18n.t('tickets.settings.models.context_k', { n: i18n.formatNumber(Math.max(1, Math.round(tokens / 1000))) });
+}
+
+// --- the class groups -----------------------------------------------------------
+
+export interface ClassRowView {
+  /** The row's place in `reply.models` — the list a write sends whole. */
+  readonly index: number;
+  readonly row: ModelRow;
+  readonly chip: string;
+  readonly tools: boolean;
+  readonly image: boolean;
+  readonly context: string;
+  readonly cost: string;
+}
+
+export interface ClassGroupView {
+  readonly name: CapabilityClass;
+  readonly sessions: number | null;
+  readonly count: string;
+  readonly busy: string;
+  readonly rows: readonly ClassRowView[];
+}
+
+export function classGroupsOf(reply: ModelsReply, slots: readonly SlotView[], i18n: I18n): readonly ClassGroupView[] {
+  const harnesses = reply.discovery.harnesses;
+  const named = reply.classes.map((c) => c.name);
+  // A row whose class the list lacks still shows — after the listed ones, at no cap.
+  const extra = [...new Set(reply.models.map((row) => row.class))].filter((name) => !named.includes(name));
+  const classes: readonly ClassConfig[] = [...reply.classes, ...extra.map((name): ClassConfig => ({ name, sessions: null }))];
+  return classes.map((cls) => {
+    const rows = reply.models
+      .map((row, index): ClassRowView => ({
+        index,
+        row,
+        chip: chipOf(row, slots, harnesses, i18n),
+        tools: row.tools === true,
+        image: row.input?.includes('image') === true,
+        context: contextWords(row.context, i18n),
+        cost: i18n.t('tickets.settings.models.cost_factor', { n: trimmedNumber(i18n, row.cost) }),
+      }))
+      .filter((view) => view.row.class === cls.name);
+    const load = reply.now.classes.find((entry) => entry.name === cls.name);
+    return {
+      name: cls.name,
+      sessions: cls.sessions,
+      count: i18n.t('tickets.settings.models.class_models', { count: rows.length }),
+      busy: i18n.t(load?.cap === null || load === undefined ? 'tickets.settings.models.busy_open' : 'tickets.settings.models.busy', { busy: load?.busy ?? 0, cap: load?.cap ?? 0 }),
+      rows,
+    };
+  });
+}
+
+// --- the new-model cards --------------------------------------------------------
+
+export interface FoundCardView {
+  readonly key: string;
+  readonly provider: WorkerProviderId;
+  readonly model: string;
+  readonly chip: string;
+  readonly suggested: CapabilityClass;
+}
+
+export function foundCardsOf(reply: ModelsReply, slots: readonly SlotView[], i18n: I18n): readonly FoundCardView[] {
+  return reply.discovery.found.map((found: DiscoveredModel) => ({
+    key: `${found.provider}:${found.model}`,
+    provider: found.provider,
+    model: found.model,
+    chip: chipOf(found, slots, reply.discovery.harnesses, i18n),
+    suggested: found.suggested,
+  }));
+}
+
+// --- what a write sends -----------------------------------------------------------
+
+/** One row as `poolModelsConfig` takes it: the stored keys, the declared capabilities kept as they are. */
+export function storedRowOf(row: ModelRow): Record<string, unknown> {
   return {
-    global: capText(reply.capacity.global, i18n),
-    perProvider: load.slots.map((slot) => ({ label: slot.label, cap: slot.cap === null ? '–' : trimmedNumber(i18n, slot.cap) })),
-    now: busy.length === 0 ? head : i18n.t('tickets.settings.models.cap.now_join', { head, slots: busy.join(' · ') }),
+    model: row.model,
+    ...(row.slot !== null ? { slot: row.slot } : { provider: row.provider }),
+    category: row.category,
+    class: row.class,
+    cost: row.cost,
+    ...(row.enabled ? {} : { enabled: false }),
+    ...(row.input !== undefined ? { input: row.input } : {}),
+    ...(row.tools !== undefined ? { tools: row.tools } : {}),
+    ...(row.context !== undefined ? { context: row.context } : {}),
+    ...(row.output !== undefined ? { output: row.output } : {}),
   };
+}
+
+/** The whole table with one row changed — what every row edit and a move write. */
+export function modelsPayload(rows: readonly ModelRow[], index: number, change: Partial<Pick<ModelRow, 'class' | 'cost' | 'enabled'>>): { models: readonly Record<string, unknown>[] } {
+  return { models: rows.map((row, i) => storedRowOf(i === index ? { ...row, ...change } : row)) };
+}
+
+export function classesPayload(classes: readonly ClassConfig[]): { classes: readonly ClassConfig[] } {
+  return { classes: classes.map((c) => ({ name: c.name, sessions: c.sessions })) };
+}
+
+/** The class list with one class's cap changed. */
+export function classSessionsPayload(classes: readonly ClassConfig[], name: CapabilityClass, sessions: number | null): { classes: readonly ClassConfig[] } {
+  return classesPayload(classes.map((c) => (c.name === name ? { ...c, sessions } : c)));
 }
 
 export function capacityPayload(reply: ModelsReply, global: number | null): { capacity: { global: number | null; perSlot: Readonly<Record<string, number>> } } {
   return { capacity: { global, perSlot: reply.capacity.perSlot } };
 }
 
-// --- routing (req-178 / req-181) -----------------------------------------------
-
-export type RoutingKey = keyof RoutingSettings;
-
-/** What the Routing group's three fields show: `1.3` (empty = never), the two shares as percent (`10`, `20`). */
-export interface RoutingView {
-  readonly upgradeAboveQ: string;
-  readonly reservePerWindow: string;
-  readonly burnRate: string;
-}
-
-const percentText = (share: number, i18n: I18n): string => i18n.formatNumber(Math.round(share * 1000) / 10, { maximumFractionDigits: 1 });
-
-export function routingViewOf(routing: RoutingSettings, i18n: I18n): RoutingView {
-  return {
-    upgradeAboveQ: routing.upgradeAboveQ === null ? '' : trimmedNumber(i18n, routing.upgradeAboveQ),
-    reservePerWindow: percentText(routing.reservePerWindow, i18n),
-    burnRate: percentText(routing.burnRate, i18n),
-  };
-}
-
-/** `Upgrade above q` as the engine takes it: a surplus above 0; empty = never step up. */
-export function parseUpgrade(text: string): Parsed<number | null> {
-  const value = numberOf(text);
-  return value === null || (typeof value === 'number' && value > 0) ? { ok: true, value } : invalid;
-}
-
-/** A share typed as percent (`10`, `12,5`) as the engine takes it: 0 to below 1; empty = 0 (off). */
-export function parsePercentShare(text: string): Parsed<number> {
-  const value = numberOf(text.replace('%', ''));
-  if (value === null) {
-    return { ok: true, value: 0 };
+/** The class list with a new class put above `before` (a class name), else last; the refusal's key when the name does not read or exists. */
+export function classAdded(
+  classes: readonly ClassConfig[],
+  typed: string,
+  before: CapabilityClass | null,
+): { readonly ok: true; readonly classes: readonly ClassConfig[] } | { readonly ok: false; readonly error: 'name' | 'taken' } {
+  const name = classNameOf(typed);
+  if (name === null) {
+    return { ok: false, error: 'name' };
   }
-  return typeof value === 'number' && value < 100 ? { ok: true, value: Math.round(value * 10) / 1000 } : invalid;
-}
-
-/** The field's text as the routing key's value. */
-export function parseRouting(key: RoutingKey, text: string): Parsed<number | null> {
-  return key === 'upgradeAboveQ' ? parseUpgrade(text) : parsePercentShare(text);
-}
-
-/** What `poolModelsConfig` takes for one changed field: the whole `routing` key, the others as the engine has them. */
-export function routingPayload(routing: RoutingSettings, key: RoutingKey, value: number | null): { routing: RoutingSettings } {
-  return { routing: { ...routing, [key]: value } };
-}
-
-// --- ledgers -----------------------------------------------------------------
-
-export type LedgerKey = keyof LedgerDefaults;
-
-export function ledgerPayload(reply: ModelsReply, key: LedgerKey, value: number | null): { ledgers: LedgerDefaults } {
-  return { ledgers: { ...reply.ledgers, [key]: value } };
-}
-
-// --- slots -------------------------------------------------------------------
-
-export interface WindowView {
-  readonly label: string;
-  /** The bar's fill; null = no bar (the share is not known). */
-  readonly bar: { readonly width: number; readonly low: boolean } | null;
-  readonly text: string;
-  readonly reliability: QuotaReliability;
-}
-
-export interface SlotCardView {
-  readonly id: string;
-  readonly name: string;
-  readonly billing: string;
-  readonly windows: readonly WindowView[];
-  /** The one row of a slot whose quota nothing measures: its words and the `unknown` chip. */
-  readonly unknownRow: string | null;
-  /** `q 1.4 · upgrade allowed`; '' = none. */
-  readonly q: string;
-}
-
-/** When a window resets: the time today, weekday and time within the week, else the day. */
-export function resetWords(at: Date, now: Date, i18n: I18n): string {
-  const sameDay = at.toDateString() === now.toDateString();
-  if (sameDay) {
-    return i18n.formatTime(at);
+  if (classes.some((c) => c.name === name)) {
+    return { ok: false, error: 'taken' };
   }
-  const days = (at.getTime() - now.getTime()) / 86_400_000;
-  if (days > 0 && days < 7) {
-    const weekday = new Intl.DateTimeFormat(i18n.locale, { weekday: 'short' }).format(at);
-    return i18n.t('tickets.settings.models.slot.weekday_time', { weekday, time: i18n.formatTime(at) });
-  }
-  return new Intl.DateTimeFormat(i18n.locale, { day: 'numeric', month: 'short' }).format(at);
+  const entry: ClassConfig = { name, sessions: null };
+  const at = before === null ? -1 : classes.findIndex((c) => c.name === before);
+  return { ok: true, classes: at < 0 ? [...classes, entry] : [...classes.slice(0, at), entry, ...classes.slice(at)] };
 }
 
-const WINDOW_KEY: Readonly<Record<string, string>> = { '5h': 'five_hours', '7d': 'seven_days', month: 'month', 'month-code': 'month_code' };
-
-function windowLabel(name: string, i18n: I18n): string {
-  const key = `tickets.settings.models.window.${WINDOW_KEY[name] ?? name}`;
-  return i18n.has(key) ? i18n.lookup(key) : name;
-}
-
-function windowText(window: QuotaWindow, now: Date, i18n: I18n): string {
-  const at = window.resetsAt === null ? null : new Date(window.resetsAt);
-  const when = at !== null && !Number.isNaN(at.getTime()) ? resetWords(at, now, i18n) : null;
-  if (window.remaining === null) {
-    return i18n.t('capacity.slot.quota_unknown');
-  }
-  const counted = window.limit !== undefined && window.used !== undefined;
-  const params = counted
-    ? { left: i18n.formatNumber(Math.max(0, window.limit! - window.used!)), limit: i18n.formatNumber(window.limit!), when: when ?? '' }
-    : { share: Math.round(window.remaining * 100), when: when ?? '' };
-  const key = `tickets.settings.models.slot.${counted ? 'count_left' : 'share_left'}${when === null ? '' : '_resets'}`;
-  return i18n.lookup(key, params);
-}
-
-/** What the slot cards read of the pool: the table's rows and the engine's routing (the reserve's peach, the upgrade mark). */
-export interface SlotCardPool {
-  readonly rows: readonly ModelRow[];
-  readonly routing: RoutingSettings;
-}
-
-function windowViewOf(window: QuotaWindow, now: Date, i18n: I18n, reserve: number): WindowView {
-  const share = window.remaining === null ? null : Math.min(1, Math.max(0, window.remaining));
-  return {
-    label: windowLabel(window.name, i18n),
-    bar: share === null ? null : { width: Math.round(share * BAR_WIDTH * 100) / 100, low: share < reserve },
-    text: windowText(window, now, i18n),
-    reliability: window.reliability,
-  };
-}
-
-export function billingWords(billing: SlotBilling | null, i18n: I18n): string {
-  if (billing === null) {
-    return '';
-  }
-  const price = billing.kind === 'subscription' ? billing.pricePerMonth : billing.pricePerCredit;
-  const money =
-    price === null
-      ? null
-      : new Intl.NumberFormat(i18n.locale, { style: 'currency', currency: billing.currency ?? 'USD', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(price);
-  return i18n.lookup(`tickets.settings.models.billing.${billing.kind}${money === null ? '_unpriced' : ''}`, { price: money ?? '' });
-}
-
-/** The classes the slot's rows serve, strongest first. */
-export function classesOfSlot(slot: SlotView, rows: readonly ModelRow[]): readonly CapabilityClass[] {
-  const served = rows.filter((row) => (row.slot !== null ? row.slot === slot.id : row.provider === slot.provider)).map((row) => row.class);
-  return (['A', 'B', 'C'] as const).filter((letter) => served.includes(letter));
-}
-
-function qWords(slot: SlotView, pool: SlotCardPool, i18n: I18n): string {
-  if (slot.state === 'needs-login') {
-    return i18n.t('capacity.slot.needs_login');
-  }
-  if (slot.q === null || !Number.isFinite(slot.q)) {
-    return '';
-  }
-  const q = i18n.formatNumber(slot.q, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  const upgrade = pool.routing.upgradeAboveQ;
-  if (upgrade !== null && Math.round(slot.q * 10) / 10 > upgrade) {
-    return i18n.t('tickets.settings.models.slot.q_upgrade', { q });
-  }
-  const classes = classesOfSlot(slot, pool.rows);
-  if (classes.length === 0) {
-    return i18n.t('tickets.settings.models.slot.q_only', { q });
-  }
-  return i18n.t('tickets.settings.models.slot.q_class', { q, classes: new Intl.ListFormat(i18n.locale, { type: 'conjunction' }).format(classes) });
-}
-
-export function slotCardsOf(slots: readonly SlotView[], pool: SlotCardPool, now: Date, i18n: I18n): readonly SlotCardView[] {
-  return slots.map((slot) => {
-    const measured = slot.windows.some((window) => window.remaining !== null);
-    return {
-      id: slot.id,
-      name: slot.label,
-      billing: billingWords(slot.billing, i18n),
-      windows: measured ? slot.windows.map((window) => windowViewOf(window, now, i18n, pool.routing.reservePerWindow)) : [],
-      unknownRow: measured ? null : i18n.t(slot.quota === 'counting' ? 'tickets.settings.models.slot.counted' : 'capacity.slot.quota_unknown'),
-      q: qWords(slot, pool, i18n),
-    };
-  });
+/** The class list without an empty class; unchanged when models still sit in it. */
+export function classRemoved(classes: readonly ClassConfig[], rows: readonly ModelRow[], name: CapabilityClass): readonly ClassConfig[] {
+  return rows.some((row) => row.class === name) ? classes : classes.filter((c) => c.name !== name);
 }
 
 // --- the Runners line of the desk ----------------------------------------------
 
-/** `Claude A 2 · z.ai 3`: the slots and the sessions each serves (req-186, in place of the pool sizes). */
+/** `Claude A 2 · z.ai 3`: the slots and the sessions each serves. */
 export function slotSessionsLine(slots: readonly SlotView[], i18n: I18n): string {
   if (slots.length === 0) {
     return i18n.t('tickets.settings.models.runners_none');
   }
   return slots.map((slot) => (slot.total === null ? slot.label : `${slot.label} ${i18n.formatNumber(slot.total)}`)).join(' · ');
-}
-
-/** Rows a slot picker offers for a blank new row: the first place there is. */
-export function blankRowOf(options: readonly PlaceOption[], slots: readonly SlotView[]): ModelRow {
-  const first = options[0];
-  const base: ModelRow = { model: '', slot: null, provider: 'claude-code', category: '', class: 'B', cost: 1, sessions: 1 };
-  return first === undefined ? base : rowPlaced(base, first.value, slots);
 }

@@ -5,7 +5,7 @@ import type { SlotView } from '../../../../packages/tickets-engine/src/fleet/pro
 import { i18n } from '../../../../shared/i18n';
 import { addableModelsOf, modelLinesOf, movedPool, tableRowOf } from './persona-work-model';
 
-const row = (model: string, over: Record<string, unknown> = {}) => ({ model, slot: null, provider: 'claude-code', category: 'x', class: 'A', cost: 3, sessions: 2, ...over });
+const row = (model: string, over: Record<string, unknown> = {}) => ({ model, slot: null, provider: 'claude-code', category: 'x', class: 'A', cost: 3, enabled: true, ...over });
 const table = { ok: true, models: [row('opus'), row('sonnet', { class: 'B', cost: 1 }), row('glm-5.3', { provider: 'opencode', class: 'C', cost: 0.2, slot: 'z' }), row('shared', { provider: 'kimi' }), row('shared', { provider: 'opencode' })] } as unknown as ModelsReply;
 const slots = [
   { id: 'a', label: 'Claude A', provider: 'claude-code', busy: 1, total: 3 },
@@ -19,16 +19,16 @@ describe('modelLinesOf (R11): the persona models against the model table', () =>
   it('reads class, factor and the live sessions on the model against what the slots serving it allow (req-239)', () => {
     const runs = [run({}), run({ id: 's', model: 'claude-code/opus', kind: '1:1' }), run({ id: 'z', provider: 'opencode', model: 'glm-5.3', slot: { id: 'z', label: 'z.ai' } })];
     const lines = modelLinesOf(['opus', 'sonnet', 'glm-5.3'], 'claude-code', table, slots, runs, i18n);
-    expect(lines[0]).toMatchObject({ index: 1, model: 'opus', detail: 'Claude Code · class A · factor 3', busy: '2 / 4 busy' }); // two Claude slots × 2 sessions of opus
-    expect(lines[1]).toMatchObject({ model: 'sonnet', busy: '0 / 4 busy' });
-    expect(lines[2]).toMatchObject({ index: 3, model: 'glm-5.3', detail: 'z.ai · class C · factor 0.2', busy: '1 / 2 busy' });
+    expect(lines[0]).toMatchObject({ index: 1, model: 'opus', detail: 'Claude Code · class A · factor 3', busy: '2 / 5 busy' }); // the two Claude slots allow 3 + 2 sessions
+    expect(lines[1]).toMatchObject({ model: 'sonnet', busy: '0 / 5 busy' });
+    expect(lines[2]).toMatchObject({ index: 3, model: 'glm-5.3', detail: 'z.ai · class C · factor 0.2', busy: '1 busy' }); // z.ai sets no cap of its own
   });
 
   it('counts a live session only: a finished run, another provider, another slot and a run with no model are not on the row', () => {
     const runs = [run({ state: 'done' }), run({ state: 'failed' }), run({ provider: 'kimi' }), run({ model: null }), run({ model: 'sonnet' }), run({ state: 'starting' }), run({ state: 'stopping' })];
-    expect(modelLinesOf(['opus'], 'claude-code', table, slots, runs, i18n)[0]!.busy).toBe('2 / 4 busy');
+    expect(modelLinesOf(['opus'], 'claude-code', table, slots, runs, i18n)[0]!.busy).toBe('2 / 5 busy');
     const slotted = [run({ provider: 'opencode', model: 'glm-5.3', slot: { id: 'other', label: 'o' } })];
-    expect(modelLinesOf(['glm-5.3'], 'opencode', table, slots, slotted, i18n)[0]!.busy).toBe('0 / 2 busy');
+    expect(modelLinesOf(['glm-5.3'], 'opencode', table, slots, slotted, i18n)[0]!.busy).toBe('0 busy');
   });
 
   it('counts by the model the pool granted where the run carries one', () => {

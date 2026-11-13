@@ -9,6 +9,7 @@
  * existing file's layout, comments and unknown keys survive a
  * transition rewrite untouched.
  */
+import type { ClassName } from '../contracts/capability-class';
 import { Document, isScalar, parseDocument, Scalar } from 'yaml';
 import { splitFrontmatter } from '../../../../shared/frontmatter';
 import { maskFenceLines, maskFences } from '../../../../shared/markdown/fences';
@@ -612,7 +613,7 @@ export interface HeaderPatch {
   readonly repos?: readonly string[];
   readonly worker?: string;
   /** The class pin (req-186, `class: B`); null removes the key (the persona's class decides). */
-  readonly class?: 'A' | 'B' | 'C' | null;
+  readonly class?: ClassName | null;
 }
 
 /** Rewrites the header's keys in a frontmatter block; every other key, comment and style survives. */
@@ -753,7 +754,7 @@ export function patchTrack(text: string, track: TicketTrack | null, now: Date, a
  * file and appends one Log line (req-186, the card's class control) — the
  * header patch of `patchTrack` with the class's own audit line.
  */
-export function patchClass(text: string, value: 'A' | 'B' | 'C' | null, now: Date, actor: string): string {
+export function patchClass(text: string, value: ClassName | null, now: Date, actor: string): string {
   const { yamlText, body, hadFence } = splitFrontmatter(text);
   if (!hadFence || yamlText === null) {
     throw new Error('ticket has no frontmatter fence');

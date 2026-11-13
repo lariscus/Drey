@@ -1,14 +1,16 @@
+import type { ClassName } from './capability-class';
+
 /**
  * The ticket keys the capacity pool reads (req-170, specs/ticket-schema.md;
  * dricket: `x-class`, `x-model`, `x-size`, `x-allowance`, `x-needs`). All
  * optional — the reader sets a field only when the file names a valid value.
  */
 export interface TicketPoolMeta {
-  /** The class pin (`class: A`): the run asks the pool for exactly this class. */
-  readonly class?: 'A' | 'B' | 'C' | null;
+  /** The class pin (`class: heavy`; req-287 — the letters A/B/C read as heavy/standard/light): the run asks the pool for exactly this class. */
+  readonly class?: ClassName | null;
   /** The model pin (`model: claude-opus-4-1`): the run asks for this model of the table; it beats every class rule. */
   readonly model?: string | null;
-  /** The plan part's size (`size: S|M|L`): it asks for class C, B or A. */
+  /** The plan part's size (`size: S|M|L`): it asks for class light, standard or heavy. */
   readonly size?: 'S' | 'M' | 'L' | null;
   /** The ticket's allowance in USD (`allowance: 2.50`); absent = the default of Settings → Models. */
   readonly allowance?: number | null;
@@ -19,7 +21,7 @@ export interface TicketPoolMeta {
 /** A pipeline phase's pool keys (pipeline.md). */
 export interface PhasePoolMeta {
   /** The phase's class floor (`min-class:`, req-170): no run of it asks the pool for a lighter class; absent = none. */
-  readonly minClass?: 'A' | 'B' | 'C' | null;
+  readonly minClass?: ClassName | null;
   /** What every run of the phase needs of its model (`needs: image`, req-178); merged with the ticket's; absent = nothing. */
   readonly needs?: ModelNeeds | null;
 }

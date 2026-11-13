@@ -32,7 +32,7 @@ describe('step 3: the pipeline keeps the lifecycle columns', () => {
       tokenBudget: 40000000,
       dropped: ['audit: on'],
     });
-    expect(out.patch).toEqual({ minClass: 'B', maxTurns: 80 });
+    expect(out.patch).toEqual({ minClass: 'standard', maxTurns: 80 });
     const parsed = parsePipeline(out.text);
     expect(parsed.phases.map((p) => [p.id, p.persona])).toEqual([['inbox', null], ['prioritized', null], ['done', null]]);
     expect(parsed.flow?.map((e) => e.persona)).toEqual(['paul', 'paul', 'ben', 'ralf', 'tessa', 'you']);

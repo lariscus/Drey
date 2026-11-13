@@ -3,7 +3,7 @@ import type { ModelRow } from '../protocol';
 import { MODELS_DEV_URL, ModelsDevImport } from './models-dev-import';
 import { FakeQuotaHttp, fixture } from './routing.fake';
 
-const row = (model: string, over: Partial<ModelRow> = {}): ModelRow => ({ model, slot: null, provider: 'claude-code', category: '', class: 'B', cost: 1, sessions: 1, ...over });
+const row = (model: string, over: Partial<ModelRow> = {}): ModelRow => ({ model, slot: null, provider: 'claude-code', category: '', class: 'standard', cost: 1, enabled: true, ...over });
 const registry = (): FakeQuotaHttp => new FakeQuotaHttp(() => ({ status: 200, body: fixture('models-dev-api.json') }));
 
 describe('ModelsDevImport — the one-shot capability import (req-178)', () => {

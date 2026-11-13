@@ -1,5 +1,5 @@
 import type { FileSystem } from '../ports/file-system';
-import { slotAdded, slotRemoved, withoutRetiredSlotKeys, type SlotEdit } from './slot-edit';
+import { slotAdded, slotRemoved, slotUpdated, withoutRetiredSlotKeys, type SlotEdit } from './slot-edit';
 
 export type WriteOutcome = { readonly ok: true } | { readonly ok: false; readonly error: string };
 /** A one-slot edit's outcome: `invalid` when the edit does not stand, else what the file said. */
@@ -56,9 +56,14 @@ export class ServiceConfigFile {
     return this.edit((root) => slotAdded(root, entry));
   }
 
-  /** D-69: removes one slot (an implied one through `impliedOff`); refused while a model row names it. */
-  removeSlot(id: string): Promise<SlotEditOutcome> {
-    return this.edit((root) => slotRemoved(root, id));
+  /** D-69: removes one slot (an implied one through `impliedOff`); refused while a model row names it, unless `withModels` (req-287) takes those rows along. */
+  removeSlot(id: string, withModels = false): Promise<SlotEditOutcome> {
+    return this.edit((root) => slotRemoved(root, id, withModels));
+  }
+
+  /** req-287: changes one slot's label, cost or sessions in place, every other key kept. */
+  updateSlot(id: string, patch: Readonly<Record<string, unknown>>): Promise<SlotEditOutcome> {
+    return this.edit((root) => slotUpdated(root, id, patch));
   }
 
   /** Replaces the pool keys (`models`, `capacity`, `ledgers`, req-170), every other key kept. */
