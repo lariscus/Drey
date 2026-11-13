@@ -23,7 +23,7 @@ import { parsePlanChain } from '../core/plan-chain';
 import { applyFlowOp, type FlowOp } from '../core/flow-edit';
 import type { FlowReply, FlowSaveReply, FlowStepView, FlowTarget, FlowScope } from '../contracts/flow';
 import { allowedAfter, type PersonaAllowedPatch } from '../contracts/persona-allowed';
-import { BUILDING_STATE, DEFAULT_PIPELINE_TEXT, READY_STATE } from '../core/pipeline-states';
+import { BUILDING_STATE, DEFAULT_PIPELINE_TEXT, READY_STATE, STANDARD_FLOW_LINE } from '../core/pipeline-states';
 import { parseChainItems, renderChainEntries, unreadableEntryMessage } from '../core/chain-list';
 import { validateChain } from '../core/chain-validate';
 import { flowDraftText, flowPersonasOf, flowStepViews, lockedOfCard, partFlowSteps } from './flow-views';
@@ -63,6 +63,8 @@ import { parseTicketChainFields } from '../core/ticket-chain-fields';
 import type { PinCursorOf } from '../store/stage-migration-plan';
 import { crewLookupOf, holderOf } from '../core/chain-holder';
 import { lanesOf, withPersonaBoard } from '../core/persona-board';
+import { builderOf, crewMigrationOf, defaultsMigrationOf, flowOrderOf, pipelineMigrationOf } from '../core/board-migration';
+import { LEGACY_DEFAULT_PERSONAS, type BoardMigrationOffer, type BoardMigrationResult, type BoardMigrationStep, type CrewMigrationPlan } from '../contracts/board-migration';
 import type { TicketDetail } from '../ports/ticket-store';
 import { ARCHIVED_LABEL } from '../store/legacy-bridge';
 import { StoreBoardSource, type LegacyWrite } from '../store/store-board-source';
@@ -99,7 +101,7 @@ import { handoverFromConfig, handoverOverrideKeys } from './handover-config';
 import type { EffectiveCrew } from '../fleet/config/layered-config-resolver';
 import { appendMemory, describeMemoryEntries, memoryPathFor, toggleMemoryPin } from './persona-store';
 import { EMPTY_PERSONA_SETTINGS, HUMAN_PERSONA_ID, humanPersona, isAgentPersona, loadPersonaSkills, personaFileText, parsePersonaFile, personaRef, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaSkill } from '../core/persona';
-import { crewOrderOf, inCrewOrder } from '../core/crew-order';
+import { crewOrderOf, inCrewOrder, withCrewOrder } from '../core/crew-order';
 import { personaRunSettingsOf } from '../core/persona-settings';
 import { settingsAfter, type PersonaSettingsPatch } from '../contracts/persona-settings-patch';
 import { CREW_FILE } from '../contracts/crew-config';
@@ -262,6 +264,12 @@ export interface BoardServiceOptions {
 }
 
 /** A dricket write that met a ticket changed in the meantime (dk exit 12): nothing was written, the caller asks the user. */
+/** req-268: the next migration step and what running it writes. */
+interface BoardMigrationPlan {
+  readonly offer: BoardMigrationOffer;
+  readonly pipeline?: NonNullable<ReturnType<typeof pipelineMigrationOf>>;
+}
+
 /** What `dk add` writes as the description of a ticket nobody has filled yet. */
 const DK_EMPTY_DESCRIPTION = '(no description)';
 
@@ -464,7 +472,7 @@ export class EngineBoardService {
     const store = await readStoreSettings(this.host.configGet.bind(this.host));
     this.dricket = store.backend === 'dricket' ? store : null;
     const snapshot = store.backend === 'dricket'
-      ? await this.personaBoardOf(store, vault, mdFiles, await this.dricketSnapshot(store, { ...common, crew: await this.crewKinds(vault, mdFiles) }))
+      ? await this.personaBoardOf(store, vault, { mdFiles, pipelineText }, await this.dricketSnapshot(store, { ...common, crew: await this.crewKinds(vault, mdFiles) }))
       : assembleBoard({
         ...common,
         files,
@@ -485,12 +493,106 @@ export class EngineBoardService {
   }
 
   /** req-270: on a lifecycle store the board is a persona board — the crew's lanes and every active card's hold. */
-  private async personaBoardOf(store: StoreSettings, vault: EngineVault, mdFiles: readonly string[], board: BoardSnapshot): Promise<BoardSnapshot> {
+  private async personaBoardOf(store: StoreSettings, vault: EngineVault, files: { readonly mdFiles: readonly string[]; readonly pipelineText: string | null }, board: BoardSnapshot): Promise<BoardSnapshot> {
     if (!isLifecycleStore(await this.storeBoard.stages(store).catch(() => null))) {
       return board;
     }
-    const crew = await this.crewInOrder(vault, mdFiles);
-    return withPersonaBoard(board, lanesOf(crew), crewLookupOf(new Map(crew.map((persona) => [persona.id, persona.kind]))));
+    const crew = await this.crewInOrder(vault, files.mdFiles);
+    const persona = withPersonaBoard(board, lanesOf(crew), crewLookupOf(new Map(crew.map((p) => [p.id, p.kind]))));
+    // req-268: the meta vault's next migration step, offered only once the store's own migration is through.
+    const offer = board.storeMigration === undefined ? await this.boardMigrationPlan(vault, files.pipelineText, crew) : null;
+    return offer === null ? persona : { ...persona, boardMigration: offer.offer };
+  }
+
+  /** req-268: the next of steps 3–5 with what it writes; null when the meta vault is migrated. */
+  private async boardMigrationPlan(vault: EngineVault, pipelineText: string | null, crew: readonly Persona[]): Promise<BoardMigrationPlan | null> {
+    const pipeline = pipelineText === null ? null : pipelineMigrationOf(pipelineText, crew);
+    if (pipeline !== null) {
+      return { offer: pipeline.plan, pipeline };
+    }
+    const flow = pipelineText === null ? undefined : parsePipeline(pipelineText).flow;
+    const flowLine = flow === undefined || flow.length === 0 ? STANDARD_FLOW_LINE : renderChainEntries(flow).join('; ');
+    const builder = builderOf(flowLine, crew);
+    const crewPlan = crewMigrationOf(await this.host.read(vault.id, CREW_FILE).catch(() => null), crew, builder, flowOrderOf(flowLine));
+    if (crewPlan !== null) {
+      return { offer: crewPlan };
+    }
+    const prompts = new Map<string, string>();
+    for (const id of [...LEGACY_DEFAULT_PERSONAS, ...(builder === null ? [] : [builder])]) {
+      if (crew.some((p) => p.id === id)) {
+        prompts.set(id, await this.host.read(vault.id, `${PERSONAS_DIR}/${id}/prompt.md`).catch(() => ''));
+      }
+    }
+    const defaults = defaultsMigrationOf(crew, prompts, builder);
+    return defaults === null ? null : { offer: defaults };
+  }
+
+  /**
+   * req-268: runs step 3 (`pipeline`) or step 4 (`crew`) of the live board migration on the owner's
+   * confirmation — one commit each. Step 5 (`defaults`) is req-261's `personaRemove` per persona.
+   * Refused when the step is not the one the board offers now (someone migrated meanwhile).
+   */
+  migrateBoard(input: { readonly step: BoardMigrationStep }): Promise<BoardMigrationResult> {
+    return this.enqueue(async () => {
+      const vault = await this.detect();
+      const store = await this.refreshDricket();
+      if (vault === null || store === null || !isLifecycleStore(await this.storeBoard.stages(store).catch(() => null))) {
+        return { ok: false, error: 'the board migration runs on a dricket store on the lifecycle stages — migrate the store first' };
+      }
+      const crew = await this.crewInOrder(vault, await this.host.listMarkdownFiles(vault.id));
+      const plan = await this.boardMigrationPlan(vault, await this.readOptional(vault.id, PIPELINE_PATH), crew);
+      if (plan === null || plan.offer.step !== input.step || plan.offer.step === 'defaults') {
+        return { ok: false, error: plan === null ? 'the board is migrated' : `the next migration step is ${plan.offer.step}, not ${input.step}` };
+      }
+      try {
+        const touched = plan.pipeline !== undefined ? await this.writePipelineStep(vault, crew, plan.pipeline) : await this.writeCrewStep(vault, crew, plan.offer as CrewMigrationPlan);
+        const warning = await this.commit(vault, touched, `tickets: board migration step ${input.step === 'pipeline' ? 3 : 4} (${input.step}, req-268)`);
+        this.host.announceChanges(vault.id, touched);
+        this.announceChanged();
+        return { ok: true, ...(warning === null ? {} : { warning }) };
+      } catch (error) {
+        return { ok: false, error: messageOf(error) };
+      }
+    });
+  }
+
+  /** Step 3's files: `pipeline.md`, and the builder's record when keys move onto it. */
+  private async writePipelineStep(vault: EngineVault, crew: readonly Persona[], step: NonNullable<ReturnType<typeof pipelineMigrationOf>>): Promise<string[]> {
+    await this.host.write(vault.id, PIPELINE_PATH, step.text);
+    const touched = [PIPELINE_PATH];
+    const builder = crew.find((persona) => persona.id === step.builder);
+    if (builder !== undefined && step.plan.moved !== null) {
+      touched.push(await this.writePersonaSettings(vault, builder, step.patch));
+    }
+    return touched;
+  }
+
+  /** Step 4's files: `crew.md` with `order:`, and the records that gain a leaving action. */
+  private async writeCrewStep(vault: EngineVault, crew: readonly Persona[], plan: CrewMigrationPlan): Promise<string[]> {
+    const touched: string[] = [];
+    if (plan.order !== null) {
+      const written = withCrewOrder(await this.host.read(vault.id, CREW_FILE).catch(() => null), plan.order);
+      if (!written.ok) {
+        throw new Error(written.error);
+      }
+      await this.host.write(vault.id, CREW_FILE, written.text);
+      touched.push(CREW_FILE);
+    }
+    for (const { persona, action } of plan.leaving) {
+      const record = crew.find((p) => p.id === persona);
+      if (record !== undefined) {
+        touched.push(await this.writePersonaSettings(vault, record, { leaving: [...record.settings.leaving, action] }));
+      }
+    }
+    return touched;
+  }
+
+  /** One persona record with a settings patch (the persona page's writer, without its commit); its path. */
+  private async writePersonaSettings(vault: EngineVault, persona: Persona, patch: PersonaSettingsPatch): Promise<string> {
+    const path = `${PERSONAS_DIR}/${persona.id}/persona.md`;
+    const { body, hadFence } = splitFrontmatter(await this.host.read(vault.id, path));
+    await this.host.write(vault.id, path, personaFileText({ ...persona, settings: settingsAfter(persona.settings, patch) }, hadFence ? body : undefined));
+    return path;
   }
 
   /** The dricket board: the store is itself a git repository, so the footer names the store, not the vault's repository state (D-9). */

@@ -63,6 +63,7 @@ import { openFlowTab, registerFlowKind } from './flow/register';
 import { openReviewTab, registerReviewKind } from './review/register';
 import type { WorkRow } from './work-groups';
 import { boardIssuesChip, boardIssuesList, type BoardIssuesDeps } from './board-issues';
+import { boardMigrationBar } from './board-migration-bar';
 import { storeMigrationBar } from './store-migration-bar';
 import type { ChainStatus, FleetHandoverConfig, RunInfo } from '../../../packages/tickets-engine/src/fleet/protocol';
 import type { NormalizedEvent } from '../../../packages/tickets-engine/src/fleet/harness/contract';
@@ -589,6 +590,8 @@ function boardViewControlsNode(api: DreyPluginApi): { node: HTMLElement; dispose
 
 /** The non-git note was dismissed in this window (A-09); it returns on the next start. */
 let gitWarningDismissed = false;
+/** req-268: whether the board migration's details are unfolded (this window only). */
+let boardMigrationOpen = false;
 
 function buildBoardView(api: DreyPluginApi): BoardView {
   const root = el('div', 'tickets-view');
@@ -634,6 +637,22 @@ function buildBoardView(api: DreyPluginApi): BoardView {
       // req-265: the store still uses the old stages - the owner's click migrates it, nothing else does.
       const migrate = (): void => void runMutation(api.i18n.t('work.store_migration.busy'), () => invokeBoard('migrateStoreStages'));
       root.append(storeMigrationBar({ api, offer: snap.storeMigration, migrate }));
+    }
+    if (snap.boardMigration !== undefined) {
+      // req-268: the meta vault's next migration step (3-5) - shown with what it writes, run only on the owner's confirmation.
+      root.append(
+        boardMigrationBar({
+          i18n: api.i18n,
+          offer: snap.boardMigration,
+          open: boardMigrationOpen,
+          toggle: (open) => {
+            boardMigrationOpen = open;
+            render();
+          },
+          invoke: (method, payload) => invokeBoard(method, payload),
+          mutate: (label, run) => void runMutation(label, run),
+        }),
+      );
     }
     root.append(workListNode(workPanelDeps(api), snap, fleetRuns, folds, notifyViews, workFilter.get()));
     const statusBar = statusBarNode(api, snap, fleet.node);

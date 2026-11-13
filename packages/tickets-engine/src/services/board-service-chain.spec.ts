@@ -289,4 +289,24 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     expect(await service.sendBack({ id, note: 'start over', position: 1 })).toMatchObject({ ok: true });
     expect(field(dkId, 'x-at')).toBe('1');
   });
+  // Last in the file: it rewrites the meta vault's pipeline.md and crew.md the cases above read.
+  it("migrates the meta vault on the owner's confirmation: step 3 the pipeline, step 4 the crew (req-268)", async () => {
+    const held = chained('Through the migration', 'ben;you;ralf;you', 3);
+    expect((await service.snapshot()).boardMigration).toMatchObject({ step: 'pipeline', removed: ['Shaping', 'Building', 'Ready to try'], flow: null });
+    expect(await service.migrateBoard({ step: 'crew' })).toMatchObject({ ok: false });
+
+    expect(await service.migrateBoard({ step: 'pipeline' })).toMatchObject({ ok: true });
+    const pipeline = readFileSync(path.join(root, 'meta', 'tickets', '_meta', 'pipeline.md'), 'utf8');
+    expect(pipeline).not.toContain('building');
+    const after = await service.snapshot();
+    expect(after.pipeline.map((p) => p.id)).toEqual(['inbox', 'prioritized', 'done']);
+    expect(after.columns.flatMap((c) => c.tickets).find((t) => t.id === held.id)?.hold).toMatchObject({ holder: 'ralf', position: 3 });
+    expect(after.issues.some((issue) => issue.message.includes('"active"'))).toBe(false);
+    expect(after.boardMigration).toEqual({ step: 'crew', order: ['pia', 'ben', 'ralf', 'you'], leaving: [{ persona: 'ben', action: 'sync-main' }] });
+
+    expect(await service.migrateBoard({ step: 'crew' })).toMatchObject({ ok: true });
+    expect(readFileSync(path.join(root, 'meta', 'tickets', '_meta', 'crew.md'), 'utf8')).toContain('order: [pia, ben, ralf, you]');
+    expect(readFileSync(path.join(root, 'meta', 'tickets', '_meta', 'personas', 'ben', 'persona.md'), 'utf8')).toContain('leaving: [sync-main]');
+    expect((await service.snapshot()).boardMigration).toBeUndefined();
+  });
 });

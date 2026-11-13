@@ -10,6 +10,7 @@
  * marks a group the filter emptied; its state lives in the caller, the
  * store beside the folds.
  */
+import { holdBadgeOf } from '../../../packages/tickets-engine/src/contracts/persona-board';
 import type { DreyPluginApi } from '../../../shared/plugin-api/renderer';
 import { allowanceStateOf, allowanceTitle } from './allowance';
 import { usd } from './team/team-model';
@@ -534,6 +535,39 @@ function richTop(card: TicketCard, more: HTMLElement): HTMLElement {
   return top;
 }
 
+/**
+ * A persona board row's meta (req-271, board 7a v2): who holds it and where it is in its chain —
+ * `Ben · 3/6`, `Ben asks · 3/6`, `no persona · 4/6`, `Accept · 6/6`, then `sent back` while a send-back's
+ * stretch runs again. Null off the persona board.
+ */
+function holdParts(deps: WorkPanelDeps, snap: BoardSnapshot, row: WorkRow): HTMLElement[] | null {
+  const hold = row.card.hold;
+  if (hold === undefined || snap.lanes === undefined) {
+    return null;
+  }
+  const i18n = deps.api.i18n;
+  const nameOf = (id: string | null): string => (id === null ? '' : (snap.lanes?.find((lane) => lane.persona === id)?.title ?? id));
+  const badge = holdBadgeOf(hold);
+  const word =
+    hold.why === 'question'
+      ? i18n.t('work.hold.asks', { name: nameOf(hold.named) })
+      : hold.why === 'second-send-back'
+        ? i18n.t('work.hold.sent_back_twice')
+        : hold.why === 'no-persona'
+          ? i18n.t('work.hold.no_persona')
+          : badge === 'accept'
+            ? i18n.t('board.badge.accept')
+            : nameOf(hold.holder);
+  const parts = [el('span', 'work-meta-phase', word), el('span', 'work-meta-position', i18n.t('work.hold.position', { at: hold.position, of: hold.length }))];
+  if (badge === 'sent-back-once') {
+    parts.push(el('span', 'work-kind', i18n.t('work.hold.sent_back')));
+  }
+  if (row.need !== null && row.need.kind !== 'checkpoint') {
+    parts.push(el('span', 'work-kind', needKindLabel(row.need, snap).toLowerCase()));
+  }
+  return parts;
+}
+
 /** A Needs-you row: the title, then id · phase · what it waits for · age and the cost. */
 function rowNode(_deps: WorkPanelDeps, snap: BoardSnapshot, row: WorkRow): HTMLElement {
   const { card, need } = row;
@@ -542,7 +576,10 @@ function rowNode(_deps: WorkPanelDeps, snap: BoardSnapshot, row: WorkRow): HTMLE
     node.dataset['need'] = need.kind;
   }
   node.append(richTop(card, more));
-  if (need !== null) {
+  const held = holdParts(_deps, snap, row);
+  if (held !== null) {
+    node.append(richSub(row, held, need === null ? '' : ageWords(need.since, Date.now())));
+  } else if (need !== null) {
     const kind = needKindLabel(need, snap);
     // The phase word is dropped when the kind already says it (*Ready to try* in Ready to try).
     const parts = kind === row.phase.title ? [phaseChipNode(row)] : [phaseChipNode(row), el('span', 'work-kind', kind.toLowerCase())];
@@ -591,6 +628,11 @@ function runningRowNode(deps: WorkPanelDeps, snap: BoardSnapshot, row: WorkRow):
     node.dataset['running'] = 'true';
   }
   node.append(richTop(card, more));
+  const held = holdParts(deps, snap, row);
+  if (held !== null) {
+    node.append(richSub(row, held, step.live ? ageWords(row.run?.startedAt ?? null, Date.now()) : '', { deps }));
+    return node;
+  }
   // The step word is dropped when it only repeats the phase (board 7a: "Building · queued").
   const stepWord = el('span', 'work-run-step', step.step);
   stepWord.hidden = step.step.toLowerCase() === row.phase.title.toLowerCase();

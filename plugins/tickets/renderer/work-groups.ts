@@ -29,6 +29,7 @@ import {
 import type { RunInfo, RunState } from '../../../packages/tickets-engine/src/fleet/protocol';
 import { needsOf } from '../../../packages/tickets-engine/src/server/needs';
 import { phaseColorOf } from './phase-colors';
+import { YOU_LANE } from '../../../packages/tickets-engine/src/contracts/persona-board';
 
 const LIVE: ReadonlySet<RunState> = new Set(['starting', 'running', 'stopping', 'detached']);
 
@@ -196,7 +197,67 @@ export function dependencyOrder<T extends { readonly card: TicketCard }>(
   return out;
 }
 
+/**
+ * The persona board's groups (req-271, board 7a v2): Needs you — the remote's
+ * needs, then every ticket that stands at You (its own entry, a question, the
+ * second send-back, no persona) — then Running (every other held ticket, the
+ * live runs first), Prioritized and Inbox from their lifecycle columns. No
+ * Shaping group: a Shape entry is held by its persona and runs as Running.
+ */
+function personaWorkGroups(board: BoardSnapshot, runs: readonly RunInfo[]): WorkGroups {
+  const positionOf = new Map(board.columns.map((column, index) => [column.phase.id, index]));
+  const row = (card: TicketCard, column: BoardColumn, need: NeedItem | null, queued = false): WorkRow => ({
+    card,
+    phase: column.phase,
+    phaseColor: phaseColorOf(column.phase, positionOf.get(column.phase.id) ?? 0),
+    need,
+    queued,
+    run: liveRunOf(card.id, runs),
+  });
+  const placed = new Map<string, { card: TicketCard; column: BoardColumn }>();
+  for (const column of board.columns) {
+    for (const card of column.tickets) {
+      if (!placed.has(card.id)) {
+        placed.set(card.id, { card, column });
+      }
+    }
+  }
+  const needs: WorkRow[] = [];
+  const seen = new Set<string>();
+  for (const need of needsOf(board, runs)) {
+    const at = placed.get(need.ticketId);
+    if (at !== undefined && !seen.has(need.ticketId)) {
+      seen.add(need.ticketId);
+      needs.push(row(at.card, at.column, need));
+    }
+  }
+  for (const { card, column } of placed.values()) {
+    if (card.hold?.holder === YOU_LANE && !seen.has(card.id)) {
+      seen.add(card.id);
+      needs.push(row(card, column, { kind: 'checkpoint', ticketId: card.id, title: card.meta.title ?? card.id, phase: column.phase.id, runId: null, text: '', since: null }));
+    }
+  }
+  const held = [...placed.values()].filter(({ card }) => card.hold !== undefined && !seen.has(card.id)).map(({ card, column }) => row(card, column, null));
+  const byPosition = (a: WorkRow, b: WorkRow): number => (b.card.hold?.position ?? 0) - (a.card.hold?.position ?? 0);
+  const live = held.filter((entry) => entry.run !== null).sort(byPosition);
+  const waiting = dependencyOrder(held.filter((entry) => entry.run === null), byPosition, board.priorities);
+  const edge = (id: string, queued: boolean): WorkRow[] => {
+    const column = board.columns.find((candidate) => candidate.phase.id === id && !candidate.unknown);
+    return column === undefined ? [] : column.tickets.filter((card) => !seen.has(card.id) && card.hold === undefined).map((card) => row(card, column, null, queued));
+  };
+  return {
+    needs,
+    shaping: [],
+    running: [...live, ...waiting],
+    // Prioritized rides as the queued ideas: the filter splits it into its own group.
+    ideas: [...dependencyOrder(edge('prioritized', true), () => 0, board.priorities), ...dependencyOrder(edge('inbox', false), ideaRecency('inbox'), board.priorities)],
+  };
+}
+
 export function workGroups(board: BoardSnapshot, runs: readonly RunInfo[]): WorkGroups {
+  if (board.lanes !== undefined) {
+    return personaWorkGroups(board, runs);
+  }
   const configured = board.columns.filter((column) => !column.unknown);
   const pipeline = configured.map((column) => column.phase);
   const firstPhaseId = pipeline[0]?.id ?? '';

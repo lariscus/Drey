@@ -433,6 +433,8 @@ export interface BoardSnapshot {
    * (`contracts/persona-board.ts`). Absent = the phase board.
    */
   readonly lanes?: readonly BoardLane[];
+  /** req-268: the next step of the live board migration the owner may confirm (steps 3–5); absent = none. */
+  readonly boardMigration?: import('./board-migration').BoardMigrationOffer;
 }
 
 /** `true` when the id parses AND matches the file stem it came from. */
