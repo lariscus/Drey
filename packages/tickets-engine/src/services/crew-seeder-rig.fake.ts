@@ -6,6 +6,7 @@ import { CrewConfigFiles } from './crew-config-files';
 import { CrewSeeder } from './crew-seeder';
 import { CrewSeedModels } from './crew-seed-models';
 import type { EngineHost, EngineVault } from './host';
+import { PersonaAvatars } from './persona-avatars';
 import { PersonaFolders } from './persona-folders';
 import { ShippedCrewFiles } from './shipped-crew-files';
 
@@ -49,6 +50,7 @@ export class CrewSeederRig {
       host,
       git,
       folders: new PersonaFolders(host),
+      avatars: new PersonaAvatars(host),
       crew: { effective: async () => ({ defaultWorker: options.worker ?? 'opencode' }), crewFiles: new CrewConfigFiles(host, git) },
       table: { rows: async () => options.rows ?? null },
       models: new CrewSeedModels(),

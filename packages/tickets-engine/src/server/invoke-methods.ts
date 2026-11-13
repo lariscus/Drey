@@ -28,6 +28,8 @@ export const TEAM_METHODS = [
   'sharedSkills', 'personaSkills', 'personaSkillToggle', 'personaSkillRemove', 'skillUpload', 'personaPromptPreview',
   // req-261: delete a persona, confirmed by its typed title.
   'personaRemove',
+  // req-292: a persona's picture as a data URL (the Crew's circles).
+  'personaAvatar',
 ] as const;
 
 // pair/revoke take primitive args; the invoke channel carries one object

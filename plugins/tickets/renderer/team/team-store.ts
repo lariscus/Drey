@@ -8,6 +8,7 @@
  */
 import type { PersonaView } from '../../shared/remote-protocol';
 import type { DeskDeps } from '../desk-deps';
+import { personaPictures } from './persona-pictures';
 
 const MIN_GAP_MS = 4_000;
 
@@ -43,6 +44,7 @@ export function createTeamStore(deps: DeskDeps, now: () => number = Date.now): T
       try {
         const reply = await deps.invoke('personas');
         personas = Array.isArray(reply) ? (reply as PersonaView[]) : [];
+        personaPictures.note(personas);
         loaded = true;
         error = '';
       } catch (failure) {

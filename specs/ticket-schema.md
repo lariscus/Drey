@@ -1128,7 +1128,7 @@ tickets/_meta/personas/
     friction.md       # retired (req-169): migrated once into reviews.md, then removed
     improvements.md   # the aggregation's proposals (E6 — format below)
     skills/           # the persona's own skills: <name>/SKILL.md (req-172, `_meta/skills/` below)
-    avatar.png        # optional
+    avatar.png        # optional: the persona's picture (req-292 — below)
 ```
 
 - The persona id **is** the folder name: lowercase letters, digits and
@@ -1192,6 +1192,26 @@ lists — a board seeded before req-269 (`seeded-crew: [paul, ben, ralf, tessa]`
 an order already set stays, except that Pia, offered for the first time, goes to its front (the concept §12). One commit (`personas: the default crew (req-256)`: the persona files and `crew.md`), one log line. The seeding changes
 **no** pipeline pin: on a chain board the chain names the personas; a phase-board column without a `persona:` pin still runs
 the ring until the owner pins one (`persona: ben` on the column in `pipeline.md`).
+
+**The persona picture (req-292).** `personas/<id>/avatar.png` is optional: a PNG, drawn cropped to the circle wherever a
+client draws the persona (the Crew cards and detail, the Capacity band, the Persona page's head and Profile, the ticket card
+and its Parts rows; Mission Control's team, chat, flow and ticket screens). Without one the circle draws the initials or the
+silhouette on the persona's `color` as before; a file that is not a PNG or is larger than 2 MB counts as none. The package
+ships one for each default-crew persona and one for the human `you` (`packages/tickets-engine/personas/<id>/avatar.png`,
+the Drey crew's comic squirrels). **Where it is written** — never over a picture that is there (an exclusive create):
+- the seeding copies each seeded persona's picture into its folder, in the seeding's commit;
+- where the board service creates `you` ("Initialize board", or the first read of the persona list on a board without it),
+  its picture rides that commit (`tickets: initialize board` / `tickets: you persona`);
+- **the backfill** at the engine's start, after the seeding (`CrewPictures`, `services/crew-pictures.ts`): every id of
+  `seeded-crew:` and `you` whose folder exists but holds no `avatar.png` gets the shipped picture — one commit
+  `personas: crew pictures` of the pictures and `crew.md`. A deleted persona has no folder and is not re-created.
+
+The ids given a picture (or found with one) join `seeded-pictures:` in `crew.md` in the same commit; an id there is never
+given one again, so a picture the owner removes stays removed. **The read:** the persona list (`GET /api/personas`, the
+plugin IPC `personas`) carries `avatarVersion` — a token of the file's size and mtime, absent without a picture, so a client
+asks for nothing then — and `GET /api/personas/<id>/avatar` (remote port and plugin IPC `personaAvatar`) answers
+`{ok: true, dataUrl: "data:image/png;base64,…"}`, or 404 `{ok: false, error}` without one. Clients cache by
+`<id>@<avatarVersion>`. Uploading and removing a picture is req-288's (Persona v3).
 
 **Deleting a persona (req-261).** `POST /api/personas/<id>/remove` `{confirm: <the persona's title>}` (remote port and
 plugin IPC `personaRemove`; answers `{ok: true, persona, files, warning?}` or `{ok: false, code, error, columns?,
@@ -1571,6 +1591,7 @@ every device working this tickets repository shares, versioned with it.
 ```markdown
 ---
 seeded-crew: [pia, paul, ben, ralf, tessa]  # the shipped default crew already offered to this board (req-256, req-269)
+seeded-pictures: [pia, paul, ben, ralf, tessa, you]  # the ids given their shipped picture (req-292)
 order: [pia, paul, ben, ralf, tessa, you]  # the crew's order (req-258): the Crew tab, later the board's persona columns
 default-persona: ben          # retired (req-257): read with a warning, never used
 default-worker: claude-code   # the assignment ring's floor (was defaultWorker)
@@ -1615,7 +1636,9 @@ closing-round signals belong here). `seeded-crew:` is one of them (req-256): not
 setting, the marker `CrewSeeder` writes — a list of the shipped default crew's persona ids
 (`paul`, `ben`, `ralf`, `tessa`) the board has been offered; a missing key means none
 yet (the next engine start seeds), and an id in it is never seeded again, whether its
-folder exists or the owner deleted it.
+folder exists or the owner deleted it. `seeded-pictures:` (req-292) is its twin for the
+shipped pictures: the ids whose `avatar.png` the seeding or the start's backfill laid
+down (or found there); an id in it is never given the shipped picture again.
 
 `order:` (req-258, concept §9) is the crew's order: a list of persona ids (`core/crew-order.ts`). The persona list
 (`listPersonas`, every crew surface — the Crew tab, Mission Control's team, the flow editor's pickers) draws the listed

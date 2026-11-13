@@ -19,6 +19,7 @@ import {
 } from './capacity-model';
 import { teamModelOf, usd, usdBudget, type PersonaCardModel } from './team-model';
 import type { TeamStore } from './team-store';
+import { personaPictures } from './persona-pictures';
 import type { I18n } from '../../../../shared/i18n/types';
 import { spanText } from '../../../../shared/tranche';
 
@@ -89,6 +90,7 @@ const CLOCK: readonly IconShape[] = [{ cx: 12, cy: 12, r: 9 }, { d: 'M12 7v5l3 2
 function avatarNode(card: PersonaCardModel, i18n: I18n): HTMLElement {
   const avatar = h('span', 'desk-cap-avatar', card.initials);
   avatar.style.setProperty('--persona-color', card.color);
+  personaPictures.paint(avatar, card.id);
   if (card.state === 'stuck') {
     const dot = h('span', 'desk-cap-stuckdot');
     dot.setAttribute('role', 'img');

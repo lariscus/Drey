@@ -5,11 +5,13 @@ import { NodeFileSystem } from '../fleet/node-file-system';
 import { CrewConfigFiles } from './crew-config-files';
 import { CrewConfigMigrator } from './crew-config-migrator';
 import { CrewConfigService } from './crew-config-service';
+import { CrewPictures } from './crew-pictures';
 import { CrewSeeder } from './crew-seeder';
 import { CrewSeedModels } from './crew-seed-models';
 import { CrewLegacyFiles, type FlatConfigStore } from './crew-legacy-files';
 import { FreeSessionService, type FreeSessionBoard, type FreeSessionFleet } from './free-session-service';
 import type { EngineHost } from './host';
+import { PersonaAvatars } from './persona-avatars';
 import { PersonaFolders } from './persona-folders';
 import { ServiceModelTable } from './service-model-table';
 import { ShippedCrewFiles } from './shipped-crew-files';
@@ -51,9 +53,22 @@ export function composeCrewSeeder(wiring: { readonly host: EngineHost; readonly 
     host: wiring.host,
     git: wiring.git,
     folders: new PersonaFolders(wiring.host),
+    avatars: new PersonaAvatars(wiring.host),
     crew: wiring.crew,
     table: new ServiceModelTable(new NodeFileSystem(), path.join(wiring.home, 'service.json')),
     models: new CrewSeedModels(),
+    log: wiring.log,
+  });
+}
+
+/** req-292's backfill of the shipped pictures, run at the engine's start after the crew seeding. */
+export function composeCrewPictures(wiring: { readonly host: EngineHost; readonly git: TicketsGit; readonly crew: CrewConfigService; readonly avatars: PersonaAvatars; readonly log: Log }): CrewPictures {
+  return new CrewPictures({
+    host: wiring.host,
+    git: wiring.git,
+    folders: new PersonaFolders(wiring.host),
+    avatars: wiring.avatars,
+    crewFiles: wiring.crew.crewFiles,
     log: wiring.log,
   });
 }

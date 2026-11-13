@@ -9,6 +9,8 @@ import { newTicketFileText } from '../core/ticket-files';
 import type { LedgerWrite } from '../core/ledger';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from '../fleet/protocol';
 import { parseHandover } from '../contracts/tickets';
+import { PersonaAvatars } from './persona-avatars';
+import { SHIPPED_PERSONAS_DIR } from './shipped-crew-files';
 
 /**
  * E7: the board service's ledger writes and the status read, against a
@@ -1075,6 +1077,22 @@ describe('EngineBoardService default pipeline (req-99a)', () => {
 
     expect(await serviceOf().setHumanName('')).toMatchObject({ ok: true });
     expect((await serviceOf().listPersonas()).find((p) => p.kind === 'human')?.title).toBe('You');
+  });
+
+  it('req-292: the human persona is created with its shipped picture, never over one that is there', async () => {
+    const avatars = new PersonaAvatars({ resolveAssetPath: (_vault, rel) => path.join(vaultDir, rel) });
+    const picture = path.join(vaultDir, 'tickets', '_meta', 'personas', 'you', 'avatar.png');
+    const shipped = await fsp.readFile(path.join(SHIPPED_PERSONAS_DIR, 'you', 'avatar.png'));
+    await fsp.rm(pipelinePath());
+    expect(await serviceOf({ avatars }).initialize('v')).toMatchObject({ ok: true });
+    expect((await fsp.readFile(picture)).equals(shipped)).toBe(true);
+    await fsp.rm(path.dirname(picture), { recursive: true, force: true });
+    await serviceOf({ avatars }).ensureHumanPersona();
+    expect((await fsp.readFile(picture)).equals(shipped)).toBe(true);
+    await fsp.rm(path.join(path.dirname(picture), 'persona.md'));
+    await fsp.writeFile(picture, 'mine');
+    await serviceOf({ avatars }).ensureHumanPersona();
+    expect(await fsp.readFile(picture, 'utf8')).toBe('mine');
   });
 
   it('an existing board gets the human persona created on first sight and keeps its columns', async () => {

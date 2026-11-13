@@ -23,6 +23,7 @@ import type { PersonaAllowedPatch } from '../contracts/persona-allowed';
 import type { PersonaSettingsPatch } from '../contracts/persona-settings-patch';
 import { personaReadOnly } from '../core/persona-settings';
 import type { FleetSnapshot } from '../services/fleet-client';
+import type { BoardAvatarsPort } from '../services/board-avatars';
 import type {
   AutopilotRecord,
   AutopilotRefusal,
@@ -41,6 +42,7 @@ import type {
   ChatChangePayload,
   ImprovementDecision,
   NeedItem,
+  PersonaAvatarReply,
   PersonaImprovementsReply,
   PersonaJournalRemove,
   PersonaJournalReply,
@@ -221,6 +223,8 @@ export interface PathsChange {
 export interface DreyPortOptions {
   /** Settings → Tickets → Remote access: bypass runs from a device (default off); asked per run. */
   readonly allowBypass: () => boolean;
+  /** req-292: the persona pictures — the list's `avatarVersion`, the `personaAvatar` read; absent = no pictures. */
+  readonly avatars?: BoardAvatarsPort;
 }
 
 /** The run states that still hold the ticket (the hand-off waits them out). */
@@ -564,6 +568,7 @@ export class DreyTicketsPort implements TicketsRemotePort {
     const paused = chain?.pausedPersonas;
     // req-239: the commit age of each persona's folder; a failing git leaves the field out.
     const committed: Readonly<Record<string, string>> = (await this.records?.commitAges?.(personas.map((p) => p.id)).catch(() => ({}))) ?? {};
+    const avatars: Readonly<Record<string, string>> = (await this.options.avatars?.versions(personas.map((p) => p.id))) ?? {};
     return personas.map((p) => ({
       id: p.id,
       // req-269: only an agent carries a harness, models and run settings; the owner and Mission Control's persona do not.
@@ -574,6 +579,7 @@ export class DreyTicketsPort implements TicketsRemotePort {
       model: p.kind === 'agent' ? p.models.default : '',
       pool: p.kind === 'agent' ? p.models.pool : [],
       color: p.color,
+      ...(avatars[p.id] !== undefined ? { avatarVersion: avatars[p.id] } : {}),
       ...(p.summary !== '' ? { summary: p.summary } : {}),
       ...(p.kind === 'agent' ? { allowed: p.allowed, settings: p.settings, readOnly: personaReadOnly(p) } : {}),
       ...(committed[p.id] !== undefined ? { committedAt: committed[p.id] } : {}),
@@ -582,6 +588,10 @@ export class DreyTicketsPort implements TicketsRemotePort {
       ...(phases[p.id] !== undefined ? { phases: phases[p.id] } : {}),
       ...(paused !== undefined ? { paused: paused.includes(p.id) } : {}),
     }));
+  }
+
+  personaAvatar(personaId: string): Promise<PersonaAvatarReply> {
+    return this.options.avatars?.dataUrl(personaId) ?? Promise.resolve({ ok: false, error: 'persona pictures are not wired on this port' });
   }
 
   personaImprovements(personaId: string): Promise<PersonaImprovementsReply> {

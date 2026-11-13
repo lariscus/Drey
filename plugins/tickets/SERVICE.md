@@ -215,6 +215,11 @@ Invoke-RestMethod "http://127.0.0.1:$($l.port)/status" -Headers $h
 The engine's invoke channel (`/api/invoke`, `/api/events`, `/api/health` on
 `components.engine.port`) and the runner's routes (`components.runner.port`,
 its own token — FLEET.md) are unchanged.
+The persona pictures (req-292) ride both of the engine's channels: the invoke
+method `personaAvatar` (Drey's desktop circles) and the remote gateway's
+`GET /api/personas/<id>/avatar` (Mission Control, the phone) answer
+`{ok: true, dataUrl}`, the gateway a 404 without a picture; the persona list
+says which persona has one (`avatarVersion`). FLEET.md, "The default crew".
 
 ## Lifecycle
 

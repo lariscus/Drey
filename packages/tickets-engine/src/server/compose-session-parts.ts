@@ -88,12 +88,12 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
   const personaRecords = new PersonaRecords({ board, host, git, log });
   const skills = new SkillService({ board, host, git });
   const personaRemoval = new PersonaRemoveService({ board, fleet, host, git, pins: new PersonaPinReader(host, parts.crew.crewFiles) });
-  const startupWork = migrateOnce(log, { personaRecords, skills, prose: new PersonaProseMigrator({ board, host, git, log }), crew: { board, seeder: parts.crewSeeder } });
+  const startupWork = migrateOnce(log, { personaRecords, skills, prose: new PersonaProseMigrator({ board, host, git, log }), crew: { board, seeder: parts.crewSeeder, pictures: parts.crewPictures } });
   return { chat, personaSessions, personaRecords, skills, personaRemoval, startupWork };
 }
 
 /** The migrations that run behind startup: failures are logged, never fatal. */
-function migrateOnce(log: Log, migrators: { personaRecords: PersonaRecords; skills: SkillService; prose: PersonaProseMigrator; crew: { board: Pick<BoardParts['board'], 'detect'>; seeder: BoardParts['crewSeeder'] } }): Promise<void> {
+function migrateOnce(log: Log, migrators: { personaRecords: PersonaRecords; skills: SkillService; prose: PersonaProseMigrator; crew: { board: Pick<BoardParts['board'], 'detect'>; seeder: BoardParts['crewSeeder']; pictures: BoardParts['crewPictures'] } }): Promise<void> {
   // req-169: friction.md migrates once into each persona's journal.
   void migrators.personaRecords.migrateAll().catch((error: unknown) => log(`friction.md migration failed: ${messageOf(error)}`, 'warn'));
   // req-172: skills as Agent Skills; the legacy flat files migrate once into folders.
@@ -101,9 +101,15 @@ function migrateOnce(log: Log, migrators: { personaRecords: PersonaRecords; skil
   // req-171 (R11): one prose, not two - the prose below a persona.md fence moves once into prompt.md.
   void migrators.prose.migrateAll().catch((error: unknown) => log(`persona prose migration failed: ${messageOf(error)}`, 'warn'));
   // req-256: a board that lacks the default crew gets it once (the `seeded-crew:` marker in crew.md keeps a deleted persona deleted).
-  return migrators.crew.board
+  // req-292: then the seeded crew and `you` get the shipped pictures they lack (the `seeded-pictures:` marker keeps a removed one removed).
+  const { board, seeder, pictures } = migrators.crew;
+  return board
     .detect()
-    .then((vault) => (vault === null || migrators.crew.seeder === null ? undefined : migrators.crew.seeder.seed(vault)))
-    .then(() => undefined)
+    .then(async (vault) => {
+      if (vault !== null) {
+        await seeder?.seed(vault);
+        await pictures?.backfill(vault);
+      }
+    })
     .catch((error: unknown) => log(`default crew seeding failed: ${messageOf(error)}`, 'warn'));
 }

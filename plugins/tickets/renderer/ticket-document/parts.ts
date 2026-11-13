@@ -190,7 +190,7 @@ function partRow(deps: PartsNodeDeps, view: PartsView, part: PartView): HTMLElem
   persona.setAttribute('aria-label', i18n.t('ticket.parts.persona', { n }));
   persona.disabled = part.locked;
   persona.append(
-    avatarNode(part.personaColor, part.personaName, 20),
+    avatarNode(part.personaColor, part.personaName, 20, part.personaId),
     el('span', 'tickets-part-persona-name', part.personaName),
     deps.icon('chevron-down', 12),
   );

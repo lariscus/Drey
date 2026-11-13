@@ -7,6 +7,7 @@ import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
 import type { MessageKey } from '../../../../shared/i18n/types';
 import { h } from '../desk-deps';
 import type { Choice } from './persona-allowed-model';
+import { personaPictures } from './persona-pictures';
 import { initialsOf } from './team-model';
 
 export type Translate = DreyPluginApi['i18n']['t'];
@@ -29,10 +30,12 @@ export function iconButton(api: DreyPluginApi, icon: string, label: string, onCl
   return button;
 }
 
-export function avatarNode(className: string, title: string, color: string): HTMLElement {
+/** The persona's circle: its picture when it has one (req-292), else its initials on its colour. */
+export function avatarNode(className: string, title: string, color: string, id: string | null = null): HTMLElement {
   const node = h('span', className, initialsOf(title));
   node.setAttribute('aria-hidden', 'true');
   node.style.setProperty('--persona-color', color);
+  personaPictures.paint(node, id);
   return node;
 }
 

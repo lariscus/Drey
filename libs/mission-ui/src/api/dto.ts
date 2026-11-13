@@ -259,6 +259,8 @@ export interface PersonaView {
   readonly pool: readonly string[];
   /** `#rrggbb`; the avatar ring's colour. */
   readonly color: string;
+  /** req-292: the picture's version (`personas/<id>/avatar.png`); absent = no picture, the circle draws the silhouette and asks for nothing. */
+  readonly avatarVersion?: string;
   /** The persona's one line for the crew list (`summary:`, req-144); absent = none, the card then draws the role. */
   readonly summary?: string;
   /** The newest live run this persona dispatched, if any. */
@@ -1203,6 +1205,7 @@ function personaOf(raw: unknown): PersonaView | null {
   const skills = strArray(persona['skills']);
   const paused = personasPausedOf(persona['paused']);
   const summary = str(persona['summary']).trim();
+  const avatarVersion = str(persona['avatarVersion']);
   return {
     id,
     ...(persona['kind'] === 'human' || persona['kind'] === 'mission' ? { kind: persona['kind'] } : {}),
@@ -1212,6 +1215,7 @@ function personaOf(raw: unknown): PersonaView | null {
     model: str(persona['model']),
     pool: strArray(persona['pool']),
     color: str(persona['color'], '#7aa2f7'),
+    ...(avatarVersion !== '' ? { avatarVersion } : {}),
     ...(summary !== '' ? { summary } : {}),
     budget: moneyOf(persona['budget']),
     // A lone directory entry carries no fleet context; parseTeam folds the run in.

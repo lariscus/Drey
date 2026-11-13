@@ -5,10 +5,12 @@ import { FleetEventWriter } from '../fleet/event-writer';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from '../fleet/protocol';
 import { RunnerComponent } from '../service/runner-component';
 import { EngineBoardService } from '../services/board-service';
-import { composeCrewConfig, composeCrewSeeder, composeFreeSessions } from '../services/compose-crew-sessions';
+import { composeCrewConfig, composeCrewPictures, composeCrewSeeder, composeFreeSessions } from '../services/compose-crew-sessions';
+import type { CrewPictures } from '../services/crew-pictures';
 import type { CrewSeeder } from '../services/crew-seeder';
 import { FleetClient } from '../services/fleet-client';
 import type { FreeSessionService } from '../services/free-session-service';
+import { PersonaAvatars } from '../services/persona-avatars';
 import { DkHealthProbe } from '../store/dk-health';
 import { execProbe } from '../store/dk-health-exec';
 import { ChangeHub } from './drey-port';
@@ -30,6 +32,10 @@ export interface BoardParts {
   readonly crew: ReturnType<typeof composeCrewConfig>;
   /** req-256: seeds the default crew — "Initialize board" through the board, the engine's start through the session parts; null = `seedDefaultCrew: false`. */
   readonly crewSeeder: CrewSeeder | null;
+  /** req-292: the shipped pictures for a board seeded before them, at the engine's start; null with `seedDefaultCrew: false`. */
+  readonly crewPictures: CrewPictures | null;
+  /** req-292: the persona pictures in the vault — the Crew's circles read them, the human persona's creation copies one. */
+  readonly avatars: PersonaAvatars;
   readonly board: EngineBoardService;
   readonly freeSessions: FreeSessionService;
 }
@@ -55,6 +61,8 @@ export function composeBoardParts(opts: EngineOptions, config: FileConfigStore, 
   // keys from it; the first read of a vault moves the old keys of config.json and chain.json in once.
   const crew = composeCrewConfig({ host, git, config, fleetRoot, log });
   const crewSeeder = opts.seedDefaultCrew === false ? null : composeCrewSeeder({ host, git, crew, home: opts.home, log });
+  const avatars = new PersonaAvatars(host);
+  const crewPictures = opts.seedDefaultCrew === false ? null : composeCrewPictures({ host, git, crew, avatars, log });
   const board = new EngineBoardService(
     host,
     git,
@@ -67,12 +75,12 @@ export function composeBoardParts(opts: EngineOptions, config: FileConfigStore, 
     normalizeFleetPools({}),
     normalizeFleetHandover({}),
     `engine@${hostname().toLowerCase()}`,
-    { events, crew, dkHealth: new DkHealthProbe(execProbe), ...(crewSeeder === null ? {} : { crewSeeder }) },
+    { events, crew, dkHealth: new DkHealthProbe(execProbe), avatars, ...(crewSeeder === null ? {} : { crewSeeder }) },
   );
   // req-173 (R12): the free sessions the owner opens (service window, Crew tab) or accepts from Pia's card.
   const freeSessions = composeFreeSessions({ board, fleet, crew, host, log });
   board.onChanged(() => hub.emit('board'));
-  return { hub, host, git, fleet, presence, events, crew, crewSeeder, board, freeSessions };
+  return { hub, host, git, fleet, presence, events, crew, crewSeeder, crewPictures, avatars, board, freeSessions };
 }
 
 /** No runner was handed in: the engine's own, in-process, over `<home>/fleet`. */

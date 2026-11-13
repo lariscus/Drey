@@ -44,6 +44,11 @@ files:
   # type, served as-is over plugin://. Present only after
   # `npm run fetch:drawio` -- `npm run pack` runs it.
   - 'dist-electron/plugins/drawio/webapp/**'
+  # The tickets engine's shipped files (scripts/build-plugins.mjs copies
+  # them beside its output): the step prompts and the default crew -- the
+  # personas' persona.md / prompt.md and their pictures (req-292).
+  - 'dist-electron/packages/tickets-engine/prompts/**'
+  - 'dist-electron/packages/tickets-engine/personas/**'
   - 'dist/drey/browser/**'
   # Drey Service's window (req-165): the page the service window process
   # (`Drey.exe --drey-service-window`, electron/boot.ts) loads from disk.

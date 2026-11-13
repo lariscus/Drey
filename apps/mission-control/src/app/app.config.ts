@@ -27,6 +27,8 @@ import { MC_PLAN_STATE, type McPlanState } from '@mission-ui/plan/plan.model';
 import { MC_APPROVE_STATE, type McApproveState } from '@mission-ui/plan/approve.model';
 import { MC_FLOW_STATE, type McFlowState } from '@mission-ui/flow/flow.model';
 import { MC_NOTES_HOST, type McNotesHost } from '@mission-ui/notes/notes.model';
+import { MC_PERSONA_PICTURES } from '@mission-ui/phone/persona-pictures';
+import { McPersonaPictureStore } from './api/persona-pictures';
 
 /**
  * One shared McState for the whole shell: the chat tab consumes it
@@ -51,6 +53,14 @@ export const appConfig: ApplicationConfig = {
           stopAll: () => state.stopAllQuietly(),
           liftHold: () => state.liftHold(),
         };
+      },
+    },
+    // req-292: the persona pictures every circle draws, one fetch per picture version.
+    {
+      provide: MC_PERSONA_PICTURES,
+      useFactory: (): McPersonaPictureStore => {
+        const state = inject(McState);
+        return new McPersonaPictureStore(computed(() => state.team().personas), (id) => state.personaAvatar(id));
       },
     },
     { provide: MC_CHAT_STATE, useExisting: McState },

@@ -61,8 +61,11 @@ async function openCrew(page: Page): Promise<void> {
   await page.getByRole('menuitem', { name: 'Crew', exact: true }).click();
 }
 
-/** The commits the engine makes in a fresh board of its own accord: the default crew when it starts (req-256), the human persona when the Crew list is first read (E10-6). */
-const ENGINE_COMMITS = ['personas: the default crew (req-256)', 'tickets: you persona'];
+/**
+ * The commits the engine makes in a fresh board of its own accord: the default crew when it starts (req-256), then the
+ * shipped pictures for the fixture's own Ben and Ralf (req-292), the human persona when the Crew list is first read (E10-6).
+ */
+const ENGINE_COMMITS = ['personas: the default crew (req-256)', 'personas: crew pictures', 'tickets: you persona'];
 
 /**
  * A board's persona files are tracked: the seed is committed (the fixture writes it when the app starts), so a deletion is a commit of removals.
@@ -128,6 +131,7 @@ test('a persona is deleted from its page by typing its name, in one commit, and 
   const shown = git(vaultDir, 'show', '--name-status', '--format=', removal[0]!).split('\n');
   expect(shown.every((line) => line.startsWith('D\t'))).toBe(true);
   expect(shown.map((line) => line.split('\t')[1]).sort()).toEqual([
+    'tickets/_meta/personas/ralf/avatar.png',
     'tickets/_meta/personas/ralf/memory.md',
     'tickets/_meta/personas/ralf/persona.md',
     'tickets/_meta/personas/ralf/prompt.md',

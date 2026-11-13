@@ -1,6 +1,7 @@
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import { NOTES_VAULT_KEY } from '../contracts/notes';
+import { BoardAvatars } from '../services/board-avatars';
 import { NotesService } from '../services/notes-service';
 import type { BoardParts } from './compose-board-parts';
 import type { SessionParts } from './compose-session-parts';
@@ -32,7 +33,7 @@ export async function composeRemoteParts(opts: EngineOptions, config: FileConfig
     board.board,
     board.fleet,
     board.hub,
-    { allowBypass: () => remoteService?.allowBypass() ?? false },
+    { allowBypass: () => remoteService?.allowBypass() ?? false, avatars: new BoardAvatars(board.board, board.avatars) },
     sessions.chat,
     sessions.personaSessions,
     sessions.personaRecords,

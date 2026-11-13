@@ -180,6 +180,24 @@ describe('DreyTicketsPort', () => {
     expect((await port.personas()).every((v) => v.committedAt === undefined)).toBe(true);
   });
 
+  it('req-292: carries the picture version of the personas that have one, and reads the picture as a data URL', async () => {
+    const { board, fleet } = fakes();
+    vi.mocked(board.listPersonas).mockResolvedValue([fakePersona('pia', 'Pia'), fakePersona('ben', 'Ben')]);
+    const avatars = {
+      versions: vi.fn(async () => ({ ben: 'v1' })),
+      bytes: vi.fn(async () => null),
+      dataUrl: vi.fn(async (id: string) => ({ ok: true as const, dataUrl: `data:image/png;base64,${id}` })),
+    };
+    const port = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false, avatars });
+    const views = await port.personas();
+    expect(views.find((v) => v.id === 'ben')?.avatarVersion).toBe('v1');
+    expect(views.find((v) => v.id === 'pia')).not.toHaveProperty('avatarVersion');
+    expect(await port.personaAvatar('ben')).toEqual({ ok: true, dataUrl: 'data:image/png;base64,ben' });
+    const bare = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false });
+    expect((await bare.personas()).every((v) => v.avatarVersion === undefined)).toBe(true);
+    expect((await bare.personaAvatar('ben')).ok).toBe(false);
+  });
+
   it('carries the persona’s phase assignment and the chain’s pause state (U4)', async () => {
     const { board, fleet } = fakes();
     vi.mocked(board.listPersonas).mockResolvedValue([fakePersona('pia', 'Pia'), fakePersona('ben', 'Ben')]);

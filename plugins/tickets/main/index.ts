@@ -871,6 +871,11 @@ const plugin: MainPluginModule = {
       const persona = str(payload, 'persona');
       return persona === null ? { ok: false, error: 'bad persona payload' } : client.invoke('personaJournal', persona);
     });
+    // req-292: a persona's picture as a data URL (the Crew's circles; the list's `avatarVersion` says which have one).
+    ctx.ipc.handle('personaAvatar', (payload) => {
+      const persona = str(payload, 'persona');
+      return persona === null ? { ok: false, error: 'bad persona payload' } : client.invoke('personaAvatar', persona);
+    });
     ctx.ipc.handle('personaJournalRemove', (payload) => {
       const persona = str(payload, 'persona');
       const at = str(payload, 'at');

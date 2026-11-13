@@ -29,6 +29,7 @@ import { mountMemoryPane } from './memory-pane';
 import { mountNewSessionForm, type NewSessionFormHandle } from './new-session-form';
 import { mountOneOnOnePane } from './one-on-one-pane';
 import { personaPictureNode } from './persona-picture';
+import { personaPictures } from './persona-pictures';
 import { onCrewFocus, takeCrewFocus } from './team-focus';
 import type { TeamStore } from './team-store';
 
@@ -172,7 +173,7 @@ function personaCardNode(
   });
   const top = h('div', 'desk-persona-top');
   const title = h('span', 'desk-persona-title');
-  title.append(personaPictureNode(card.color, card.title), card.title);
+  title.append(personaPictureNode(card.color, card.title, 20, card.id), card.title);
   top.append(title, h('span', 'desk-head-spacer'), h('span', 'desk-persona-dot'), h('span', 'desk-persona-state', card.stateWord));
   node.append(top, headlineNode(card), h('div', 'desk-persona-role', subLineOf(card)));
   const stuck = card.runs.find((run) => run.stuck);
@@ -254,6 +255,7 @@ function detailNode(deps: DeskDeps, store: TeamStore, card: PersonaCardModel, pe
   const head = h('div', 'desk-detail-head');
   const avatar = h('span', 'desk-avatar desk-avatar-lg', card.initials);
   avatar.style.setProperty('--persona-color', card.color);
+  personaPictures.paint(avatar, persona.id);
   const name = h('div', 'desk-detail-name');
   name.append(h('span', 'desk-persona-title', card.title), h('span', 'desk-persona-role', card.role));
   head.append(avatar, name);
