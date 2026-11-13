@@ -301,3 +301,17 @@ Given in German in the session; English here.
   picker beside the presets, as the highlight colour in Settings → Appearance has;
   Purpose (and the persona's Instructions) are Drey's Markdown editor — the
   formatting strip and Live | Source, as on today's Persona page — not plain text.
+- **Models (owner, 2026-11-13):** a model must move between classes easily — by
+  dragging its row into another class or through the class menu on the row;
+  a class **super heavy** above heavy (for Fable), and the list of classes is the
+  owner's (Add class); every account carries its **cost** — subscription per
+  month, credits per credit, or per token — edited in place (today the board and
+  page give no place for it).
+- **Settings have no scopes (owner, 2026-11-13):** the tabs All devices · This
+  device · This vault go from Settings — settings are global. The one exception:
+  a phone or iPad sets its own appearance (theme, text size) on that device, and
+  that is not configurable from the desktop. Where a setting is stored (the
+  vault's `_meta/`, the machine's `service.json`, the app config) stays an
+  implementation detail the page does not show. Stage 3 turns this into an
+  ADR-0010 later change and a roadmap item that removes the scope tabs from the
+  built Settings tab (board 7g, milestone 197).

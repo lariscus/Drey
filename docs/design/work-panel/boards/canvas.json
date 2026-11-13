@@ -455,14 +455,14 @@
       "y": 28860,
       "w": 1440,
       "h": 2000,
-      "title": "7k v3 · Drey — Persona: class and an optional pinned model instead of a harness, picture change/remove (D-67), skills from the library with GitHub sources, Allowed to without vaults, Instructions fill the rest (2026-11-13)"
+      "title": "7k v3 · Drey — Persona: class (super heavy · heavy · standard · light) and an optional pinned model instead of a harness, picture change/remove (D-67), skills from the library with GitHub sources, Allowed to without vaults, Instructions fill the rest (2026-11-13)"
     },
     "DeskModelsV3.dc.html": {
       "x": 4560,
       "y": 28860,
       "w": 1440,
-      "h": 1640,
-      "title": "7l v3 · Drey — Settings → Models: discovered from the harnesses, slots per class, accounts added and removed in place (2026-11-13)"
+      "h": 1700,
+      "title": "7l v3 · Drey — Settings → Models: discovered from the harnesses; four classes (super heavy · heavy · standard · light, Add class), a model moves by drag or its class menu; slots per class; accounts with their cost, added and removed in place (2026-11-13)"
     },
     "DeskSkillsLibrary.dc.html": {
       "x": 6080,
@@ -662,7 +662,7 @@
       "y": 28860,
       "w": 420,
       "fill": "blue",
-      "text": "Design round 2026-11-13 (owner's findings after verifying 242–251). Concept: docs/design/work-panel/project-handling-draft.md.\n\n1. Projects live in the tickets vault (_meta/projects/<id>.md): name, colour, purpose, repos, plain folders (read), vault access None/Read/Write.\n2. One board holds every project (option A); one global project filter in the title bar filters Files, Tickets, board, Review and Find, saved with the View. Capacity stays cross-project.\n3. Write = project grants Write AND the persona may change notes AND the run is not read-only. A 1:1 reads every project's vaults, read-only.\n4. A persona picks a class (heavy · standard · light) and may pin a model of it; default: next free in class. The harness follows from the model.\n5. Models are discovered from the installed harnesses; slots per class, optional caps per account; accounts added and removed in place.\n6. No private / work distinction (owner, 2026-11-13): the slot profile of req-177 goes.\n7. Colour: the preset swatches plus a free colour picker, as for the highlight colour. Purpose and Instructions are Drey's Markdown editor (formatting strip, Live | Source), not plain text."
+      "text": "Design round 2026-11-13 (owner's findings after verifying 242–251). Concept: docs/design/work-panel/project-handling-draft.md.\n\n1. Projects live in the tickets vault (_meta/projects/<id>.md): name, colour, purpose, repos, plain folders (read), vault access None/Read/Write.\n2. One board holds every project (option A); one global project filter in the title bar filters Files, Tickets, board, Review and Find, saved with the View. Capacity stays cross-project.\n3. Write = project grants Write AND the persona may change notes AND the run is not read-only. A 1:1 reads every project's vaults, read-only.\n4. A persona picks a class (super heavy · heavy · standard · light — the list is the owner's: Add class) and may pin a model of it; default: next free in class. The harness follows from the model.\n5. Models are discovered from the installed harnesses; slots per class, optional caps per account; accounts added and removed in place.\n6. No private / work distinction (owner, 2026-11-13): the slot profile of req-177 goes.\n7. Colour: the preset swatches plus a free colour picker, as for the highlight colour. Purpose and Instructions are Drey's Markdown editor (formatting strip, Live | Source), not plain text.\n8. Models: a model moves between classes by dragging it or through its class menu; every account carries its cost (subscription per month, credits, per token).\n9. Settings have no scopes (owner, 2026-11-13): no All devices · This device · This vault tabs; settings are global. Only a phone or iPad sets its own appearance, on that device, not from the desktop."
     }
   },
   "order": [
