@@ -889,13 +889,13 @@ creates the configuration files under `tickets/_meta/`:
   folder…** picks a folder and registers every git repository found
   inside (the folder itself and its subfolders) with clone URL, branch
   and local path prefilled.
-**The crew a new board starts with.** The same step adds four crew members next
-to *You*: **Paul** (plans), **Ben** (builds), **Ralf** (reviews) and **Tessa**
-(tests). They appear on the Crew tab, in Mission Control's team list and in the
+**The crew a new board starts with.** The same step adds **Pia** (Mission
+Control's own persona, below) and four crew members next to *You*: **Paul**
+(plans), **Ben** (builds), **Ralf** (reviews) and **Tessa** (tests). They appear on the Crew tab, in Mission Control's team list and in the
 flow editor like any persona, each with a short prompt of its own, your default
 worker and — when the machine's model table names models for that worker — the
-strongest of them first. A board you created earlier gets the four once, the
-next time the service starts; if you delete one of them it stays deleted, and
+strongest of them first. A board you created earlier gets the crew once, the
+next time the service starts (Pia alone, when the four are already there); if you delete one of them it stays deleted, and
 nothing you have changed is touched. Seeding does not move any work to them
 by itself. On a board whose store runs on the new stages (after **Migrate**),
 a ticket's **chain** says who works it — whoever stands at the ticket's
@@ -1009,8 +1009,10 @@ ticket stands:
   **Launch this version** (only when the ticket has a worktree and a
   launch command — it opens the worktree in a new console and starts the
   program there, a second instance beside yours), **Move to <next
-  column>**, and **Send back…** (one note, then the ticket goes back to
-  the nearest agent column with the note in its log).
+  column>** and **Send back…** (one note, then the ticket goes back to
+  the nearest agent column with the note in its log) — on a board on the new
+  stages **Accept** and **Send back…** with a target, as *The persona board*
+  below describes.
 - **In Done** it is the final report: **What was delivered** first (the
   ticket's `## Result`, when a run wrote one), then the changes. The only button is **Archive**, which
   files the ticket away and removes its worktree when clean (a dirty
@@ -1133,20 +1135,19 @@ Paul may write a chain into the plan (`### Chain`); when the shaped plan is
 saved it becomes the ticket's chain. A plan's parts carry their own; a part
 without one gets the standard flow.
 
-**How a ticket walks its chain** (on a migrated store). The persona at the
-ticket's current step works it: when the run ends green, the ticket goes on
-to the next step and the next persona. Until the board draws a column per
-persona, a ticket stands in the column of whoever holds it — Paul's shaping
-step in Shaping, an agent's step in its column (or the first working
-column), your own steps on **Ready to try**. There, **Accept** finishes your
-step and hands the ticket on; at the last step of a repository ticket it is
+**How a ticket walks its chain** (on a migrated store; the whole picture is
+*The persona board* below). The persona at the ticket's current step works it:
+when the run ends green, the ticket goes on to the next step and the next
+persona, and it stands in that persona's column on the Board. Your own steps
+stand in *You*. There, **Accept** finishes your step and hands the ticket on; at the last step of a repository ticket it is
 the sign-off and merges the branch (You's *commit*). **Send back** returns it
 to the nearest earlier agent step. Moving a ticket into a working column
 moves it to the step that stands there. A step whose persona no longer
 exists, or a step marked *Tell me when it is done* that just finished, shows
 in **Needs you**. A persona that finds an earlier step's work wanting can
 **send the ticket back** to it (once per ticket — a second time it comes
-to you with both reasons); every step from there runs again. A persona
+to you with both reasons); every step from there runs again. Your own
+**Send back** is never refused and does not use that one. A persona
 that asks you a question moves the card to you until you answer. When Paul
 writes a chain into his plan, it becomes the ticket's chain as his step
 ends. At a step of **Pia**, Mission Control looks at the ticket once and
@@ -1245,6 +1246,78 @@ never fails the move).
 
 The complete format — every field, the grammar, the agent rules — is
 specified in the repo's `specs/ticket-schema.md`.
+
+### The persona board {#persona-board}
+
+On a board whose ticket store has been migrated (**Migrate**, then the three
+board steps above) the board is organised by **who works a ticket**, not by
+where it is in a pipeline. Everything the Board, the Tickets panel, Mission
+Control and the Crew tab show follows from a few rules.
+
+- **A ticket's stage is its life**: *Inbox*, *Prioritized*, then *active* while
+  it is being worked (a run holds it: *running*), then *Done*. A stage never
+  says who works it.
+- **A ticket's chain is its own way**: the personas it goes through, in order
+  (`Paul, Paul, Ben, Ralf, Tessa, You`). Each entry is one **step**, and what
+  happens at a step is what that persona's instructions say — there is no list
+  of step kinds. A new ticket gets a copy of the board's standard flow; from
+  then on you, Paul (in the plan) or Pia (as a card) can change it on the Flow
+  tab. The ticket's **position** (`Ben · 3 of 6`) says where it is. The entry
+  you shape with Paul carries the mark *Shape*.
+- **The holder is the persona at the current step.** The Board's columns are
+  the holders, in the crew's order. A ticket whose step names no persona that
+  exists any more stands at *You* and says *no persona for position 4*; so
+  does a ticket that waits for your answer or your decision. **Name four
+  personas Plan, Build, Review and Test and the Board is the old phase board
+  again** — nothing else is switched.
+- **A persona's instructions are the step.** Its run starts from its
+  `prompt.md` (the Persona page's Instructions); only the Shape dialog adds the
+  question protocol, and a persona that is read-only is *told* so in its brief.
+  A step with no persona does not run: it waits for you, with the reason.
+
+**How a ticket moves.** A green run moves it to the next step; the last step
+moves it to Done (a repository ticket first merges: **Accept** at your last
+step is the sign-off, *Leaving actions* above). **You** move a ticket by
+**Accept** at your own step, **Send back…** (pick the earlier step, say why), a
+drag, or the card's context menu: *start* a ticket from Inbox or Prioritized on
+a persona, *hand* the current step to another persona, *park* it back in
+Prioritized. A running ticket and one waiting for your answer cannot be handed
+over.
+
+**Send back.** A persona that finds an earlier step's work wanting ends its run
+with a send-back to that step. Every step from there on is invalid and runs
+again; the card marks them dashed and the ticket's log says why. A ticket may
+be sent back **once** by its personas — the second send-back does not move it:
+it comes to you with both reasons, and you accept or send it back yourself.
+Your own send-back never counts. A persona that asks a question moves the card
+to you; your answer returns it to the same persona.
+
+**Leaving actions** are machine work that runs when a ticket leaves a persona,
+inside its claim and without a model: Ben's `sync-main` (merge `main` into the
+branch before review), your `commit` (the merge at sign-off). A conflict in
+`sync-main` ends Ben's run red with the conflicting files as the reason, so his
+next run gets them as its task; it does not use the one send-back.
+
+**Capacity.** Every run needs room in the big pool *and* in its persona's pool
+(*Parallel · max*): a card says `waits for Ben` or `queued · waits for a B
+slot`. A persona with a *Parallel · min* above zero may start a run even when
+the big pool is full. Three red runs in a row hold a persona until you play it
+on the Crew tab. The queue prefers tickets that are further along in their
+chain, so finishing beats starting.
+
+**Pia** is Mission Control's persona: a chain entry for her is one Mission
+Control turn on the ticket (a chat of its own), with no session and no slot.
+Confirm one of her cards and her step is done; otherwise **Accept** moves the
+ticket on.
+
+**What you can read afterwards.** The ledger records when each persona holds a
+ticket (`hold` lines), and the token report groups cost by persona — with red
+gates and the time its tickets were held — and by chain position (runs, cost,
+busy and waiting time).
+
+**A board that has not migrated** (the files backend, a store on the old
+stages) keeps the phase board: columns are phases, a column's persona runs it,
+**Move to** and **Send back…** work as before.
 
 ### The Autopilot switch
 
@@ -1526,8 +1599,8 @@ before it; hover it for the long form, click it to open the Crew tab.
 **Prioritized, persona and cost on every row.** The ideas already in the
 fleet's queue are their own group, **Prioritized**, between Shaping and
 Inbox; a row says whom it waits for (*waits for Ben*). Every row also carries
-the **persona** that works on it (the live run's, else the ticket's pin, else
-the column's) and the **cost** of the ticket so far, written as on the phone
+the **persona** that works on it (the live run's, else the holder of the
+ticket's current step; on a board that has not migrated the column's) and the **cost** of the ticket so far, written as on the phone
 (`$1.20`); a ticket without a known cost shows none.
 
 **Board, Crew and the pool.** Two more surfaces show the whole desk, from
@@ -1578,7 +1651,7 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   picture already in a persona's folder stays. The picture is the file
   `avatar.png` in the persona's folder; a persona without one shows its
   initials (or its silhouette) on its colour, everywhere the crew is drawn —
-  here, the Capacity band, the persona's page, the ticket card and Mission
+  here, the pool popover, the persona's page, the ticket card and Mission
   Control on the iPad and the phone. A run that stopped making progress
   turns amber and offers **Nudge** (asks the worker for a status line),
   **Hand to Claude Code** (stops the run and starts the ticket again on
@@ -1610,8 +1683,8 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   are told to change no file (an instruction in their brief, not a lock: the
   reviewer and the tester are read-only unless you switch it off);
   **Parallel · max** and **Parallel · min** — the most runs of the persona at
-  once, and how many it may start when the big pool is full (recorded for the
-  per-persona pool that comes next); **Leaving actions** — machine work when a
+  once, and how many it may start when the big pool is full (both are
+  enforced: a run needs room in the persona's pool and in the big one); **Leaving actions** — machine work when a
   ticket leaves the persona, `sync-main` or `commit` (see *Leaving actions*
   below); the daily budget) and **Allowed to** (which vaults the persona
   may change, whether its runs ask before running commands, whether it may
@@ -1655,8 +1728,8 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   and own skills) as one commit. Tickets and their history and the 1:1's chat
   files stay. It is refused, with the reason in the same window, for *You*, for
   a persona with a run, a 1:1 or a session open (stop it first) and for a
-  persona a column of the Work panel or the crew's default persona names (the
-  message lists the columns; unpin it first). Pia, Mission Control's persona,
+  persona a column of the Work panel names, on a board that has not migrated
+  (the message lists the columns; unpin it first). Pia, Mission Control's persona,
   has no **Delete persona…**. A crew member from a new board
   (Paul, Ben, Ralf or Tessa) stays deleted. The persona's tab stays open on a
   *No persona* note until you close it.

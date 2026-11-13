@@ -717,16 +717,18 @@ stands one beyond it and the engine moves the ticket to `done`
 The owner's **Accept** on an `active` chain ticket moves the cursor on; at
 the chain's last entry a You entry of a repository ticket is the sign-off
 (You's `commit` machine run, then `done`), any other last entry goes to
-`done`. The owner's **Send back** moves the cursor to the nearest earlier
-agent position (a target picker is req-270's) and never uses the ticket's
-one send-back. **Until req-270/271 draw holder columns** the board keeps the
-pipeline's columns, and an `active` ticket stands in the column of its
-holder (`core/chain-placement.ts`, owner 2026-11-12): the agent column whose
-`persona:` names the holder, else the first agent column; a `:shape` entry in
-the queue column before it (Shaping); You in the first checkpoint (Ready to
-try); a pipeline with none of these shows the stage as one "active"
-column. An owner's move of a chain ticket into a working column moves the
-cursor to the position that stands there (`store/chain-move.ts`).
+`done`. The owner's **Send back** moves the cursor to the earlier position
+the owner names (the target picker, "The persona board" below), else to the
+nearest earlier agent position, and never uses the ticket's one send-back.
+**The board's columns are the holders** (milestone 254, "The persona board"
+below); the interim placement of milestone 247 (`core/chain-placement.ts`,
+owner 2026-11-12) survives only as the column an active ticket also stands in
+inside `BoardSnapshot.columns`: the agent column whose `persona:` names the
+holder, else the first agent column; a `:shape` entry in the queue column
+before it (Shaping); You in the first checkpoint (Ready to try); a pipeline
+that holds only the lifecycle phases shows the stage as one "active" column.
+An owner's move of a chain ticket into a working column of such a pipeline
+moves the cursor to the position that stands there (`store/chain-move.ts`).
 
 **What a chain run may say** (req-257, milestone 248). The brief of a chain
 run lists the positions (`prompts/disciplines/chain.md`). Ending the turn
@@ -813,11 +815,15 @@ grammar (a `- <entry>` list reads the same); when the plan is saved through
 the Shape chat (`setPlan`) it becomes the ticket's `chain:` in the same
 write and commit (`tickets: <id> plan, chain`), checked by the guard — one
 that does not hold leaves the chain as it was and the save says why. (A plan
-run's own `### Chain` is applied by req-257's runner.)
+run's own `### Chain` is applied at the run's green end, "What a chain run
+may say" above.)
 
-**The human persona (E10-6).** A gate the human persona works runs no agent:
-the ticket's `persona:` pin, else the phase's `persona:`, else the engine
-default resolves to a `kind: human` persona, and the dispatch pass stamps
+**The human persona (E10-6).** On a lifecycle store a `you` entry of the
+chain is held by You: the card stands in You's column, Accept hands it on,
+Send back returns it (the persona board below). On the phase board a gate
+the human persona works runs no agent: the phase's `persona:` (the ticket
+pin and the engine default no longer resolve, req-257) names a
+`kind: human` persona, and the dispatch pass stamps
 `awaiting` instead of composing a run (once; `paused:` status line, Log line
 `parked for <name> - the <phase> gate is a manual step`). **Accept** is the
 board's ordinary accept (the ticket moves to the next phase, the field goes,
@@ -885,6 +891,61 @@ earlier position of the chain (without it the nearest earlier agent
 position); the owner's send-back never uses the ticket's one send-back. A
 drop on Done is the ordinary `transition` into the terminal stage. A column
 head's drag writes the crew's `order:` (`crewOrderSet`, the Crew tab's key).
+
+### The persona board as a whole (ADR-0098)
+
+**What makes a board a persona board.** The store's `[stages]` are the
+lifecycle (`inbox prioritized active running done`, `claim = ["running"]`,
+"The store's stages" below); everything else is derived. The files backend and
+a store still on the phase stages stay a **phase board**: the phase is the
+directory or the stage, the column's `persona:` names who runs it, the ring
+and the column breaker stay (until E14-9b). A persona board has no column
+vocabulary in `pipeline.md` beyond the lifecycle edges (below).
+
+**Which stage a ticket is in, and who holds it.**
+
+| Stage | Holder | Column on the board |
+|---|---|---|
+| `inbox`, `prioritized` | none | Inbox, Prioritized (the edges) |
+| `active` | `holderOf` over `x-chain`, `x-at`, `x-awaiting` | the holder's column, status on the card |
+| `running` | the same — a run holds the claim | the holder's column, status *running* (never a column of its own) |
+| `done` | none | Done this week |
+
+**Who moves a ticket, and what is written** (one commit unless said):
+
+| Move | By | Written |
+|---|---|---|
+| create | capture, Pia (card), the owner | `x-chain` = the standard flow, `x-at: 1`, stage `inbox` |
+| start / hand / park | the owner (drag, menu) | "The owner's moves" above |
+| a run ends green | the runner | leaving actions first, then `x-at` + 1 and one release into `active` (a plan run's `### Chain` in the same write) |
+| the last entry ends | the runner / the owner | the engine's `put --claim` into `done`; at a You entry of a repository ticket only after the `commit` leaving action |
+| a persona's `SEND-BACK:` | the runner | the first: `x-at` back, `x-sent-back: from>to`, the invalidation line; the second: `x-awaiting: you`, `needs-decision [second-send-back]` |
+| a question in a run | the worker | `x-awaiting: you` before the claim is given up; the answer's reclaim clears it |
+| Accept / Send back at You | the owner, Pia (card) | the cursor on / back to the picked position; `x-awaiting` cleared |
+| claim | the runner only | `dk claim` (`active -> running`); humans' edits are `put --claim` |
+
+**`pipeline.md` on a persona board** (milestone 254, "The board migration"
+below): `phases:` holds the lifecycle edges only (Inbox, Prioritized, Done),
+`flow:` the standard flow, `token-budget:` stays a board key; `wip:`,
+`claim:`, `handover:`, `persona:`, `min-class`, `needs`, `max-turns`,
+`max-work` of the old working column are gone from it (the run settings on
+the builder's `persona.md`). **"Initialize board" still writes the phase
+pipeline shown below** (six phases plus `flow:`) and seeds the crew; the
+store reaches the persona board through the Tickets panel's **Migrate** and
+the three steps that follow. Creating a store on the lifecycle stages is E14-9b.
+
+**Capacity.** A run needs room in the **big pool** (ADR-0095) and in its
+persona's pool (`parallel:`; absent = no cap); `min:` (default 0) lets a
+persona start a run while the big pool is full. The card says which one it
+waits for (`personaWaits`: `waits for ben` / `queued · waits for a B slot`).
+The breaker counts red gates per persona: three in a row (a `max-red` of the
+column the run stood in overrides it while the pipeline still has one — step 3
+of the board migration drops the column's keys); a held persona dispatches
+nothing until it is played. The human persona and Mission Control's never take a slot, a seat or
+a budget.
+
+**Metrics.** `hold` lines in the ledger and the position on a chain run's
+`run_settled` (below); `GET /report` groups by persona and by position.
 
 ### The fleet ledger (E7)
 
@@ -967,6 +1028,14 @@ On a store the verbs are comments (E14-6). A first line `Decision needed: <quest
 
 ## `_meta/pipeline.md` — the phases and their handovers
 
+> **Two kinds of board** (ADR-0098). This section describes the **phase board**
+> — the files backend and a store still on the phase stages: every phase is a
+> column and the handover keys decide who works it. On a **persona board** (a
+> store on the lifecycle stages, after the board migration's step 3) the file
+> holds only the lifecycle edges, `flow:` and `token-budget:`; the columns are
+> the personas, "The persona board as a whole" above. What "Initialize board"
+> writes is still the phase file below.
+
 ```markdown
 ---
 push: origin
@@ -1004,7 +1073,8 @@ machine resolves no conflict. **A sign-off whose human persona does not list `co
 is refused** with the way to add it (the Crew tab → You → Work → Leaving actions). A ticket with no `repo:` has nothing to
 merge and moves directly. On a store dk refuses an agent's release into a terminal stage, so
 the run hands back to `ready` (on a lifecycle store: `active` pinned to `ready`, req-265) and the engine then makes the owner's move into `done`.
-*Send back* is the ordinary send-back to Building.
+*Send back* is the ordinary send-back to Building (on a persona board: to the
+earlier position the owner picks, "The persona board" above).
 
 Boards and stores that exist keep their columns: a default is written only into an empty
 repository, and nothing renames a folder. Earlier defaults were `inbox · plan · build ·
@@ -1163,7 +1233,7 @@ commit per change; hand edits win on refresh):
 - `color:` — optional `#rrggbb`. The Work panel's phase chip uses it;
   without it a curated default palette colours by position.
 
-**Agent lane rules** (enforced by the runner, not the board — the
+**Agent lane rules** (the phase board; enforced by the runner, not the board — the
 board serves the human): an agent works the tickets the dispatcher
 gives it — the column's own queue first, then the previous column's
 top — and a dispatched run's completion moves the ticket from where it
@@ -1178,7 +1248,7 @@ is one too (an older board's Review → Sign Off), so the whole run of the
 owner's columns after a worker column raises Needs-you cards. Backward moves are human moves — the one exception
 is the circuit breaker's park into inbox, always logged.
 
-**Dispatch order** (req-63): one candidate list over every playing
+**Dispatch order** (req-63; the phase board — a persona board dispatches by holder, below): one candidate list over every playing
 automatic column, ordered by priority class (the configured
 vocabulary's first half before its second — see `priorities:` above),
 then column rank — the rightmost column first, so
