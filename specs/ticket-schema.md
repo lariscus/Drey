@@ -829,6 +829,63 @@ appears in the capacity or stuck figures and carries no budget. The old
 delta's `insert manual(you) after <phase>` is gone with the delta; its place
 is a `you` entry in the chain, parked by req-257.
 
+### The persona board (req-270, req-271; concept rows 9 and 10)
+
+On a lifecycle store (`inbox prioritized active running done`, req-265) the
+board's middle columns are the personas that **hold** a ticket — derived from
+its chain, cursor and `awaiting` by the one holder rule, never stored — and the
+step is status on the card (boards 7e v2 and 7a v2). The board snapshot carries
+two fields for every surface (`packages/tickets-engine/src/contracts/persona-board.ts`;
+the desktop Board and Tickets panel, Mission Control with req-273):
+
+- **`lanes`** — the holder columns in the crew's order (`order:` in
+  `crew.md`, `inCrewOrder`), You included (added last when the crew has no
+  human record): `{ persona, title, kind: agent | human | mission, color,
+  parallel, min }`. Present exactly when the board is a persona board;
+  absent on the phase board (the files backend, a store on the old stages).
+- **`hold`** on every `active` / `running` card: `{ holder, why, position,
+  length, chain, mode, named, claimed, sentBack, questions }` — `why` is
+  `entry` (the persona of the entry at the cursor, You's own entry
+  included), `question` (`awaiting: you` after a run's question; `named` is
+  the persona that asked, `questions` the open decisions), `second-send-back`
+  (`awaiting: you` with an open `needs-decision [second-send-back]`) or
+  `no-persona` (the entry names no readable persona). Absent in the
+  lifecycle columns.
+
+An active ticket also stays in `columns` — in its holder's pipeline column
+while the pipeline has one (milestone 247's placement), else in the stage's
+own column (`active` / `running`, which a persona board does not report as
+"not a phase in pipeline.md") — so every reader that walks the columns still
+sees it. The pure helpers beside the types turn a hold into what a card
+draws, without words (each surface words them from its catalog):
+`chainCellsOf` (done · now · again — the stretch a send-back invalidated,
+up to where it came from — · next), `holdBadgeOf` (*Sent back once / twice*,
+*Question*, *No persona*, *Accept*), `holdStatusOf` (running, from the
+persona that sent it back, merging main, committing, queued for a slot,
+waits for its persona, held, shaping, a Mission Control turn, asks, decide,
+no persona for position *n*, ready, your step, waiting) and `laneLoadOf`
+(`2/2 · 1 waiting`; You and Mission Control none). What only the runner
+knows rides the chain status: `queue` (the pool's queue, req-170) and, new,
+`personaWaits` — ticket → persona, the tickets the last pass left waiting
+because their persona runs its maximum (`parallel:`).
+
+**The owner's moves** (concept §4), each one `put` on the store with a
+status line, `personaBoardMove` (`services/persona-board-moves.ts`):
+
+| Move | From → to | Writes |
+|---|---|---|
+| `start` | Inbox / Prioritized → a persona's column | stage `active`; the dropped-on persona takes the entry at the cursor (its mode and notify stay); a ticket without a chain gets `flow:` first, else a chain of that one persona |
+| `hand` | a persona's column → another's (You included) | the entry at the cursor becomes the target persona; refused while a run holds the claim (stop it first) and while the ticket waits for the owner's answer (a question, the second send-back); a ticket at You for want of a persona is assigned this way; a drop on its own holder does nothing |
+| `park` | a persona's column → Prioritized (or Inbox) | the stage; the chain and the cursor stay; refused while a run holds the claim |
+
+Accept and Send back keep their calls: `acceptTicket` (the cursor on; at the
+last You entry of a repository ticket You's commit, then `done`), and
+`sendBack` with an optional **`position`** — the owner's target picker, any
+earlier position of the chain (without it the nearest earlier agent
+position); the owner's send-back never uses the ticket's one send-back. A
+drop on Done is the ordinary `transition` into the terminal stage. A column
+head's drag writes the crew's `order:` (`crewOrderSet`, the Crew tab's key).
+
 ### The fleet ledger (E7)
 
 `tickets/_meta/ledger.jsonl` — the fleet's events as one strict JSON line
@@ -968,6 +1025,10 @@ the old phase stays in `x-legacy-phase`. `migrate-tickets --pipeline-out` writes
   into the ticket at creation and the ticket's own from then on; absent = new
   tickets carry no chain. An unreadable entry drops the whole key with a
   warning. Read by `core/pipeline-flow.ts`.
+- `token-budget`: optional (req-268) — the board's daily token budget once the
+  pipeline holds only the lifecycle columns: step 3 of the board migration
+  keeps the old working column's `token-budget` here (concept §5: it stays a
+  board key). Recorded, not yet read by a chain board's runner.
 - `closing-signals`: optional (req-169) — the signals that earn a run its
   **closing round** (see Personas, *The journal and the closing round*):
   a list of `red-gate`, `retry`, `steer`, `cost`, `friction`; `none` or
@@ -1961,6 +2022,36 @@ try → the last You entry; a ticket without a chain gets the standard flow copi
 flow the old pin stays), a second config commit removes the old stages (ADR-0090 later change,
 concept §12 steps 1–2). An `active` ticket that a migration of milestones 239–246 left with a pin is
 offered the same conversion (the pin goes, the cursor comes).
+
+**The board migration (req-268, concept §12 steps 3–5).** Once the store runs
+on the lifecycle stages the meta vault still describes the phase board; the
+board snapshot's `boardMigration` offers the next step and the Tickets panel
+shows it as a line with **Review…** (what the step writes) and **Migrate** —
+never run on its own, each step only on the owner's confirmation
+(`core/board-migration.ts`, `BoardService.migrateBoard`):
+
+1. **step 3, `pipeline`** — `pipeline.md` keeps only the lifecycle columns
+   (`inbox`, `prioritized` and the terminal one) with their `persona:` keys
+   gone, gains the standard `flow:` when it has none, keeps the old working
+   column's `token-budget` as a top-level key, and moves its `min-class`,
+   `needs`, `max-turns` and `max-work` onto the builder's `persona.md` (the
+   first persona after the shape persona's entries of the flow — Ben — where
+   its record sets none); `ci`, `audit` and `semantic` have no ruling and go
+   with the column, named in the offer first. The shipped phase-board prose
+   is replaced, any other prose kept. One commit (`pipeline.md` and the
+   builder's record). This unpins `build-default`.
+2. **step 4, `crew`** — `crew.md`'s `order:` when it has none (Mission
+   Control's persona first, then the personas in the order the flow names
+   them, the rest in pipeline order, You last; the legacy defaults left out)
+   and the leaving actions where missing: the builder's `sync-main`, You's
+   `commit`. One commit.
+3. **step 5, `defaults`** — `build-default` and `commit-default` are deleted
+   by req-261's route (`personaRemove`, confirmed by the title), one commit
+   each; a prompt that differs from the builder's own is named in the offer
+   first, never merged.
+
+Steps run in this order; a step another device ran meanwhile is refused with
+the step that is next.
 
 Not carried: `branch` (the rule `t/<id>` wins), `run` (the runner's table),
 `parked-*` (a parked ticket is stage `blocked`), `labels`, `kind`, `size`,

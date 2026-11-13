@@ -5957,3 +5957,52 @@ sequenceDiagram
 ```
 
 A chain run's brief lists the positions and the `SEND-BACK:` marker (`prompts/disciplines/chain.md`); the harness's result text is read for it (`event-text.ts` `sendBackOf`), `exitVerdict` answers `send-back` before the gate, and `RunCompletion.sendBack` decides with `decideSendBack` over the request's `cursor` (its entries and the send-back already used). Pia's entry never reaches the runner: the engine sweeps on every board and fleet change, runs one turn per entry, and the ticket's `awaiting` keeps a second turn from starting.
+
+## 6.125 The persona board: a drop becomes one move (req-270/271, milestone 254)
+
+The Board tab draws the snapshot's `lanes` and every card's `hold`; the runtime
+half of a card's status comes from the fleet. A card dropped on a column is
+decided by `dropOf` and sent as one call; the engine checks it again against
+the card it reads and writes one `put` with a status line.
+
+```mermaid
+sequenceDiagram
+    participant O as Owner
+    participant B as Board tab (persona-board-view)
+    participant M as plugin main
+    participant S as BoardService
+    participant D as dricket store
+    O->>B: drag T-0122 from Ben to Ralf
+    B->>B: dropOf(card, "ralf") -> hand
+    B->>M: invoke personaBoardMove {kind: hand, id, persona: ralf}
+    M->>M: parsePersonaBoardMove
+    M->>S: personaBoardMove(move)
+    S->>S: snapshot -> card.hold; personaMoveOf (refused while claimed or awaiting)
+    S->>D: put (x-chain entry at x-at = ralf), status line
+    S-->>B: board changed -> repaint (Ralf's column)
+    Note over B: running · waits for Ben · queued come from<br/>the runs and the chain status (personaWaits, queue)
+```
+
+## 6.126 The board migration: one step per confirmation (req-268, milestone 254)
+
+```mermaid
+sequenceDiagram
+    participant O as Owner
+    participant P as Tickets panel (board-migration-bar)
+    participant S as BoardService
+    participant V as meta vault (git)
+    S->>S: snapshot on a lifecycle store -> boardMigrationPlan (3, 4 or 5)
+    S-->>P: snapshot.boardMigration
+    O->>P: Review…
+    P->>P: the step's lines (columns removed, flow, keys moved …)
+    O->>P: Migrate
+    alt step 3 or 4
+        P->>S: migrateBoard {step}
+        S->>S: plan again (refused when another step is next)
+        S->>V: pipeline.md + builder's persona.md / crew.md + records, one commit
+    else step 5
+        P->>S: personaRemove {persona, confirm: title} per legacy default
+        S->>V: one commit each (req-261's route)
+    end
+    S-->>P: board changed -> the next step's line, or none
+```
