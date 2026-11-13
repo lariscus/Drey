@@ -721,6 +721,11 @@ button:focus-visible {
 .ph-gcount {
   margin-left: auto;
 }
+/* req-273: a holder group's circle (boards 10c v2: 24 px; 10e v2: 22 px). */
+.ph-gava {
+  display: flex;
+  flex-shrink: 0;
+}
 .ph-trow {
   position: relative;
   display: flex;
