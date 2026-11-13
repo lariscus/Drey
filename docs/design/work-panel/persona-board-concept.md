@@ -754,3 +754,18 @@ No production code under `plugins/`, `packages/`, `libs/` or `apps/` changed; no
 spec except the req-257 row's pointer; no changelog entry (no milestone). The
 owner's store and meta vault were read, not written. The canvas boards are not
 drawn — the draft is a repository file for the decision.
+
+## 17. Later changes — the design round of 2026-11-13
+
+From [project-handling-draft.md](project-handling-draft.md) (accepted 2026-11-13; rows req-282 – req-291):
+
+- **Projects on the board.** One board holds every project (option A). A global
+  project filter in the title bar hides the cards of other projects; under *All
+  projects* a card carries a project chip. **The persona columns, their load
+  (`Ben · 2/2 · 1 waiting`) and the pool chip stay whole** — capacity is
+  cross-project (§9 unchanged). Board 7n.
+- **The persona record (§0, §5, §9).** `worker:` and `models:` (default + pool)
+  give way to `class:` and an optional pinned `model:`; the harness follows from
+  the model; `min-class` folds into `class`. The per-persona pool and breaker of
+  §9 (`parallel`, `min`) are unchanged. `allowed: write-vaults` gives way to
+  `allowed: write-notes` plus the project's vault grants. Board 7k v3.

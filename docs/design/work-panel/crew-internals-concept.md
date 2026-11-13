@@ -371,3 +371,33 @@ No code under `plugins/`, `packages/` or `libs/` changed. The roadmap,
 changelog and `decisions.md` are not edited here (the integrator does that from
 §3). The Settings → Models page is described, not drawn. The memory ruling is
 open (R4).
+
+## 5. Later changes — the design round of 2026-11-13
+
+The owner reshaped five rulings after verifying milestones 242–251; the concept is
+[project-handling-draft.md](project-handling-draft.md) (§10–§12), the boards are 7k v3, 7l v3, 7m, 7n and 7o, the build
+items roadmap rows req-282 – req-291. Each later change in one line:
+
+- **R5 (vault rights)** — no longer "read every registered vault": a run reads
+  the vaults (and plain folders) its ticket's **project** grants; it writes where
+  the project says Write **and** the persona has `allowed: write-notes` **and** the
+  run is not read-only. A 1:1 reads every project's vaults and folders, read-only.
+  `allowed: write-vaults` leaves the persona (req-282/283).
+- **R8 (skills)** — the shared pool becomes a **skills library** in Settings with
+  GitHub sources (repository, path, ref), still files under `_meta/skills/`; a
+  persona picks from it (req-289).
+- **R10 (the pool)** — the classes are a list the owner keeps, shipped as super
+  heavy · heavy · standard · light (A · B · C migrated); the slots live at class
+  level (at most N sessions per class), the accounts of req-177 are an optional
+  extra cap and carry their cost; the model table is **discovered from the
+  installed harnesses**, not typed in (req-286/287). "Never a smaller class"
+  stands. The repository `profile` (private / work) of req-177 is retired
+  (req-290).
+- **R11 (the Persona page)** — the persona picks a **class** and optionally pins
+  a **model** of it instead of a harness and a model pool; Allowed to loses its
+  vault rows; the picture can be changed and removed; Instructions fill the rest
+  (req-288, board 7k v3).
+- **R12 / R13 (sessions and layers)** — the session record gains `project`; a
+  free session takes one. Projects are vault layer (`_meta/projects/`). The
+  three layers stay in storage, but the Settings tab shows **no scopes**:
+  settings are global, only a phone or iPad keeps its own appearance (req-291).
