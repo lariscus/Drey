@@ -105,7 +105,6 @@ The owner fixed the end of the current stretch ("ich habe das gefühl mit jedem 
 ### Known defects
 
 
-- **D-67 — The persona picture cannot be changed** (S; owner request, outside the list; the owner's interim verification 2026-11-13). The Persona page's Profile block draws the initials circle and nothing that changes it: `Upload picture…` was never built (req-235, frozen). **Waits for the owner's choice** (milestone 252 asked): build req-235's desktop half now, or with the persona redesign after the finish line.
 - **D-56 — The owner's configured Flow and Crew settings are missing in his installation** (M; (owner request, outside the list; owner's first verification round on the integrated build, 2026-11-07); **needs the owner's detail: which page is empty, what was configured before the cut-over**). Facts: the store's `_meta/personas` holds only `build-default`, `commit-default` and `you`; the default crew (E12-9d) is shipped and seeded since milestone 235 (req-256) — a board without it gets it at the engine's next start, so that half is closed; milestone 230 moves the crew keys of `config.json` / `chain.json` into `crew.md` once and the pools live in `service.json`'s slots (req-177), which seeding does not touch; the chain config in `~/.drey-engine/fleet/chain.json` still points at `ticketsVaultPath E:\projects\drey-tickets` with three pools. Done when Settings → Tickets → Flow and Crew show what the owner configured, and a cut-over migrates those settings or says what it cannot carry.
 
 
