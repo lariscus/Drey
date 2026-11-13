@@ -2,7 +2,7 @@ import type { CapabilityClass } from './protocol-pool';
 
 // ---------------------------------------------------------------------------
 // Surplus routing (req-178, ADR-0095 later change): the choice within the
-// granted class. A hard filter (profile, required capabilities, provider
+// granted class. A hard filter (required capabilities, provider
 // rules, slot state, caps, ledgers, the reserve per window), then the soft
 // choice by the largest surplus `q`, a model step up within the slot above
 // `Upgrade above q` — never a smaller class. These are the wire shapes the

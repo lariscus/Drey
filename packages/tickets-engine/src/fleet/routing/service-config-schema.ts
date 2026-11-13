@@ -10,7 +10,7 @@
 
 /** The root keys of `service.json`, each with its owner and what it holds. */
 export const SERVICE_JSON_KEYS = {
-  slots: 'req-177 · routing/slot-config.ts — the accounts per provider: id, label, provider, profile, login folder, sessions',
+  slots: 'req-177 · routing/slot-config.ts — the accounts per provider: id, label, provider, login folder, sessions',
   impliedOff: 'D-69 · routing/slot-config.ts — the providers whose implied stand-in slot the owner removed (Settings → Models)',
   quota: 'req-177 · routing/slot-config.ts — the quota sources per provider (Claude Code, Kimi, z.ai), their refresh',
   models: 'req-170 · routing/pool-config.ts — the model table: model id, provider, category, class, cost factor, capabilities',

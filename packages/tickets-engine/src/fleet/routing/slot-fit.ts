@@ -39,7 +39,7 @@ function blocked(view: SlotView): SlotRefusal | null {
  * The routing's hard filter on one slot (req-178 over req-170's checks):
  * the step's required capabilities, the slot's state, the row's sessions,
  * the provider's throttle, the caps, the slot's ledger and the reserve per
- * window. The first refusal wins; the profile and the row's own slot are
+ * window. The first refusal wins; the row's own slot is
  * settled before (`PoolGrant`), the choice among what passes after.
  */
 export class SlotFit {

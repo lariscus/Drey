@@ -46,7 +46,6 @@ test('Add slot… adds a row, and every slot card can be removed (D-69)', async 
   await expect(draft).toBeVisible();
   await draft.getByRole('textbox', { name: 'Name' }).fill('Claude B');
   await draft.getByRole('combobox', { name: 'Provider' }).selectOption('claude-code');
-  await draft.getByRole('combobox', { name: 'Profile' }).selectOption('work');
   await draft.getByRole('textbox', { name: 'Name' }).press('Enter');
   await expect(names.filter({ hasText: 'Claude B' })).toBeVisible({ timeout: 30_000 });
   await expect(draft).toHaveCount(0);

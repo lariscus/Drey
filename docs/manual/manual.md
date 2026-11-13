@@ -1656,19 +1656,18 @@ that serves it (or the runner, when it runs on any account of that
 runner), a free *category* word, its class, its cost factor and the sessions
 it may run at once on one account; click a cell to change it, **Add model…**
 starts a new row (Enter saves, Esc drops it), the cross at the row's end
-removes it. A row that only runs on work accounts is dimmed and carries a
-*Work* chip. **Capacity:** the *Global cap* in cost factors, a read-only
+removes it. **Capacity:** the *Global cap* in cost factors, a read-only
 list of each account's cap (the largest of its rows times its sessions, unless
 `service.json` sets one), and a live line (*Now: 2.4 of 6 · Claude A 2 of 5*)
-of what the running sessions weigh. **Slots:** one card per account — its
-profile (*Private* or *Work*), what it costs, and one row per quota window
+of what the running sessions weigh. **Slots:** one card per account — what
+it costs, and one row per quota window
 (*5 h*, *7 d*, *month*) with a bar for the share left (peach once it is
 below the share kept in reserve), when the window resets (a time today, a
 weekday and time within the week, else the date), and whether the reading is *measured*, *estimated* or *unknown*;
 `q` on the right says whether the account has surplus to let a lighter
 class upgrade onto it (*upgrade allowed*) or only serves its own classes
 (*class B only*). **Add slot…** opens a row: type the account's name, pick
-its provider and profile, and Enter adds the slot (Esc drops the row). The
+its provider, and Enter adds the slot (Esc drops the row). The
 cross at a card's head removes the slot — an account you configured, or
 the stand-in account Drey assumes for a provider you never set up, which
 then gets no runs on this machine until you add a slot for it again. A slot

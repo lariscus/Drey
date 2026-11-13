@@ -118,7 +118,7 @@ Invoke-RestMethod "http://127.0.0.1:$($d.port)/health" -Headers $h
 | `GET /events` | the runner's events as server-sent events (req-176): `event: run` with a run's record each time it is persisted, `event: line` with `{runId, event}` for each line of a run's stream, `event: slot` with a slot's view when its state, windows or busy count changed (req-177), `event: pool` with the pool's live load when it changed (req-170), `event: tranche` with the tranche's status (req-179), `event: hold` with the burn rate's hold when it rose, changed its percent or cleared (`null`, req-181); a `: ping` comment every 15 s, `retry: 3000` at the start. A read: it never keeps the runner awake, and it ends when the runner goes to sleep — reconnect then. `curl.exe -N -H "Authorization: Bearer …" http://127.0.0.1:<port>/events` |
 | `GET /log?tail=N` | daemon log tail, plain text (default 300 lines, max 2000; daemon builds) |
 | `GET /chain` | chain state + config (daemon builds); `slots` carries the 7e summary per slot (req-177); `pool` the live load (`{used, global, slots: [{id, label, used, cap, derived}]}`) and `queue` the tasks waiting for the pool (req-170) |
-| `GET /slots` | every slot (req-177): `{ok, slots: [{id, label, provider, profile, billing, quota, state, busy, total, windows: [{name, spanMs, remaining, resetsAt, reliability, fetchedAt, used?, limit?, unit?, rejected?}], q, reason, lastFetch, lastFetchError, implied}], configPath}` — see "Slots" below |
+| `GET /slots` | every slot (req-177): `{ok, slots: [{id, label, provider, billing, quota, state, busy, total, windows: [{name, spanMs, remaining, resetsAt, reliability, fetchedAt, used?, limit?, unit?, rejected?}], q, reason, lastFetch, lastFetchError, implied}], configPath}` — see "Slots" below |
 | `POST /slots/refresh` `{id?}` | read the quotas now (one slot, or all), the config reloaded first |
 | `POST /slots/login-done` `{id}` | the owner signed the slot's account in again: `needs-login` clears, its quota is read |
 | `POST /slots/config` `{slots: [...]}` | write the `slots` of `service.json` (every other key kept) and reload; a broken entry refuses the whole list (422), a file that does not parse refuses the write (409) |
@@ -544,7 +544,10 @@ A **slot** is an account a worker runs on (ADR-0095 later change):
 `Claude A` and `Claude B` as two Claude Code logins, `z.ai`, `Kimi`, at
 work `Copilot`. Every run is bound to one slot when it starts; the
 binding is on the run record (`slot: {id, label}`) and in the stream's
-opening lines (`slot: Claude A`). Code: `packages/tickets-engine/src/fleet/routing/`,
+opening lines (`slot: Claude A`). Req-290 retired the `profile` a slot
+(and a repository) once carried: every slot may serve every repository —
+an old `profile` key in `service.json` or `repos.md` is read and silently
+ignored, and no write emits it again. Code: `packages/tickets-engine/src/fleet/routing/`,
 wired in `fleet/compose-routing.ts`.
 
 ### `service.json` — where the slots are configured
@@ -561,7 +564,7 @@ then works with the implied slots and logs why.
 ```json
 {
   "slots": [
-    { "id": "claude-a", "label": "Claude A", "provider": "claude-code", "profile": "private", "sessions": 2,
+    { "id": "claude-a", "label": "Claude A", "provider": "claude-code", "sessions": 2,
       "billing": { "kind": "subscription", "pricePerMonth": 90, "currency": "EUR" },
       "login": { "claudeConfigDir": "C:/Users/me/.claude-a" } },
     { "id": "claude-b", "label": "Claude B", "provider": "claude-code",
@@ -570,7 +573,7 @@ then works with the implied slots and logs why.
       "billing": { "kind": "subscription", "pricePerMonth": 30 },
       "login": { "opencodeAuthEntry": "zai-coding-plan" } },
     { "id": "kimi", "label": "Kimi", "provider": "kimi" },
-    { "id": "copilot", "label": "Copilot", "provider": "opencode", "profile": "work",
+    { "id": "copilot", "label": "Copilot", "provider": "opencode",
       "billing": { "kind": "credits", "pricePerCredit": 0.04 },
       "limits": [{ "window": "month", "budget": 1000, "unit": "runs" }] }
   ],
@@ -583,7 +586,6 @@ then works with the implied slots and logs why.
 | `id` | letters, digits, `.`, `_`, `-`; unique |
 | `label` | what the boards show; default the id |
 | `provider` | `claude-code`, `opencode`, `kimi` or `copilot` — the harness the slot's runs use |
-| `profile` | `private` (default) or `work`: a repository runs only on slots of its own `profile:` (`_meta/repos.md`) |
 | `sessions` | concurrent runs the account serves; absent = no cap of its own. Req-63's `fleet.pool.<provider>.size` moved here once (req-170): see "The capacity pool" |
 | `billing` | `{kind: "subscription", pricePerMonth}` or `{kind: "credits", pricePerCredit}`, optional `currency` — display data |
 | `login` | the harness login, **never a key**: `claudeConfigDir` (spawned as `CLAUDE_CONFIG_DIR`; absent = the default login), `opencodeAuthEntry` / `opencodeAuthFile` (the entry of opencode's `auth.json` the z.ai quota is read with), `kimiCredentials` / `kimiHome` (the Kimi CLI's credentials file; `kimiHome` is spawned as `KIMI_HOME`), `copilotHome` (a Copilot CLI account's config folder, spawned as `COPILOT_HOME`; req-182) |
@@ -624,19 +626,18 @@ run is routed by it yet (req-178).
 | `needs-login` | a run ended on `authentication_failed` / 401 / "Please run /login", or a quota read got 401 | refused, **never retried** — sign the account in (`claude` with that `CLAUDE_CONFIG_DIR`, `/login`), then `POST /slots/login-done`; a remote read that succeeds clears it too |
 | `unknown` | no readout and no counted run | takes the run |
 
-A start binds a free slot of the request's provider and profile — the
+A start binds a free slot of the request's provider — the
 slot the resumed session lives on first, else the first in
 `service.json`'s order — or is refused with each candidate's reason
-(`no work slot serves claude-code: the repository is work and never runs
-on a private slot — …`). A failed start frees its slot; a restarted
-runner re-reserves the slots of the runs it adopts. The run's own
-`failed` card is the Needs-you card of an expired login.
+(`no free slot serves claude-code — …`). A failed start frees its slot; a
+restarted runner re-reserves the slots of the runs it adopts. The run's
+own `failed` card is the Needs-you card of an expired login.
 
 ## The capacity pool — model table, cap, class requests, ledgers (req-170)
 
 Every start asks the pool before a worker spawns (ADR-0095, R10). The
 pool grants a model of **exactly the class the start asked for**, on a
-free slot of the repository's profile, while the caps and the ledgers
+free slot, while the caps and the ledgers
 have room — or the start waits: no process, no slot. **Never a smaller
 class.** Code: `fleet/routing/` (`ModelTable`, `CapacityCap`, `Ledgers`,
 `PoolGrant`, `PoolGate`, `RequestQueue`, `PoolMigration`; req-178's
@@ -717,7 +718,7 @@ line.
 Two stages, then a possible step up, over every row of the class in the
 persona's pool on every slot that serves it:
 
-1. **The filter** (hard; `SlotFit`): the repository's profile; the
+1. **The filter** (hard; `SlotFit`): the
    step's needs against the row's declared capabilities (`no image input`,
    `image input not declared`, `context 128k < 200k`, `no tool calls`); the
    slot's state (`needs-login`, `exhausted`, `busy n/n`); the row's
@@ -821,7 +822,7 @@ Every pass rebuilds the queue in dispatch order (priority class, the
 rightmost column, position), so when a run settles the next pass serves
 it front to back. `reason: config` means waiting will not help: the
 persona's pool holds no model of the class, a row's cost is above a cap,
-no slot of the profile serves it — fix `service.json` or the persona.
+no slot serves it — fix `service.json` or the persona.
 
 ### The three ledgers
 
@@ -1238,8 +1239,7 @@ window, the Crew tab and Pia's confirmed `startSession` card all call it):
   model); `permissionMode` the session's override over the vault's
   `permission-mode` (the 1:1's read-only rule does not apply); `ticketId`
   the marker `free`, `worktreePath` = `repoPath` = the folder, `gate:
-  'none'`, `ledger.noTicket`; `profile` the profile of the repository the
-  folder lies in (`repos.md`), else `private`. The brief
+  'none'`, `ledger.noTicket`. The brief
   (`fleet/free-session-brief.ts`, `specs/classifier-spec.md` "The free
   session brief"): who the persona is, the folder, what the mode allows,
   and — in the tickets vault — that its ticket files are the board's.
@@ -1424,7 +1424,7 @@ GitHub Copilot, a code entered in the browser) and stores the token in
 `<XDG_DATA_HOME>/opencode/auth.json`; it reads no existing gh or Copilot CLI
 login (no `hosts.json` / `apps.json`, no `GH_TOKEN` / `COPILOT_GITHUB_TOKEN`).
 After that one step every `opencode acp` start uses the stored token without
-asking. A work-profile slot of its own needs its own opencode data home —
+asking. A Copilot slot of its own needs its own opencode data home —
 roadmap req-211.
 
 What the removed `opencode serve` adapter had and ACP does not carry:

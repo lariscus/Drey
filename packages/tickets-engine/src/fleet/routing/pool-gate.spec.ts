@@ -5,6 +5,7 @@ import { ClaudeCodeQuotaSource } from './claude-code-quota-source';
 import { CountingQuotaSource } from './counting-quota-source';
 import { MemoryFileSystem } from '../ports/memory-file-system.fake';
 import { FakeClock, FakeQuotaSource, grantOf, slot, window } from './routing.fake';
+import { parseServiceSlots } from './slot-config';
 import type { Slot } from './slot';
 import { CapacityCap } from './capacity-cap';
 import { Ledgers } from './ledgers';
@@ -46,11 +47,10 @@ const prefer = (id: string): { prefer: string; persona: null } => ({ prefer: id,
 const request = (over: Partial<RunRequest> = {}): RunRequest => ({ ticketId: 'T-0001', provider: 'claude-code', ...over }) as RunRequest;
 const claudeA = slot({ id: 'claude-a', label: 'Claude A', sessions: 1, login: { claudeConfigDir: '/c/a' } });
 const claudeB = slot({ id: 'claude-b', label: 'Claude B', sessions: 1, login: { claudeConfigDir: '/c/b' } });
-const claudeWork = slot({ id: 'claude-w', label: 'Claude Work', profile: 'work' });
 
-describe('PoolGate — the profile rule and the free slot (req-177 under the pool)', () => {
-  it('binds the first free slot of the provider and profile, reserves it and tells the change', async () => {
-    const { registry, gate, reservations, changes } = parts([claudeA, claudeB, claudeWork]);
+describe('PoolGate — the free slot (req-177 under the pool)', () => {
+  it('binds the first free slot of the provider, reserves it and tells the change', async () => {
+    const { registry, gate, reservations, changes } = parts([claudeA, claudeB]);
     await registry.load();
     expect(gate.bind(request(), 'R-1', NOBODY)).toMatchObject({ id: 'claude-a', label: 'Claude A' });
     expect(reservations.busy('claude-a')).toBe(1);
@@ -61,15 +61,12 @@ describe('PoolGate — the profile rule and the free slot (req-177 under the poo
     expect(gate.bind(request(), 'R-3', NOBODY)).toMatchObject({ id: 'claude-a', label: 'Claude A' });
   });
 
-  it('a work repository runs only on a work slot, and a private one never on it — not even as a fallback', async () => {
-    const { registry, gate } = parts([claudeA, claudeWork]);
+  it('req-290: a slot whose service.json entry still carries an old profile key serves any start (the key is ignored)', async () => {
+    const parsed = parseServiceSlots({ slots: [{ id: 'claude-w', label: 'Claude Work', provider: 'claude-code', profile: 'work' }] });
+    expect(parsed.errors).toEqual([]);
+    const { registry, gate } = parts(parsed.slots.filter((s) => !s.implied));
     await registry.load();
-    expect(gate.bind(request({ profile: 'work' }), 'R-1', NOBODY)).toMatchObject({ id: 'claude-w', label: 'Claude Work' });
-    const onlyPrivate = parts([claudeA]);
-    await onlyPrivate.registry.load();
-    expect(onlyPrivate.gate.bind(request({ profile: 'work' }), 'R-2', NOBODY)).toEqual({
-      refused: 'no work slot serves claude-code: the repository is work and never runs on a private slot — add a work slot for claude-code to service.json',
-    });
+    expect(gate.bind(request(), 'R-1', NOBODY)).toMatchObject({ id: 'claude-w', label: 'Claude Work' });
   });
 
   it('prefers the slot the resumed session lives on while it is free', async () => {
@@ -89,10 +86,10 @@ describe('PoolGate — the profile rule and the free slot (req-177 under the poo
   });
 
   it("hands the worker its account's environment", async () => {
-    const { registry, gate } = parts([claudeA, claudeWork]);
+    const { registry, gate } = parts([claudeA, claudeB]);
     await registry.load();
     expect(gate.envOf('claude-a')).toEqual({ CLAUDE_CONFIG_DIR: '/c/a' });
-    expect(gate.envOf('claude-w')).toBeUndefined();
+    expect(gate.envOf('claude-b')).toEqual({ CLAUDE_CONFIG_DIR: '/c/b' });
     expect(gate.envOf('gone')).toBeUndefined();
   });
 });

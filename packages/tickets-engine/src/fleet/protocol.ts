@@ -15,7 +15,6 @@ import type { HandoverMode } from './protocol-fleet-config';
 import type { CapabilityClass, PoolGrantRecord, RunLedgerInput } from './protocol-pool';
 import type { RouteRecord } from './protocol-routing';
 import type { ModelNeeds } from '../contracts/ticket-pool-meta';
-import type { SlotProfile } from './protocol-slots';
 import type { ShapedQuestion } from '../contracts/question-shape';
 import type { TicketForm } from '../contracts/tickets';
 import type { SessionKind, SessionSpec } from './protocol-session';
@@ -30,8 +29,7 @@ export type { CapabilityClass, CapacityConfig, ClassRequest, FullLedger, LedgerD
 export { DEFAULT_ROUTING, INPUT_MODALITIES } from './protocol-routing';
 export type { BurnRateBasis, BurnRateReading, BurnRateSlotReading, CapabilityImportReport, FilteredSlot, InputModality, ModelCapabilities, RouteRecord, RouteStepUp, RoutingSettings } from './protocol-routing';
 export type { ModelNeeds } from '../contracts/ticket-pool-meta';
-export { SLOT_PROFILES } from './protocol-slots';
-export type { QuotaKind, QuotaReliability, QuotaWindow, SlotBilling, SlotProfile, SlotStateName, SlotSummary, SlotView } from './protocol-slots';
+export type { QuotaKind, QuotaReliability, QuotaWindow, SlotBilling, SlotStateName, SlotSummary, SlotView } from './protocol-slots';
 export type { AutopilotRecord, AutopilotReason, AutopilotRefusal, AutopilotState, BurnRateHold, ChainConfig, ChainHold, ChainMaster, ChainStatus, ChainStoreConfig, ChainTrip, ColumnMode } from './protocol-chain';
 export { DEFAULT_EARLY_STOP, DEFAULT_TRANCHE, normalizeTranche, tranchesOff, tranchesPerDay } from './protocol-tranche';
 export type { AnomalyRule, CheckpointReport, EarlyStop, EarlyStopConfig, RedTicket, TrancheConfig, TrancheEnd, TrancheStatus } from './protocol-tranche';
@@ -275,8 +273,6 @@ export interface RunRequest {
    * every older sender.
    */
   readonly dk?: RunDkTarget;
-  /** req-177: the repository's profile (`profile:` in `_meta/repos.md`); absent = `private`. A run is served only by a slot of this profile. */
-  readonly profile?: SlotProfile;
   /** req-170: the class the start asked the pool for (the dispatch's class request); absent = a pinned model decides by its own row. */
   readonly poolClass?: CapabilityClass;
   /** req-170: why that class — the plan part's size, the phase floor, the ticket pin; lands on the run record. */

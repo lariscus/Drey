@@ -158,6 +158,7 @@ const slotOf = (id: string, label: string, provider: string, profile: string, bi
   id,
   label,
   provider,
+  // req-290: the retired profile key still arrives from an older engine and is ignored by the page.
   profile,
   billing,
   quota,
@@ -315,7 +316,6 @@ test('board 7l: Settings → Tickets → Models', async ({ page, electronApp }) 
       groups: all('.tset-models-group').map(rel),
       th: all('.tset-models-table th').map(rel),
       rows: all('.tset-models-table tbody tr').map(rel),
-      chip: rel(q('.tset-models-chipwrap .tset-models-chip')),
       addModel: rel(q('.tset-models-addrow .tset-models-btn')),
       globalCap: rel(q('input[aria-label="Global cap"]')),
       perProvider: rel(q('.tset-models-perprovider')),

@@ -1,4 +1,3 @@
-import type { SlotProfile } from './protocol-slots';
 import type { WorkerProviderId } from './protocol';
 import type { CapabilityImportReport, ModelCapabilities, RouteRecord, RoutingSettings } from './protocol-routing';
 import type { ModelNeeds } from '../contracts/ticket-pool-meta';
@@ -177,7 +176,7 @@ export interface PoolEntry {
 /**
  * What a session asks the pool for before it starts (req-170, ADR-0095):
  * `{persona, class, context size}` plus what the pool needs to answer —
- * the models it may run, the repository's profile, the ledger inputs.
+ * the models it may run and the ledger inputs.
  */
 export interface ClassRequest {
   readonly ticket: string;
@@ -188,7 +187,6 @@ export interface ClassRequest {
   readonly pool: readonly PoolEntry[];
   /** The harness an entry without a provider runs on when the table does not hold it. */
   readonly provider: WorkerProviderId;
-  readonly profile: SlotProfile;
   /** The context the session expects to need; the filter takes no model with a smaller declared window (req-178). */
   readonly contextTokens: number | null;
   /** req-178: the capabilities its model must have (the phase's and the ticket's `needs:`); absent = none. */

@@ -1,5 +1,5 @@
 import type { FileSystem } from '../ports/file-system';
-import { slotAdded, slotRemoved, type SlotEdit } from './slot-edit';
+import { slotAdded, slotRemoved, withoutRetiredSlotKeys, type SlotEdit } from './slot-edit';
 
 export type WriteOutcome = { readonly ok: true } | { readonly ok: false; readonly error: string };
 /** A one-slot edit's outcome: `invalid` when the edit does not stand, else what the file said. */
@@ -46,9 +46,9 @@ export class ServiceConfigFile {
     }
   }
 
-  /** Replaces the `slots` key, every other key kept; refused while the file does not parse. */
+  /** Replaces the `slots` key, every other key kept; refused while the file does not parse. The retired `profile` key (req-290) is dropped. */
   writeSlots(slots: readonly unknown[]): Promise<WriteOutcome> {
-    return this.update((root) => ({ ...root, slots }));
+    return this.update((root) => ({ ...root, slots: slots.map(withoutRetiredSlotKeys) }));
   }
 
   /** D-69: appends one slot entry, every other entry kept as written. */

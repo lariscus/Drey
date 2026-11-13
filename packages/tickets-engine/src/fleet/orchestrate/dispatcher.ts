@@ -250,8 +250,7 @@ export class Dispatcher {
     if (this.classes === null || this.deps.pool === undefined || phase === null || persona === null) {
       return null;
     }
-    const repo = item.card.meta.repo === null ? null : (snap.repos.find((r) => r.name === item.card.meta.repo) ?? null);
-    const request = this.classes.build({ card: item.card, phase, persona, repo, prefer: this.lastSlotOf(item.card.id) });
+    const request = this.classes.build({ card: item.card, phase, persona, prefer: this.lastSlotOf(item.card.id) });
     const decision = this.deps.pool.classes.choose(request);
     return decision.kind === 'grant' ? { request, grant: { request, decision }, wait: null } : { request, grant: null, wait: decision };
   }

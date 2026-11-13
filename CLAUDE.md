@@ -586,8 +586,8 @@ extraction, ADR-0088):
   the supervisor's and the chain's parts with the one ticket writer
   `RunBookkeeper`, `harness/` the adapter contract, the Claude Code adapter (stream-json)
   and the one ACP adapter serving opencode, Kimi and Copilot CLI (req-182), `store/` the ticket store port, `routing/`
-  the slots per account with their quota windows and the profile rule
-  (req-177) and the capacity pool — model table, cap, class grant, the
+  the slots per account with their quota windows (req-177; the profile
+  rule retired by req-290) and the capacity pool — model table, cap, class grant, the
   three ledgers (req-170) — and the routing within the class: filter,
   surplus choice, step up, reserve per window (req-178), and the burn rate over all slots (req-181); configured in the service home's
   `service.json`, `config/` the one resolver of the three configuration

@@ -4754,10 +4754,10 @@ sequenceDiagram
     participant W as ProcessSupervisor + adapter
     participant H as EventHub
     participant L as SlotRunListener
-    D->>S: start(request with profile)
+    D->>S: start(request)
     S->>G: bind(request, runId, the resumed session's slot)
-    G->>R: views() — provider, profile, state, busy of total
-    alt a free slot of the profile
+    G->>R: views() — provider, state, busy of total
+    alt a free slot of the provider
         G-->>S: {id, label} (reserved)
         S->>W: spawn with the slot's env (CLAUDE_CONFIG_DIR)
         W-->>H: run record, stream lines (rateLimit, errors)
@@ -4766,15 +4766,15 @@ sequenceDiagram
         H-->>L: the run's terminal record
         L->>R: release, count the telemetry, refresh the slot's quota
         R-->>H: slot event (state, windows, q changed)
-    else none free, or none of the profile
+    else none free
         G-->>S: refused: the reason
         S-->>D: {ok: false, error} — nothing claimed, nothing spawned
     end
 ```
 
 The registry also reads the remote quotas on its own round (`quota.refreshMinutes`, z.ai and Kimi only for
-configured slots, at most once a minute per slot) and reloads `service.json` each time. A run never goes to a
-slot of the other profile; an expired login is a slot state, never a retry.
+configured slots, at most once a minute per slot) and reloads `service.json` each time. Every slot may serve
+every repository (req-290 retired the profile); an expired login is a slot state, never a retry.
 
 How a quota readout reaches the slot and the boards — from a run's own stream, or from the registry's round:
 
@@ -4829,7 +4829,7 @@ sequenceDiagram
         D->>Q: queued · waits: T-0122 has spent $2.61 of its $2.50 allowance
         D->>K: raise — one blocked: [ledger-ticket] comment (Needs-you), kept in chain.json
     else rows of exactly the class in the persona's pool
-        loop each row, each slot of the repository's profile (never a smaller class)
+        loop each row, each slot that serves it (never a smaller class)
             P->>C: slot not blocked, row sessions free, provider not throttled, slot cap + global cap, slot's day
         end
         alt a slot has room
@@ -4871,7 +4871,6 @@ sequenceDiagram
     participant E as CostEstimate
     P->>P: options = the pool's rows of exactly the class
     loop each option × each slot of its provider
-        P->>P: profile — another profile's slot → filtered ("work profile")
         P->>F: refusal(option, slot, request)
         F->>CF: the step's needs vs the row's input / tools / context / output
         F->>F: slot state, row sessions, provider throttle, caps, slot's day

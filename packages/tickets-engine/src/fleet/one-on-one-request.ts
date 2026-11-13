@@ -77,7 +77,6 @@ export class OneOnOneRequestBuilder {
       claimIdentity: null,
       origin: input.origin,
       column: null,
-      profile: 'private',
       ...(poolClass !== null ? { poolClass } : {}),
       poolWhy: `1:1 with ${persona.id}: ${harness.model ?? `${harness.provider}'s default`}`,
       ledger: { allowance: null, personaBudget: persona.budget, spendAboveAllowance: false, noTicket: true },

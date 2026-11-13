@@ -17,7 +17,6 @@ export function slotSummaryOf(view: SlotView): SlotSummary {
   return {
     id: view.id,
     label: view.label,
-    profile: view.profile,
     state: view.state,
     busy: view.busy,
     total: view.total,

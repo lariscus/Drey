@@ -28,8 +28,6 @@ interface RepoDraft {
   launch: string;
   instructions: string;
   link: string; // comma-separated folder names
-  /** req-177: the slot profile, kept as the file has it — no field of its own on this page (yet). */
-  profile?: RepoRef['profile'];
 }
 
 function draftOf(repo: RepoRef): RepoDraft {
@@ -44,7 +42,6 @@ function draftOf(repo: RepoRef): RepoDraft {
     launch: repo.launch ?? '',
     instructions: repo.instructions ?? '',
     link: (repo.link ?? []).join(', '),
-    ...(repo.profile !== undefined ? { profile: repo.profile } : {}),
   };
 }
 
@@ -68,7 +65,6 @@ function refOf(draft: RepoDraft): RepoRef {
     launch: one(draft.launch),
     instructions: one(draft.instructions),
     ...(links.length > 0 ? { link: links } : {}),
-    ...(draft.profile !== undefined ? { profile: draft.profile } : {}),
   };
 }
 
@@ -122,7 +118,7 @@ export function createReposSection(api: DreyPluginApi, reload: () => Promise<voi
     advanced.append(el('summary', undefined, 'Advanced'));
     const field = (
       label: string,
-      key: Exclude<keyof RepoDraft, 'profile'>,
+      key: keyof RepoDraft,
       hint?: string,
       fallback?: string,
       into: HTMLElement = form,
@@ -149,7 +145,7 @@ export function createReposSection(api: DreyPluginApi, reload: () => Promise<voi
     field('Local path', 'path', 'The local checkout the fleet opens and tests in.');
     field('Worker', 'worker', 'This repo\'s default fleet worker.', 'the board\'s default worker');
     // Rarely needed: kept out of the way, their defaults shown when empty.
-    const rare = (label: string, key: Exclude<keyof RepoDraft, 'profile'>, hint: string, fallback?: string): void =>
+    const rare = (label: string, key: keyof RepoDraft, hint: string, fallback?: string): void =>
       field(label, key, hint, fallback, advanced);
     rare('Policy', 'policy', 'Branch protection a push must respect, as a note for the worker (not enforced by the app).');
     rare('Worktrees base', 'worktrees', 'Where the fleet\'s checkouts live.', 'the tickets repo\'s _worktrees');

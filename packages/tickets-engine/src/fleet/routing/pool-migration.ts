@@ -16,7 +16,7 @@ type Entry = Record<string, unknown>;
 /** A slot entry as `service.json` stores the implied slot of a provider. */
 function impliedEntry(provider: WorkerProviderId, sessions: number): Entry {
   const slot = impliedSlot(provider);
-  return { id: slot.id, label: slot.label, provider, profile: 'private', quota: slot.quota, sessions };
+  return { id: slot.id, label: slot.label, provider, quota: slot.quota, sessions };
 }
 
 /** The `slots` with every provider's sessions set: a slot that names none takes its provider's old pool size. */

@@ -3,9 +3,11 @@
  * The slot names the harness login it maps to — it never holds a key: a
  * Claude account is a `CLAUDE_CONFIG_DIR`, z.ai is an entry of opencode's
  * `auth.json`, Kimi is the CLI's credentials file. The runner reads the
- * secret from there when it fetches a quota, and forgets it.
+ * secret from there when it fetches a quota, and forgets it. Req-290
+ * retired the profile a slot once carried: every slot may serve every
+ * repository.
  */
-import type { QuotaKind, SlotBilling, SlotProfile, WorkerProviderId } from '../protocol';
+import type { QuotaKind, SlotBilling, WorkerProviderId } from '../protocol';
 
 /** The harness login a slot maps to; every field is a reference, never a secret. */
 export interface SlotLogin {
@@ -34,7 +36,6 @@ export interface Slot {
   readonly id: string;
   readonly label: string;
   readonly provider: WorkerProviderId;
-  readonly profile: SlotProfile;
   readonly billing: SlotBilling | null;
   /** Concurrent sessions the account serves; null = the provider's pool decides alone. */
   readonly sessions: number | null;

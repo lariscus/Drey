@@ -504,8 +504,16 @@ Open a ticket that is still an idea (a phase before the first automatic
 one) from the Files panel or the Tickets panel: the ticket is its Markdown
 file, and the **Mission Control** target shows that ticket's conversation
 with a chip *T-0130.md attached* above the composer. Write what you want;
-Mission Control relays it to Paul, the planner, who reads the ticket's
-repository and rewrites **only the `## Plan` chapter** of the open file.
+Mission Control relays it to the persona that holds the ticket's *Shape* step
+(Paul on a board that kept the standard flow), who reads the ticket's
+repository and rewrites **only the `## Plan` chapter** of the open file. Who
+speaks is not fixed: it is the persona of the step marked *Shape* in the
+ticket's chain, speaking with its own instructions (`prompt.md`) — rename Paul to
+Paula, edit what Paul is told, or give the step to Ralf in the ticket's Flow
+tab, and the next message is answered by that persona. When a plan names who
+builds a part, it picks from the crew as the Crew tab lists it now. The
+persona answers here with the assistant's LLM settings, not with its own
+model. Below, "Paul" stands for whoever holds that step.
 
 - Your own text in the document is saved before each message goes out, so
   Paul reads what you wrote. While he works the document is locked; his
@@ -1077,8 +1085,11 @@ who takes it (any persona of the crew), *Tell me when it is done*, *Earlier* /
 *Later*, *Add a persona after* and *Remove gate*. The round **+** between two
 steps adds a persona there. A step drawn with a dashed outline is a change you
 have not saved. Type into *Ask Paul to change this flow* (or leave it empty)
-and press *Ask Paul* to get his draft with the reason, *Undo draft* if you do
-not like it. Nothing is written until **Save flow**; *Reset to standard flow*
+and press *Ask Paul* to get a draft with the reason, *Undo draft* if you do
+not like it. The draft is written by the persona of the ticket's planning step
+(the first step whose persona hands over a plan), else the one that holds
+*Shape*, speaking with its own instructions; a chain with neither gets the
+answer *No persona is assigned to plan T-…* and nothing is drafted. Nothing is written until **Save flow**; *Reset to standard flow*
 puts the standard flow back behind the steps that have begun. The current step
 and the ones before it cannot change, and the whole flow is read-only while a
 run is live on the ticket.
@@ -1645,19 +1656,18 @@ that serves it (or the runner, when it runs on any account of that
 runner), a free *category* word, its class, its cost factor and the sessions
 it may run at once on one account; click a cell to change it, **Add model…**
 starts a new row (Enter saves, Esc drops it), the cross at the row's end
-removes it. A row that only runs on work accounts is dimmed and carries a
-*Work* chip. **Capacity:** the *Global cap* in cost factors, a read-only
+removes it. **Capacity:** the *Global cap* in cost factors, a read-only
 list of each account's cap (the largest of its rows times its sessions, unless
 `service.json` sets one), and a live line (*Now: 2.4 of 6 · Claude A 2 of 5*)
-of what the running sessions weigh. **Slots:** one card per account — its
-profile (*Private* or *Work*), what it costs, and one row per quota window
+of what the running sessions weigh. **Slots:** one card per account — what
+it costs, and one row per quota window
 (*5 h*, *7 d*, *month*) with a bar for the share left (peach once it is
 below the share kept in reserve), when the window resets (a time today, a
 weekday and time within the week, else the date), and whether the reading is *measured*, *estimated* or *unknown*;
 `q` on the right says whether the account has surplus to let a lighter
 class upgrade onto it (*upgrade allowed*) or only serves its own classes
 (*class B only*). **Add slot…** opens a row: type the account's name, pick
-its provider and profile, and Enter adds the slot (Esc drops the row). The
+its provider, and Enter adds the slot (Esc drops the row). The
 cross at a card's head removes the slot — an account you configured, or
 the stand-in account Drey assumes for a provider you never set up, which
 then gets no runs on this machine until you add a slot for it again. A slot

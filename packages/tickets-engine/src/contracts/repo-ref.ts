@@ -1,11 +1,9 @@
 /**
  * One work repository of `tickets/_meta/repos.md` (ADR-0075,
  * `specs/ticket-schema.md`). Split out of `tickets.ts` with req-177; that
- * file re-exports it.
+ * file re-exports it. Req-290 retired the `profile:` key a repository
+ * once carried: every slot may serve every repository.
  */
-
-/** The slot profile a repository runs under (req-177): a `work` repository never runs on a `private` slot, nor the other way round. */
-export type RepoProfile = 'private' | 'work';
 
 /** One work repo from `tickets/_meta/repos.md`. */
 export interface RepoRef {
@@ -39,9 +37,4 @@ export interface RepoRef {
   readonly instructions: string | null;
   /** Git-ignored folders a fleet worktree links from the checkout (`link:`, req-56); absent = none. */
   readonly link?: readonly string[];
-  /**
-   * The profile the repository runs under (`profile:`, req-177): served only
-   * by a slot of this profile, never by the other. Absent = `private`.
-   */
-  readonly profile?: RepoProfile;
 }

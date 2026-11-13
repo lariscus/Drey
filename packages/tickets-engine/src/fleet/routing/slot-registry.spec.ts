@@ -128,7 +128,7 @@ describe('SlotRegistry — the slots and what is known of them', () => {
     await registry.load();
     source.readings.set('claude-a', { kind: 'windows', windows: [window({ name: '5h', spanMs: 5 * 3_600_000, remaining: 0.78, resetsAt: inHours(2) }), window({ name: '7d', remaining: 0.62, resetsAt: inHours(84) })] });
     await registry.refresh();
-    expect(registry.summary()).toEqual([{ id: 'claude-a', label: 'Claude A', profile: 'private', state: 'ready', busy: 0, total: 2, remaining: 0.62, reliability: 'measured', q: 1.24, resetsAt: inHours(84) }]);
+    expect(registry.summary()).toEqual([{ id: 'claude-a', label: 'Claude A', state: 'ready', busy: 0, total: 2, remaining: 0.62, reliability: 'measured', q: 1.24, resetsAt: inHours(84) }]);
     expect(slotSummaryOf({ ...registry.view('claude-a')!, windows: [] })).toMatchObject({ remaining: null, reliability: 'unknown', resetsAt: null });
   });
 });

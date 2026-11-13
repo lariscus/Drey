@@ -1,14 +1,14 @@
 // i18n: catalog
 /**
  * Settings → Models' slot edits (D-69): `Add slot…` draws a row — name,
- * provider, profile — that Enter adds and Escape drops; every slot card
+ * provider — that Enter adds and Escape drops; every slot card
  * carries a remove control. One slot travels per write (`slotAdd` /
  * `slotRemove`); the engine keeps every other entry of `service.json` as it
  * is written, and refuses a slot a model row still names. A refusal shows
  * under the slots. The page's full redesign is a design round of its own.
  */
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
-import type { SlotProfile, SlotView, WorkerProviderId } from '../../../../packages/tickets-engine/src/fleet/protocol';
+import type { SlotView, WorkerProviderId } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { el } from '../settings-dom';
 import { RUNNER_LABEL } from '../settings-workers';
 
@@ -18,18 +18,17 @@ export interface SlotEntry {
   readonly id: string;
   readonly label: string;
   readonly provider: WorkerProviderId;
-  readonly profile: SlotProfile;
 }
 
 /** The entry a typed name makes: the name is the label, its id the name in lower case with `-` for anything an id may not hold; null when nothing is left. */
-export function slotEntryOf(name: string, provider: WorkerProviderId, profile: SlotProfile): SlotEntry | null {
+export function slotEntryOf(name: string, provider: WorkerProviderId): SlotEntry | null {
   const label = name.trim();
   const id = label
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/g, '-')
     .replace(/^[^a-z0-9]+|-+$/g, '')
     .slice(0, 48);
-  return id === '' ? null : { id, label, provider, profile };
+  return id === '' ? null : { id, label, provider };
 }
 
 export interface SlotEditor {
@@ -86,13 +85,8 @@ export function createSlotEditor(api: DreyPluginApi, onSlots: (slots: readonly S
     for (const id of Object.keys(RUNNER_LABEL) as WorkerProviderId[]) {
       provider.append(Object.assign(el('option', undefined, RUNNER_LABEL[id]), { value: id }));
     }
-    const profile = el('select', 'tset-models-cellfield');
-    profile.setAttribute('aria-label', t('tickets.settings.models.slot.profile'));
-    for (const id of ['private', 'work'] as const) {
-      profile.append(Object.assign(el('option', undefined, t(`tickets.settings.models.profile.${id}`)), { value: id }));
-    }
     const commit = async (): Promise<void> => {
-      const entry = slotEntryOf(name.value, provider.value as WorkerProviderId, profile.value as SlotProfile);
+      const entry = slotEntryOf(name.value, provider.value as WorkerProviderId);
       if (entry === null) {
         name.setAttribute('aria-invalid', 'true');
         return;
@@ -102,7 +96,7 @@ export function createSlotEditor(api: DreyPluginApi, onSlots: (slots: readonly S
         draftBox.replaceChildren();
       }
     };
-    for (const control of [name, provider, profile] as readonly HTMLElement[]) {
+    for (const control of [name, provider] as readonly HTMLElement[]) {
       control.addEventListener('keydown', (event: KeyboardEvent) => {
         if (event.key === 'Enter') {
           void commit();
@@ -113,7 +107,7 @@ export function createSlotEditor(api: DreyPluginApi, onSlots: (slots: readonly S
         }
       });
     }
-    row.append(name, provider, profile);
+    row.append(name, provider);
     return row;
   }
 

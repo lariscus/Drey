@@ -2,7 +2,7 @@ import { splitPoolEntry, type Persona } from '../core/persona';
 import { parseWorkerValue } from './assignment';
 import type { EffectiveCrew, SessionOverrides } from './config/layered-config-resolver';
 import { LayeredConfigResolver } from './config/layered-config-resolver';
-import type { CapabilityClass, RunRequest, SlotProfile, WorkerProviderId } from './protocol';
+import type { CapabilityClass, RunRequest, WorkerProviderId } from './protocol';
 import { FREE_SESSION_TICKET } from './protocol-session';
 
 /** What one free session's start is composed from. */
@@ -22,8 +22,6 @@ export interface FreeSessionInput {
   readonly overrides: SessionOverrides;
   /** The model table's class of a model on a provider; null when the table holds no row for it. */
   readonly classOf?: (provider: WorkerProviderId, model: string | null) => CapabilityClass | null;
-  /** The slot profile of the repository the directory lies in (`_meta/repos.md`); absent = `private`. */
-  readonly profile?: SlotProfile;
   readonly git?: string;
 }
 
@@ -87,7 +85,6 @@ export class FreeSessionRequestBuilder {
       claimIdentity: null,
       origin: input.origin,
       column: null,
-      profile: input.profile ?? 'private',
       ...(poolClass !== null ? { poolClass } : {}),
       poolWhy: `free session of ${persona.id}: ${session.model ?? `${provider}'s default`}`,
       ledger: { allowance: null, personaBudget: persona.budget, spendAboveAllowance: false, noTicket: true },

@@ -344,7 +344,7 @@ export function resolveCardWorker(
   return defaultWorker;
 }
 
-export type { RepoProfile, RepoRef } from './repo-ref';
+export type { RepoRef } from './repo-ref';
 export { DEFAULT_PRIORITY_CONFIG, TICKET_PRIORITIES, parsePriorityConfig, priorityClass, priorityWeight } from './ticket-priority';
 export type { PriorityConfig, TicketPriority } from './ticket-priority';
 

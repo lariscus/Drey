@@ -7,7 +7,7 @@ import { composeFreeSessionBrief } from '../fleet/free-session-brief';
 import { FreeSessionRequestBuilder } from '../fleet/free-session-request';
 import type { CapabilityClass, ModelsReply, RunInfo, RunRequest, WorkerProviderId } from '../fleet/protocol';
 import { isTicketRun } from '../fleet/protocol-session';
-import { normalizedPath, SessionDirectoryRule } from '../fleet/session/session-directory-rule';
+import { SessionDirectoryRule } from '../fleet/session/session-directory-rule';
 import type { CrewConfigService } from './crew-config-service';
 import type { EngineHost, EngineVault } from './host';
 
@@ -134,7 +134,7 @@ export class FreeSessionService {
 
   private async requestOf(at: { vault: EngineVault; persona: Persona; ask: FreeSessionAsk; origin: string; directory: string; ticketsVault: boolean }): Promise<{ ok: true; request: RunRequest } | { ok: false; error: string }> {
     const { vault, persona, ask } = at;
-    const [crew, classOf, repos] = await Promise.all([this.deps.crew.effective(vault), this.classLookup(), this.deps.board.listRepos().catch(() => ({ repos: [] as readonly RepoRef[] }))]);
+    const [crew, classOf] = await Promise.all([this.deps.crew.effective(vault), this.classLookup()]);
     const overrides = {
       ...(ask.permissionMode !== undefined ? { permissionMode: ask.permissionMode } : {}),
       ...(ask.model !== undefined ? { model: ask.model } : {}),
@@ -142,8 +142,7 @@ export class FreeSessionService {
     };
     const permissionMode = overrides.permissionMode ?? crew.permissionMode;
     const instruction = await this.brief(vault, persona, { directory: at.directory, permissionMode, ticketsVault: at.ticketsVault });
-    const repo = repos.repos.find((r) => r.path !== null && (normalizedPath(at.directory) + '/').startsWith(normalizedPath(r.path) + '/'));
-    return this.builder.build({ persona, ticketsVaultPath: vault.path, directory: at.directory, instruction, origin: at.origin, crew, overrides, classOf, ...(repo?.profile !== undefined ? { profile: repo.profile } : {}) });
+    return this.builder.build({ persona, ticketsVaultPath: vault.path, directory: at.directory, instruction, origin: at.origin, crew, overrides, classOf });
   }
 
   private async brief(vault: EngineVault, persona: Persona, where: { directory: string; permissionMode: RunRequest['permissionMode']; ticketsVault: boolean }): Promise<string> {

@@ -155,7 +155,7 @@ function slotSummaries(): Record<string, unknown>[] {
   } while (reset.getDay() !== 1);
   const resetsAt = reset.toISOString();
   const slot = (id: string, label: string, busy: number, total: number, extra: Record<string, unknown>): Record<string, unknown> => ({
-    id, label, profile: 'private', state: busy > 0 ? 'busy' : 'ready', busy, total, remaining: null, reliability: 'unknown', q: null, resetsAt: null, ...extra,
+    id, label, state: busy > 0 ? 'busy' : 'ready', busy, total, remaining: null, reliability: 'unknown', q: null, resetsAt: null, ...extra,
   });
   return [
     slot('claude-a', 'Claude A', 1, 2, { remaining: 0.62, reliability: 'measured', q: 1.4, resetsAt }),

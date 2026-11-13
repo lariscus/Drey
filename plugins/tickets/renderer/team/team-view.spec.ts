@@ -325,10 +325,10 @@ describe('the Capacity band: Slots row and queue row (board 7e)', () => {
       master: 'run',
       poolSize: { opencode: 2, 'claude-code': 3 },
       slots: [
-        { id: 'a', label: 'Claude A', profile: 'private', state: 'busy', busy: 1, total: 2, remaining: 0.62, reliability: 'measured', q: 1.4, resetsAt: monday },
-        { id: 'z', label: 'z.ai', profile: 'private', state: 'busy', busy: 1, total: 3, remaining: 0.7, reliability: 'estimated', q: 1.2, resetsAt: monday },
-        { id: 'k', label: 'Kimi', profile: 'private', state: 'ready', busy: 0, total: 2, remaining: null, reliability: 'unknown', q: null, resetsAt: null },
-        { id: 'l', label: 'Claude B', profile: 'private', state: 'needs-login', busy: 0, total: 1, remaining: 0.3, reliability: 'measured', q: 0.8, resetsAt: monday },
+        { id: 'a', label: 'Claude A', state: 'busy', busy: 1, total: 2, remaining: 0.62, reliability: 'measured', q: 1.4, resetsAt: monday },
+        { id: 'z', label: 'z.ai', state: 'busy', busy: 1, total: 3, remaining: 0.7, reliability: 'estimated', q: 1.2, resetsAt: monday },
+        { id: 'k', label: 'Kimi', state: 'ready', busy: 0, total: 2, remaining: null, reliability: 'unknown', q: null, resetsAt: null },
+        { id: 'l', label: 'Claude B', state: 'needs-login', busy: 0, total: 1, remaining: 0.3, reliability: 'measured', q: 0.8, resetsAt: monday },
       ],
     }) as unknown as ChainStatus;
   const queuedSnapshot = {

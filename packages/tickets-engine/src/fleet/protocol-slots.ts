@@ -3,14 +3,10 @@ import type { WorkerProviderId } from './protocol';
 // ---------------------------------------------------------------------------
 // Slots (req-177, ADR-0095 later change): a slot is an account a worker runs
 // on — `Claude A` and `Claude B` as two Claude Code logins, `z.ai`, `Kimi`,
-// at work `Copilot` — with a profile, a billing kind and its quota windows.
-// These are the wire shapes `GET /slots`, the `slot` event and the chain
-// status carry; the runner's `fleet/routing/` computes them.
-
-/** A repository is bound to one profile and never runs over the other. */
-export type SlotProfile = 'private' | 'work';
-
-export const SLOT_PROFILES: readonly SlotProfile[] = ['private', 'work'];
+// at work `Copilot` — with a billing kind and its quota windows. Req-290
+// retired the profile a slot once carried: every slot may serve every
+// repository. These are the wire shapes `GET /slots`, the `slot` event and
+// the chain status carry; the runner's `fleet/routing/` computes them.
 
 /** How far a window's numbers can be trusted: read from the provider, counted by the runner, or not known. */
 export type QuotaReliability = 'measured' | 'estimated' | 'unknown';
@@ -52,7 +48,6 @@ export interface SlotView {
   readonly id: string;
   readonly label: string;
   readonly provider: WorkerProviderId;
-  readonly profile: SlotProfile;
   readonly billing: SlotBilling | null;
   readonly quota: QuotaKind;
   readonly state: SlotStateName;
@@ -76,7 +71,6 @@ export interface SlotView {
 export interface SlotSummary {
   readonly id: string;
   readonly label: string;
-  readonly profile: SlotProfile;
   readonly state: SlotStateName;
   readonly busy: number;
   readonly total: number | null;

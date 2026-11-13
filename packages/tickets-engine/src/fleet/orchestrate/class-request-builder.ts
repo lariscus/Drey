@@ -1,4 +1,4 @@
-import type { PipelinePhase, RepoRef, TicketCard } from '../../contracts/tickets';
+import type { PipelinePhase, TicketCard } from '../../contracts/tickets';
 import { mergeNeeds } from '../../core/model-needs';
 import { splitPoolEntry, type Persona } from '../../core/persona';
 import { CAPABILITY_CLASSES, isWorkerProvider, PART_SIZE_CLASS, type CapabilityClass, type ClassRequest, type PoolEntry, type WorkerProviderId } from '../protocol';
@@ -13,7 +13,6 @@ export interface ClassRequestInput {
   readonly card: TicketCard;
   readonly phase: PipelinePhase;
   readonly persona: Persona;
-  readonly repo: RepoRef | null;
   /** req-178: the slot the ticket's last run lived on (its session can only continue there); null = none. */
   readonly prefer?: string | null;
 }
@@ -49,7 +48,6 @@ export class ClassRequestBuilder {
       ticket: card.id,
       persona: persona.id,
       provider,
-      profile: input.repo?.profile ?? 'private',
       contextTokens: null,
       ...(needs !== null ? { needs } : {}),
       ledger: { allowance: card.meta.allowance ?? null, personaBudget: persona.budget, spendAboveAllowance: persona.allowed.spendAboveAllowance },

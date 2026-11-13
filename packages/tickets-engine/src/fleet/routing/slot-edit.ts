@@ -14,6 +14,15 @@ export type SlotEdit = { readonly ok: true; readonly root: Record<string, unknow
 const entriesOf = (root: Root): readonly unknown[] => (Array.isArray(root['slots']) ? (root['slots'] as unknown[]) : []);
 const idOf = (entry: unknown): unknown => (entry !== null && typeof entry === 'object' ? (entry as Record<string, unknown>)['id'] : undefined);
 
+/** req-290: the retired `profile` key is read and silently ignored, and dropped again on every write. */
+export function withoutRetiredSlotKeys(entry: unknown): unknown {
+  if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
+    return entry;
+  }
+  const { profile: _dropped, ...rest } = entry as Record<string, unknown>;
+  return rest;
+}
+
 /** The root with `entry` appended to its slots; refused when the entry would not parse or its id is taken. */
 export function slotAdded(root: Root, entry: unknown): SlotEdit {
   const taken = new Set(parseServiceSlots(root).slots.filter((slot) => !slot.implied).map((slot) => slot.id));
@@ -22,7 +31,7 @@ export function slotAdded(root: Root, entry: unknown): SlotEdit {
     return { ok: false, error: slot };
   }
   const off = impliedOffOf(root).filter((provider) => provider !== slot.provider);
-  return { ok: true, root: { ...withOff(root, off), slots: [...entriesOf(root), entry] } };
+  return { ok: true, root: { ...withOff(root, off), slots: [...entriesOf(root), withoutRetiredSlotKeys(entry)] } };
 }
 
 /** The root without the slot `id`: a configured entry leaves the list, an implied slot's provider joins `impliedOff`. Refused while a model row names it. */

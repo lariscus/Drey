@@ -17,7 +17,6 @@ import {
 const slot = (patch: Partial<SlotSummary>): SlotSummary => ({
   id: 'a',
   label: 'Claude A',
-  profile: 'private',
   state: 'ready',
   busy: 0,
   total: 1,

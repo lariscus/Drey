@@ -109,20 +109,9 @@
   font-size: 12px !important;
 }
 
-.tset-models-work td {
-  color: var(--text-4);
-}
-
 .tset-models-table td:focus-visible {
   outline: 1px solid var(--field-border);
   outline-offset: -1px;
-}
-
-/* The chip keeps the row at 32 px through negative margins, as the board's does. */
-.tset-models-chipwrap {
-  display: inline-flex;
-  vertical-align: middle;
-  margin: -4px 0 -4px 6px;
 }
 
 .tset-models-chip {
@@ -239,10 +228,10 @@
   padding: 8px 0 0;
 }
 
-/* D-69: the new slot's row (name, provider, profile) above Add slot…; a card's remove control at its head's end. */
+/* D-69: the new slot's row (name, provider) above Add slot…; a card's remove control at its head's end. */
 .tset-models-slotdraft {
   display: grid;
-  grid-template-columns: minmax(0, 220px) minmax(0, 160px) minmax(0, 120px);
+  grid-template-columns: minmax(0, 220px) minmax(0, 160px);
   gap: 8px;
   padding-bottom: 8px;
 }
