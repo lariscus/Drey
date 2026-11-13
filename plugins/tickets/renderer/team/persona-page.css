@@ -266,6 +266,12 @@
   gap: 2px;
 }
 
+/* The tab row's trailing controls (the token figure, Preview full prompt) keep one line; the spacer gives way. */
+.persona-tabrow > :not(.persona-grow) {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .persona-tab {
   height: 28px;
   padding: 0 12px;

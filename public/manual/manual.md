@@ -1578,12 +1578,16 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   chain). The cards stand in the crew's order: drag a card onto another to
   move it, or focus one and press **Ctrl+Shift+PageUp** / **PageDown**, or
   right-click it (or press the context-menu key) for **Move left** /
-  **Move right** — the order is saved for every device. Click a card to open the persona's **1:1** (a conversation with
-  the persona, [The 1:1](#one-on-one); Ctrl+Enter sends), **Memory** (its memory lines with who wrote them —
-  pin the ones that must always ride along, remove any, a line to teach
-  it — and its journal of noteworthy runs, [Memory and journal](#memory-journal)) and **Setup** (worker,
-  model, pool, phases, cost; **Pause** or **Resume** the persona).
-  **Edit persona** on that head opens the persona's own page. On the left,
+  **Move right** — the order is saved for every device. **Click a card** (or
+  press **Enter** on it) to open the persona's own page. Its head names the
+  persona and its role, its state with today's cost (`running · $2.67 today`)
+  and a pause button (**Pause** or **Resume** the persona); its right column
+  has three tabs: **Instructions** (below), **Memory** (its memory lines with
+  who wrote them — pin the ones that must always ride along, remove any, a line
+  to teach it — and its journal of noteworthy runs, [Memory and
+  journal](#memory-journal); the tab carries the count) and **1:1** (a
+  conversation with the persona, [The 1:1](#one-on-one); Ctrl+Enter sends).
+  The tab stays where you left it while the page is open. On the left,
   **Profile** (the persona's picture — or its initials —, the name, the role and **the one
   line for the crew list** — the line under the name on the crew cards, in
   Mission Control too), **Work** (the harness; the models,
@@ -1626,7 +1630,8 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   line above the list says what was refused and why;
   **Proposals** shows a change the persona's journal or your 1:1 suggested to
   its instructions, with **Show diff**, **Dismiss** and **Apply**, and under it
-  the links to its **Memory**, its **Journal** and its **1:1**. At the top the
+  the links to its **Memory**, its **Journal** and its **1:1** (they switch the
+  page's tabs). At the top the
   page says `Saved · committed 2 days ago` (when the persona's folder was last
   committed), or `Changed · not saved`. **Save**
   writes everything you changed as one commit; new runs get it, running ones
