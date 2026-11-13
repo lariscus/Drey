@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { hostname } from 'node:os';
 import { createChatBridge } from '../services/chat-llm';
 import { ChatService } from '../services/chat-service';
+import { ChatVoices } from '../services/chat-voices';
 import { composePersonaSessions } from '../services/compose-persona-sessions';
 import { loadCrewPrompts } from '../services/crew-prompts';
 import { MissionEntryTurns } from '../services/mission-entry-turns';
@@ -59,6 +60,8 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
     sessions: parts.freeSessions, // req-173: Pia's startSession card
     shadows: new FilePlanShadowStore(path.join(opts.home, 'plan-shadow.json')),
     modelName: () => config.get<string>('chat.model'),
+    // req-272: Shape and Flow chat speak as the persona of the chain's entries, the crew read on every turn.
+    voices: new ChatVoices(board, host),
     actor: `chat@${hostname().toLowerCase()}`,
     log,
     onEvent: (file, event) => hub.emit('chat', { file, event }),

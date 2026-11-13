@@ -61,6 +61,7 @@ import {
   parseSessionFile,
 } from '../core/chat-session';
 import { TicketsGit } from '../core/tickets-git';
+import type { ChatVoiceSource } from './chat-voices';
 import type { EngineHost, EngineVault } from './host';
 
 /** The session files this service reads and writes — direct children only. */
@@ -152,6 +153,8 @@ export interface ChatServiceDeps {
   readonly shadows?: PlanShadowStore;
   /** E10-3: the model a shape turn runs on (the chat model), shown in the context line. */
   readonly modelName?: () => Promise<string | undefined>;
+  /** req-272: who speaks in a shape turn and a flow draft — the assigned persona's prompt and the crew; absent = the wrappers speak alone. */
+  readonly voices?: ChatVoiceSource;
   /** req-173: the free sessions Pia's startSession card starts once confirmed; absent = the card refuses. */
   readonly sessions?: {
     start(ask: { persona: string; directory: string; poolClass?: 'A' | 'B' | 'C' | null; firstLine?: string }, origin: string): Promise<{ ok: true; runId: string } | { ok: false; error: string }>;
@@ -403,6 +406,8 @@ export class ChatService implements ChatServicePort {
     try {
       const shape = ticket === null ? undefined : await this.shapeContext(ticket);
       const named = await this.namedTickets(text, history);
+      // req-272: a shape turn speaks as the persona of the chain's interactive entry, read now.
+      const voice = shape === undefined || this.deps.voices === undefined ? undefined : await this.deps.voices.shape(shape.ticket);
       const reply = await this.deps.bridge.runTurn({
         text,
         history,
@@ -412,6 +417,7 @@ export class ChatService implements ChatServicePort {
         ...(delta === null ? {} : { planDelta: planDeltaForModel(delta) }),
         ...(reference === undefined || reference.trim() === '' ? {} : { reference }),
         ...(shape === undefined ? {} : { shape }),
+        ...(voice === undefined ? {} : { voice }),
         ...(missionTicket === undefined ? {} : { missionTicket }),
         ...(signal === undefined ? {} : { signal }),
         emit: (event) => this.deps.onEvent(file, event),
@@ -634,26 +640,34 @@ export class ChatService implements ChatServicePort {
   }
 
   /**
-   * Paul drafts a flow (E10-5): one bridge turn under the flow prompt, the
-   * single setChain command read back as the proposed delta. No session
-   * file, no write — the draft lives on the owner's screen until "Save flow".
+   * A persona drafts a flow (E10-5, req-272): one bridge turn under the flow
+   * wrapper, opened by the `prompt.md` of the persona of the ticket's plan
+   * entry (else the shape persona), the single setChain command read back as
+   * the proposed chain. Without any such persona nothing is asked of a
+   * model: the answer says which persona to name. No session file, no
+   * write — the draft lives on the owner's screen until "Save flow".
    */
   async draftFlow(input: { readonly ticket: string; readonly context: string; readonly ask: string | null }): Promise<ChatFlowDraft> {
     const text = input.ask ?? 'Draft the flow for this ticket.';
+    const voice = this.deps.voices === undefined ? undefined : await this.deps.voices.flow(input.ticket);
+    if (voice === null) {
+      return { ok: false, error: `No persona is assigned to plan ${input.ticket}: give its chain an interactive entry (for example paul:shape) and ask again.` };
+    }
+    const who = voice?.speaker ?? 'The assigned persona';
     let reply: Awaited<ReturnType<ChatBridge['runTurn']>>;
     try {
-      reply = await this.deps.bridge.runTurn({ text, history: [], board: '', flow: { context: input.context }, emit: () => undefined });
+      reply = await this.deps.bridge.runTurn({ text, history: [], board: '', flow: { context: input.context }, ...(voice === undefined ? {} : { voice }), emit: () => undefined });
     } catch (error) {
-      return { ok: false, error: `Paul could not be reached (${error instanceof Error ? error.message : String(error)}).` };
+      return { ok: false, error: `${who} could not be reached (${error instanceof Error ? error.message : String(error)}).` };
     }
     if (reply.failure !== undefined) {
       return { ok: false, error: reply.failure.message };
     }
     const command = reply.commands.find((c) => c.kind === 'setChain');
     if (command === undefined || command.kind !== 'setChain') {
-      return { ok: false, error: reply.say.trim() === '' ? 'Paul did not propose a flow.' : reply.say.trim() };
+      return { ok: false, error: reply.say.trim() === '' ? `${who} did not propose a flow.` : reply.say.trim() };
     }
-    return { ok: true, chain: command.chain, reason: reply.say.trim() };
+    return { ok: true, chain: command.chain, reason: reply.say.trim(), ...(voice?.speaker == null ? {} : { author: voice.speaker }) };
   }
 
   /**

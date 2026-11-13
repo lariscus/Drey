@@ -113,6 +113,7 @@ export class ChatTurn {
         board: input.board,
         ...(input.shape === undefined ? {} : { shape: input.shape }),
         ...(input.flow === undefined ? {} : { flow: input.flow }),
+        ...(input.voice === undefined ? {} : { voice: input.voice }),
         ...(input.missionTicket === undefined ? {} : { ticket: input.missionTicket }),
         persona: await this.missionPersona(),
       },
@@ -126,8 +127,9 @@ export class ChatTurn {
 
   /**
    * req-269: Mission Control's persona prompt — a mission turn of the mission
-   * bridge only (a shape or flow turn speaks as Paul; a bridge with its own
-   * system prompt — the aggregator, a 1:1 — is not Mission Control).
+   * bridge only (a bridge with its own
+   * system prompt — the aggregator, a 1:1 — is not Mission Control). A shape
+   * or flow turn speaks as its own assigned persona (req-272, `input.voice`).
    */
   private async missionPersona(): Promise<string | null> {
     if (this.input.shape !== undefined || this.input.flow !== undefined || this.deps.systemPrompt !== undefined || this.deps.missionPersona === undefined) {

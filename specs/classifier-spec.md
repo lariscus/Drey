@@ -258,9 +258,29 @@ create as a `raw capture:` Log line (ticket-schema).
   the document. The Action context carries the current selection
   (`SELECTED SECTION`) next to the whole document.
 - **`SHAPE_SYSTEM_PROMPT`** (the file `packages/tickets-engine/prompts/crew/shape.md`,
-  loaded by `services/crew-prompts.ts`; E10-3) — Paul shapes one ticket with the
-  owner; the system message is the prompt plus `## Ticket <id>` and the
-  ticket text. The reply is one JSON object `{say, thought?, plan?,
+  loaded by `services/crew-prompts.ts`; E10-3; **re-cut by req-272 as a mode
+  wrapper, prompt version 3**) — the persona assigned to the ticket's
+  interactive entry shapes one ticket with the owner. The file no longer says
+  who speaks or who builds: it opens "The owner shapes one new ticket with you
+  in this chat", says this is a chat, not a run (no checkout, ticket file,
+  handover or Log line), and keeps the strict contract below. The **system
+  message is composed per turn** (`services/chat-system-prompt.ts`,
+  `services/chat-voices.ts`), blank-line separated:
+  1. the speaker's `prompt.md` (LF, version line and surrounding whitespace
+     dropped; read from the vault on every turn, never cached) — the speaker
+     is the persona of the `:shape` entry in the ticket's chain, else in the
+     standard flow (`core/chat-speaker.ts` `shapeSpeakerOf`; only an agent of
+     the crew speaks; a chain naming none, a deleted persona, a missing or
+     empty `prompt.md` leaves this part out and the wrapper opens the message);
+  2. this wrapper (with `{{plan-format}}` expanded);
+  3. `## Crew` — the roster for a part's `persona:`, one line per **agent**
+     of the crew in `crew.md`'s order, `- <id> (<title>): <its summary:, else
+     its role>` (`services/crew-roster.ts`; the human and Mission Control's
+     persona are not listed; omitted for an empty crew) — it replaces the old
+     hard-coded line "ben builds, ralf reviews, tessa tests, paul plans";
+  4. `## Ticket <id>` and the ticket text.
+  Mission Control's persona prompt (req-269) never rides a shape turn. The
+  reply is one JSON object `{say, thought?, plan?,
   question?, split?, read?}`; `plan` is the whole Plan chapter with
   `### Goal`, `### Architecture`, `### Parts`, `### Acceptance criteria`,
   `### Open questions`. A part carries indented `persona:`, **`size: S|M|L`**
@@ -271,8 +291,12 @@ create as a `raw capture:` Log line (ticket-schema).
   (`setPlan`) it becomes the ticket's `chain:` if it holds (`validateChain`).
 - **`FLOW_SYSTEM_PROMPT`** (the file `packages/tickets-engine/prompts/crew/flow.md`,
   loaded by `services/crew-prompts.ts`;
-  E10-5, re-cut by req-266) — Paul drafts one ticket's or one plan part's
-  chain. The system message is the prompt plus `## Flow` (`Standard flow:` —
+  E10-5, re-cut by req-266; **a mode wrapper since req-272, prompt version 3**)
+  — the assigned persona drafts one ticket's or one plan part's chain. The
+  wrapper opens "The owner asks you to draft the flow" and says this is a
+  chat, not a run (no file is written). The system message is the speaker's
+  `prompt.md` (read on every draft, as above) and a blank line, then the
+  wrapper, then `## Flow` (`Standard flow:` —
   pipeline.md's `flow:`; the chain now from the current position, one
   `<position>. <persona>[:mode]` line each with `(tell me)` / `(current,
   locked)`; `Saved chain:`; `Personas:` the crew as `- <id> (<title>)`, the
@@ -282,10 +306,18 @@ create as a `raw capture:` Log line (ticket-schema).
   ticket.". The reply is the mission envelope with exactly one
   `setChain` command (`{"kind":"setChain","id":…,"chain":[…]}`) — the whole
   persona list in the chain grammar, an empty list = the standard flow — and
-  a `say` that is his reason. Prompt version 2: the hard-coded roster line
-  ("paul plans, ben builds …") gave way to "pick personas from the crew
-  listed below". The desk validates it like any edit and shows it as a draft;
-  nothing is written.
+  a `say` that is the speaker's reason. Prompt version 2: the hard-coded
+  roster line ("paul plans, ben builds …") gave way to "pick personas from
+  the crew listed below". The speaker is the persona of the ticket's **plan
+  entry** — the first ordinary entry of its chain (else of the standard flow)
+  whose persona hands over a plan rather than code, i.e. its gate is
+  structural (`personaGate`: the record's `gate:`, else the planner role's
+  default) — else the shape persona (`core/chat-speaker.ts` `flowSpeakerOf`).
+  **With neither no model is called**: the answer is "No persona is assigned
+  to plan T-…: give its chain an interactive entry (for example paul:shape)
+  and ask again." The draft's author (the persona's title) rides the result,
+  so a refusal reads "Paula's draft does not hold: …". The desk validates
+  it like any edit and shows it as a draft; nothing is written.
 - **`MISSION_SYSTEM_PROMPT` and its context** (the file `packages/tickets-engine/prompts/crew/mission.md`
   via `services/crew-prompts.ts`; the context `chat-service.ts`,
   E5a; D-7a / milestone 165; req-173) — the seven intents (steer, create, promote, chain,
@@ -419,6 +451,11 @@ prompt is the instruction; the runner adds only what a run's mode needs:
   follows the persona's prompt after a blank line, so the interview-first
   protocol is not displaced (`fleet/request-instruction.ts` `runPrompt`); an
   ordinary run keeps the persona's prompt alone;
+- **the chat modes (req-272)** — the Shape chat and the flow draft are bridge
+  calls, not runs: the speaker's `prompt.md` followed by the mode's wrapper
+  (`prompts/crew/shape.md` / `flow.md`, see their entries below), composed
+  per turn from the chain's persona — the same order as the interactive
+  wrapper above (who speaks, then what the mode asks);
 - **closing round** — unchanged: the ask after a run with friction resumes
   the same session (`fleet/closing-round-prompt.ts`), whatever the persona;
 - **read-only** — a review's detached read-only checkout and session
