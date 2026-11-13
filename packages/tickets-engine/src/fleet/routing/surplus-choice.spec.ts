@@ -4,7 +4,7 @@ import type { RouteCandidate } from './route-candidate';
 import { SurplusChoice } from './surplus-choice';
 
 const view = (id: string, q: number | null, billing: SlotBilling | null = null): SlotView =>
-  ({ id, label: id, provider: 'claude-code', profile: 'private', billing, quota: 'counting', state: 'ready', busy: 0, total: null, windows: [], q, reason: null, lastFetch: null, lastFetchError: null, implied: false }) as SlotView;
+  ({ id, label: id, provider: 'claude-code', billing, quota: 'counting', state: 'ready', busy: 0, total: null, windows: [], q, reason: null, lastFetch: null, lastFetchError: null, implied: false }) as SlotView;
 const row = (model: string, cost: number): ModelRow => ({ model, slot: null, provider: 'claude-code', category: '', class: 'B', cost, sessions: 1 });
 const cand = (id: string, q: number | null, cost: number, order: number, billing: SlotBilling | null = null): RouteCandidate => ({
   row: row(`m-${id}`, cost),

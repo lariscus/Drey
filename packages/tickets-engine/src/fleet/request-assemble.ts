@@ -29,7 +29,7 @@ type WorkParts = Pick<
   'provider' | 'model' | 'permissionMode' | 'instruction' | 'continuationInstruction' | 'briefDigest' | 'acceptance' | 'gate' | 'git'
 >;
 type MoveParts = Pick<RunRequest, 'nextPhase' | 'nextPhaseDir' | 'pushRemote' | 'claimIdentity' | 'cursor'>;
-type OptionalParts = Pick<RunRequest, 'limits' | 'recordWorker' | 'column' | 'handover' | 'interactive' | 'dk' | 'parkFor' | 'leaving' | 'machine' | 'profile' | 'reviewCheckout' | 'closing'>;
+type OptionalParts = Pick<RunRequest, 'limits' | 'recordWorker' | 'column' | 'handover' | 'interactive' | 'dk' | 'parkFor' | 'leaving' | 'machine' | 'reviewCheckout' | 'closing'>;
 
 /** The wire request, its keys in the order the runner's log and record have always shown them. */
 export function assembleRunRequest(plan: RunPlan, worker: RunWorkerPin, instruction: ComposedInstruction): RunRequest {
@@ -99,7 +99,6 @@ function optionalParts(plan: RunPlan): OptionalParts {
     ...(input.dk !== undefined ? { dk: input.dk } : {}),
     ...(moves && input.parkFor ? { parkFor: input.parkFor } : {}),
     ...leavingParts(plan),
-    ...profileParts(input.repo),
     ...(plan.reviewCheckout !== null ? { reviewCheckout: plan.reviewCheckout } : {}),
     ...closingParts(input.closingSignals, input.gateFailure),
   };
@@ -124,11 +123,6 @@ function closingParts(signals: readonly ClosingSignal[] | undefined, gateFailure
     return {};
   }
   return { closing: { signals: signals ?? DEFAULT_CLOSING_SPEC.signals, retry: gateFailure !== null } };
-}
-
-/** req-177: the repository's slot profile, when `repos.md` sets one (absent reads as `private`). */
-function profileParts(repo: RepoRef | null): Pick<RunRequest, 'profile'> {
-  return repo !== null && repo.profile !== undefined ? { profile: repo.profile } : {};
 }
 
 const firstSet = (own: number | null | undefined, column: number | null | undefined): number | null => own ?? column ?? null;

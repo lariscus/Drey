@@ -2,11 +2,13 @@
  * `tickets/_meta/repos.md` (ADR-0075, `specs/ticket-schema.md`): the work
  * repositories a ticket's `repos:` field may name — read into `RepoRef`s
  * and written back from them with the owner's prose kept. Split out of
- * `ticket-board.ts` with req-177, which added the `profile:` key.
+ * `ticket-board.ts` with req-177. Req-290 retired the `profile:` key
+ * req-177 had added: an old file's `profile` is read and silently
+ * ignored, and no write emits it again.
  */
 import { parseDocument, stringify } from 'yaml';
 import { splitFrontmatter } from '../../../../shared/frontmatter';
-import type { RepoProfile, RepoRef } from '../contracts/repo-ref';
+import type { RepoRef } from '../contracts/repo-ref';
 
 export interface ReposParse {
   readonly repos: readonly RepoRef[];
@@ -71,14 +73,6 @@ function instructionsOf(name: string, raw: unknown, warnings: string[]): string 
   return null;
 }
 
-/** `profile:` (req-177) — `private` or `work`; absent (null) reads as `private`; undefined = refused. */
-function profileOf(raw: unknown): RepoProfile | null | undefined {
-  if (raw === undefined || raw === null) {
-    return null;
-  }
-  return raw === 'private' || raw === 'work' ? raw : undefined;
-}
-
 /** One entry as a `RepoRef`, or the error the whole file fails on. */
 function repoOf(name: string, raw: unknown, warnings: string[]): RepoRef | string {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
@@ -92,12 +86,8 @@ function repoOf(name: string, raw: unknown, warnings: string[]): RepoRef | strin
   const launch = launchOf(name, map['launch'], warnings);
   const instructions = instructionsOf(name, map['instructions'], warnings);
   const links = parseRepoLinks(map['link']);
-  const profile = profileOf(map['profile']);
   if (typeof links === 'string') {
     return `repos.md: repo "${name}" ${links}`;
-  }
-  if (profile === undefined) {
-    return `repos.md: repo "${name}" profile must be private or work`;
   }
   return {
     name,
@@ -110,7 +100,6 @@ function repoOf(name: string, raw: unknown, warnings: string[]): RepoRef | strin
     launch,
     instructions,
     ...(links.length > 0 ? { link: links } : {}),
-    ...(profile !== null ? { profile } : {}),
   };
 }
 
@@ -171,9 +160,6 @@ function entryOf(repo: RepoRef): Entry {
   }
   if (repo.link !== undefined && repo.link.length > 0) {
     entry['link'] = [...repo.link];
-  }
-  if (repo.profile !== undefined) {
-    entry['profile'] = repo.profile;
   }
   return entry;
 }

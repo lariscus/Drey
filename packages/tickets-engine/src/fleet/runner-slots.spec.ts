@@ -51,11 +51,11 @@ describe('the runner serves the slots (req-177)', () => {
     expect(JSON.parse(await fsp.readFile(path.join(tmp, 'service.json'), 'utf8'))).toEqual({ slots: [] });
     const { status, body } = await call('GET', '/slots');
     expect(status).toBe(200);
-    expect((body['slots'] as SlotView[]).map((s) => [s.id, s.profile, s.implied])).toEqual([
-      ['opencode', 'private', true],
-      ['claude-code', 'private', true],
-      ['kimi', 'private', true],
-      ['copilot', 'private', true],
+    expect((body['slots'] as SlotView[]).map((s) => [s.id, s.implied])).toEqual([
+      ['opencode', true],
+      ['claude-code', true],
+      ['kimi', true],
+      ['copilot', true],
     ]);
     expect(body['configPath']).toBe(path.join(tmp, 'service.json'));
     expect(http.calls).toEqual([]);
@@ -89,6 +89,8 @@ describe('the runner serves the slots (req-177)', () => {
     expect(added.status).toBe(200);
     expect((added.body['slots'] as SlotView[]).map((s) => s.id)).toEqual(['claude-a', 'kimi-work', 'opencode', 'copilot']);
     expect((await call('POST', '/slots/add', { slot: { id: 'claude-a', provider: 'claude-code' } })).status).toBe(422);
+    // req-290: the added entry drops the retired profile key on write.
+    expect(JSON.parse(await fsp.readFile(path.join(tmp, 'service.json'), 'utf8')).slots).toEqual([kept, { id: 'kimi-work', provider: 'kimi' }]);
     // An implied slot: its provider leaves the machine's slots.
     const removed = await call('POST', '/slots/remove', { id: 'copilot' });
     expect(removed.status).toBe(200);

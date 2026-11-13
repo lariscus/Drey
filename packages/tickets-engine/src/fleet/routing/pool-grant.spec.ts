@@ -62,7 +62,6 @@ const ask = (over: Partial<ClassRequest> = {}): ClassRequest => ({
   class: 'B',
   pool: [{ provider: null, model: 'opus' }, { provider: null, model: 'sonnet' }, { provider: null, model: 'glm' }, { provider: null, model: 'kimi-k2' }],
   provider: 'claude-code',
-  profile: 'private',
   contextTokens: null,
   ledger: { allowance: null, personaBudget: null, spendAboveAllowance: false },
   prefer: null,

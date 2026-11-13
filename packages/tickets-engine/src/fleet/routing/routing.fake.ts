@@ -60,7 +60,7 @@ export function fixture(name: string): unknown {
 }
 
 export function slot(over: Partial<Slot> & Pick<Slot, 'id'>): Slot {
-  return { label: over.id, provider: 'claude-code', profile: 'private', billing: null, sessions: null, login: {}, quota: 'counting', limits: [], implied: false, ...over };
+  return { label: over.id, provider: 'claude-code', billing: null, sessions: null, login: {}, quota: 'counting', limits: [], implied: false, ...over };
 }
 
 export function window(over: Partial<QuotaWindow> = {}): QuotaWindow {

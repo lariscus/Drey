@@ -7,10 +7,10 @@ import { DEFAULT_REFRESH_MS, parseServiceSlots } from './slot-config';
 /** The owner's machine as board 7l draws it. */
 const SAMPLE = {
   slots: [
-    { id: 'claude-a', label: 'Claude A', provider: 'claude-code', profile: 'private', sessions: 2, billing: { kind: 'subscription', pricePerMonth: 90, currency: 'EUR' }, login: { claudeConfigDir: 'C:/Users/o/.claude-a' } },
+    { id: 'claude-a', label: 'Claude A', provider: 'claude-code', sessions: 2, billing: { kind: 'subscription', pricePerMonth: 90, currency: 'EUR' }, login: { claudeConfigDir: 'C:/Users/o/.claude-a' } },
     { id: 'claude-b', label: 'Claude B', provider: 'claude-code', billing: { kind: 'subscription', pricePerMonth: 90 }, login: { claudeConfigDir: 'C:/Users/o/.claude-b' } },
     { id: 'zai', label: 'z.ai', provider: 'opencode', login: { opencodeAuthEntry: 'zai-coding-plan' } },
-    { id: 'copilot', label: 'Copilot', provider: 'opencode', profile: 'work', billing: { kind: 'credits', pricePerCredit: 0.04 }, limits: [{ window: 'month', budget: 1000, unit: 'runs' }] },
+    { id: 'copilot', label: 'Copilot', provider: 'opencode', billing: { kind: 'credits', pricePerCredit: 0.04 }, limits: [{ window: 'month', budget: 1000, unit: 'runs' }] },
   ],
   quota: { refreshMinutes: 5 },
   models: [{ id: 'kept by req-170' }],
@@ -21,26 +21,35 @@ describe('parseServiceSlots — the slots of service.json', () => {
     const parsed = parseServiceSlots(SAMPLE);
     expect(parsed.errors).toEqual([]);
     expect(parsed.refreshMs).toBe(5 * 60_000);
-    expect(parsed.slots.map((s) => [s.id, s.provider, s.profile, s.quota, s.implied])).toEqual([
-      ['claude-a', 'claude-code', 'private', 'claude-code', false],
-      ['claude-b', 'claude-code', 'private', 'claude-code', false],
-      ['zai', 'opencode', 'private', 'zai', false],
-      ['copilot', 'opencode', 'work', 'counting', false],
-      ['kimi', 'kimi', 'private', 'counting', true],
-      ['copilot-default', 'copilot', 'private', 'counting', true],
+    expect(parsed.slots.map((s) => [s.id, s.provider, s.quota, s.implied])).toEqual([
+      ['claude-a', 'claude-code', 'claude-code', false],
+      ['claude-b', 'claude-code', 'claude-code', false],
+      ['zai', 'opencode', 'zai', false],
+      ['copilot', 'opencode', 'counting', false],
+      ['kimi', 'kimi', 'counting', true],
+      ['copilot-default', 'copilot', 'counting', true],
     ]);
     expect(parsed.slots[0]).toMatchObject({ label: 'Claude A', sessions: 2, billing: { kind: 'subscription', pricePerMonth: 90, currency: 'EUR' } });
     expect(parsed.slots[3]).toMatchObject({ billing: { kind: 'credits', pricePerCredit: 0.04 }, limits: [{ window: 'month', budget: 1000, unit: 'runs' }] });
   });
 
-  it('a machine without slots runs every provider on an implied private slot that makes no network call', () => {
+  it('req-290: an old profile key loads whatever it says and is silently ignored', () => {
+    for (const profile of ['private', 'work', 'home']) {
+      const parsed = parseServiceSlots({ slots: [{ id: 'claude-a', provider: 'claude-code', profile }] });
+      expect(parsed.errors).toEqual([]);
+      expect(parsed.slots[0]).toMatchObject({ id: 'claude-a', provider: 'claude-code' });
+      expect('profile' in parsed.slots[0]!).toBe(false);
+    }
+  });
+
+  it('a machine without slots runs every provider on an implied slot that makes no network call', () => {
     const parsed = parseServiceSlots({});
     expect(parsed.refreshMs).toBe(DEFAULT_REFRESH_MS);
-    expect(parsed.slots.map((s) => [s.id, s.label, s.profile, s.quota, s.sessions])).toEqual([
-      ['opencode', 'OpenCode', 'private', 'counting', null],
-      ['claude-code', 'Claude Code', 'private', 'claude-code', null],
-      ['kimi', 'Kimi', 'private', 'counting', null],
-      ['copilot', 'Copilot CLI', 'private', 'counting', null],
+    expect(parsed.slots.map((s) => [s.id, s.label, s.quota, s.sessions])).toEqual([
+      ['opencode', 'OpenCode', 'counting', null],
+      ['claude-code', 'Claude Code', 'claude-code', null],
+      ['kimi', 'Kimi', 'counting', null],
+      ['copilot', 'Copilot CLI', 'counting', null],
     ]);
   });
 
@@ -50,9 +59,9 @@ describe('parseServiceSlots — the slots of service.json', () => {
   });
 
   it('leaves out a broken entry with its reason; the others stand', () => {
-    const parsed = parseServiceSlots({ slots: [{ id: 'a', provider: 'claude-code' }, { id: 'a', provider: 'kimi' }, { id: 'b', provider: 'gemini' }, { id: 'c', provider: 'kimi', profile: 'home' }, { provider: 'kimi' }] });
+    const parsed = parseServiceSlots({ slots: [{ id: 'a', provider: 'claude-code' }, { id: 'a', provider: 'kimi' }, { id: 'b', provider: 'gemini' }, { provider: 'kimi' }] });
     expect(parsed.slots.filter((s) => !s.implied).map((s) => s.id)).toEqual(['a']);
-    expect(parsed.errors).toHaveLength(4);
+    expect(parsed.errors).toHaveLength(3);
     expect(parsed.errors[0]).toBe('slot "a" is named twice');
   });
 
@@ -76,7 +85,7 @@ describe("slotEnv — the account a worker is spawned as", () => {
   });
 
   it('a second Copilot CLI account is its COPILOT_HOME, counted by the runner (req-182)', () => {
-    const copilot = parseServiceSlots({ slots: [{ id: 'cp-work', provider: 'copilot', profile: 'work', login: { copilotHome: 'C:/Users/o/.copilot-work' } }] }).slots[0]!;
+    const copilot = parseServiceSlots({ slots: [{ id: 'cp-work', provider: 'copilot', login: { copilotHome: 'C:/Users/o/.copilot-work' } }] }).slots[0]!;
     expect(slotEnv(copilot)).toEqual({ COPILOT_HOME: 'C:/Users/o/.copilot-work' });
     expect(copilot.quota).toBe('counting');
   });
@@ -104,6 +113,16 @@ describe('ServiceConfigFile — service.json in the service home', () => {
     expect(written.slots).toEqual([{ id: 'z', provider: 'kimi' }]);
     expect(written.models).toEqual(SAMPLE.models);
     expect(written.quota).toEqual(SAMPLE.quota);
+  });
+
+  it('req-290: a written slot list drops the retired profile key, and one added slot never carries it', async () => {
+    const fs = new MemoryFileSystem();
+    fs.files.set(PATH, JSON.stringify({ slots: [{ id: 'old', provider: 'claude-code', profile: 'work' }] }));
+    const file = new ServiceConfigFile(fs, PATH);
+    expect(await file.writeSlots([{ id: 'old', provider: 'claude-code', profile: 'work' }])).toEqual({ ok: true });
+    expect(JSON.parse(fs.files.get(PATH) as string).slots).toEqual([{ id: 'old', provider: 'claude-code' }]);
+    expect(await file.addSlot({ id: 'added', provider: 'kimi', profile: 'private' })).toMatchObject({ ok: true });
+    expect(JSON.parse(fs.files.get(PATH) as string).slots).toEqual([{ id: 'old', provider: 'claude-code' }, { id: 'added', provider: 'kimi' }]);
   });
 
   it('never overwrites a file that does not parse', async () => {

@@ -25,10 +25,9 @@ export interface BindContext {
 export interface SlotBinder {
   /**
    * Asks the pool for the request's model (of its class, when it names one)
-   * on a slot of its provider and profile — the preferred one when it is
+   * on a slot of its provider — the preferred one when it is
    * free — and reserves its weight, or says why none serves. A refusal is
-   * final for this start: never served by the other profile, never by a
-   * smaller class.
+   * final for this start: never served by a smaller class.
    */
   bind(request: RunRequest, runId: string, context: BindContext): SlotBinding | { readonly refused: string };
   /** The run is over (or never started): its slot is free again. */

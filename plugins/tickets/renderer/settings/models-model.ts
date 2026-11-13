@@ -33,8 +33,6 @@ export interface ModelRowView {
   readonly row: ModelRow;
   /** The provider column: the slot's name, else the runner's. */
   readonly provider: string;
-  /** True for a row that runs on work-profile slots only: dimmed, with the `Work` chip. */
-  readonly work: boolean;
   readonly cost: string;
   readonly sessions: string;
 }
@@ -46,18 +44,11 @@ export function providerLabelOf(row: ModelRow, slots: readonly SlotView[]): stri
   return RUNNER_LABEL[row.provider];
 }
 
-/** Whether a row runs on work slots only (its slot, or every slot of its provider). */
-export function isWorkRow(row: ModelRow, slots: readonly SlotView[]): boolean {
-  const served = slots.filter((slot) => (row.slot !== null ? slot.id === row.slot : slot.provider === row.provider));
-  return served.length > 0 && served.every((slot) => slot.profile === 'work');
-}
-
 export function modelRowsOf(reply: ModelsReply | null, slots: readonly SlotView[], i18n: I18n): readonly ModelRowView[] {
   return (reply?.models ?? []).map((row, index) => ({
     index,
     row,
     provider: providerLabelOf(row, slots),
-    work: isWorkRow(row, slots),
     cost: trimmedNumber(i18n, row.cost),
     sessions: i18n.formatNumber(row.sessions),
   }));
@@ -255,7 +246,6 @@ export interface WindowView {
 export interface SlotCardView {
   readonly id: string;
   readonly name: string;
-  readonly profile: string;
   readonly billing: string;
   readonly windows: readonly WindowView[];
   /** The one row of a slot whose quota nothing measures: its words and the `unknown` chip. */
@@ -358,7 +348,6 @@ export function slotCardsOf(slots: readonly SlotView[], pool: SlotCardPool, now:
     return {
       id: slot.id,
       name: slot.label,
-      profile: i18n.lookup(`tickets.settings.models.profile.${slot.profile}`),
       billing: billingWords(slot.billing, i18n),
       windows: measured ? slot.windows.map((window) => windowViewOf(window, now, i18n, pool.routing.reservePerWindow)) : [],
       unknownRow: measured ? null : i18n.t(slot.quota === 'counting' ? 'tickets.settings.models.slot.counted' : 'capacity.slot.quota_unknown'),

@@ -22,15 +22,14 @@ describe('FreeSessionRequestBuilder (req-173)', () => {
       repoPath: 'E:\\work',
       gate: 'none',
       poolClass: 'B',
-      profile: 'private',
       ledger: { allowance: null, personaBudget: 4, noTicket: true },
       session: { kind: 'free', persona: 'ben', workingDirectory: 'E:\\work' },
     });
   });
 
   it('the session record wins: permission, model pin and class over the vault and the persona', () => {
-    const built = builder.build({ ...base, profile: 'work', overrides: { permissionMode: 'read-only', model: 'opus', poolClass: 'A' }, classOf: () => 'C' });
-    expect(built.ok && built.request).toMatchObject({ permissionMode: 'read-only', model: 'opus', poolClass: 'A', profile: 'work' });
+    const built = builder.build({ ...base, overrides: { permissionMode: 'read-only', model: 'opus', poolClass: 'A' }, classOf: () => 'C' });
+    expect(built.ok && built.request).toMatchObject({ permissionMode: 'read-only', model: 'opus', poolClass: 'A' });
   });
 
   it('refuses a persona without a harness', () => {

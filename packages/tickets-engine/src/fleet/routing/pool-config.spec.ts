@@ -122,7 +122,7 @@ describe('PoolMigration — req-63 pool sizes into the slots, once', () => {
       slots: [
         { id: 'claude-a', provider: 'claude-code', sessions: 2 },
         { id: 'zai', provider: 'opencode', sessions: 3 },
-        { id: 'kimi', label: 'Kimi', provider: 'kimi', profile: 'private', quota: 'counting', sessions: 1 },
+        { id: 'kimi', label: 'Kimi', provider: 'kimi', quota: 'counting', sessions: 1 },
       ],
       migrations: [POOL_SIZE_MIGRATION],
     });

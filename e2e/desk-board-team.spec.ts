@@ -193,9 +193,9 @@ test.describe('Board, Team and Capacity (E13-8)', () => {
             poolSize: { opencode: 2, 'claude-code': 3 },
             // Board 7e's Slots row: the chain status carries one summary per slot (req-177).
             slots: [
-              { id: 'claude-a', label: 'Claude A', profile: 'private', state: 'busy', busy: 1, total: 2, remaining: 0.62, reliability: 'measured', q: 1.4, resetsAt: new Date(Date.now() + 3 * 86_400_000).toISOString() },
-              { id: 'zai', label: 'z.ai', profile: 'private', state: 'busy', busy: 1, total: 3, remaining: 0.7, reliability: 'estimated', q: 1.2, resetsAt: null },
-              { id: 'kimi', label: 'Kimi', profile: 'private', state: 'ready', busy: 0, total: 2, remaining: null, reliability: 'unknown', q: null, resetsAt: null },
+              { id: 'claude-a', label: 'Claude A', state: 'busy', busy: 1, total: 2, remaining: 0.62, reliability: 'measured', q: 1.4, resetsAt: new Date(Date.now() + 3 * 86_400_000).toISOString() },
+              { id: 'zai', label: 'z.ai', state: 'busy', busy: 1, total: 3, remaining: 0.7, reliability: 'estimated', q: 1.2, resetsAt: null },
+              { id: 'kimi', label: 'Kimi', state: 'ready', busy: 0, total: 2, remaining: null, reliability: 'unknown', q: null, resetsAt: null },
             ],
           },
         },

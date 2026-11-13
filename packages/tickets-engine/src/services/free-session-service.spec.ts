@@ -17,7 +17,7 @@ function world(crewText: string | null = null, personas: readonly Persona[] = [B
   const crew = new LayeredConfigResolver().crew(parseCrewFile(crewText).config);
   const models = { models: [{ provider: 'claude-code', model: 'sonnet', class: 'B' }] } as unknown as ModelsReply;
   const service = new FreeSessionService({
-    board: { detect: async () => VAULT, listPersonas: async () => personas, listRepos: async () => ({ repos: [{ name: 'drey', url: 'x', path: 'E:\\projects\\drey', profile: 'work' } as never] }) },
+    board: { detect: async () => VAULT, listPersonas: async () => personas, listRepos: async () => ({ repos: [{ name: 'drey', url: 'x', path: 'E:\\projects\\drey' } as never] }) },
     fleet: {
       runs: async () => runs,
       start: async (request) => (starts.push(request), { ok: true, run: { id: `R-${starts.length}` } as RunInfo }),
@@ -43,10 +43,11 @@ describe('FreeSessionService (req-173, R12)', () => {
     expect(w.sends).toEqual([['R-1', 'Tidy the inbox.']]);
   });
 
-  it('a session override wins over the vault; a repository folder takes its slot profile', async () => {
+  it('a session override wins over the vault, and the start carries no profile (req-290)', async () => {
     const w = world('---\npermission-mode: bypass\n---\n');
     await w.service.start({ persona: 'ben', directory: 'E:\\projects\\drey\\src', permissionMode: 'read-only', poolClass: 'A' }, 'drey:crew');
-    expect(w.starts[0]).toMatchObject({ permissionMode: 'read-only', poolClass: 'A', profile: 'work' });
+    expect(w.starts[0]).toMatchObject({ permissionMode: 'read-only', poolClass: 'A' });
+    expect('profile' in w.starts[0]!).toBe(false);
     expect(w.sends).toEqual([]);
   });
 

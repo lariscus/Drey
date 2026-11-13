@@ -2,11 +2,13 @@
  * The `slots` of `service.json` (req-177; machine scope, ADR-0092 R13) as
  * slots. Every entry is checked on its own: a broken one is left out with
  * its reason, the others stand. A provider no entry names gets one implied
- * `private` slot on its default login, so a machine without a `slots` key
+ * slot on its default login, so a machine without a `slots` key
  * runs as before — unless `impliedOff` names the provider (D-69: the owner
- * removed that stand-in, so the provider has no slot here).
+ * removed that stand-in, so the provider has no slot here). Req-290
+ * retired the `profile` key a slot once carried: it is read and silently
+ * ignored, whatever it says.
  */
-import { isWorkerProvider, SLOT_PROFILES, WORKER_PROVIDERS, type QuotaKind, type SlotBilling, type SlotProfile, type WorkerProviderId } from '../protocol';
+import { isWorkerProvider, WORKER_PROVIDERS, type QuotaKind, type SlotBilling, type WorkerProviderId } from '../protocol';
 import type { Slot, SlotLimit, SlotLogin } from './slot';
 
 export interface SlotConfigParse {
@@ -93,25 +95,21 @@ export function slotOf(raw: unknown, seen: ReadonlySet<string>): Slot | string {
   if (!isWorkerProvider(provider)) {
     return `slot "${id}": provider must be one of ${WORKER_PROVIDERS.join(', ')}`;
   }
-  const profile = entry['profile'] ?? 'private';
-  if (!SLOT_PROFILES.includes(profile as SlotProfile)) {
-    return `slot "${id}": profile must be private or work`;
-  }
   const login = loginOf(entry['login']);
   const quota = QUOTA_KINDS.includes(entry['quota'] as QuotaKind) ? (entry['quota'] as QuotaKind) : defaultQuotaKind(provider, login);
-  const base = { id, label: text(entry['label']) ?? id, provider, profile: profile as SlotProfile, login, quota };
+  const base = { id, label: text(entry['label']) ?? id, provider, login, quota };
   return { ...base, billing: billingOf(entry['billing']), sessions: sessionsOf(entry['sessions']), limits: limitsOf(entry['limits']), implied: false };
 }
 
 /**
- * The stand-in slot of a provider no entry names: `private`, its default
- * login. It makes no network call: Claude Code's windows come from its own
+ * The stand-in slot of a provider no entry names: its default login. It
+ * makes no network call: Claude Code's windows come from its own
  * runs and its cache, everything else is counted — a remote quota is read
  * only for a slot `service.json` names.
  */
 export function impliedSlot(provider: WorkerProviderId): Slot {
   const quota: QuotaKind = provider === 'claude-code' ? 'claude-code' : 'counting';
-  return { id: provider, label: IMPLIED_LABEL[provider], provider, profile: 'private', billing: null, sessions: null, login: {}, quota, limits: [], implied: true };
+  return { id: provider, label: IMPLIED_LABEL[provider], provider, billing: null, sessions: null, login: {}, quota, limits: [], implied: true };
 }
 
 function refreshOf(root: Entry): number {

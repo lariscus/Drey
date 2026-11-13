@@ -5,32 +5,26 @@ import { parseRepos, reposFileText, reposProse } from './repos-file';
 
 const file = (entry: string): string => ['---', 'repos:', '  drey:', '    url: https://example.test/drey.git', entry, '---', 'Notes.', ''].join('\n');
 
-describe('repos.md — the profile key (req-177)', () => {
-  it('reads `profile: work` and `profile: private`; absent stays absent (reads as private)', () => {
-    expect(parseRepos(file('    profile: work')).repos[0]?.profile).toBe('work');
-    expect(parseRepos(file('    profile: private')).repos[0]?.profile).toBe('private');
-    const plain = parseRepos(file('    branch: main')).repos[0];
-    expect(plain).toBeDefined();
-    expect('profile' in plain!).toBe(false);
+describe('repos.md — the retired profile key (req-290)', () => {
+  it('reads an old `profile` of any value and silently ignores it', () => {
+    for (const profile of ['work', 'private', 'office']) {
+      const parsed = parseRepos(file(`    profile: ${profile}`));
+      expect(parsed.error).toBeNull();
+      expect(parsed.repos[0]).toMatchObject({ name: 'drey' });
+      expect('profile' in parsed.repos[0]!).toBe(false);
+    }
   });
 
-  it('refuses any other profile: a repository is never run under a guessed one', () => {
-    expect(parseRepos(file('    profile: office'))).toEqual({ repos: [], error: 'repos.md: repo "drey" profile must be private or work', warnings: [] });
+  it('drops the key on write: a round trip through the file never emits it again', () => {
+    const withOld = file('    profile: work');
+    const text = reposFileText(parseRepos(withOld).repos, reposProse(withOld));
+    expect(text).not.toContain('profile');
+    expect(parseRepos(text).repos[0]).toMatchObject({ name: 'drey' });
   });
 
-  it('writes the profile back, and a file without one stays without', () => {
-    const parsed = parseRepos(file('    profile: work')).repos;
-    const text = reposFileText(parsed, reposProse(file('    profile: work')));
-    expect(text).toContain('profile: work');
-    expect(parseRepos(text).repos[0]?.profile).toBe('work');
-    expect(reposFileText(parseRepos(file('    branch: main')).repos, 'Notes.')).not.toContain('profile');
-  });
-
-  it("the run request carries the repository's profile, and none without one", () => {
-    const work = composeRunRequest(base({ repo: { ...REPO, profile: 'work' } }));
-    expect(work.ok && work.request.profile).toBe('work');
-    const plain = composeRunRequest(base());
-    expect(plain.ok && 'profile' in plain.request).toBe(false);
+  it('a run request never carries a profile, whatever the file said', () => {
+    const work = composeRunRequest(base({ repo: REPO }));
+    expect(work.ok && 'profile' in work.request).toBe(false);
   });
 });
 

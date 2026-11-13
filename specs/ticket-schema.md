@@ -1553,7 +1553,6 @@ repos:
     url: https://dev.azure.com/org/project/_git/lariscus
     branch: main
     policy: Azure DevOps branch policies protect main
-    profile: work
 ---
 Prose for humans.
 ```
@@ -1590,14 +1589,12 @@ fleet worktree (a junction on Windows, a directory symlink elsewhere)
 instead of the worker rebuilding them: the toolchain (`.tools`,
 `node_modules`). A folder is linked only when the checkout has it, the
 worktree does not, and git ignores it there; the brief then tells the
-worker not to install anything. `profile` (req-177, ADR-0095 later
-change) is `private` or `work`: the slot profile the repository runs
-under. A fleet run on the repository is served only by a slot of that
-profile (the slots live in the service home's `service.json`,
-`plugins/tickets/FLEET.md`) and is refused, with the reason, when no
-slot of it is free — never served by the other profile, not even as a
-fallback. Unset is `private`; any other value is a parse error of the
-file, never a guess. The run request carries it (`profile`). Names are
+worker not to install anything. `profile` is retired (req-290, 2026-11-13:
+the owner needs no work/private distinction): a repository's old `profile:
+work` or `profile: private` is read and silently ignored, whatever it
+says, and never written again — every slot may serve every repository
+(the slots live in the service home's `service.json`,
+`plugins/tickets/FLEET.md`). Names are
 unique; a ticket's `repo:` must name one of them once it is in a work
 phase.
 
@@ -1733,9 +1730,7 @@ vault itself is an allowed directory**; refused are a relative path, a
 network share, a folder inside `.git` and the worktree of a live ticket
 run. Its permission mode is the vault's `permission-mode` unless the owner
 chose another on the session (`read-only`, `accept-edits`, `bypass`); the
-read-only rule of a 1:1 does not apply. A free session in a repository's
-checkout (`repos.md` `path:`) is served by a slot of that repository's
-`profile`. Its conversation is the worker's stream (the service window's
+read-only rule of a 1:1 does not apply. Its conversation is the worker's stream (the service window's
 Sessions tab, the takeover); it has no chat file and writes no memory line.
 
 ## `_meta/chat/` — the Mission Control sessions

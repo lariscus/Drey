@@ -268,7 +268,7 @@ export function createModelsSection(api: DreyPluginApi): ModelsSection {
   }
 
   function rowOf(view: ModelRowView): HTMLElement {
-    const tr = el('tr', view.work ? 'tset-models-work' : undefined);
+    const tr = el('tr');
     const cell = (className: string, text: string, fieldName: Field): HTMLElement => {
       const td = el('td', className, text);
       td.tabIndex = 0;
@@ -281,12 +281,6 @@ export function createModelsSection(api: DreyPluginApi): ModelsSection {
       return td;
     };
     const provider = cell('tset-models-c-provider', view.provider, 'provider');
-    if (view.work) {
-      const chip = el('span', 'tset-models-chipwrap');
-      chip.append(el('span', 'tset-models-chip', t('tickets.settings.models.profile.work')));
-      // The board's markup has a space before the chip, then its 6 px margin.
-      provider.append(document.createTextNode(' '), chip);
-    }
     const remove = el('button', 'tset-models-remove icon-btn');
     remove.type = 'button';
     remove.title = t('tickets.settings.models.remove_row', { model: view.row.model });
@@ -447,7 +441,7 @@ export function createModelsSection(api: DreyPluginApi): ModelsSection {
   function cardOf(card: SlotCardView): HTMLElement {
     const box = el('div', 'tset-models-card');
     const head = el('div', 'tset-models-cardhead');
-    head.append(el('span', 'tset-models-cardname', card.name), el('span', 'tset-models-chip', card.profile), el('span', 'tset-models-billing', card.billing), slotEditor.removeButton(card));
+    head.append(el('span', 'tset-models-cardname', card.name), el('span', 'tset-models-billing', card.billing), slotEditor.removeButton(card));
     const rows = el('div', 'tset-models-windows');
     for (const window of card.windows) {
       const line = el('div', 'tset-models-window');

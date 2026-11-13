@@ -8,7 +8,6 @@ import {
   capacityPayload,
   capacityViewOf,
   classesOfSlot,
-  isWorkRow,
   ledgerPayload,
   modelRowsOf,
   modelsPayload,
@@ -39,7 +38,6 @@ const row = (extra: Partial<ModelRow> & Pick<ModelRow, 'model'>): ModelRow => ({
 
 const slot = (extra: Partial<SlotView> & Pick<SlotView, 'id' | 'label'>): SlotView => ({
   provider: 'claude-code',
-  profile: 'private',
   billing: { kind: 'subscription', pricePerMonth: 90, currency: 'EUR' },
   quota: 'claude-code',
   state: 'ready',
@@ -92,19 +90,14 @@ const reply = (extra: Partial<ModelsReply> = {}): ModelsReply => ({
 const slots: readonly SlotView[] = [
   slot({ id: 'claude-a', label: 'Claude A' }),
   slot({ id: 'zai', label: 'z.ai', provider: 'opencode' }),
-  slot({ id: 'copilot', label: 'Copilot', provider: 'opencode', profile: 'work', billing: { kind: 'credits', pricePerCredit: 0.04, currency: 'EUR' } }),
+  slot({ id: 'copilot', label: 'Copilot', provider: 'opencode', billing: { kind: 'credits', pricePerCredit: 0.04, currency: 'EUR' } }),
 ];
 
 describe('the model table rows', () => {
   it('names the slot in the provider column and trims the numbers', () => {
     const [opus, glm] = modelRowsOf(reply(), slots, i18n);
-    expect(opus).toMatchObject({ provider: 'Claude A', cost: '5', sessions: '1', work: false });
+    expect(opus).toMatchObject({ provider: 'Claude A', cost: '5', sessions: '1' });
     expect(glm).toMatchObject({ provider: 'z.ai', cost: '0.4', sessions: '3' });
-  });
-
-  it('marks a row that runs on work slots only, for the dimmed row and its chip', () => {
-    expect(modelRowsOf(reply(), slots, i18n).map((r) => r.work)).toEqual([false, false, true]);
-    expect(isWorkRow(row({ model: 'm', provider: 'opencode' }), slots)).toBe(false);
   });
 
   it('is empty while no runner answers', () => {
@@ -207,7 +200,7 @@ describe('the slot cards', () => {
       q: 1.4,
     });
     const [card] = slotCardsOf([claude], { rows: reply().models, routing: reply().routing }, now, i18n);
-    expect(card).toMatchObject({ name: 'Claude A', profile: 'Private', billing: 'subscription · €90 / month', q: 'q 1.4 · upgrade allowed' });
+    expect(card).toMatchObject({ name: 'Claude A', billing: 'subscription · €90 / month', q: 'q 1.4 · upgrade allowed' });
     expect(card?.windows.map((w) => [w.label, w.text, w.reliability, w.bar?.width, w.bar?.low])).toEqual([
       ['5 h', '78 % left · resets 14:20', 'measured', 93.6, false],
       ['7 d', '62 % left · resets Mon 09:00', 'measured', 74.4, false],
@@ -227,14 +220,13 @@ describe('the slot cards', () => {
       id: 'copilot',
       label: 'Copilot',
       provider: 'opencode',
-      profile: 'work',
       quota: 'counting',
       billing: { kind: 'credits', pricePerCredit: 0.04, currency: 'EUR' },
       windows: [{ ...window('month', 0.412, new Date(2026, 11, 1).toISOString(), 'estimated'), used: 588, limit: 1000, unit: 'tokens' as const }],
       q: 0.9,
     });
     const [card] = slotCardsOf([copilot], { rows: reply().models, routing: reply().routing }, now, i18n);
-    expect(card).toMatchObject({ profile: 'Work', billing: 'credits · €0.04 / credit' });
+    expect(card).toMatchObject({ billing: 'credits · €0.04 / credit' });
     expect(card?.windows[0]).toMatchObject({ label: 'month', text: '412 of 1,000 left · resets Dec 1' });
     expect(card?.windows[0]?.bar?.width).toBe(49.44);
   });

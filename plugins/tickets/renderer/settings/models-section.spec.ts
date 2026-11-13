@@ -10,7 +10,6 @@ const slot = (id: string, label: string, extra: Partial<SlotView> = {}): SlotVie
   id,
   label,
   provider: 'claude-code',
-  profile: 'private',
   billing: { kind: 'subscription', pricePerMonth: 90, currency: 'EUR' },
   quota: 'claude-code',
   state: 'ready',
@@ -53,7 +52,7 @@ function setup(poolReply: ModelsReply | null = models) {
       return Promise.resolve(poolReply);
     }
     if (method === 'slots') {
-      return Promise.resolve({ ok: true, slots: [slot('a', 'Claude A'), slot('w', 'Copilot', { provider: 'opencode', profile: 'work', windows: [] })], configPath: '' });
+      return Promise.resolve({ ok: true, slots: [slot('a', 'Claude A'), slot('w', 'Copilot', { provider: 'opencode', windows: [] })], configPath: '' });
     }
     if (method === 'poolModelsConfig') {
       return Promise.resolve({ ...models, ...(payload as object) });
@@ -76,13 +75,11 @@ describe('Settings → Models page', () => {
     expect([...section.root.querySelectorAll('h4')].map((h) => h.textContent)).toEqual(['Model table', 'Capacity', 'Slots', 'Routing', 'Ledgers']);
   });
 
-  it('fills the table, dims the work row and gives it the chip', async () => {
+  it('fills the table', async () => {
     const { section } = setup();
     await section.refresh();
     const rows = [...section.root.querySelectorAll('tbody tr')];
-    expect(rows.map((r) => [...r.querySelectorAll('td')].map((td) => td.textContent).join('|'))).toEqual(['claude-opus-4-1|Claude A|frontier|A|5|1', 'gpt-5.4|Copilot Work|everyday|B|1|2']);
-    expect(rows[0]?.classList.contains('tset-models-work')).toBe(false);
-    expect(rows[1]?.classList.contains('tset-models-work')).toBe(true);
+    expect(rows.map((r) => [...r.querySelectorAll('td')].map((td) => td.textContent).join('|'))).toEqual(['claude-opus-4-1|Claude A|frontier|A|5|1', 'gpt-5.4|Copilot|everyday|B|1|2']);
     expect(section.root.querySelectorAll('thead th')).toHaveLength(6);
   });
 
@@ -228,18 +225,17 @@ describe('Settings → Models page', () => {
   it('Add slot… adds a row that Enter sends as one slot, and draws the slots the engine answers (D-69)', async () => {
     const { section, invoke } = setup();
     await section.refresh();
-    invoke.mockImplementationOnce(() => Promise.resolve({ ok: true, slots: [slot('a', 'Claude A'), slot('claude-b', 'Claude B', { profile: 'work' })] }));
+    invoke.mockImplementationOnce(() => Promise.resolve({ ok: true, slots: [slot('a', 'Claude A'), slot('claude-b', 'Claude B')] }));
     [...section.root.querySelectorAll('button')].find((b) => b.textContent === 'Add slot…')!.click();
     expect(invoke).not.toHaveBeenCalledWith('serviceOpenLogFolder');
     const draft = section.root.querySelector('.tset-models-slotdraft')!;
     const name = draft.querySelector<HTMLInputElement>('input[aria-label="Name"]')!;
-    const [provider, profile] = draft.querySelectorAll('select');
+    const [provider] = draft.querySelectorAll('select');
     name.value = 'Claude B';
     provider!.value = 'claude-code';
-    profile!.value = 'work';
     name.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     await settle();
-    expect(invoke).toHaveBeenCalledWith('slotAdd', { slot: { id: 'claude-b', label: 'Claude B', provider: 'claude-code', profile: 'work' } });
+    expect(invoke).toHaveBeenCalledWith('slotAdd', { slot: { id: 'claude-b', label: 'Claude B', provider: 'claude-code' } });
     expect([...section.root.querySelectorAll('.tset-models-cardname')].map((n) => n.textContent)).toEqual(['Claude A', 'Claude B']);
     expect(section.root.querySelector('.tset-models-slotdraft')).toBeNull();
   });

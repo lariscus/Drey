@@ -37,7 +37,6 @@ export function slotView(id: string, windows: readonly QuotaWindow[], over: Part
     id,
     label: id,
     provider: 'claude-code',
-    profile: 'private',
     billing: null,
     quota: 'claude-code',
     state: 'ready',

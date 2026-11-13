@@ -42,7 +42,6 @@ export class SlotStateResolver {
       id: slot.id,
       label: slot.label,
       provider: slot.provider,
-      profile: slot.profile,
       billing: slot.billing,
       quota: slot.quota,
       state,

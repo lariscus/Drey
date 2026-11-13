@@ -37,7 +37,7 @@ interface Sweep {
 /**
  * The pool's one decision (req-170, R10, with req-178's routing): a session
  * gets a model of exactly the class it asked for, from its pool, on a free
- * slot of the repository's profile, while the caps, the ledgers and the
+ * slot, while the caps, the ledgers and the
  * reserve have room — or it waits. Among the slots that pass the filter the
  * largest surplus wins (same surplus → cheaper), and above `Upgrade above q`
  * the slot runs the next stronger model of the pool. Never a smaller class;
@@ -91,7 +91,7 @@ export class PoolGrant {
     const sweep: Sweep = { candidates: [], refusals: new Refusals(), filtered: [] };
     options.forEach((option, order) => {
       const views = this.viewsOf(option.provider);
-      for (const view of this.servingSlots(option, request, views, sweep)) {
+      for (const view of this.servingSlots(option, views, sweep)) {
         const refusal = this.deps.fit.refusal(option, view, request, views);
         if (refusal === null) {
           sweep.candidates.push({ ...option, view, order });
@@ -107,21 +107,12 @@ export class PoolGrant {
     return sweep;
   }
 
-  /** The slots of the repository's profile that serve the option's row — never one of the other profile. */
-  private servingSlots(option: RouteOption, request: ClassRequest, views: readonly SlotView[], sweep: Sweep): readonly SlotView[] {
+  /** The slots that serve the option's row (a row may name its one slot, req-290: every slot may serve every repository). */
+  private servingSlots(option: RouteOption, views: readonly SlotView[], sweep: Sweep): readonly SlotView[] {
     const model = option.row?.model ?? option.entry.model;
-    for (const other of views.filter((view) => view.profile !== request.profile)) {
-      sweep.filtered.push({ slot: other.id, model, reason: `${other.profile} profile` });
-    }
-    const ofProfile = views.filter((view) => view.profile === request.profile);
-    if (ofProfile.length === 0) {
-      const other = request.profile === 'work' ? 'private' : 'work';
-      sweep.refusals.add('config', `no ${request.profile} slot serves ${option.provider}: the repository is ${request.profile} and never runs on a ${other} slot — add a ${request.profile} slot for ${option.provider} to service.json`);
-      return [];
-    }
-    const serving = ofProfile.filter((view) => option.row === null || option.row.slot === null || option.row.slot === view.id);
+    const serving = views.filter((view) => option.row === null || option.row.slot === null || option.row.slot === view.id);
     if (serving.length === 0) {
-      sweep.refusals.add('config', `${model ?? option.provider} is served on no ${request.profile} slot`);
+      sweep.refusals.add('config', `${model ?? option.provider} is served on no slot`);
     }
     return serving;
   }

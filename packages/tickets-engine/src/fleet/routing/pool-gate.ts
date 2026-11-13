@@ -38,7 +38,6 @@ export function classRequestOf(request: RunRequest, context: GateContext): Class
     class: request.poolRoute?.class ?? request.poolClass ?? null,
     pool: [{ provider: request.provider, model: request.model }],
     provider: request.provider,
-    profile: request.profile ?? 'private',
     contextTokens: null,
     needs: request.poolNeeds ?? null,
     stepUp: false,
@@ -59,7 +58,7 @@ function routeOf(request: RunRequest, decision: PoolGrantDecision): RouteRecord 
 
 /**
  * Every start's door to the pool (req-170 over req-177): the request's model
- * on a slot of its provider and the repository's profile, of the class the
+ * on a slot of its provider, of the class the
  * dispatch asked for, while the caps and the ledgers have room — its weight
  * reserved before the worker spawns, so two starts racing for the last room
  * cannot both win. A refusal spawns nothing.

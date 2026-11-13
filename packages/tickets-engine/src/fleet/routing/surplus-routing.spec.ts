@@ -7,8 +7,7 @@ const claudeA = slot({ id: 'claude-a', label: 'Claude A', sessions: 4 });
 const claudeB = slot({ id: 'claude-b', label: 'Claude B', sessions: 4 });
 const zai = slot({ id: 'zai', label: 'z.ai', provider: 'opencode' });
 const kimi = slot({ id: 'kimi', label: 'Kimi', provider: 'kimi' });
-const copilot = slot({ id: 'copilot', label: 'Copilot', profile: 'work' });
-const SLOTS = [claudeA, claudeB, zai, kimi, copilot];
+const SLOTS = [claudeA, claudeB, zai, kimi];
 
 const VISION = { input: ['text', 'image'], tools: true, context: 200_000 };
 /** opus A only on Claude A; sonnet B on every Claude slot; glm B on z.ai (no image input); kimi C. */
@@ -26,7 +25,6 @@ const ask = (over: Partial<ClassRequest> = {}): ClassRequest => ({
   class: 'B',
   pool: POOL,
   provider: 'claude-code',
-  profile: 'private',
   contextTokens: null,
   ledger: { allowance: null, personaBudget: null, spendAboveAllowance: false },
   prefer: null,
@@ -53,7 +51,7 @@ describe('surplus routing — filter, then the largest surplus within the class 
     r.records.push({ ticketId: 'T-0121', persona: 'ben', costUsd: 0.4, startedAt: RIG_NOW.toISOString(), endedAt: RIG_NOW.toISOString(), grant: { model: 'sonnet' } });
     const decided = route(r.grant.choose(ask({ needs: { image: true } })));
     expect(decided).toMatchObject({ slot: 'claude-a', model: 'sonnet', class: 'B', requested: 'B', q: 1.25, estimatedUsd: 0.4, stepUp: null });
-    expect(decided.line).toBe('route T-0121 → claude-a/sonnet: class B, q 1.25, est $0.40 · filtered: copilot (work profile), zai (no image input)');
+    expect(decided.line).toBe('route T-0121 → claude-a/sonnet: class B, q 1.25, est $0.40 · filtered: zai (no image input)');
   });
 
   it.each<[string, Record<string, number>, string, string]>([
@@ -73,7 +71,7 @@ describe('the step up within the slot — only upwards, only above the threshold
     expect(decision).toMatchObject({ model: 'opus', class: 'A', cost: 5, slot: { id: 'claude-a' } });
     expect(decision.reason).toBe('opus, class A, cost 5 on Claude A, a step up from sonnet (q 1.5) — size M → B');
     expect(decision.route).toMatchObject({ class: 'A', requested: 'B', stepUp: { from: 'sonnet', fromClass: 'B' } });
-    expect(decision.route!.line).toBe('route T-0121 → claude-a/opus: class A (step up from sonnet, B), q 1.5, est ? · filtered: copilot (work profile)');
+    expect(decision.route!.line).toBe('route T-0121 → claude-a/opus: class A (step up from sonnet, B), q 1.5, est ?');
   });
 
   it.each<[string, Record<string, number>, Partial<ClassRequest>, Record<string, unknown> | undefined, string]>([
