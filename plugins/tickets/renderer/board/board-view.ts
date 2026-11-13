@@ -14,6 +14,10 @@ import { h, textButton, type DeskDeps } from '../desk-deps';
 import { queueWordsOf } from '../queue-line';
 import type { TeamStore } from '../team/team-store';
 import { usd } from '../team/team-model';
+import type { BoardSnapshot } from '../../shared/tickets';
+import type { PersonaBoardContext, PersonaBoardState } from './persona-board-drop';
+import { personaBoardNodes } from './persona-board-view';
+import { poolChipNode } from './pool-chip';
 import {
   boardModelOf,
   columnCostText,
@@ -190,16 +194,72 @@ export function mountBoard(deps: DeskDeps, store: TeamStore, host: HTMLElement):
     }
   };
 
+  /** req-271: what the persona board keeps for this tab (the fold chip, the pool popover, the "<n> more" tails). */
+  const personaState: PersonaBoardState = { unfolded: false, poolOpen: false, more: new Set<string>() };
+  const personaCtx: PersonaBoardContext = { deps, state: personaState, repaint: () => schedule() };
+  const closePool = (): void => {
+    if (personaState.poolOpen) {
+      personaState.poolOpen = false;
+      schedule();
+    }
+  };
+  const outsidePool = (event: Event): void => {
+    if (!(event.target instanceof Element) || event.target.closest('.pb-pool') === null) {
+      closePool();
+    }
+  };
+  const escapePool = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape' && personaState.poolOpen) {
+      closePool();
+      root.querySelector<HTMLElement>('.pb-pool-chip')?.focus();
+    }
+  };
+  window.addEventListener('mousedown', outsidePool, true);
+  window.addEventListener('keydown', escapePool, true);
+
+  /** The persona board (a lifecycle store, req-271): its own head and columns; the horizontal scroll and each column's survive a repaint. */
+  const renderPersona = (snap: BoardSnapshot): void => {
+    root.classList.add('desk-pboard');
+    const left = root.querySelector<HTMLElement>('.pb-cols')?.scrollLeft ?? 0;
+    const tops = new Map<string, number>();
+    for (const col of root.querySelectorAll<HTMLElement>('.pb-col')) {
+      tops.set(col.dataset['column'] ?? '', col.querySelector<HTMLElement>('.pb-col-body')?.scrollTop ?? 0);
+    }
+    root.replaceChildren(...personaBoardNodes(personaCtx, snap));
+    const cols = root.querySelector<HTMLElement>('.pb-cols');
+    if (cols !== null) {
+      cols.scrollLeft = left;
+    }
+    for (const col of root.querySelectorAll<HTMLElement>('.pb-col')) {
+      const body = col.querySelector<HTMLElement>('.pb-col-body');
+      if (body !== null) {
+        body.scrollTop = tops.get(col.dataset['column'] ?? '') ?? 0;
+      }
+    }
+  };
+
   const render = (): void => {
     frame = 0;
     const snap = deps.snapshot();
+    if (snap !== null && snap.vaultId !== null && snap.lanes !== undefined) {
+      renderPersona(snap);
+      return;
+    }
+    root.classList.remove('desk-pboard');
     const head = h('header', 'desk-head');
     head.append(h('h2', 'desk-h', 'Board'), h('span', 'desk-head-spacer'));
     if (snap === null || snap.vaultId === null) {
       root.replaceChildren(head, h('div', 'desk-note', snap === null ? 'Loading…' : 'No tickets repository yet - set one up in the Work panel.'));
       return;
     }
-    head.append(textButton('New idea', 'desk-btn desk-btn-primary', 'Capture a new idea', () => deps.newIdea()));
+    // req-271: the big pool's chip on the phase board too (the Capacity band is gone); its popover holds slots, tranche, queue.
+    head.append(
+      poolChipNode(deps, [], personaState.poolOpen, (open) => {
+        personaState.poolOpen = open;
+        schedule();
+      }),
+      textButton('New idea', 'desk-btn desk-btn-primary', 'Capture a new idea', () => deps.newIdea()),
+    );
     const model = boardModelOf(snap, deps.runs(), parts, deps.chain()?.queue ?? []);
     const cols = h('div', 'desk-cols');
     for (const column of model.columns) {
@@ -268,6 +328,8 @@ export function mountBoard(deps: DeskDeps, store: TeamStore, host: HTMLElement):
   render();
   return () => {
     disposed = true;
+    window.removeEventListener('mousedown', outsidePool, true);
+    window.removeEventListener('keydown', escapePool, true);
     offStore();
     offDeps();
     if (frame !== 0) {

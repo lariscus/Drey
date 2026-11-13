@@ -177,6 +177,8 @@ export interface SendBackCommand {
   readonly id: string;
   /** Trimmed, at most 500 characters — the Log line's budget. */
   readonly note: string;
+  /** req-270: the position of the chain to send it back to (the owner's target picker); absent = the nearest earlier agent position. */
+  readonly position?: number;
 }
 
 export function parseSendBack(payload: unknown): Parsed<SendBackCommand> {
@@ -188,7 +190,9 @@ export function parseSendBack(payload: unknown): Parsed<SendBackCommand> {
   if (note === '') {
     return refuse('the send-back note is empty');
   }
-  return ok({ id: p['id'], note: note.slice(0, 500) });
+  const position = p['position'];
+  const target = typeof position === 'number' && Number.isInteger(position) && position >= 1 ? { position } : {};
+  return ok({ id: p['id'], note: note.slice(0, 500), ...target });
 }
 
 export interface PlanPartsEditCommand {

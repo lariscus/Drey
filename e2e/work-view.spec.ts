@@ -28,8 +28,9 @@ test.afterAll(() => {
 /**
  * The Work view (E13-13, ADR-0089): the tickets plugin's preset next to
  * Notes. The switcher lists Notes | Work, Ctrl+2 switches, the Work layout
- * is the Tickets panel left, the Assistant right and the Capacity band
- * below, and opening a ticket from Notes jumps to Work.
+ * is the Tickets panel left, the Assistant right and nothing below (the
+ * Capacity band became the Board's pool chip, req-271), and opening a
+ * ticket from Notes jumps to Work.
  */
 const PIPELINE = [
   '---',
@@ -68,12 +69,9 @@ test.describe('The Work view (E13-13)', () => {
     await page.keyboard.press('Control+2');
     await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('.tickets-panel').filter({ visible: true })).toBeVisible({ timeout: 15_000 });
-    // The band's content shows only on the Board and Crew tabs (E12-15).
-    await expect(page.locator('.desk-capacity')).toBeHidden({ timeout: 15_000 });
-    // Board 7e: the preset seeds the band's first height (SDK 1.51, fidelity ruling O7).
-    await expect
-      .poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem('drey.dock') ?? '{}') as { views?: Record<string, { bottomH?: number }> }).views?.['tickets.work']?.bottomH))
-      .toBe(168);
+    // req-271: no Capacity band -- the Work view's bottom dock holds nothing (the big pool is the Board's chip).
+    await expect(page.locator('.desk-capacity')).toHaveCount(0);
+    await expect(page.locator('app-dock[side="bottom"]')).toBeHidden();
     await expect(page.locator('app-dock-strip button[aria-label="Show Assistant"], app-dock-strip button[aria-label="Hide Assistant"]').first()).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('view-work.png') });
 

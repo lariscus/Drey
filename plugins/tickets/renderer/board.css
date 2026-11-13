@@ -3828,3 +3828,32 @@ button.tickets-statusbar-fleet:focus-visible {
   opacity: 0.5;
   cursor: default;
 }
+
+/* req-268: the board migration's line — wraps when unfolded: the step's details, then Migrate and Cancel. */
+.tickets-board-migration {
+  flex-wrap: wrap;
+}
+
+.tickets-board-migration:has(.tickets-board-migration-list) .tickets-warn-text {
+  white-space: normal;
+}
+
+.tickets-board-migration-list {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  padding-left: 18px;
+  color: var(--text-2);
+}
+
+.tickets-board-migration-actions {
+  display: flex;
+  gap: 6px;
+  flex-basis: 100%;
+  justify-content: flex-end;
+}
+
+.tickets-board-migration-run {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+

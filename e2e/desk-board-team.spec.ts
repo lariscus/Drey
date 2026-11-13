@@ -144,8 +144,8 @@ function liveRun(id: string, ticketId: string, personaId: string, extra: Record<
   };
 }
 
-test.describe('Board, Team and Capacity (E13-8)', () => {
-  test('shows the board, the team and the capacity band', async ({ page, electronApp, vaultDir }, testInfo) => {
+test.describe('Board, Team and the pool chip (E13-8, req-271)', () => {
+  test('shows the board, the team and the pool chip', async ({ page, electronApp, vaultDir }, testInfo) => {
     // The Work view exists once the plugin has registered it; Ctrl+2 before that does nothing.
     await expect(page.locator('[role="tablist"][aria-label="Views"] [role="tab"]')).toHaveText(['Notes', 'Work', 'Crew'], { timeout: 30_000 });
     // The title bar carries no capture button (board 9a); it is the Work panel's first header action (board 7a).
@@ -155,7 +155,7 @@ test.describe('Board, Team and Capacity (E13-8)', () => {
     await expect(statusBar).toContainText(/\$\d+\.\d\d of \$\d+ today/, { timeout: 15_000 });
     await expect(statusBar).toContainText(/needs? you in Work/);
 
-    // The Work view (Ctrl+2) puts the Tickets panel and the Capacity band in place.
+    // The Work view (Ctrl+2) puts the Tickets panel in place.
     await page.keyboard.press('Control+2');
     const panel = page.locator('.tickets-panel').filter({ visible: true });
     await expect(panel.locator('.work-row[data-id="T-0121"]')).toBeVisible({ timeout: 15_000 });
@@ -257,35 +257,28 @@ test.describe('Board, Team and Capacity (E13-8)', () => {
     await expect(team.locator('[data-persona="paul"]')).toBeFocused();
     expect(fs.readFileSync(path.join(vaultDir, 'tickets', '_meta', 'crew.md'), 'utf8')).toContain('order: [pia, ben, paul, ralf, tessa');
 
-    // --- Capacity band in the bottom dock: only on the Board tab (board 7e; the Crew tab, 7f, has none)
-    await expect(page.locator('.desk-capacity')).toBeHidden();
-    // D-47: the dock's only panel draws nothing here, so the bottom band takes no height at all.
+    // --- req-271: no Capacity band any more -- the bottom dock stays empty; the big pool is the Board's chip.
+    await expect(page.locator('.desk-capacity')).toHaveCount(0);
     await expect(page.locator('app-dock[side="bottom"]')).toBeHidden();
     await openFromMenu('Board');
-    const band = page.locator('.desk-capacity').filter({ visible: true });
-    await expect(band).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator('app-dock[side="bottom"]')).toBeVisible();
-    await expect(band.locator('.desk-cap-person').filter({ hasText: 'Tessa' })).toContainText('stuck on T-0126');
-    await expect(band.locator('.desk-cap-today')).toHaveText('$4.22 of $19 today');
-    // Header value (board 7e): live sessions over the pools, what waits for a slot.
-    await expect(page.locator('app-panel-frame', { has: band }).locator('.status')).toHaveText(/^2 of 5 sessions( · [0-9]+ queued)?$/);
-    // The Slots row: one chip per slot, the share with its bar, q and its upgrade mark, `unknown` without a bar.
-    await expect(band.locator('.desk-slot .desk-slot-name')).toHaveText(['Claude A', 'z.ai', 'Kimi']);
-    await expect(band.locator('.desk-slot[data-slot="claude-a"] .desk-slot-share')).toHaveText('62 %');
-    await expect(band.locator('.desk-slot[data-slot="claude-a"] .desk-slot-q')).toHaveText('q 1.4');
-    await expect(band.locator('.desk-slot[data-slot="claude-a"] .desk-slot-upgrade')).toHaveCount(1);
-    await expect(band.locator('.desk-slot[data-slot="zai"] .desk-slot-fill-estimated')).toHaveCount(1);
-    await expect(band.locator('.desk-slot[data-slot="kimi"] .desk-slot-note')).toHaveText('unknown');
-    await expect(band.locator('.desk-slot[data-slot="kimi"] .desk-slot-bar')).toHaveCount(0);
-    // The Tranche-and-queue row: the queue part names what waits (the seeded Prioritized column), the tranche part is empty (req-179).
-    await expect(band.locator('.desk-cap-queuerow .desk-queue-text')).toHaveText(/^T-[0-9]+ queued · waits for a slot · 1st$/);
-    await expect(band.locator('.desk-tranche-text')).toHaveCount(0);
-    await page.screenshot({ path: testInfo.outputPath('desk-capacity.png') });
-
-    // The band rule (E12-15, board 7e): hidden once another tab (a ticket) is the active one.
-    await panel.locator('.work-row[data-id="T-0121"]').click();
-    await expect(page.locator('.desk-capacity')).toBeHidden({ timeout: 15_000 });
+    const chip = page.locator('.desk-board .pb-pool-chip').filter({ visible: true });
+    await expect(chip).toHaveText('2/5', { timeout: 15_000 });
     await expect(page.locator('app-dock[side="bottom"]')).toBeHidden();
+    await chip.click();
+    const pop = page.locator('.desk-board .pb-pool-pop').filter({ visible: true });
+    await expect(pop.locator('.pb-pool-sub')).toHaveText('2 of 5 sessions');
+    // The slots: one chip per slot, the share with its bar, q and its upgrade mark, `unknown` without a bar.
+    await expect(pop.locator('.desk-slot .desk-slot-name')).toHaveText(['Claude A', 'z.ai', 'Kimi']);
+    await expect(pop.locator('.desk-slot[data-slot="claude-a"] .desk-slot-share')).toHaveText('62 %');
+    await expect(pop.locator('.desk-slot[data-slot="claude-a"] .desk-slot-q')).toHaveText('q 1.4');
+    await expect(pop.locator('.desk-slot[data-slot="claude-a"] .desk-slot-upgrade')).toHaveCount(1);
+    await expect(pop.locator('.desk-slot[data-slot="zai"] .desk-slot-fill-estimated')).toHaveCount(1);
+    await expect(pop.locator('.desk-slot[data-slot="kimi"] .desk-slot-note')).toHaveText('unknown');
+    await expect(pop.locator('.desk-slot[data-slot="kimi"] .desk-slot-bar')).toHaveCount(0);
+    await expect(pop.locator('.desk-tranche-text')).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('desk-pool-chip.png') });
+    await page.keyboard.press('Escape');
+    await expect(pop).toBeHidden();
     stopEngine();
   });
 });

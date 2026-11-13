@@ -5,7 +5,9 @@
  * dialog 16, as CSS tokens), no font-size below the type floor (13 px on
  * Mission Control; 12 px on the desktop tickets surfaces, where only dense
  * list metadata goes that low) and the Anthrazit attention pastels exist
- * in the token blocks. Other Drey panels keep the legacy radius steps and
+ * in the token blocks. A size below the floor that an accepted board draws
+ * carries the comment `below the floor: board <id> draws …` on its line (req-271:
+ * board 7e v2's initials at 10 and 9 px). Other Drey panels keep the legacy radius steps and
  * are deliberately not scanned. Lives under `shared/` for the Node runner.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -46,9 +48,10 @@ function fontViolations(files: string[], floorPx: number): string[] {
   const out: string[] = [];
   for (const file of files) {
     const css = readFileSync(file, 'utf8');
-    for (const m of css.matchAll(/font-size\s*:\s*(?:calc\()?(\d*\.?\d+)(px|rem)/g)) {
+    for (const m of css.matchAll(/font-size\s*:\s*(?:calc\()?(\d*\.?\d+)(px|rem)[^;\n]*;?([^\n]*)/g)) {
       const px = m[2] === 'rem' ? parseFloat(m[1]!) * 16 : parseFloat(m[1]!);
-      if (px < floorPx) {
+      // An accepted board that draws a size below the floor says so on the line (req-271: board 7e v2's initials).
+      if (px < floorPx && !/\/\* below the floor: board [0-9a-z]+ v?[0-9]* draws /.test(m[3] ?? '')) {
         out.push(`${file}: ${m[0]}`);
       }
     }

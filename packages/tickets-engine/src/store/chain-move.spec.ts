@@ -3,7 +3,7 @@ import { crewLookupOf } from '../core/chain-holder';
 import { placementColumnsOf } from '../core/chain-placement';
 import { pipelinePhaseOf } from '../core/pipeline-phase';
 import type { TicketDetail } from '../ports/ticket-store';
-import { withCursorForMove } from './chain-move';
+import { withChainAndCursor, withCursorForMove } from './chain-move';
 import { documentField } from './document-fields';
 import type { HolderPlacement } from './store-board';
 
@@ -35,5 +35,16 @@ describe("an owner's move of a chain ticket on a lifecycle store", () => {
     expect(withCursorForMove(LEGACY, record('active', '3'), 'prioritized', PLACEMENT)).toBe(LEGACY);
     expect(withCursorForMove(LEGACY, record('active', '3'), 'done', PLACEMENT)).toBe(LEGACY);
     expect(withCursorForMove(LEGACY, { id: 'T-1', stage: 'active', extensions: {} } as unknown as TicketDetail, 'building', PLACEMENT)).toBe(LEGACY);
+  });
+});
+
+describe('the chain and cursor of a persona board move (req-270)', () => {
+  it('replaces the whole chain and the cursor and keeps every other key and the body', () => {
+    const out = withChainAndCursor(LEGACY, ['paul:shape', 'paul', 'bob', 'you'], 3);
+    expect(out).toBe('---\nid: T-1\ntitle: x\nchain: [paul:shape, paul, bob, you]\nat: 3\n---\nbody\n');
+  });
+
+  it('adds the keys a chainless ticket lacks', () => {
+    expect(withChainAndCursor('---\nid: T-1\n---\nbody\n', ['ben'], 1)).toBe('---\nid: T-1\nchain: [ben]\nat: 1\n---\nbody\n');
   });
 });

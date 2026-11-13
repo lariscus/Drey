@@ -516,7 +516,9 @@ adds a tripped persona here too) · `personaRedStreak` · `personaCooldownUntil`
 · `personaTripped` (req-257: the persona breaker on a chain board — red
 gates in a row per persona, its one-minute breather, the trip's
 `{reason, at}` while the persona holds; playing it clears the trip and the
-streak) · `ledgerCards`
+streak; the chain status also answers `personaWaits`, never persisted —
+req-271: ticket → persona, the tickets the last pass left waiting because
+their persona runs its maximum, the Board card's `waits for Ben`) · `ledgerCards`
 (per ticket the keys of the ledger cards the pool raised and has not
 resolved yet — req-170) · `tranche` (the current tranche's counters:
 `index`, `day`, `startedAt`, `started`, `pending`, `facts`, `anomalyFrom`,

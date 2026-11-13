@@ -11,6 +11,7 @@
  * reachable; the plugin renderer bundle may not import packages).
  */
 import type { ChainEntry, TicketChainFields } from './chain';
+import type { PersonaBoardFields, TicketHoldField } from './persona-board';
 import type { PhasePoolMeta, TicketPoolMeta } from './ticket-pool-meta';
 import type { RepoRef } from './repo-ref';
 import type { PriorityConfig, TicketPriority } from './ticket-priority';
@@ -203,7 +204,7 @@ export interface TicketUsage {
 }
 
 /** One ticket as the board renders it — meta plus derived/board context. */
-export interface TicketCard {
+export interface TicketCard extends TicketHoldField {
   readonly id: string;
   /** Current vault-relative path (`tickets/<phase>/<id>.md`). */
   readonly path: string;
@@ -375,7 +376,7 @@ export interface RecentDone {
 }
 
 /** The whole board, rebuilt from files on every fetch — no stored state. */
-export interface BoardSnapshot {
+export interface BoardSnapshot extends PersonaBoardFields {
   readonly vaultId: string | null;
   readonly vaultName: string | null;
   /** Display name of the active vault — the empty state's initialize hint. */

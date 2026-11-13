@@ -97,9 +97,14 @@ export class HolderPass {
   /** The wait line of every chain ticket the pass did not start (said once per ticket and reason). */
   noteWaits(view: HolderPassView, plan: HolderPlan, started: ReadonlySet<string>): void {
     const { notes } = this.deps;
+    this.clearWaits();
     for (const [id, ticket] of view.held) {
       if (started.has(id)) {
         continue;
+      }
+      const wait = plan.waits.get(id);
+      if (wait?.why === 'persona-full') {
+        this.deps.state.personaWaits[id] = wait.persona;
       }
       const line = this.waitLine(id, ticket, plan);
       if (line !== null) {
@@ -162,6 +167,14 @@ export class HolderPass {
       }
     }
     return live;
+  }
+
+  /** Forgets the last pass's persona waits (the Autopilot stopped, or a new pass begins). */
+  clearWaits(): void {
+    const waits = this.deps.state.personaWaits;
+    for (const id of Object.keys(waits)) {
+      delete waits[id];
+    }
   }
 
   /** The personas that start nothing this pass: paused (the owner, the breaker) or cooling down. */

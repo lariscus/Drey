@@ -18,9 +18,10 @@ import type { HolderPlacement } from '../store/store-board';
  *   first, then `done`; any other last entry goes straight to `done` (a
  *   chain that does not end at You ends without a commit, concept §14
  *   reading 5).
- * - Send back (until req-270's target picker) moves the cursor to the
- *   nearest earlier agent position; the owner's send-back never uses the
- *   one send-back a ticket has (reading 6).
+ * - Send back moves the cursor to the position the owner picked (req-270's
+ *   target picker: any earlier position), else to the nearest earlier agent
+ *   position; the owner's send-back never uses the one send-back a ticket
+ *   has (reading 6).
  */
 export type OwnerAccept =
   | { readonly kind: 'none' }
@@ -63,12 +64,17 @@ export function ownerAcceptOf(card: TicketCard, placement: HolderPlacement): Own
   return { kind: 'done', line: `accepted at the last position (${at} of ${length}) — the chain is through` };
 }
 
-/** What the owner's Send back does to a chain ticket. */
-export function ownerSendBackOf(card: TicketCard, placement: HolderPlacement): OwnerSendBack {
+/** What the owner's Send back does to a chain ticket; `position` = the owner's pick of an earlier position. */
+export function ownerSendBackOf(card: TicketCard, placement: HolderPlacement, position?: number): OwnerSendBack {
   const active = activeChainOf(card, placement);
   const chain = card.meta.chain;
   if (active === null || chain === undefined) {
     return { kind: 'none' };
+  }
+  if (position !== undefined) {
+    return position >= 1 && position < active.at
+      ? { kind: 'cursor', at: position, persona: chain[position - 1]!.persona }
+      : { kind: 'refused', error: `position ${position} is not before position ${active.at} of ${card.id}` };
   }
   const target = ownerSendBackTarget(chain, active.at, (persona) => placement.lookup(persona)?.kind === 'agent');
   if (target === null) {

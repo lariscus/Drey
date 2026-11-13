@@ -63,6 +63,7 @@ import { openFlowTab, registerFlowKind } from './flow/register';
 import { openReviewTab, registerReviewKind } from './review/register';
 import type { WorkRow } from './work-groups';
 import { boardIssuesChip, boardIssuesList, type BoardIssuesDeps } from './board-issues';
+import { boardMigrationBar } from './board-migration-bar';
 import { storeMigrationBar } from './store-migration-bar';
 import type { ChainStatus, FleetHandoverConfig, RunInfo } from '../../../packages/tickets-engine/src/fleet/protocol';
 import type { NormalizedEvent } from '../../../packages/tickets-engine/src/fleet/harness/contract';
@@ -91,9 +92,8 @@ import { mountTeam } from './team/team-view';
 import { PERSONA_KIND, personaIdOfKey, personaKeyOf } from './team/persona-model';
 import { mountPersonaPage, personaWordCountOf } from './team/persona-page';
 import { focusCrew } from './team/team-focus';
-import { bandHeaderStatusOf, bandStatusOf, queuedIdsOf } from './team/capacity-model';
+import { bandStatusOf } from './team/capacity-model';
 import { queueWordsFor } from './queue-line';
-import { bandShownFor, mountCapacity } from './team/capacity-view';
 import { mountBoard } from './board/board-view';
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -591,6 +591,8 @@ function boardViewControlsNode(api: DreyPluginApi): { node: HTMLElement; dispose
 
 /** The non-git note was dismissed in this window (A-09); it returns on the next start. */
 let gitWarningDismissed = false;
+/** req-268: whether the board migration's details are unfolded (this window only). */
+let boardMigrationOpen = false;
 
 function buildBoardView(api: DreyPluginApi): BoardView {
   const root = el('div', 'tickets-view');
@@ -636,6 +638,22 @@ function buildBoardView(api: DreyPluginApi): BoardView {
       // req-265: the store still uses the old stages - the owner's click migrates it, nothing else does.
       const migrate = (): void => void runMutation(api.i18n.t('work.store_migration.busy'), () => invokeBoard('migrateStoreStages'));
       root.append(storeMigrationBar({ api, offer: snap.storeMigration, migrate }));
+    }
+    if (snap.boardMigration !== undefined) {
+      // req-268: the meta vault's next migration step (3-5) - shown with what it writes, run only on the owner's confirmation.
+      root.append(
+        boardMigrationBar({
+          i18n: api.i18n,
+          offer: snap.boardMigration,
+          open: boardMigrationOpen,
+          toggle: (open) => {
+            boardMigrationOpen = open;
+            render();
+          },
+          invoke: (method, payload) => invokeBoard(method, payload),
+          mutate: (label, run) => void runMutation(label, run),
+        }),
+      );
     }
     root.append(workListNode(workPanelDeps(api), snap, fleetRuns, folds, notifyViews, workFilter.get()));
     const statusBar = statusBarNode(api, snap, fleet.node);
@@ -3227,35 +3245,8 @@ const plugin: { activate(api: DreyPluginApi): void } = {
         }),
       }),
     );
-    // The Capacity band (E13-8): a panel for the bottom dock - slots busy,
-    // what each persona does, today's cost, Pause all, Open Team.
-    api.ui.registerWidget({
-      id: 'tickets-capacity',
-      title: api.i18n.t('capacity.title'),
-      icon: 'rocket',
-      defaultDock: 'bottom',
-      defaultOpen: false,
-      defaultFlex: 120,
-      flush: true,
-      status: () => bandHeaderStatusOf(fleetRuns, chain, queuedIdsOf(snapshot, fleetRuns).length, api.i18n),
-      // SDK 1.52: off the Board tab the panel draws nothing, so the bottom dock takes no height (D-47).
-      shown: () => bandShownFor(api.documents.active()?.path ?? null),
-      // Board 7e: one hover action, Pause all (a second press lets the chain run again).
-      headerActions: (host) => {
-        const pause = el('button', 'icon-btn');
-        pause.type = 'button';
-        pause.title = api.i18n.t('capacity.pause_all_title');
-        pause.setAttribute('aria-label', api.i18n.t('capacity.pause_all'));
-        pause.append(api.ui.icon('pause', 14));
-        pause.addEventListener('click', () => void runChainAction('chainMaster', { mode: chain?.master === 'halted' ? 'run' : 'halted' }));
-        host.append(pause);
-        return () => pause.remove();
-      },
-      mount: (el) => mountCapacity(deskDeps(api), teamStore(api), el, () => openTeamDoc(api)),
-    });
     api.commands.register({ id: 'tickets.openBoard', label: 'Open the Board', run: () => openBoardDoc(api) });
     api.commands.register({ id: 'tickets.openTeam', label: 'Open the Crew', run: () => openTeamDoc(api) });
-    api.commands.register({ id: 'tickets.showCapacity', label: 'Show the Capacity band', run: () => api.ui.revealWidget('tickets-capacity') });
     api.ui.registerSettingsPage(
       createTicketsSettingsPage(api, {
         openTeam: () => openTeamDoc(api),

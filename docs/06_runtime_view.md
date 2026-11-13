@@ -6054,3 +6054,52 @@ sequenceDiagram
 The recorder observes instead of hooking the writers of the cursor, so every way the cursor moves is recorded the same
 way; its time resolution is the dispatch pass. A restarted runner keeps its book in `chain.json` and writes nothing for
 a hold it already recorded; a hold it never saw starts at the first pass that sees it.
+
+## 6.128 The persona board: a drop becomes one move (req-270/271, milestone 254)
+
+The Board tab draws the snapshot's `lanes` and every card's `hold`; the runtime
+half of a card's status comes from the fleet. A card dropped on a column is
+decided by `dropOf` and sent as one call; the engine checks it again against
+the card it reads and writes one `put` with a status line.
+
+```mermaid
+sequenceDiagram
+    participant O as Owner
+    participant B as Board tab (persona-board-view)
+    participant M as plugin main
+    participant S as BoardService
+    participant D as dricket store
+    O->>B: drag T-0122 from Ben to Ralf
+    B->>B: dropOf(card, "ralf") -> hand
+    B->>M: invoke personaBoardMove {kind: hand, id, persona: ralf}
+    M->>M: parsePersonaBoardMove
+    M->>S: personaBoardMove(move)
+    S->>S: snapshot -> card.hold; personaMoveOf (refused while claimed or awaiting)
+    S->>D: put (x-chain entry at x-at = ralf), status line
+    S-->>B: board changed -> repaint (Ralf's column)
+    Note over B: running · waits for Ben · queued come from<br/>the runs and the chain status (personaWaits, queue)
+```
+
+## 6.129 The board migration: one step per confirmation (req-268, milestone 254)
+
+```mermaid
+sequenceDiagram
+    participant O as Owner
+    participant P as Tickets panel (board-migration-bar)
+    participant S as BoardService
+    participant V as meta vault (git)
+    S->>S: snapshot on a lifecycle store -> boardMigrationPlan (3, 4 or 5)
+    S-->>P: snapshot.boardMigration
+    O->>P: Review…
+    P->>P: the step's lines (columns removed, flow, keys moved …)
+    O->>P: Migrate
+    alt step 3 or 4
+        P->>S: migrateBoard {step}
+        S->>S: plan again (refused when another step is next)
+        S->>V: pipeline.md + builder's persona.md / crew.md + records, one commit
+    else step 5
+        P->>S: personaRemove {persona, confirm: title} per legacy default
+        S->>V: one commit each (req-261's route)
+    end
+    S-->>P: board changed -> the next step's line, or none
+```

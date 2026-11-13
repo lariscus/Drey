@@ -934,6 +934,15 @@ its heading (remembered across restarts):
   (document, Thread, Review); **Show older** at the foot loads the whole
   archive under a search field (id or title words).
 
+On a board on the new stages the groups follow **who holds** a ticket:
+**Needs you** lists everything that stands at You — your own step (*Accept*),
+a worker's question (*Ben asks*), the second send-back, a step no persona
+takes (*no persona*) — then **Running** (every other ticket a persona holds,
+the ones a worker is on first), **Prioritized** and **Inbox**; there is no
+Shaping group (a ticket you shape stands with its persona). A row's grey line
+reads `T-0129 · Ralf · 3/6`: who holds it and where it is in its chain, and
+`sent back` while the steps after a send-back run again.
+
 Every ticket sits in exactly one group — Needs you wins. A row
 leads with the ticket's id, the title and an age; under it sits **one grey
 line** — the phase, what waits on you or what the worker does, the
@@ -965,7 +974,20 @@ old stage moved to *active*, keeping its column. It runs only when you click
 it, waits while a run holds a ticket, and picks up where it stopped if it was
 interrupted. When the store's configuration is not on this computer,
 **Copy stages** copies the stages to paste into its `dricket.toml`; Migrate
-then moves the tickets. The board's columns look the same before and after.
+then moves the tickets. From then on the Board draws one column per persona
+(see *Board, Crew and the pool*) and the Tickets panel groups by who holds a
+ticket.
+
+**The board on the new stages: three more steps.** Once the store runs on the
+new stages, the same line offers the rest of the move, one step at a time and
+only on your click: **step 3** — the pipeline keeps only Inbox, Prioritized and
+Done and gains the standard flow; what the old working column carried for its
+runs (the class floor, model needs, turn and work ceilings) moves to the
+builder, and its token budget stays a board key; **step 4** — the crew's order
+and the leaving actions (the builder's *sync-main*, your *commit*); **step 5** —
+deleting *build-default* and *commit-default*, one commit each (when a prompt
+differs from the builder's own, the step says so first). **Review…** lists
+what the step writes; **Migrate** runs it, **Cancel** folds the list away.
 
 **The step card** (req-75 W3, reworked in req-86). At the end of a
 step, the thread shows a card above the transcript that follows where the
@@ -1377,7 +1399,7 @@ time span (4 hours), whichever ends first. While On, the popover shows where
 the tranche stands: *Tranche 4 of 10 runs*, today's cost, *2 h 10 min left*, a
 thin bar, and *Pauses with a checkpoint report after the tranche.* The status
 item's tooltip says the same (*Autopilot: On · tranche 4 of 10*), and the
-Capacity band under the Board tab has a line for it (*Tranche 4 of 10 runs ·
+Board's pool chip has a line for it in its popover (*Tranche 4 of 10 runs ·
 $4.10 of $15 · checkpoint in 6 runs or 2 h 10 min*).
 
 When the tranche is used up, the Autopilot **pauses itself**: running steps
@@ -1497,11 +1519,40 @@ the **persona** that works on it (the live run's, else the ticket's pin, else
 the column's) and the **cost** of the ticket so far, written as on the phone
 (`$1.20`); a ticket without a known cost shows none.
 
-**Board, Crew and Capacity.** Three more surfaces show the whole desk, from
+**Board, Crew and the pool.** Two more surfaces show the whole desk, from
 the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
-(*Open the Board*, *Open the Crew*, *Show the Capacity band*):
+(*Open the Board*, *Open the Crew*):
 
-- **Board** (an editor tab) — the pipeline as columns. A card shows the
+- **Board** (an editor tab). On a board on the new stages (after **Migrate**)
+  the columns are **Inbox**, **Prioritized**, one column **per persona** in the
+  crew's order — *You* among them — and **Done this week**. A card shows the
+  ticket's id, its title, its chain as initials (the steps done grey, the
+  current one filled, after a send-back the steps that run again dashed), who
+  holds it and where (`Ben · 3 of 6`), its cost and one status line:
+  *running · 6 min*, *running · from Tessa* (Tessa sent it back), *merging
+  main*, *waits for Ben* (Ben runs his maximum), *queued · waits for a B slot*
+  (the big pool is full), *shaping with you*. A word beside the id says what
+  waits on you: *Question*, *No persona*, *Sent back once* or *twice*,
+  *Accept*. A persona's head shows its load, `2/2 · 1 waiting` (its runs
+  against its maximum, amber at the maximum, and what waits for it). Personas
+  that hold nothing fold into one **+ n personas** chip; click it, or drag a
+  card over it, to open their columns. **Drag** a card from Inbox or
+  Prioritized onto a persona to start it there (that persona takes the
+  ticket's current step), from one persona to another to give the step to
+  someone else (refused while a run holds the ticket — stop it first — or while
+  it waits for your answer), back to Prioritized or Inbox to park it, or onto
+  Done. Right-click a card (or press the context-menu key) for the same moves.
+  On a card at your own step, **Accept** moves it on (at the last step: the
+  commit, then Done) and **Send back…** lets you pick the earlier step it goes
+  back to and asks why. Drag a persona's head onto another to change the
+  crew's order — the same order as the Crew tab's. In the board's head the
+  **pool chip** — `4/5 · 1 queued`, the running sessions over what the pools
+  carry and what waits for a slot — opens **Capacity**: a chip per account (see
+  *Accounts and their quota*), the tranche, the ticket next in the pool's
+  queue with its class and place, runs beyond the pool on a persona's minimum,
+  **Pause all** and **Open in Service window**.
+  On a board that has not migrated (the files backend, a store on the old
+  stages) the Board is the pipeline as columns, with the same pool chip. A card shows the
   ticket's id, what it is doing (*Running*, *Waiting*, *Plan*), its persona,
   its title and its cost; the head of a column shows the summed cost of its
   tickets. A ticket that is a part of another hangs under it, and a plan's
@@ -1592,13 +1643,6 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   has no **Delete persona…**. A crew member from a new board
   (Paul, Ben, Ralf or Tessa) stays deleted. The persona's tab stays open on a
   *No persona* note until you close it.
-- **Capacity** (a panel for the bottom dock) — its header reads `2 of 5
-  sessions · 1 queued`: the live sessions over what the pools carry, and the
-  tickets waiting to be pulled. Below it: what each persona is doing right now,
-  today's cost, **Open Crew ›**, a chip per account (see *Accounts and their
-  quota*), and a last line with the ticket next in the queue. **Pause all**
-  sits in the header. It shows only while the Board tab is active. As the only panel of the bottom dock it has no
-  icon strip above it; the chevron in its header folds it to the header.
 
 **Accounts and their quota.** Each worker runs on one of your accounts —
 for example two Claude Code logins, z.ai and Kimi. Every repository is
@@ -1610,7 +1654,7 @@ login expires, the run that hit it ends and its card in **Needs you**
 names the refused login; no further run starts on that account until you
 sign in to it again. Nothing is retried on its own.
 
-In the Capacity band each account is a chip: its sessions as dots (filled
+In the pool chip's popover each account is a chip: its sessions as dots (filled
 while busy), the share of its quota left as a bar — blue when the provider
 reports it, amber when Drey only estimates it, no bar and `unknown` when
 neither — and when the quota resets. `q` compares the quota left with the
@@ -1700,7 +1744,7 @@ run) waits for the current action — a command or an edit — to finish and
 then pauses; it never cuts one off half-way. A worker silent for ten
 minutes is flagged *Looks stuck*; after forty it is stopped and the step
 retries with a growing wait. The Work panel itself shows no worker
-cards: they live in the Crew tab and the Capacity band.
+cards: they live in the Crew tab and on the Board.
 
 **The worker on the ticket.** The thread's conversation is the
 ticket's story in steps: each earlier run of the ticket is one folded
@@ -1769,7 +1813,7 @@ over.
 Work panel's **⋯** menu) shows a card per persona with one row per live
 run, and the controls act on a run or on everything at once — **Nudge**,
 **Hand to Claude Code**, **Stop**, **Pause all** and the armed **Stop
-all** (click twice); see *Board, Crew and Capacity* above. A busy worker
+all** (click twice); see *Board, Crew and the pool* above. A busy worker
 without progress — no edit for eight minutes, the same file read again
 and again, or the runner itself flagging it — is flagged **Looks
 stuck**; the ticket thread's header shows the same word. The fleet daemon's log is on disk as `runner.log` in the fleet folder of the service home (`~/.drey-engine/fleet`).
@@ -2502,8 +2546,8 @@ automatically.
   the switcher after *Notes* and cannot be deleted, and opening a
   document that belongs to such a view (a tab the plugin names for it)
   switches there first. The tickets plugin offers **Work** (`Ctrl+2`):
-  the Tickets panel on the left, the Assistant on the right and the
-  Capacity band below. Opening a ticket — from the Tickets panel, the Files panel, a
+  the Tickets panel on the left, the Assistant on the right and nothing
+  below. Opening a ticket — from the Tickets panel, the Files panel, a
   `[[T-0121]]` link or the quick switcher — never changes the view: the
   ticket opens as a tab in the view you are in. Opening the Board or
   Crew tab switches to Work; Notes is `Ctrl+1`.

@@ -258,4 +258,55 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     expect(field(dkId, 'x-at')).toBe('3');
     expect(field(dkId, 'x-awaiting')).toBeNull();
   });
+  it('is a persona board: the crew as lanes, every active card with its hold (req-270)', async () => {
+    const { id } = chained('Held', 'ben;you;ralf;you', 3);
+    const snap = await service.snapshot();
+    expect(snap.lanes?.map((lane) => [lane.persona, lane.kind])).toEqual([['pia', 'mission'], ['ben', 'agent'], ['ralf', 'agent'], ['you', 'human']]);
+    const card = snap.columns.flatMap((c) => c.tickets).find((t) => t.id === id);
+    expect(card?.hold).toMatchObject({ holder: 'ralf', why: 'entry', position: 3, length: 4, chain: ['ben', 'you', 'ralf', 'you'], claimed: false });
+  });
+
+  it('starts, hands and parks a ticket by its persona columns (req-270)', async () => {
+    const dkId = dk(['add', '--unclaimed', '-m', 'Fresh idea']).trim();
+    const id = `T-${dkId.slice(2).padStart(4, '0')}`;
+    expect(await service.personaBoardMove({ kind: 'start', id, persona: 'ben' })).toMatchObject({ ok: true });
+    expect(field(dkId, 'stage')).toBe('active');
+    expect(field(dkId, 'x-at')).toBe('1');
+    expect(field(dkId, 'x-chain')?.split(';')[0]).toBe('ben:shape'); // the dropped-on persona takes the entry at the cursor, its mode with it
+
+    const moved = chained('Hand', 'ben;you;ralf;you', 3);
+    expect(await service.personaBoardMove({ kind: 'hand', id: moved.id, persona: 'ben' })).toMatchObject({ ok: true });
+    expect(field(moved.dkId, 'x-chain')).toBe('ben;you;ben;you');
+    expect(field(moved.dkId, 'x-at')).toBe('3');
+
+    expect(await service.personaBoardMove({ kind: 'park', id: moved.id, stage: 'prioritized' })).toMatchObject({ ok: true });
+    expect(field(moved.dkId, 'stage')).toBe('prioritized');
+    expect(field(moved.dkId, 'x-at')).toBe('3');
+  });
+
+  it("Send back at You goes to the position the owner picked (req-270)", async () => {
+    const { id, dkId } = chained('Picked', 'ben;you;ralf;you', 4);
+    expect(await service.sendBack({ id, note: 'start over', position: 1 })).toMatchObject({ ok: true });
+    expect(field(dkId, 'x-at')).toBe('1');
+  });
+  // Last in the file: it rewrites the meta vault's pipeline.md and crew.md the cases above read.
+  it("migrates the meta vault on the owner's confirmation: step 3 the pipeline, step 4 the crew (req-268)", async () => {
+    const held = chained('Through the migration', 'ben;you;ralf;you', 3);
+    expect((await service.snapshot()).boardMigration).toMatchObject({ step: 'pipeline', removed: ['Shaping', 'Building', 'Ready to try'], flow: null });
+    expect(await service.migrateBoard({ step: 'crew' })).toMatchObject({ ok: false });
+
+    expect(await service.migrateBoard({ step: 'pipeline' })).toMatchObject({ ok: true });
+    const pipeline = readFileSync(path.join(root, 'meta', 'tickets', '_meta', 'pipeline.md'), 'utf8');
+    expect(pipeline).not.toContain('building');
+    const after = await service.snapshot();
+    expect(after.pipeline.map((p) => p.id)).toEqual(['inbox', 'prioritized', 'done']);
+    expect(after.columns.flatMap((c) => c.tickets).find((t) => t.id === held.id)?.hold).toMatchObject({ holder: 'ralf', position: 3 });
+    expect(after.issues.some((issue) => issue.message.includes('"active"'))).toBe(false);
+    expect(after.boardMigration).toEqual({ step: 'crew', order: ['pia', 'ben', 'ralf', 'you'], leaving: [{ persona: 'ben', action: 'sync-main' }] });
+
+    expect(await service.migrateBoard({ step: 'crew' })).toMatchObject({ ok: true });
+    expect(readFileSync(path.join(root, 'meta', 'tickets', '_meta', 'crew.md'), 'utf8')).toContain('order: [pia, ben, ralf, you]');
+    expect(readFileSync(path.join(root, 'meta', 'tickets', '_meta', 'personas', 'ben', 'persona.md'), 'utf8')).toContain('leaving: [sync-main]');
+    expect((await service.snapshot()).boardMigration).toBeUndefined();
+  });
 });

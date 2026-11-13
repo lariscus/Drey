@@ -3,8 +3,9 @@ import type { DreyPluginApi, ViewPresetContrib } from '../../../shared/plugin-ap
 /**
  * The Work view (E13-13, ADR-0089): the tickets plugin's saved layout next
  * to Notes. First cut -- the Tickets panel left, the tabs in the centre
- * (ticket documents, the Board, the Team), the Assistant right, the Capacity
- * band below. The Review, Shape, Parts and Flow tabs arrive with their own
+ * (ticket documents, the Board, the Team), the Assistant right, nothing
+ * below — the Capacity band was merged into the Board's pool chip (req-271,
+ * owner 2026-11-11). The Review, Shape, Parts and Flow tabs arrive with their own
  * milestones; the Assistant's Mission Control target with E13-5 (the preset
  * carries no `assistantTarget` until the Assistant knows one).
  */
@@ -12,15 +13,11 @@ export const WORK_VIEW_ID = 'tickets.work';
 
 export const WORK_VIEW_LABEL = 'Work';
 
-/** The dock panel ids the preset arranges (`tickets` and `tickets-capacity` are this plugin's, `assistant` the Assistant plugin's). */
+/** The dock panel ids the preset arranges (`tickets` is this plugin's, `assistant` the Assistant plugin's). */
 export const WORK_PANELS = {
   left: ['tickets'],
   right: ['assistant'],
-  bottom: ['tickets-capacity'],
 } as const;
-
-/** Board 7e: the Capacity band's first height: header 28 + persona row 62 + Slots row 32 + queue row 34 + 12 above the status bar (the dock's own top border is drawn above it). */
-export const WORK_CAPACITY_HEIGHT = 168;
 
 /** The Crew view (boards 9a, 7h: Notes · Work · Crew): the tickets panel and the Assistant, the Board's and Crew's tabs are opened from the panel. */
 export const CREW_VIEW_ID = 'tickets.crew';
@@ -55,8 +52,7 @@ export function createWorkPreset(): ViewPresetContrib {
     layout: {
       left: [...WORK_PANELS.left],
       right: [...WORK_PANELS.right],
-      bottom: [...WORK_PANELS.bottom],
-      bottomH: WORK_CAPACITY_HEIGHT,
+      bottom: [],
     },
   };
 }
