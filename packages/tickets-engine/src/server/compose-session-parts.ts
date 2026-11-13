@@ -15,7 +15,9 @@ import { ProjectService } from '../services/project-service';
 import { PersonaRecords } from '../services/persona-records';
 import { PersonaSessionService } from '../services/persona-session-service';
 import { FilePlanShadowStore } from '../services/plan-shadow';
-import { SkillService } from '../services/skill-service';
+import { composeSkills } from '../services/compose-skills';
+import type { SkillLibraryService } from '../services/skill-library-service';
+import type { SkillService } from '../services/skill-service';
 import type { BoardParts } from './compose-board-parts';
 import type { EngineOptions } from './engine-types';
 import type { FileConfigStore } from './file-config';
@@ -28,6 +30,8 @@ export interface SessionParts {
   readonly personaSessions: PersonaSessionService;
   readonly personaRecords: PersonaRecords;
   readonly skills: SkillService;
+  /** req-289: Settings → Skills library — the listing and the GitHub sources. */
+  readonly skillLibrary: SkillLibraryService;
   /** req-261: deleting a persona. */
   readonly personaRemoval: PersonaRemoveService;
   /** req-284: Settings → Projects' writes, one commit each. */
@@ -94,7 +98,7 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
     ...(opts.oneOnOneTools === undefined ? {} : { tools: opts.oneOnOneTools }),
   });
   const personaRecords = new PersonaRecords({ board, host, git, log });
-  const skills = new SkillService({ board, host, git });
+  const { skills, library: skillLibrary } = composeSkills({ board, host, git, env: process.env, ...(opts.github === undefined ? {} : { github: opts.github }) });
   const personaRemoval = new PersonaRemoveService({ board, fleet, host, git, pins: new PersonaPinReader(host, parts.crew.crewFiles) });
   const projects = new ProjectService({ board, host, git, changed: () => board.announceChanged() });
   const startupWork = migrateOnce(log, {
@@ -104,7 +108,7 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
     crew: { board, seeder: parts.crewSeeder, pictures: parts.crewPictures },
     projects: (opts.migrateProjects ?? opts.seedDefaultCrew !== false) ? new ProjectMigrator({ board, host, git, log }) : null,
   });
-  return { chat, personaSessions, personaRecords, skills, personaRemoval, projects, startupWork };
+  return { chat, personaSessions, personaRecords, skills, skillLibrary, personaRemoval, projects, startupWork };
 }
 
 /** The one-time migrations of the engine's start. */

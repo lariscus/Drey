@@ -63,6 +63,7 @@ Top-level rules, once, up front:
       crew.md         # the crew's defaults and limits — the vault layer (req-173), see below
       prompts/        # the handover prompts (`agent <prompt-ref>` names one file)
       skills/         # the shared skills: <name>/SKILL.md, Agent Skills folders (req-172) — see Skills below
+      skill-sources.md # the skills library's GitHub sources (req-289) — see _meta/skills/ below
       personas/       # the agent personas (E3, the improvement loop E6):
                       #   <id>/persona.md + prompt.md + memory.md + reviews.md +
                       #   improvements.md (+ avatar.png) — see Personas below
@@ -1620,13 +1621,80 @@ tickets/_meta/personas/<id>/skills/ # the persona's own home
   the name is refused (`exists`) unless `overwrite: true`, which replaces the
   folder and commits the removals. One commit `skills: <name> added in <the
   shared pool | persona>` (or `replaced`).
+  An upload over a skill a GitHub source brought makes it the owner's own:
+  its name leaves the source's record in the same commit (req-289).
+
+### GitHub sources — `_meta/skill-sources.md` (req-289, R8)
+
+The skills library (Settings → Tickets → Skills library, board 7o) fetches
+skills from a **public GitHub repository**. A fetched skill is an ordinary
+Agent Skills folder in the shared home `_meta/skills/<name>/` — byte for byte
+what the repository holds at the fetched commit, scripts and references
+included; nothing Drey writes lands inside the folder. Its source is recorded
+**beside** the skills folder, in one file:
+
+```yaml
+---
+sources:
+  - repo: github.com/acme/skills     # always github.com/<owner>/<repo>
+    path: ""                         # the folder in the repository; "" = its root
+    ref: v1.4                        # the tag or branch the owner asked for
+    commit: 3f2a…                    # the commit the ref pointed at (7–64 hex)
+    fetched: 2026-11-13T09:12:00.000Z
+    skills: [angular-standalone, playwright-e2e]   # the folders it brought
+---
+
+The GitHub sources of the skills library: …   # prose, kept on every write
+```
+
+- **A source** is a repository and a folder in it (`repo` + `path` is its
+  identity, written `github.com/acme/skills/skills/e2e` when the path is not
+  empty). Its skills are every folder under `path` that holds a `SKILL.md` —
+  the topmost one where folders nest (a skill's own `examples/x/SKILL.md` is a
+  file of it); the folder's name is the skill's name (the repository's name
+  when the root itself is the skill). At most 50 skills per source. Each
+  folder passes the upload's checks (`SKILL.md` with a description and a body,
+  200 files, 8 MiB, 256 KiB for `SKILL.md`); a folder that fails is skipped
+  and named in the reply, the rest are taken.
+- **Fetch** (`skillSourceFetch {repo, path?, ref}`, `repo` as
+  `github.com/o/r`, `https://github.com/o/r(.git)` or `o/r`): refused when the
+  source is already recorded (`exists` — update it instead) or when a skill
+  name is already taken in the shared home (`exists`, naming them — the
+  library never overwrites a skill it did not bring). **One commit** of the
+  folders and the record: `skills: <source> fetched at <ref> (<n> skills)`.
+- **Update** (`skillSourceUpdate {source, to?}`): the source fetched again at
+  `to` (default its own ref) — its folders that are gone at the new commit
+  are removed, the others rewritten, new ones added, the record moved to the
+  new ref and commit; **one commit** `skills: <source> updated at <ref> (<n>
+  skills)` that records the removals.
+- **Remove** (`skillSourceRemove {source}`): its folders and its entry leave,
+  one commit `skills: source <source> removed (<n> skills)`. **Delete**
+  (`skillDelete {name, persona?}`): a shared skill's folder (and its name in a
+  source's `skills:`), or a persona's own skill; one commit `skills: <name>
+  deleted …`. The page asks first and says how many personas select it; their
+  `skills:` lists keep the name, which then reads as *missing*.
+- **A newer ref**: a version tag (`v1.4`, `2.0.1`) is updated by the highest
+  tag above it spelled the same way (`v1.5`, never `1.5`); a branch by a new
+  commit on it (the button then reads *Update to main*). GitHub is asked only
+  on the owner's action — Fetch, Update, and the library page's first look
+  when it opens (at most once in five minutes per source); what the look found
+  is kept in the service's memory, never written, and every skill listing
+  carries it (`SkillView.source`, `SkillView.updateAvailable`, read by the
+  Persona page).
+- **The network**: the REST API (`api.github.com`) for a ref's commit, the
+  tree and the tags; `raw.githubusercontent.com` for the files. No token and
+  no credentials are sent or stored; a private repository answers 404
+  (`not_found`), a spent hourly limit is `rate_limited`, anything else
+  `fetch_failed`. `DREY_GITHUB_API_URL` / `DREY_GITHUB_RAW_URL` move both
+  (the e2e's local fake).
 
 ### The routes
 
 All answer `{ok: true, …}` or `{ok: false, code, error}` (a 200 either way,
 like the board's); `code` is one of `no_vault`, `no_persona`, `no_skill`,
 `bad_name`, `bad_scope`, `bad_skill_file`, `bad_archive`, `path_escape`,
-`exists`, `too_large`, `not_own`, `internal`, and a client shows the catalog
+`exists`, `too_large`, `not_own`, `internal` — and for the GitHub sources
+`bad_source`, `no_source`, `not_found`, `rate_limited`, `fetch_failed` —, and a client shows the catalog
 text `skills.error.<code>`. Types: `packages/tickets-engine/src/contracts/skills.ts`.
 
 | Route | Remote port / plugin IPC | Does |
@@ -1637,6 +1705,10 @@ text `skills.error.<code>`. Types: `packages/tickets-engine/src/contracts/skills
 | `POST /api/personas/<id>/skills/remove` `{name}` | `personaSkillRemove` | deletes an **own** skill's folder, one commit that records the removals; a shared skill is `not_own` |
 | `POST /api/skills` `{scope, persona?, format, name?, text?, zipBase64?, overwrite?}` | `skillUpload` | uploads (above): `{name, origin, files, replaced, list}` |
 | `GET /api/personas/<id>/prompt?step=&model=` | `personaPromptPreview` | the brief a run would start with: `{persona, step, text, tokens, tokenizer, parts, skills}` |
+| — (invoke and plugin IPC only) | `skillLibrary {check?}` | the library (req-289): `{library: {sources, skills}}` — every shared and own skill with its source, `updateAvailable`, tokens, size and `usedBy`; `check` asks GitHub for newer refs first |
+| — | `skillSourceFetch`, `skillSourceUpdate`, `skillSourceRemove`, `skillDelete` | the GitHub sources and deleting a skill (above): `{library, source?, skipped, warning}` |
+
+Types of the library: `packages/tickets-engine/src/contracts/skill-library.ts`.
 
 `list` is `{persona, skills[], missing[], selectedTokens, tokenizer}`; a skill
 is `{name, description, origin: own|shared, on, overridesShared, legacy, size,

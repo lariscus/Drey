@@ -11,6 +11,7 @@ import { missingShippedPrompts } from './settings/desk-model';
 import { createDeskSettings, type DeskSettingsHooks } from './settings/desk-settings';
 import { ticketsEntries, ticketsSections, type TicketsSectionId } from './settings-sections';
 import { createModelsSection } from './settings/models-section';
+import { createSkillsLibrarySection } from './settings/skills-library-section';
 import { createWorkersSection } from './settings-workers';
 import { CrewSettings } from './settings-crew';
 
@@ -88,6 +89,7 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
         });
         prompts.update(listing, usage);
         void models.refresh();
+        void skillsLibrary.refresh();
         repos.update(reposListing);
         if (!workersOpened) {
           workersOpened = true;
@@ -104,9 +106,13 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
       let workersOpened = false;
       const remote = createRemoteSection(api);
       const models = createModelsSection(api);
+      // req-289: Settings → Skills library sits after Models, as board 7o's nav has it.
+      const skillsLibrary = createSkillsLibrarySection(api);
+      const afterAutopilot = el('div', 'tset-after-autopilot');
+      afterAutopilot.append(models.root, skillsLibrary.root);
       const desk = createDeskSettings(api, {
         ...hooks,
-        afterAutopilot: models.root,
+        afterAutopilot,
         manageRunners: () => {
           workers.root.scrollIntoView({ block: 'start', behavior: 'smooth' });
         },
@@ -154,6 +160,7 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
         prompts.dispose();
         remote.dispose();
         models.dispose();
+        skillsLibrary.dispose();
       };
     },
   };

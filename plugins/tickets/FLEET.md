@@ -1197,6 +1197,16 @@ the format, the order, the upload rules and the migration.
   total as `≈ N tokens at start` and **Preview full prompt** shows the brief.
   The persona list carries `committedAt` (when `personas/<id>/` was last
   committed) for the page's `Saved · committed 2 days ago`.
+- **GitHub sources** (req-289, milestone 268): Settings → Tickets → Skills
+  library fetches skills from a public GitHub repository into the shared
+  `_meta/skills/` — ordinary skill folders a run loads like any other — and
+  records each source in `_meta/skill-sources.md` (`specs/ticket-schema.md`,
+  "GitHub sources"). Fetch, Update and Remove are one commit each, queued with
+  every other skill write (`SkillWriteQueue`). Drey Service asks GitHub only on
+  the owner's action (Fetch, Update, the library's first look when the page
+  opens); no token is sent. `DREY_GITHUB_API_URL` / `DREY_GITHUB_RAW_URL` point
+  it at another host — the e2e's local fake. A run never fetches: a skill that
+  a source updates changes the next run's brief, not a running one.
 - **Checking one by hand**, against a service you started with your own home
   (never the owner's): `curl -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/api/personas/<id>/skills`.
   A `code` in the answer is what failed (`no_skill`, `exists`, `path_escape`, …).

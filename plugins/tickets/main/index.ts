@@ -853,7 +853,8 @@ const plugin: MainPluginModule = {
     // The Flow tab (E13-11) and the Settings page's engine half (E13-12):
     // the engine's own flow calls and `videos.*` settings, one channel each.
     // req-284: Settings → Projects' writes; the engine checks the payload (ProjectService).
-    for (const method of ['flow', 'flowEdit', 'flowDraft', 'flowSave', 'settingsRead', 'settingsPatch', 'projectSave', 'projectRemove', 'projectAddRepo']) {
+    // req-289: Settings → Skills library; the engine checks the payload (SkillLibraryService).
+    for (const method of ['flow', 'flowEdit', 'flowDraft', 'flowSave', 'settingsRead', 'settingsPatch', 'projectSave', 'projectRemove', 'projectAddRepo', 'skillLibrary', 'skillSourceFetch', 'skillSourceUpdate', 'skillSourceRemove', 'skillDelete']) {
       ctx.ipc.handle(method, (payload) => client.invoke(method, payload));
     }
     ctx.ipc.handle('personaMemory', (payload) => {

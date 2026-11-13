@@ -41,3 +41,6 @@ export const REMOTE_METHODS = ['status', 'configure', 'init', 'localClient', 'ca
 
 // req-284: Settings → Projects' writes (ProjectService), one commit each.
 export const PROJECT_METHODS = ['projectSave', 'projectRemove', 'projectAddRepo'] as const;
+
+// req-289: Settings → Skills library (SkillLibraryService): the listing, the GitHub sources, deleting a skill.
+export const SKILL_LIBRARY_METHODS = ['skillLibrary', 'skillSourceFetch', 'skillSourceUpdate', 'skillSourceRemove', 'skillDelete'] as const;

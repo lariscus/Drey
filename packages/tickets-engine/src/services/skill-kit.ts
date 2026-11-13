@@ -6,6 +6,7 @@ import type { SkillFileSystem } from './skill-file-system';
 import { SkillFolderReader } from './skill-folder-reader';
 import { SkillLister } from './skill-lister';
 import { SkillMigrator } from './skill-migrator';
+import { SkillSourceStore } from './skill-source-store';
 import { SkillUploader } from './skill-uploader';
 
 /** The skill classes wired over one vault's disk (req-172); the composition of `SkillService`, one per vault per call. */
@@ -17,6 +18,8 @@ export interface SkillKit {
   readonly committer: SkillCommitter;
   readonly migrator: SkillMigrator;
   readonly preview: PromptPreview;
+  /** req-289: the GitHub sources' record. */
+  readonly sources: SkillSourceStore;
 }
 
 export type SkillKitHost = Pick<EngineHost, 'announceChanges' | 'log'>;
@@ -33,5 +36,6 @@ export function buildSkillKit(fs: SkillFileSystem, host: SkillKitHost, git: Skil
     committer,
     migrator: new SkillMigrator(fs, committer, host),
     preview: new PromptPreview(fs),
+    sources: new SkillSourceStore(fs),
   };
 }
