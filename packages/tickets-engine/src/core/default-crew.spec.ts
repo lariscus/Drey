@@ -12,12 +12,13 @@ const AGENT_IDS = DEFAULT_CREW_IDS.filter((id) => id !== 'pia');
 type Shipped = Exclude<ReturnType<typeof shippedPersonaOf>, string>;
 
 describe('the shipped default crew files (req-256)', () => {
-  it('ships Pia first, then the four ids of decision D7, one folder each', async () => {
+  it('ships Pia first, then the four ids of decision D7, one folder each (and the human persona\'s picture, req-292)', async () => {
     expect(DEFAULT_CREW_IDS).toEqual(['pia', 'paul', 'ben', 'ralf', 'tessa']);
-    expect((await fsp.readdir(DIR)).sort()).toEqual([...DEFAULT_CREW_IDS].sort());
+    expect((await fsp.readdir(DIR)).sort()).toEqual([...DEFAULT_CREW_IDS, 'you'].sort());
     for (const id of DEFAULT_CREW_IDS) {
-      expect((await fsp.readdir(path.join(DIR, id))).sort()).toEqual(['persona.md', 'prompt.md']);
+      expect((await fsp.readdir(path.join(DIR, id))).sort()).toEqual(['avatar.png', 'persona.md', 'prompt.md']);
     }
+    expect(await fsp.readdir(path.join(DIR, 'you'))).toEqual(['avatar.png']);
   });
 
   it('are LF and newline-terminated, byte for byte as the repo holds them', async () => {

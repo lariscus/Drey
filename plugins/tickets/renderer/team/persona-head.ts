@@ -43,6 +43,6 @@ export function personaHead(ctx: BlockContext, counts: HeadCounts, back: () => v
   });
   names.append(h('b', 'persona-head-name', draft.title), h('span', 'persona-muted', sub));
   const state = h('span', 'persona-muted persona-state');
-  head.append(avatarNode('persona-avatar persona-avatar-head', draft.title, ctx.persona.color), names, h('span', 'persona-grow'), state, outlineButton(t('persona.page.back'), 'persona-back', back));
+  head.append(avatarNode('persona-avatar persona-avatar-head', draft.title, ctx.persona.color, ctx.persona.id), names, h('span', 'persona-grow'), state, outlineButton(t('persona.page.back'), 'persona-back', back));
   return { element: head, state };
 }

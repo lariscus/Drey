@@ -1497,9 +1497,16 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   parts that are not tickets yet hang under the planning ticket as *P1*,
   *P2*. A click opens the ticket; **New idea** in the first column captures
   one. *Done this week* is the last column.
-- **Crew** (an editor tab) — a card per persona: its state (*idle*,
+- **Crew** (an editor tab) — a card per persona: its picture, its state (*idle*,
   *running*, *waiting*, *stuck*, *paused*), the day's cost against its
-  budget, and one row per live run. A run that stopped making progress
+  budget, and one row per live run. The shipped crew — Pia, Paul, Ben, Ralf,
+  Tessa and you — come with their pictures (the Drey crew's squirrels); a
+  board set up before them gets them the next time the engine starts, and a
+  picture already in a persona's folder stays. The picture is the file
+  `avatar.png` in the persona's folder; a persona without one shows its
+  initials (or its silhouette) on its colour, everywhere the crew is drawn —
+  here, the Capacity band, the persona's page, the ticket card and Mission
+  Control on the iPad and the phone. A run that stopped making progress
   turns amber and offers **Nudge** (asks the worker for a status line),
   **Hand to Claude Code** (stops the run and starts the ticket again on
   Claude Code) and **Stop**. Above the cards: today's cost against all
@@ -1515,7 +1522,7 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   it — and its journal of noteworthy runs, [Memory and journal](#memory-journal)) and **Setup** (worker,
   model, pool, phases, cost; **Pause** or **Resume** the persona).
   **Edit persona** on that head opens the persona's own page. On the left,
-  **Profile** (the circle with the initials, the name, the role and **the one
+  **Profile** (the persona's picture — or its initials —, the name, the role and **the one
   line for the crew list** — the line under the name on the crew cards, in
   Mission Control too), **Work** (the harness; the models,
   strongest first, each with its class, its factor and how many of its

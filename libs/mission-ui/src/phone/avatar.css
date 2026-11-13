@@ -6,3 +6,6 @@
   display: block;
   border-radius: 50%;
 }
+.pic {
+  object-fit: cover;
+}

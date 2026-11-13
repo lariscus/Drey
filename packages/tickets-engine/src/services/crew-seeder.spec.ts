@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { crewOrderOf } from '../core/crew-order';
-import { seededCrewOf } from '../core/crew-seed-marker';
+import { SEEDED_PICTURES_KEY, seededCrewOf, seededListOf } from '../core/crew-seed-marker';
 import { DEFAULT_CREW_IDS } from '../core/default-crew';
 import { parsePersonaFile } from '../core/persona';
 import { CREW_SEED_COMMIT } from './crew-seeder';
@@ -37,6 +37,16 @@ describe('CrewSeeder — the default crew Pia, Paul, Ben, Ralf, Tessa (req-256, 
       expect(rig.commits[0]!.paths).toContain(`${DIR}/tessa/prompt.md`);
       expect(rig.announced).toHaveLength(1);
       expect(rig.logs.filter((line) => line.startsWith('crew: seeded the default crew'))).toHaveLength(1);
+    });
+
+    it('req-292: copies the shipped picture of each persona in the same commit and marks it in crew.md', async () => {
+      await rig.seeder.seed(rig.vault);
+      for (const id of DEFAULT_CREW_IDS) {
+        expect(await rig.exists(`${DIR}/${id}/avatar.png`)).toBe(true);
+        expect(rig.commits[0]!.paths).toContain(`${DIR}/${id}/avatar.png`);
+      }
+      expect(seededListOf(await rig.read(CREW), SEEDED_PICTURES_KEY)).toEqual([...DEFAULT_CREW_IDS]);
+      expect(seededCrewOf(await rig.read(CREW))).toEqual([...DEFAULT_CREW_IDS]);
     });
 
     it('req-258: writes the crew order, the human last, and the shipped run settings', async () => {
@@ -127,7 +137,7 @@ describe('CrewSeeder — the default crew Pia, Paul, Ben, Ralf, Tessa (req-256, 
     expect(seededCrewOf(await rig.read(CREW))).toEqual(['paul', 'ben', 'ralf', 'tessa', 'pia']);
     expect(crewOrderOf(await rig.read(CREW))).toEqual(['pia', 'paul', 'ben', 'you']);
     expect(rig.commits).toHaveLength(1);
-    expect(rig.commits[0]!.paths).toEqual([`${DIR}/pia/persona.md`, `${DIR}/pia/prompt.md`, CREW]);
+    expect(rig.commits[0]!.paths).toEqual([`${DIR}/pia/persona.md`, `${DIR}/pia/prompt.md`, `${DIR}/pia/avatar.png`, CREW]);
   });
 
   it('req-269: an order that already names Pia, or a Pia the owner deleted, is left as it is', async () => {

@@ -1,11 +1,18 @@
+import { personaPictures } from './persona-pictures';
+
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /**
  * The persona's picture, one drawing everywhere (fidelity ruling O8): the Crew
- * cards, the ticket card and the Parts rows. The persona colour, a head and
- * shoulders; a persona without a colour draws on the border grey.
+ * cards, the ticket card and the Parts rows. Its `avatar.png` when it has one
+ * (req-292), else the silhouette: the persona colour, a head and shoulders; a
+ * persona without a colour draws on the border grey.
  */
-export function personaPictureNode(color: string, title: string, size = 20): SVGElement {
+export function personaPictureNode(color: string, title: string, size = 20, id: string | null = null): Element {
+  return personaPictures.paint(silhouetteNode(color, title, size), id, title);
+}
+
+function silhouetteNode(color: string, title: string, size: number): SVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('role', 'img');
   svg.setAttribute('aria-label', title);

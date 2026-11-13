@@ -5957,3 +5957,36 @@ sequenceDiagram
 ```
 
 A chain run's brief lists the positions and the `SEND-BACK:` marker (`prompts/disciplines/chain.md`); the harness's result text is read for it (`event-text.ts` `sendBackOf`), `exitVerdict` answers `send-back` before the gate, and `RunCompletion.sendBack` decides with `decideSendBack` over the request's `cursor` (its entries and the send-back already used). Pia's entry never reaches the runner: the engine sweeps on every board and fleet change, runs one turn per entry, and the ticket's `awaiting` keeps a second turn from starting.
+
+## 6.125 The persona pictures — seeding, the start's backfill, the read into every circle (req-292, milestone 253)
+
+The shipped pictures reach a board three ways — the seeding (6.117) copies each seeded persona's `avatar.png` into its commit, the creation of `you` copies its own, and at the engine's start `CrewPictures` backfills a board seeded before them. The clients read the version on the persona list and ask for a picture once per version.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Start as engine start (composeSessionParts.migrateOnce)
+    participant Seed as CrewSeeder
+    participant Pics as CrewPictures
+    participant Av as PersonaAvatars (vault + package)
+    participant Crew as crew.md (seeded-crew, seeded-pictures)
+    participant Git as TicketsGit
+    participant Port as DreyTicketsPort / BoardAvatars
+    participant UI as Drey renderer (PersonaPictures) / Mission Control (McPersonaPictureStore)
+    Start->>Seed: seed(vault) — new personas with their pictures, ids into seeded-pictures
+    Start->>Pics: backfill(vault)
+    Pics->>Crew: read — candidates = seeded-crew + you, minus seeded-pictures
+    loop each candidate whose folder exists
+        Pics->>Av: copyShipped(vault, id) — exclusive create, never over a picture
+    end
+    alt something copied
+        Pics->>Crew: put(seeded-pictures += copied and found)
+        Pics->>Git: one commit "personas: crew pictures"
+    else nothing to copy
+        Pics-->>Start: nothing — no write, no commit
+    end
+    UI->>Port: personas — each view carries avatarVersion (size + mtime), absent without a picture
+    UI->>Port: personaAvatar(id) (IPC) / GET /api/personas/<id>/avatar — once per id@version
+    Port->>Av: read(vault, id) — a PNG up to 2 MB
+    Port-->>UI: {ok, dataUrl} or 404 — the circle keeps its initials / silhouette until and unless it arrives
+```

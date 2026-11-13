@@ -69,6 +69,7 @@ import {
 } from '@mission-ui/api/dto';
 import type { McApproveReply, McPartsEdit } from '@mission-ui/plan/approve.model';
 import type { McFlowOp, McFlowReply } from '@mission-ui/flow/flow.model';
+import { pictureUrlOf } from './persona-pictures';
 
 export type PairingPhase = 'needs-code' | 'pairing' | 'ready';
 
@@ -1333,6 +1334,12 @@ export class McState {
   /** The memoized object URL for one attachment; null until `ensureAttachment` fetched it. */
   attachmentUrl(name: string): string | null {
     return this.attachmentUrls().get(name) ?? null;
+  }
+
+  /** req-292: one persona's picture as a data URL (`GET /api/personas/<id>/avatar`); null = none or the desk did not answer. */
+  async personaAvatar(id: string): Promise<string | null> {
+    const reply = await this.client.request('GET', `/api/personas/${encodeURIComponent(id)}/avatar`).catch(() => null);
+    return pictureUrlOf(reply);
   }
 
   /** Fetches one attachment on demand; the memo hands out the same URL afterwards. */

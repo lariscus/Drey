@@ -993,6 +993,23 @@ app-dock[side='bottom']:has(.desk-capacity[hidden]):not(:has(app-panel-frame:not
   border-radius: 50%;
 }
 
+/*
+ * req-292: the persona's picture (avatar.png) in its circle, cropped to it.
+ * In place of a silhouette it keeps the silhouette's size; inside a circle
+ * (initials on the persona colour) it fills the circle, the colour behind it.
+ */
+.persona-picture {
+  display: block;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.has-picture > .persona-picture {
+  width: 100%;
+  height: 100%;
+}
+
 .desk-avatar {
   background: var(--persona-color, var(--border));
   border: 0;

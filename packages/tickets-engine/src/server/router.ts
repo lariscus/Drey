@@ -428,6 +428,12 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
     if (memory !== null) {
       return json(await port.personaMemory(memory[1]!));
     }
+    // req-292: the persona's picture as a data URL, 404 without one (the list's `avatarVersion` says which have one).
+    const avatar = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/avatar$/.exec(req.path);
+    if (avatar !== null) {
+      const reply = await port.personaAvatar(avatar[1]!);
+      return reply.ok ? json(reply) : fail(404, reply.error);
+    }
     // req-169: the persona's journal (reviews.md), apart from its memory.
     const journal = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/journal$/.exec(req.path);
     if (journal !== null) {

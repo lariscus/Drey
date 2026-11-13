@@ -1,6 +1,6 @@
 import { CREW_FILE } from '../contracts/crew-config';
 import { seededPersonaText, seededPromptText, type ShippedPersona } from '../core/default-crew';
-import { seededCrewOf, withSeededCrew } from '../core/crew-seed-marker';
+import { SEEDED_PICTURES_KEY, seededCrewOf, seededListOf, withSeededCrew, withSeededList } from '../core/crew-seed-marker';
 import { crewOrderOf, withCrewOrder } from '../core/crew-order';
 import { HUMAN_PERSONA_ID, PERSONAS_DIR, type PersonaModels } from '../core/persona';
 import type { CrewWrite } from '../core/crew-file-write';
@@ -9,6 +9,7 @@ import type { ModelRow } from '../fleet/protocol-pool';
 import type { CrewConfigFiles } from './crew-config-files';
 import type { CrewSeedModels } from './crew-seed-models';
 import type { EngineHost, EngineVault } from './host';
+import type { PersonaAvatarWriter } from './persona-avatars';
 import type { PersonaFolderPort } from './persona-folders';
 import type { ModelTablePort } from './service-model-table';
 import type { ShippedCrew, ShippedCrewSource } from './shipped-crew-files';
@@ -28,6 +29,8 @@ export interface CrewSeederDeps {
   readonly host: Pick<EngineHost, 'write' | 'announceChanges'>;
   readonly git: Pick<TicketsGit, 'locate' | 'commitPaths'>;
   readonly folders: PersonaFolderPort;
+  /** req-292: the shipped picture of each seeded persona, copied beside its files. */
+  readonly avatars: PersonaAvatarWriter;
   /** The vault's crew settings: the default worker, and the file the marker lives in. */
   readonly crew: {
     effective(vault: EngineVault): Promise<{ readonly defaultWorker: string }>;
@@ -74,6 +77,14 @@ function withOrder(marked: CrewWrite, shipped: readonly ShippedPersona[], offere
   }
   const front = offered.filter((persona) => persona.persona.kind === 'mission' && !order.includes(persona.id)).map((persona) => persona.id);
   return front.length === 0 ? marked : withCrewOrder(marked.text, [...front, ...order]);
+}
+
+/** req-292: the ids whose shipped picture the seeding laid down join `seeded-pictures:`, so a picture the owner removes stays removed. */
+function withPictures(marked: CrewWrite, ids: readonly string[]): CrewWrite {
+  if (!marked.ok || ids.length === 0) {
+    return marked;
+  }
+  return withSeededList(marked.text, SEEDED_PICTURES_KEY, [...seededListOf(marked.text, SEEDED_PICTURES_KEY), ...ids]);
 }
 
 export class CrewSeeder {
@@ -126,17 +137,19 @@ export class CrewSeeder {
     }
     const models = this.deps.models.pick(run.worker, run.rows);
     const written = await this.writePersonas(run, missing, models);
-    await files.put(vault, marker.text);
-    const paths = [...written, CREW_FILE];
+    const pictured = withPictures(marker, written.pictured);
+    await files.put(vault, pictured.ok ? pictured.text : marker.text);
+    const paths = [...written.paths, CREW_FILE];
     await this.commit(vault, paths);
     this.deps.host.announceChanges(vault.id, paths);
     this.report(run, { seeded: missing, models, kept: offered.length - missing.length });
     return missing.length === 0 ? { kind: 'nothing' } : { kind: 'seeded', ids: missing.map((persona) => persona.id) };
   }
 
-  private async writePersonas(run: Seeding, personas: readonly ShippedPersona[], models: PersonaModels | null): Promise<string[]> {
+  private async writePersonas(run: Seeding, personas: readonly ShippedPersona[], models: PersonaModels | null): Promise<{ readonly paths: string[]; readonly pictured: string[] }> {
     const { vault, worker } = run;
     const written: string[] = [];
+    const pictured: string[] = [];
     for (const persona of personas) {
       const prompt = seededPromptText(persona, run.shipped.steps);
       if (prompt.stepMissing) {
@@ -147,8 +160,13 @@ export class CrewSeeder {
       await this.deps.host.write(vault.id, promptPath, prompt.text);
       await this.deps.host.write(vault.id, personaPath, seededPersonaText(persona, worker, models));
       written.push(personaPath, promptPath);
+      const avatarPath = await this.deps.avatars.copyShipped(vault, persona.id);
+      if (avatarPath !== null) {
+        written.push(avatarPath);
+        pictured.push(persona.id);
+      }
     }
-    return written;
+    return { paths: written, pictured };
   }
 
   /** One commit of exactly these paths; a vault outside git keeps the write unversioned (logged), a failed commit logs. */

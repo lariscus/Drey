@@ -2,7 +2,7 @@
   <section class="detail" role="dialog" aria-modal="true" [attr.aria-label]="title()">
     @if (pad()) {
       <div class="pd-head">
-        <mc-ph-avatar [name]="title()" [color]="color()" [size]="40" />
+        <mc-ph-avatar [persona]="openId()" [name]="title()" [color]="color()" [size]="40" />
         <span class="pd-who">
           <b>{{ title() }}</b>
           <span class="pd-role">{{ role() }}</span>

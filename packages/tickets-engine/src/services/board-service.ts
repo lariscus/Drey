@@ -256,6 +256,8 @@ export interface BoardServiceOptions {
   readonly crewSeeder?: { seed(vault: EngineVault): Promise<unknown> };
   /** req-277: `dk` missing, older than the bundled release or no git become board issues on dricket; absent = no check. */
   readonly dkHealth?: DkHealth;
+  /** req-292: where the human persona is created, its shipped picture is copied beside it; absent = no picture. */
+  readonly avatars?: { copyShipped(vault: EngineVault, id: string): Promise<string | null> };
 }
 
 /** A dricket write that met a ticket changed in the meantime (dk exit 12): nothing was written, the caller asks the user. */
@@ -4349,6 +4351,15 @@ export class EngineBoardService {
     return this.personaPatch({ id: HUMAN_PERSONA_ID, title });
   }
 
+  /** req-292: the human persona's shipped picture, copied where the persona is created; the paths written (none when a picture is there). */
+  private async humanAvatar(vault: EngineVault): Promise<string[]> {
+    const written = await this.options.avatars?.copyShipped(vault, HUMAN_PERSONA_ID).catch((error: unknown) => {
+      this.host.log(`human persona picture failed: ${messageOf(error)}`, 'warn');
+      return null;
+    });
+    return written === null || written === undefined ? [] : [written];
+  }
+
   ensureHumanPersona(): Promise<void> {
     return this.enqueue(async () => {
       try {
@@ -4361,8 +4372,9 @@ export class EngineBoardService {
           return;
         }
         await this.host.write(vault.id, personaPath, personaFileText(humanPersona(await this.humanNameOfConfig())));
-        await this.commit(vault, [personaPath], 'tickets: you persona');
-        this.host.announceChanges(vault.id, [personaPath]);
+        const paths = [personaPath, ...(await this.humanAvatar(vault))];
+        await this.commit(vault, paths, 'tickets: you persona');
+        this.host.announceChanges(vault.id, paths);
         this.announceChanged();
       } catch (error) {
         this.host.log(`human persona setup failed: ${messageOf(error)}`, 'warn');
@@ -4929,15 +4941,16 @@ export class EngineBoardService {
       } catch (error) {
         return { ok: false, error: `write failed: ${messageOf(error)}` };
       }
+      const humanPaths = [humanPersonaPath, ...(await this.humanAvatar(target))];
       // The worktrees base is ignored from day one (ADR-0080: ensured,
       // not documented — one own commit when it changes something).
       await this.ensureWorktreesIgnored(target);
       const warning = await this.commit(
         target,
-        [PIPELINE_PATH, REPOS_PATH, humanPersonaPath, ...promptPaths],
+        [PIPELINE_PATH, REPOS_PATH, ...humanPaths, ...promptPaths],
         'tickets: initialize board',
       );
-      this.host.announceChanges(target.id, [PIPELINE_PATH, REPOS_PATH, humanPersonaPath, ...promptPaths]);
+      this.host.announceChanges(target.id, [PIPELINE_PATH, REPOS_PATH, ...humanPaths, ...promptPaths]);
       // req-256: Paul, Ben, Ralf and Tessa follow the pipeline and the prompts, in a commit of their own (never throws).
       await this.options.crewSeeder?.seed(target);
       this.announceChanged();

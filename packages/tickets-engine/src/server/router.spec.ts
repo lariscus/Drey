@@ -69,6 +69,7 @@ function port(): TicketsRemotePort {
     personaMemoryPin: vi.fn(async () => ({ ok: true, entries: [{ text: 'lesson', pinned: true }] })),
     personaMemoryRemove: vi.fn(async () => ({ ok: true, entries: [] })),
     personaJournal: vi.fn(async () => ({ ok: true, entries: [] })),
+    personaAvatar: vi.fn(async (id: string) => (id === 'ben' ? { ok: true as const, dataUrl: 'data:image/png;base64,AAAA' } : { ok: false as const, error: `persona ${id} has no picture` })),
     personaJournalRemove: vi.fn(async () => ({ ok: true, entries: [] })),
     personaPatch: vi.fn(ok),
     chainPersonaPause: vi.fn(async (cmd: { persona: string; paused: boolean }) => ({ ok: true, persona: cmd.persona, paused: cmd.paused })),
@@ -496,6 +497,10 @@ describe('route', () => {
     // req-169: the journal's read, and one line or entry removed by index and what the client saw
     expect(await route(req({ path: '/api/personas/pia/journal', authorization: auth }), deps)).toEqual({ status: 200, body: { ok: true, entries: [] } });
     expect(remote.personaJournal).toHaveBeenCalledWith('pia');
+    // req-292: the picture as a data URL; a persona without one is a 404
+    expect(await route(req({ path: '/api/personas/ben/avatar', authorization: auth }), deps)).toEqual({ status: 200, body: { ok: true, dataUrl: 'data:image/png;base64,AAAA' } });
+    expect(await route(req({ path: '/api/personas/pia/avatar', authorization: auth }), deps)).toEqual({ status: 404, body: { ok: false, error: 'persona pia has no picture' } });
+    expect((await route(req({ path: '/api/personas/../avatar', authorization: auth }), deps)).status).toBe(404);
     await route(req({ method: 'POST', path: '/api/personas/pia/memory/remove', origin, authorization: auth, body: { index: 0, text: '2026-11-09 · you · x' } }), deps);
     expect(remote.personaMemoryRemove).toHaveBeenCalledWith({ persona: 'pia', index: 0, text: '2026-11-09 · you · x' });
     await route(req({ method: 'POST', path: '/api/personas/pia/journal/remove', origin, authorization: auth, body: { index: 2, at: '2026-11-09T10:00:00Z' } }), deps);

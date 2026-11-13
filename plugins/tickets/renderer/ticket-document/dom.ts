@@ -251,7 +251,7 @@ export interface CardFacts {
   /** 9a: the grey words after the runner (`· default`). */
   readonly workerNote: string;
   /** 7b: the persona as a picture; null = the name alone. */
-  readonly avatar: { readonly color: string; readonly name: string } | null;
+  readonly avatar: { readonly color: string; readonly name: string; readonly id?: string } | null;
   readonly repo: string;
   readonly branch: string;
   /** `$1.84 in total · est. $1.50–2.40 · from 3 runs`; '' while nothing is known. */
@@ -319,12 +319,12 @@ function flowRow(items: readonly FlowItem[]): HTMLElement {
   return row;
 }
 
-/** The persona's picture, the Crew cards' drawing (fidelity ruling O8). */
-export function avatarNode(color: string, title: string, size: number): HTMLElement {
+/** The persona's picture, the Crew cards' drawing (fidelity ruling O8; its `avatar.png` when it has one, req-292). */
+export function avatarNode(color: string, title: string, size: number, id: string | null = null): HTMLElement {
   const avatar = el('span', 'tickets-doc-avatar');
   avatar.title = title;
   avatar.style.setProperty('--avatar-size', `${size}px`);
-  avatar.append(personaPictureNode(color, title, size));
+  avatar.append(personaPictureNode(color, title, size, id));
   return avatar;
 }
 
@@ -407,7 +407,7 @@ export function cardNode(actions: CardActions, facts: CardFacts): HTMLElement {
     grid.append(label(i18n.t('ticket.card.worker')));
     const worker = el('span', 'tickets-card-value tickets-card-wide');
     if (facts.avatar !== null) {
-      worker.append(avatarNode(facts.avatar.color, facts.avatar.name, 24));
+      worker.append(avatarNode(facts.avatar.color, facts.avatar.name, 24, facts.avatar.id ?? null));
     } else {
       worker.textContent = facts.worker;
     }

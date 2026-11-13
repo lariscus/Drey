@@ -85,6 +85,7 @@ import {
 import type { DeskDeps } from './desk-deps';
 import { teamModelOf, usd } from './team/team-model';
 import { createTeamStore, type TeamStore } from './team/team-store';
+import { personaPictures } from './team/persona-pictures';
 import { createConversationProvider } from './conversation/targets';
 import { mountTeam } from './team/team-view';
 import { PERSONA_KIND, personaIdOfKey, personaKeyOf } from './team/persona-model';
@@ -3104,6 +3105,8 @@ const plugin: { activate(api: DreyPluginApi): void } = {
   activate(api) {
     backend = api.backend;
     statusApi = api;
+    // req-292: the persona pictures every circle draws, asked for over the plugin's IPC.
+    personaPictures.connect((method, payload) => api.backend.invoke(method, payload));
     const slots = createStatusSlots(api.ui, 'tickets.showBoard', (key, params) => api.i18n.t(key, params));
     statusSlots = slots;
     fleetListeners.add(refreshStatusItem);

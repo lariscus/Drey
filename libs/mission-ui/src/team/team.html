@@ -25,7 +25,7 @@
           @for (persona of personas() ?? []; track persona.id) {
             <article class="pd-card" [class.pd-sel]="selectedId() === persona.id">
               <button type="button" class="pd-head" [attr.aria-current]="selectedId() === persona.id ? 'true' : null" (click)="pick(persona)">
-                <mc-ph-avatar [name]="persona.title" [color]="persona.color" [size]="36" />
+                <mc-ph-avatar [persona]="persona.id" [name]="persona.title" [color]="persona.color" [size]="36" />
                 <span class="pd-who">
                   <b class="ph-ellipsis">{{ persona.title }}</b>
                   <span class="pd-role ph-ellipsis">{{ roleLineOf(persona) }}</span>

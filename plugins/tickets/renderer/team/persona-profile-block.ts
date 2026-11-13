@@ -15,7 +15,7 @@ export function profileBlock(ctx: BlockContext): HTMLElement {
   const block = h('section', 'persona-block');
   block.setAttribute('aria-label', t('persona.page.profile'));
   const picture = h('div', 'persona-profile-row');
-  picture.append(avatarNode('persona-avatar persona-avatar-profile', draft.title, ctx.persona.color));
+  picture.append(avatarNode('persona-avatar persona-avatar-profile', draft.title, ctx.persona.color, ctx.persona.id));
   const roles = ROLE_OPTIONS.map((role) => ({ value: roleLabel(role), label: t(`persona.role.${role}`) }));
   const role = selectOf(roles, draft.role, (value) => ctx.edit({ role: value }));
   role.dataset['field'] = 'role';

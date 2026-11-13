@@ -184,6 +184,8 @@ export interface TicketsRemotePort extends SkillsPort, PersonaRemovePort {
 
   /** The team: every persona, read-only (the Team tab's cards). */
   personas(): Promise<readonly PersonaView[]>;
+  /** req-292: the persona's picture (`personas/<id>/avatar.png`) as a `data:image/png` URL; refused when it has none. */
+  personaAvatar(personaId: string): Promise<PersonaAvatarReply>;
 
   /** The persona 1:1's read (req-168): the conversation of its chat session file, the cards, the session state. */
   personaThread(personaId: string): Promise<PersonaThreadReply>;
@@ -277,6 +279,9 @@ export interface TicketsRemotePort extends SkillsPort, PersonaRemovePort {
   onChanged(listener: (what: RemoteChange, payload?: ChatChangePayload) => void): () => void;
 }
 
+/** req-292: a persona's picture, or why there is none. */
+export type PersonaAvatarReply = { readonly ok: true; readonly dataUrl: string } | { readonly ok: false; readonly error: string };
+
 /**
  * The team card's persona shape (E5b): the display slice of the
  * persona directory, without prompt and memory.
@@ -293,6 +298,8 @@ export interface PersonaView {
   readonly pool: readonly string[];
   /** `#rrggbb`; the chips' and avatars' colour. */
   readonly color: string;
+  /** req-292: the picture's version (it changes with the file); absent = no `avatar.png`, the circle draws without one and asks for nothing. */
+  readonly avatarVersion?: string;
   /** The one line for the crew list (`summary:`, req-144); absent = none, the cards then draw the role. */
   readonly summary?: string;
   /** `allowed:` (req-171): what the persona may do beyond its runs; absent on older servers and for the human. */

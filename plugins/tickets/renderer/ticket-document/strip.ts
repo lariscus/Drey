@@ -18,6 +18,7 @@ import type { I18n } from '../../../../shared/i18n/types';
 import { cardOfDocument } from '../ticket-header';
 import { actionBarOf, chainOf, costSummary, flowItemsOf, pageShapeOf, statusOf, titleCase, workerOf, type PersonaName } from './model';
 import { hasOpenParts } from './parts-model';
+import { personaPictures } from '../team/persona-pictures';
 
 export interface TicketStripDeps {
   /** The catalog (`api.i18n`): every word of the card comes through it. */
@@ -83,6 +84,7 @@ export function createTicketStrip(deps: TicketStripDeps): TicketStrip {
         personas = Array.isArray(reply)
           ? (reply as PersonaName[]).filter((p) => typeof p.id === 'string' && typeof p.title === 'string')
           : [];
+        personaPictures.note(personas);
         notify();
       })
       .catch(() => {
@@ -150,7 +152,7 @@ export function createTicketStrip(deps: TicketStripDeps): TicketStrip {
           workerNote: shape === 'early' && own.worker !== null ? `· ${own.persona ?? deps.i18n.t('ticket.card.default')}` : '',
           avatar:
             card.phase === 'shaping' && !planToAccept && worker !== null
-              ? { color: pinned?.color ?? '', name: worker.who }
+              ? { color: pinned?.color ?? '', name: worker.who, ...(pinned === undefined ? {} : { id: pinned.id }) }
               : null,
           repo: own.repo ?? deps.i18n.t('ticket.card.none'),
           branch: own.branch ?? '',
