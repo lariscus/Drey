@@ -13,6 +13,7 @@ import type { I18n } from '../../../../shared/i18n/types';
 import type { BoardSnapshot } from '../../shared/tickets';
 import { h, type DeskDeps } from '../desk-deps';
 import { queueWordsFor } from '../queue-line';
+import { personaPictures } from '../team/persona-pictures';
 import { usd } from '../team/team-model';
 import { openCardMenu, openSendBackPicker } from './persona-board-actions';
 import { dropCard, type PersonaBoardContext } from './persona-board-drop';
@@ -58,6 +59,7 @@ function avatarNode(model: PersonaLaneModel): HTMLElement {
   if (model.lane.color !== '') {
     avatar.style.setProperty('--persona-color', model.lane.color);
   }
+  personaPictures.paint(avatar, model.lane.persona);
   return avatar;
 }
 
