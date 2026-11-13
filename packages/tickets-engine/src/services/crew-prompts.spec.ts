@@ -28,8 +28,13 @@ describe('the crew prompt files', () => {
     const crew = await loadCrewPrompts();
     expect(crew.mission).toMatch(/^You are Mission Control/);
     expect(crew.mission.endsWith('\n')).toBe(false);
-    expect(crew.shape).toMatch(/^You are Paul/);
-    expect(crew.flow).toMatch(/^You are Paul/);
+    // req-272: shape and flow are mode wrappers now — no persona's name in them; the speaker's prompt.md goes in front.
+    expect(crew.shape).toMatch(/^The owner shapes one new ticket with you/);
+    expect(crew.flow).toMatch(/^The owner asks you to draft the flow/);
+    // (The fragments' examples name ids, as examples; the wrappers' own text does not, nor does it carry the old roster line.)
+    for (const text of [crew.shape, crew.flow]) {
+      expect(text).not.toMatch(/\bPaul\b|planner of the tickets crew|ben \(builds\)/);
+    }
     expect(crew.aggregator).toMatch(/^You are the improvement aggregator/);
     // The strict output contract every parser relies on stays in all four.
     for (const text of [crew.mission, crew.shape, crew.flow, crew.aggregator]) {

@@ -178,9 +178,9 @@ export interface ChatServicePort {
   dismiss(input: { readonly file: string; readonly id: string }): Promise<ChatDecisionResult>;
 }
 
-/** Paul's flow draft: the proposed delta and his reason, or why there is none. */
+/** The flow draft of the assigned persona (req-272, `author` = its title): the proposed chain and the reason, or why there is none. */
 export type ChatFlowDraft =
-  | { readonly ok: true; readonly chain: readonly string[]; readonly reason: string }
+  | { readonly ok: true; readonly chain: readonly string[]; readonly reason: string; readonly author?: string }
   | { readonly ok: false; readonly error: string };
 
 /** One marked line of the shared plan. */
@@ -305,8 +305,10 @@ export interface ChatBridge {
      * the read-only access to the ticket's repository.
      */
     readonly shape?: ChatShapeContext;
-    /** Present on a flow draft (E10-5): the flow Paul reads, replacing the board digest. */
+    /** Present on a flow draft (E10-5): the flow the persona reads, replacing the board digest. */
     readonly flow?: { readonly context: string };
+    /** req-272: the persona that speaks in a shape turn or a flow draft; absent = the wrapper alone. */
+    readonly voice?: ChatVoice;
     /** Receives the live stream: thought and text deltas — the turn's progress signal. */
     emit(event: ChatStreamEvent): void;
     /**
@@ -324,6 +326,20 @@ export interface ChatBridge {
     /** Set when no model answered (not set up, unsupported provider, unreachable, refused): `say` then holds the failure's message. */
     readonly failure?: ChatModelFailure;
   }>;
+}
+
+/**
+ * Who speaks in a shape turn or a flow draft (req-272): the assigned
+ * persona's `prompt.md` opens the system message, ahead of the mode's
+ * wrapper. Absent = no persona resolved; the wrapper speaks alone.
+ */
+export interface ChatVoice {
+  /** The speaking persona's title — for the failure messages; null = none resolved. */
+  readonly speaker: string | null;
+  /** The speaking persona's `prompt.md` (LF, trimmed, version line dropped); null = none or empty. */
+  readonly prompt: string | null;
+  /** The crew a shape turn may name for a plan part, one line each, in `crew.md`'s order; '' = none (a flow draft carries its own list). */
+  readonly roster: string;
 }
 
 /** What a shape turn hands the bridge. */

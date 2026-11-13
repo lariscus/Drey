@@ -719,7 +719,7 @@ export class DreyTicketsPort implements TicketsRemotePort {
       return drafted;
     }
     const view = await this.boardService.flowEdit({ ...target, chain: drafted.chain, edit: { op: 'view' } });
-    return view.ok ? { ...view, reason: drafted.reason } : { ok: false, error: `Paul's draft does not hold: ${view.error}` };
+    return view.ok ? { ...view, reason: drafted.reason } : { ok: false, error: `${drafted.author === undefined ? 'The' : `${drafted.author}'s`} draft does not hold: ${view.error}` };
   }
 
   chatSessions(): Promise<readonly ChatSessionMeta[]> {

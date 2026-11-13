@@ -5990,3 +5990,31 @@ sequenceDiagram
     Port->>Av: read(vault, id) — a PNG up to 2 MB
     Port-->>UI: {ok, dataUrl} or 404 — the circle keeps its initials / silhouette until and unless it arrives
 ```
+
+## 6.126 Shape and Flow chat as the assigned persona — chain → speaker → `prompt.md` + wrapper + crew (req-272, milestone 255)
+
+```mermaid
+sequenceDiagram
+    actor Owner
+    participant CS as ChatService
+    participant V as ChatVoices
+    participant B as BoardService
+    participant P as the speaker's prompt.md
+    participant CT as ChatTurn (bridge)
+    participant M as chat model
+    Owner->>CS: a line in a shape session (or "Ask …" in the Flow tab)
+    CS->>V: shape(ticket) · flow(ticket)
+    V->>B: snapshot (the ticket's chain, pipeline.md flow:) · listPersonas (crew.md order)
+    V->>V: shapeSpeakerOf: the :shape entry, else the standard flow's<br/>flowSpeakerOf: the plan entry (structural gate), else the shape persona
+    V->>P: the speaker's prompt.md (no cache; LF, version line dropped)
+    V-->>CS: ChatVoice {speaker, prompt, roster}
+    alt a flow draft and nobody to ask
+        CS-->>Owner: "No persona is assigned to plan T-…" — no model call
+    else
+        CS->>CT: runTurn {…, shape | flow, voice}
+        CT->>M: system = prompt.md + shape.md | flow.md (wrapper + contract) + ## Crew (shape) + ## Ticket | ## Flow
+        M-->>CT: the JSON envelope
+    end
+```
+
+The persona's `prompt.md` opens the system message and the mode's wrapper (`prompts/crew/shape.md`, `flow.md`: the chat is not a run, the strict JSON contract wins over how a run ends, the plan format or the chain grammar) follows it — who speaks before what the mode asks (R11). The wrapper names no persona; a shape turn lists the crew in its own `## Crew` block (the agents with their one-line `summary:`, in `crew.md`'s order), a flow draft's context already lists it. Nothing is cached: a rename, an edit on the Persona page, a reorder or a deleted persona applies to the next message. Without a speaker or without a readable prompt the wrapper speaks alone — a shape turn never stops for it. The model stays the chat bridge's (the assistant's LLM settings), not the persona's.

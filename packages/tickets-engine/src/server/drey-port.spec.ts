@@ -732,8 +732,11 @@ describe('flowDraft (E10-5)', () => {
     const refused = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false }, chat({ ok: false, error: 'No model.' }));
     await expect(refused.flowDraft({ id: 'T-1', part: null, ask: null })).resolves.toEqual({ ok: false, error: 'No model.' });
     vi.mocked(board.flowEdit).mockResolvedValue({ ok: false, error: 'the pipeline has no phase "design"' });
-    const bad = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false }, chat({ ok: true, chain: ['insert design after review'], reason: 'r' }));
-    await expect(bad.flowDraft({ id: 'T-1', part: null, ask: null })).resolves.toEqual({ ok: false, error: "Paul's draft does not hold: the pipeline has no phase \"design\"" });
+    // req-272: the draft is named after the persona that wrote it (a renamed Paul is Paula).
+    const bad = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false }, chat({ ok: true, chain: ['insert design after review'], reason: 'r', author: 'Paula' }));
+    await expect(bad.flowDraft({ id: 'T-1', part: null, ask: null })).resolves.toEqual({ ok: false, error: "Paula's draft does not hold: the pipeline has no phase \"design\"" });
+    const unnamed = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false }, chat({ ok: true, chain: ['insert design after review'], reason: 'r' }));
+    await expect(unnamed.flowDraft({ id: 'T-1', part: null, ask: null })).resolves.toEqual({ ok: false, error: 'The draft does not hold: the pipeline has no phase "design"' });
   });
 
   it('stops before asking Paul when the flow cannot change', async () => {

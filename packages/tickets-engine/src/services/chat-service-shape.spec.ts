@@ -2,7 +2,7 @@ import { promises as fsp, type Dirent } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { ChatBridge, ChatShapeContext, ChatShapeReply } from '../contracts/chat';
+import type { ChatBridge, ChatShapeContext, ChatShapeReply, ChatVoice } from '../contracts/chat';
 import type { BoardSnapshot } from '../contracts/tickets';
 import { parseSessionFile } from '../core/chat-session';
 import { withPlanSection } from '../core/plan-section';
@@ -27,6 +27,8 @@ let vaultPath: string;
 let ticketText: string;
 let reply: ChatShapeReply;
 let seen: ChatShapeContext | undefined;
+let seenVoice: ChatVoice | undefined;
+let asked: string[];
 let moves: { id: string; from: string; to: string }[];
 let planFails: boolean;
 let clock: number;
@@ -39,6 +41,8 @@ beforeEach(async () => {
   ticketText = base;
   reply = { plan: null, question: null, splitReason: null, sources: [] };
   seen = undefined;
+  seenVoice = undefined;
+  asked = [];
   moves = [];
   planFails = false;
   clock = Date.parse('2026-11-04T09:00:00Z');
@@ -103,8 +107,9 @@ function boot(): ChatService {
     },
   } as unknown as ChatBoardPort;
   const bridge = {
-    runTurn: async (input: { shape?: ChatShapeContext }) => {
+    runTurn: async (input: { shape?: ChatShapeContext; voice?: ChatVoice }) => {
       seen = input.shape;
+      seenVoice = input.voice;
       return { say: 'I wrote the plan.', thought: null, commands: [], ...(input.shape === undefined ? {} : { shape: reply }) };
     },
   } as unknown as ChatBridge;
@@ -119,6 +124,13 @@ function boot(): ChatService {
     now: () => new Date((clock += 1000)),
     git,
     shadows: new MemoryPlanShadowStore(),
+    voices: {
+      shape: async (ticket) => {
+        asked.push(ticket);
+        return { speaker: 'Paula', prompt: '## Who Paula is', roster: '- ben (Ben): builds' };
+      },
+      flow: async () => null,
+    },
   });
 }
 
@@ -137,6 +149,14 @@ describe('a shape turn', () => {
   it('gives a plain chat no shape context', async () => {
     await service.start({ text: 'Hello' });
     expect(seen).toBeUndefined();
+    expect(seenVoice).toBeUndefined();
+    expect(asked).toEqual([]);
+  });
+
+  it("speaks as the assigned persona: the ticket's voice rides the turn (req-272)", async () => {
+    await service.start({ text: 'Shape this', ticket: TICKET });
+    expect(asked).toEqual([TICKET]);
+    expect(seenVoice).toEqual({ speaker: 'Paula', prompt: '## Who Paula is', roster: '- ben (Ben): builds' });
   });
 
   it('writes the plan chapter and nothing else of the ticket', async () => {

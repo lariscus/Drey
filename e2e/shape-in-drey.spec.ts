@@ -86,7 +86,7 @@ const server = http.createServer((req, res) => {
     const user = [...messages].reverse().find((m) => m.role === 'user');
     const text = typeof user?.content === 'string' ? user.content : '';
     const system = messages.find((m) => m.role === 'system');
-    const isShape = typeof system?.content === 'string' && system.content.includes('You are Paul, the planner');
+    const isShape = typeof system?.content === 'string' && system.content.includes('The owner shapes one new ticket with you');
     let answer = 'The model says: nothing to shape here.';
     if (isShape) {
       requests.push({ body, text });
