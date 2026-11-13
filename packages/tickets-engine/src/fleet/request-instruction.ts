@@ -33,6 +33,7 @@ function scoutInstructionInput(plan: RunPlan): ScoutInstructionInput {
     ...(plan.extras.readGrounds.length > 0 ? { extraRepos: plan.extras.readGrounds } : {}),
     ...interactivePart(input),
     ...personaInstructionParts(input.persona ?? null),
+    ...projectPart(input),
   };
 }
 
@@ -64,6 +65,7 @@ function shipInstructionInput(plan: RunPlan): InstructionInput {
     caps: input.caps ?? DEFAULT_FLEET_CAPS,
     ...interactivePart(input),
     ...personaInstructionParts(input.persona ?? null),
+    ...projectPart(input),
     ...(plan.reviewCheckout !== null ? { reviewCheckout: plan.reviewCheckout } : {}),
     ...(input.cursor !== undefined ? { chain: { at: input.cursor.at, length: input.cursor.length, entries: input.cursor.entries ?? [] } } : {}),
   };
@@ -89,6 +91,11 @@ function runPrompt(input: ComposeRunInput): string | null {
   }
   const own = stripPromptVersion(personaPrompt);
   return input.interactive !== undefined && phasePrompt !== null && phasePrompt.trim() !== '' ? `${own.trimEnd()}\n\n${phasePrompt.trim()}` : own;
+}
+
+/** req-282: the ticket's project for the brief's `## Project`; nothing for an Unassigned ticket. */
+function projectPart(input: ComposeRunInput): Pick<InstructionInput, 'project'> {
+  return input.project !== undefined && input.project !== null ? { project: { name: input.project.name, purpose: input.project.purpose } } : {};
 }
 
 function interactivePart(input: ComposeRunInput): { interactive?: InteractiveMode } {

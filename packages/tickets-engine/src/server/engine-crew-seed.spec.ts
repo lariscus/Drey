@@ -56,7 +56,7 @@ describe('the engine seeds the default crew at its start (req-256)', () => {
     }
     expect(parsePersonaFile('pia', (await read(`${PERSONAS}/pia/persona.md`))!)).toMatchObject({ kind: 'mission', title: 'Pia' });
     expect(seededCrewOf(await read('tickets/_meta/crew.md'))).toEqual(['pia', 'paul', 'ben', 'ralf', 'tessa']);
-    expect((await git(['log', '--format=%s'])).trim().split('\n')).toEqual(['personas: the default crew (req-256)', 'seed']);
+    expect((await git(['log', '--format=%s'])).trim().split('\n')).toEqual(['projects: the first project "vault" from repos.md and the registered vaults (req-282)', 'personas: the default crew (req-256)', 'seed']);
     expect((await git(['status', '--porcelain', '--', 'tickets/_meta'])).trim()).toBe('');
     const ids = ((await engine.invoke('personas')) as readonly { id: string }[]).map((p) => p.id);
     expect(ids).toEqual(expect.arrayContaining(['pia', 'paul', 'ben', 'ralf', 'tessa']));
@@ -69,7 +69,7 @@ describe('the engine seeds the default crew at its start (req-256)', () => {
     await git(['commit', '-m', 'owner removes ralf']);
     await start();
     expect(await read(`${PERSONAS}/ralf/persona.md`)).toBeNull();
-    expect((await git(['log', '--format=%s'])).trim().split('\n')).toEqual(['owner removes ralf', 'personas: the default crew (req-256)', 'seed']);
+    expect((await git(['log', '--format=%s'])).trim().split('\n')).toEqual(['owner removes ralf', 'projects: the first project "vault" from repos.md and the registered vaults (req-282)', 'personas: the default crew (req-256)', 'seed']);
   });
 
   it('leaves the owner\'s own personas and pipeline as they are', async () => {

@@ -13,11 +13,13 @@
 import type { ChainEntry, TicketChainFields } from './chain';
 import type { PersonaBoardFields, TicketHoldField } from './persona-board';
 import type { PhasePoolMeta, TicketPoolMeta } from './ticket-pool-meta';
+import type { BoardProjects, TicketProjectField } from './projects';
 import type { RepoRef } from './repo-ref';
 import type { PriorityConfig, TicketPriority } from './ticket-priority';
 import type { TicketRun } from './ticket-run';
 export type { TicketRun } from './ticket-run';
 export type { StoreStageMigrationOffer, StoreStageMigrationResult } from './store-stage-migration';
+export type { FolderStatus } from './folder-status';
 
 /** `T-` + at least four digits (`T-0042`). Grammar of ids AND file stems. */
 export const TICKET_ID_PATTERN = /^T-\d{4,}$/;
@@ -124,8 +126,8 @@ export interface TicketIssue {
   readonly message: string;
 }
 
-/** Parsed, normalized ticket frontmatter (all optionals reflect absence). */
-export interface TicketMeta extends TicketPoolMeta, TicketChainFields {
+/** Parsed, normalized ticket frontmatter (all optionals reflect absence; req-282's `project` rides {@link TicketProjectField}). */
+export interface TicketMeta extends TicketPoolMeta, TicketChainFields, TicketProjectField {
   readonly id: string | null;
   readonly title: string | null;
   /**
@@ -376,7 +378,7 @@ export interface RecentDone {
 }
 
 /** The whole board, rebuilt from files on every fetch — no stored state. */
-export interface BoardSnapshot extends PersonaBoardFields {
+export interface BoardSnapshot extends PersonaBoardFields, BoardProjects {
   readonly vaultId: string | null;
   readonly vaultName: string | null;
   /** Display name of the active vault — the empty state's initialize hint. */
@@ -507,14 +509,6 @@ export interface ProjectRef {
   readonly name: string;
   readonly path: string;
   readonly active: boolean;
-}
-
-/** Whether the phase folders carry their derived numbers (T-0041, req-50). */
-export interface FolderStatus {
-  /** Absolute path of `tickets/`; null without a tickets vault. */
-  readonly root: string | null;
-  /** The renames "Number folders" would make; empty = numbered. */
-  readonly moves: readonly { readonly from: string; readonly to: string }[];
 }
 
 /** `create`'s success result: the minted id and the new file's path, so

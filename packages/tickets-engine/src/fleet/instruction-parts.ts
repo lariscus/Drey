@@ -23,11 +23,19 @@ export interface ComposedInstruction {
   readonly stable: string;
 }
 
+/** The ticket's project as the brief names it (req-282): its name and its purpose (the record's body). */
+export interface BriefProject {
+  readonly name: string;
+  readonly purpose: string;
+}
+
 /** The fields of a brief's stable head, as both brief inputs carry them. */
 export interface BriefHeadSource {
   readonly repoInstructions: string | null;
   readonly prompt: string | null;
   readonly skillsSection?: string | null;
+  /** req-282: the ticket's project; null/absent = Unassigned, no section. */
+  readonly project?: BriefProject | null;
   readonly plan: string | null;
 }
 
@@ -39,6 +47,8 @@ export interface BriefHead {
   readonly repoInstructions: string;
   readonly prompt: string;
   readonly skills: string;
+  /** The `## Project` section, '' when the project has no purpose (or the ticket none). */
+  readonly project: string;
   readonly plan: string;
 }
 
@@ -57,18 +67,33 @@ export function briefHead(source: BriefHeadSource): BriefHead {
     repoInstructions: trimmed(source.repoInstructions),
     prompt: trimmed(source.prompt),
     skills: trimmed(source.skillsSection),
+    project: projectSection(source.project),
     plan: trimmed(source.plan),
   };
 }
 
 /**
+ * req-282 (ADR-0097 later change): the project's purpose as a short section,
+ * so a worker knows what the thing is without re-deriving it from the repo.
+ * A project without a purpose adds nothing — the brief stays byte-identical.
+ */
+export function projectSection(project: BriefProject | null | undefined): string {
+  const purpose = trimmed(project?.purpose);
+  if (project === null || project === undefined || purpose === '') {
+    return '';
+  }
+  return [`## Project`, `This ticket belongs to the project "${project.name.trim()}".`, purpose].join('\n\n');
+}
+
+/**
  * The head's sections in brief order: the repo's agent instructions
  * verbatim, the phase template (or the persona's prompt), the persona's
- * skills, `## Plan` verbatim — each only when non-blank.
+ * skills, the ticket's `## Project` (req-282), `## Plan` verbatim — each
+ * only when non-blank.
  */
 export function headParts(head: BriefHead): string[] {
   const parts: string[] = [];
-  for (const part of [head.repoInstructions, head.prompt, head.skills]) {
+  for (const part of [head.repoInstructions, head.prompt, head.skills, head.project]) {
     if (part !== '') {
       parts.push(part);
     }

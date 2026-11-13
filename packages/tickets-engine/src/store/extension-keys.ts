@@ -3,6 +3,7 @@
  * order (ADR-0090) — one list for the read (`store-board`) and the write
  * (`legacy-bridge`). req-170 added the pool's `class`, `model`, `size` and
  * `allowance`, req-178 its `needs`, req-266 the chain's cursor `at` and its `sent-back`
- * (the chain itself rides as `x-chain`, its entries joined by `;`).
+ * (the chain itself rides as `x-chain`, its entries joined by `;`), req-282 the
+ * ticket's `project`.
  */
-export const EXTENSION_KEYS = ['worker', 'persona', 'track', 'form', 'proof', 'awaiting', 'class', 'model', 'size', 'allowance', 'needs', 'at', 'sent-back'] as const;
+export const EXTENSION_KEYS = ['worker', 'persona', 'track', 'form', 'proof', 'awaiting', 'class', 'model', 'size', 'allowance', 'needs', 'at', 'sent-back', 'project'] as const;

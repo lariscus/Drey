@@ -313,3 +313,19 @@ describe('multi-repo runs (req-72)', () => {
     expect(result).toMatchObject({ ok: false, error: expect.stringContaining('lariscus') });
   });
 });
+
+describe('composeRunRequest — the ticket\'s project (req-282)', () => {
+  const building = phase('building', { handover: 'agent build-default' });
+
+  it('the purpose reaches the instruction and changes the brief digest; an Unassigned ticket composes as before', () => {
+    const plain = composeRunRequest(base({ workingPhase: building, nextPhaseId: 'ready' }));
+    const withProject = composeRunRequest(base({ workingPhase: building, nextPhaseId: 'ready', project: { name: 'Drey', purpose: 'The note app.' } }));
+    const unassigned = composeRunRequest(base({ workingPhase: building, nextPhaseId: 'ready', project: null }));
+    if (!plain.ok || !withProject.ok || !unassigned.ok) {
+      throw new Error('expected three composed requests');
+    }
+    expect(withProject.request.instruction).toContain('## Project\n\nThis ticket belongs to the project "Drey".\n\nThe note app.');
+    expect(withProject.request.briefDigest).not.toBe(plain.request.briefDigest);
+    expect(unassigned.request).toEqual(plain.request);
+  });
+});

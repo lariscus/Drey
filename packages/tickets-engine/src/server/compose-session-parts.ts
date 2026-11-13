@@ -9,6 +9,7 @@ import { MissionEntryTurns } from '../services/mission-entry-turns';
 import { MissionPersonaPrompt } from '../services/mission-persona-prompt';
 import { PersonaPinReader } from '../services/persona-pin-reader';
 import { PersonaProseMigrator } from '../services/persona-prose-migrator';
+import { ProjectMigrator } from '../services/project-migrator';
 import { PersonaRemoveService } from '../services/persona-remove-service';
 import { PersonaRecords } from '../services/persona-records';
 import { PersonaSessionService } from '../services/persona-session-service';
@@ -92,12 +93,28 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
   const personaRecords = new PersonaRecords({ board, host, git, log });
   const skills = new SkillService({ board, host, git });
   const personaRemoval = new PersonaRemoveService({ board, fleet, host, git, pins: new PersonaPinReader(host, parts.crew.crewFiles) });
-  const startupWork = migrateOnce(log, { personaRecords, skills, prose: new PersonaProseMigrator({ board, host, git, log }), crew: { board, seeder: parts.crewSeeder, pictures: parts.crewPictures } });
+  const startupWork = migrateOnce(log, {
+    personaRecords,
+    skills,
+    prose: new PersonaProseMigrator({ board, host, git, log }),
+    crew: { board, seeder: parts.crewSeeder, pictures: parts.crewPictures },
+    projects: (opts.migrateProjects ?? opts.seedDefaultCrew !== false) ? new ProjectMigrator({ board, host, git, log }) : null,
+  });
   return { chat, personaSessions, personaRecords, skills, personaRemoval, startupWork };
 }
 
+/** The one-time migrations of the engine's start. */
+interface StartupMigrators {
+  readonly personaRecords: PersonaRecords;
+  readonly skills: SkillService;
+  readonly prose: PersonaProseMigrator;
+  readonly crew: { board: Pick<BoardParts['board'], 'detect'>; seeder: BoardParts['crewSeeder']; pictures: BoardParts['crewPictures'] };
+  /** req-282: null = `migrateProjects: false`. */
+  readonly projects: ProjectMigrator | null;
+}
+
 /** The migrations that run behind startup: failures are logged, never fatal. */
-function migrateOnce(log: Log, migrators: { personaRecords: PersonaRecords; skills: SkillService; prose: PersonaProseMigrator; crew: { board: Pick<BoardParts['board'], 'detect'>; seeder: BoardParts['crewSeeder']; pictures: BoardParts['crewPictures'] } }): Promise<void> {
+function migrateOnce(log: Log, migrators: StartupMigrators): Promise<void> {
   // req-169: friction.md migrates once into each persona's journal.
   void migrators.personaRecords.migrateAll().catch((error: unknown) => log(`friction.md migration failed: ${messageOf(error)}`, 'warn'));
   // req-172: skills as Agent Skills; the legacy flat files migrate once into folders.
@@ -115,5 +132,11 @@ function migrateOnce(log: Log, migrators: { personaRecords: PersonaRecords; skil
         await pictures?.backfill(vault);
       }
     })
-    .catch((error: unknown) => log(`default crew seeding failed: ${messageOf(error)}`, 'warn'));
+    .catch((error: unknown) => log(`default crew seeding failed: ${messageOf(error)}`, 'warn'))
+    // req-282: a board without project records gets its first one — after the seeding, so the two never commit at once.
+    .then(() => migrators.projects?.migrate())
+    .then(
+      () => undefined,
+      (error: unknown) => log(`the first project could not be written: ${messageOf(error)}`, 'warn'),
+    );
 }
