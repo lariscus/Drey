@@ -223,18 +223,38 @@
   color: var(--text-4);
 }
 
-.tset-models-error {
+.tset-models-error,
+.tset-models-slotnote {
   font-size: 14px;
   line-height: 21px;
   padding: 0 0 6px;
 }
 
-.tset-models-error[hidden] {
+.tset-models-error[hidden],
+.tset-models-slotnote[hidden] {
   display: none;
 }
 
 .tset-models-addslot {
   padding: 8px 0 0;
+}
+
+/* D-69: the new slot's row (name, provider, profile) above Add slot…; a card's remove control at its head's end. */
+.tset-models-slotdraft {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 160px) minmax(0, 120px);
+  gap: 8px;
+  padding-bottom: 8px;
+}
+
+.tset-models-slotdraft .tset-models-cellfield[aria-invalid='true'] {
+  border-color: var(--status-deleted);
+}
+
+.tset-models-slotremove {
+  flex: none;
+  width: 22px;
+  height: 22px;
 }
 
 /* --- capacity ----------------------------------------------------------------- */

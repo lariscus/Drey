@@ -3,7 +3,8 @@
  * slots. Every entry is checked on its own: a broken one is left out with
  * its reason, the others stand. A provider no entry names gets one implied
  * `private` slot on its default login, so a machine without a `slots` key
- * runs as before.
+ * runs as before — unless `impliedOff` names the provider (D-69: the owner
+ * removed that stand-in, so the provider has no slot here).
  */
 import { isWorkerProvider, SLOT_PROFILES, WORKER_PROVIDERS, type QuotaKind, type SlotBilling, type SlotProfile, type WorkerProviderId } from '../protocol';
 import type { Slot, SlotLimit, SlotLogin } from './slot';
@@ -118,6 +119,12 @@ function refreshOf(root: Entry): number {
   return typeof minutes === 'number' && minutes >= 1 ? minutes * 60_000 : DEFAULT_REFRESH_MS;
 }
 
+/** The providers whose implied slot the owner removed (`impliedOff`, D-69): no stand-in slot for them on this machine. */
+export function impliedOffOf(root: Readonly<Record<string, unknown>>): readonly WorkerProviderId[] {
+  const raw = root['impliedOff'];
+  return Array.isArray(raw) ? raw.filter(isWorkerProvider) : [];
+}
+
 /** `service.json`'s parsed root as slots: the configured ones in their order, then the implied ones. */
 export function parseServiceSlots(root: unknown): SlotConfigParse {
   const config = (root !== null && typeof root === 'object' && !Array.isArray(root) ? root : {}) as Entry;
@@ -133,7 +140,8 @@ export function parseServiceSlots(root: unknown): SlotConfigParse {
     }
   }
   const taken = new Set(slots.map((s) => s.id));
-  const implied = WORKER_PROVIDERS.filter((provider) => !slots.some((s) => s.provider === provider))
+  const off = impliedOffOf(config);
+  const implied = WORKER_PROVIDERS.filter((provider) => !off.includes(provider) && !slots.some((s) => s.provider === provider))
     .map(impliedSlot)
     .map((slot) => (taken.has(slot.id) ? { ...slot, id: `${slot.id}-default` } : slot));
   return { slots: [...slots, ...implied], errors, refreshMs: refreshOf(config) };

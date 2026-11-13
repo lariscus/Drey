@@ -89,3 +89,18 @@ test('the Persona page fits, its editor scrolls its own text, and the splitter s
   await grip.dblclick();
   await expect.poll(async () => Math.round((await frame.boundingBox())!.height)).toBe(Math.round(before));
 });
+
+test('Preview full prompt opens the brief below the editor, its text readable (D-68)', async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  await openTessa(page);
+  const pageRoot = page.locator('.persona-page').filter({ visible: true });
+  await pageRoot.getByRole('button', { name: 'Preview full prompt' }).click();
+  const panel = pageRoot.locator('.persona-ed-preview');
+  await expect(panel.locator('.cm-content')).toContainText('Tessa is the tester', { timeout: 15_000 });
+  await panel.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath('persona-preview-open.png') });
+  await testInfo.attach('persona-preview-open', { path: testInfo.outputPath('persona-preview-open.png'), contentType: 'image/png' });
+  // The brief's view is drawn at a readable height, not collapsed under the part chips.
+  const view = await panel.locator('.persona-ed-view').evaluate((node) => node.getBoundingClientRect().height);
+  expect(view).toBeGreaterThan(100);
+});
