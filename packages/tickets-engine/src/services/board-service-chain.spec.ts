@@ -258,4 +258,35 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     expect(field(dkId, 'x-at')).toBe('3');
     expect(field(dkId, 'x-awaiting')).toBeNull();
   });
+  it('is a persona board: the crew as lanes, every active card with its hold (req-270)', async () => {
+    const { id } = chained('Held', 'ben;you;ralf;you', 3);
+    const snap = await service.snapshot();
+    expect(snap.lanes?.map((lane) => [lane.persona, lane.kind])).toEqual([['pia', 'mission'], ['ben', 'agent'], ['ralf', 'agent'], ['you', 'human']]);
+    const card = snap.columns.flatMap((c) => c.tickets).find((t) => t.id === id);
+    expect(card?.hold).toMatchObject({ holder: 'ralf', why: 'entry', position: 3, length: 4, chain: ['ben', 'you', 'ralf', 'you'], claimed: false });
+  });
+
+  it('starts, hands and parks a ticket by its persona columns (req-270)', async () => {
+    const dkId = dk(['add', '--unclaimed', '-m', 'Fresh idea']).trim();
+    const id = `T-${dkId.slice(2).padStart(4, '0')}`;
+    expect(await service.personaBoardMove({ kind: 'start', id, persona: 'ben' })).toMatchObject({ ok: true });
+    expect(field(dkId, 'stage')).toBe('active');
+    expect(field(dkId, 'x-at')).toBe('1');
+    expect(field(dkId, 'x-chain')?.split(';')[0]).toBe('ben:shape'); // the dropped-on persona takes the entry at the cursor, its mode with it
+
+    const moved = chained('Hand', 'ben;you;ralf;you', 3);
+    expect(await service.personaBoardMove({ kind: 'hand', id: moved.id, persona: 'ben' })).toMatchObject({ ok: true });
+    expect(field(moved.dkId, 'x-chain')).toBe('ben;you;ben;you');
+    expect(field(moved.dkId, 'x-at')).toBe('3');
+
+    expect(await service.personaBoardMove({ kind: 'park', id: moved.id, stage: 'prioritized' })).toMatchObject({ ok: true });
+    expect(field(moved.dkId, 'stage')).toBe('prioritized');
+    expect(field(moved.dkId, 'x-at')).toBe('3');
+  });
+
+  it("Send back at You goes to the position the owner picked (req-270)", async () => {
+    const { id, dkId } = chained('Picked', 'ben;you;ralf;you', 4);
+    expect(await service.sendBack({ id, note: 'start over', position: 1 })).toMatchObject({ ok: true });
+    expect(field(dkId, 'x-at')).toBe('1');
+  });
 });

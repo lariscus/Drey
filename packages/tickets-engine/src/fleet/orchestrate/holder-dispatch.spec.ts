@@ -66,6 +66,9 @@ describe('the holder dispatch on a lifecycle store (req-257)', () => {
 
     expect(fleet.records).toHaveLength(1);
     expect(logs.join('\n')).toMatch(/waits for ben — the persona runs its maximum/);
+    // req-271: the chain status names the waiting ticket and its persona — the card's `waits for Ben`
+    const waiting = fleet.records[0]!.request.ticketId === 'T-0310' ? 'T-0311' : 'T-0310';
+    expect(orch.status().personaWaits).toEqual({ [waiting]: 'ben' });
   });
 
   it('finishing beats starting: the later position takes the one slot', async () => {

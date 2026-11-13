@@ -63,3 +63,16 @@ describe("the owner's Send back on a chain ticket", () => {
     expect(ownerSendBackOf(card('ready', 'pia; you', 2), PLACEMENT)).toEqual({ kind: 'refused', error: 'there is no agent position before position 2 to send T-1 back to' });
   });
 });
+
+describe("the owner's Send back to a picked position (req-270)", () => {
+  it('goes to any earlier position the owner picked', () => {
+    expect(ownerSendBackOf(card('ready', STANDARD, 6), PLACEMENT, 2)).toEqual({ kind: 'cursor', at: 2, persona: 'paul' });
+    expect(ownerSendBackOf(card('ready', STANDARD, 6), PLACEMENT, 1)).toEqual({ kind: 'cursor', at: 1, persona: 'paul' });
+  });
+
+  it('refuses the cursor itself, a later position or none', () => {
+    expect(ownerSendBackOf(card('ready', STANDARD, 4), PLACEMENT, 4).kind).toBe('refused');
+    expect(ownerSendBackOf(card('ready', STANDARD, 4), PLACEMENT, 5).kind).toBe('refused');
+    expect(ownerSendBackOf(card('ready', STANDARD, 4), PLACEMENT, 0).kind).toBe('refused');
+  });
+});

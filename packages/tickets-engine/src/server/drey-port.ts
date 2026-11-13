@@ -120,7 +120,7 @@ export interface RemoteBoard {
   /** The owner's answer to a Needs-you decision: a `resolved` status line / comment (E14-6). */
   answerNeed(input: { id: string; key?: string; text?: string; actor?: string }): Promise<MutationResult>;
   /** The proof card's send-back with a mandatory note (E5c). */
-  sendBack(input: { id: string; note: string; actor?: string; comments?: readonly ReviewComment[] }): Promise<MutationResult>;
+  sendBack(input: { id: string; note: string; actor?: string; comments?: readonly ReviewComment[]; position?: number }): Promise<MutationResult>;
   /** The E6 improvements card: one persona's proposals and counts. */
   personaImprovements(personaId: string): Promise<PersonaImprovementsReply>;
   /** The E6 1:1 decision; the apply lands in exactly one commit on the desk. */
@@ -649,7 +649,7 @@ export class DreyTicketsPort implements TicketsRemotePort {
     return this.boardService.acceptTicket({ ...cmd, actor });
   }
 
-  ticketSendBack(cmd: { id: string; note: string; comments?: readonly ReviewComment[] }, actor: string): Promise<MutationResult> {
+  ticketSendBack(cmd: { id: string; note: string; comments?: readonly ReviewComment[]; position?: number }, actor: string): Promise<MutationResult> {
     return this.boardService.sendBack({ ...cmd, actor });
   }
 

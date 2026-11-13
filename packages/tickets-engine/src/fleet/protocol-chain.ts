@@ -144,6 +144,8 @@ export interface ChainStatus {
   readonly personaRedStreak?: Readonly<Record<string, number>>;
   /** req-257: the personas the breaker holds, why and since when (each is also in `pausedPersonas`). Absent on older runners. */
   readonly personaTripped?: Readonly<Record<string, ChainTrip>>;
+  /** req-271: the tickets the last pass left waiting because their persona runs its maximum (`parallel:`) — ticket id -> persona; the card's `waits for Ben`. Absent on older runners. */
+  readonly personaWaits?: Readonly<Record<string, string>>;
   /**
    * Per provider: the effective parallel runs its pool carries right now
    * (configured size, capped by a probe, minus a rate-limit shrink) — the

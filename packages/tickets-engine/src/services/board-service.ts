@@ -49,7 +49,9 @@ import { TicketStoreError } from '../ports/ticket-store';
 import { FileTicketStore } from '../store/file-ticket-store';
 import { checkoutOf, createDricketStore, groupByStage, readStoreSettings, type StoreListing, type StoreSettings } from '../store/store-settings';
 import { archivedRecordFiles, recordToBoardFile, type HolderPlacement } from '../store/store-board';
-import { withCursorForMove } from '../store/chain-move';
+import { withChainAndCursor, withCursorForMove } from '../store/chain-move';
+import { personaMoveOf } from './persona-board-moves';
+import type { PersonaBoardMove } from '../contracts/persona-board';
 import { runCursorOf } from '../fleet/run-cursor';
 import { MISSION_ENTRY_KEY, type MissionEntry } from './mission-entry-turns';
 import { ownerAcceptOf, ownerSendBackOf } from './chain-owner-moves';
@@ -60,6 +62,7 @@ import { cursorForPin, placementColumnsOf } from '../core/chain-placement';
 import { parseTicketChainFields } from '../core/ticket-chain-fields';
 import type { PinCursorOf } from '../store/stage-migration-plan';
 import { crewLookupOf, holderOf } from '../core/chain-holder';
+import { lanesOf, withPersonaBoard } from '../core/persona-board';
 import type { TicketDetail } from '../ports/ticket-store';
 import { ARCHIVED_LABEL } from '../store/legacy-bridge';
 import { StoreBoardSource, type LegacyWrite } from '../store/store-board-source';
@@ -461,7 +464,7 @@ export class EngineBoardService {
     const store = await readStoreSettings(this.host.configGet.bind(this.host));
     this.dricket = store.backend === 'dricket' ? store : null;
     const snapshot = store.backend === 'dricket'
-      ? await this.dricketSnapshot(store, { ...common, crew: await this.crewKinds(vault, mdFiles) })
+      ? await this.personaBoardOf(store, vault, mdFiles, await this.dricketSnapshot(store, { ...common, crew: await this.crewKinds(vault, mdFiles) }))
       : assembleBoard({
         ...common,
         files,
@@ -479,6 +482,15 @@ export class EngineBoardService {
     await this.refreshHandover(snapshot);
     await this.syncChainConfig(vault, snapshot.pipeline);
     return snapshot;
+  }
+
+  /** req-270: on a lifecycle store the board is a persona board — the crew's lanes and every active card's hold. */
+  private async personaBoardOf(store: StoreSettings, vault: EngineVault, mdFiles: readonly string[], board: BoardSnapshot): Promise<BoardSnapshot> {
+    if (!isLifecycleStore(await this.storeBoard.stages(store).catch(() => null))) {
+      return board;
+    }
+    const crew = await this.crewInOrder(vault, mdFiles);
+    return withPersonaBoard(board, lanesOf(crew), crewLookupOf(new Map(crew.map((persona) => [persona.id, persona.kind]))));
   }
 
   /** The dricket board: the store is itself a git repository, so the footer names the store, not the vault's repository state (D-9). */
@@ -2964,6 +2976,8 @@ export class EngineBoardService {
     actor?: string;
     /** E11-3: line comments of the review; they land in the ticket's Handover as structured feedback. */
     comments?: readonly ReviewComment[];
+    /** req-270: the earlier chain position the owner picked; absent = the nearest earlier agent position. */
+    position?: number;
   }): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
       const vault = await this.detect();
@@ -3005,9 +3019,9 @@ export class EngineBoardService {
   }
 
   /** req-257: the owner's Send back on a chain ticket of a lifecycle store — the cursor to the nearest earlier agent position; null = the column move of old. */
-  private async chainSendBack(vault: EngineVault, snap: BoardSnapshot, card: TicketCard, input: { readonly note: string; readonly actor?: string; readonly comments?: readonly ReviewComment[] }): Promise<BoardMutationResult | null> {
+  private async chainSendBack(vault: EngineVault, snap: BoardSnapshot, card: TicketCard, input: { readonly note: string; readonly actor?: string; readonly comments?: readonly ReviewComment[]; readonly position?: number }): Promise<BoardMutationResult | null> {
     const placement = await this.holderPlacement(vault, snap.pipeline);
-    const decision = placement === null ? null : ownerSendBackOf(card, placement);
+    const decision = placement === null ? null : ownerSendBackOf(card, placement, Number.isInteger(input.position) ? input.position : undefined);
     if (decision === null || decision.kind === 'none') {
       return null;
     }
@@ -3022,6 +3036,41 @@ export class EngineBoardService {
       await this.commentOn(card, `sent back: ${input.note.trim()}`, actor);
     }
     return written;
+  }
+
+  /**
+   * req-270: the owner's move on a persona board (`persona-board-moves.ts`): start a ticket on a
+   * persona, hand the entry at the cursor to another persona, park it — one `put` with a status line.
+   */
+  personaBoardMove(move: PersonaBoardMove): Promise<BoardMutationResult> {
+    return this.enqueue(async () => {
+      const store = this.dricket;
+      const snap = await this.snapshot();
+      const lanes = snap.lanes;
+      if (store === null || lanes === undefined) {
+        return { ok: false, error: 'the persona board runs on a migrated dricket store' };
+      }
+      const card = findOnBoard(snap, move.id);
+      if (card === null) {
+        return { ok: false, error: `${move.id} is not on the board` };
+      }
+      const lookup = crewLookupOf(new Map(lanes.map((lane) => [lane.persona, lane.kind])));
+      const decision = personaMoveOf({ move, card, lookup, flow: snap.flow ?? [] });
+      if (decision.kind !== 'write') {
+        return decision.kind === 'refused' ? { ok: false, error: decision.error } : { ok: true };
+      }
+      try {
+        const record = await this.storeBoard.record(store, card.id);
+        const legacy = recordToBoardFile(record, card.phase).text;
+        const text = decision.chain === null ? legacy : withChainAndCursor(legacy, decision.chain.entries, decision.chain.at);
+        await this.putRecord(store, record, text, decision.phase === null ? { keepStage: true } : { phase: decision.phase });
+      } catch (error) {
+        return { ok: false, error: error instanceof TicketChangedError ? `${card.id} changed meanwhile — look again and retry` : messageOf(error) };
+      }
+      await this.noteStatus(card, 'done', { text: decision.line }, this.owner);
+      this.announceChanged();
+      return { ok: true };
+    });
   }
 
   /** A plain comment on a store ticket; a failure is a log line, the move it follows already happened. */
@@ -4015,11 +4064,12 @@ export class EngineBoardService {
    */
   async listPersonas(): Promise<readonly Persona[]> {
     const vault = await this.detect();
-    if (vault === null) {
-      return [];
-    }
+    return vault === null ? [] : this.crewInOrder(vault, await this.host.listMarkdownFiles(vault.id));
+  }
+
+  /** Every persona of the vault's listing in the crew's order (req-258's `order:`). */
+  private async crewInOrder(vault: EngineVault, files: readonly string[]): Promise<readonly Persona[]> {
     const loader = this.personaLoaderFor(vault);
-    const files = await this.host.listMarkdownFiles(vault.id);
     const ids: string[] = [];
     for (const file of files) {
       const match = /^tickets\/_meta\/personas\/([a-z0-9][a-z0-9-]{0,63})\/persona\.md$/.exec(file);

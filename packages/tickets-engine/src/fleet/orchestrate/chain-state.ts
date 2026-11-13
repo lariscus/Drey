@@ -98,6 +98,8 @@ export class ChainState {
   readonly personaRedStreak: Record<string, number> = {};
   readonly personaCooldownUntil: Record<string, string> = {};
   readonly personaTripped: Record<string, ChainTrip> = {};
+  /** req-271: the tickets the last pass left waiting for their persona's own pool (ticket -> persona); never persisted. */
+  readonly personaWaits: Record<string, string> = {};
   /** req-170: per ticket, the open ledger cards' keys (`ledger-ticket`, `ledger-persona-ben`). */
   readonly ledgerCards: Record<string, string[]> = {};
   /** req-179: the current tranche; null before the first release (the tranche parts own it). */
@@ -143,6 +145,7 @@ export class ChainState {
       pausedPersonas: [...this.pausedPersonas].sort(),
       personaRedStreak: { ...this.personaRedStreak },
       personaTripped: { ...this.personaTripped },
+      personaWaits: { ...this.personaWaits },
       poolSize: pools.poolSize,
     };
   }
@@ -152,7 +155,7 @@ export class ChainState {
     this.config = null;
     this.vault = null;
     this.autopilot = AUTOPILOT_OFF;
-    const maps = [this.columns, this.redStreak, this.cooldownUntil, this.tokensDay, this.tokensUsed, this.tripped, this.ticketFailures, this.ownerHold, this.ciBackoff, this.ledgerCards, this.personaRedStreak, this.personaCooldownUntil, this.personaTripped];
+    const maps = [this.columns, this.redStreak, this.cooldownUntil, this.tokensDay, this.tokensUsed, this.tripped, this.ticketFailures, this.ownerHold, this.ciBackoff, this.ledgerCards, this.personaRedStreak, this.personaCooldownUntil, this.personaTripped, this.personaWaits];
     for (const map of maps as Record<string, unknown>[]) {
       for (const key of Object.keys(map)) {
         delete map[key];

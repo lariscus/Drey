@@ -185,6 +185,7 @@ export class Dispatcher {
       holders.noteWaits(view, planned, new Set(planned.plan.map((item) => item.card.id)));
     } else {
       this.deps.pool?.queue.clear();
+      holders.clearWaits();
     }
     this.deps.notes.endPass();
   }
