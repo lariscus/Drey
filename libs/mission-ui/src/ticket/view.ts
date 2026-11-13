@@ -39,6 +39,7 @@ import { costInTotalText, costSoFarText, estimateInlineText, estimateText, noEst
 import { Markdown } from '../markdown/markdown';
 import type { MdMode } from '../markdown/mode';
 import { TicketEditMode, TicketModeSwitch } from './mode-switch';
+import { TicketHoldFace } from './hold-decision';
 import { planPartsOf, planSectionOf } from '../plan/plan.model';
 import {
   DEFAULT_DIFF_FONT_SIZE,
@@ -185,6 +186,16 @@ export class TicketView {
   private readonly panes = inject(Panes);
   private readonly padCards = inject(PadCards);
 
+  /** req-273: the persona board's rows and the decision at You (boards 10e v2, 10o v2); inactive on a phase board. */
+  protected readonly holdFace = new TicketHoldFace({
+    doc: this.doc,
+    readOnly: this.readOnly,
+    checks: computed(() => {
+      const strip = this.proofStrip();
+      return strip === null ? null : { passed: strip.passed, total: strip.total };
+    }),
+  });
+
   /** The ticket's persona as a picture (the iPad's Worker row, 10e). */
   protected readonly workerColor = computed(() => {
     const name = this.workerName();
@@ -206,7 +217,8 @@ export class TicketView {
 
   /** The ticket head: left beside an open Assistant while it builds (10e), centred on a ready ticket (10q) and without the pane (10s). */
   protected readonly headCentred = computed(() =>
-    !this.shapeFace() && ((this.decisionNeed() !== null && this.proofStrip() !== null) || !this.panes.right() || this.panes.orientation() === 'portrait'),
+    !this.shapeFace() &&
+    ((!this.holdFace.active() && this.decisionNeed() !== null && this.proofStrip() !== null) || !this.panes.right() || this.panes.orientation() === 'portrait'),
   );
 
   /** The link to the card in the Assistant (10e, 10q, 10s); null = nothing waits. */
@@ -224,7 +236,7 @@ export class TicketView {
       const name = this.workerName();
       return name === null ? this.i18n.t('ticket.pad.decision_question_anon') : this.i18n.t('ticket.pad.decision_question', { name });
     }
-    return this.i18n.t('ticket.pad.decision_ready');
+    return this.holdFace.targets() !== null ? this.holdFace.link() : this.i18n.t('ticket.pad.decision_ready');
   });
 
   protected goToCard(): void {
@@ -263,9 +275,11 @@ export class TicketView {
       untracked(() => this.padCards.card.set(card));
       return;
     }
+    // req-273: a persona board ticket held by You carries its own decision (10e v2).
+    const held = this.holdFace.padCard();
     const need = this.decisionNeed();
-    if (need === null) {
-      untracked(() => this.padCards.card.set(null));
+    if (held !== null || need === null) {
+      untracked(() => this.padCards.card.set(held));
       return;
     }
     const name = this.workerName();
@@ -439,7 +453,11 @@ export class TicketView {
     return (this.work?.needs ?? []).filter((need) => need.ticketId === id);
   });
 
-  protected readonly needsYou = computed(() => this.ticketNeeds().length > 0);
+  /** A need names the ticket, or (req-273) it waits at You's position on a persona board. */
+  protected readonly needsYou = computed(() => this.ticketNeeds().length > 0 || this.holdFace.youHold());
+
+  /** The cost word and the total's label say `in total` once the ticket waits for the owner's decision. */
+  protected readonly costSettled = computed(() => (this.decisionNeed() !== null && this.proofStrip() !== null) || this.holdFace.targets() !== null);
 
   /** The need the pinned decision card answers (board 10o): a checkpoint or a manual step. */
   protected readonly decisionNeed = computed<McNeed | null>(() =>
@@ -603,6 +621,7 @@ export class TicketView {
     this.decisionPick.set(null);
     this.decisionDone.set(null);
     this.decisionError.set(null);
+    this.holdFace.reset();
     // A run face opens with the `<id>:` prefix the thread's composer always carries.
     this.threadDraft.set(untracked(() => (this.mode() === 'thread' ? `${this.id()}: ` : '')));
     this.threadError.set(null);
@@ -644,7 +663,7 @@ export class TicketView {
       return null;
     }
     // A bare cost says what it is (req-98): in total once the ticket waits on the owner, so far while it is worked.
-    return this.decisionWaiting() ? costInTotalText(this.i18n, amount) : costSoFarText(this.i18n, amount);
+    return this.decisionWaiting() || this.holdFace.youHold() ? costInTotalText(this.i18n, amount) : costSoFarText(this.i18n, amount);
   });
 
 

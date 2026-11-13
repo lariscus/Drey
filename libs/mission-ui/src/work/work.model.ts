@@ -47,6 +47,8 @@ export interface McNeed {
   readonly questions?: readonly McWaitQuestion[];
   /** A `QUESTION:` turn's parsed fixed shape (req-75 W2); absent otherwise. */
   readonly shaped?: McShapedQuestion;
+  /** req-273: when the need arose (ISO); absent = no time named. */
+  readonly since?: string;
 }
 
 /** One option of a worker's question form (the engine's WaitQuestion option). */

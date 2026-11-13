@@ -26,6 +26,7 @@ import { MC_TOAST_STATE } from '@mission-ui/toast.model';
 import { MC_PLAN_STATE, type McPlanState } from '@mission-ui/plan/plan.model';
 import { MC_APPROVE_STATE, type McApproveState } from '@mission-ui/plan/approve.model';
 import { MC_FLOW_STATE, type McFlowState } from '@mission-ui/flow/flow.model';
+import { laneIdsOf } from '@mission-ui/team/crew-order';
 import { MC_NOTES_HOST, type McNotesHost } from '@mission-ui/notes/notes.model';
 import { MC_PERSONA_PICTURES } from '@mission-ui/phone/persona-pictures';
 import { McPersonaPictureStore } from './api/persona-pictures';
@@ -159,6 +160,7 @@ export const appConfig: ApplicationConfig = {
           undoDraft: () => state.undoFlowDraft(),
           save: () => state.saveFlow(),
           close: () => state.closeFlow(),
+          crewOrder: () => laneIdsOf(state.board()) ?? [],
         };
       },
     },
@@ -200,6 +202,9 @@ export const appConfig: ApplicationConfig = {
           get waits() {
             return state.team().waits ?? null;
           },
+          get pausedPersonas() {
+            return state.team().pausedPersonas ?? [];
+          },
           get openTicketId() {
             return state.ticketOpen()?.id ?? state.approvalTicket();
           },
@@ -221,6 +226,7 @@ export const appConfig: ApplicationConfig = {
           sendBackManual: (ticketId, note, position) => state.sendBackManualStep(ticketId, note, position),
           handTicket: (ticketId, persona) => state.handTicket(ticketId, persona),
           startTicketRun: (ticketId) => state.startTicketRun(ticketId),
+          answerDecision: (ticketId, key, text) => state.answerTicketDecision(ticketId, key, text),
           openPersona: (titleOrId) => {
             const byTitle = (
               state.personas() as unknown as readonly { id: string; title: string }[]
@@ -249,6 +255,10 @@ export const appConfig: ApplicationConfig = {
           handToClaude: (runId) => state.handToClaude(runId),
           stopRun: (runId) => state.stopRun(runId),
           stopAll: () => state.stopAll(),
+          board: state.board,
+          readOnly: state.readOnly,
+          setCrewOrder: (order) => state.setCrewOrder(order),
+          toast: (message, kind) => state.toast(message, kind),
         };
       },
     },

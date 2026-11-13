@@ -21,19 +21,26 @@
             }
           </div>
         }
-        <div class="pd-list">
+        <div class="pd-list crew-list">
           @for (persona of personas() ?? []; track persona.id) {
-            <article class="pd-card" [class.pd-sel]="selectedId() === persona.id">
+            <article class="pd-card crew-row" [class.pd-sel]="selectedId() === persona.id" [class.crew-dragging]="dragging() === persona.id" [attr.data-persona]="persona.id">
+              <div class="crew-headrow">
+                @if (canMove(persona, 1) || canMove(persona, -1)) {
+                  <button type="button" class="crew-handle pd-handle" [attr.aria-label]="'crew.order.handle' | t: { name: persona.title }" [attr.title]="'crew.order.handle' | t: { name: persona.title }" (pointerdown)="handleDown($event, persona)" (keydown)="handleKey($event, persona)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" /><circle cx="9" cy="12" r="1.6" /><circle cx="15" cy="12" r="1.6" /><circle cx="9" cy="18" r="1.6" /><circle cx="15" cy="18" r="1.6" /></svg>
+                  </button>
+                }
               <button type="button" class="pd-head" [attr.aria-current]="selectedId() === persona.id ? 'true' : null" (click)="pick(persona)">
                 <mc-ph-avatar [persona]="persona.id" [name]="persona.title" [color]="persona.color" [size]="36" />
                 <span class="pd-who">
                   <b class="ph-ellipsis">{{ persona.title }}</b>
-                  <span class="pd-role ph-ellipsis">{{ roleLineOf(persona) }}</span>
+                  <span class="pd-role ph-ellipsis">{{ roleLineOf(persona) }}@if (holdsLineOf(persona); as holds) {<span class="crew-holds"> · {{ holds }}</span>}</span>
                 </span>
                 <span class="pd-state">
                   <span class="pd-sdot" [attr.data-tone]="stateToneOf(persona)"></span>{{ phoneStateOf(persona) }}
                 </span>
               </button>
+              </div>
               @if (dayCostFootOf(persona); as foot) {
                 <div class="pd-budget">
                   <div class="pd-budget-line">
@@ -123,7 +130,7 @@
       }
       @if (personas(); as list) {
         @for (persona of list; track persona.id) {
-          <article class="ph-card">
+          <article class="ph-card crew-row" [attr.data-persona]="persona.id">
             <button type="button" class="ph-head" [attr.aria-expanded]="setupOf()?.id === persona.id" (click)="selectSetup(persona)">
               <svg class="ph-ava" role="img" [attr.aria-label]="persona.title" width="36" height="36" viewBox="0 0 24 24">
                 <rect width="24" height="24" [attr.fill]="persona.color" />
@@ -132,7 +139,7 @@
               </svg>
               <span class="ph-who">
                 <b class="ph-ellipsis">{{ persona.title }}</b>
-                <span class="ph-role ph-ellipsis">{{ roleLineOf(persona) }}</span>
+                <span class="ph-role ph-ellipsis">{{ roleLineOf(persona) }}@if (holdsLineOf(persona); as holds) {<span class="crew-holds"> · {{ holds }}</span>}</span>
               </span>
               <span class="ph-state">
                 <span class="ph-sdot" [attr.data-tone]="stateToneOf(persona)"></span>{{ phoneStateOf(persona) }}
@@ -232,6 +239,12 @@
               </div>
             </div>
           }
+          @if (canMove(setup, -1) || canMove(setup, 1)) {
+            <div class="ph-setup-acts crew-moves">
+              <button type="button" class="ph-cbtn crew-move-up" [disabled]="!canMove(setup, -1)" (click)="move(setup, -1)">{{ 'crew.order.up' | t }}</button>
+              <button type="button" class="ph-cbtn crew-move-down" [disabled]="!canMove(setup, 1)" (click)="move(setup, 1)">{{ 'crew.order.down' | t }}</button>
+            </div>
+          }
           @if (canPause() && setup.kind !== 'human') {
             <div class="ph-setup-acts">
               <button type="button" class="ph-cbtn" (click)="togglePause(setup)">
@@ -285,9 +298,14 @@
   }
 
   @if (personas(); as list) {
-    <ul class="cards">
+    <ul class="cards crew-list">
       @for (persona of list; track persona.id) {
-        <li class="card">
+        <li class="card crew-row" [class.crew-dragging]="dragging() === persona.id" [attr.data-persona]="persona.id">
+          @if (canMove(persona, 1) || canMove(persona, -1)) {
+            <button type="button" class="crew-handle " [attr.aria-label]="'crew.order.handle' | t: { name: persona.title }" [attr.title]="'crew.order.handle' | t: { name: persona.title }" (pointerdown)="handleDown($event, persona)" (keydown)="handleKey($event, persona)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" /><circle cx="9" cy="12" r="1.6" /><circle cx="15" cy="12" r="1.6" /><circle cx="9" cy="18" r="1.6" /><circle cx="15" cy="18" r="1.6" /></svg>
+            </button>
+          }
           <ng-template #head>
             <div class="ptop">
               <span class="pava" [style.background-color]="persona.color" aria-hidden="true">{{
@@ -295,7 +313,7 @@
               }}</span>
               <span class="pwho">
                 <span class="pname">{{ persona.title }}</span>
-                <span class="prole">{{ persona.summary ?? persona.role }}{{ phasesFootOf(persona) ? ' · ' + phasesFootOf(persona) : '' }}</span>
+                <span class="prole">{{ persona.summary ?? persona.role }}@if (personaBoard()) {@if (holdsLineOf(persona); as holds) {<span class="crew-holds"> · {{ holds }}</span>}} @else { {{ phasesFootOf(persona) ? ' · ' + phasesFootOf(persona) : '' }} }</span>
               </span>
               <span class="pstat">
                 <span class="led" [class]="'led ' + dotClass(persona)" aria-hidden="true"></span>

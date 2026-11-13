@@ -6103,3 +6103,38 @@ sequenceDiagram
     end
     S-->>P: board changed -> the next step's line, or none
 ```
+
+## 6.130 Mission Control on the persona board: Send back to a position (req-273, milestone 259)
+
+The phone and the iPad read the same snapshot as the desktop Board: `/api/board`
+carries `lanes` and every active card's `hold`, `/api/fleet` the live runs and
+the chain block (`personaWaits`, the pool's queue). The Work list groups by
+holder; the decision on a ticket at You names its target.
+
+```mermaid
+sequenceDiagram
+    participant O as Owner (phone / iPad)
+    participant W as Work list (holder-rows)
+    participant T as Ticket screen + decision card
+    participant G as Gateway (router)
+    participant S as BoardService
+    participant D as dricket store
+    W->>G: GET /api/board, /api/needs, /api/fleet
+    G-->>W: lanes, holds, needs, runs, chain waits
+    W->>W: Needs you (at You) · Paul · Ben … in crew order, id · n/m · word
+    O->>W: tap T-0118 (6/6 · Accept)
+    W->>T: open ticket: holder You · 6 of 6, flow, cost by position
+    O->>T: Send back to Ben · 3 of 6, note
+    T->>G: POST /api/tickets/T-0118/send-back {note, position: 3}
+    G->>G: parseSendBack (position a whole number from 1)
+    G->>S: sendBack {id, note, position}
+    S->>D: put (x-at = 3, x-sent-back 6>3), status line
+    S-->>G: board changed (event stream)
+    G-->>W: board frame -> T-0118 under Ben, 3/6 · sent back
+```
+
+The no-persona card's **Assign…** and **Do it myself** are `POST …/hand {persona}`
+(the board's `hand` move, refused while a run holds the claim); the merge
+conflict card's **Let Ben resolve** starts the holder's run again (`POST
+/api/runs`); the Crew list's drag writes the whole order (`POST /api/crew/order`,
+`crew.md`'s `order:`, one commit) and the list reads the board again.

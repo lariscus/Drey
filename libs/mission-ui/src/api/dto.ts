@@ -176,6 +176,8 @@ export interface NeedView {
   readonly questions?: readonly WaitQuestionView[];
   /** A `QUESTION:` turn's parsed fixed shape (req-75 W2); absent otherwise. */
   readonly shaped?: ShapedQuestionView;
+  /** req-273: when the need arose (ISO); absent when the desk names no time — a card's time line then reads now. */
+  readonly since?: string;
 }
 
 // --- Chain (req-266): the persona list --------------------------------------------
@@ -1167,6 +1169,7 @@ export function parseNeeds(json: unknown): NeedView[] {
       ...(runId !== null ? { runId } : {}),
       ...(questions.length > 0 ? { questions } : {}),
       ...(shaped !== null ? { shaped } : {}),
+      ...(typeof item['since'] === 'string' && item['since'] !== '' ? { since: item['since'] } : {}),
     };
     needs.push(need);
   }

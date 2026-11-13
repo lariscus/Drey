@@ -1254,6 +1254,21 @@ export class McState {
     return body['ok'] === true ? { ok: true } : refusal(body, 'the desk did not hand the ticket over');
   }
 
+  /** req-273: the owner's answer to a ticket's open decision (`POST …/answer {key, text}`); no key = the ticket's only open one. */
+  async answerTicketDecision(id: string, key: string | null, text: string): Promise<McReply> {
+    const trimmed = text.trim();
+    if (trimmed === '') {
+      return { ok: false, error: 'the answer is empty' };
+    }
+    const body = await this.client
+      .request<Record<string, unknown>>('POST', `/api/tickets/${encodeURIComponent(id)}/answer`, { ...(key === null ? {} : { key }), text: trimmed })
+      .catch(fail);
+    if (isFailure(body)) {
+      return body;
+    }
+    return body['ok'] === true ? { ok: true } : refusal(body, 'the desk did not take the answer');
+  }
+
   /** req-273: starts the ticket's run again (`POST /api/runs`), the holder's own run. */
   async startTicketRun(id: string): Promise<McReply> {
     const body = await this.client.request<Record<string, unknown>>('POST', '/api/runs', { id }).catch(fail);
@@ -1269,7 +1284,12 @@ export class McState {
     if (isFailure(body)) {
       return body;
     }
-    return body['ok'] === true ? { ok: true } : refusal(body, 'the desk did not change the crew order');
+    if (body['ok'] !== true) {
+      return refusal(body, 'the desk did not change the crew order');
+    }
+    // The lanes carry the order: read the board again so the list stands on the desk's answer.
+    void this.refreshWork();
+    return { ok: true };
   }
 
   /** Sends the open ticket back to the agent; the note is mandatory (an empty one refuses). */

@@ -1840,6 +1840,12 @@ A terminal can read the cost overview the same way the board does:
 `GET /report` on the runner (see `plugins/tickets/FLEET.md`) groups the
 runs' tokens by ticket, phase and model, and shows how much of each
 run's input was spent before its first write — the exploration cost.
+The same report groups by persona — runs, tokens, cost, red gates and
+how long the persona held tickets — and by position in the chain:
+how long the runs at position 1, 2, … worked, how long tickets sat
+there, and the difference, the waiting time. The held times come from
+the board's ledger, which notes each time a ticket moves to another
+persona or position.
 
 **When a worker needs you.** A worker that cannot go on without a
 decision of yours asks: its run stops at the question instead of ending,
@@ -2350,6 +2356,28 @@ the largest, 21 px body text) — with the preview underneath; it is kept per de
 once. On an iPad Settings has its categories on the left, then a search and one section per category; **Change…** opens a section's page. In **Work** every ticket is
 one row — id and age, title, a line saying what it waits for, the persona and the cost so far
 (**$1.20 so far**); a ticket that needs you is shown once, under **Needs you**.
+
+**On the persona board** (a store on the lifecycle stages) **Work** groups the tickets by who holds
+them: **Needs you** first — a persona's question, a position without a persona, a ticket sent back
+twice and everything waiting for your Accept — then one group per persona in the crew's order, with
+the persona's circle and the number of tickets (the group's tooltip and, on the desktop web, its
+head give the persona's load, `Ben · 2/2 · 1 waiting`), then **Prioritized**, **Inbox** and **Done this
+week**, folded. A row reads `T-0123 · 3/6 · merging main`: the position in its chain and one word —
+*Ben asks*, *no persona*, *sent back twice*, *Accept*, *shaping with you*, *running*, *merging main*,
+*sent back*, *waits for Ben*, *queued*. Swiping right accepts only a ticket at You; swiping left still
+opens the ticket with **Send back** waiting. A ticket shows its holder and position (`You · 6 of 6`),
+the chain with a ✓ for each done position, the **Holder** and **Cost by position**. At You's last
+position the decision names its target: on the iPad the card in the Assistant has **Accept**, the
+earlier positions to **Send back to** and a note; on the phone the bar at the foot has a **Send back to**
+list (preset to the builder), **Send back…** and **Accept and merge**. Mission Control's chat adds a card
+for a position without a persona (**Assign…** a persona, or **Do it myself**), a persona's question
+(one button per option, or **Write an answer…**), a ticket sent back twice (both reasons, **Send back…**
+or **Accept**) and a merge conflict while a persona merges `main` (the files, **Resolve in Drey**,
+**Let Ben resolve**, **Do it myself**). **Crew** lists the personas in the crew's order with what each
+holds now; on the iPad and the desktop web drag a row by its handle to change the order, on the phone
+use **Move up** and **Move down** under the persona's card — the order is the board's columns. The flow
+editor's pickers list the crew in the same order, and a line under the flow says where a send-back
+goes.
 
 The chat's **microphone** button (next to Send) dictates into the message
 field: tap it, speak, and the words appear as you talk; tap again to stop.
