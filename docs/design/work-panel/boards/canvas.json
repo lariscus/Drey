@@ -483,14 +483,14 @@
       "y": 32820,
       "w": 1440,
       "h": 900,
-      "title": "7q · Drey — Work view (Ctrl+2) as it opens, recommended: the persona Board alone at full width, both side docks folded (Tickets left, the Assistant on Mission Control right), no bottom band (2026-11-13)"
+      "title": "7q rejected · Drey — Work view on the Board alone at full width, both side docks folded — put to the owner and declined 2026-11-13 (he wants Mission Control open); history only"
     },
     "DeskViewWorkMC.dc.html": {
       "x": 3040,
       "y": 32820,
       "w": 1440,
       "h": 900,
-      "title": "7q alt · Drey — Work view, the alternative: the Board with Mission Control open in the right dock (380); the board scrolls sideways, You and Done start off screen (2026-11-13)"
+      "title": "7q · Drey — Work view (Ctrl+2) as it opens, the owner's choice: the persona Board with Mission Control open in the right dock (380), the Tickets panel in the folded left dock; the board keeps its column width and scrolls sideways, no bottom band (2026-11-13)"
     },
     "DeskViewCrew.dc.html": {
       "x": 4560,
@@ -704,7 +704,7 @@
       "y": 32820,
       "w": 440,
       "fill": "blue",
-      "text": "Default layouts per view (owner request 2026-11-13, finish line step 5).\n\n• Notes: navigate left (Calendar, Files open; Find, Templates, Open windows, Source control, Tickets closed), about-this-note right (Assistant on Model open; Outline, Backlinks closed). Today's daily note. Docks 300 / 380, as every desktop board draws them.\n\n• Work: the Board tab, the view's own (comes back on every visit). Docks folded; Ctrl+B shows Tickets, Ctrl+Alt+B Mission Control (the view's Assistant target). A ticket opens as a tab beside the Board.\n\n• Crew: the Crew tab, the view's own. Docks folded, the Assistant on Mission Control. A card opens the Persona page as a tab.\n\n• No view has a bottom band (the Capacity band became the pool chip, req-271).\n\n• View → Reset layout: the active view back to THIS design (today: every view gets the Notes arrangement). Layout → Reset to saved layout: back to the user's saved layout, as now. A saved layout is never overwritten by a changed default."
+      "text": "Default layouts per view (owner request 2026-11-13, finish line step 5; accepted the same day, roadmap req-297).\n\n• Notes: navigate left (Calendar, Files open; Find, Templates, Open windows, Source control, Tickets closed), about-this-note right (Assistant on Model open; Outline, Backlinks closed). Today's daily note. Docks 300 / 380, as every desktop board draws them.\n\n• Work (owner's choice 2026-11-13, 7q DeskViewWorkMC): the Board tab, the view's own (comes back on every visit), Mission Control open in the right dock (380, the view's Assistant target), Tickets in the folded left dock (Ctrl+B). The board scrolls sideways. A ticket opens as a tab beside the Board. The full-width board (DeskViewWork) was declined.\n\n• Crew: the Crew tab, the view's own. Docks folded, the Assistant on Mission Control. A card opens the Persona page as a tab.\n\n• No view has a bottom band (the Capacity band became the pool chip, req-271).\n\n• View → Reset layout: the active view back to THIS design (today: every view gets the Notes arrangement). Layout → Reset to saved layout: back to the user's saved layout, as now. A saved layout is never overwritten by a changed default."
     }
   },
   "order": [

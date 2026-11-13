@@ -26,9 +26,10 @@ the window so every block shows; in the app the left column and the settings pan
 
 The default-layout boards (`DeskViewNotes`, `DeskViewWork`, `DeskViewWorkMC`, `DeskViewCrew`, the revised
 `canvas.json`) show what each view opens with — on a first start and after `View → Reset layout` — and were exported from
-canvas version `1794596818-9dc4` (owner request 2026-11-13, finish line step 5); they sit in their own row at the bottom of
-the canvas, with the per-view spec in the sticky `viewsNote`. `DeskViewWorkMC` is the alternative to `DeskViewWork` put to
-the owner, not a second default. **Awaiting the owner's OK.**
+canvas version `1794596818-9dc4` (titles and `viewsNote` revised in `1794597654-e225`; owner request 2026-11-13, finish
+line step 5); they sit in their own row at the bottom of the canvas, with the per-view spec in the sticky `viewsNote`.
+**Accepted by the owner on 2026-11-13** (row req-297): for Work he chose `DeskViewWorkMC` (Mission Control open);
+`DeskViewWork` (the board alone at full width) was declined and stays only as history.
 
 A session that builds or changes a screen reads the board's HTML for the exact
 measures, colours, spacing and strings, opens the PNG to see it, and compares
@@ -90,10 +91,10 @@ above.
 | 7m · Settings → Projects: name, colour (presets and a free colour picker), purpose in the Markdown editor, repositories, folders, vault access None / Read / Write (no profile: the owner needs no work / private distinction) — **2026-11-13, accepted 2026-11-13** | `DeskProjects` | 1440×960 | desktop |
 | 7n · The global project filter in the title bar: Files and the board filtered to Drey, the load in the column headers counts every project — **2026-11-13, accepted 2026-11-13** | `DeskProjectFilter` | 1440×900 | desktop |
 | 7o · Settings → Skills library: GitHub sources added in place, shared / GitHub / own skills, who uses them — **2026-11-13, accepted 2026-11-13** | `DeskSkillsLibrary` | 1440×900 | desktop |
-| 7p · Notes view as it opens: Calendar and Files open in the left dock (Find, Templates, Open windows, Source control, Tickets as icons), today's daily note, the Assistant on Model in the right dock (Outline, Backlinks as icons), docks 300 / 380, no bottom band — **2026-11-13, canvas `1794596818-9dc4`, awaiting the owner's OK** | `DeskViewNotes` | 1440×900 | desktop |
-| 7q · Work view as it opens: the persona Board alone at full width, both side docks folded (Tickets left, the Assistant on Mission Control right), no bottom band — **2026-11-13, recommended** | `DeskViewWork` | 1440×900 | desktop |
-| 7q alt · Work view, the alternative: the Board with Mission Control open in the right dock (380), the board scrolls sideways — **2026-11-13, put to the owner** | `DeskViewWorkMC` | 1440×900 | desktop |
-| 7r · Crew view as it opens: the Crew tab alone at full width, both side docks folded, a card opens the Persona page as a tab, no bottom band — **2026-11-13** | `DeskViewCrew` | 1440×900 | desktop |
+| 7p · Notes view as it opens: Calendar and Files open in the left dock (Find, Templates, Open windows, Source control, Tickets as icons), today's daily note, the Assistant on Model in the right dock (Outline, Backlinks as icons), docks 300 / 380, no bottom band — **2026-11-13, canvas `1794596818-9dc4`, accepted 2026-11-13 (req-297)** | `DeskViewNotes` | 1440×900 | desktop |
+| 7q · Work view as it opens: the persona Board with Mission Control open in the right dock (380), the Tickets panel in the folded left dock, the board keeps its column width and scrolls sideways, no bottom band — **2026-11-13, the owner's choice, accepted (req-297)** | `DeskViewWorkMC` | 1440×900 | desktop |
+| 7q declined · Work view on the Board alone at full width, both side docks folded — **put to the owner 2026-11-13 and declined; history only** | `DeskViewWork` | 1440×900 | desktop |
+| 7r · Crew view as it opens: the Crew tab alone at full width, both side docks folded, a card opens the Persona page as a tab, no bottom band — **2026-11-13, accepted (req-297)** | `DeskViewCrew` | 1440×900 | desktop |
 | 9a · Drey today, cleaned up — ticket T-0017 in Work, Assistant without the rail | `DeskClean` | 1440×900 | desktop |
 | 9b · Drey today — Calendar, Source control, Outline, Search and Tasks redesigned — **not a target design** (owner, 2026-11-06; a sketch, nothing is measured against it) | `DeskPanels` | 1440×900 | desktop |
 | 9c · Find: Search and Tasks in one left-dock panel, Search mode (req-161, accepted 2026-11-08) | `DeskFind` | 1440×900 | desktop |
