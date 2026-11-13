@@ -4,6 +4,7 @@ import type { ChainConfig, WorkerProviderId } from '../protocol';
 import { LIVE_RUN_STATES } from '../run/run-state';
 import type { BoardPersonas, HeldTicket, TicketPersona } from './board-personas';
 import type { ChainState } from './chain-state';
+import type { HoldRecorder } from './hold-recorder';
 import type { PersonaBreaker } from './persona-breaker';
 import type { SupervisorDirectory } from './supervisor-directory';
 import type { WaitNotes } from './wait-notes';
@@ -14,6 +15,8 @@ export interface HolderPassDeps {
   readonly directory: SupervisorDirectory;
   readonly notes: WaitNotes;
   readonly breaker: PersonaBreaker;
+  /** req-274: the cursor's moves as `hold` ledger lines; absent = none written. */
+  readonly holds?: HoldRecorder;
 }
 
 /** What one pass on a chain board resolved: the holders and the agent holders' personas (what the dispatch loads). */
@@ -49,6 +52,20 @@ export class HolderPass {
       entries.set(id, ticket.entry);
     }
     return { held, entries };
+  }
+
+  /**
+   * req-274: every ticket's holder to the hold record, each pass — the pass's own view while the
+   * Autopilot runs (`view`), else the holders read for the record alone, so a move made while it is
+   * off is still recorded at the pass that sees it.
+   */
+  async recordHolds(config: ChainConfig, snap: BoardSnapshot, view: HolderPassView | null): Promise<void> {
+    const holds = this.deps.holds;
+    if (holds === undefined) {
+      return;
+    }
+    const holders = view !== null ? new Map([...view.held].map(([id, ticket]) => [id, ticket.holder])) : await this.deps.personas.holdersOf(config, snap);
+    await holds.observe(holders);
   }
 
   plan(config: ChainConfig, snap: BoardSnapshot, view: HolderPassView, counts: HolderPassCounts): HolderPlan {

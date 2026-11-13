@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { LedgerWrite } from '../../core/ledger';
 import { ChainHarness, ONE, STORE } from './chain-harness.fake';
 
 /**
@@ -87,5 +88,20 @@ describe('the holder dispatch on a lifecycle store (req-257)', () => {
 
     expect(fleet.records).toEqual([]);
     expect(logs.join('\n')).toContain('persona "ben" is paused');
+  });
+
+  it('req-274: each pass records the holders as hold lines — with the Autopilot off too — and chain.json keeps them', async () => {
+    h.io.seed('T-0330', 'active', { chain: STANDARD, extensions: { at: '3' } });
+    h.io.seed('T-0331', 'active', { chain: ['paul', 'bob'], extensions: { at: '2' } });
+    h.io.seed('T-0332', 'inbox', { chain: STANDARD });
+    const lines: LedgerWrite[] = [];
+    const { orch } = h.build({ events: { ledger: (write) => lines.push(write) } });
+    await orch.configure(h.config({ store: LIFECYCLE }));
+
+    expect(lines.filter((l) => l.kind === 'hold')).toEqual([
+      { kind: 'hold', ticket: 'T-0330', persona: 'ben', position: 3, length: 4 },
+      { kind: 'hold', ticket: 'T-0331', persona: 'you', position: 2, length: 2 },
+    ]);
+    expect((await h.chainFile())['holds']).toEqual({ 'T-0330': { persona: 'ben', position: 3, length: 4 }, 'T-0331': { persona: 'you', position: 2, length: 2 } });
   });
 });

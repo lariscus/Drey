@@ -15,6 +15,13 @@ export interface OwnerHold {
   readonly at: string;
 }
 
+/** req-274: the holder and chain position a ticket's last `hold` ledger line recorded. */
+export interface HoldMark {
+  readonly persona: string;
+  readonly position: number | null;
+  readonly length: number | null;
+}
+
 /**
  * Which tickets vault a chain file belongs to, and how this device reaches
  * it (req-173): the path is the file's key, the store and the git
@@ -68,6 +75,8 @@ export interface ChainFile {
   readonly personaTripped?: Record<string, ChainTrip>;
   /** req-170: per ticket, the ledger cards (Needs-you blockers) the pool raised and has not resolved yet. */
   readonly ledgerCards?: Record<string, string[]>;
+  /** req-274: per held ticket, the holder its last `hold` ledger line named (the recorder compares each pass against it). */
+  readonly holds?: Record<string, HoldMark>;
   /** req-179: the current tranche's counters, facts and checkpoint; absent before the first release. */
   readonly tranche?: TrancheRecord;
 }
@@ -100,6 +109,8 @@ export class ChainState {
   readonly personaTripped: Record<string, ChainTrip> = {};
   /** req-170: per ticket, the open ledger cards' keys (`ledger-ticket`, `ledger-persona-ben`). */
   readonly ledgerCards: Record<string, string[]> = {};
+  /** req-274: per held ticket, the last recorded hold (see {@link ChainFile}). */
+  readonly holds: Record<string, HoldMark> = {};
   /** req-179: the current tranche; null before the first release (the tranche parts own it). */
   tranche: TrancheRecord | null = null;
   /** The pipeline of the last pass — the breaker's thresholds and the quality rungs read it (not persisted). */
@@ -152,7 +163,7 @@ export class ChainState {
     this.config = null;
     this.vault = null;
     this.autopilot = AUTOPILOT_OFF;
-    const maps = [this.columns, this.redStreak, this.cooldownUntil, this.tokensDay, this.tokensUsed, this.tripped, this.ticketFailures, this.ownerHold, this.ciBackoff, this.ledgerCards, this.personaRedStreak, this.personaCooldownUntil, this.personaTripped];
+    const maps = [this.columns, this.redStreak, this.cooldownUntil, this.tokensDay, this.tokensUsed, this.tripped, this.ticketFailures, this.ownerHold, this.ciBackoff, this.ledgerCards, this.holds, this.personaRedStreak, this.personaCooldownUntil, this.personaTripped];
     for (const map of maps as Record<string, unknown>[]) {
       for (const key of Object.keys(map)) {
         delete map[key];
@@ -182,6 +193,7 @@ export class ChainState {
       personaCooldownUntil: { ...this.personaCooldownUntil },
       personaTripped: { ...this.personaTripped },
       ledgerCards: Object.fromEntries(Object.entries(this.ledgerCards).map(([ticket, keys]) => [ticket, [...keys]])),
+      holds: { ...this.holds },
       ...(this.tranche !== null ? { tranche: this.tranche } : {}),
       ...(handoverAt !== undefined ? { handoverAt } : {}),
     };

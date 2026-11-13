@@ -5957,3 +5957,40 @@ sequenceDiagram
 ```
 
 A chain run's brief lists the positions and the `SEND-BACK:` marker (`prompts/disciplines/chain.md`); the harness's result text is read for it (`event-text.ts` `sendBackOf`), `exitVerdict` answers `send-back` before the gate, and `RunCompletion.sendBack` decides with `decideSendBack` over the request's `cursor` (its entries and the send-back already used). Pia's entry never reaches the runner: the engine sweeps on every board and fleet change, runs one turn per entry, and the ticket's `awaiting` keeps a second turn from starting.
+
+## 6.125 The cursor moves → a `hold` line → the report's held, busy and waiting time (req-274, milestone 256)
+
+```mermaid
+sequenceDiagram
+    participant X as whoever moves the cursor (a run's hand-on · a send-back · the owner's drag · a hand edit)
+    participant S as dricket store (x-chain, x-at, x-awaiting, stage)
+    participant D as Dispatcher.runHolders (every pass, 15 s)
+    participant H as HolderPass / BoardPersonas
+    participant HR as HoldRecorder
+    participant CJ as chain.json (holds)
+    participant L as tickets/_meta/ledger.jsonl
+    participant RR as RunReadRoutes (GET /report)
+    X->>S: x-at = 3 (or a new persona at the cursor, or x-awaiting: you, or a lifecycle stage)
+    D->>S: read the board snapshot
+    D->>H: resolve (Autopilot on) · holdersOf (Autopilot off)
+    H-->>D: every ticket's holder (holderOf: persona, position n of m)
+    D->>HR: observe(holders)
+    HR->>CJ: compare with the last recorded hold of each ticket
+    alt holder or position changed
+        HR->>L: {"event":"hold","ticket":"T-0002","persona":"ben","position":3,"length":6}
+        HR->>CJ: holds[T-0002] = ben @ 3/6
+    else the ticket reached Inbox / Prioritized / Done, or left the board
+        HR->>L: {"event":"hold","ticket":"T-0002"} (closes the hold)
+        HR->>CJ: holds[T-0002] removed
+    else unchanged
+        HR-->>D: nothing written
+    end
+    Note over L: a chain run's run_settled carries its position too (RunInfo.chainPosition)
+    RR->>L: read the ledgers of the recorded runs' vaults and the chain's vault
+    RR->>RR: holdSpans (a hold lasts until the ticket's next hold line; an open one until now)
+    RR-->>RR: byPersona: cost, red gates, heldMs · byPosition: busyMs (runs' working time), heldMs, waitingMs = held − busy
+```
+
+The recorder observes instead of hooking the writers of the cursor, so every way the cursor moves is recorded the same
+way; its time resolution is the dispatch pass. A restarted runner keeps its book in `chain.json` and writes nothing for
+a hold it already recorded; a hold it never saw starts at the first pass that sees it.

@@ -557,6 +557,12 @@ export interface RunInfo {
   readonly model?: string | null;
   /** The phase the ticket sat in when the run started. */
   readonly phase?: string | null;
+  /**
+   * req-274: the chain position the run worked — the cursor at its start
+   * (1-based) and the chain's length; absent outside a chain and on records
+   * written before it. The report's per-position busy time reads it.
+   */
+  readonly chainPosition?: { readonly at: number; readonly length: number };
   /** Usage summed over the run's model calls; a null counter was never reported. */
   readonly usage?: RunUsage;
   /**

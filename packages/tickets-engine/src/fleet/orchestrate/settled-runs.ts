@@ -37,6 +37,11 @@ export interface SettledRunsDeps {
  * leaves, and the breaker on a failure. The status comment of the end is
  * the run's own release (E14-6), never a second line here.
  */
+/** req-274: a chain run's position and the chain's length for its ledger line; nothing outside a chain. */
+function positionOf(info: RunInfo): { readonly position?: number; readonly length?: number } {
+  return info.chainPosition === undefined ? {} : { position: info.chainPosition.at, length: info.chainPosition.length };
+}
+
 export class SettledRuns {
   constructor(private readonly deps: SettledRunsDeps) {}
 
@@ -99,6 +104,7 @@ export class SettledRuns {
         tokensIn: info.tokensIn,
         tokensOut: info.tokensOut,
         cost: cost !== null && cost > 0 ? cost : null,
+        ...positionOf(info), // req-274: the chain position the run worked
       });
     }
   }

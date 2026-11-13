@@ -7,7 +7,8 @@
  * Pure over `ReportRun`; absent counters count 0 into a group's sums,
  * and a pre-T-0048 record (no `usage`) falls back to its cumulative
  * `tokensIn`/`tokensOut`. E3 (ADR-0088) adds the per-persona cost
- * grouping (`personaCostReport`) next to the ticket/phase/model one.
+ * grouping (`personaCostReport`) next to the ticket/phase/model one;
+ * req-274 builds the persona and position rows on it (`persona-report.ts`).
  */
 import type { RunUsage } from './protocol';
 
@@ -29,6 +30,12 @@ export interface ReportRun {
   readonly tokensBeforeFirstWrite: number | null;
   /** The run's cost in USD, when the provider reported one. */
   readonly costUsd?: number | null;
+  /** req-274: the chain position the run worked; null/absent outside a chain and on older records. */
+  readonly position?: number | null;
+  /** req-274: the run's working time in milliseconds; null/absent when unknown. */
+  readonly busyMs?: number | null;
+  /** req-274: the machine gate's verdict, once it ran. */
+  readonly gate?: 'green' | 'red' | null;
 }
 
 export interface ReportGroup {

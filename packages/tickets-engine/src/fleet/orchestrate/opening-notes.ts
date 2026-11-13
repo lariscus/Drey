@@ -55,6 +55,11 @@ function slotNotes(slot: SlotBinding | null): readonly string[] {
 }
 
 /** The slot (req-177) and the pool's grant (req-170) a run's record carries; nothing without a binding. */
+/** req-274: the chain position a chain run works (its cursor at the start); nothing outside a chain. */
+function chainPositionFields(request: RunOpening['request']): Pick<RunInfo, 'chainPosition'> {
+  return request.cursor === undefined ? {} : { chainPosition: { at: request.cursor.at, length: request.cursor.length } };
+}
+
 function slotFields(slot: SlotBinding | null): Pick<RunInfo, 'slot' | 'grant'> {
   if (slot === null) {
     return {};
@@ -91,6 +96,7 @@ export function newRunInfo(opening: RunOpening, initial: RunInfo['state']): RunI
     gateResult: null,
     model: request.model,
     phase: request.phase,
+    ...chainPositionFields(request), // req-274
     ...(request.form === 'scout' ? { form: 'scout' as const } : {}), // E8: the board's lanes and the settle hooks read it
     usage: { input: null, cacheRead: null, cacheCreation: null, output: null },
     ...slotFields(opening.slot ?? null),

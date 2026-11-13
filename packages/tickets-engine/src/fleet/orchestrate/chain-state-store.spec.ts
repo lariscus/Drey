@@ -52,6 +52,21 @@ describe('ChainStateStore per vault', () => {
     expect(restored.config).toBeNull();
   });
 
+  it('req-274: the last recorded holds come back, a broken entry is dropped', async () => {
+    const { fs, store } = setup();
+    const state = new ChainState();
+    state.vault = A;
+    state.holds['T-1'] = { persona: 'ben', position: 2, length: 4 };
+    state.holds['T-2'] = { persona: 'you', position: null, length: null };
+    state.holds['T-3'] = { persona: 'ben', position: 0, length: 4 };
+    await store.persist(state);
+    const restored = new ChainState();
+    await new ChainStateStore('/fleet', fs, clock, () => undefined).load(restored);
+    expect(restored.holds).toEqual({ 'T-1': { persona: 'ben', position: 2, length: 4 }, 'T-2': { persona: 'you', position: null, length: null } });
+    restored.reset();
+    expect(restored.holds).toEqual({});
+  });
+
   it('moves a pre-req-173 chain.json into its vault file and keeps it as chain.legacy.json', async () => {
     const { fs, store, logs } = setup();
     const old = { version: 1, config: { ...A, defaultWorker: 'claude-code', permissionMode: 'accept-edits' }, master: 'halted', columns: { review: 'held' }, redStreak: { build: 2 } };
