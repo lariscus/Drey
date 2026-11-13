@@ -46,7 +46,8 @@ export class PersonaSessionContext {
     return composeOneOnOneBrief({
       id: persona.id,
       title: persona.title,
-      role: persona.role,
+      // req-294: Mission Control's persona carries no crew role ("custom"); her 1:1 names what she is.
+      role: persona.kind === 'mission' ? 'Mission Control persona' : persona.role,
       prompt: await expandShippedFragments(prompt ?? ''),
       skills: skills.skills.map((s) => ({ name: s.name, text: s.text })),
       memory,

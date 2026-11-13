@@ -17,6 +17,8 @@ export interface ApiTurnInput {
   readonly system: string;
   readonly history: readonly { readonly role: 'owner' | 'persona'; readonly text: string }[];
   readonly text: string;
+  /** req-293: a model on the assistant's connection in place of its own (Mission Control's persona's pin); absent or null = its own. */
+  readonly model?: string | null;
 }
 
 export type ApiTurnRunner = (input: ApiTurnInput) => Promise<TurnOutcome>;
@@ -27,9 +29,9 @@ export type ApiTurnRunner = (input: ApiTurnInput) => Promise<TurnOutcome>;
  * with the persona's 1:1 brief as the system prompt and the conversation
  * as the history. `make` builds a bridge over a system prompt.
  */
-export function bridgeTurnRunner(make: (systemPrompt: string) => ChatBridge): ApiTurnRunner {
+export function bridgeTurnRunner(make: (systemPrompt: string, model: string | null) => ChatBridge): ApiTurnRunner {
   return async (input) => {
-    const bridge = make(`${input.system}\n\n${API_ENVELOPE_RULE}`);
+    const bridge = make(`${input.system}\n\n${API_ENVELOPE_RULE}`, input.model ?? null);
     const reply = await bridge.runTurn({
       text: input.text,
       history: input.history.map((m) => ({ role: m.role === 'owner' ? 'owner' : 'mission', text: m.text })),

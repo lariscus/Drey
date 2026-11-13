@@ -31,6 +31,7 @@ import type { PersonaSettings } from '../core/persona-settings';
 import type { PersonaRemovePort } from './persona-remove';
 import type { ScoutReport } from './scout';
 import type { SkillsPort } from './skills';
+import type { ChatModelsReply } from './chat-models';
 
 /** What the "Needs you" list holds, in the order it shows them. */
 export type NeedKind =
@@ -186,6 +187,10 @@ export interface TicketsRemotePort extends SkillsPort, PersonaRemovePort {
   personas(): Promise<readonly PersonaView[]>;
   /** req-292: the persona's picture (`personas/<id>/avatar.png`) as a `data:image/png` URL; refused when it has none. */
   personaAvatar(personaId: string): Promise<PersonaAvatarReply>;
+  /** req-281: the persona's instructions (`prompt.md`) as text, for an editor that changes them; '' when the file is absent. */
+  personaInstructions(personaId: string): Promise<{ readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string }>;
+  /** req-293: the assistant's connection and the models its endpoint lists (Mission Control's persona's Model choice). */
+  chatModels(): Promise<ChatModelsReply>;
 
   /** The persona 1:1's read (req-168): the conversation of its chat session file, the cards, the session state. */
   personaThread(personaId: string): Promise<PersonaThreadReply>;
@@ -224,6 +229,8 @@ export interface TicketsRemotePort extends SkillsPort, PersonaRemovePort {
     readonly allowed?: PersonaAllowedPatch;
     /** req-258: the run settings the page's Work block sets. */
     readonly settings?: PersonaSettingsPatch;
+    /** req-293: Mission Control's persona's chat model; null = the assistant's own. */
+    readonly chatModel?: string | null;
   }): Promise<MutationResult>;
   /** The chain's persona pause (U4): a paused persona's tickets hold until played again. */
   chainPersonaPause(cmd: { readonly persona: string; readonly paused: boolean }): Promise<ChainPersonaPauseReply>;
@@ -306,6 +313,10 @@ export interface PersonaView {
   readonly avatarVersion?: string;
   /** The one line for the crew list (`summary:`, req-144); absent = none, the cards then draw the role. */
   readonly summary?: string;
+  /** req-293: Mission Control's persona's chat model (`model:`); absent = the assistant's own model. */
+  readonly chatModel?: string;
+  /** req-296: the skills a mission persona carries (`skills:`), so her detail can switch them; absent for the others (they read `personaSkills`). */
+  readonly skills?: readonly string[];
   /** `allowed:` (req-171): what the persona may do beyond its runs; absent on older servers and for the human. */
   readonly allowed?: PersonaAllowed;
   /** req-258: the run settings as the record holds them (null = the column's value or the role's default); absent on older servers and for the human. */

@@ -39,6 +39,9 @@ import {
   parseSessions,
   liveTicketsOf,
   parseTeam,
+  parseChatModels,
+  parsePersonaInstructions,
+  parsePersonaSkills,
   parseTicketDetail,
   parseEstimate,
   parsePlanStatus,
@@ -48,8 +51,10 @@ import {
   parseWork,
   DEFAULT_PRIORITY_CONFIG,
   type ChatProposalView,
+  type ChatModelsView,
   type ChatStateView,
   type ChatStreamView,
+  type PersonaSkillRowView,
   type McEstimate,
   type McFlow,
   type McPlanApproval,
@@ -252,6 +257,12 @@ export class McState {
   /** req-169: the open persona's journal (reviews.md); null while it loads or when none is open. */
   readonly personaJournal = signal<PersonaJournalView | null>(null);
   readonly personaJournalError = signal<string | null>(null);
+  /** req-293: the assistant's connection and the models it lists (Pia's Model sheet); null until loaded or when the desk refused. */
+  readonly chatModels = signal<ChatModelsView | null>(null);
+  /** req-281: the open mission persona's instructions as text (her editor's start); null until loaded. */
+  readonly personaInstructions = signal<string | null>(null);
+  /** req-296: the open mission persona's skills with origin, switch and tokens; null until loaded. */
+  readonly personaSkills = signal<readonly PersonaSkillRowView[] | null>(null);
 
   private stopListen: (() => void) | null = null;
   private booted = false;
@@ -1504,10 +1515,32 @@ export class McState {
     this.personaMemoryError.set(null);
     this.personaJournal.set(null);
     this.personaJournalError.set(null);
+    this.chatModels.set(null);
+    this.personaInstructions.set(null);
+    this.personaSkills.set(null);
     void this.loadPersona(id);
     void this.loadPersonaThread(id);
     void this.loadPersonaMemory(id);
     void this.loadPersonaJournal(id);
+    if (this.team().personas.find((persona) => persona.id === id)?.kind === 'mission') {
+      void this.loadMissionPersonaSetup(id);
+    }
+  }
+
+  /** req-281/293/296: what the mission persona's Setup shows beyond the directory entry — all tolerant, a refusal leaves the block on its fallback. */
+  private async loadMissionPersonaSetup(id: string): Promise<void> {
+    const base = `/api/personas/${encodeURIComponent(id)}`;
+    const [models, instructions, skills] = await Promise.all([
+      this.client.request('GET', '/api/chat/models').catch(() => null),
+      this.client.request('GET', `${base}/instructions`).catch(() => null),
+      this.client.request('GET', `${base}/skills`).catch(() => null),
+    ]);
+    if (this.personaDetail()?.id !== id) {
+      return;
+    }
+    this.chatModels.set(parseChatModels(models));
+    this.personaInstructions.set(parsePersonaInstructions(instructions));
+    this.personaSkills.set(parsePersonaSkills(skills));
   }
 
   /** Back to the team list: drops the loaded views and any failure. */
@@ -1521,6 +1554,9 @@ export class McState {
     this.personaMemoryError.set(null);
     this.personaJournal.set(null);
     this.personaJournalError.set(null);
+    this.chatModels.set(null);
+    this.personaInstructions.set(null);
+    this.personaSkills.set(null);
   }
 
   /**
@@ -1838,6 +1874,13 @@ export class McState {
       return refusal(body, 'the desk did not take the change');
     }
     await this.refreshTeam();
+    if (patch.prompt !== undefined && this.personaInstructions() !== null) {
+      this.personaInstructions.set(patch.prompt);
+    }
+    if (patch.skills !== undefined && this.personaSkills() !== null && this.personaDetail()?.id === id) {
+      const on = new Set(patch.skills);
+      this.personaSkills.update((rows) => rows?.map((row) => ({ ...row, on: on.has(row.name) })) ?? null);
+    }
     return { ok: true };
   }
 

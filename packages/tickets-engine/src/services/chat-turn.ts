@@ -54,7 +54,7 @@ export class ChatTurn {
   ) {}
 
   async run(): Promise<ChatTurnOutcome> {
-    const resolved = await resolveChatModel(this.deps.config);
+    const resolved = await resolveChatModel(this.deps.config, await this.modelOverride());
     if (!resolved.ok) {
       return failed(resolved.failure);
     }
@@ -73,6 +73,15 @@ export class ChatTurn {
     } finally {
       this.input.signal?.removeEventListener('abort', onCancel);
     }
+  }
+
+  /** req-293: the pinned model of this turn — Mission Control's own turns (or every turn of a bridge with its own prompt); null = `chat.model`. */
+  private async modelOverride(): Promise<string | null> {
+    const ownTurn = this.deps.systemPrompt !== undefined || (this.input.shape === undefined && this.input.flow === undefined);
+    if (this.deps.model === undefined || !ownTurn) {
+      return null;
+    }
+    return this.deps.model().catch(() => null);
   }
 
   private aborted(): boolean {

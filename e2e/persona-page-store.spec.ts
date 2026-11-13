@@ -86,7 +86,6 @@ test('reads and writes prompt.md in the checkout vault', async ({ page, vaultDir
   await page.locator('button[aria-label="More actions"]:visible').click({ force: true });
   await page.getByRole('menuitem', { name: 'Crew', exact: true }).click();
   await page.locator('.desk-team [data-persona="ben"]').first().click();
-  await page.locator('.desk-detail-head .persona-edit-btn').click();
   const body = page.locator('.persona-page').filter({ visible: true });
   const editor = body.locator('.persona-ed-view .cm-content');
   await expect(editor).toContainText('You are Ben, on a store.', { timeout: 15_000 });

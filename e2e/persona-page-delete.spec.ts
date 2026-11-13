@@ -94,7 +94,6 @@ async function openPersona(page: Page, id: string, vaultDir: string): Promise<vo
   await openCrew(page);
   await trackSeed(vaultDir);
   await page.locator(`.desk-team [data-persona="${id}"]`).first().click();
-  await page.locator('.desk-detail-head .persona-edit-btn').click();
   await expect(page.locator('.persona-page .persona-ed-view .cm-content').filter({ visible: true })).toBeVisible({ timeout: 15_000 });
 }
 

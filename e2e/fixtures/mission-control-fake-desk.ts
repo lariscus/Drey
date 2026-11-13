@@ -169,10 +169,38 @@ export interface FakeDeskOptions {
   readonly boards?: boolean;
   /** With `boards`: the iPad boards' overlay (5b-5i, 10e-10s). */
   readonly pad?: boolean;
+  /** With `boards`: Mission Control's persona Pia leads the crew, with her setup reads (req-281, boards 5d v2 / 10i v2). */
+  readonly mission?: boolean;
+}
+
+/** req-281: Pia's answers on top of the board sample; undefined = not one of hers. */
+function missionRoute(pathname: string, pad: boolean): unknown {
+  switch (pathname) {
+    case '/api/personas':
+      return [BOARDS.PIA, ...(pad ? BOARDS.PAD_PERSONAS : BOARDS.PERSONAS)];
+    case '/api/chat/models':
+      return BOARDS.PIA_CHAT_MODELS;
+    case '/api/personas/pia/instructions':
+      return { ok: true, text: BOARDS.PIA_INSTRUCTIONS };
+    case '/api/personas/pia/skills':
+      return BOARDS.PIA_SKILLS;
+    case '/api/personas/pia/memory':
+      return BOARDS.PIA_MEMORY;
+    case '/api/personas/pia/thread':
+      return { ok: true, messages: [], proposals: [] };
+    case '/api/personas/pia/improvements':
+      return BOARDS.PAD_PERSONA_IMPROVEMENTS;
+    default:
+      return undefined;
+  }
 }
 
 /** The answers of the board sample, by path; undefined = not a sample route. */
-function boardsRoute(pathname: string, pad: boolean): unknown {
+function boardsRoute(pathname: string, pad: boolean, mission = false): unknown {
+  const hers = mission ? missionRoute(pathname, pad) : undefined;
+  if (hers !== undefined) {
+    return hers;
+  }
   const estimate = /^\/api\/estimate\/([^/]+)\/([^/]+)\//.exec(pathname);
   if (estimate !== null) {
     return (pad ? BOARDS.PAD_ESTIMATES : BOARDS.ESTIMATES)[`${estimate[1]}/${estimate[2]}`] ?? { ok: false, error: 'no basis' };
@@ -278,7 +306,7 @@ export async function startFakeDesk(
       return;
     }
     if (options.boards === true && (req.method === 'GET' || req.method === 'HEAD')) {
-      const answer = url.pathname === '/api/fleet' ? { ...BOARDS.FLEET, chain: { ...BOARDS.FLEET.chain, ...(chain['autopilotSet'] === true ? { autopilot: chain['autopilot'] } : {}), ...trancheExtras() } } : boardsRoute(url.pathname, options.pad === true);
+      const answer = url.pathname === '/api/fleet' ? { ...BOARDS.FLEET, chain: { ...BOARDS.FLEET.chain, ...(chain['autopilotSet'] === true ? { autopilot: chain['autopilot'] } : {}), ...trancheExtras() } } : boardsRoute(url.pathname, options.pad === true, options.mission === true);
       if (answer !== undefined) {
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify(answer));

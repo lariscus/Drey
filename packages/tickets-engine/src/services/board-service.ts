@@ -4410,6 +4410,7 @@ export class EngineBoardService {
     budget?: number | null;
     allowed?: PersonaAllowedPatch;
     settings?: PersonaSettingsPatch;
+    chatModel?: string | null;
   }): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
       let id: string;
@@ -4430,8 +4431,8 @@ export class EngineBoardService {
         return { ok: false, error: refusal };
       }
       const sent = (key: string): boolean =>
-        input[key as 'title' | 'role' | 'worker' | 'model' | 'pool' | 'color' | 'skills' | 'prompt' | 'summary' | 'budget' | 'allowed' | 'settings'] !== undefined;
-      if (!['title', 'role', 'worker', 'model', 'pool', 'color', 'skills', 'prompt', 'summary', 'budget', 'allowed', 'settings'].some(sent)) {
+        input[key as keyof typeof input] !== undefined;
+      if (!['title', 'role', 'worker', 'model', 'pool', 'color', 'skills', 'prompt', 'summary', 'budget', 'allowed', 'settings', 'chatModel'].some(sent)) {
         return { ok: true }; // nothing to change
       }
       const personaPath = `${PERSONAS_DIR}/${id}/persona.md`;
@@ -4457,6 +4458,8 @@ export class EngineBoardService {
         ...(input.budget !== undefined ? { budget: input.budget } : {}),
         ...(input.allowed !== undefined ? { allowed: allowedAfter(persona.allowed, input.allowed) } : {}),
         ...(input.settings !== undefined ? { settings: settingsAfter(persona.settings, input.settings) } : {}),
+        // req-293: Mission Control's persona's chat model; blank = the assistant's own (the line leaves the file).
+        ...(input.chatModel !== undefined ? { chatModel: (input.chatModel ?? '').trim() === '' ? null : (input.chatModel ?? '').trim() } : {}),
       };
       const patched = personaFileText(next, hadFence ? body : undefined);
       const touched = [personaPath];

@@ -185,14 +185,24 @@ describe('PersonaSessionService — the 1:1 as a persona session (req-168)', () 
     expect(await service.decide('ben', 'p-1', 'dismiss')).toEqual({ ok: false, error: 'no open proposal p-1' });
   });
 
-  it('req-269: Mission Control\'s persona has no 1:1 — a line to her is refused, nothing is written or started', async () => {
-    await write('tickets/_meta/personas/pia/persona.md', "---\ntitle: Pia\nkind: mission\nrole: custom\n---\n");
+  it('req-294: Mission Control\'s persona has a 1:1 over the chat bridge — no harness, no session, her pinned model, her memory', async () => {
+    await write('tickets/_meta/personas/pia/persona.md', "---\ntitle: Pia\nkind: mission\nrole: custom\nmodel: \"glm-4.7-flash\"\n---\n");
+    await write('tickets/_meta/personas/pia/memory.md', '- The owner wants answers first.\n');
     const service = boot();
-    expect(await service.send('pia', 'Hello')).toEqual({ ok: false, error: 'Pia is Mission Control — talk to her in the Mission Control chat' });
+    expect(await service.thread('pia')).toMatchObject({ session: 'bridge' });
+    await service.send('pia', 'Hello');
     await service.idle();
     expect(fleet.starts).toEqual([]);
-    expect(bridgeCalls).toEqual([]);
-    expect(changed).toEqual([]);
+    expect(bridgeCalls[0]).toMatchObject({ text: 'Hello', history: [], model: 'glm-4.7-flash' });
+    expect(bridgeCalls[0]!.system).toContain('You are Pia, the Mission Control persona of this crew');
+    expect(bridgeCalls[0]!.system).toContain('The owner wants answers first.');
+  });
+
+  it('an api persona\'s bridge turn pins no model (req-293 is Mission Control\'s persona\'s only)', async () => {
+    const service = boot();
+    await service.send('anna', 'Hello');
+    await service.idle();
+    expect(bridgeCalls[0]!.model).toBeNull();
   });
 
   it('an api persona talks over the chat bridge with its brief — no session is started', async () => {

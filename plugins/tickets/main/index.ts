@@ -884,6 +884,8 @@ const plugin: MainPluginModule = {
       const persona = str(payload, 'persona');
       return persona === null ? { ok: false, error: 'bad persona payload' } : client.invoke('personaAvatar', persona);
     });
+    // req-293: the assistant's connection and its models — Mission Control's persona's Model choice on her page.
+    ctx.ipc.handle('chatModels', () => client.invoke('chatModels'));
     ctx.ipc.handle('personaJournalRemove', (payload) => {
       const persona = str(payload, 'persona');
       const at = str(payload, 'at');

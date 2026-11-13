@@ -17,8 +17,8 @@ export interface PersonaSessionsWiring {
   readonly fleetChanges: FleetChanges;
   /** A 1:1 session file changed without a client's call. */
   readonly changed: (file: string) => void;
-  /** A chat bridge over a system prompt — the `api` persona's way. */
-  readonly bridge: (systemPrompt: string) => ChatBridge;
+  /** A chat bridge over a system prompt — the `api` persona's way; `model` (req-293) pins a model on the assistant's connection, null = its own. */
+  readonly bridge: (systemPrompt: string, model: string | null) => ChatBridge;
   readonly log: (message: string, level?: 'info' | 'warn' | 'error') => void;
   /** The tools attached to a 1:1 (req-217: the service's vault MCP); absent = none (no service). */
   readonly tools?: OneOnOneToolSeam;

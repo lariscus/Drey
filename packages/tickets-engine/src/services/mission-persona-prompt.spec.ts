@@ -44,5 +44,38 @@ describe('MissionPersonaPrompt (req-269)', () => {
   it('never throws when the board fails', async () => {
     const broken = new MissionPersonaPrompt({ detect: async () => VAULT, listPersonas: () => Promise.reject(new Error('boom')) }, { read: async () => '' });
     expect(await broken.text()).toBeNull();
+    expect(await broken.model()).toBeNull();
+  });
+});
+
+describe('MissionPersonaPrompt — memory, skills and the pinned model (req-293, req-294, req-296)', () => {
+  const pia = (frontmatter: string): Persona => parsePersonaFile('pia', `---\ntitle: Pia\nkind: mission\n${frontmatter}---\n`);
+
+  it('carries her memory slice and her enabled skills after the instructions, in that order', async () => {
+    const files = {
+      'tickets/_meta/personas/pia/prompt.md': 'Pia steers.',
+      'tickets/_meta/personas/pia/memory.md': '- Answers first.\n',
+      'tickets/_meta/personas/pia/skills/board-triage/SKILL.md': '---\nname: board-triage\n---\nSort the inbox by value.\n',
+      'tickets/_meta/skills/release-notes/SKILL.md': '---\nname: release-notes\n---\nWrite the notes.\n',
+    };
+    const text = (await reader([pia('skills: [board-triage]\n')], files).text())!;
+    expect(text.startsWith('Pia steers.\n\n## Memory')).toBe(true);
+    expect(text).toContain('- Answers first.');
+    expect(text).toContain('## Skills');
+    expect(text).toContain('### board-triage\n\nSort the inbox by value.');
+    expect(text).not.toContain('release-notes');
+    expect(text.indexOf('## Memory')).toBeLessThan(text.indexOf('## Skills'));
+  });
+
+  it('speaks from memory or skills alone when prompt.md is empty', async () => {
+    const text = await reader([pia('')], { 'tickets/_meta/personas/pia/memory.md': '- Answers first.\n' }).text();
+    expect(text).toContain('## Memory');
+  });
+
+  it('reads her pinned model; none or blank is null (the assistant\'s own)', async () => {
+    expect(await reader([pia('model: "glm-4.7-flash"\n')], {}).model()).toBe('glm-4.7-flash');
+    expect(await reader([pia('')], {}).model()).toBeNull();
+    expect(await reader([pia('model: "  "\n')], {}).model()).toBeNull();
+    expect(await reader([persona('ben', 'agent')], {}).model()).toBeNull();
   });
 });

@@ -21,6 +21,9 @@ import {
   parseProposal,
   parseSessions,
   parseTeam,
+  parseChatModels,
+  parsePersonaInstructions,
+  parsePersonaSkills,
   parseTicketDetail,
   parseTicketDiff,
   parseVerlaufEntries,
@@ -1663,5 +1666,47 @@ describe('parseChatFailure (D-1)', () => {
     expect(parseChatFailure(undefined)).toBeNull();
     expect(parseChatFailure({ code: 'nonsense', reason: 'r' })).toBeNull();
     expect(parseChatFailure({ code: 'refused' })).toBeNull();
+  });
+});
+
+describe('Mission Control persona reads (req-281, req-293, req-296)', () => {
+  it('parseTeam keeps chatModel and skills of a persona, and drops a blank chatModel', () => {
+    const team = parseTeam(
+      [
+        { id: 'pia', kind: 'mission', title: 'Pia', chatModel: ' gpt-oss-20b ', skills: ['Board triage'] },
+        { id: 'ben', chatModel: '  ' },
+      ],
+      null,
+    );
+    expect(team.personas[0]).toMatchObject({ kind: 'mission', chatModel: 'gpt-oss-20b', skills: ['Board triage'] });
+    expect(team.personas[1]).not.toHaveProperty('chatModel');
+  });
+
+  it('parseChatModels reads the connection and refuses a refusal or junk', () => {
+    expect(parseChatModels({ ok: true, provider: 'lmstudio', providerLabel: 'LM Studio', assistantModel: 'q', models: ['q', 5, 'r'] })).toEqual({
+      providerLabel: 'LM Studio',
+      assistantModel: 'q',
+      models: ['q', 'r'],
+    });
+    expect(parseChatModels({ ok: true })).toEqual({ providerLabel: '', assistantModel: '', models: [] });
+    expect(parseChatModels({ ok: false, error: 'no' })).toBeNull();
+    expect(parseChatModels('junk')).toBeNull();
+  });
+
+  it('parsePersonaInstructions reads the text and refuses a refusal or junk', () => {
+    expect(parsePersonaInstructions({ ok: true, text: '# Who\n' })).toBe('# Who\n');
+    expect(parsePersonaInstructions({ ok: true, text: '' })).toBe('');
+    expect(parsePersonaInstructions({ ok: false, error: 'no' })).toBeNull();
+    expect(parsePersonaInstructions({ ok: true })).toBeNull();
+  });
+
+  it('parsePersonaSkills maps each skill with origin, switch and tokens, skipping junk rows', () => {
+    const list = { skills: [{ name: 'a', origin: 'shared', on: true, tokens: 12 }, { name: 'b' }, null, { origin: 'own' }] };
+    expect(parsePersonaSkills({ ok: true, list })).toEqual([
+      { name: 'a', origin: 'shared', on: true, tokens: 12 },
+      { name: 'b', origin: 'own', on: false, tokens: 0 },
+    ]);
+    expect(parsePersonaSkills({ ok: false, code: 'no_persona', error: 'x' })).toBeNull();
+    expect(parsePersonaSkills({ ok: true })).toBeNull();
   });
 });

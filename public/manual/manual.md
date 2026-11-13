@@ -489,12 +489,21 @@ speech bubble (**Model**), a rocket (**Mission Control**) and two heads
   Z.ai GLM); with a CLI provider it answers with an error card saying so.
   The head's list button opens the earlier Mission Control chats, `+`
   starts a new one. Pia speaks with her own instructions: on the Crew tab
-  her card (the first one) opens her page, where **Instructions** holds who
-  she is and **How the owner works with Pia** — a few lines the board ships
-  as a start. Rewrite them to say how you want her to answer you; she
-  reads them on your next message. Her page has only **Profile** and
-  **Instructions**: she runs no sessions, has no 1:1 and no budget, and she
-  cannot be deleted.
+  her card (the first one, always *idle*) opens her page, where
+  **Instructions** holds who she is and **How the owner works with Pia** — a
+  few lines the board ships as a start. Rewrite them to say how you want her
+  to answer you; she reads them on your next message, together with her
+  **Memory** (the tab beside it — the same memory lines every persona has)
+  and the **Skills** you switch on for her (the block on the left; their
+  tokens count in *tokens at start*). **Model** picks what she thinks with:
+  the provider is the assistant's (*Settings → LLM* changes it), the model
+  *Same as the assistant* by default, one of the models that endpoint lists,
+  or **Other model…** to type one. Her **1:1** tab is a conversation to shape
+  her, like every persona's. She runs through no harness — no session, no
+  slot, no tools: she proposes, you confirm — has no budget and cannot be
+  deleted. In Mission Control her tile leads the Crew and opens the same
+  three parts (Chat, Memory, Setup — Setup holds her model, her skills and
+  her instructions, with **Discard** and **Save**).
 - **1:1** opens a menu of the crew's agent personas: a conversation with
   that persona, answered by the persona itself — see [The 1:1](#one-on-one).
 
@@ -894,7 +903,7 @@ current step runs; change it on the **Flow** tab (click the step, choose Ben
 under *who works it*). On a board that has not migrated yet, a column runs
 with the persona it names: give it `persona: ben` in
 `tickets/_meta/pipeline.md`. A persona's prompt replaces the step's own prompt
-for the runs it takes — Edit persona opens it (its first lines say who the
+for the runs it takes — a click on its Crew card opens it (its first lines say who the
 persona is; below them stands the step it works).
 
 **The Work panel** (req-75) shows six groups, each folded or opened by
@@ -1265,9 +1274,11 @@ the switch says why (*The runner could not be started: …*).
 
 A 1:1 is a conversation with one persona of the crew, answered by the
 persona itself — on its own worker and model, from its instructions, its
-skills, its memory and its latest runs. You find it on the Crew tab (a
-persona's **1:1**), in the Assistant (the **1:1** menu) and in Mission
+skills, its memory and its latest runs. You find it on the persona's page (its
+**1:1** tab — a Crew card opens the page), in the Assistant (the **1:1** menu) and in Mission
 Control (*Talk to <name> 1:1*); all three show the same conversation.
+Pia's 1:1 starts no session: each line is one call of her model, with her
+instructions, memory and skills — it takes none of the crew's places.
 
 - **Send a line** and it is in the conversation at once. The first line
   starts a session for the persona (the line under the conversation reads
@@ -1331,8 +1342,8 @@ skills you already use with Claude drop in unchanged.
 
 ### Memory and journal {#memory-journal}
 
-Each persona keeps two lists, shown apart on its **Memory** tab (the Crew
-tab, and the Memory pane of the persona in Mission Control):
+Each persona keeps two lists, shown apart on its **Memory** tab (the persona's
+page, and the Memory pane of the persona in Mission Control):
 
 - **Memory** — the lessons its runs read. Each line says who wrote it and
   where it came from: *you · 2026-11-09* for a line you added,
@@ -1578,12 +1589,16 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   chain). The cards stand in the crew's order: drag a card onto another to
   move it, or focus one and press **Ctrl+Shift+PageUp** / **PageDown**, or
   right-click it (or press the context-menu key) for **Move left** /
-  **Move right** — the order is saved for every device. Click a card to open the persona's **1:1** (a conversation with
-  the persona, [The 1:1](#one-on-one); Ctrl+Enter sends), **Memory** (its memory lines with who wrote them —
-  pin the ones that must always ride along, remove any, a line to teach
-  it — and its journal of noteworthy runs, [Memory and journal](#memory-journal)) and **Setup** (worker,
-  model, pool, phases, cost; **Pause** or **Resume** the persona).
-  **Edit persona** on that head opens the persona's own page. On the left,
+  **Move right** — the order is saved for every device. **Click a card** (or
+  press **Enter** on it) to open the persona's own page. Its head names the
+  persona and its role, its state with today's cost (`running · $2.67 today`)
+  and a pause button (**Pause** or **Resume** the persona); its right column
+  has three tabs: **Instructions** (below), **Memory** (its memory lines with
+  who wrote them — pin the ones that must always ride along, remove any, a line
+  to teach it — and its journal of noteworthy runs, [Memory and
+  journal](#memory-journal); the tab carries the count) and **1:1** (a
+  conversation with the persona, [The 1:1](#one-on-one); Ctrl+Enter sends).
+  The tab stays where you left it while the page is open. On the left,
   **Profile** (the persona's picture — or its initials —, the name, the role and **the one
   line for the crew list** — the line under the name on the crew cards, in
   Mission Control too), **Work** (the harness; the models,
@@ -1626,7 +1641,8 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   line above the list says what was refused and why;
   **Proposals** shows a change the persona's journal or your 1:1 suggested to
   its instructions, with **Show diff**, **Dismiss** and **Apply**, and under it
-  the links to its **Memory**, its **Journal** and its **1:1**. At the top the
+  the links to its **Memory**, its **Journal** and its **1:1** (they switch the
+  page's tabs). At the top the
   page says `Saved · committed 2 days ago` (when the persona's folder was last
   committed), or `Changed · not saved`. **Save**
   writes everything you changed as one commit; new runs get it, running ones

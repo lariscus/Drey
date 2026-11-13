@@ -93,10 +93,8 @@ test('the crew pictures land in the board and every persona circle draws them', 
   await page.screenshot({ path: testInfo.outputPath('persona-pictures-crew.png') });
   await testInfo.attach('persona-pictures-crew', { path: testInfo.outputPath('persona-pictures-crew.png'), contentType: 'image/png' });
 
-  // The detail under the cards and the Persona page: the head and the profile draw Ben's picture.
+  // The Persona page a card opens (req-295): the head and the profile draw Ben's picture.
   await benCard.click();
-  await expect(page.locator('.desk-detail-head .desk-avatar img.persona-picture')).toBeVisible({ timeout: 15_000 });
-  await page.locator('.desk-detail-head .persona-edit-btn').click();
   const body = page.locator('.persona-page').filter({ visible: true });
   await expect(body.locator('.persona-avatar-head img.persona-picture')).toBeVisible({ timeout: 15_000 });
   await expect(body.locator('.persona-avatar-profile img.persona-picture')).toBeVisible();

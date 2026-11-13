@@ -50,7 +50,6 @@ async function openTessa(page: Page): Promise<void> {
   await page.locator('button[aria-label="More actions"]:visible').click({ force: true });
   await page.getByRole('menuitem', { name: 'Crew', exact: true }).click();
   await page.locator('.desk-team [data-persona="tessa"]').first().click();
-  await page.locator('.desk-detail-head .persona-edit-btn').click();
   await expect(page.locator('.persona-page .persona-ed-view .cm-content').filter({ visible: true })).toBeVisible({ timeout: 15_000 });
 }
 

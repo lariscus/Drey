@@ -322,11 +322,16 @@ create as a `raw capture:` Log line (ticket-schema).
   via `services/crew-prompts.ts`; the context `chat-service.ts`,
   E5a; D-7a / milestone 165; req-173) — the seven intents (steer, create, promote, chain,
   blocked, session, report) and the strict `{say, thought, commands}` envelope. The system
-  message is — **req-269** — the `prompt.md` of Mission Control's persona (the crew's first
+  message is — **req-269** — the persona part of Mission Control's persona (the crew's first
   `kind: mission` persona, Pia as shipped; read from the vault on **every** turn by
-  `services/mission-persona-prompt.ts`, CRLF folded and trimmed, so the owner's edit applies on
-  the next message; absent, unreadable or blank = left out, and the turn opens with the prompt
-  alone) and a blank line, then the prompt (`mission.md`, unchanged at version 3: the intents
+  `services/mission-persona-prompt.ts`, so the owner's edit applies on the next message):
+  her `prompt.md` (CRLF folded and trimmed), then — **req-294** — her `## Memory` slice (the
+  very `personaMemorySection` a run's instruction carries: the lead line, the pinned lines and
+  the newest within the budget), then — **req-296** — her `## Skills` block (the one block of
+  `fleet/skills-section.ts`, her enabled skills from her own folder or the shared pool, in
+  `skills:` order); each part left out when empty, the whole part left out when all are (the
+  turn then opens with the prompt alone; the composer is `services/mission-persona-text.ts`).
+  A blank line, then the prompt (`mission.md`, unchanged at version 3: the intents
   and the contract), then `## Board digest` — or, on **Pia's entry in a ticket's chain** (req-257:
   a session titled `<her title> — T-0123, position 2 of 4`, `services/mission-entry-turns.ts`),
   `## Ticket <id>` and the ticket's text (capped like a shape turn's) in the digest's place. Her
@@ -368,7 +373,10 @@ create as a `raw capture:` Log line (ticket-schema).
 - **The Mission Control bridge's provider call** (`packages/tickets-engine/src/services/chat-model.ts`,
   `chat-llm.ts`, D-1 / milestone 131; since req-269 one turn is `chat-turn.ts`, its system message
   `chat-system-prompt.ts` `chatSystemOf` — the persona prompt rides only a mission turn of the
-  mission bridge, never a shape or flow turn, the aggregator's turn or a 1:1) — every Mission Control prompt above
+  mission bridge, never a shape or flow turn, the aggregator's turn or a 1:1; **req-293**: the
+  `model` of the request is `chat.model`, except on Mission Control's own turns — and her 1:1 —
+  when her `persona.md` pins `model:`, which is then sent in its place on the same connection;
+  a shape or flow turn speaks as another persona and keeps `chat.model`) — every Mission Control prompt above
   (mission, shape, flow, aggregator) goes out as ONE streamed request in the
   dialect of the provider Drey pushed as `chat.provider`: for `lmstudio`,
   `openai-compat`, `openrouter` `POST {baseUrl}/chat/completions` with
@@ -760,6 +768,11 @@ or `{"kind": "skill", "summary": "<one line>", "skill": "<the name of a skill to
   > Reply with exactly one JSON object and nothing else: {"say": "<your answer as Markdown, proposal blocks included>"}.
 
   The bridge's board-digest slot reads `Not embedded in a 1:1.`
+- **Mission Control's persona** (req-294, req-296): her 1:1 always takes
+  the `api` way — she runs through no harness (no slot, no tools) whatever
+  her file says; her brief is the same one with the role written
+  `Mission Control persona` (*"You are Pia, the Mission Control persona of
+  this crew. …"*), and the call asks her pinned model (below).
 
 ---
 

@@ -1,20 +1,22 @@
 import { isMissionPersona, PERSONAS_DIR, type Persona } from '../core/persona';
+import { loadPersonaSkills } from '../core/skill-load';
 import type { EngineHost, EngineVault } from './host';
+import { missionPersonaText } from './mission-persona-text';
 
-/** The board as the reader needs it: the vault and the crew in its order. */
+/** The board as the prompt read needs it. */
 export interface MissionPersonaBoard {
   detect(): Promise<EngineVault | null>;
   listPersonas(): Promise<readonly Persona[]>;
 }
 
 /**
- * Mission Control's persona prompt (req-269): the `prompt.md` of the crew's
- * `kind: mission` persona — Pia as shipped; the first one in the crew's
- * order should a board hold two. Read from disk on every call (the owner's
- * edit on the Persona page applies on the next Mission Control turn) and
- * never cached; folded to LF and trimmed. Null when there is no vault, no
- * mission persona, or no or an empty `prompt.md` — Mission Control then
- * speaks with its own prompt alone. Never throws.
+ * Mission Control's persona as her turns read it (req-269, req-293,
+ * req-294, req-296): the persona part of the system message — `prompt.md`,
+ * her `memory.md` slice and her enabled skills ({@link missionPersonaText})
+ * — and the chat model her `model:` pins. Read fresh on every turn, so an
+ * edit applies on the next message; nothing read is null, never a throw (a
+ * turn without her speaks with the mission prompt alone, on the assistant's
+ * model).
  */
 export class MissionPersonaPrompt {
   constructor(
@@ -24,19 +26,36 @@ export class MissionPersonaPrompt {
 
   async text(): Promise<string | null> {
     try {
-      const vault = await this.board.detect();
-      if (vault === null) {
+      const found = await this.persona();
+      if (found === null) {
         return null;
       }
-      const persona = (await this.board.listPersonas()).find((candidate) => isMissionPersona(candidate));
-      if (persona === undefined) {
-        return null;
-      }
-      const raw = await this.host.read(vault.id, `${PERSONAS_DIR}/${persona.id}/prompt.md`);
-      const text = (raw ?? '').replace(/\r\n/g, '\n').trim();
-      return text === '' ? null : text;
+      const { vault, persona } = found;
+      const read = (rel: string): Promise<string | null> => this.host.read(vault.id, rel).catch(() => null);
+      const dir = `${PERSONAS_DIR}/${persona.id}`;
+      const [prompt, memory, skills] = await Promise.all([read(`${dir}/prompt.md`), read(`${dir}/memory.md`), loadPersonaSkills(read, persona.id, persona.skills)]);
+      return missionPersonaText({ prompt: prompt ?? '', memory: memory ?? '', skills: skills.skills });
     } catch {
       return null;
     }
+  }
+
+  /** req-293: the model her `model:` pins; null = the assistant's own. */
+  async model(): Promise<string | null> {
+    try {
+      const model = (await this.persona())?.persona.chatModel?.trim() ?? '';
+      return model === '' ? null : model;
+    } catch {
+      return null;
+    }
+  }
+
+  private async persona(): Promise<{ readonly vault: EngineVault; readonly persona: Persona } | null> {
+    const vault = await this.board.detect();
+    if (vault === null) {
+      return null;
+    }
+    const persona = (await this.board.listPersonas()).find((candidate) => isMissionPersona(candidate));
+    return persona === undefined ? null : { vault, persona };
   }
 }

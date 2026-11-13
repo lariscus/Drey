@@ -32,7 +32,7 @@ export interface ContextParts {
 
 /** What a repaint of a loaded page depends on; the day's cost, the pause and the commit age do not count. */
 export const viewKeyOf = (persona: PersonaView, deps: DeskDeps): string =>
-  JSON.stringify([persona.title, persona.role, persona.worker, persona.pool, persona.color, persona.budget, persona.phases, persona.summary, persona.allowed, deps.snapshot()?.pipeline.map((phase) => phase.id)]);
+  JSON.stringify([persona.title, persona.role, persona.worker, persona.pool, persona.color, persona.budget, persona.phases, persona.summary, persona.allowed, persona.chatModel, deps.snapshot()?.pipeline.map((phase) => phase.id)]);
 
 export function blockContextOf(parts: ContextParts): BlockContext {
   const { deps, session, base } = parts;

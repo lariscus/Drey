@@ -51,9 +51,9 @@ const DEFAULT_PROVIDER = 'openai-compat';
 
 /** The Anthropic API requires an explicit output cap on every call. */
 const ANTHROPIC_MAX_TOKENS = 4096;
-const ANTHROPIC_VERSION = '2023-06-01';
+export const ANTHROPIC_VERSION = '2023-06-01';
 /** Reachability probes fail fast; generation has its own (long) turn timeout. */
-const TEST_TIMEOUT_MS = 8_000;
+export const TEST_TIMEOUT_MS = 8_000;
 
 /** The resolved connection: what a turn or a test sends, and to whom. */
 export interface ChatModelSpec {
@@ -92,7 +92,11 @@ export function chatFailure(
 }
 
 /** Reads the engine config into a spec, or the reason Mission Control has no model yet. */
-export async function resolveChatModel(config: ChatModelConfig): Promise<{ readonly ok: true; readonly spec: ChatModelSpec } | { readonly ok: false; readonly failure: ChatModelFailure }> {
+/** `override` (req-293): a model on the same connection in place of `chat.model` — Mission Control's persona's pin; null or blank = `chat.model`. */
+export async function resolveChatModel(
+  config: ChatModelConfig,
+  override: string | null = null,
+): Promise<{ readonly ok: true; readonly spec: ChatModelSpec } | { readonly ok: false; readonly failure: ChatModelFailure }> {
   const [baseUrl, apiKey, model, provider, enabled] = await Promise.all([
     config.get<string>(CHAT_KEYS.baseUrl),
     config.get<string>(CHAT_KEYS.apiKey),
@@ -102,7 +106,7 @@ export async function resolveChatModel(config: ChatModelConfig): Promise<{ reado
   ]);
   const id = text(provider) === '' ? DEFAULT_PROVIDER : text(provider);
   const base = text(baseUrl).replace(/\/+$/, '');
-  const modelId = text(model);
+  const modelId = text(override) === '' ? text(model) : text(override);
   const key = text(apiKey) === '' ? null : text(apiKey);
   if (enabled === false) {
     return {
@@ -235,65 +239,4 @@ export function httpReason(status: number, body: string): string {
     return `the endpoint answered HTTP 404${tail} — the URL or the model id is wrong.`;
   }
   return `the endpoint answered HTTP ${status}${tail}.`;
-}
-
-export interface ChatTestResult {
-  readonly ok: boolean;
-  readonly message: string;
-}
-
-/**
- * The settings screen's "Test connection": resolves the config like a
- * turn would, then asks the endpoint for its model list (a cheap GET that
- * costs no tokens). A host without the listing but reachable counts as
- * reachable — Drey lets the model id be typed by hand for such hosts.
- */
-export async function testChatModel(config: ChatModelConfig, transport: typeof fetch = fetch): Promise<ChatTestResult> {
-  const resolved = await resolveChatModel(config);
-  if (!resolved.ok) {
-    return { ok: false, message: resolved.failure.message };
-  }
-  const { spec } = resolved;
-  const url = spec.dialect === 'openai' ? `${spec.baseUrl}/models` : `${spec.baseUrl}/v1/models`;
-  const headers: Record<string, string> =
-    spec.dialect === 'openai'
-      ? spec.apiKey === null
-        ? {}
-        : { authorization: `Bearer ${spec.apiKey}` }
-      : { 'anthropic-version': ANTHROPIC_VERSION, ...(spec.apiKey === null ? {} : { 'x-api-key': spec.apiKey }) };
-  try {
-    const response = await transport(url, { method: 'GET', headers, signal: AbortSignal.timeout(TEST_TIMEOUT_MS) });
-    const body = await response.text().catch(() => '');
-    if (response.ok) {
-      const ids = modelIds(body);
-      const known = ids.length === 0 || ids.includes(spec.model);
-      return {
-        ok: true,
-        message: known
-          ? `Connected to ${spec.providerLabel} at ${spec.baseUrl}. Model ${spec.model}${ids.length === 0 ? ' (the endpoint lists no models).' : ' is available.'}`
-          : `Connected to ${spec.providerLabel} at ${spec.baseUrl}, but it does not list the model ${spec.model}. Pick another in Drey → Settings → Assistant.`,
-      };
-    }
-    if (response.status === 404 || response.status === 405) {
-      return { ok: true, message: `Reached ${spec.providerLabel} at ${spec.baseUrl} — it exposes no model list, so the model ${spec.model} is untested.` };
-    }
-    return { ok: false, message: chatFailure('refused', spec.provider, spec.baseUrl, spec.model, httpReason(response.status, body)).message };
-  } catch (error) {
-    const reason = error instanceof Error && error.name === 'TimeoutError' ? 'no answer within 8 seconds.' : `could not be reached — ${causeOf(error)}.`;
-    return { ok: false, message: chatFailure('unreachable', spec.provider, spec.baseUrl, spec.model, reason).message };
-  }
-}
-
-function modelIds(body: string): string[] {
-  try {
-    const data = (JSON.parse(body) as { data?: unknown }).data;
-    return Array.isArray(data)
-      ? data.flatMap((entry): string[] => {
-          const id = typeof entry === 'object' && entry !== null ? (entry as { id?: unknown }).id : undefined;
-          return typeof id === 'string' ? [id] : [];
-        })
-      : [];
-  } catch {
-    return [];
-  }
 }

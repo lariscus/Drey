@@ -243,9 +243,8 @@ test.describe('Board, Team and the pool chip (E13-8, req-271)', () => {
     await expect(team.locator('[data-persona="tessa"] .desk-persona-headline')).toHaveText('No output for 9 min on T-0126');
     await expect(team.locator('[data-persona="tessa"] .desk-persona-controls button')).toHaveCount(3);
     await expect(team.locator('[data-persona="ben"] .desk-persona-role')).toHaveText('Builder · $3.25 today');
-    // The persona detail sits under the cards: the first persona is selected, Setup first.
-    await expect(team.locator('.desk-tab')).toHaveText(['Setup', 'Memory', '1:1']);
-    await expect(team.locator('.desk-pool-model')).toHaveText('qwen3-coder');
+    // req-295: the cards alone — no detail pane under them; a card opens the Persona page.
+    await expect(team.locator('.desk-detail, .desk-tabs')).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('desk-team.png') });
 
     // req-258: the crew's order -- Ctrl+Shift+PageDown moves the focused card right, written as order: in crew.md (Pia, seeded at the start, first -- req-269).

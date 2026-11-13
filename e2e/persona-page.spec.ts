@@ -6,7 +6,7 @@ import { test, expect, type Page } from './fixtures/drey';
 
 /**
  * The Persona page (board 7k, milestone 201) in the running app: opened
- * from the Crew tab's `Edit persona`, read from the persona's files in the
+ * from a Crew card (req-295), read from the persona's files in the
  * vault, saved as one commit through `personaPatch`. A home of its own, so
  * the plugin spawns an engine for the seeded vault and never adopts the
  * owner's.
@@ -56,7 +56,6 @@ async function openPersona(page: Page, id: string): Promise<void> {
   await page.locator('button[aria-label="More actions"]:visible').click({ force: true });
   await page.getByRole('menuitem', { name: 'Crew', exact: true }).click();
   await page.locator(`.desk-team [data-persona="${id}"]`).first().click();
-  await page.locator('.desk-detail-head .persona-edit-btn').click();
   await expect(page.locator('.persona-page .persona-ed-view .cm-content').filter({ visible: true })).toBeVisible({ timeout: 15_000 });
 }
 

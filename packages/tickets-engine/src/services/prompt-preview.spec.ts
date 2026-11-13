@@ -4,6 +4,7 @@ import { estimateTokens } from '../core/token-count';
 import { composeInstruction } from '../fleet/instruction';
 import { previewInstructionInput } from '../fleet/prompt-preview-input';
 import { loadDisciplineTexts } from '../fleet/discipline-texts';
+import { loadCrewPrompts } from './crew-prompts';
 import { PromptPreview } from './prompt-preview';
 import { MemorySkillFileSystem } from './skill-file-system.fake';
 
@@ -66,5 +67,31 @@ describe('PromptPreview', () => {
   it('reports a selected skill that has no text instead of failing', async () => {
     const data = await new PromptPreview(new MemorySkillFileSystem(files)).build(ben, { step: 'build', model: null });
     expect(data.warnings).toEqual(['no text for skill ghost']);
+  });
+});
+
+describe('PromptPreview — Mission Control\'s persona (req-281, req-296)', () => {
+  const pia = parsePersonaFile('pia', '---\ntitle: Pia\nkind: mission\nrole: custom\nskills: [board-triage]\n---\n');
+  const piaFiles = {
+    'tickets/_meta/personas/pia/prompt.md': 'Pia steers.',
+    'tickets/_meta/personas/pia/memory.md': '- Answers first.\n',
+    'tickets/_meta/personas/pia/skills/board-triage/SKILL.md': '---\nname: board-triage\n---\nSort the inbox.\n',
+  };
+
+  it('previews her Mission Control system message — her part, then the mission prompt — not a run brief', async () => {
+    const crew = await loadCrewPrompts();
+    const data = await new PromptPreview(new MemorySkillFileSystem(piaFiles)).build(pia, { step: 'build', model: null });
+    expect(data.text.startsWith('Pia steers.\n\n## Memory')).toBe(true);
+    expect(data.text).toContain('### board-triage\n\nSort the inbox.');
+    expect(data.text).toContain(crew.mission.trim());
+    expect(data.text).not.toContain('The ticket sits in the');
+  });
+
+  it('counts her skills in the tokens at start, and the parts add up', async () => {
+    const data = await new PromptPreview(new MemorySkillFileSystem(piaFiles)).build(pia, { step: 'build', model: null });
+    const without = await new PromptPreview(new MemorySkillFileSystem(piaFiles)).build({ ...pia, skills: [] }, { step: 'build', model: null });
+    expect(data.tokens).toBeGreaterThan(without.tokens);
+    expect(data.skills.map((skill) => skill.name)).toEqual(['board-triage']);
+    expect(data.parts.reduce((sum, part) => sum + part.tokens, 0)).toBe(data.tokens);
   });
 });

@@ -65,7 +65,7 @@ export const fx = {
   views: [] as FakeView[],
   showDiff: vi.fn(async () => undefined),
   retitled: [] as string[],
-  crew: [] as [string, string][],
+  commands: [] as [string, unknown][],
   backs: 0,
   removed: 0,
   refreshes: 0,
@@ -91,7 +91,7 @@ export function resetFixture(): void {
   fx.views = [];
   fx.showDiff = vi.fn(async () => undefined);
   fx.retitled = [];
-  fx.crew = [];
+  fx.commands = [];
   fx.backs = 0;
   fx.removed = 0;
   fx.refreshes = 0;
@@ -202,6 +202,7 @@ function depsOf(): DeskDeps {
   return {
     api: {
       i18n,
+      commands: { run: (id: string, payload?: unknown) => fx.commands.push([id, payload]) },
       vault: {
         readFile: async () => {
           if ('error' in fx.prompt) {
@@ -233,9 +234,9 @@ function depsOf(): DeskDeps {
         case 'slots':
           return SLOTS;
         case 'personaMemory':
-          return { ok: true, entries: [1, 2, 3] };
+          return fx.replies['personaMemory'] ?? { ok: true, entries: [1, 2, 3] };
         case 'personaJournal':
-          return { ok: true, entries: [1, 2] };
+          return fx.replies['personaJournal'] ?? { ok: true, entries: [1, 2] };
         case 'personaSkills':
         case 'personaSkillToggle':
         case 'personaSkillRemove':
@@ -248,7 +249,10 @@ function depsOf(): DeskDeps {
       }
     },
     subscribe: () => () => undefined,
-    mutate: async () => ({ ok: true }) as never,
+    mutate: async (_label, run) => {
+      await run();
+      return { ok: true } as never;
+    },
     chainAction: async () => undefined,
     openTicket: () => undefined,
     newIdea: () => undefined,
@@ -267,7 +271,7 @@ export async function settle(): Promise<void> {
 }
 
 export async function mount(seams: PersonaPageSeams = {}): Promise<void> {
-  const pageHost: PersonaPageHost = { back: () => (fx.backs += 1), retitle: (title) => fx.retitled.push(title), openCrew: (persona, tab) => fx.crew.push([persona, tab]), removed: () => (fx.removed += 1) };
+  const pageHost: PersonaPageHost = { back: () => (fx.backs += 1), retitle: (title) => fx.retitled.push(title), removed: () => (fx.removed += 1) };
   fx.dispose = mountPersonaPage(depsOf(), storeOf(), fx.host, 'ben', pageHost, seams);
   await settle();
 }

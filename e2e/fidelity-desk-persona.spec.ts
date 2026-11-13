@@ -309,7 +309,6 @@ test('board 7k: the Persona page', async ({ page, electronApp, vaultDir }) => {
   await expect(page.locator('.desk-board').filter({ visible: true })).toBeVisible({ timeout: 15_000 });
   await openFromMenu('Crew');
   await page.locator('.desk-team [data-persona="ben"]').first().click();
-  await page.locator('.desk-detail-head .persona-edit-btn').click();
   await expect(page.locator('.persona-page .persona-ed-view .cm-content')).toBeVisible({ timeout: 15_000 });
   const crewTab = page.locator('app-tab-bar .tab', { hasText: 'Crew' }).first();
   await crewTab.hover();

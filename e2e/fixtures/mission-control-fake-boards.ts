@@ -495,6 +495,40 @@ export const PAD_FLOW_130_DRAFT = {
 /** 5d: the iPad's crew list: Paul runs a two-entry pool (the local model first, Claude Code as overflow). */
 export const PAD_PERSONAS = PERSONAS.map((p) => (p.id === 'paul' ? { ...p, model: 'qwen3-coder', pool: ['opencode', 'claude-code'] } : p));
 
+/** req-281 (boards 5d v2, 10i v2): Mission Control's persona and her setup reads. */
+export const PIA = {
+  id: 'pia',
+  kind: 'mission',
+  title: 'Pia',
+  role: 'custom',
+  worker: '',
+  model: '',
+  pool: [],
+  color: '#d9cff5',
+  summary: "Mission Control: the owner's one contact — steers the board and the crew; every change is a card the owner confirms.",
+  skills: ['board-triage'],
+  budget: null,
+};
+export const PIA_CHAT_MODELS = { ok: true, provider: 'lmstudio', providerLabel: 'LM Studio', assistantModel: 'qwen3-coder-30b', models: ['glm-4.7-flash', 'gpt-oss-20b', 'qwen3-coder-30b'] };
+export const PIA_INSTRUCTIONS = [
+  '## Who Pia is',
+  '',
+  "Pia is Mission Control: the owner's one contact for the board and the crew. She steers the work and does not do it herself. She moves tickets, captures ideas, changes chains and starts sessions, and every change she proposes waits for the owner's confirmation.",
+  '',
+  '## How the owner works with Pia',
+  '',
+  "- She answers briefly and plainly, in the owner's language, with the answer first.",
+  '- She proposes what the owner asked for and nothing beside it. When a request is unclear, she asks one question instead of guessing.',
+  '- She says what she cannot see or do instead of inventing a ticket, a persona or a state.',
+  '',
+].join('\n');
+const piaSkill = (name: string, origin: 'own' | 'shared', on: boolean, tokens: number) => ({ name, description: '', origin, on, overridesShared: false, legacy: false, size: tokens * 4, tokens, files: 0, allowedTools: [], license: null, declaredName: null });
+export const PIA_SKILLS = {
+  ok: true,
+  list: { persona: 'pia', skills: [piaSkill('board-triage', 'own', true, 280), piaSkill('release-notes', 'shared', false, 190)], missing: [], selectedTokens: 280, tokenizer: { id: 'openai-estimate', family: 'openai-compatible', exact: false, model: null } },
+};
+export const PIA_MEMORY = { ok: true, entries: [{ text: 'Answers first.', pinned: true }, { text: 'Ticket ids in full.', pinned: false }, { text: 'No tables on the phone.', pinned: false }] };
+
 /** 5d: what the persona page asks besides the list: no proposals, an empty thread, twelve memory entries. */
 export const PAD_PERSONA_IMPROVEMENTS = { persona: null, proposals: [], openCount: 0, frictionCount: 0 };
 export const PAD_PERSONA_THREAD = { messages: [] };

@@ -400,6 +400,8 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
         return json(await port.sharedSkills());
       case '/api/chat/sessions':
         return json(await port.chatSessions());
+      case '/api/chat/models':
+        return json(await port.chatModels());
       case '/api/settings':
         return deps.settings === undefined ? fail(404, 'no such route') : json(await deps.settings.read(device.id));
       case '/api/pairing':
@@ -451,6 +453,11 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
     const journal = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/journal$/.exec(req.path);
     if (journal !== null) {
       return json(await port.personaJournal(journal[1]!));
+    }
+    // req-281: the persona's instructions as text (Mission Control's editor for Pia).
+    const instructions = /^\/api\/personas\/([a-z0-9][a-z0-9-]{0,63})\/instructions$/.exec(req.path);
+    if (instructions !== null) {
+      return json(await port.personaInstructions(instructions[1]!));
     }
     const stream = /^\/api\/runs\/([A-Za-z0-9_.-]+)\/stream$/.exec(req.path);
     if (stream !== null) {

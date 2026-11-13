@@ -20,7 +20,7 @@ import {
 import { RemoteGateway } from './gateway';
 import type { PairingAccess, PairingReply } from './router';
 import { qrMatrix } from './qr';
-import { testChatModel } from '../services/chat-model';
+import { listChatModels, testChatModel } from '../services/chat-model-probe';
 import {
   normalizeVideoSettings,
   chatSettingsOf,

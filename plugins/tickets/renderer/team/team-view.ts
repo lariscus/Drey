@@ -2,20 +2,15 @@
  * The Crew tab (E13-8; design board DeskTeam / 7f): the head with the
  * day's budget and the chain's pause and stop, one card per persona with
  * its state, what it does, and - for a stuck run - Nudge, Hand to Claude
- * Code and Stop (asking first); under the cards the selected persona's
- * detail: a list of panes at the left (Setup, Memory, 1:1) and the pane.
- * `Edit persona` opens the Persona page (board 7k, `persona-page.ts`).
- * Not built yet and left out, as the board has them: New persona, Talk to 1:1 in the
- * Assistant, Remove from crew, Friction, Notify / Runs after, the slot
- * share and the week / typical-run costs (E12-16, E13-19). Plain DOM over
- * the model in `team-model.ts`.
+ * Code and Stop (asking first). Only the cards (board 7f v2, req-295): a
+ * click or Enter on any card opens that persona's page (board 7k v4,
+ * `persona-page.ts`), which holds state, cost, Pause, Instructions, Memory
+ * and 1:1. Plain DOM over the model in `team-model.ts`.
  */
 import { autopilotSwitchViewOf, autopilotToneOf } from '../../../../shared/autopilot';
-import type { PersonaView } from '../../shared/remote-protocol';
 import { h, textButton, type DeskDeps } from '../desk-deps';
 import { NUDGE_TEXT } from '../workers-view';
 import {
-  poolLabelOf,
   usdBudget,
   teamHeadOf,
   teamModelOf,
@@ -25,12 +20,8 @@ import {
   type TeamModel,
 } from './team-model';
 import { attachCrewReorder, withOthersKept, type CrewReorder } from './crew-reorder';
-import { mountMemoryPane } from './memory-pane';
 import { mountNewSessionForm, type NewSessionFormHandle } from './new-session-form';
-import { mountOneOnOnePane } from './one-on-one-pane';
 import { personaPictureNode } from './persona-picture';
-import { personaPictures } from './persona-pictures';
-import { onCrewFocus, takeCrewFocus } from './team-focus';
 import type { TeamStore } from './team-store';
 
 /** How long "Stop all" stays armed after the first press. */
@@ -38,9 +29,6 @@ const ARM_MS = 4_000;
 
 /** How often the ages and stuck minutes repaint without any event. */
 const TICK_MS = 15_000;
-
-type DetailTab = 'Setup' | 'Memory' | '1:1';
-const DETAIL_TABS: readonly DetailTab[] = ['Setup', 'Memory', '1:1'];
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -151,24 +139,23 @@ function personaCardNode(
   deps: DeskDeps,
   store: TeamStore,
   card: PersonaCardModel,
-  selected: boolean,
   stopAsk: boolean,
-  select: () => void,
+  open: () => void,
   setStopAsk: (open: boolean) => void,
   reorder: CrewReorder,
 ): HTMLElement {
-  const node = h('article', `desk-persona desk-persona-${card.state}${selected ? ' desk-persona-selected' : ''}`);
+  const node = h('article', `desk-persona desk-persona-${card.state}`);
   node.dataset['persona'] = card.id;
   node.tabIndex = 0;
   node.setAttribute('role', 'button');
   node.setAttribute('aria-label', `${card.title}, ${card.stateWord}`);
   node.style.setProperty('--persona-color', card.color);
-  node.addEventListener('click', select);
+  node.addEventListener('click', open);
   attachCrewReorder(node, card.id, reorder);
   node.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && event.target === node) {
       event.preventDefault();
-      select();
+      open();
     }
   });
   const top = h('div', 'desk-persona-top');
@@ -200,94 +187,10 @@ function personaCardNode(
   return node;
 }
 
-// --- the persona detail -------------------------------------------------------
+// --- messages ---------------------------------------------------------------
 
 function messageNode(text: string, kind: 'empty' | 'error' = 'empty'): HTMLElement {
   return h('div', kind === 'error' ? 'desk-note desk-note-error' : 'desk-note', text);
-}
-
-/** Setup (board 7f): the model pool in order, and what the persona cost today. */
-function setupPane(deps: DeskDeps, store: TeamStore, persona: PersonaView, card: PersonaCardModel, body: HTMLElement): void {
-  body.append(h('b', 'desk-pane-title', 'Setup'));
-  const columns = h('div', 'desk-setup');
-  const poolColumn = h('div', 'desk-setup-col');
-  poolColumn.append(h('span', 'desk-label', 'Model pool, in order'));
-  const label = poolLabelOf(persona.worker);
-  const entries = persona.pool.length > 0 ? persona.pool : persona.model === '' ? [] : [persona.model];
-  entries.forEach((model, index) => {
-    if (index > 0) {
-      poolColumn.append(h('div', 'desk-pool-link', `when ${label} is full`));
-    }
-    const entry = h('div', `desk-pool${index === 0 ? ' desk-pool-first' : ''}`);
-    const text = h('div', 'desk-pool-body');
-    const name = h('div', 'desk-pool-name');
-    name.append(h('b', undefined, label), h('span', 'desk-pool-model', model));
-    text.append(name, h('div', 'desk-pool-note', index === 0 ? 'First choice' : 'Overflow'));
-    entry.append(h('span', 'desk-pool-n', String(index + 1)), text);
-    poolColumn.append(entry);
-  });
-  if (entries.length === 0) {
-    poolColumn.append(messageNode('No model set.'));
-  }
-  columns.append(poolColumn);
-  body.append(columns);
-  if (card.dailyCost !== null) {
-    body.append(h('span', 'desk-label', 'Cost'));
-    const costs = h('div', 'desk-costs');
-    const today = h('div', 'desk-cost');
-    today.append(h('span', 'desk-cost-label', 'Today'), h('b', 'desk-cost-value', usd(card.dailyCost)), h('span', 'desk-cost-note', card.runs.length > 0 ? `${card.runs.length} ${card.runs.length === 1 ? 'slot' : 'slots'} running` : 'no run now'));
-    costs.append(today);
-    body.append(costs);
-  }
-  const actions = h('div', 'desk-detail-actions');
-  actions.append(
-    textButton(card.paused ? `Resume ${persona.title}` : `Pause ${persona.title}`, 'desk-btn', card.paused ? 'The dispatcher takes this persona\'s tickets again' : 'The dispatcher holds this persona\'s tickets until it is resumed', () =>
-      void deps
-        .mutate(card.paused ? 'Resuming the persona' : 'Pausing the persona', () => deps.invoke('personaPause', { persona: persona.id, paused: !card.paused }))
-        .then(() => store.refresh()),
-    ),
-  );
-  body.append(actions);
-}
-
-function detailNode(deps: DeskDeps, store: TeamStore, card: PersonaCardModel, persona: PersonaView, tab: DetailTab, setTab: (tab: DetailTab) => void): HTMLElement {
-  const detail = h('section', 'desk-detail');
-  const head = h('div', 'desk-detail-head');
-  const avatar = h('span', 'desk-avatar desk-avatar-lg', card.initials);
-  avatar.style.setProperty('--persona-color', card.color);
-  personaPictures.paint(avatar, persona.id);
-  const name = h('div', 'desk-detail-name');
-  name.append(h('span', 'desk-persona-title', card.title), h('span', 'desk-persona-role', card.role));
-  head.append(avatar, name);
-  const openPersona = deps.openPersona;
-  if (openPersona !== undefined) {
-    const edit = h('button', 'persona-edit-btn', deps.api.i18n.t('persona.page.edit'));
-    edit.type = 'button';
-    edit.addEventListener('click', () => openPersona(persona.id));
-    head.append(h('span', 'desk-head-spacer'), edit);
-  }
-  const main = h('div', 'desk-detail-main');
-  const tabs = h('div', 'desk-tabs');
-  tabs.setAttribute('role', 'tablist');
-  for (const entry of DETAIL_TABS) {
-    const button = h('button', `desk-tab${entry === tab ? ' desk-tab-on' : ''}`, entry);
-    button.type = 'button';
-    button.setAttribute('role', 'tab');
-    button.setAttribute('aria-selected', String(entry === tab));
-    button.addEventListener('click', () => setTab(entry));
-    tabs.append(button);
-  }
-  const body = h('div', 'desk-detail-body');
-  main.append(tabs, body);
-  detail.append(head, main);
-  if (tab === '1:1') {
-    mountOneOnOnePane(deps, persona, body);
-  } else if (tab === 'Memory') {
-    mountMemoryPane(deps, persona, body);
-  } else {
-    setupPane(deps, store, persona, card, body);
-  }
-  return detail;
 }
 
 // --- the tab -------------------------------------------------------------------
@@ -339,39 +242,16 @@ function budgetNode(model: TeamModel): HTMLElement | null {
 export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): () => void {
   const root = h('div', 'desk-team');
   host.append(root);
-  let selected: string | null = null;
-  let tab: DetailTab = 'Setup';
   let stopAskFor: string | null = null;
   let armed = false;
   let armTimer: ReturnType<typeof setTimeout> | null = null;
   let frame = 0;
-  let detailKey = '';
-  let detail: HTMLElement | null = null;
   let newSession: NewSessionFormHandle | null = null;
   let pendingFocus: string | null = null;
-  // The Persona page's links (req-171) open this tab on a persona's Memory or 1:1: waiting at mount, or while it is open.
-  const asked = takeCrewFocus();
-  if (asked !== null) {
-    selected = asked.persona;
-    tab = asked.tab;
-  }
-  const offFocus = onCrewFocus((focus) => {
-    takeCrewFocus();
-    selected = focus.persona;
-    tab = focus.tab;
-    detailKey = '';
-    schedule();
-  });
 
   const render = (): void => {
     frame = 0;
     const model = teamModelOf(store.personas(), deps.runs(), deps.chain(), deps.titleOf, Date.now());
-    // The first persona is selected until the owner picks another: the detail is always there (board 7f).
-    // req-269: never Mission Control's persona — she has no 1:1, runs or setup; her card opens her page.
-    if (selected === null || !model.personas.some((entry) => entry.id === selected && !entry.mission)) {
-      selected = model.personas.find((entry) => !entry.mission)?.id ?? null;
-      detailKey = '';
-    }
     const head = h('header', 'desk-head');
     head.append(h('h2', 'desk-h', 'Crew'), h('span', 'desk-head-sub', store.loaded() ? teamHeadOf(model) : 'Loading…'), h('span', 'desk-head-spacer'));
     const budget = budgetNode(model);
@@ -452,17 +332,9 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
           deps,
           store,
           card,
-          card.id === selected,
           stopAskFor === card.id,
-          () => {
-            if (card.mission) {
-              deps.openPersona?.(card.id);
-              return;
-            }
-            selected = card.id;
-            detailKey = '';
-            schedule();
-          },
+          // req-295: a card opens the persona's page — state, cost, Pause, Memory and 1:1 are there.
+          () => deps.openPersona?.(card.id),
           (open) => {
             stopAskFor = open ? card.id : null;
             schedule();
@@ -478,23 +350,9 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
       grid.append(messageNode(store.error(), 'error'));
     }
 
-    // The detail keeps its own DOM across fleet repaints (a typed message survives).
-    const persona = selected === null ? undefined : store.personas().find((entry) => entry.id === selected);
-    const card = model.personas.find((entry) => entry.id === selected);
-    const key = persona === undefined ? '' : `${persona.id}|${tab}|${card?.paused === true}`;
-    if (key !== detailKey) {
-      detailKey = key;
-      detail =
-        persona === undefined || card === undefined
-          ? null
-          : detailNode(deps, store, card, persona, tab, (next) => {
-              tab = next;
-              schedule();
-            });
-    }
     // A repaint replaces the cards: the focused one (or the one just moved) keeps the focus.
     const active = document.activeElement instanceof HTMLElement && root.contains(document.activeElement) ? (document.activeElement.dataset['persona'] ?? null) : null;
-    root.replaceChildren(head, ...(newSession === null ? [] : [newSession.node]), grid, ...(detail === null ? [] : [detail]));
+    root.replaceChildren(head, ...(newSession === null ? [] : [newSession.node]), grid);
     const focus = pendingFocus ?? active;
     pendingFocus = null;
     if (focus !== null) {
@@ -514,7 +372,6 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
   return () => {
     offStore();
     offDeps();
-    offFocus();
     clearInterval(tick);
     if (armTimer !== null) {
       clearTimeout(armTimer);

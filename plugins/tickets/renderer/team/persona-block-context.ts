@@ -4,6 +4,7 @@
  * data read beside it, the draft and the two ways to change it. A block
  * draws; the page owns the state, the load and the Save.
  */
+import type { ChatModelsReply } from '../../../../packages/tickets-engine/src/contracts/chat-models';
 import type { ModelsReply } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { SlotView } from '../../../../packages/tickets-engine/src/fleet/protocol-slots';
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
@@ -20,6 +21,8 @@ export interface PageExtras {
   readonly table: ModelsReply | null;
   readonly slots: readonly SlotView[];
   readonly vaults: readonly VaultChoice[];
+  /** Mission Control's persona's Model block (req-293): the assistant's connection; null for the others or when the engine could not answer. */
+  readonly chatModels: ChatModelsReply | null;
 }
 
 export interface BlockContext {
