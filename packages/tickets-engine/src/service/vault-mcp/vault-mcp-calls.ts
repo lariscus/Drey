@@ -1,8 +1,9 @@
 /**
  * One worker's vault tool calls (req-167, ADR-0094): the shared tool set
  * (`shared/vault-tools`, ADR-0071 — the one implementation) over the
- * registered vaults on disk, with the worker's rights (R5: reads everything,
- * writes where its persona allows), no `vault_delete`, the app's own folders
+ * registered vaults on disk, with the worker's rights (req-283: it reaches
+ * its project's vaults and plain folders, writes where the project says Write
+ * and its persona may change notes), no `vault_delete`, the app's own folders
  * protected, ADR-0060's stale-write guard, and every call audited on the
  * run's stream. A refusal is the tool's `Error:` text the model acts on —
  * no dialog: a detached run cannot wait for a click.
@@ -11,7 +12,7 @@ import { LinkRewriter } from '../../../../../shared/link-rewriter';
 import { cleanPath, fail, VaultTools, type McpToolDef, type McpToolResult, type VaultCallOptions, type VaultToolDeps } from '../../../../../shared/vault-tools';
 import { DiskToolVault, type VaultSite } from './disk-tool-vault';
 import { ChangeCollector } from './change-collector';
-import type { PersonaRights } from './persona-rights';
+import type { ProjectRights } from './project-rights';
 import type { TokenSession } from './run-tokens';
 import { VaultCallAuditor } from './vault-call-auditor';
 import { vaultCallTarget, type VaultCallTarget } from './vault-call-target';
@@ -26,7 +27,7 @@ const TOUCHES_FILE = new Set(['vault_read', 'vault_edit', 'vault_write']);
 export interface VaultMcpCallsDeps {
   readonly vaults: { current(): Promise<VaultSite[]> };
   readonly disk: VaultDisk;
-  readonly rights: PersonaRights;
+  readonly rights: ProjectRights;
   readonly auditor: VaultCallAuditor;
   /**
    * A worker changed files: the vault's folder and the vault-relative paths
@@ -47,8 +48,9 @@ export class VaultMcpCalls {
 
   async call(session: TokenSession, name: string, args: Readonly<Record<string, unknown>>): Promise<McpToolResult> {
     const timer = this.deps.auditor.start();
-    const vault = new DiskToolVault(await this.deps.vaults.current(), this.deps.disk);
-    const grant = await this.deps.rights.grantFor(session.grant);
+    // req-283: only what the token's project reaches exists for this call — any other vault is "not available".
+    const { sites, grant } = await this.deps.rights.reachOf(session.grant, await this.deps.vaults.current());
+    const vault = new DiskToolVault(sites, this.deps.disk);
     const collector = new ChangeCollector();
     const tools = this.toolsOver(vault, collector);
     const options: VaultCallOptions = { ...(await this.optionsOf(tools, session.grant.tools)), grant };

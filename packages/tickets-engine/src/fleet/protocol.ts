@@ -302,6 +302,13 @@ export interface RunRequest {
    * directory. Absent = a ticket run, every older sender.
    */
   readonly session?: SessionSpec;
+  /**
+   * req-283: the project whose vaults and folders the worker's vault token
+   * reaches — a ticket run's is the ticket's project (`ticketProject`), a free
+   * session's the one picked or its folder's. Absent = none (Unassigned): the
+   * worker reaches no vault. A 1:1 ignores it: it reads every project's.
+   */
+  readonly projectId?: string;
   /** req-169: the closing round's signals and whether the run is a retry; absent = all five signals, no retry. */
   readonly closing?: ClosingRoundSpec;
 }

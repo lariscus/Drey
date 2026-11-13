@@ -328,4 +328,15 @@ describe('composeRunRequest — the ticket\'s project (req-282)', () => {
     expect(withProject.request.briefDigest).not.toBe(plain.request.briefDigest);
     expect(unassigned.request).toEqual(plain.request);
   });
+
+  it("req-283: the project's id rides the request as projectId (the worker's vault reach), outside the brief", () => {
+    const named = composeRunRequest(base({ workingPhase: building, nextPhaseId: 'ready', project: { id: 'drey', name: 'Drey', purpose: 'The note app.' } }));
+    const anonymous = composeRunRequest(base({ workingPhase: building, nextPhaseId: 'ready', project: { name: 'Drey', purpose: 'The note app.' } }));
+    if (!named.ok || !anonymous.ok) {
+      throw new Error('expected two composed requests');
+    }
+    expect(named.request.projectId).toBe('drey');
+    expect(named.request.briefDigest).toBe(anonymous.request.briefDigest);
+    expect(anonymous.request.projectId).toBeUndefined();
+  });
 });

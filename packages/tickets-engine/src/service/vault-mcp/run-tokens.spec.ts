@@ -15,7 +15,7 @@ function store(): { tokens: RunTokens; hashed: string[] } {
   return { tokens: new RunTokens(crypto), hashed };
 }
 
-const grant = (runId: string): VaultGrant => ({ runId, ticketId: 'T-1', persona: 'ben', readOnly: false, emit: () => undefined });
+const grant = (runId: string): VaultGrant => ({ runId, ticketId: 'T-1', persona: 'ben', readOnly: false, scope: { kind: 'project', project: 'drey' }, emit: () => undefined });
 
 describe('RunTokens (req-167)', () => {
   it('mints a fresh token per worker and resolves it to its grant', () => {

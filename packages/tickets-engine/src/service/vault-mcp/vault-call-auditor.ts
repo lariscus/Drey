@@ -13,7 +13,8 @@ import { targetLabel, type VaultCallTarget } from './vault-call-target';
 /** The server's name in every harness: the model calls `mcp__drey__vault_read`. */
 export const VAULT_MCP_NAME = 'drey';
 
-const REFUSALS = [/ may not write vault "/, / since you read it /];
+// req-283: a vault outside the token's project is "not available" — a refusal like a write the grant leaves read-only.
+const REFUSALS = [/ may not write vault "/, / since you read it /, /^Error: vault "[^"]*" is not available to this call/, /^Error: no vault is available to this call/];
 const MAX_TEXT = 240;
 
 export interface VaultCallAuditorDeps {

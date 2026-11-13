@@ -1,4 +1,5 @@
 import type { FreeSessionAsk, FreeSessionStartReply, SessionOptionsReply } from '../contracts/free-session';
+import type { ProjectRecord } from '../contracts/projects';
 import type { RepoRef } from '../contracts/repo-ref';
 import { loadPersonaSkills, personaRef, type Persona } from '../core/persona';
 import { expandShippedFragments } from '../core/prompt-file';
@@ -8,6 +9,7 @@ import { FreeSessionRequestBuilder } from '../fleet/free-session-request';
 import type { CapabilityClass, ModelsReply, RunInfo, RunRequest, WorkerProviderId } from '../fleet/protocol';
 import { isTicketRun } from '../fleet/protocol-session';
 import { SessionDirectoryRule } from '../fleet/session/session-directory-rule';
+import { SessionProjectRule, type SessionProjectVerdict } from '../fleet/session/session-project-rule';
 import type { CrewConfigService } from './crew-config-service';
 import type { EngineHost, EngineVault } from './host';
 
@@ -16,6 +18,8 @@ export interface FreeSessionBoard {
   detect(): Promise<EngineVault | null>;
   listPersonas(): Promise<readonly Persona[]>;
   listRepos(): Promise<{ readonly repos: readonly RepoRef[] }>;
+  /** req-283: the board's project records (`_meta/projects/`). */
+  projectRecords(): Promise<readonly ProjectRecord[]>;
 }
 
 /** The runner as a free session needs it. */
@@ -54,6 +58,7 @@ function messageOf(error: unknown): string {
 export class FreeSessionService {
   private readonly builder = new FreeSessionRequestBuilder();
   private readonly rule = new SessionDirectoryRule();
+  private readonly projectRule = new SessionProjectRule();
 
   constructor(private readonly deps: FreeSessionServiceDeps) {}
 
@@ -71,11 +76,12 @@ export class FreeSessionService {
     if (vault === null) {
       return { ok: false, error: 'no tickets vault detected' };
     }
-    const [personas, repos, crew, models] = await Promise.all([
+    const [personas, repos, crew, models, projects] = await Promise.all([
       this.deps.board.listPersonas(),
       this.deps.board.listRepos().catch(() => ({ repos: [] as readonly RepoRef[] })),
       this.deps.crew.effective(vault),
       this.models(),
+      this.projects(),
     ]);
     const classes = [...new Set((models?.models ?? []).map((row) => row.class))].sort();
     return {
@@ -86,6 +92,7 @@ export class FreeSessionService {
       repos: repos.repos.filter((r) => r.path !== null).map((r) => ({ name: r.name, path: r.path! })),
       permissionMode: crew.permissionMode,
       defaultPersona: crew.defaultPersona,
+      projects: projects.map((p) => ({ id: p.id, name: p.name })),
     };
   }
 
@@ -119,7 +126,11 @@ export class FreeSessionService {
     if (!verdict.ok) {
       return verdict;
     }
-    const request = await this.requestOf({ vault, persona, ask, origin, directory: verdict.directory, ticketsVault: verdict.ticketsVault });
+    const project = await this.projectOf(ask, verdict.directory);
+    if (!project.ok) {
+      return project;
+    }
+    const request = await this.requestOf({ vault, persona, ask, origin, directory: verdict.directory, ticketsVault: verdict.ticketsVault, projectId: project.project });
     if (!request.ok) {
       return request;
     }
@@ -127,12 +138,23 @@ export class FreeSessionService {
     if (!started.ok) {
       return started;
     }
-    this.deps.log(`free session ${started.run.id}: ${persona.id} in ${verdict.directory} (${request.request.permissionMode}), asked by ${origin}`);
+    const where = project.project === null ? 'no project — no vault' : `project ${project.project}`;
+    this.deps.log(`free session ${started.run.id}: ${persona.id} in ${verdict.directory} (${request.request.permissionMode}, ${where}), asked by ${origin}`);
     await this.sendFirst(started.run.id, ask.firstLine);
     return { ok: true, runId: started.run.id };
   }
 
-  private async requestOf(at: { vault: EngineVault; persona: Persona; ask: FreeSessionAsk; origin: string; directory: string; ticketsVault: boolean }): Promise<{ ok: true; request: RunRequest } | { ok: false; error: string }> {
+  /** req-283: the project picked, or the directory's (`SessionProjectRule`). */
+  private async projectOf(ask: FreeSessionAsk, directory: string): Promise<SessionProjectVerdict> {
+    const [projects, repos] = await Promise.all([this.projects(), this.deps.board.listRepos().catch(() => ({ repos: [] as readonly RepoRef[] }))]);
+    return this.projectRule.pick({ picked: ask.project ?? null, directory, projects, repos: repos.repos });
+  }
+
+  private projects(): Promise<readonly ProjectRecord[]> {
+    return this.deps.board.projectRecords().catch(() => []);
+  }
+
+  private async requestOf(at: { vault: EngineVault; persona: Persona; ask: FreeSessionAsk; origin: string; directory: string; ticketsVault: boolean; projectId: string | null }): Promise<{ ok: true; request: RunRequest } | { ok: false; error: string }> {
     const { vault, persona, ask } = at;
     const [crew, classOf] = await Promise.all([this.deps.crew.effective(vault), this.classLookup()]);
     const overrides = {
@@ -142,7 +164,7 @@ export class FreeSessionService {
     };
     const permissionMode = overrides.permissionMode ?? crew.permissionMode;
     const instruction = await this.brief(vault, persona, { directory: at.directory, permissionMode, ticketsVault: at.ticketsVault });
-    return this.builder.build({ persona, ticketsVaultPath: vault.path, directory: at.directory, instruction, origin: at.origin, crew, overrides, classOf });
+    return this.builder.build({ persona, ticketsVaultPath: vault.path, directory: at.directory, instruction, origin: at.origin, crew, overrides, classOf, projectId: at.projectId });
   }
 
   private async brief(vault: EngineVault, persona: Persona, where: { directory: string; permissionMode: RunRequest['permissionMode']; ticketsVault: boolean }): Promise<string> {

@@ -62,11 +62,13 @@ function optionalsOf(payload: Record<string, unknown>): Omit<FreeSessionAsk, 'pe
   }
   const model = text(payload['model']);
   const firstLine = text(payload['firstLine']);
+  const project = text(payload['project']);
   return {
     ...(className !== null ? { poolClass: className } : {}),
     ...(permission !== undefined ? { permissionMode: permission as SessionPermission } : {}),
     ...(model !== null ? { model } : {}),
     ...(firstLine !== null ? { firstLine } : {}),
+    ...(project !== null ? { project } : {}),
   };
 }
 
@@ -74,7 +76,7 @@ export type ParsedAsk = { readonly ok: true; readonly value: FreeSessionAsk; rea
 
 const text = (value: unknown): string | null => (typeof value === 'string' && value.trim() !== '' ? value.trim() : null);
 
-/** `{ persona, directory, poolClass?, permissionMode?, model?, firstLine?, origin? }`. */
+/** `{ persona, directory, poolClass?, permissionMode?, model?, firstLine?, project?, origin? }`. */
 export function parseFreeSessionAsk(payload: unknown): ParsedAsk {
   if (!isRecord(payload)) {
     return { ok: false, error: 'a session start needs { persona, directory }' };

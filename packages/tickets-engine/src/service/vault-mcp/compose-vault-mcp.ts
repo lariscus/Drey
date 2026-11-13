@@ -1,11 +1,13 @@
 /**
  * The `mcp` component's wiring (req-167): the Node adapters (disk, crypto,
  * launch files, the HTTP face) and the engine's two seams — its config (the
- * registered vaults Drey names) and its board (the personas' grants). Called
+ * registered vaults Drey names) and its board (the project records and the
+ * personas' `write-notes`, req-283). Called
  * once by the service host; a spec builds the parts over fakes instead.
  */
+import type { ProjectRecord } from '../../contracts/projects';
 import type { Persona } from '../../core/persona';
-import { PersonaRights } from './persona-rights';
+import { ProjectRights, type RightsSource } from './project-rights';
 import { RegisteredVaults, type VaultsConfig } from './registered-vaults';
 import { RunTokens } from './run-tokens';
 import { VaultCallAuditor } from './vault-call-auditor';
@@ -31,18 +33,15 @@ export interface VaultMcpWiring {
   readonly changed?: (change: VaultPathsChange) => void;
 }
 
-/** A persona's `allowed: write-vaults`, read off the board's persona list at every call. */
-function personaSource(invoke: VaultMcpWiring['invoke']): { writeVaultsOf(id: string): Promise<readonly string[] | null> } {
+/** req-283: the board's project records and a persona's `allowed: write-notes`, read through the engine at every call. */
+function rightsSource(invoke: VaultMcpWiring['invoke']): RightsSource {
+  const call = (method: string): Promise<unknown> => {
+    const channel = invoke();
+    return channel === null ? Promise.reject(new Error('the engine is not up')) : channel(method);
+  };
   return {
-    writeVaultsOf: async (id) => {
-      const call = invoke();
-      if (call === null) {
-        return null;
-      }
-      const personas = (await call('listPersonas')) as readonly Persona[];
-      const persona = personas.find((p) => p.id === id);
-      return persona === undefined ? null : (persona.allowed.writeVaults ?? []);
-    },
+    projects: async () => (await call('projectRecords')) as readonly ProjectRecord[],
+    writesNotes: async (id) => ((await call('listPersonas')) as readonly Persona[]).find((p) => p.id === id)?.allowed.writeNotes === true,
   };
 }
 
@@ -52,7 +51,7 @@ export function composeVaultMcp(wiring: VaultMcpWiring): VaultMcpComponent {
   const calls = new VaultMcpCalls({
     vaults: new RegisteredVaults(wiring.config, wiring.hostedVault, disk),
     disk,
-    rights: new PersonaRights(personaSource(wiring.invoke)),
+    rights: new ProjectRights(rightsSource(wiring.invoke), disk),
     auditor: new VaultCallAuditor({ now, log: wiring.log }),
     ...(wiring.changed === undefined ? {} : { changed: wiring.changed }),
   });

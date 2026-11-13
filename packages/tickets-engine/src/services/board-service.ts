@@ -12,7 +12,8 @@ import { randomBytes } from 'node:crypto';
 import { promises as fsp, existsSync } from 'node:fs';
 import * as path from 'node:path';
 import { archivedTicketIds, nextTicketId, TICKETS_ARCHIVE_DIR, TICKET_ID_PATTERN, type BoardSnapshot, type RecentDone, type StoreStageMigrationOffer, type StoreStageMigrationResult, FolderStatus, PipelinePhase, ProjectRef, PromptEntry, PromptListing, RepoCandidate, RepoRef, ReposListing, TicketCard, TicketForm, TicketPriority, TicketTrack } from '../contracts/tickets';
-import { PROJECTS_DIR, ticketProject } from '../contracts/projects';
+import { PROJECTS_DIR, ticketProject, type ProjectRecord } from '../contracts/projects';
+import { parseProjects } from '../core/project-record';
 import { parseChanges, parseResult, planApprovedOf, storyOf, type ChangesReply } from '../contracts/changes';
 import { type RefineReply, TicketReply, AttachmentReply, type DocumentSaveReply, type TicketDocumentLocation } from '../contracts/replies';
 import { documentRelPath, idOfDocumentPath } from '../store/document-paths';
@@ -4761,6 +4762,16 @@ export class EngineBoardService {
       this.announceChanged();
       return { ok: true, ...(warning === null ? {} : { warning }) };
     });
+  }
+
+  /** req-283: the project records alone (`_meta/projects/*.md`) — the vault MCP reads them at every call, the free session at its start. */
+  async projectRecords(): Promise<readonly ProjectRecord[]> {
+    const vault = await this.detect();
+    if (vault === null) {
+      return [];
+    }
+    const files = (await this.host.listMarkdownFiles(vault.id)).filter((p) => p.startsWith(`${PROJECTS_DIR}/`));
+    return parseProjects(await this.readFiles(vault, files)).projects;
   }
 
   /**

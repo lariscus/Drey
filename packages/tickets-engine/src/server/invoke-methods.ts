@@ -10,7 +10,7 @@ export const BOARD_METHODS = [
   'worktreesStatus', 'chainRefusal', 'setClaim', 'startRun', 'setColumnConfig', 'listPrompts', 'savePrompt',
   'restoreShippedPrompts', 'listRepos', 'saveRepos', 'pickFolder', 'scanRepos', 'listProjects',
   'switchProject', 'openTicketsFolder', 'folderStatus', 'numberFolders', 'reorderPhases', 'editPhase',
-  'personaLearn', 'listPersonas', 'verifyTicket', 'verifyStatus', 'estimateOf',
+  'personaLearn', 'listPersonas', 'projectRecords', 'verifyTicket', 'verifyStatus', 'estimateOf',
   'chatSessions', 'chatOpen', 'chatSend', 'chatStart', 'chatConfirm', 'chatDismiss', 'chatShapeDecide', 'chatPlanStatus',
   'ticketDocument', 'saveDocument', 'setHumanName',
   'initialize', 'onVaultEvent', 'migrateStoreStages', 'personaBoardMove', 'migrateBoard',

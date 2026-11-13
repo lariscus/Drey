@@ -26,8 +26,8 @@ describe('the Persona page v2 (R11, board 7k)', () => {
       ['2', 'sonnetClaude Code · class standard · factor 1', '0 / 3 busy'],
     ]);
     expect(q<HTMLInputElement>('[data-field="budget"]').value).toBe('$5');
-    expect([...fx.host.querySelectorAll('.persona-allow-row')].map((row) => row.firstElementChild?.textContent)).toEqual(['Read vaults', 'Write vaults', 'Run commands in the worktree', 'Reach the network', 'Spend above the ticket allowance']);
-    expect(q('.persona-vault-pick > button').textContent).toBe('notes▾');
+    expect([...fx.host.querySelectorAll('.persona-allow-row')].map((row) => row.firstElementChild?.textContent)).toEqual(['Change notes where the project allows', 'Run commands in the worktree', 'Reach the network', 'Spend above the ticket allowance']);
+    expect(q<HTMLSelectElement>('select[aria-label="Change notes where the project allows"]').value).toBe('on');
     expect(q('.persona-skill').textContent).toContain('personas/ben/skills/tdd/SKILL.md');
     expect(q('.persona-skill').textContent).toContain('own · 240 tokens');
     expect(q('[data-proposal]').textContent).toContain('Add a line');
@@ -67,9 +67,10 @@ describe('the Persona page v2 (R11, board 7k)', () => {
     type(q('[data-field="budget"]'), '$7.50');
     typeInEditor('New instructions');
     const selects = [...fx.host.querySelectorAll<HTMLSelectElement>('.persona-allow-row select')];
-    choose(selects[0]!, 'bypass');
-    choose(selects[1]!, 'on');
-    choose(selects[2]!, 'allow');
+    choose(selects[0]!, 'off');
+    choose(selects[1]!, 'bypass');
+    choose(selects[2]!, 'on');
+    choose(selects[3]!, 'allow');
     expect(stateText()).toBe('Changed · not saved');
     buttonOf('Save').click();
     await settle();
@@ -82,7 +83,7 @@ describe('the Persona page v2 (R11, board 7k)', () => {
         worker: 'opencode',
         budget: 7.5,
         prompt: 'New instructions',
-        allowed: { runCommands: 'bypass', network: true, spendAboveAllowance: true },
+        allowed: { writeNotes: false, runCommands: 'bypass', network: true, spendAboveAllowance: true },
       },
     ]);
     expect(stateText()).toBe('Saved');
@@ -90,19 +91,13 @@ describe('the Persona page v2 (R11, board 7k)', () => {
     expect(q('.persona-head-name').textContent).toBe('Benno');
   });
 
-  it('the write-vaults choice is the vault ids, per vault', async () => {
+  it('req-283: Change notes where the project allows saves write-notes — the vaults are the project\'s', async () => {
     await mount();
-    q('.persona-vault-pick > button').click();
-    const boxes = [...fx.host.querySelectorAll<HTMLInputElement>('.persona-vault-item input')];
-    expect(boxes.map((box) => [box.dataset['vault'], box.checked])).toEqual([['v1', false], ['notes', true]]);
-    boxes[0]!.checked = true;
-    boxes[0]!.dispatchEvent(new Event('change'));
-    boxes[1]!.checked = false;
-    boxes[1]!.dispatchEvent(new Event('change'));
-    expect(q('.persona-vault-pick > button').textContent).toBe('tickets▾');
+    expect(fx.host.querySelector('.persona-vault-pick')).toBeNull();
+    choose(q<HTMLSelectElement>('select[aria-label="Change notes where the project allows"]'), 'off');
     buttonOf('Save').click();
     await settle();
-    expect(patches()).toEqual([{ persona: 'ben', allowed: { writeVaults: ['v1'] } }]);
+    expect(patches()).toEqual([{ persona: 'ben', allowed: { writeNotes: false } }]);
   });
 
   it('req-258: the run settings save as one settings patch of what changed', async () => {

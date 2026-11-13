@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import type { SkillListData } from '../../../../packages/tickets-engine/src/contracts/skills';
-import { writeVaultsText, writeVaultsToggled } from './persona-allowed-model';
 import { failureKeyOf, failureTextOf, skillCountsOf, skillPathOf, skillRowsOf, skillTitleOf } from './persona-skills-model';
 import { skillsOf } from './persona-skills.fixture';
 
@@ -60,19 +59,3 @@ describe('the skill rows (R11, req-237)', () => {
   });
 });
 
-describe('the write-vaults choice', () => {
-  const vaults = [
-    { id: 'v1', name: 'tickets' },
-    { id: 'notes', name: 'notes' },
-  ];
-
-  it('names the vaults, an unknown id as it is, and none as the given word', () => {
-    expect(writeVaultsText([], vaults, 'None')).toBe('None');
-    expect(writeVaultsText(['notes', 'gone'], vaults, 'None')).toBe('notes, gone');
-  });
-
-  it('ticks and unticks in the registry order, unknown ids last', () => {
-    expect(writeVaultsToggled(['gone'], vaults, 'notes', true)).toEqual(['notes', 'gone']);
-    expect(writeVaultsToggled(['notes', 'v1'], vaults, 'notes', false)).toEqual(['v1']);
-  });
-});

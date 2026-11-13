@@ -89,7 +89,7 @@ const until = async (done: () => boolean, ms: number): Promise<void> => {
 function quietStart(adapter: ProviderAdapter, env: Record<string, string>): { handle: WorkerHandle; events: NormalizedEvent[] } {
   const events: NormalizedEvent[] = [];
   const runDir = tempDir();
-  const access = component.open({ runId: `live-${adapter.id}`, ticketId: 'T-0', persona: null, readOnly: false, runDir, harness: adapter.label, emit: (e) => events.push(e) }, adapter.mcpLaunch!.bind(adapter))!;
+  const access = component.open({ runId: `live-${adapter.id}`, ticketId: 'T-0', persona: null, readOnly: false, scope: { kind: 'every-project' }, runDir, harness: adapter.label, emit: (e) => events.push(e) }, adapter.mcpLaunch!.bind(adapter))!;
   const handle = adapter.spawn({ cwd: tempDir(), instruction: 'unused', model: null, permissionMode: 'read-only', resumeRef: null, ticketId: 'T-0', holdAtSpawn: true, env, mcp: access.launch, onEvent: (e) => events.push(e), onSessionRef: () => undefined });
   return { handle, events };
 }
@@ -119,7 +119,7 @@ describe.skipIf(!LIVE || !installed('kimi'))('Kimi 2.5.2 connects to the vault M
 describe.skipIf(!LIVE || !installed('claude'))('Claude Code connects to the vault MCP (live)', () => {
   it('reads the --mcp-config file in the run folder and calls the endpoint with its token, before any prompt', async () => {
     const runDir = tempDir();
-    const access = component.open({ runId: 'live-claude', ticketId: 'T-0', persona: null, readOnly: false, runDir, harness: 'Claude Code', emit: () => undefined }, claudeCodeMcpLaunch)!;
+    const access = component.open({ runId: 'live-claude', ticketId: 'T-0', persona: null, readOnly: false, scope: { kind: 'every-project' }, runDir, harness: 'Claude Code', emit: () => undefined }, claudeCodeMcpLaunch)!;
     const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', ...access.launch.args];
     const child = spawnChild('claude', args, { cwd: tempDir(), stdio: ['pipe', 'ignore', 'ignore'] });
     await until(() => hits.length > 0, 45_000);

@@ -30,7 +30,7 @@ export const view: PersonaView = {
   budget: 5,
   phases: ['build'],
   summary: 'Builds one part of a ticket, test first.',
-  allowed: { spendAboveAllowance: false, writeVaults: ['notes'] },
+  allowed: { spendAboveAllowance: false, writeNotes: true },
   settings: { minClass: 'standard', needs: null, maxTurns: null, maxWorkMin: null, gate: null, parallel: 2, min: 0, leaving: ['sync-main'], readOnly: false },
   readOnly: false,
 };

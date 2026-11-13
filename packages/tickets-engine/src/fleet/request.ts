@@ -193,8 +193,14 @@ export function composeRunRequest(input: ComposeRunInput): ComposeRunResult {
   }
   const plan = planRun({ input, scout, acceptance, extras });
   const instruction = composeRunInstruction(plan);
-  const request = assembleRunRequest(plan, worker, instruction);
+  const request = { ...assembleRunRequest(plan, worker, instruction), ...projectIdOf(input) };
   return { ok: true, request, truncations: instruction.truncations, persona: input.persona?.id ?? null };
+}
+
+/** req-283: the ticket's project rides the request — the worker's vault token reaches its vaults. */
+function projectIdOf(input: ComposeRunInput): { projectId?: string } {
+  const id = input.project?.id;
+  return id === undefined ? {} : { projectId: id };
 }
 
 /** The persona's record says its hand-over gate is structural. */

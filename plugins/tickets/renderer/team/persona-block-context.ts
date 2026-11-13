@@ -10,7 +10,6 @@ import type { SlotView } from '../../../../packages/tickets-engine/src/fleet/pro
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
 import type { PersonaView } from '../../shared/remote-protocol';
 import type { DeskDeps } from '../desk-deps';
-import type { VaultChoice } from './persona-allowed-model';
 import type { Translate } from './persona-dom';
 import type { PersonaDraft, personaPathsOf } from './persona-model';
 import type { PersonaPreviewState } from './persona-preview-state';
@@ -20,7 +19,6 @@ import type { PersonaSkillsState } from './persona-skills-state';
 export interface PageExtras {
   readonly table: ModelsReply | null;
   readonly slots: readonly SlotView[];
-  readonly vaults: readonly VaultChoice[];
   /** Mission Control's persona's Model block (req-293): the assistant's connection; null for the others or when the engine could not answer. */
   readonly chatModels: ChatModelsReply | null;
 }

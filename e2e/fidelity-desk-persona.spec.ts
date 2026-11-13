@@ -86,7 +86,7 @@ const BEN = [
   'leaving: [sync-main]',
   'readonly: false',
   'allowed:',
-  '  write-vaults: [notes]',
+  '  write-notes: true',
   '---',
   '',
 ].join('\n');

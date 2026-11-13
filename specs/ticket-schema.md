@@ -1319,7 +1319,7 @@ tickets/_meta/personas/
   | `min` | runs the persona may start while the big pool is full, overrunning it on purpose (concept §9); config and the Persona page only. **Recorded, not yet enforced** (req-257). Written only when above 0 | `0` |
   | `leaving` | the leaving actions, in order: `sync-main` (merge `main` into the branch when a ticket leaves the persona) and `commit` (the merge into `main` after the owner's sign-off). Run since req-267, inside the claim, on a heavy governor seat, no model: `sync-main` at the end of a green run of the persona, after the gate and the closing round, before the hand-on — the integration branch's git upstream (fetched; the local branch without one) merged into the ticket's branch, the card reading `merging main`; a conflict is aborted and ends the run red with the conflict as its gate failure (no send-back). `commit` on the human persona is the sign-off's merge ("Accept on Ready to try" above), the card reading `committing`. Seeded: the shipped Ben `[sync-main]`, the You a new board writes `[commit]`. An unknown name is dropped | `[]` |
   | `readonly` | `true | false` — **instructed read-only** (req-258): the run's brief carries the read-only discipline instead of the writing rules, the ticket-file duties and the handover. An instruction, not a lock: the worktree, the harness session and its permissions stay as they are (a technical lock needs a harness change — `decisions.md`). The review run's detached read-only checkout and read-only session (req-183) stay tied to the `review` phase and the `reviewer` role | the role's: `true` for `reviewer` and `tester`, else `false` |
-  | `allowed` | a map; five keys. `write-notes: true` (req-282) — the persona may change notes where its ticket's project grants `write` (the concept's intersection: project per vault ∧ this switch ∧ the run not read-only); written by the first project's migration for every persona that named `write-vaults`, read by the vault MCP from req-283 on. `spend-above-allowance: true` — the persona runs on past a ticket's `allowance:` instead of waiting for the owner (req-170). `write-vaults: [<vault id>, …]` — the registered vaults (Drey's registry ids, ADR-0051) its runs may change through Drey Service's vault MCP (req-167, R5; one id reads as a list, duplicates drop); every registered vault stays readable, a vault not named is read-only for it, and a read-only run (a review) writes none whatever this says — a refusal reaches the model as `Error: <persona> may not write vault "<id>" (allowed: read)` and the run's stream as an audit line. `vault_move` counts as writing. `run-commands: accept-edits \| bypass` — the harness permission mode the persona's runs may take (the Persona page's "Run commands in the worktree"; absent = the crew's `permissionMode`) and `network: true` — it may reach the network (web search and fetch, package installs): both are **recorded and not yet read by the runner** (req-142's enforcement remainder; the page shows no more about them than the choice). Each key written only when set | nothing beyond: reads every vault, writes none |
+  | `allowed` | a map; four keys. `write-notes: true` (req-282, enforced since req-283) — the persona may change notes where its run's project grants `write` (the concept's intersection: project per vault ∧ this switch ∧ the run not read-only; the vaults themselves are the project's, `_meta/projects/` below) — a refusal reaches the model as `Error: <persona> may not write vault "<id>" (allowed: read)` and the run's stream as an audit line; `vault_move` counts as writing; written by the first project's migration for every persona that named `write-vaults`, and by the Persona page's "Change notes where the project allows". `spend-above-allowance: true` — the persona runs on past a ticket's `allowance:` instead of waiting for the owner (req-170). The retired `write-vaults: [<vault id>, …]` (req-167; device ids) grants nothing since req-283: it is read only by the first project's migration, never written back, and dropped from every persona file by the engine's start once a project exists (one commit, `personas: drop write-vaults — the vault rights are the project's (req-283)`). `run-commands: accept-edits \| bypass` — the harness permission mode the persona's runs may take (the Persona page's "Run commands in the worktree"; absent = the crew's `permissionMode`) and `network: true` — it may reach the network (web search and fetch, package installs): both are **recorded and not yet read by the runner** (req-142's enforcement remainder; the page shows no more about them than the choice). Each key written only when set | nothing beyond: reads its project's vaults, writes none |
 
 - `prompt.md` — the longform persona prompt, free Markdown, **the one prose of the persona** (R11, req-171: one prose, not two).
   The "who Ben is" part stands at its top, as a `## Who Ben is` section; `persona.md` keeps the frontmatter and nothing below
@@ -1781,10 +1781,19 @@ the capacity pool and the routing count every project). A file whose name
 is not an id is a board warning; every other deviation reads tolerantly
 and shows as a warning.
 
-What reads it today (req-282): the board (the snapshot's `projects`, the
-per-ticket checks under `project` above) and the run brief. The vault
-rights of a run (req-283), Settings → Projects (req-284) and the global
-project filter (req-285) build on the same records.
+What reads it today: the board (the snapshot's `projects`, the
+per-ticket checks under `project` above), the run brief (req-282) and
+the workers' vault MCP (req-283): a run's token carries its ticket's
+project (a free session's: the one picked, or the one project naming a
+repository whose checkout holds its folder) and reaches exactly the
+`vaults` marked `read` or `write` — matched by registered name — and the
+absolute `folders` (read-only, under the vault path rules: no
+`tickets/`, `chats/` or dot-folder, links resolved inside the folder);
+it writes a `write` vault only with the persona's `write-notes` and a
+run that is not read-only. A 1:1 reads the union of every project's
+vaults and folders, read-only; a vault no project names is read by no
+worker. Settings → Projects (req-284) and the global project filter
+(req-285) build on the same records.
 
 **The first project (migration at the engine's start).** A board whose
 `_meta/projects/` holds no file gets one project, written by the engine
@@ -1801,8 +1810,9 @@ One commit, `projects: the first project "<name>" from repos.md and the
 registered vaults (req-282)`. A `repos.md` that does not parse
 postpones the migration to the next start; a board with any project
 file is left alone (deleting every project file brings the default back
-at the next start). `write-vaults` stays in the persona file until
-req-283 moves the enforcement to the project.
+at the next start). Once a project exists, the same start drops the
+retired `write-vaults` from every persona file that still names it, in a
+commit of its own (req-283).
 
 ## `_meta/crew.md` — the crew's defaults and limits (the vault layer, req-173)
 

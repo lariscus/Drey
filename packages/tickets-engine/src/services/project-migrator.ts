@@ -38,8 +38,9 @@ function messageOf(error: unknown): string {
  * record gets its first project (`planProjectMigration`), the personas that
  * named `write-vaults` get `allowed: write-notes: true`, and everything lands
  * in one logged commit. Idempotent — a board with a project file is left
- * alone, so every start can run it. `write-vaults` stays in the persona file:
- * the vault MCP still reads it until req-283 moves the rights to the project.
+ * alone, so every start can run it. req-283: once a project exists, the
+ * retired `write-vaults` leaves every persona file that still carries it, in
+ * a commit of its own — the vault rights are the project's now.
  */
 export class ProjectMigrator {
   private readonly git: TicketsGit;
@@ -54,9 +55,33 @@ export class ProjectMigrator {
       return null;
     }
     const files = await this.deps.host.listMarkdownFiles(vault.id);
-    if (files.some((p) => p.startsWith(`${PROJECTS_DIR}/`))) {
-      return null;
+    const hasProject = files.some((p) => p.startsWith(`${PROJECTS_DIR}/`));
+    const result = hasProject ? null : await this.firstProject(vault);
+    if (hasProject || result !== null) {
+      await this.dropWriteVaults(vault);
     }
+    return result;
+  }
+
+  /** req-283: `write-vaults` out of every persona file that still names it — only once a project carries the rights. */
+  private async dropWriteVaults(vault: EngineVault): Promise<void> {
+    const stale = (await this.personaFiles(vault)).filter((f) => (f.persona.allowed.writeVaults ?? []).length > 0);
+    if (stale.length === 0) {
+      return;
+    }
+    const touched: string[] = [];
+    for (const file of stale) {
+      const path = `${PERSONAS_DIR}/${file.persona.id}/persona.md`;
+      await this.deps.host.write(vault.id, path, personaFileText(file.persona, file.body));
+      touched.push(path);
+    }
+    await this.commit(vault, touched, 'personas: drop write-vaults — the vault rights are the project\'s (req-283)');
+    this.deps.host.announceChanges(vault.id, touched);
+    this.deps.log(`projects: dropped write-vaults from ${stale.map((f) => f.persona.id).join(', ')} — the project grants the vaults, write-notes the persona's half`);
+  }
+
+  /** req-282: the board's first project; null when `repos.md` does not parse (the next start tries again). */
+  private async firstProject(vault: EngineVault): Promise<ProjectMigrationResult | null> {
     const repos = parseRepos(await this.read(vault, REPOS_PATH));
     if (repos.error !== null) {
       this.deps.log(`projects: the first project waits for a readable repos.md — ${repos.error}`, 'warn');

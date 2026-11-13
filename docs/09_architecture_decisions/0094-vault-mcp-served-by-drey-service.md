@@ -172,3 +172,47 @@ token** is read-only in the grant and carries a tool cut
 (`VaultGrant.tools`: `vault_list`, `vault_search`, `vault_read`); the
 spawn path sets it for `kind: '1:1'` only, a free session keeps its
 persona's rights.
+
+**Later change (milestone 265, req-283): the rights are the project's.**
+The owner's round of 2026-11-13 (concept `project-handling-draft.md` §2,
+§3, §10) moved *which* vaults a worker reaches from the persona to the
+project; R5's "reads every registered vault" no longer holds.
+
+- **The token carries the project.** `VaultGrantRequest.scope` (and the
+  token's `VaultGrant.scope`) is `{ kind: 'project', project }` for a
+  ticket run — the ticket's project (`ticketProject`, carried as
+  `RunRequest.projectId` by `composeRunRequest`) — and for a free session
+  — the one picked (`FreeSessionAsk.project`) or the one project naming a
+  repository whose checkout holds its folder (`SessionProjectRule`; none
+  or several = no project) — and `{ kind: 'every-project' }` for a 1:1.
+  The spawn path (`ProcessSupervisor.openVault`) sets it.
+- **Read** = the project's vaults marked `read` or `write`, matched by the
+  vault's registered **name** in `vaults.registered` (ids are per device),
+  plus its plain `folders` (absolute paths), served read-only as vaults of
+  their own (`folder-<last segment>`, never with a colon so `id:path`
+  labels still parse) under the same path rule (`core/note-path.ts`: no
+  `tickets/`, `chats/` or dot-folder, `.git` included; links resolved
+  inside the folder). A vault outside the reach does not exist for the
+  call: the shared set's own refusal, `Error: vault "<id>" is not
+  available to this call. Pass one of: …`; `vault_list` lists only the
+  reach. A 1:1 reads the union of every project's vaults and folders; a
+  registered vault no project names is read by no worker.
+- **Write** = the project says `write` **∧** the persona has `allowed:
+  write-notes` **∧** the run is not read-only (a review, a 1:1). The
+  alternative weighed in the concept — write on the project alone — would
+  give a reviewer or tester write rights the moment a project grants any
+  (`specs/decisions.md`, 2026-11-13). A plain folder is never written. The
+  refusal wording (`Error: <who> may not write vault "<id>" (allowed:
+  read)`) and the audit line are unchanged; an out-of-reach vault is now
+  audited as `refused` too and logged.
+- **Fail closed.** No project, an unknown project or an unreadable board
+  gives no vault (`Error: no vault is available to this call.`) — never
+  every vault, as R5's default once was. The records and the personas are
+  read through the engine at every call (`projectRecords`, a new board
+  invoke method, and `listPersonas`), so an edit applies to the next call.
+- **`write-vaults` retired.** `PersonaRights` is gone (`ProjectRights` +
+  the pure `project-reach.ts`). `allowed: write-vaults` grants nothing; it
+  is parsed only for the first project's migration (req-282), never
+  written back, and the engine's start drops it from every persona file
+  once a project exists (`ProjectMigrator`, one commit). The Persona page's
+  vault picker became the switch *Change notes where the project allows*.

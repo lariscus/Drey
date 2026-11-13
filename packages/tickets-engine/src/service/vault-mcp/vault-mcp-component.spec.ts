@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { NormalizedEvent, WorkerMcpServer } from '../../fleet/harness/contract';
 import type { VaultGrantRequest } from '../../fleet/orchestrate/worker-vault';
 import { MemoryVaultDisk } from './memory-vault-disk.fake';
-import { PersonaRights } from './persona-rights';
+import { ProjectRights } from './project-rights';
 import { RunTokens } from './run-tokens';
 import { VaultCallAuditor } from './vault-call-auditor';
 import { VaultMcpCalls } from './vault-mcp-calls';
@@ -17,7 +17,7 @@ function harness(listen: () => Promise<number> = async () => 4711) {
   const calls = new VaultMcpCalls({
     vaults: { current: async () => [] },
     disk: new MemoryVaultDisk(),
-    rights: new PersonaRights({ writeVaultsOf: async () => [] }),
+    rights: new ProjectRights({ projects: async () => [], writesNotes: async () => false }, new MemoryVaultDisk()),
     auditor: new VaultCallAuditor({ now: () => new Date(0), log: () => undefined }),
   });
   let changes = 0;
@@ -31,7 +31,7 @@ function harness(listen: () => Promise<number> = async () => 4711) {
     onChange: () => changes++,
   });
   const events: NormalizedEvent[] = [];
-  const request: VaultGrantRequest = { runId: 'run-1', ticketId: 'T-1', persona: 'ben', readOnly: false, runDir: 'R:/runs/run-1', harness: 'Claude Code', emit: (e) => events.push(e) };
+  const request: VaultGrantRequest = { runId: 'run-1', ticketId: 'T-1', persona: 'ben', readOnly: false, scope: { kind: 'project', project: 'drey' }, runDir: 'R:/runs/run-1', harness: 'Claude Code', emit: (e) => events.push(e) };
   const describeAsFile = (server: WorkerMcpServer) => ({ files: [{ path: `${server.runDir}/mcp.json`, text: server.token }], args: ['--mcp-config'], acpServers: [] });
   return { component, tokens, written, removed, events, request, describeAsFile, changes: () => changes };
 }

@@ -41,7 +41,8 @@ export const ROLE_OPTIONS = ['planner', 'builder', 'reviewer', 'tester', 'custom
 
 /** The `Allowed to` block as the form edits it; `runCommands` '' = the crew setting decides. */
 export interface AllowedDraft {
-  readonly writeVaults: readonly string[];
+  /** `write-notes` (req-283): may change notes where the ticket's project grants Write. */
+  readonly writeNotes: boolean;
   readonly runCommands: '' | PersonaRunCommands;
   readonly network: boolean;
   readonly spend: boolean;
@@ -82,7 +83,7 @@ export interface PersonaPatchKeys {
 
 function allowedOf(view: PersonaView): AllowedDraft {
   return {
-    writeVaults: view.allowed?.writeVaults ?? [],
+    writeNotes: view.allowed?.writeNotes === true,
     runCommands: view.allowed?.runCommands ?? '',
     network: view.allowed?.network === true,
     spend: view.allowed?.spendAboveAllowance === true,
@@ -111,8 +112,8 @@ function sameList(a: readonly string[], b: readonly string[]): boolean {
 /** Only the `allowed:` keys that differ: the engine replaces what it is sent. */
 function allowedPatchOf(base: AllowedDraft, draft: AllowedDraft): PersonaAllowedPatch | null {
   const patch: { -readonly [K in keyof PersonaAllowedPatch]: PersonaAllowedPatch[K] } = {};
-  if (!sameList(draft.writeVaults, base.writeVaults)) {
-    patch.writeVaults = draft.writeVaults;
+  if (draft.writeNotes !== base.writeNotes) {
+    patch.writeNotes = draft.writeNotes;
   }
   if (draft.runCommands !== base.runCommands) {
     patch.runCommands = draft.runCommands === '' ? null : draft.runCommands;

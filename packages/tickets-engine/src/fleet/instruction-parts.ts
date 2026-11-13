@@ -25,6 +25,8 @@ export interface ComposedInstruction {
 
 /** The ticket's project as the brief names it (req-282): its name and its purpose (the record's body). */
 export interface BriefProject {
+  /** The record's id: the run request carries it as `projectId`, the worker's vault reach (req-283). Not part of the brief. */
+  readonly id?: string;
   readonly name: string;
   readonly purpose: string;
 }
