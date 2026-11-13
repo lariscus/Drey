@@ -50,10 +50,14 @@ export function fitComposer(field: HTMLTextAreaElement, maxRows = COMPOSER_MAX_R
   field.toggleAttribute('data-grown', fit.grown);
 }
 
-/** `<textarea [mcComposerFit]="draft()">`: the field follows its text after every render. */
+/**
+ * `<textarea [mcComposerFit]="draft()">`: the field follows its text at once on every keystroke (no frame
+ * with a stale height after Delete or a paste) and after every render, for the changes that do not come
+ * from the keyboard — dictation, a prefill, the clear after a send.
+ */
 @Directive({
   selector: 'textarea[mcComposerFit]',
-  host: { '(window:resize)': 'refit()' },
+  host: { '(window:resize)': 'refit()', '(input)': 'refit()' },
 })
 export class ComposerFit {
   /** The draft; a change of it (typing, dictation, a prefill, the clear after a send) refits. */
