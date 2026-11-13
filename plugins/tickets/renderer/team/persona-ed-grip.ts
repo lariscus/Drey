@@ -3,8 +3,10 @@
  * The splitter under the Instructions editor (D-66, the owner's interim
  * verification 2026-11-13): drag it to give the editor a height of its
  * own, Arrow Up / Down steps it, a double-click hands the height back to
- * the page (the editor then fills what the column leaves). The height is
- * one value per machine, like the Ready card's splitter.
+ * the page. The height is one value per machine, like the Ready card's
+ * splitter. D-70: it is a minimum, not a fixed height — the editor still
+ * fills whatever room the column has, and the dragged height only makes
+ * it taller than that (the column then scrolls).
  */
 import { h } from '../desk-deps';
 
@@ -38,15 +40,15 @@ function remembered(): number | null {
   }
 }
 
-/** Sizes `frame`; `null` lets the stylesheet fill the column again. */
+/** Gives `frame` a minimum height; `null` leaves it to the stylesheet's minimum again. */
 function sizeFrame(frame: HTMLElement, px: number | null): number | null {
   if (px === null) {
-    frame.style.height = '';
+    frame.style.minHeight = '';
     frame.classList.remove('persona-ed-sized');
     return null;
   }
   const clamped = Math.max(INSTRUCTIONS_MIN_HEIGHT, Math.round(px));
-  frame.style.height = `${clamped}px`;
+  frame.style.minHeight = `${clamped}px`;
   frame.classList.add('persona-ed-sized');
   return clamped;
 }

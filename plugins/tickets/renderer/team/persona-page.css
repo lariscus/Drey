@@ -571,8 +571,9 @@
   color: var(--text-primary);
 }
 
+/* D-70: a dragged height is a minimum (set inline as min-height); the frame keeps growing into the free room. */
 .persona-ed.persona-ed-sized {
-  flex: none;
+  flex: 1 0 auto;
 }
 
 .persona-ed-view {

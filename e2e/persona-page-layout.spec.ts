@@ -65,6 +65,13 @@ test('the Persona page fits, its editor scrolls its own text, and the splitter s
   // The column holds everything without a scrollbar of its own.
   const column = await right.evaluate((node) => ({ scroll: node.scrollHeight, client: node.clientHeight }));
   expect(column.scroll).toBeLessThanOrEqual(column.client + 1);
+  // D-70: the editor takes the room the column leaves — the column's last block ends just above its bottom (padding and margin only).
+  const gap = await pageRoot.evaluate((root) => {
+    const col = root.querySelector('.persona-right')!;
+    const last = col.lastElementChild!.getBoundingClientRect();
+    return Math.round(col.getBoundingClientRect().bottom - last.bottom);
+  });
+  expect(gap).toBeLessThan(60);
   // The editor's text is longer than the editor: its own scroller scrolls it.
   const text = await scroller.evaluate((node) => ({ scroll: node.scrollHeight, client: node.clientHeight, overflow: getComputedStyle(node).overflowY }));
   expect(text.client).toBeGreaterThan(100);
@@ -88,6 +95,29 @@ test('the Persona page fits, its editor scrolls its own text, and the splitter s
 
   await grip.dblclick();
   await expect.poll(async () => Math.round((await frame.boundingBox())!.height)).toBe(Math.round(before));
+});
+
+test("Pia's page (Profile and Instructions only) gives the editor the whole right column (D-70)", async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  await expect(page.locator('app-titlebar [role="tab"]', { hasText: 'Work' })).toBeVisible({ timeout: 30_000 });
+  await page.keyboard.press('Control+2');
+  await page.locator('app-panel-frame', { has: page.locator('.tickets-panel') }).filter({ visible: true }).locator('.head').hover();
+  await page.locator('button[aria-label="More actions"]:visible').click({ force: true });
+  await page.getByRole('menuitem', { name: 'Crew', exact: true }).click();
+  // A height dragged once before (here 200 px) is a minimum, not a fixed height: the editor still fills the column (D-70).
+  await page.evaluate(() => localStorage.setItem('drey.tickets.personaInstructionsHeight', '200'));
+  // Mission Control's persona has no detail pane: her card opens her page.
+  await page.locator('.desk-team [data-persona="pia"]').first().click({ timeout: 30_000 });
+  const pageRoot = page.locator('.persona-page').filter({ visible: true });
+  await expect(pageRoot.locator('.persona-ed-view .cm-content')).toBeVisible({ timeout: 15_000 });
+  await page.screenshot({ path: testInfo.outputPath('persona-layout-pia.png') });
+  await testInfo.attach('persona-layout-pia', { path: testInfo.outputPath('persona-layout-pia.png'), contentType: 'image/png' });
+  const gap = await pageRoot.evaluate((root) => {
+    const col = root.querySelector('.persona-right')!.getBoundingClientRect();
+    const ed = root.querySelector('.persona-block-fill > .persona-ed')!.getBoundingClientRect();
+    return Math.round(col.bottom - ed.bottom);
+  });
+  expect(gap).toBeLessThan(80);
 });
 
 test('Preview full prompt opens the brief below the editor, its text readable (D-68)', async ({ page }, testInfo) => {
