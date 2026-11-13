@@ -33,7 +33,7 @@ describe('modelLinesOf (R11): the persona models against the model table', () =>
 
   it('counts by the model the pool granted where the run carries one', () => {
     const granted = [run({ model: null, grant: { model: 'opus' } })];
-    expect(modelLinesOf(['opus'], 'claude-code', table, slots, granted, i18n)[0]!.busy).toBe('1 / 4 busy');
+    expect(modelLinesOf(['opus'], 'claude-code', table, slots, granted, i18n)[0]!.busy).toBe('1 / 5 busy');
   });
 
   it('says so for a model the table lacks and draws no busy figure', () => {

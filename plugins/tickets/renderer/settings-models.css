@@ -13,6 +13,11 @@
   line-height: 18px;
 }
 
+/* Board 7l v3 draws the page 1100 wide; the host's one page width (760) would wrap the account rows. */
+:where(.settings-ui) .pane:has(.mdl) {
+  max-width: min(100%, 1100px);
+}
+
 .mdl-grow {
   flex-grow: 1;
 }
@@ -89,7 +94,7 @@
   padding: 0;
   background: transparent;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   color: var(--text-4);
 }
 
@@ -111,7 +116,7 @@
   gap: 6px;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   color: var(--text-primary);
   font: inherit;
   font-size: 13px;
@@ -157,7 +162,7 @@
   padding: 0 8px;
   background: var(--bg-input);
   border: 1px solid var(--field-border);
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   color: var(--text-primary);
   font: inherit;
   font-size: 13px;
@@ -193,7 +198,7 @@
   gap: 4px;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 999px;
   color: var(--text-4);
   font-size: 12px;
   white-space: nowrap;
@@ -206,7 +211,7 @@
   height: 26px;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   flex-shrink: 0;
 }
 
@@ -300,7 +305,7 @@
   padding: 0 12px;
   background: var(--bg-dock);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   margin-bottom: 10px;
 }
 
@@ -318,7 +323,7 @@
 .mdl-class {
   background: var(--bg-dock);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   margin-bottom: 8px;
 }
 
@@ -413,7 +418,7 @@
   gap: 6px;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   color: var(--text-primary);
   font: inherit;
   font-size: 12px;
@@ -433,7 +438,7 @@
   box-sizing: border-box;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
 
@@ -447,7 +452,7 @@
   text-align: left;
   background: transparent;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   color: var(--text-primary);
   font: inherit;
   font-size: 13px;
@@ -462,12 +467,13 @@
   display: flex;
 }
 
-.mdl-sw {
+/* The host's checkbox rule (settings-ui.css) is element + attribute specific; this one has to outrank it. */
+.mdl .mdl-sw[type='checkbox'] {
   -webkit-appearance: none;
   appearance: none;
   width: 36px;
   height: 20px;
-  border-radius: 16px;
+  border-radius: var(--radius-dialog);
   background: var(--border);
   position: relative;
   flex-shrink: 0;
@@ -476,7 +482,7 @@
   transition: background 0.2s;
 }
 
-.mdl-sw::after {
+.mdl .mdl-sw::after {
   content: '';
   position: absolute;
   top: 2px;
@@ -488,12 +494,12 @@
   transition: left 0.2s;
 }
 
-.mdl-sw:checked {
+.mdl .mdl-sw:checked {
   background: var(--accent);
   border-color: var(--accent);
 }
 
-.mdl-sw:checked::after {
+.mdl .mdl-sw:checked::after {
   left: 18px;
   background: var(--accent-contrast);
 }
@@ -507,7 +513,7 @@
   padding: 10px;
   background: var(--bg-dock);
   border: 1px solid var(--field-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   margin-bottom: 6px;
 }
 
@@ -522,15 +528,19 @@
 /* --- accounts ------------------------------------------------------------------------------ */
 
 .mdl-account-name {
+  flex-shrink: 0;
   font-weight: 600;
   width: 70px;
 }
 
 .mdl-account-harness {
   width: 84px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .mdl-cost-cluster {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -543,11 +553,12 @@
   box-sizing: border-box;
   background: var(--bg-input);
   border: 1px solid var(--field-border);
-  border-radius: 4px;
+  border-radius: var(--radius-chip);
   padding: 0 0 0 8px;
 }
 
 .mdl-amountfield {
+  box-sizing: content-box;
   width: 52px;
   height: 26px;
   background: transparent;
@@ -564,12 +575,16 @@
 }
 
 .mdl-sessions {
+  flex-shrink: 0;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .mdl-windows {
+  flex-shrink: 0;
+  white-space: nowrap;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -591,7 +606,7 @@
 .mdl-track {
   width: 70px;
   height: 6px;
-  border-radius: 3px;
+  border-radius: 999px;
   background: var(--border);
   overflow: hidden;
   display: block;
@@ -610,7 +625,7 @@
 .mdl-confirm {
   background: var(--bg-input);
   border: 1px solid var(--needs-you);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
 }
 
 /* --- the routing fold -------------------------------------------------------------------------- */

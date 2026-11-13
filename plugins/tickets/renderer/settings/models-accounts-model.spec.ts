@@ -82,7 +82,7 @@ describe('adding an account', () => {
 
   it('refuses an empty or taken label and an amount that does not read', () => {
     expect(slotEntryOf({ ...draft, label: ' ' }, slots)).toEqual({ ok: false, field: 'label' });
-    expect(slotEntryOf({ ...draft, label: 'Z.AI' }, slots)).toEqual({ ok: false, field: 'label' });
+    expect(slotEntryOf({ ...draft, label: 'Zai' }, slots)).toEqual({ ok: false, field: 'label' });
     expect(slotEntryOf({ ...draft, amount: 'x' }, slots)).toEqual({ ok: false, field: 'amount' });
   });
 });

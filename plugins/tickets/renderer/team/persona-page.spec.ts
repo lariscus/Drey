@@ -15,15 +15,15 @@ describe('the Persona page v2 (R11, board 7k)', () => {
     expect(q<HTMLSelectElement>('[data-field="role"]').value).toBe('Builder');
     expect(q<HTMLInputElement>('[data-field="summary"]').value).toBe('Builds one part of a ticket, test first.');
     expect(fx.host.querySelector('.persona-step')).toBeNull(); // req-258: the persona board has no steps
-    expect(q<HTMLSelectElement>('[data-field="min-class"]').value).toBe('B');
+    expect(q<HTMLSelectElement>('[data-field="min-class"]').value).toBe('standard');
     expect(q('[data-field="readonly"]').getAttribute('aria-checked')).toBe('false');
     expect(q<HTMLInputElement>('[data-field="parallel"]').value).toBe('2');
     expect(q<HTMLInputElement>('[data-field="min"]').value).toBe('0');
     expect([...fx.host.querySelectorAll('.persona-action')].map((node) => node.textContent)).toEqual(['sync-main']);
     expect(q<HTMLSelectElement>('[data-field="worker"]').value).toBe('claude-code');
     expect([...fx.host.querySelectorAll('.persona-pool-row')].map((node) => [node.querySelector('.persona-pool-n')?.textContent, node.querySelector('.persona-pool-name')?.textContent, node.querySelector('.persona-tag')?.textContent])).toEqual([
-      ['1', 'opusClaude Code · class A · factor 3', '0 / 2 busy'],
-      ['2', 'sonnetClaude Code · class B · factor 1', '0 / 3 busy'],
+      ['1', 'opusClaude Code · class heavy · factor 3', '0 / 3 busy'],
+      ['2', 'sonnetClaude Code · class standard · factor 1', '0 / 3 busy'],
     ]);
     expect(q<HTMLInputElement>('[data-field="budget"]').value).toBe('$5');
     expect([...fx.host.querySelectorAll('.persona-allow-row')].map((row) => row.firstElementChild?.textContent)).toEqual(['Read vaults', 'Write vaults', 'Run commands in the worktree', 'Reach the network', 'Spend above the ticket allowance']);
@@ -107,7 +107,7 @@ describe('the Persona page v2 (R11, board 7k)', () => {
 
   it('req-258: the run settings save as one settings patch of what changed', async () => {
     await mount();
-    choose(q<HTMLSelectElement>('[data-field="min-class"]'), 'A');
+    choose(q<HTMLSelectElement>('[data-field="min-class"]'), 'heavy');
     q('[data-field="readonly"]').click();
     expect(q('[data-field="readonly"]').getAttribute('aria-checked')).toBe('true');
     type(q<HTMLInputElement>('[data-field="parallel"]'), '');
@@ -119,7 +119,7 @@ describe('the Persona page v2 (R11, board 7k)', () => {
     expect([...fx.host.querySelectorAll('.persona-action')].map((node) => node.textContent)).toEqual(['commit']);
     buttonOf('Save').click();
     await settle();
-    expect(patches()).toEqual([{ persona: 'ben', settings: { minClass: 'A', readOnly: true, parallel: null, min: 1, leaving: ['commit'] } }]);
+    expect(patches()).toEqual([{ persona: 'ben', settings: { minClass: 'heavy', readOnly: true, parallel: null, min: 1, leaving: ['commit'] } }]);
   });
 
   it('the models come from the table; a row moves, goes, and a new one is picked from the table', async () => {

@@ -48,11 +48,11 @@ export function registerModelsIpc(handle: Handle, fleet: ModelsFleet): void {
   handle('poolModelsDiscover', (payload) => fleet.discoverModels(objectOf(payload)['registry'] !== false));
   handle('poolModelAdd', (payload): Promise<ModelsReply | Refusal> | Refusal => {
     const { provider, model, class: cls } = objectOf(payload);
-    return typeof provider === 'string' && typeof model === 'string' && typeof cls === 'string' ? fleet.addDiscoveredModel(provider, model, cls) : { ok: false, error: 'which model, which class?' };
+    return typeof provider === 'string' && typeof model === 'string' && typeof cls === 'string' ? fleet.addDiscoveredModel({ provider, model, class: cls }) : { ok: false, error: 'which model, which class?' };
   });
   handle('poolModelIgnore', (payload): Promise<ModelsReply | Refusal> | Refusal => {
     const { provider, model } = objectOf(payload);
-    return typeof provider === 'string' && typeof model === 'string' ? fleet.ignoreDiscoveredModel(provider, model) : { ok: false, error: 'which model?' };
+    return typeof provider === 'string' && typeof model === 'string' ? fleet.ignoreDiscoveredModel({ provider, model }) : { ok: false, error: 'which model?' };
   });
   handle('slots', (): Promise<SlotsReply | null> => fleet.slots());
   handle('slotsConfig', (payload): Promise<SlotsReply | Refusal> | Refusal => {
@@ -65,12 +65,12 @@ export function registerModelsIpc(handle: Handle, fleet: ModelsFleet): void {
   });
   handle('slotRemove', (payload): Promise<SlotsReply | Refusal> | Refusal => {
     const { id, withModels } = objectOf(payload);
-    return typeof id === 'string' ? fleet.removeSlot(id, withModels === true) : { ok: false, error: 'which slot?' };
+    return typeof id === 'string' ? fleet.removeSlot(withModels === true ? { id, withModels: true } : id) : { ok: false, error: 'which slot?' };
   });
   // req-287: an account's label, cost or sessions edited in place.
   handle('slotUpdate', (payload): Promise<SlotsReply | Refusal> | Refusal => {
     const { id, patch } = objectOf(payload);
-    return typeof id === 'string' && patch !== null && typeof patch === 'object' && !Array.isArray(patch) ? fleet.updateSlot(id, patch as Record<string, unknown>) : { ok: false, error: 'which slot?' };
+    return typeof id === 'string' && patch !== null && typeof patch === 'object' && !Array.isArray(patch) ? fleet.updateSlot({ id, patch: patch as Record<string, unknown> }) : { ok: false, error: 'which slot?' };
   });
   handle('slotsRefresh', (payload) => {
     const id = objectOf(payload)['id'];

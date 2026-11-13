@@ -357,9 +357,7 @@ export class FleetClient {
   }
 
   /** Reads the quotas now (one slot, or all). */
-  refreshSlots(id?: string): Promise<SlotsReply | { readonly ok: false; readonly error: string }> {
-    return this.slotWrite<SlotsReply>('/slots/refresh', id === undefined ? {} : { id });
-  }
+  refreshSlots = (id?: string): Promise<SlotsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<SlotsReply>('/slots/refresh', id === undefined ? {} : { id });
 
   /** The owner signed the slot's account in again: it takes runs again. */
   slotLoginDone(id: string): Promise<{ readonly ok: true; readonly slot: SlotView | null } | { readonly ok: false; readonly error: string }> {
@@ -367,18 +365,16 @@ export class FleetClient {
   }
 
   /** Writes the `slots` of `service.json` (every other key kept); a broken entry refuses the whole list. */
-  writeSlots(slots: readonly unknown[]): Promise<SlotsReply | { readonly ok: false; readonly error: string }> {
-    return this.slotWrite<SlotsReply>('/slots/config', { slots });
-  }
+  writeSlots = (slots: readonly unknown[]): Promise<SlotsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<SlotsReply>('/slots/config', { slots });
 
   /** D-69: adds one slot entry to `service.json`, every other entry kept as written. */
   addSlot = (slot: unknown): Promise<SlotsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<SlotsReply>('/slots/add', { slot });
 
-  /** D-69: removes one slot — a configured entry, or an implied slot (its provider then has no slot here); req-287: `withModels` removes the model rows naming it too. */
-  removeSlot = (id: string, withModels = false): Promise<SlotsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<SlotsReply>('/slots/remove', withModels ? { id, withModels } : { id });
+  /** D-69: removes one slot — a configured entry, or an implied slot (its provider then has no slot here); req-287: `withModels` removes the model rows naming it too. One argument: the engine's invoke channel carries one payload. */
+  removeSlot = (input: string | { readonly id: string; readonly withModels?: boolean }): Promise<SlotsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<SlotsReply>('/slots/remove', typeof input === 'string' ? { id: input } : input);
 
   /** req-287: changes one account's label, cost (`billing`) or sessions in place; a `null` removes the key. */
-  updateSlot = (id: string, patch: Readonly<Record<string, unknown>>): Promise<SlotsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<SlotsReply>('/slots/update', { id, patch });
+  updateSlot = (input: { readonly id: string; readonly patch: Readonly<Record<string, unknown>> }): Promise<SlotsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<SlotsReply>('/slots/update', input);
 
   // --- the capacity pool (req-170, board 7l) ----------------------------------
 
@@ -397,24 +393,16 @@ export class FleetClient {
   }
 
   /** req-286: asks every harness what it offers (*Find models again*); `registry` also fills the capabilities from models.dev — one network call, only on the owner's ask. */
-  discoverModels(registry: boolean): Promise<(ModelsReply & { readonly registryError?: string | null }) | { readonly ok: false; readonly error: string }> {
-    return this.slotWrite('/models/discover', { registry });
-  }
+  discoverModels = (registry: boolean): Promise<(ModelsReply & { readonly registryError?: string | null }) | { readonly ok: false; readonly error: string }> => this.slotWrite('/models/discover', { registry });
 
   /** req-286: takes a model the last check found into the table, under the class the card picked. */
-  addDiscoveredModel(provider: string, model: string, cls: string): Promise<ModelsReply | { readonly ok: false; readonly error: string }> {
-    return this.slotWrite<ModelsReply>('/models/add', { provider, model, class: cls });
-  }
+  addDiscoveredModel = (input: { readonly provider: string; readonly model: string; readonly class: string }): Promise<ModelsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<ModelsReply>('/models/add', input);
 
   /** req-286: keeps a found model's card away (`discovery.ignored`). */
-  ignoreDiscoveredModel(provider: string, model: string): Promise<ModelsReply | { readonly ok: false; readonly error: string }> {
-    return this.slotWrite<ModelsReply>('/models/ignore', { provider, model });
-  }
+  ignoreDiscoveredModel = (input: { readonly provider: string; readonly model: string }): Promise<ModelsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<ModelsReply>('/models/ignore', input);
 
   /** req-178: fills the model table's undeclared capability columns from models.dev — one network call, only on the owner's ask; the reply's `imported` says what. */
-  importModelCapabilities(): Promise<ModelsReply | { readonly ok: false; readonly error: string }> {
-    return this.slotWrite<ModelsReply>('/models/import', {});
-  }
+  importModelCapabilities = (): Promise<ModelsReply | { readonly ok: false; readonly error: string }> => this.slotWrite<ModelsReply>('/models/import', {});
 
   private async slotWrite<T>(pathname: string, body: unknown): Promise<T | { readonly ok: false; readonly error: string }> {
     const reply = await this.conn.postWithWake<T>(pathname, body);

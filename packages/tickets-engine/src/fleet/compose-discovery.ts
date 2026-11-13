@@ -36,7 +36,7 @@ export interface DiscoveryDeps {
 export function harnessProbes(deps: Pick<DiscoveryDeps, 'home' | 'env' | 'fs' | 'spawnFn' | 'windows'>): HarnessProbe[] {
   const locator = new BinaryLocator(deps.fs, deps.env, deps.windows);
   const cwd = deps.fs.join(deps.home, 'discovery');
-  const probes: HarnessProbe[] = [new ClaudeCodeProbe(deps.spawnFn, locator, cwd), ...ACP_PROBE_TARGETS.map((target) => new AcpProbe(target, deps.spawnFn, locator, cwd))];
+  const probes: HarnessProbe[] = [new ClaudeCodeProbe(deps.spawnFn, locator, cwd), ...ACP_PROBE_TARGETS.map((target) => new AcpProbe(target, deps.spawnFn, locator, { cwd }))];
   // The probes' sessions start in the service home's own folder, made before the first spawn.
   return probes.map((p) => ({ provider: p.provider, label: p.label, probe: async () => (await deps.fs.mkdirp(cwd), p.probe()) }));
 }

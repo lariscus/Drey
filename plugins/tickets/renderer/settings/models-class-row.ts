@@ -103,10 +103,11 @@ export function classRowOf(ctx: RowContext, view: ClassRowView): HTMLElement {
   grip.append(glyph('grip', 14));
   grip.addEventListener('dragstart', (event) => {
     ctx.dragging(view.index);
-    if (event.dataTransfer !== null) {
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', view.row.model);
-      event.dataTransfer.setDragImage(row, 0, 0);
+    const transfer = event.dataTransfer as DataTransfer | null | undefined;
+    if (transfer !== null && transfer !== undefined) {
+      transfer.effectAllowed = 'move';
+      transfer.setData('text/plain', view.row.model);
+      transfer.setDragImage(row, 0, 0);
     }
   });
   grip.addEventListener('dragend', () => ctx.dragging(null));

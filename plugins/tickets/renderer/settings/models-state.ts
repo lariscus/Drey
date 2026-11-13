@@ -53,6 +53,15 @@ export class ModelsState {
     }
   }
 
+  /** A write woke a sleeping runner: the accounts the first read could not get are read now. */
+  private async readSlotsIfMissing(): Promise<void> {
+    if (this.slots.length > 0) {
+      return;
+    }
+    const slots = await (this.api.backend.invoke('slots') as Promise<SlotsAnswer>).catch(() => null);
+    this.slots = slots?.ok === true ? slots.slots : [];
+  }
+
   private offline(): boolean {
     this.error = this.t('tickets.settings.models.offline');
     return false;
@@ -75,7 +84,10 @@ export class ModelsState {
         return false;
       }
       this.reply = answer;
-      this.error = '';
+      // req-286: Find models again keeps the harnesses' answer when the registry did not answer, and says so.
+      const registryError = (answer as { readonly registryError?: unknown }).registryError;
+      this.error = typeof registryError === 'string' ? registryError : '';
+      await this.readSlotsIfMissing();
       return true;
     } catch (failure) {
       return this.refused(failure);

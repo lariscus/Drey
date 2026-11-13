@@ -120,7 +120,7 @@ describe('AcpProbe — the models of `session/new` (req-286)', () => {
     const init = { agentInfo: { name: 'OpenCode', version: '2.0.32' }, agentCapabilities: { sessionCapabilities: { delete: {} } } };
     const session = { result: { sessionId: 's1', configOptions: [{ id: 'model', category: 'model', currentValue: 'zai-coding-plan/glm-5.3', options: [{ value: 'zai-coding-plan/glm-5.3', name: 'GLM-5.3' }, { value: 'github-copilot/gpt-5.4', name: 'GPT-5.4' }] }, { id: 'mode', options: [{ value: 'build' }] }] } };
     const methods = acpAgent(proc, init, session);
-    const outcome = await new AcpProbe(opencode, () => proc, locatorWith('/bin/opencode.cmd'), '/home/discovery').probe();
+    const outcome = await new AcpProbe(opencode, () => proc, locatorWith('/bin/opencode.cmd'), { cwd: '/home/discovery' }).probe();
     expect(outcome).toEqual({
       installed: true,
       version: '2.0.32',
@@ -138,7 +138,7 @@ describe('AcpProbe — the models of `session/new` (req-286)', () => {
   it('Kimi signed out: session/new refused for authentication', async () => {
     const proc = fakeProcess();
     acpAgent(proc, { agentInfo: { name: 'Kimi Code CLI', version: '2.5.2' } }, { error: { message: 'Authentication required' } });
-    expect(await new AcpProbe(ACP_PROBE_TARGETS[1]!, () => proc, locatorWith('/bin/kimi.exe'), '/x').probe()).toEqual({ installed: true, version: '2.5.2', signedIn: false, models: [], error: null });
+    expect(await new AcpProbe(ACP_PROBE_TARGETS[1]!, () => proc, locatorWith('/bin/kimi.exe'), { cwd: '/x' }).probe()).toEqual({ installed: true, version: '2.5.2', signedIn: false, models: [], error: null });
   });
 
   it('reads ACP’s models.availableModels too, each model once', () => {
@@ -149,6 +149,6 @@ describe('AcpProbe — the models of `session/new` (req-286)', () => {
   });
 
   it('Copilot CLI not on PATH: not installed', async () => {
-    expect((await new AcpProbe(ACP_PROBE_TARGETS[2]!, () => fakeProcess(), locatorWith(), '/x').probe()).installed).toBe(false);
+    expect((await new AcpProbe(ACP_PROBE_TARGETS[2]!, () => fakeProcess(), locatorWith(), { cwd: '/x' }).probe()).installed).toBe(false);
   });
 });

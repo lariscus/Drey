@@ -57,7 +57,7 @@ export function createHeadPart(state: ModelsState): HeadPart {
     const reply = state.reply;
     const discovery = reply?.discovery;
     checked.textContent = discovery === undefined ? '' : state.checking ? state.t('tickets.settings.models.checking') : checkedWords(discovery, new Date(), api.i18n);
-    again.disabled = reply === null || state.checking;
+    again.disabled = state.checking; // a sleeping runner: the write wakes it
     capRow.replaceChildren();
     harnessGroup.replaceChildren();
     harnesses.replaceChildren();

@@ -237,6 +237,30 @@ describe('Settings → Models page', () => {
     expect(section.root.querySelector('.mdl-class')).toBeNull();
   });
 
+  it('a sleeping runner: Find models again stays on, wakes it, and the accounts are read then', async () => {
+    let awake = false;
+    const invoke = vi.fn((method: string): Promise<unknown> => {
+      if (method === 'poolModelsDiscover') {
+        awake = true;
+        return Promise.resolve({ ...pool, registryError: 'the registry answered nothing' });
+      }
+      if (method === 'slots') {
+        return Promise.resolve(awake ? { ok: true, slots, configPath: '' } : null);
+      }
+      return Promise.resolve(awake ? pool : null);
+    });
+    const section = createModelsSection({ i18n, backend: { invoke } } as unknown as DreyPluginApi);
+    document.body.replaceChildren(section.root);
+    await section.refresh();
+    const again = byLabel<HTMLButtonElement>(section.root, 'Find models again');
+    expect(again.disabled).toBe(false);
+    again.click();
+    await settle();
+    await settle();
+    expect(section.root.querySelectorAll('.mdl-account').length).toBe(slots.length);
+    expect(section.root.querySelector('.mdl-note')?.textContent).toBe('the registry answered nothing');
+  });
+
   it('shows the engine refusal of a write', async () => {
     const { section, invoke } = setup();
     await section.refresh();

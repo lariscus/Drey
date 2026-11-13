@@ -135,6 +135,16 @@ function loadAnnouncer(pool: () => PoolLoad, publish: ((load: PoolLoad) => void)
   };
 }
 
+/** req-286: the registry import and the discovery over the harness probes (the real four unless a spec passes its own). */
+function discoveryOf(deps: RoutingDeps, settings: PoolSettingsRegistry, slots: () => readonly Slot[], http: QuotaHttp): { importer: ModelsDevImport; discovery: ReturnType<typeof composeDiscovery> } {
+  // DREY_MODELS_REGISTRY_URL: another registry file (an e2e points it at a closed port: no network call).
+  const url = deps.env['DREY_MODELS_REGISTRY_URL'];
+  const importer = url !== undefined && url !== '' ? new ModelsDevImport(http, url) : new ModelsDevImport(http);
+  const probes = deps.probes !== undefined ? { probes: deps.probes } : {};
+  const discovery = composeDiscovery({ home: deps.home, env: deps.env, fs: deps.fs, clock: deps.clock, log: deps.log, settings, slots, registry: importer, spawnFn: nodeSpawnFn(), windows: process.platform === 'win32', ...probes });
+  return { importer, discovery };
+}
+
 export function composeRouting(deps: RoutingDeps): Routing {
   const config = new ServiceConfigFile(deps.fs, path.join(deps.home, 'service.json'));
   const classMigration = new ClassMigration(config, deps.log);
@@ -169,17 +179,12 @@ export function composeRouting(deps: RoutingDeps): Routing {
     clock: deps.clock,
     log: deps.log,
     ...(deps.throttle !== undefined ? { throttle: deps.throttle } : {}),
-    registry,
-    settings,
-    cap,
-    reservations,
-    config,
+    ...{ registry, settings, cap, reservations, config },
     burnRateFile: burnRateFileOf(deps.fs, path.join(deps.home, 'burn-rate.json')),
     timeText: deps.timeText ?? localTimeText,
   });
   const loop = new QuotaRefreshLoop(registry, deps.schedule ?? nodeSchedule, deps.log);
-  const importer = new ModelsDevImport(http);
-  const discovery = composeDiscovery({ home: deps.home, env: deps.env, fs: deps.fs, clock: deps.clock, log: deps.log, settings, slots: () => registry.list(), registry: importer, spawnFn: nodeSpawnFn(), windows: process.platform === 'win32', ...(deps.probes !== undefined ? { probes: deps.probes } : {}) });
+  const { importer, discovery } = discoveryOf(deps, settings, () => registry.list(), http);
   return {
     registry,
     gate: new PoolGate(registry, reservations, pool.grant, pool.shares),

@@ -1354,7 +1354,7 @@
   "tickets.settings.models.harness.install": "Install…",
   "tickets.settings.models.harness.install_hint": "{harness} is not installed on this machine",
   "tickets.settings.models.cap.global": "Global cap",
-  "tickets.settings.models.cap.title": "Sessions at once across all classes",
+  "tickets.settings.models.cap.title": "Cost factors running at once, all classes together",
   "tickets.settings.models.cap.now": "Now {used} of {cap}",
   "tickets.settings.models.cap.now_open": "Now {used}",
   "tickets.settings.models.step_down": "decrease",

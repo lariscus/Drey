@@ -44,6 +44,12 @@ function weightOf(entry: Entry, model: string): Pick<ModelRow, 'cost'> | string 
   return cost === null ? `model "${model}": the cost factor must be a number of 0 or more` : { cost };
 }
 
+/** A row's class when the list holds it (an old letter read as its name, req-287); null otherwise. */
+function listedClassOf(raw: unknown, classes: readonly ClassConfig[]): string | null {
+  const name = classNameOf(raw);
+  return name !== null && classes.some((c) => c.name === name) ? name : null;
+}
+
 /** One row of `models`, or the reason it is left out. */
 export function modelRowOf(raw: unknown, slots: readonly Slot[], seen: readonly ModelRow[], classes: readonly ClassConfig[]): ModelRow | string {
   const entry = (raw !== null && typeof raw === 'object' ? raw : {}) as Entry;
@@ -55,8 +61,8 @@ export function modelRowOf(raw: unknown, slots: readonly Slot[], seen: readonly 
   if (typeof place === 'string') {
     return `model "${model}" ${place}`;
   }
-  const rowClass = classNameOf(entry['class']);
-  if (rowClass === null || !classes.some((c) => c.name === rowClass)) {
+  const rowClass = listedClassOf(entry['class'], classes);
+  if (rowClass === null) {
     return `model "${model}": class must be one of ${classes.map((c) => c.name).join(', ')}`;
   }
   const weight = weightOf(entry, model);

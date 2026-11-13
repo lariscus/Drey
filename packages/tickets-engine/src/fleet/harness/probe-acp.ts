@@ -51,15 +51,20 @@ export class AcpProbe {
   readonly provider: WorkerProviderId;
   readonly label: string;
 
+  private readonly cwd: string;
+  private readonly timeoutMs: number;
+
   constructor(
     private readonly target: AcpProbeTarget,
     private readonly spawnFn: SpawnFn,
     private readonly locator: BinaryLocator,
-    private readonly cwd: string,
-    private readonly timeoutMs: number = PROBE_MS,
+    /** Where the probe's session starts; how long it may take (45 s). */
+    place: { readonly cwd: string; readonly timeoutMs?: number },
   ) {
     this.provider = target.provider;
     this.label = target.label;
+    this.cwd = place.cwd;
+    this.timeoutMs = place.timeoutMs ?? PROBE_MS;
   }
 
   async probe(): Promise<ProbeOutcome> {
