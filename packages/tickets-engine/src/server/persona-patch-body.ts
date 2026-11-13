@@ -45,18 +45,24 @@ const PERSONA_PATCH_KEYS: readonly (keyof PersonaPatchInput)[] = [
   'chatModel',
 ];
 
+/** The keys that may also be null (to clear them): the type their value has otherwise, and the refusal. */
+const NULLABLE: Partial<Record<keyof PersonaPatchInput, readonly ['number' | 'string', string]>> = {
+  budget: ['number', 'budget is a number of dollars or null'],
+  chatModel: ['string', 'chatModel is a model id or null'],
+};
+
 /** One key's value as the patch carries it: the shape checked, or the refusal. */
 function valueOf(key: keyof PersonaPatchInput, value: unknown): Parsed<unknown> {
+  const nullable = NULLABLE[key];
+  if (nullable !== undefined) {
+    return value === null || typeof value === nullable[0] ? { ok: true, value } : { ok: false, error: nullable[1] };
+  }
   switch (key) {
     case 'pool':
     case 'skills':
       return Array.isArray(value) && value.every((v) => typeof v === 'string')
         ? { ok: true, value: value.map((v) => (v as string).trim()) }
         : { ok: false, error: `${key} is a list of names` };
-    case 'budget':
-      return value === null || typeof value === 'number' ? { ok: true, value } : { ok: false, error: 'budget is a number of dollars or null' };
-    case 'chatModel':
-      return value === null || typeof value === 'string' ? { ok: true, value } : { ok: false, error: 'chatModel is a model id or null' };
     case 'allowed':
     case 'settings':
       return asObject(value) !== null ? { ok: true, value } : { ok: false, error: `${key} is an object` };

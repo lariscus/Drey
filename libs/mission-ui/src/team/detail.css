@@ -894,7 +894,7 @@ mc-app-bar {
   cursor: pointer;
   background: var(--line);
   border: 0;
-  border-radius: 16px;
+  border-radius: 999px;
   transition: background 0.15s ease;
 }
 
@@ -997,6 +997,7 @@ mc-app-bar {
     flex: 1 1 160px;
     min-height: 160px;
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .pia-acts {
     justify-content: flex-end;
