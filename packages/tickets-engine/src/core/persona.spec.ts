@@ -58,6 +58,20 @@ describe('kind: mission — Mission Control\'s persona (req-269)', () => {
     expect(text).toBe(PIA);
     expect(parsePersonaFile('pia', text)).toMatchObject({ kind: 'mission', title: 'Pia', summary: 'Mission Control.' });
   });
+
+  it('req-293: reads and writes her pinned chat model as `model:` (quoted, a colon is safe); none = the assistant\'s', () => {
+    const pinned = parsePersonaFile('pia', PIA.replace('color:', 'model: "qwen3:30b"\ncolor:'));
+    expect(pinned.chatModel).toBe('qwen3:30b');
+    const text = personaFileText(pinned);
+    expect(text).toContain('model: "qwen3:30b"');
+    expect(parsePersonaFile('pia', text).chatModel).toBe('qwen3:30b');
+    expect(parsePersonaFile('pia', PIA).chatModel).toBeNull();
+    expect(personaFileText({ ...pinned, chatModel: null })).toBe(PIA);
+  });
+
+  it('req-293: an agent has no chat model — `model:` is not read for it', () => {
+    expect(parsePersonaFile('ben', '---\ntitle: Ben\nmodel: "x"\n---\n').chatModel).toBeUndefined();
+  });
 });
 
 describe('entryWorkOf — what happens at a chain entry (req-269)', () => {

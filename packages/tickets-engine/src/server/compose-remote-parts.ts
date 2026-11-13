@@ -2,6 +2,7 @@ import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import { NOTES_VAULT_KEY } from '../contracts/notes';
 import { BoardAvatars } from '../services/board-avatars';
+import { listChatModels } from '../services/chat-model-probe';
 import { NotesService } from '../services/notes-service';
 import type { BoardParts } from './compose-board-parts';
 import type { SessionParts } from './compose-session-parts';
@@ -33,7 +34,12 @@ export async function composeRemoteParts(opts: EngineOptions, config: FileConfig
     board.board,
     board.fleet,
     board.hub,
-    { allowBypass: () => remoteService?.allowBypass() ?? false, avatars: new BoardAvatars(board.board, board.avatars) },
+    {
+      allowBypass: () => remoteService?.allowBypass() ?? false,
+      avatars: new BoardAvatars(board.board, board.avatars),
+      // req-293: the assistant's connection and its models, for Mission Control's persona's Model choice.
+      chatModels: () => listChatModels(config),
+    },
     sessions.chat,
     sessions.personaSessions,
     sessions.personaRecords,

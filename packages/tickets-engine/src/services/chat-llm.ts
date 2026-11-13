@@ -36,6 +36,14 @@ export interface ChatBridgeDeps {
    * next message; null = none. Asked only when `systemPrompt` is absent.
    */
   readonly missionPersona?: () => Promise<string | null>;
+  /**
+   * req-293: a model on the assistant's connection in place of `chat.model`,
+   * asked on every turn; null = the assistant's own. On the mission bridge it
+   * applies to Mission Control's own turns only (a shape or flow turn speaks
+   * as another persona); a bridge with its own system prompt (Pia's 1:1)
+   * applies it to every turn.
+   */
+  readonly model?: () => Promise<string | null>;
 }
 
 export function createChatBridge(deps: ChatBridgeDeps): ChatBridge {

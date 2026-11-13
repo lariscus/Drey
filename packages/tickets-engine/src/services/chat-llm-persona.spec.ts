@@ -101,3 +101,34 @@ describe('the bridge with Mission Control\'s persona (req-269)', () => {
     expect(systems[2]!.startsWith('AGGREGATOR\n\n## Board digest')).toBe(true);
   });
 });
+
+describe('the pinned model of Mission Control\'s persona (req-293)', () => {
+  /** Records the `model` of each request body. */
+  function models(seen: string[]): typeof fetch {
+    const inner = recording([]);
+    return (async (url: unknown, init?: unknown) => {
+      seen.push((JSON.parse(String((init as RequestInit).body)) as { model: string }).model);
+      return inner(url as string, init as RequestInit);
+    }) as typeof fetch;
+  }
+
+  it('a mission turn asks her model in place of chat.model; a blank pin falls back to it', async () => {
+    const seen: string[] = [];
+    let pin: string | null = 'glm-4.7-flash';
+    const bridge = createChatBridge({ crew: CREW, config: config(), fetch: models(seen), missionPersona: async () => PIA, model: async () => pin });
+    await bridge.runTurn({ text: 'Hi', history: [], board: BOARD, emit });
+    pin = null;
+    await bridge.runTurn({ text: 'Hi', history: [], board: BOARD, emit });
+    expect(seen).toEqual(['glm-4.7-flash', 'glm-5']);
+  });
+
+  it('a shape or flow turn speaks as another persona: the assistant\'s model; a bridge with its own prompt takes the pin', async () => {
+    const seen: string[] = [];
+    const model = async (): Promise<string> => 'glm-4.7-flash';
+    const shape: ChatShapeContext = { ticket: 'T-0001', ticketText: 'Body.', readFile: async () => ({ ok: false, error: 'none' }) };
+    await createChatBridge({ crew: CREW, config: config(), fetch: models(seen), model }).runTurn({ text: 'Hi', history: [], board: BOARD, shape, emit });
+    await createChatBridge({ crew: CREW, config: config(), fetch: models(seen), model }).runTurn({ text: 'Hi', history: [], board: BOARD, flow: { context: 'Ctx.' }, emit });
+    await createChatBridge({ crew: CREW, config: config(), fetch: models(seen), model, systemPrompt: 'ONE ON ONE' }).runTurn({ text: 'Hi', history: [], board: BOARD, emit });
+    expect(seen).toEqual(['glm-5', 'glm-5', 'glm-4.7-flash']);
+  });
+});

@@ -112,6 +112,12 @@ export interface Persona {
   readonly allowed: PersonaAllowed;
   /** The run settings (req-258): class floor, needs, ceilings, gate, own pool, leaving actions, read-only. */
   readonly settings: PersonaSettings;
+  /**
+   * req-293: `model:` of Mission Control's persona — the model of her chat
+   * turns on the assistant's connection; absent or null = the assistant's
+   * own model. Read and written for the mission persona only.
+   */
+  readonly chatModel?: string | null;
 }
 
 export const PERSONAS_DIR = 'tickets/_meta/personas';
@@ -195,6 +201,12 @@ function modelLines(persona: Persona): string[] {
   return [`worker: ${persona.worker}`, 'models:', `  default: ${persona.models.default}`, `  pool: [${persona.models.pool.join(', ')}]`];
 }
 
+/** req-293: Mission Control's persona's `model:` — a double-quoted scalar (a model id may hold a colon); none = the assistant's model. */
+function chatModelLines(model: string | null | undefined): string[] {
+  const id = (model ?? '').trim();
+  return id === '' ? [] : [`model: ${JSON.stringify(id)}`];
+}
+
 /** The one line is a double-quoted YAML scalar (JSON's escapes are YAML's), so a colon or a quote in it never breaks the fence. */
 function summaryLines(summary: string): string[] {
   const text = summary.replace(/\s+/g, ' ').trim();
@@ -223,6 +235,7 @@ export function parsePersonaFile(id: string, text: string): Persona {
     budget: budgetOf(get('budget')),
     allowed: allowedOf(get('allowed')),
     settings: personaSettingsOf(get),
+    ...(kindOf(get('kind')) === 'mission' ? { chatModel: asString(get('model')) ?? null } : {}),
   };
 }
 
@@ -277,7 +290,7 @@ export function personaFileText(persona: Persona, body?: string): string {
     ...(persona.kind === 'agent' ? [] : [`kind: ${persona.kind}`]),
     `role: ${persona.role}`,
     ...summaryLines(persona.summary),
-    ...(persona.kind === 'mission' ? [] : modelLines(persona)),
+    ...(persona.kind === 'mission' ? chatModelLines(persona.chatModel) : modelLines(persona)),
     `color: '${persona.color}'`,
     `skills: [${persona.skills.join(', ')}]`,
     ...(persona.budget !== null ? [`budget: ${persona.budget}`] : []),

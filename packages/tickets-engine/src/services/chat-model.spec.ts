@@ -6,9 +6,9 @@ import {
   chatRequest,
   deltaOf,
   resolveChatModel,
-  testChatModel,
   type ChatModelConfig,
 } from './chat-model';
+import { listChatModels, testChatModel } from './chat-model-probe';
 
 /**
  * The engine's whole knowledge of providers (D-1, milestone 131): the
@@ -158,5 +158,32 @@ describe('testChatModel', () => {
     await testChatModel(config({ 'chat.provider': 'zai-glm', 'chat.baseUrl': 'https://api.z.ai/api/anthropic', 'chat.apiKey': 'zk', 'chat.model': 'glm' }), spy);
     expect(seen[0]!.url).toBe('https://api.z.ai/api/anthropic/v1/models');
     expect(seen[0]!.headers['x-api-key']).toBe('zk');
+  });
+});
+
+describe('listChatModels and the pinned model (req-293)', () => {
+  const cfg = config({ 'chat.provider': 'lmstudio', 'chat.baseUrl': 'http://h/v1', 'chat.model': 'glm' });
+  const reply = (status: number, body: unknown): typeof fetch => (async () => new Response(JSON.stringify(body), { status })) as typeof fetch;
+
+  it('names the connection and lists the endpoint\'s models, sorted and once each', async () => {
+    const r = await listChatModels(cfg, reply(200, { data: [{ id: 'qwen' }, { id: 'glm' }, { id: 'qwen' }] }));
+    expect(r).toEqual({ ok: true, provider: 'lmstudio', providerLabel: 'LM Studio', assistantModel: 'glm', models: ['glm', 'qwen'] });
+  });
+
+  it('an endpoint without a list, or out of reach, lists nothing but is no refusal (the id stays typeable)', async () => {
+    expect(await listChatModels(cfg, reply(404, {}))).toMatchObject({ ok: true, models: [] });
+    const down = (async () => Promise.reject(new Error('ECONNREFUSED'))) as typeof fetch;
+    expect(await listChatModels(cfg, down)).toMatchObject({ ok: true, models: [] });
+  });
+
+  it('refuses a connection the bridge cannot use', async () => {
+    expect(await listChatModels(config({ 'chat.provider': 'claude-code', 'chat.model': 'opus' }), reply(200, {}))).toMatchObject({ ok: false });
+  });
+
+  it('resolveChatModel takes a pinned model in place of chat.model; a blank pin is none', async () => {
+    const pinned = await resolveChatModel(cfg, 'qwen');
+    expect(pinned.ok && pinned.spec.model).toBe('qwen');
+    const blank = await resolveChatModel(cfg, '  ');
+    expect(blank.ok && blank.spec.model).toBe('glm');
   });
 });

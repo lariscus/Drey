@@ -18,6 +18,8 @@ export interface PersonaPatchFields {
   allowed?: PersonaAllowedPatch;
   /** req-258: the run settings. */
   settings?: PersonaSettingsPatch;
+  /** req-293: Mission Control's persona's chat model; null or '' = the assistant's own. */
+  chatModel?: string | null;
 }
 
 const isBool = (value: unknown): boolean => value === undefined || typeof value === 'boolean';
@@ -52,6 +54,7 @@ const RULES: readonly Rule[] = [
   [(i) => i.prompt !== undefined && typeof i.prompt !== 'string', 'the prompt is markdown text'],
   [(i) => i.summary !== undefined && (typeof i.summary !== 'string' || i.summary.length > 200), 'the one line for the crew list is text of at most 200 characters'],
   [(i) => i.budget !== undefined && i.budget !== null && !(typeof i.budget === 'number' && Number.isFinite(i.budget) && i.budget >= 0), 'the daily budget is a number of dollars, zero or more, or null'],
+  [(i) => i.chatModel !== undefined && i.chatModel !== null && (typeof i.chatModel !== 'string' || i.chatModel.length > 200), 'the chat model is a model id of at most 200 characters, or null for the assistant\'s model'],
   [(i) => i.allowed !== undefined && allowedBroken(i.allowed), 'allowed is { spendAboveAllowance?, runCommands?, network?, writeVaults? } with run-commands accept-edits or bypass'],
 ];
 

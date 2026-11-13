@@ -56,7 +56,8 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
     host,
     git,
     // req-269: Mission Control speaks with its persona's prompt (Pia), read on every turn.
-    bridge: opts.chatBridge ?? createChatBridge({ config, crew, missionPersona: () => missionPrompt.text() }),
+    // req-293/294/296: her memory and skills ride the prompt, her `model:` pins the model of her own turns.
+    bridge: opts.chatBridge ?? createChatBridge({ config, crew, missionPersona: () => missionPrompt.text(), model: () => missionPrompt.model() }),
     sessions: parts.freeSessions, // req-173: Pia's startSession card
     shadows: new FilePlanShadowStore(path.join(opts.home, 'plan-shadow.json')),
     modelName: () => config.get<string>('chat.model'),
@@ -84,7 +85,7 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
     fleet,
     fleetChanges: (listener) => hub.subscribe((what) => (what === 'fleet' ? listener() : undefined)),
     changed: (file) => hub.emit('chat', { file, event: { kind: 'done' } }),
-    bridge: (systemPrompt) => opts.chatBridge ?? createChatBridge({ config, crew, systemPrompt }),
+    bridge: (systemPrompt, model) => opts.chatBridge ?? createChatBridge({ config, crew, systemPrompt, ...(model === null ? {} : { model: () => Promise.resolve(model) }) }),
     log,
     ...(opts.oneOnOneTools === undefined ? {} : { tools: opts.oneOnOneTools }),
   });

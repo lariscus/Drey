@@ -24,6 +24,7 @@ import type { PersonaSettingsPatch } from '../contracts/persona-settings-patch';
 import { personaReadOnly } from '../core/persona-settings';
 import type { FleetSnapshot } from '../services/fleet-client';
 import type { BoardAvatarsPort } from '../services/board-avatars';
+import type { ChatModelsReply } from '../contracts/chat-models';
 import type {
   AutopilotRecord,
   AutopilotRefusal,
@@ -125,6 +126,8 @@ export interface RemoteBoard {
   sendBack(input: { id: string; note: string; actor?: string; comments?: readonly ReviewComment[]; position?: number }): Promise<MutationResult>;
   /** The E6 improvements card: one persona's proposals and counts. */
   personaImprovements(personaId: string): Promise<PersonaImprovementsReply>;
+  /** req-281: the persona's current prompt.md rides this read; a fake without it has none. */
+  improvementInput?(personaId: string): Promise<{ readonly prompt?: string | null }>;
   /** The E6 1:1 decision; the apply lands in exactly one commit on the desk. */
   decideImprovement(input: { id: string; proposalId: string; decision: ImprovementDecision; now?: string }): Promise<MutationResult>;
   /** The E7 status read: the ticket's status-log lines; [] when absent or broken. */
@@ -225,6 +228,8 @@ export interface DreyPortOptions {
   readonly allowBypass: () => boolean;
   /** req-292: the persona pictures — the list's `avatarVersion`, the `personaAvatar` read; absent = no pictures. */
   readonly avatars?: BoardAvatarsPort;
+  /** req-293: the assistant's connection and its models (Mission Control's persona's Model choice); absent = refused. */
+  readonly chatModels?: () => Promise<ChatModelsReply>;
 }
 
 /** The run states that still hold the ticket (the hand-off waits them out). */
@@ -581,6 +586,9 @@ export class DreyTicketsPort implements TicketsRemotePort {
       color: p.color,
       ...(avatars[p.id] !== undefined ? { avatarVersion: avatars[p.id] } : {}),
       ...(p.summary !== '' ? { summary: p.summary } : {}),
+      // req-293/296: Mission Control's persona carries her chat model and her skills on the list.
+      ...(p.kind === 'mission' && (p.chatModel ?? '') !== '' ? { chatModel: p.chatModel! } : {}),
+      ...(p.kind === 'mission' ? { skills: p.skills } : {}),
       ...(p.kind === 'agent' ? { allowed: p.allowed, settings: p.settings, readOnly: personaReadOnly(p) } : {}),
       ...(committed[p.id] !== undefined ? { committedAt: committed[p.id] } : {}),
       budget: p.budget,
@@ -592,6 +600,18 @@ export class DreyTicketsPort implements TicketsRemotePort {
 
   personaAvatar(personaId: string): Promise<PersonaAvatarReply> {
     return this.options.avatars?.dataUrl(personaId) ?? Promise.resolve({ ok: false, error: 'persona pictures are not wired on this port' });
+  }
+
+  async personaInstructions(personaId: string): Promise<{ readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string }> {
+    if (this.boardService.improvementInput === undefined) {
+      return { ok: false, error: 'the instructions are not readable on this port' };
+    }
+    const input = await this.boardService.improvementInput(personaId);
+    return { ok: true, text: (input.prompt ?? '').replace(/\r\n/g, '\n') };
+  }
+
+  chatModels(): Promise<ChatModelsReply> {
+    return this.options.chatModels?.() ?? Promise.resolve({ ok: false, error: 'the chat model list is not wired on this port' });
   }
 
   personaImprovements(personaId: string): Promise<PersonaImprovementsReply> {

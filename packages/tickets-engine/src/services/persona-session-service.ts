@@ -39,6 +39,15 @@ export interface PersonaSessionServiceDeps {
 
 type Found = { readonly vault: EngineVault; readonly persona: Persona } | { readonly error: string };
 
+/**
+ * Whether a 1:1 line goes to the chat bridge: an `api` persona, and Mission
+ * Control's persona (req-294, req-296: she runs through no harness — no
+ * slot, no tools; her file carries no `worker:`).
+ */
+function onBridge(persona: Persona): boolean {
+  return isMissionPersona(persona) || parseWorkerValue(persona.worker) === null;
+}
+
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -78,10 +87,6 @@ export class PersonaSessionService {
       return { ok: false, error: found.error };
     }
     const id = found.persona.id;
-    if (isMissionPersona(found.persona)) {
-      // req-269: Mission Control's persona has no 1:1 — her conversation is the Mission Control chat.
-      return { ok: false, error: `${found.persona.title} is Mission Control — talk to her in the Mission Control chat` };
-    }
     if (this.answering.has(id)) {
       return { ok: false, error: `${found.persona.title} is still answering — wait for the answer` };
     }
@@ -136,7 +141,7 @@ export class PersonaSessionService {
     const id = found.persona.id;
     let outcome: TurnOutcome;
     try {
-      outcome = parseWorkerValue(found.persona.worker) === null ? await this.bridgeTurn(found, earlier, text) : await this.sessionTurn(found, open, earlier, text);
+      outcome = onBridge(found.persona) ? await this.bridgeTurn(found, earlier, text) : await this.sessionTurn(found, open, earlier, text);
     } catch (error) {
       outcome = { ok: false, error: messageOf(error) };
     }
@@ -153,10 +158,11 @@ export class PersonaSessionService {
     }
   }
 
-  /** An `api` persona: one bridge call with the brief as the system prompt. */
+  /** An `api` persona or Mission Control's persona: one bridge call with the brief as the system prompt (hers on her pinned model, req-293). */
   private async bridgeTurn(found: { vault: EngineVault; persona: Persona }, earlier: readonly PersonaMessage[], text: string): Promise<TurnOutcome> {
     const system = await this.deps.context.brief(found.vault, found.persona, []);
-    return this.deps.bridge({ system, history: earlier.map((m) => ({ role: m.role, text: m.text })), text });
+    const model = isMissionPersona(found.persona) ? (found.persona.chatModel ?? null) : null;
+    return this.deps.bridge({ system, history: earlier.map((m) => ({ role: m.role, text: m.text })), text, model });
   }
 
   /** A runner persona: the held session, else a fresh quiet one from the pool; the line sent; the turn awaited. */
@@ -209,7 +215,7 @@ export class PersonaSessionService {
   private async reply(found: { persona: Persona }, open: OpenSession | null): Promise<PersonaThreadReply> {
     const id = found.persona.id;
     const runs = await this.deps.fleet.runs().catch(() => [] as readonly RunInfo[]);
-    const state = sessionStateOf({ runs, persona: id, bridge: parseWorkerValue(found.persona.worker) === null, answering: this.answering.has(id) });
+    const state = sessionStateOf({ runs, persona: id, bridge: onBridge(found.persona), answering: this.answering.has(id) });
     const failure = this.failures.get(id);
     return {
       ok: true,

@@ -30,6 +30,8 @@ export const TEAM_METHODS = [
   'personaRemove',
   // req-292: a persona's picture as a data URL (the Crew's circles).
   'personaAvatar',
+  // req-281/293: Mission Control's persona's instructions and the assistant's models for her Model choice.
+  'personaInstructions', 'chatModels',
 ] as const;
 
 // pair/revoke take primitive args; the invoke channel carries one object
