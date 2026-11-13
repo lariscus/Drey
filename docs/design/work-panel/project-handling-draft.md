@@ -297,3 +297,7 @@ Given in German in the session; English here.
   repository (the `profile:` key of `repos.md`, the slots' `profile` in
   `service.json`, the refusal "no slot of this profile" and the Private / Work tags
   in Settings go; an old key is read and ignored). A `decisions.md` entry records it.
+- **On the boards (owner, 2026-11-13):** the project colour gets a free colour
+  picker beside the presets, as the highlight colour in Settings → Appearance has;
+  Purpose (and the persona's Instructions) are Drey's Markdown editor — the
+  formatting strip and Live | Source, as on today's Persona page — not plain text.

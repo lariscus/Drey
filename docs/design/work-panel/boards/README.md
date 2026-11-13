@@ -20,8 +20,8 @@ canvas, the boards they revise stay as they were. **Accepted by the owner on 202
 
 The design round of 2026-11-13 (`DeskProjects`, `DeskProjectFilter`, `DeskPersonaV3`, `DeskModelsV3`,
 `DeskSkillsLibrary`, the revised `canvas.json`) was drawn from [../project-handling-draft.md](../project-handling-draft.md)
-and exported from canvas version `1794584435-935c`; the boards sit in their own row at the bottom of the canvas.
-**Not yet accepted by the owner.** `DeskPersonaV3` (1440×2000) and `DeskModelsV3` (1440×1640) are drawn taller than
+and exported from canvas version `1794584592-f77c`; the boards sit in their own row at the bottom of the canvas.
+**Not yet accepted by the owner.** `DeskPersonaV3` (1440×2000), `DeskModelsV3` (1440×1640) and `DeskProjects` (1440×960) are drawn taller than
 the window so every block shows; in the app the left column and the settings pane scroll.
 
 A session that builds or changes a screen reads the board's HTML for the exact
@@ -79,9 +79,9 @@ above.
 | 7j · Ticket ready to try: proof, checks, screenshots, cost table, accept | `DeskReady` | 1440×900 | desktop |
 | 7k · Persona setup: profile, picture, work, permissions, prompt blocks — **superseded 2026-11-08 by the R11 mockup [`../crew-internals/persona-page-mockup.html`](../crew-internals/persona-page-mockup.html); built as milestone 231 (req-171), screenshot [`../crew-internals/persona-page-built.png`](../crew-internals/persona-page-built.png), retaken with the real skill routes, the prompt preview and the commit age as milestone 233 (req-237/238/239; [`persona-page-built-preview.png`](../crew-internals/persona-page-built-preview.png) with Preview full prompt open)** | `DeskPersona` | 1440×900 | desktop |
 | 7k v2 · Persona setup, Work block of the persona board: model pool, class floor, parallel max and min, leaving actions (`sync-main`), read-only; no steps chips — **req-264, canvas `1794411563-4786`** | `DeskPersonaV2` | 1440×900 | desktop |
-| 7k v3 · Persona: a class (heavy · standard · light) and an optional pinned model instead of a harness, the picture changed and removed (D-67), Allowed to without vaults, skills from the library with a GitHub source, Instructions fill the rest — **2026-11-13, canvas `1794584435-935c`, not yet accepted** | `DeskPersonaV3` | 1440×2000 | desktop |
+| 7k v3 · Persona: a class (heavy · standard · light) and an optional pinned model instead of a harness, the picture changed and removed (D-67), Allowed to without vaults, skills from the library with a GitHub source, Instructions in the Markdown editor fill the rest — **2026-11-13, canvas `1794584592-f77c`, not yet accepted** | `DeskPersonaV3` | 1440×2000 | desktop |
 | 7l v3 · Settings → Models: harnesses and the models they offer, discovered; slots per class; accounts added and removed in place; routing folded — **2026-11-13, not yet accepted** | `DeskModelsV3` | 1440×1640 | desktop |
-| 7m · Settings → Projects: name, colour, purpose, repositories, folders, vault access None / Read / Write (no profile: the owner needs no work / private distinction) — **2026-11-13, not yet accepted** | `DeskProjects` | 1440×900 | desktop |
+| 7m · Settings → Projects: name, colour (presets and a free colour picker), purpose in the Markdown editor, repositories, folders, vault access None / Read / Write (no profile: the owner needs no work / private distinction) — **2026-11-13, not yet accepted** | `DeskProjects` | 1440×960 | desktop |
 | 7n · The global project filter in the title bar: Files and the board filtered to Drey, the load in the column headers counts every project — **2026-11-13, not yet accepted** | `DeskProjectFilter` | 1440×900 | desktop |
 | 7o · Settings → Skills library: GitHub sources added in place, shared / GitHub / own skills, who uses them — **2026-11-13, not yet accepted** | `DeskSkillsLibrary` | 1440×900 | desktop |
 | 9a · Drey today, cleaned up — ticket T-0017 in Work, Assistant without the rail | `DeskClean` | 1440×900 | desktop |
