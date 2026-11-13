@@ -94,3 +94,24 @@ persona can be set read-only. Two mode wrappers join the composition: a
 dialog run appends the column's interactive prompt after the persona's
 prompt, and a persona whose `gate:` is `structural` gets no gate commands
 in its brief.
+
+## Later change — req-282 (milestone 263): the project's purpose as `## Project`
+
+A ticket belongs to a project (`tickets/_meta/projects/<id>.md`, its own
+`project:` or the board's only project). The project's body — its purpose,
+a few sentences — rides the brief as a `## Project` section: one line
+naming the project, then the purpose. It sits in the **stable head**,
+behind the persona's skills and before `## Plan`
+(`fleet/instruction-parts.ts` `projectSection` / `headParts`), and joins
+the `stable` digest input, because it changes per project, not per run;
+a resume's continuation does not repeat it. The ship and the scout brief
+both carry it; both dispatchers (`TicketDispatch`, the board service's
+owner-started run) resolve the ticket's project from the board snapshot
+(`ticketProject`). An Unassigned ticket, or a project without a purpose,
+adds nothing — the brief stays byte-identical, so the migration that
+writes a board's first project (no purpose) changes no brief and no
+digest. Rejected: putting the purpose among the variable parts (it would
+not change between runs of one project and would push the persona's
+memory slice down), and a project instruction file per project (the
+purpose is meant to be short; long rules belong in the repository's own
+agent instructions, which the brief already opens with).

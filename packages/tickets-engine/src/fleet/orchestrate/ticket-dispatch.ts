@@ -1,3 +1,4 @@
+import { ticketProject } from '../../contracts/projects';
 import type { BoardSnapshot, PipelinePhase, RepoRef, TicketCard } from '../../contracts/tickets';
 import { splitPoolEntry } from '../../core/persona';
 import { personaRunSettingsOf } from '../../core/persona-settings';
@@ -229,6 +230,7 @@ export class TicketDispatch {
       parkFor,
       ...(config.store !== undefined ? { dk: dkTargetFor(config.store, snap.pipeline, workingPhaseId) } : {}),
       handover: 'auto', // the supervisor's rules decide (T-0049); the dialog is the only place a mode is chosen
+      project: ticketProject(card.meta.project, snap.projects ?? []), // req-282: its purpose rides the brief
       ...this.personaPins(planned, got.prompt),
     };
   }

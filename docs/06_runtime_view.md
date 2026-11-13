@@ -6139,7 +6139,56 @@ conflict card's **Let Ben resolve** starts the holder's run again (`POST
 /api/runs`); the Crew list's drag writes the whole order (`POST /api/crew/order`,
 `crew.md`'s `order:`, one commit) and the list reads the board again.
 
-## 6.131 Find models again → the harnesses' offers → a new model added to a class (req-286/287, milestone 262)
+## 6.131 The first project at the engine's start, and the project in a run's brief (req-282, milestone 263)
+
+A board without `tickets/_meta/projects/` gets one project when the engine
+starts — after the default crew's seeding, so the two never commit at once —
+and from then on every board read carries the records and every dispatch
+resolves the ticket's project for the brief.
+
+```mermaid
+sequenceDiagram
+    participant E as Engine start (compose-session-parts)
+    participant M as ProjectMigrator
+    participant V as Tickets vault (_meta)
+    participant C as Engine config (vaults.registered)
+    participant G as git
+    E->>E: crew seeding (req-256), pictures (req-292)
+    E->>M: migrate()
+    M->>V: list _meta/projects/*.md
+    alt a project file exists
+        M-->>E: nothing to do
+    else none
+        M->>V: read repos.md (broken = wait for the next start)
+        M->>C: the registered vaults (id, name, path)
+        M->>V: read every persona.md (allowed: write-vaults)
+        M->>M: planProjectMigration: first repo's name, every repo, every vault read, resolvable write-vaults write
+        M->>V: write projects/<id>.md, write-notes: true on those personas
+        M->>G: one commit "projects: the first project ... (req-282)"
+        M-->>E: log; an id this device does not know is reported
+    end
+```
+
+```mermaid
+sequenceDiagram
+    participant B as Board read (BoardService / StoreChainBoard)
+    participant A as assembleBoard
+    participant D as TicketDispatch / owner run
+    participant R as composeRunRequest
+    B->>A: pipeline.md, repos.md, projects/*.md, tickets
+    A->>A: parseProjects; per ticket ticketProjectIssues (unknown project, working ticket without one, repo outside its project)
+    A-->>B: snapshot.projects, card.meta.project, issues
+    D->>D: ticketProject(card.meta.project, snapshot.projects) — own, else the only one, else Unassigned
+    D->>R: project {name, purpose}
+    R->>R: headParts: instructions, prompt, ## Skills, ## Project, ## Plan (stable digest includes it)
+```
+
+A ticket without `project:` reads as the board's only project; once a second
+project exists it reads as Unassigned, and only outside the first and the
+last column is that a badge. A project without a purpose adds no section, so
+the first project changes no brief.
+
+## 6.132 Find models again → the harnesses' offers → a new model added to a class (req-286/287, milestone 264)
 
 No model is typed in. Settings → Models asks the runner to check the
 harnesses (on its first look without the network, on *Find models again*

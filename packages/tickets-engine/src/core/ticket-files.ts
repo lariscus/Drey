@@ -114,6 +114,7 @@ export function parseTicketFile(text: string, relPath: string, priorities: Prior
   }
   const worker = asText(obj['worker']);
   const persona = asText(obj['persona']);
+  const project = asText(obj['project']); // req-282: absent = none named (`ticketProjectId` decides)
   // E11-1: the proof pin; only the two words read, anything else is no pin.
   // E10: the parent of a part. Only a ticket id other than the ticket's
   // own reads; anything else warns and reads as no parent.
@@ -228,6 +229,7 @@ export function parseTicketFile(text: string, relPath: string, priorities: Prior
       repos,
       worker,
       persona,
+      ...(project !== null ? { project } : {}),
       ...(proof !== null ? { proof } : {}),
       ...(parent !== null ? { parent } : {}),
       ...poolKeys,

@@ -186,3 +186,23 @@ The owner's Grobkonzept "Drey crew" (2026-11-08) adds **checkpoints in tranches*
 ## Later change (2026-11-09, as built — milestone 230, req-173, R13): `chain.json` is runtime state, one per tickets vault
 
 `chain.json` keeps **runtime state only** — the Autopilot, the column states, the breaker, the streaks, the holds, the tranche — and no configuration: the board sends the resolved chain config (`tickets/_meta/crew.md` over the defaults) and the runner holds it in memory. It is **one file per tickets vault**, `<fleet root>/chains/<vault key>/chain.json` (the folder name plus a hash of the path, `orchestrate/chain-state-paths.ts`), with `chain-vault.json` naming the vault served last; the file's `vault` field is the locator (path, store, git — how this machine reaches it). A config for another vault writes the current state away, empties it and loads that vault's file **under the boot rule** — so two vaults never share a master and a switch never carries an On Autopilot over. At boot the runner resolves the last vault's `crew.md` itself (`config/chain-config-restorer.ts`, the board's resolver), so the handover rule (*the chain keeps running across a handover moments ago*) works with Drey closed. A machine-wide `chain.json` from before is moved into its vault's file once (its `config` dropped) and kept as `chain.legacy.json` for the key migration.
+
+## Later change — the chain's control model on the persona board (ADR-0098, milestones 247 – 248)
+
+On a lifecycle store the chain's runners no longer drive *columns* but
+*holders*. The dispatcher's candidates are the tickets an agent persona holds
+(`fleet/holder-plan.ts`, `Dispatcher.runHolders`); the order is the priority
+class, then the **later cursor position first** (finishing beats starting —
+replacing "the rightmost column"), then rank. A run needs room in the big pool
+and in the **persona's pool** (`parallel:`, `min:` — a persona below its
+minimum overruns a full big pool on purpose). The circuit breaker counts red
+gates **per persona** (`orchestrate/persona-breaker.ts`; three in a row, or the
+`max-red` of the column the run stood in while the pipeline still has one; the
+persona is held until played) and the column's `held` mode becomes the
+persona's. A run's green end advances the cursor and releases once into
+`active`; a run's verdicts can send the ticket back (`SEND-BACK:`), a question
+moves the card to You and back, a leaving action (`sync-main`) runs in the
+claim before the hand-on. The tranche, the governor, the Autopilot and
+`chain.json` are unchanged. The column dispatch, the column breaker and the
+ring stay for the phase board until E14-9b. See
+[ADR-0098](0098-the-persona-board.md).

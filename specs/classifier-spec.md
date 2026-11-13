@@ -905,6 +905,29 @@ exactly this text inside the composed instruction. Progressive loading — name
 and description in the block, the body read by a `skill_read` tool — is
 req-240 and is **not** in the block today.
 
+## The project section (req-282, ADR-0097 later change)
+
+`packages/tickets-engine/src/fleet/instruction-parts.ts` `projectSection` —
+the ticket's project in a run's brief (the ship and the scout brief alike).
+The project is the ticket's own `project:` or the board's only project
+(`ticketProject` in `contracts/projects.ts`, resolved by both dispatchers
+from the board snapshot); the purpose is the body of
+`tickets/_meta/projects/<id>.md`, trimmed.
+
+```markdown
+## Project
+
+This ticket belongs to the project "<name>".
+
+<the purpose>
+```
+
+It rides the stable head right behind the `## Skills` block and before
+`## Plan`, and is part of the `stable` digest input — a changed purpose
+changes `briefDigest`. An Unassigned ticket or a project without a purpose
+gets no section, so such a brief is byte-identical to one composed before
+req-282. A resume's continuation does not repeat it.
+
 ---
 
 ## The assistant's system prompt (milestones 76–78, ADR-0071)

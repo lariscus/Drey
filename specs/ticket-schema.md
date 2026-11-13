@@ -59,6 +59,7 @@ Top-level rules, once, up front:
       pipeline.md     # the phases + handover config (config, never data)
       order.md        # ignored since req-75 W1 (the former order pins), may be absent
       repos.md        # work-repo name -> clone URL/path mapping
+      projects/       # the projects (req-282): <id>.md per project — see _meta/projects/ below
       crew.md         # the crew's defaults and limits — the vault layer (req-173), see below
       prompts/        # the handover prompts (`agent <prompt-ref>` names one file)
       skills/         # the shared skills: <name>/SKILL.md, Agent Skills folders (req-172) — see Skills below
@@ -356,6 +357,7 @@ of the Plan and removes it for fewer than two parts.
 | `repo` | string | Name from `_meta/repos.md`: the ticket's **primary** work repo (req-72) — where the fleet's gate runs and whose worktree is the run's home. May be empty until the ticket leaves inbox for a work phase; entering one without a known repo is an issue. |
 | `repos` | list of names | Optional (req-72). Every work repo the ticket touches, **primary first** — `repos: [drey, lariscus]`. When set, the list is the truth and `repo:` repeats its first entry (a mismatch is a noise finding, the list wins). One worktree per named repo, all on the ticket's branch; a run refuses while any named repo lacks a local `path:` in `_meta/repos.md`. One or zero names write no `repos:` line. |
 | `worker` | string | Optional pin for the fleet worker (M84): `opencode`, `claude-code`, `kimi`, `copilot` (req-182), or `<provider>/<model>`. Wins over the column's `worker:` key, the phase handover's `@worker` pin, the repo's `worker:` and the configured default (M85's assignment ring). An unknown value badges the card; a run start with it refuses. |
+| `project` | project id | Optional (req-282; `x-project` on a store). The id of a project in `_meta/projects/` — the work scope the ticket happens in. Absent: the board's only project while it has exactly one, **Unassigned** once it has two or more (tickets are never rewritten for this). An inbox ticket may stay Unassigned; a ticket in any other column but the last without a project is an issue (a warning badge), as is a named project the board does not know, and a `repo:` / `repos:` name that is not one of its project's repos. Its purpose rides the run brief as `## Project`. |
 | `persona` | string | **Retired** (req-257): the old persona pin (ADR-0088 E3, `x-persona` on a store). Still read and shown on a card until req-270, never used to dispatch — on a lifecycle store the chain's entry at the cursor says who works a ticket, on the phase board the column's `persona:`. See `_meta/personas/` below. |
 | `awaiting` | persona id | Optional (E10-6). The ticket is **parked at a manual step** for that human persona (`awaiting: you`): the dispatcher never takes it (no run, no worktree) and it shows in Needs you as a `manual` card. Machine-written when a manual gate parks the ticket; **any transition clears it** (Accept or Send back are ordinary board moves, so is a hand move). See "The human persona" under The chain. |
 | `priority` | one id of the board's configured vocabulary | Required. The vocabulary is the vault's own — `_meta/pipeline.md`'s `priorities:` list (default `urgent \| high \| normal \| low`); the list's order IS the weight, first = highest. An omitted or unknown id reads as the vocabulary's default (its middle entry) with a warning badge; machine writers always write a vocabulary word. See [Priorities](#priorities-priorities-in-pipelinemd). |
@@ -717,16 +719,18 @@ stands one beyond it and the engine moves the ticket to `done`
 The owner's **Accept** on an `active` chain ticket moves the cursor on; at
 the chain's last entry a You entry of a repository ticket is the sign-off
 (You's `commit` machine run, then `done`), any other last entry goes to
-`done`. The owner's **Send back** moves the cursor to the nearest earlier
-agent position (a target picker is req-270's) and never uses the ticket's
-one send-back. **Until req-270/271 draw holder columns** the board keeps the
-pipeline's columns, and an `active` ticket stands in the column of its
-holder (`core/chain-placement.ts`, owner 2026-11-12): the agent column whose
-`persona:` names the holder, else the first agent column; a `:shape` entry in
-the queue column before it (Shaping); You in the first checkpoint (Ready to
-try); a pipeline with none of these shows the stage as one "active"
-column. An owner's move of a chain ticket into a working column moves the
-cursor to the position that stands there (`store/chain-move.ts`).
+`done`. The owner's **Send back** moves the cursor to the earlier position
+the owner names (the target picker, "The persona board" below), else to the
+nearest earlier agent position, and never uses the ticket's one send-back.
+**The board's columns are the holders** (milestone 254, "The persona board"
+below); the interim placement of milestone 247 (`core/chain-placement.ts`,
+owner 2026-11-12) survives only as the column an active ticket also stands in
+inside `BoardSnapshot.columns`: the agent column whose `persona:` names the
+holder, else the first agent column; a `:shape` entry in the queue column
+before it (Shaping); You in the first checkpoint (Ready to try); a pipeline
+that holds only the lifecycle phases shows the stage as one "active" column.
+An owner's move of a chain ticket into a working column of such a pipeline
+moves the cursor to the position that stands there (`store/chain-move.ts`).
 
 **What a chain run may say** (req-257, milestone 248). The brief of a chain
 run lists the positions (`prompts/disciplines/chain.md`). Ending the turn
@@ -813,11 +817,15 @@ grammar (a `- <entry>` list reads the same); when the plan is saved through
 the Shape chat (`setPlan`) it becomes the ticket's `chain:` in the same
 write and commit (`tickets: <id> plan, chain`), checked by the guard — one
 that does not hold leaves the chain as it was and the save says why. (A plan
-run's own `### Chain` is applied by req-257's runner.)
+run's own `### Chain` is applied at the run's green end, "What a chain run
+may say" above.)
 
-**The human persona (E10-6).** A gate the human persona works runs no agent:
-the ticket's `persona:` pin, else the phase's `persona:`, else the engine
-default resolves to a `kind: human` persona, and the dispatch pass stamps
+**The human persona (E10-6).** On a lifecycle store a `you` entry of the
+chain is held by You: the card stands in You's column, Accept hands it on,
+Send back returns it (the persona board below). On the phase board a gate
+the human persona works runs no agent: the phase's `persona:` (the ticket
+pin and the engine default no longer resolve, req-257) names a
+`kind: human` persona, and the dispatch pass stamps
 `awaiting` instead of composing a run (once; `paused:` status line, Log line
 `parked for <name> - the <phase> gate is a manual step`). **Accept** is the
 board's ordinary accept (the ticket moves to the next phase, the field goes,
@@ -885,6 +893,61 @@ earlier position of the chain (without it the nearest earlier agent
 position); the owner's send-back never uses the ticket's one send-back. A
 drop on Done is the ordinary `transition` into the terminal stage. A column
 head's drag writes the crew's `order:` (`crewOrderSet`, the Crew tab's key).
+
+### The persona board as a whole (ADR-0098)
+
+**What makes a board a persona board.** The store's `[stages]` are the
+lifecycle (`inbox prioritized active running done`, `claim = ["running"]`,
+"The store's stages" below); everything else is derived. The files backend and
+a store still on the phase stages stay a **phase board**: the phase is the
+directory or the stage, the column's `persona:` names who runs it, the ring
+and the column breaker stay (until E14-9b). A persona board has no column
+vocabulary in `pipeline.md` beyond the lifecycle edges (below).
+
+**Which stage a ticket is in, and who holds it.**
+
+| Stage | Holder | Column on the board |
+|---|---|---|
+| `inbox`, `prioritized` | none | Inbox, Prioritized (the edges) |
+| `active` | `holderOf` over `x-chain`, `x-at`, `x-awaiting` | the holder's column, status on the card |
+| `running` | the same — a run holds the claim | the holder's column, status *running* (never a column of its own) |
+| `done` | none | Done this week |
+
+**Who moves a ticket, and what is written** (one commit unless said):
+
+| Move | By | Written |
+|---|---|---|
+| create | capture, Pia (card), the owner | `x-chain` = the standard flow, `x-at: 1`, stage `inbox` |
+| start / hand / park | the owner (drag, menu) | "The owner's moves" above |
+| a run ends green | the runner | leaving actions first, then `x-at` + 1 and one release into `active` (a plan run's `### Chain` in the same write) |
+| the last entry ends | the runner / the owner | the engine's `put --claim` into `done`; at a You entry of a repository ticket only after the `commit` leaving action |
+| a persona's `SEND-BACK:` | the runner | the first: `x-at` back, `x-sent-back: from>to`, the invalidation line; the second: `x-awaiting: you`, `needs-decision [second-send-back]` |
+| a question in a run | the worker | `x-awaiting: you` before the claim is given up; the answer's reclaim clears it |
+| Accept / Send back at You | the owner, Pia (card) | the cursor on / back to the picked position; `x-awaiting` cleared |
+| claim | the runner only | `dk claim` (`active -> running`); humans' edits are `put --claim` |
+
+**`pipeline.md` on a persona board** (milestone 254, "The board migration"
+below): `phases:` holds the lifecycle edges only (Inbox, Prioritized, Done),
+`flow:` the standard flow, `token-budget:` stays a board key; `wip:`,
+`claim:`, `handover:`, `persona:`, `min-class`, `needs`, `max-turns`,
+`max-work` of the old working column are gone from it (the run settings on
+the builder's `persona.md`). **"Initialize board" still writes the phase
+pipeline shown below** (six phases plus `flow:`) and seeds the crew; the
+store reaches the persona board through the Tickets panel's **Migrate** and
+the three steps that follow. Creating a store on the lifecycle stages is E14-9b.
+
+**Capacity.** A run needs room in the **big pool** (ADR-0095) and in its
+persona's pool (`parallel:`; absent = no cap); `min:` (default 0) lets a
+persona start a run while the big pool is full. The card says which one it
+waits for (`personaWaits`: `waits for ben` / `queued · waits for a B slot`).
+The breaker counts red gates per persona: three in a row (a `max-red` of the
+column the run stood in overrides it while the pipeline still has one — step 3
+of the board migration drops the column's keys); a held persona dispatches
+nothing until it is played. The human persona and Mission Control's never take a slot, a seat or
+a budget.
+
+**Metrics.** `hold` lines in the ledger and the position on a chain run's
+`run_settled` (below); `GET /report` groups by persona and by position.
 
 ### The fleet ledger (E7)
 
@@ -967,6 +1030,14 @@ On a store the verbs are comments (E14-6). A first line `Decision needed: <quest
 
 ## `_meta/pipeline.md` — the phases and their handovers
 
+> **Two kinds of board** (ADR-0098). This section describes the **phase board**
+> — the files backend and a store still on the phase stages: every phase is a
+> column and the handover keys decide who works it. On a **persona board** (a
+> store on the lifecycle stages, after the board migration's step 3) the file
+> holds only the lifecycle edges, `flow:` and `token-budget:`; the columns are
+> the personas, "The persona board as a whole" above. What "Initialize board"
+> writes is still the phase file below.
+
 ```markdown
 ---
 push: origin
@@ -1004,7 +1075,8 @@ machine resolves no conflict. **A sign-off whose human persona does not list `co
 is refused** with the way to add it (the Crew tab → You → Work → Leaving actions). A ticket with no `repo:` has nothing to
 merge and moves directly. On a store dk refuses an agent's release into a terminal stage, so
 the run hands back to `ready` (on a lifecycle store: `active` pinned to `ready`, req-265) and the engine then makes the owner's move into `done`.
-*Send back* is the ordinary send-back to Building.
+*Send back* is the ordinary send-back to Building (on a persona board: to the
+earlier position the owner picks, "The persona board" above).
 
 Boards and stores that exist keep their columns: a default is written only into an empty
 repository, and nothing renames a folder. Earlier defaults were `inbox · plan · build ·
@@ -1164,7 +1236,7 @@ commit per change; hand edits win on refresh):
 - `color:` — optional `#rrggbb`. The Work panel's phase chip uses it;
   without it a curated default palette colours by position.
 
-**Agent lane rules** (enforced by the runner, not the board — the
+**Agent lane rules** (the phase board; enforced by the runner, not the board — the
 board serves the human): an agent works the tickets the dispatcher
 gives it — the column's own queue first, then the previous column's
 top — and a dispatched run's completion moves the ticket from where it
@@ -1179,7 +1251,7 @@ is one too (an older board's Review → Sign Off), so the whole run of the
 owner's columns after a worker column raises Needs-you cards. Backward moves are human moves — the one exception
 is the circuit breaker's park into inbox, always logged.
 
-**Dispatch order** (req-63): one candidate list over every playing
+**Dispatch order** (req-63; the phase board — a persona board dispatches by holder, below): one candidate list over every playing
 automatic column, ordered by priority class (the configured
 vocabulary's first half before its second — see `priorities:` above),
 then column rank — the rightmost column first, so
@@ -1247,7 +1319,7 @@ tickets/_meta/personas/
   | `min` | runs the persona may start while the big pool is full, overrunning it on purpose (concept §9); config and the Persona page only. **Recorded, not yet enforced** (req-257). Written only when above 0 | `0` |
   | `leaving` | the leaving actions, in order: `sync-main` (merge `main` into the branch when a ticket leaves the persona) and `commit` (the merge into `main` after the owner's sign-off). Run since req-267, inside the claim, on a heavy governor seat, no model: `sync-main` at the end of a green run of the persona, after the gate and the closing round, before the hand-on — the integration branch's git upstream (fetched; the local branch without one) merged into the ticket's branch, the card reading `merging main`; a conflict is aborted and ends the run red with the conflict as its gate failure (no send-back). `commit` on the human persona is the sign-off's merge ("Accept on Ready to try" above), the card reading `committing`. Seeded: the shipped Ben `[sync-main]`, the You a new board writes `[commit]`. An unknown name is dropped | `[]` |
   | `readonly` | `true | false` — **instructed read-only** (req-258): the run's brief carries the read-only discipline instead of the writing rules, the ticket-file duties and the handover. An instruction, not a lock: the worktree, the harness session and its permissions stay as they are (a technical lock needs a harness change — `decisions.md`). The review run's detached read-only checkout and read-only session (req-183) stay tied to the `review` phase and the `reviewer` role | the role's: `true` for `reviewer` and `tester`, else `false` |
-  | `allowed` | a map; four keys. `spend-above-allowance: true` — the persona runs on past a ticket's `allowance:` instead of waiting for the owner (req-170). `write-vaults: [<vault id>, …]` — the registered vaults (Drey's registry ids, ADR-0051) its runs may change through Drey Service's vault MCP (req-167, R5; one id reads as a list, duplicates drop); every registered vault stays readable, a vault not named is read-only for it, and a read-only run (a review) writes none whatever this says — a refusal reaches the model as `Error: <persona> may not write vault "<id>" (allowed: read)` and the run's stream as an audit line. `vault_move` counts as writing. `run-commands: accept-edits \| bypass` — the harness permission mode the persona's runs may take (the Persona page's "Run commands in the worktree"; absent = the crew's `permissionMode`) and `network: true` — it may reach the network (web search and fetch, package installs): both are **recorded and not yet read by the runner** (req-142's enforcement remainder; the page shows no more about them than the choice). Each key written only when set | nothing beyond: reads every vault, writes none |
+  | `allowed` | a map; five keys. `write-notes: true` (req-282) — the persona may change notes where its ticket's project grants `write` (the concept's intersection: project per vault ∧ this switch ∧ the run not read-only); written by the first project's migration for every persona that named `write-vaults`, read by the vault MCP from req-283 on. `spend-above-allowance: true` — the persona runs on past a ticket's `allowance:` instead of waiting for the owner (req-170). `write-vaults: [<vault id>, …]` — the registered vaults (Drey's registry ids, ADR-0051) its runs may change through Drey Service's vault MCP (req-167, R5; one id reads as a list, duplicates drop); every registered vault stays readable, a vault not named is read-only for it, and a read-only run (a review) writes none whatever this says — a refusal reaches the model as `Error: <persona> may not write vault "<id>" (allowed: read)` and the run's stream as an audit line. `vault_move` counts as writing. `run-commands: accept-edits \| bypass` — the harness permission mode the persona's runs may take (the Persona page's "Run commands in the worktree"; absent = the crew's `permissionMode`) and `network: true` — it may reach the network (web search and fetch, package installs): both are **recorded and not yet read by the runner** (req-142's enforcement remainder; the page shows no more about them than the choice). Each key written only when set | nothing beyond: reads every vault, writes none |
 
 - `prompt.md` — the longform persona prompt, free Markdown, **the one prose of the persona** (R11, req-171: one prose, not two).
   The "who Ben is" part stands at its top, as a `## Who Ben is` section; `persona.md` keeps the frontmatter and nothing below
@@ -1670,6 +1742,68 @@ truth; the scan is a seeding step, not a live reference. A ticket may
 name several of these repos in its `repos:` list (see the frontmatter
 fields) — the fleet prepares one worktree per name.
 
+## `_meta/projects/` — projects (req-282)
+
+One file per project, `tickets/_meta/projects/<id>.md` — the id is the
+file stem (lowercase letters, digits and dashes). The vault layer of R13,
+beside `repos.md`: versioned with the board, shared by every device that
+works it. A project is a **work scope for the Crew**, not a note topic
+(tags stay free labels; a project never creates or moves a folder).
+
+```markdown
+---
+name: Drey
+color: '#8ecbef'
+repos:              # names from _meta/repos.md, primary first
+  - drey
+folders:            # plain folders a worker may read (never written, never a run's home)
+  - E:/specs/drey
+vaults:             # by the vault's registered NAME — ids are per device
+  Drey notes: write
+  Work notes: read
+  Private: none     # the explicit "never", the same as leaving it out
+---
+A local, topic-based note app (Electron + Angular) and its Crew.
+```
+
+| Key | Shape | Rules |
+|---|---|---|
+| `name` | string | Shown wherever the project is named; absent = the id. |
+| `color` | `#rrggbb` | Absent = none (a client draws its default); anything else is a warning and reads as none. |
+| `repos` | list of names | Names from `_meta/repos.md`, primary first. `repos.md` stays the one registry of checkouts; a repo may belong to several projects. |
+| `folders` | list of paths | Plain folders, read-only context (a spec folder, a copy of a shared drive). They never host a run. |
+| `vaults` | map name → `none \| read \| write` | Drey's registered vaults by **name** (a device id names nothing on another machine). An unknown access is a warning and reads as `none`; a name this device has not registered is greyed in Settings ("not on this device") and no run reads it there. |
+| body | Markdown | The **purpose**, a few sentences. It rides every run brief of the project's tickets as `## Project` (ADR-0097 later change), behind the persona's skills and before `## Plan`; a project without a purpose adds nothing to the brief. |
+
+No pipeline, crew, persona or quota keys: those stay board-wide
+(`crew.md`, `personas/`) or machine-wide (`service.json` — quotas, slots,
+the capacity pool and the routing count every project). A file whose name
+is not an id is a board warning; every other deviation reads tolerantly
+and shows as a warning.
+
+What reads it today (req-282): the board (the snapshot's `projects`, the
+per-ticket checks under `project` above) and the run brief. The vault
+rights of a run (req-283), Settings → Projects (req-284) and the global
+project filter (req-285) build on the same records.
+
+**The first project (migration at the engine's start).** A board whose
+`_meta/projects/` holds no file gets one project, written by the engine
+when it starts (`ProjectMigrator`): named after the first repository of
+`repos.md` (else the tickets vault's name), holding every `repos.md`
+entry and every vault Drey has registered (the engine key
+`vaults.registered`) as `read`, colour `#8ecbef`, no purpose — exactly
+what a worker could reach before, now visible. Each persona's
+`allowed: write-vaults` ids that this device resolves become `write` on
+that project, and every persona that named any gets
+`allowed: write-notes: true`; an id this device has not registered is
+reported in the service log, never guessed. Tickets are not rewritten.
+One commit, `projects: the first project "<name>" from repos.md and the
+registered vaults (req-282)`. A `repos.md` that does not parse
+postpones the migration to the next start; a board with any project
+file is left alone (deleting every project file brings the default back
+at the next start). `write-vaults` stays in the persona file until
+req-283 moves the enforcement to the project.
+
 ## `_meta/crew.md` — the crew's defaults and limits (the vault layer, req-173)
 
 The vault layer of the configuration (R13, ADR-0092 later change): what
@@ -1966,6 +2100,11 @@ column; the board still renders), the fleet runner before every action
    noise badge).
 6. `claimed-by` grammar; `claimed-at` present with `claimed-by`.
 7. `repo` (when present) resolves in `repos.md`.
+7a. Projects (req-282, only on a board with project records): a named
+    `project` exists in `_meta/projects/`; a ticket outside the first and
+    the last column belongs to a project (its own, or the board's only
+    one); its `repo:` / `repos:` names are its project's repos. All
+    warnings — the board renders, the fleet still dispatches.
 8. (Removed with req-75 W1: `order.md` is no longer read.)
 9. A ticket without backticked acceptance criteria cannot be worked:
    the fleet refuses to start an agent run for it (the most common
@@ -2045,6 +2184,7 @@ its changed chapters back inside the claim (D-30, [FLEET.md](../plugins/tickets/
 | `x-worker` `x-persona` `x-track` `x-form` `x-proof` `x-awaiting` | `worker` `persona` `track` `form` `proof` `awaiting` | raw values |
 | `x-class` `x-model` `x-size` `x-allowance` | `class` `model` `size` `allowance` | raw values (req-170); `allowance` as a number |
 | `x-needs` | `needs` | the one-line form (req-178), `image, context-200k` |
+| `x-project` | `project` | the project id (req-282) |
 | `x-interactive` | `interactive` | only `true` |
 | `x-chain` | `chain` | the persona list, entries separated by `;` (req-266) |
 | `x-at`, `x-sent-back` | `at`, `sent-back` | the chain's cursor and its one send-back (req-266) |

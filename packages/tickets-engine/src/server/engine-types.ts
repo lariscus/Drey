@@ -53,6 +53,12 @@ export interface EngineOptions {
    * personas) turns it off.
    */
   readonly seedDefaultCrew?: boolean;
+  /**
+   * Write a board's first project at the start (req-282, `ProjectMigrator`). Defaults to
+   * {@link seedDefaultCrew}: a spec that turns the crew seeding off because it counts commits gets
+   * neither start-up commit.
+   */
+  readonly migrateProjects?: boolean;
 }
 
 export interface Engine {

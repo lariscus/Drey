@@ -263,7 +263,7 @@ A **free session** (ADR-0092 later change) asks the pool like a 1:1: the class t
 
 The owner no longer needs the work/private distinction (*"ich brauche keine Unterscheidung zwischen work und private"*, 2026-11-13): the `profile:` key of `repos.md`, the slots' `profile` in `service.json`, the routing's profile filter, the refusal for a missing or mismatching profile and the Private / Work tags of Settings → Models are gone. **Every slot may serve every repository.** Old files keep loading: a `profile` in `repos.md` or `service.json` (whatever it says) is read and silently ignored, and no write emits it again — `reposFileText` drops it on the round trip, and `service.json`'s slot writers (`writeSlots`, the one-slot add) strip it. `RepoRef`, `Slot`, `SlotView`, `SlotSummary`, `RunRequest` and `ClassRequest` no longer carry a `profile`. The FLEET.md and ticket-schema passages were rewritten with it.
 
-## Later change (2026-11-13, req-286 and req-287, milestone 262): classes as the owner's list, slots at class level, models discovered, accounts with their cost
+## Later change (2026-11-13, req-286 and req-287, milestone 264): classes as the owner's list, slots at class level, models discovered, accounts with their cost
 
 Board 7l v3 (`DeskModelsV3`, accepted 2026-11-13) and the owner's words — models taken from the harnesses, Settings → Models redesigned, slots removable, capabilities as classes with optional extra provider accounts.
 
