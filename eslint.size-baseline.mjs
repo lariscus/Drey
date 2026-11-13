@@ -15,7 +15,6 @@ export const SIZE_BASELINE = [
   'packages/tickets-engine/src/core/commands.ts',
   'packages/tickets-engine/src/core/flow-edit.ts',
   'packages/tickets-engine/src/core/improvements.ts',
-  'packages/tickets-engine/src/core/ledger.ts',
   'packages/tickets-engine/src/core/normalize.ts',
   'packages/tickets-engine/src/core/phase-dirs.ts',
   'packages/tickets-engine/src/core/plan-delta.ts',

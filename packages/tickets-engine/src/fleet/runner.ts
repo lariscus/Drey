@@ -125,7 +125,7 @@ function parseArgs(argv: readonly string[]): Args {
 }
 
 /** The fleet ledger (E7): the vault arrives only with the chain config, so the writer is built on the first event. */
-function ledgerOf(log: (message: string) => void): { events: FleetEvents; setVault: (vaultPath: string) => void } {
+function ledgerOf(log: (message: string) => void): { events: FleetEvents; setVault: (vaultPath: string) => void; vault: () => string | null } {
   let vaultPath: string | null = null;
   let writer: FleetEventWriter | null = null;
   return {
@@ -140,6 +140,7 @@ function ledgerOf(log: (message: string) => void): { events: FleetEvents; setVau
     setVault: (next) => {
       vaultPath = next;
     },
+    vault: () => vaultPath,
   };
 }
 
@@ -333,7 +334,7 @@ export async function startRunner(args: Args, deps: RunnerDeps = {}): Promise<Ru
   const exit = new RunnerExit({ exit: exitProcess, log, orchestrator, supervisors, idle, idleMs: args.idleMs, descriptorPath: writesDescriptor ? descriptorPath : null, closeStreams });
   const api = new RunnerHttpApi(
     descriptor.token,
-    [new LifecycleRoutes(exit, supervisors, log, { version: VERSION, build }), new ChainRoutes(orchestrator, supervisors, exit, ledger.setVault), new RunReadRoutes(supervisors), new RunWriteRoutes(supervisors), new SlotRoutes(routing.registry, routing.config, routing.check), new ModelRoutes(routing.poolDesk, routing.config), new GovernorRoutes(governor.governor), stream],
+    [new LifecycleRoutes(exit, supervisors, log, { version: VERSION, build }), new ChainRoutes(orchestrator, supervisors, exit, ledger.setVault), new RunReadRoutes(supervisors, { chainVault: ledger.vault }), new RunWriteRoutes(supervisors), new SlotRoutes(routing.registry, routing.config, routing.check), new ModelRoutes(routing.poolDesk, routing.config), new GovernorRoutes(governor.governor), stream],
     { exit, idle },
   );
   const server = api.server();

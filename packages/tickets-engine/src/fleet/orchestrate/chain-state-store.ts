@@ -2,7 +2,7 @@ import { autopilotAtBoot, autopilotOfMaster, restoreAutopilot } from '../autopil
 import type { Clock } from '../ports/clock';
 import type { FileSystem } from '../ports/file-system';
 import type { ChainTrip, ColumnMode } from '../protocol';
-import { locatorOf, type ChainFile, type ChainState, type ChainVaultLocator, type OwnerHold, type TicketFailure } from './chain-state';
+import { locatorOf, type ChainFile, type ChainState, type ChainVaultLocator, type HoldMark, type OwnerHold, type TicketFailure } from './chain-state';
 import { ChainStatePaths } from './chain-state-paths';
 import { PreVaultChainMove } from './pre-vault-chain-move';
 import { restoreTranche } from './tranche/tranche-record';
@@ -16,6 +16,9 @@ const isText = (value: unknown): value is string => typeof value === 'string';
 const isMode = (value: unknown): value is ColumnMode => value === 'playing' || value === 'held';
 const isFailure = (value: unknown): value is TicketFailure => typeof (value as TicketFailure | null)?.count === 'number' && typeof (value as TicketFailure).until === 'string';
 const isHold = (value: unknown): value is OwnerHold => typeof (value as OwnerHold | null)?.phase === 'string' && typeof (value as OwnerHold).at === 'string';
+const isPosition = (value: unknown): value is number | null => value === null || (typeof value === 'number' && Number.isInteger(value) && value >= 1);
+const isHoldMark = (value: unknown): value is HoldMark =>
+  typeof (value as HoldMark | null)?.persona === 'string' && isPosition((value as HoldMark).position) && isPosition((value as HoldMark).length);
 const isKeys = (value: unknown): value is string[] => Array.isArray(value) && value.every((key) => typeof key === 'string');
 const isTrip = (value: unknown): value is ChainTrip => typeof (value as ChainTrip | null)?.reason === 'string' && typeof (value as ChainTrip).at === 'string';
 const isLocator = (value: unknown): value is ChainVaultLocator =>
@@ -41,6 +44,7 @@ function restoreMaps(state: ChainState, parsed: ChainFile): void {
   copyValid(parsed.ticketFailures, state.ticketFailures, isFailure, (f) => ({ count: f.count, until: f.until }));
   copyValid(parsed.ownerHold, state.ownerHold, isHold, (h) => ({ phase: h.phase, at: h.at }));
   copyValid(parsed.ledgerCards, state.ledgerCards, isKeys, (keys) => [...keys]);
+  copyValid(parsed.holds, state.holds, isHoldMark, (h) => ({ persona: h.persona, position: h.position, length: h.length }));
   const held = Object.fromEntries(Object.entries(parsed.tripped ?? {}).filter(([phase]) => state.columns[phase] === 'held'));
   copyValid(held, state.tripped, isTrip, (t) => ({ reason: t.reason, at: t.at }));
   for (const persona of (parsed.pausedPersonas ?? []).filter((p) => typeof p === 'string' && p.trim() !== '')) {

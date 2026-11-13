@@ -836,13 +836,41 @@ each, append-only, swept into git by the next regular commit (never
 committed per line). The reader skips a line it cannot parse. Shape:
 `{"v":1,"ts":"<UTC>","event":"<kind>","ticket":"T-0002", …}` with
 `persona`, `model`, `cost` (USD, four digits), `tokensIn`, `tokensOut`,
-`from`, `to` present only where the event knows them. Kinds:
+`from`, `to`, `position`, `length` present only where the event knows
+them. Kinds:
 `dispatched` (persona and model the dispatch resolved), `phase`
-(`from`/`to`), `proof_ready`, `merged`, `archived` and `run_settled`
+(`from`/`to`), `proof_ready`, `merged`, `archived`, `run_settled`
 (one line per completed run with its effective tokens and cost — the
-source of the ticket cards' cost and the persona day budgets).
+source of the ticket cards' cost and the persona day budgets; a chain
+run adds the chain `position` it worked and the chain's `length`) and
+`hold` (req-274, below).
 `phase`, `merged` and `archived` carry no persona, model or cost.
 The code is `core/ledger.ts` (`LEDGER_FILE`).
+
+**`hold` lines** (req-274, the persona board concept §10) record the
+cursor's moves on a lifecycle store:
+
+```
+{"v":1,"ts":"2026-11-13T09:00:00Z","event":"hold","ticket":"T-0002","persona":"ben","position":3,"length":6}
+{"v":1,"ts":"2026-11-13T11:30:00Z","event":"hold","ticket":"T-0002","persona":"you","position":6,"length":6}
+{"v":1,"ts":"2026-11-13T12:00:00Z","event":"hold","ticket":"T-0002"}
+```
+
+From `ts` on the ticket is held by `persona` (the holder rule's result:
+the entry's persona, or `you` for a question, a decision or a position
+with no persona) at chain `position` (1-based) of `length`; `position`
+is absent when the ticket has no readable chain. A line without
+`persona` closes the hold: the ticket reached a lifecycle column
+(Inbox, Prioritized, Done) or left the board. The runner's dispatch
+pass writes a line whenever a ticket's derived holder or position
+differs from the last one it recorded — with the Autopilot off too —
+so a run's hand-on, a send-back, an owner's drag and a hand edit of
+`x-at` all land, at the pass that first sees them (every 15 s by
+default). The last recorded hold per ticket is kept in the runner's
+`chain.json` (`holds`), so a restart writes no duplicate. How long a
+holder held a ticket is the time to the ticket's next `hold` line; an
+open hold runs until now (`core/hold-spans.ts`). The phase board
+writes no `hold` lines.
 
 ### The ticket status log (E7)
 

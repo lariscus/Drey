@@ -169,6 +169,7 @@ export class Dispatcher {
     const holders = this.deps.holders!;
     const running = state.master === 'run';
     const view: HolderPassView = running ? await holders.resolve(config, snap) : { held: new Map(), entries: new Map() };
+    await holders.recordHolds(config, snap, running ? view : null); // req-274: the cursor's moves as `hold` lines
     const pools = new PassPools(config, snap, view.entries, this.deps.pool !== undefined);
     const planned = holders.plan(config, snap, view, {
       busy: occupied.busy,

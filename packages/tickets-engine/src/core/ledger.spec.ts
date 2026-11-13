@@ -22,6 +22,8 @@ describe('ledger line round-trip', () => {
       tokensOut: null,
       from: 'build',
       to: 'review',
+      position: null,
+      length: null,
     });
   });
 
@@ -54,6 +56,8 @@ describe('ledger line round-trip', () => {
       tokensOut: 6_000,
       from: null,
       to: null,
+      position: null,
+      length: null,
     });
   });
 
@@ -71,6 +75,46 @@ describe('ledger line round-trip', () => {
     expect(parseLedgerLine('{"v":1,"ts":"1","event":"run_settled","ticket":"T-0001","tokensOut":"many"}')).toMatchObject({
       tokensOut: null,
     });
+  });
+});
+
+describe('hold lines and positions (req-274)', () => {
+  it('round-trips a hold with its holder, position and length', () => {
+    const line = renderLedgerLine('2026-11-13T09:00:00Z', { kind: 'hold', ticket: 'T-0007', persona: 'ben', position: 3, length: 6 });
+    expect(line.trim()).toBe('{"v":1,"ts":"2026-11-13T09:00:00Z","event":"hold","ticket":"T-0007","persona":"ben","position":3,"length":6}');
+    expect(parseLedgerLine(line.trim())).toMatchObject({ kind: 'hold', ticket: 'T-0007', persona: 'ben', position: 3, length: 6, cost: null });
+  });
+
+  it('a closing hold names no persona and no position', () => {
+    const line = renderLedgerLine('2026-11-13T10:00:00Z', { kind: 'hold', ticket: 'T-0007' });
+    expect(line.trim()).toBe('{"v":1,"ts":"2026-11-13T10:00:00Z","event":"hold","ticket":"T-0007"}');
+    expect(parseLedgerLine(line.trim())).toMatchObject({ kind: 'hold', persona: null, position: null, length: null });
+  });
+
+  it('a chain run settles with its position', () => {
+    const line = renderLedgerLine('1', { kind: 'run_settled', ticket: 'T-0007', persona: 'ben', tokensIn: 10, tokensOut: 2, position: 2, length: 5 });
+    expect(parseLedgerLine(line.trim())).toMatchObject({ kind: 'run_settled', position: 2, length: 5, tokensIn: 10 });
+  });
+
+  it('a length without a position is neither written nor read', () => {
+    expect(renderLedgerLine('1', { kind: 'hold', ticket: 'T-1', persona: 'you', length: 4 }).trim()).toBe('{"v":1,"ts":"1","event":"hold","ticket":"T-1","persona":"you"}');
+    expect(parseLedgerLine('{"v":1,"ts":"1","event":"hold","ticket":"T-1","length":4}')).toMatchObject({ position: null, length: null });
+  });
+
+  it('refuses a position that is no 1-based integer', () => {
+    expect(parseLedgerLine('{"v":1,"ts":"1","event":"hold","ticket":"T-1","persona":"ben","position":0,"length":3}')).toMatchObject({ position: null, length: null });
+    expect(parseLedgerLine('{"v":1,"ts":"1","event":"hold","ticket":"T-1","persona":"ben","position":1.5}')).toMatchObject({ position: null });
+  });
+
+  it('hold lines leave the settled-run projections alone', () => {
+    const events = parseLedger(
+      [
+        '{"v":1,"ts":"2026-11-13T09:00:00Z","event":"hold","ticket":"T-1","persona":"ben","position":1,"length":2}',
+        '{"v":1,"ts":"2026-11-13T09:30:00Z","event":"run_settled","ticket":"T-1","persona":"ben","cost":0.5,"tokensIn":100,"tokensOut":10,"position":1,"length":2}',
+      ].join('\n'),
+    );
+    expect(settledUsageByTicket(events)['T-1']).toEqual({ tokensIn: 100, tokensOut: 10, cost: 0.5, runs: 1 });
+    expect(personaDailyCosts(events, '2026-11-13')).toEqual({ ben: 0.5 });
   });
 });
 

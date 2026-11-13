@@ -66,19 +66,33 @@ export class BoardPersonas {
    */
   async resolveHolders(config: ChainConfig, snap: BoardSnapshot): Promise<Map<string, HeldTicket>> {
     const fileOf = this.cacheFor(config);
+    const held = new Map<string, HeldTicket>();
+    for (const { card, holder } of await this.holdersWith(config, snap, fileOf)) {
+      const runs = holder.kind === 'entry' && holder.work === 'run';
+      const resolution: PersonaResolution = runs ? { persona: holder.persona, source: 'chain' } : { persona: null, source: 'none' };
+      held.set(card.id, { holder, entry: await this.load(resolution, card, fileOf) });
+    }
+    return held;
+  }
+
+  /** req-274: every ticket's holder alone — the hold record's read while no persona is loaded (the Autopilot is off). */
+  async holdersOf(config: ChainConfig, snap: BoardSnapshot): Promise<Map<string, TicketHolder>> {
+    const holders = await this.holdersWith(config, snap, this.cacheFor(config));
+    return new Map(holders.map(({ card, holder }) => [card.id, holder]));
+  }
+
+  /** The holder rule over every card of the snapshot, with one crew read. */
+  private async holdersWith(config: ChainConfig, snap: BoardSnapshot, fileOf: FileOf): Promise<{ readonly card: TicketCard; readonly holder: TicketHolder }[]> {
     const lookup = crewLookupOf(await this.crewKinds(config, fileOf));
     const terminal = snap.pipeline[snap.pipeline.length - 1]?.id ?? null;
-    const held = new Map<string, HeldTicket>();
+    const out: { card: TicketCard; holder: TicketHolder }[] = [];
     for (const column of snap.columns) {
       const stage = column.phase.id === terminal ? 'done' : EDGE_STAGES.includes(column.phase.id) ? column.phase.id : 'active';
       for (const card of column.tickets) {
-        const holder = holderOf({ stage, chain: card.meta.chain, at: card.meta.at, awaiting: card.meta.awaiting }, lookup);
-        const runs = holder.kind === 'entry' && holder.work === 'run';
-        const resolution: PersonaResolution = runs ? { persona: holder.persona, source: 'chain' } : { persona: null, source: 'none' };
-        held.set(card.id, { holder, entry: await this.load(resolution, card, fileOf) });
+        out.push({ card, holder: holderOf({ stage, chain: card.meta.chain, at: card.meta.at, awaiting: card.meta.awaiting }, lookup) });
       }
     }
-    return held;
+    return out;
   }
 
   /** req-257: who a plan run's `### Chain` may name — the crew with `you` — and who takes no mode (every non-agent). */

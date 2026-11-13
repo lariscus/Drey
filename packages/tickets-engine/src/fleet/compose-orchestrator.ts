@@ -25,6 +25,7 @@ import { Dispatcher } from './orchestrate/dispatcher';
 import type { GateSeats, GateShell } from './orchestrate/gate-runner';
 import { HumanGates } from './orchestrate/human-gates';
 import { HolderPass } from './orchestrate/holder-pass';
+import { HoldRecorder } from './orchestrate/hold-recorder';
 import { PersonaBreaker } from './orchestrate/persona-breaker';
 import { LedgerCards } from './orchestrate/ledger-cards';
 import { PoolCapacity, type SlotProbe } from './orchestrate/pool-capacity';
@@ -173,7 +174,7 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
     directory,
     pools,
     settled: new SettledRuns({ state, directory, pools, breaker, personaBreaker, clock, persist, ...events }),
-    dispatcher: new Dispatcher({ state, board, directory, pools, personas, humanGates, dispatch, notes, clock, log, pipelineRead, persist, tranches, holders: new HolderPass({ state, personas, directory, notes, breaker: personaBreaker }), ...pool, ...hold }),
+    dispatcher: new Dispatcher({ state, board, directory, pools, personas, humanGates, dispatch, notes, clock, log, pipelineRead, persist, tranches, holders: new HolderPass({ state, personas, directory, notes, breaker: personaBreaker, holds: new HoldRecorder({ book: state, persist, ...events }) }), ...pool, ...hold }),
     ci: new CiSweep({ state, board, bookkeeper, shell: deps.execShell ?? execShell, clock, log, pipelineRead, persist, ...(deps.seats !== undefined ? { seats: deps.seats } : {}) }),
     clock,
     log,

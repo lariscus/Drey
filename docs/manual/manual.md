@@ -1797,6 +1797,12 @@ A terminal can read the cost overview the same way the board does:
 `GET /report` on the runner (see `plugins/tickets/FLEET.md`) groups the
 runs' tokens by ticket, phase and model, and shows how much of each
 run's input was spent before its first write — the exploration cost.
+The same report groups by persona — runs, tokens, cost, red gates and
+how long the persona held tickets — and by position in the chain:
+how long the runs at position 1, 2, … worked, how long tickets sat
+there, and the difference, the waiting time. The held times come from
+the board's ledger, which notes each time a ticket moves to another
+persona or position.
 
 **When a worker needs you.** A worker that cannot go on without a
 decision of yours asks: its run stops at the question instead of ending,

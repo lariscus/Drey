@@ -9,7 +9,9 @@
  *     {"v":1,"ts":"2026-11-02T09:45:00Z","event":"proof_ready","ticket":"T-0001"}
  *     {"v":1,"ts":"2026-11-02T10:00:00Z","event":"merged","ticket":"T-0001","persona":"tessa"}
  *     {"v":1,"ts":"2026-11-02T10:05:00Z","event":"archived","ticket":"T-0001"}
- *     {"v":1,"ts":"2026-11-02T09:41:00Z","event":"run_settled","ticket":"T-0002","persona":"paul","model":"opus","tokensIn":48000,"tokensOut":6000,"cost":1.17}
+ *     {"v":1,"ts":"2026-11-02T09:41:00Z","event":"run_settled","ticket":"T-0002","persona":"paul","model":"opus","cost":1.17,"tokensIn":48000,"tokensOut":6000,"position":2,"length":5}
+ *     {"v":1,"ts":"2026-11-02T09:41:05Z","event":"hold","ticket":"T-0002","persona":"ben","position":3,"length":5}
+ *     {"v":1,"ts":"2026-11-02T11:00:00Z","event":"hold","ticket":"T-0002"}
  *
  * Cost rides the events that know it (`cost` in USD cents? No — the
  * house telemetry reports tokens; `cost` is the fractional dollar the
@@ -24,11 +26,22 @@
  * fact the mover knows (a hand move would have to invent one). The
  * verify harness runs no model and no persona, so `proof_ready` stays
  * null there too.
+ *
+ * `hold` (req-274, the persona board concept §10): the chain's cursor moved
+ * — from `ts` on the ticket is held by `persona` at chain `position` of
+ * `length`; a `hold` without a persona closes the hold (the ticket left the
+ * chain for a lifecycle column, or the board lost it). The dispatch pass
+ * writes one whenever a ticket's derived holder or position changes, so
+ * the time each holder held a ticket reads off consecutive lines, without
+ * the store's git history. `run_settled` carries the run's chain
+ * `position`/`length` too (absent on a run outside a chain).
  */
 
 import type { TicketUsage } from '../contracts/tickets';
 
-export type LedgerEventKind = 'dispatched' | 'phase' | 'proof_ready' | 'merged' | 'archived' | 'run_settled';
+export type LedgerEventKind = 'dispatched' | 'phase' | 'proof_ready' | 'merged' | 'archived' | 'run_settled' | 'hold';
+
+const KINDS: ReadonlySet<string> = new Set<LedgerEventKind>(['dispatched', 'phase', 'proof_ready', 'merged', 'archived', 'run_settled', 'hold']);
 
 export interface LedgerEvent {
   readonly kind: LedgerEventKind;
@@ -46,6 +59,10 @@ export interface LedgerEvent {
   readonly tokensOut: number | null;
   readonly from: string | null;
   readonly to: string | null;
+  /** req-274: the chain position (1-based) of a `hold` or a chain run's `run_settled`; null otherwise. */
+  readonly position: number | null;
+  /** req-274: the chain's length at that moment; null with `position`. */
+  readonly length: number | null;
 }
 
 export interface LedgerWrite {
@@ -59,46 +76,52 @@ export interface LedgerWrite {
   readonly tokensOut?: number | null;
   readonly from?: string | null;
   readonly to?: string | null;
+  /** req-274: the chain position and length (`hold`, a chain run's `run_settled`); omitted otherwise. */
+  readonly position?: number | null;
+  readonly length?: number | null;
 }
 
 export const LEDGER_FILE = 'tickets/_meta/ledger.jsonl';
 
-/** The strict one-line wire shape; null refuses instead of guessing. */
-export function parseLedgerLine(raw: string): LedgerEvent | null {
+const textOf = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
+const countOf = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : null);
+const positionOf = (v: unknown): number | null => (typeof v === 'number' && Number.isInteger(v) && v >= 1 ? v : null);
+const costOf = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 10_000) / 10_000 : null);
+
+/** The JSON object of one line; null when the line is no object. */
+function objectOf(raw: string): Record<string, unknown> | null {
   let value: unknown;
   try {
     value = JSON.parse(raw);
   } catch {
     return null;
   }
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+/** The strict one-line wire shape; null refuses instead of guessing. */
+export function parseLedgerLine(raw: string): LedgerEvent | null {
+  const obj = objectOf(raw);
+  const kind = obj?.['event'];
+  const ts = textOf(obj?.['ts']);
+  const ticket = textOf(obj?.['ticket']);
+  if (obj === null || obj['v'] !== 1 || typeof kind !== 'string' || !KINDS.has(kind) || ts === null || ticket === null) {
     return null;
   }
-  const obj = value as Record<string, unknown>;
-  if (obj['v'] !== 1) {
-    return null;
-  }
-  const kind = obj['event'];
-  const ts = typeof obj['ts'] === 'string' ? obj['ts'] : '';
-  const ticket = typeof obj['ticket'] === 'string' ? obj['ticket'] : '';
-  if (!isKind(kind) || ts === '' || ticket === '') {
-    return null;
-  }
-  const str = (v: unknown): string | null => (typeof v === 'string' && v !== '' ? v : null);
-  const cost = typeof obj['cost'] === 'number' && Number.isFinite(obj['cost']) ? Math.round(obj['cost'] * 10_000) / 10_000 : null;
-  const tokens = (v: unknown): number | null =>
-    typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : null;
+  const position = positionOf(obj['position']);
   return {
-    kind,
+    kind: kind as LedgerEventKind,
     ts,
     ticket,
-    persona: str(obj['persona']),
-    model: str(obj['model']),
-    cost,
-    tokensIn: tokens(obj['tokensIn']),
-    tokensOut: tokens(obj['tokensOut']),
-    from: str(obj['from']),
-    to: str(obj['to']),
+    persona: textOf(obj['persona']),
+    model: textOf(obj['model']),
+    cost: costOf(obj['cost']),
+    tokensIn: countOf(obj['tokensIn']),
+    tokensOut: countOf(obj['tokensOut']),
+    from: textOf(obj['from']),
+    to: textOf(obj['to']),
+    position,
+    length: position === null ? null : positionOf(obj['length']),
   };
 }
 
@@ -117,32 +140,25 @@ export function parseLedger(text: string): readonly LedgerEvent[] {
   return events;
 }
 
-/** The one-line serialization an append-only writer emits. */
-export function renderLedgerLine(ts: string, write: LedgerWrite): string {
-  return `${JSON.stringify({
-    v: 1,
-    ts,
-    event: write.kind,
-    ticket: write.ticket,
-    ...(write.persona != null && write.persona !== '' ? { persona: write.persona } : {}),
-    ...(write.model != null && write.model !== '' ? { model: write.model } : {}),
-    ...(write.cost != null ? { cost: write.cost } : {}),
-    ...(write.tokensIn != null ? { tokensIn: write.tokensIn } : {}),
-    ...(write.tokensOut != null ? { tokensOut: write.tokensOut } : {}),
-    ...(write.from != null && write.from !== '' ? { from: write.from } : {}),
-    ...(write.to != null && write.to !== '' ? { to: write.to } : {}),
-  })}\n`;
+/** The write's optional fields in wire order, an absent or empty one left out. */
+function optionalFields(write: LedgerWrite): Record<string, string | number> {
+  const fields: [string, string | number | null | undefined][] = [
+    ['persona', write.persona],
+    ['model', write.model],
+    ['cost', write.cost],
+    ['tokensIn', write.tokensIn],
+    ['tokensOut', write.tokensOut],
+    ['from', write.from],
+    ['to', write.to],
+    ['position', write.position],
+    ['length', write.position == null ? null : write.length],
+  ];
+  return Object.fromEntries(fields.filter((field): field is [string, string | number] => field[1] != null && field[1] !== ''));
 }
 
-function isKind(value: unknown): value is LedgerEventKind {
-  return (
-    value === 'dispatched' ||
-    value === 'phase' ||
-    value === 'proof_ready' ||
-    value === 'merged' ||
-    value === 'archived' ||
-    value === 'run_settled'
-  );
+/** The one-line serialization an append-only writer emits. */
+export function renderLedgerLine(ts: string, write: LedgerWrite): string {
+  return `${JSON.stringify({ v: 1, ts, event: write.kind, ticket: write.ticket, ...optionalFields(write) })}\n`;
 }
 
 // --- projections over the settled runs (concept §4.3) ------------------------

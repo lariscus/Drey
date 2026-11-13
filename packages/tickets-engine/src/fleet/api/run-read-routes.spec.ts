@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { SupervisorSet } from '../orchestrate/supervisor-set';
 import { attachCommandOf } from './attach-command';
 import type { RouteContext } from './route-context';
-import { RunReadRoutes } from './run-read-routes';
+import { parseLedger } from '../../core/ledger';
+import type { JournalReader } from '../journal-reader';
+import type { LedgerReader } from '../ledger-reader';
+import type { RunInfo } from '../protocol';
+import { busyMsOf, RunReadRoutes } from './run-read-routes';
 
 /** The Sessions tab's reads (req-166): a run's instruction and the attach command of its harness session. */
 function request(pathname: string): { ctx: RouteContext; answer: { status: number; body: unknown } } {
@@ -68,5 +72,46 @@ describe('attachCommandOf', () => {
     expect(attachCommandOf('claude-code', null, 'W')).toBeNull();
     expect(attachCommandOf('other', 'x', 'W')).toBeNull();
     expect(attachCommandOf('claude-code', 'x; rm -rf /', 'W')).toBeNull();
+  });
+});
+
+describe('GET /report (req-274: grouped by persona and by chain position)', () => {
+  it('answers the persona rows with time held and the position rows from the records and the hold lines', async () => {
+    const info = {
+      id: 'R-3', ticketId: 'T-0007', persona: 'ben', provider: 'claude-code', state: 'done', tokensIn: 100, tokensOut: 10, costUsd: 0.3,
+      startedAt: '2026-11-13T09:00:00Z', endedAt: '2026-11-13T09:20:00Z', gateResult: 'red', chainPosition: { at: 2, length: 3 }, phase: 'build', model: 'opus',
+    };
+    const set = { records: () => [{ info, request: { ticketsVaultPath: 'V', phase: 'build', model: 'opus' } }] } as unknown as SupervisorSet;
+    const vaultsRead: string[][] = [];
+    const ledgers = {
+      eventsOf: (vaults: readonly string[]) => {
+        vaultsRead.push([...vaults]);
+        return Promise.resolve(parseLedger('{"v":1,"ts":"2026-11-13T08:30:00Z","event":"hold","ticket":"T-0007","persona":"ben","position":2,"length":3}'));
+      },
+    } as unknown as LedgerReader;
+    const journals = { entriesOf: () => Promise.resolve([]) } as unknown as JournalReader;
+    const r = request('/report');
+    await new RunReadRoutes(set, { ledgers, journals, chainVault: () => 'W', now: () => new Date('2026-11-13T09:30:00Z') }).handle(r.ctx);
+    expect(vaultsRead).toEqual([['V', 'W']]);
+    expect(r.answer.body).toMatchObject({
+      ok: true,
+      byPersona: [{ persona: 'ben', runs: 1, costUsd: 0.3, redGates: 1, heldMs: 60 * 60_000 }],
+      byPosition: [{ position: 2, runs: 1, busyMs: 20 * 60_000, heldMs: 60 * 60_000, waitingMs: 40 * 60_000 }],
+    });
+  });
+});
+
+describe('busyMsOf (req-274)', () => {
+  const base = { startedAt: '2026-11-13T09:00:00Z', endedAt: null } as unknown as RunInfo;
+  const now = Date.parse('2026-11-13T10:00:00Z');
+
+  it('the closed busy spans plus the open one', () => {
+    expect(busyMsOf({ ...base, execMs: 60_000, execSince: '2026-11-13T09:59:00Z' }, now)).toBe(120_000);
+    expect(busyMsOf({ ...base, execMs: 60_000, execSince: null }, now)).toBe(60_000);
+  });
+
+  it('a record before req-67: the wall clock of an ended run, nothing for a live one', () => {
+    expect(busyMsOf({ ...base, endedAt: '2026-11-13T09:05:00Z' }, now)).toBe(300_000);
+    expect(busyMsOf(base, now)).toBeNull();
   });
 });
