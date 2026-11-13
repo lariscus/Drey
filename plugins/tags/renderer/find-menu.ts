@@ -7,6 +7,7 @@
  */
 import type { DreyPluginApi, FindMenuEntry } from '../../../shared/plugin-api/renderer';
 import { el } from './dom.js';
+import type { Scope } from './search-prefs.js';
 
 /** A menu row: the SDK's rows plus a plain action (Export, Summarize). */
 export type FindMenuRow =
@@ -20,6 +21,34 @@ export type FindMenuRow =
     };
 
 const WIDTH = 236;
+
+/**
+ * The menu's "Look in" group: This note | This vault | All vaults, plus
+ * "This project (<name>)" while the title bar's scope choice narrows
+ * (`projectLabel` non-null, SDK 1.59). `current` is the scope a run uses.
+ */
+export function lookInRows(
+  t: DreyPluginApi['i18n']['t'],
+  current: Scope,
+  projectLabel: string | null,
+  pick: (scope: Scope) => void,
+): FindMenuRow[] {
+  const row = (scope: Scope, label: string): FindMenuRow => ({
+    kind: 'check',
+    label,
+    checked: current === scope,
+    run: () => pick(scope),
+  });
+  return [
+    { kind: 'label', label: t('find.menu.look_in') },
+    row('file', t('find.scope.file')),
+    row('vault', t('find.scope.vault')),
+    row('all', t('find.scope.all')),
+    ...(projectLabel !== null
+      ? [row('project', t('find.scope.project', { project: projectLabel }))]
+      : []),
+  ];
+}
 
 /** Opens the menu under `anchor`'s panel header; returns the close function. */
 export function openFindMenu(

@@ -2,7 +2,8 @@
 
 export const PREFS_KEY = 'drey.search';
 
-export type Scope = 'file' | 'vault' | 'all';
+/** `project` (SDK 1.59): the vaults of the title bar's scope choice. */
+export type Scope = 'file' | 'vault' | 'all' | 'project';
 
 export interface SearchPrefs {
   scope: Scope;
@@ -31,7 +32,9 @@ export function parsePrefs(raw: string | null): SearchPrefs {
   try {
     const parsed = JSON.parse(raw) as Partial<SearchPrefs>;
     const scope: Scope =
-      parsed.scope === 'file' || parsed.scope === 'all' ? parsed.scope : DEFAULT_PREFS.scope;
+      parsed.scope === 'file' || parsed.scope === 'all' || parsed.scope === 'project'
+        ? parsed.scope
+        : DEFAULT_PREFS.scope;
     return {
       scope,
       matchCase: parsed.matchCase === true,

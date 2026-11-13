@@ -40,6 +40,7 @@ import {
 } from './model';
 import { vaultFileOf } from './open-file';
 import { patchRowsOf, wholeFileRowsOf, type PatchRow } from './patch';
+import { chipOf } from '../projects/project-scope';
 
 export interface ReviewDeps {
   readonly api: DreyPluginApi;
@@ -188,6 +189,16 @@ export function mountReview(deps: ReviewDeps, host: HTMLElement, ticketId: strin
     const snapshot = deps.snapshot();
     const row = el('div', 'tickets-review-head-row');
     row.append(el('span', 'tickets-review-id', ticketId), el('b', 'tickets-review-title', current?.meta.title ?? ''));
+    // req-285: the ticket's project, on a board with more than one (the tab is one ticket; the filter hides nothing in it).
+    const project = current === null ? null : chipOf(current, null, snapshot?.projects ?? []);
+    if (project !== null) {
+      const chip = el('span', 'pb-project', project.label);
+      const dot = el('span', 'pb-project-dot');
+      dot.style.background = project.color;
+      chip.prepend(dot);
+      chip.title = i18n.t('board.project_chip', { name: project.label });
+      row.append(chip);
+    }
     if (current !== null && snapshot !== null && actionBarOf(deps.rowOf(current), snapshot).decide) {
       row.append(pillNode(i18n.t('review.needs_review'), 'peach', 'is-review'), decisionLinkNode(i18n, ticketId, () => undefined));
     }

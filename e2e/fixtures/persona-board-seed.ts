@@ -90,7 +90,7 @@ export function fieldOf(dirs: StoreDirs): (id: string, key: string) => string | 
 }
 
 /** Initializes the store on the lifecycle stages and writes every seed with its chain fields. */
-export function seedStore(dirs: StoreDirs): void {
+export function seedStore(dirs: StoreDirs, seeds: readonly Seed[] = SEEDS): void {
   const dk = dkOf(dirs);
   const git = (...args: string[]): string => execFileSync('git', args, { cwd: dirs.storeDir, encoding: 'utf8', windowsHide: true, stdio: 'pipe' });
   const shown = (id: string): string => (JSON.parse(dk(['show', id, '--json'])) as { data: { content: string } }).data.content;
@@ -101,7 +101,7 @@ export function seedStore(dirs: StoreDirs): void {
   fs.writeFileSync(toml, `${fs.readFileSync(toml, 'utf8').replace(/\[transitions\.agent\][\s\S]*?(?=\n\[|$)/, '')}\n[stages]\nvalues = ["inbox", "prioritized", "active", "running", "done"]\ninitial = "inbox"\nterminal = ["done"]\nclaim = ["running"]\ncancelled = "cancelled"\n`);
   git('commit', '-q', '-am', 'the lifecycle stages');
   git('checkout', '-q', 'tickets');
-  for (const seed of SEEDS) {
+  for (const seed of seeds) {
     const id = dk(['add', '--unclaimed', '-m', seed.title]).trim();
     const text = shown(id);
     const fields = ['x-entered-inbox: 2026-11-10T09:00:00Z', `x-chain: ${seed.chain ?? STANDARD}`, ...(seed.at === undefined ? [] : [`x-at: ${seed.at}`]), ...Object.entries(seed.extra ?? {}).map(([k, v]) => `${k}: ${v}`)];

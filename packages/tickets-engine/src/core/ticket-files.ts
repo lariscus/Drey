@@ -836,6 +836,8 @@ export interface NewTicketInput {
   readonly rawCapture?: string;
   /** The chain copied in at creation (req-266: the standard flow, or a part's own); absent/empty = none. */
   readonly chain?: readonly string[];
+  /** The ticket's project (req-285: capture lands in the filtered project); absent = none named. */
+  readonly project?: string;
 }
 
 /** The strict canonical ticket file — exactly the shapes of the spec. */
@@ -852,6 +854,7 @@ export function newTicketFileText(input: NewTicketInput): string {
     `title: ${title}`,
     `repo: ${repo}`,
     ...(repos.length > 1 ? [`repos: [${repos.join(', ')}]`] : []),
+    ...(input.project !== undefined && input.project.trim() !== '' ? [`project: ${input.project.trim()}`] : []),
     `priority: ${input.priority}`,
     `rank: ${input.rank}`,
     `branch: ${branchForTicket(input.id)}`,

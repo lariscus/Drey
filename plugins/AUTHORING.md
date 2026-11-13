@@ -131,6 +131,13 @@ leaves the app on the previous build. Verify with
   `ui.refreshStatus()` re-reads every dock panel's `status` now — the shell does it on document and vault
   events only, so a panel whose status changes otherwise (an async search result) calls it after the change.
   The sample plugin registers a tiny third find mode.
+  1.59 (req-285, the project filter) adds the title bar's scope filter: `ui.registerWorkspaceScope({ label, allLabel,
+  manageLabel?, manage? })` returns a handle whose `setOptions` takes the choices (`WorkspaceScopeOption`: `id`, `label`,
+  `color` — `''` draws a dashed dot —, an optional `count`, and `sources`: the vaults by name with `readOnly` and the plain
+  folders the Files panel lists, or `null` for a choice that does not narrow Files). One registration per window (a second
+  is refused, logged); the base keeps the choice per view (ADR-0089 later change). Every plugin reads it with
+  `ui.workspaceScope()` and `ui.onWorkspaceScopeChange`. `FindQuery.scope` gains `'project'` (a find mode restricts itself
+  to the choice's vaults).
   1.58 (req-284, Settings → Projects) adds `PluginSettingsPageContrib.bare`: the host draws no title and no
   description for the page and lets its body take the detail pane's full width instead of the one Settings page
   width — for a page that draws its own head and layout, such as a master-detail list (board 7m).

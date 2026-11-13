@@ -1740,5 +1740,21 @@
   "projects.access_of": "{name} access",
   "projects.not_on_device": "not on this device",
   "projects.saved": "Saved · committed {minutes, plural, =0 {just now} one {# min ago} other {# min ago}}",
-  "projects.not_saved": "Not saved: {error}"
+  "projects.not_saved": "Not saved: {error}",
+  "files.scope.summary": "{label} · {vaults, plural, one {# vault} other {# vaults}}{folders, plural, =0 {} one {, # folder} other {, # folders}}",
+  "files.scope.read": "read",
+  "files.scope.read_title": "Read only for this project",
+  "files.scope.folder_missing": "Folder not found",
+  "files.scope.open": "Open",
+  "files.scope.reveal": "Reveal in File Explorer",
+  "find.scope.project": "This project ({project})",
+  "find.status.hits_project": "{hits} in {project}",
+  "find.status.open_project": "{count} open in {project}",
+
+  "projects.filter.label": "Project filter",
+  "projects.filter.all": "All projects",
+  "projects.filter.manage": "Manage projects…",
+  "projects.filter.unassigned": "Unassigned",
+  "board.load.every_project": "Counts every project",
+  "board.project_chip": "Project: {name}"
 }

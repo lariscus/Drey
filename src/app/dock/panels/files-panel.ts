@@ -15,9 +15,11 @@ import { FilesCommandsService } from '../../services/files-commands.service';
 import { VaultService } from '../../vault';
 import { VaultFileEntry, VaultStatus } from '../../../../shared/ipc-api';
 import type { FilesContextMenuItem } from '../../../../shared/plugin-api/renderer';
+import { I18nPipe } from '../../i18n';
 import { Icon } from '../../icons/icon';
 import { PanelHeaderActions } from '../panel-header-actions';
 import { FileOperationsService } from './file-operations.service';
+import { FilesScopeState, FolderRow } from './files-scope';
 import { FilesTreeState } from './files-tree-state';
 import {
   SelectionModifiers,
@@ -52,6 +54,16 @@ interface VaultMenu {
   vault: VaultStatus;
   /** Plugin-contributed rows for this open (SDK 1.32), computed at open. */
   pluginItems: readonly FilesContextMenuItem[];
+}
+
+/** Anchor + target for a plain-folder row's right-click menu (req-285): Open and Reveal only. */
+interface FolderMenu {
+  x: number;
+  y: number;
+  root: string;
+  rel: string;
+  /** The file row it was opened on, or null for a folder (section header or directory). */
+  file: FolderRow | null;
 }
 
 /** An in-progress "new file" / "new folder" with its inline name input showing. */
@@ -95,7 +107,7 @@ interface PendingVaultRename {
 @Component({
   selector: 'app-files-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, Icon, PanelHeaderActions],
+  imports: [NgTemplateOutlet, Icon, PanelHeaderActions, I18nPipe],
   providers: [FilesTreeState],
   templateUrl: './files-panel.html',
   styleUrl: './files-panel.css',
@@ -104,6 +116,7 @@ export class FilesPanel {
   protected readonly vault = inject(VaultService);
   protected readonly editor = inject(EditorService);
   private readonly tree = inject(FilesTreeState);
+  protected readonly scope = inject(FilesScopeState);
   private readonly operations = inject(FileOperationsService);
   private readonly decorations = inject(FileDecorationService);
   private readonly pluginMenuItems = inject(FilesCommandsService);
@@ -116,6 +129,7 @@ export class FilesPanel {
   protected readonly allFoldersExpanded = this.tree.allFoldersExpanded;
 
   protected readonly vaultMenu = signal<VaultMenu | null>(null);
+  protected readonly folderMenu = signal<FolderMenu | null>(null);
   protected readonly menu = signal<TreeMenu | null>(null);
   protected readonly creating = signal<PendingCreate | null>(null);
   protected readonly renaming = signal<PendingRename | null>(null);
@@ -422,9 +436,13 @@ export class FilesPanel {
     return vault.active ? `${vault.path} · Active vault` : vault.path;
   }
 
-  /** The header's "New file": a name row at the top of the active vault. */
+  /**
+   * The header's "New file": a name row at the top of the active vault --
+   * under a project filter, of a shown vault the project may write.
+   */
   protected onNewFile(): void {
-    const target = this.vault.vaults().find((v) => v.active) ?? this.vault.vaults()[0];
+    const writable = this.scope.vaults().filter((v) => !this.scope.isReadOnly(v.id));
+    const target = writable.find((v) => v.active) ?? writable[0];
     if (target === undefined) {
       return;
     }
@@ -636,6 +654,45 @@ export class FilesPanel {
   protected closeMenus(): void {
     this.menu.set(null);
     this.vaultMenu.set(null);
+    this.folderMenu.set(null);
+  }
+
+  /** A plain folder's directory row: fold / unfold, listing it the first time. */
+  protected onFolderDirClick(row: FolderRow): void {
+    this.scope.toggleDir(row.root, row.rel);
+  }
+
+  protected onFolderFileClick(row: FolderRow): void {
+    this.scope.open(row);
+  }
+
+  /** Right-click in a plain folder: Open (files) and Reveal in File Explorer, nothing that writes. */
+  protected openFolderMenu(event: MouseEvent, root: string, row: FolderRow | null): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.folderMenu.set({
+      x: Math.min(event.clientX, window.innerWidth - 220),
+      y: Math.min(event.clientY, window.innerHeight - 100),
+      root,
+      rel: row?.rel ?? '',
+      file: row?.type === 'file' ? row : null,
+    });
+  }
+
+  protected onFolderMenuOpen(): void {
+    const menu = this.folderMenu();
+    this.closeMenus();
+    if (menu?.file) {
+      this.scope.open(menu.file);
+    }
+  }
+
+  protected async onFolderMenuReveal(): Promise<void> {
+    const menu = this.folderMenu();
+    this.closeMenus();
+    if (menu) {
+      await this.scope.reveal(menu.root, menu.rel);
+    }
   }
 
   /** Closes the row menu and hands back what it was opened on. */

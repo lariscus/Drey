@@ -916,6 +916,19 @@ change is saved and committed at once; *Project actions* (⋯) deletes a
 project after asking — its tickets keep the name and show as an unknown
 project.
 
+**The project filter.** Right of the view switcher in the title bar sits
+the project filter: *All projects*, each project, *Unassigned* (with how
+many tickets have no project) and *Manage projects…* (Settings →
+Projects). Pick a project and the window follows it: the Files panel lists
+only that project's vaults and folders (a `read` tag on the ones its runs
+may only read, and a line like *Drey · 2 vaults, 1 folder* under the
+header), the Board and the Tickets panel show only its tickets, Find offers
+*This project* among the places to look, and a new idea lands in it. The
+persona columns, their load and the capacity chip still count every
+project — the Crew and its quotas are shared. Under *All projects* each
+card names its project. Every view remembers its own choice, so a view you
+save while a project is picked opens filtered.
+
 **The crew a new board starts with.** The same step adds **Pia** (Mission
 Control's own persona, below) and four crew members next to *You*: **Paul**
 (plans), **Ben** (builds), **Ralf** (reviews) and **Tessa** (tests). They appear on the Crew tab, in Mission Control's team list and in the

@@ -196,8 +196,13 @@ export interface PluginWidgetContrib {
 export interface FindQuery {
   readonly tags: readonly string[];
   readonly text: string;
-  /** Where to look: the open note, the active vault or every vault. */
-  readonly scope: 'file' | 'vault' | 'all';
+  /**
+   * Where to look: the open note, the active vault or every vault -- or
+   * (SDK 1.59) the vaults of the title bar's scope choice, `project`: the
+   * registered vaults `ui.workspaceScope().sources.vaults` names. The panel
+   * sends `project` only while that choice narrows (its `sources` non-null).
+   */
+  readonly scope: 'file' | 'vault' | 'all' | 'project';
 }
 
 /** One menu row a find mode contributes (SDK 1.54). */
@@ -401,6 +406,50 @@ export interface ViewPresetLayout {
    * layout -- board 7h: a view owns its tabs).
    */
   readonly openTabs?: readonly { readonly kind: string; readonly path: string }[];
+}
+
+/**
+ * One choice of the title bar's scope filter (SDK 1.59, `ui.registerWorkspaceScope`):
+ * a project, say. The host draws it and knows only what Files narrows to;
+ * every other meaning stays with the plugin that offers it.
+ */
+export interface WorkspaceScopeOption {
+  /** Stable within the registration; it is what a view remembers. */
+  readonly id: string;
+  readonly label: string;
+  /** The dot: `#rrggbb`, or `''` for a dashed empty dot (an "Unassigned" choice). */
+  readonly color: string;
+  /** A small figure at the row's end (`4`); absent = none. */
+  readonly count?: number;
+  /**
+   * What the Files panel lists under this choice: registered vaults by
+   * NAME (`readOnly` draws a `read` tag) and plain folders (absolute
+   * paths, read-only). `null` = this choice does not narrow Files (an
+   * "Unassigned" choice): Files and Find stay as under "all".
+   */
+  readonly sources: {
+    readonly vaults: readonly { readonly name: string; readonly readOnly: boolean }[];
+    readonly folders: readonly string[];
+  } | null;
+}
+
+/** The title bar's scope filter (SDK 1.59): one per window, right of the view switcher. */
+export interface WorkspaceScopeContrib {
+  /** The control's tooltip and accessible name ("Project filter"). */
+  readonly label: string;
+  /** The first row, the choice that filters nothing ("All projects"). */
+  readonly allLabel: string;
+  /** A last row under a separator that opens where the choices are kept ("Manage projects…"). */
+  readonly manageLabel?: string;
+  manage?(): void;
+}
+
+/** What `ui.registerWorkspaceScope` returns. */
+export interface WorkspaceScopeHandle {
+  /** Replaces the choices (the plugin calls it whenever its data changes). */
+  setOptions(options: readonly WorkspaceScopeOption[]): void;
+  /** Removes the control; every view's choice is kept for a later registration. */
+  dispose(): void;
 }
 
 /**
@@ -1201,6 +1250,19 @@ export interface DreyPluginApi {
     activeViewId(): string;
     /** Fires when the active view changes (SDK 1.46). */
     onActiveViewChange(listener: () => void): Unsubscribe;
+    /**
+     * The title bar's scope filter (SDK 1.59): a base slot right of the
+     * view switcher that one plugin fills with its choices (a second
+     * registration is refused with a logged warning). The choice is kept
+     * per view (ADR-0089), so a view opens filtered; the Files panel lists
+     * the choice's `sources`, and every plugin reads it through
+     * `workspaceScope()`. Removed with the plugin.
+     */
+    registerWorkspaceScope(contrib: WorkspaceScopeContrib): WorkspaceScopeHandle;
+    /** The active view's choice; null = "all" (or no filter registered). */
+    workspaceScope(): WorkspaceScopeOption | null;
+    /** Fires when the choice changes: picked, the view switched, or the choices replaced. */
+    onWorkspaceScopeChange(listener: () => void): Unsubscribe;
     registerMenuContributions(items: readonly MenuContribution[]): Unsubscribe;
     /**
      * @deprecated The "Add entry" drawer was removed in milestone 43

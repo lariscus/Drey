@@ -1796,6 +1796,12 @@ changes afterwards, so a rename keeps every ticket's `project:` valid.
 that name exists) and lists it in the project in the same commit. A
 removed project's tickets keep its id; the board reports it as unknown.
 
+**Capture into a project** (req-285): a create (`create` on the invoke
+channel, `POST /api/tickets`) may carry `project: <id>`; the new ticket is
+written with `project:` (`x-project` on a store). Drey sends the title
+bar filter's project; under *All projects* or *Unassigned* it sends none and
+the ticket starts Unassigned. A value that is not a project id is dropped.
+
 **The first project (migration at the engine's start).** A board whose
 `_meta/projects/` holds no file gets one project, written by the engine
 when it starts (`ProjectMigrator`): named after the first repository of

@@ -27,6 +27,7 @@ import {
 import type { ChainStatus, RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { DEFAULT_PRIORITY_CONFIG, priorityWeight, type BoardSnapshot, type TicketCard } from '../../shared/tickets';
 import { liveRunOf } from '../work-groups';
+import type { ProjectChip } from '../projects/project-scope';
 
 /** One position of a card's chain: the persona's initials and how far the chain is. */
 export interface ChainCellModel {
@@ -63,6 +64,8 @@ export interface PersonaCardModel {
   readonly decide: boolean;
   /** The personas that worked a done ticket (`Ralf · Ben · Tessa`). */
   readonly workedBy: readonly string[];
+  /** req-285: the project chip under *All projects*; null = none. */
+  readonly project: ProjectChip | null;
 }
 
 export interface PersonaLaneModel {
@@ -110,6 +113,13 @@ export interface BoardLive {
   /** The pool's words for a queued ticket (`queued · waits for a B slot`); null = not queued. */
   readonly queueWords: (ticketId: string) => string | null;
   readonly now: number;
+  /**
+   * req-285, the title bar's project filter: which tickets the board shows
+   * (absent = all) and the chip a card carries (absent = none). Columns,
+   * their load and their folding count every project.
+   */
+  readonly shows?: (card: TicketCard) => boolean;
+  readonly chip?: (card: TicketCard) => ProjectChip | null;
 }
 
 interface Crew {
@@ -189,6 +199,7 @@ export function personaCardOf(card: TicketCard, snap: BoardSnapshot, live: Board
     cost: costOf(card),
     decide: hold !== null && hold.holder === YOU_LANE && hold.why === 'entry',
     workedBy: [...new Set(cells.filter((cell) => crew.kindOf(cell.persona) === 'agent').map((cell) => cell.name))],
+    project: live.chip?.(card) ?? null,
   };
 }
 
@@ -206,14 +217,14 @@ export function personaBoardModelOf(snap: BoardSnapshot, live: BoardLive, unfold
   const lanes = snap.lanes ?? [];
   const configured = snap.columns.filter((column) => !column.unknown);
   const terminal = configured.length > 0 ? configured[configured.length - 1]!.phase.id : null;
+  const shows = live.shows ?? (() => true);
   const cardsOfColumn = (id: string | null): readonly PersonaCardModel[] =>
-    id === null ? [] : (snap.columns.find((column) => column.phase.id === id)?.tickets ?? []).filter((card) => card.hold === undefined).map((card) => personaCardOf(card, snap, live, lanes));
+    id === null ? [] : (snap.columns.find((column) => column.phase.id === id)?.tickets ?? []).filter((card) => card.hold === undefined && shows(card)).map((card) => personaCardOf(card, snap, live, lanes));
   const byLane = cardsByLane(snap);
-  const laneModels = lanes.map((lane) => {
-    const cards = (byLane.get(lane.persona) ?? []).map((card) => personaCardOf(card, snap, live, lanes));
-    return { lane, initials: initialsOf(lane.title), cards, load: loadOf(lane, cards, live.runs) };
-  });
-  const folded = laneModels.filter((model) => model.lane.kind !== 'human' && model.cards.length === 0).map((model) => model.lane);
+  // The load and the folding count every project's cards (req-285): the pool is cross-project.
+  const every = lanes.map((lane) => ({ lane, cards: (byLane.get(lane.persona) ?? []).map((card) => personaCardOf(card, snap, live, lanes)) }));
+  const laneModels = every.map(({ lane, cards }) => ({ lane, initials: initialsOf(lane.title), cards: cards.filter((model) => shows(model.card)), load: loadOf(lane, cards, live.runs) }));
+  const folded = every.filter((model) => model.lane.kind !== 'human' && model.cards.length === 0).map((model) => model.lane);
   const done = cardsOfColumn(terminal === 'inbox' || terminal === 'prioritized' ? null : terminal);
   return {
     inbox: cardsOfColumn(LIFECYCLE_EDGES[0]),

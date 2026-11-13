@@ -49,6 +49,7 @@ import type { WorktreeFile } from '../../../packages/tickets-engine/src/core/wor
 import { createWorkFilterStore, filterPopover, isFilterActive, NO_WORK_FILTER, type WorkFilterState } from './work-filter';
 import { createTicketsSettingsPage } from './settings-page';
 import { createProjectsSettingsPage } from './projects/projects-page';
+import { createProjectFilter, type ProjectFilter } from './projects/project-filter';
 import { createFilesOperationsHandler, ticketsContextMenuItems } from './files-guard';
 import { createTicketHeader, showsTicketDocument, ticketLogFold, ticketTabTitle } from './ticket-header';
 import { openTicketDocument, type TicketDocumentReply } from './open-ticket';
@@ -118,6 +119,8 @@ const messageOf = (error: unknown): string =>
 // --- the shared board store (one snapshot, any number of views) --------
 
 let snapshot: BoardSnapshot | null = null;
+/** req-285: the title bar's project filter, registered at activation. */
+let projectFilter: ProjectFilter | null = null;
 let note = '';
 
 /**
@@ -206,6 +209,7 @@ const refreshBoard = createBoardRefresh<BoardSnapshot>({
   read: () => invokeBoard('board') as Promise<BoardSnapshot>,
   onBoard: (board) => {
     snapshot = board;
+    projectFilter?.update(board);
   },
   onRead: () => {
     refreshStatusItem();
@@ -656,7 +660,7 @@ function buildBoardView(api: DreyPluginApi): BoardView {
         }),
       );
     }
-    root.append(workListNode(workPanelDeps(api), snap, fleetRuns, folds, notifyViews, workFilter.get()));
+    root.append(workListNode(workPanelDeps(api), projectFilter?.scoped(snap) ?? snap, fleetRuns, folds, notifyViews, workFilter.get()));
     const statusBar = statusBarNode(api, snap, fleet.node);
     if (statusBar !== null) {
       // The foot's tooltip names the store (fidelity ruling O3); errors and the orphan chip stay visible.
@@ -1111,6 +1115,8 @@ function openCreateModal(api: DreyPluginApi, snap: BoardSnapshot, opts?: { dicta
           // The raw words behind a tidied capture (req-75 W5c) — only
           // when Tidy up actually changed the fields.
           ...(rawCapture !== null ? { raw: rawCapture } : {}),
+          // req-285: a capture lands in the filtered project (none under All projects or Unassigned).
+          ...(projectFilter?.captureProject() !== undefined ? { project: projectFilter.captureProject() } : {}),
         }),
       ).then((result) => {
         // The file is pre-filled by the canonical writer — open it so
@@ -1781,6 +1787,7 @@ function deskDeps(api: DreyPluginApi): DeskDeps {
       }
     },
     titleOf: (ticketId) => boardCard(ticketId)?.meta.title ?? null,
+    scope: () => projectFilter?.boardScope() ?? null,
   };
   return deskDepsMemo;
 }
@@ -3167,6 +3174,8 @@ const plugin: { activate(api: DreyPluginApi): void } = {
     });
     teamStore(api).subscribe(refreshStatusItem);
     api.ui.onActiveViewChange(refreshStatusItem);
+    // req-285: the title bar's project filter; the views repaint when the choice changes.
+    projectFilter = createProjectFilter(api, { snapshot: () => snapshot, repaint: notifyViews });
     fleetListeners.add(fireDesk);
     api.commands.register({
       id: 'tickets.showBoard',

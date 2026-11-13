@@ -115,6 +115,8 @@ export class ExternalFileGate {
   private queued: string[] = [];
   private ready = false;
   private readonly allowed = new Set<string>();
+  /** Files listed from a project's plain folder (req-285): readable, never writable. */
+  private readonly readable = new Set<string>();
 
   constructor(
     private readonly getVaults: () => readonly VaultRoot[],
@@ -142,9 +144,24 @@ export class ExternalFileGate {
     return pending;
   }
 
-  /** Throws unless `absolutePath` is a path main collected from the OS itself. */
+  /**
+   * Files main itself listed from a project's plain folder (`folder:list`,
+   * req-285): they join the READ allowlist only -- the folder is read-only
+   * for the project, so `write` still refuses them.
+   */
+  admitReadOnly(absolutePaths: readonly string[]): void {
+    for (const absolute of absolutePaths) {
+      if (isExternalOpenPath(absolute)) {
+        this.readable.add(allowKey(absolute));
+      }
+    }
+  }
+
+  /** Throws unless `absolutePath` is a path main collected from the OS itself (or, to read, listed itself). */
   private assertAllowed(absolutePath: string, verb: 'read' | 'written'): void {
-    if (!this.allowed.has(allowKey(absolutePath)) || !isExternalOpenPath(absolutePath)) {
+    const key = allowKey(absolutePath);
+    const admitted = this.allowed.has(key) || (verb === 'read' && this.readable.has(key));
+    if (!admitted || !isExternalOpenPath(absolutePath)) {
       throw new Error(`This file was not opened from the operating system and cannot be ${verb}.`);
     }
   }

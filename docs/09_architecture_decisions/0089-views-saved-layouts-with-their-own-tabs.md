@@ -290,3 +290,29 @@ switch. Two additive SDK surfaces close that:
 - The tab menu's "Show this tab in" is an inline list as board 7i draws it, no
   flyout. "Go to the <view> view" stands for every other view: it switches, and
   brings the tab forward only where that view shows it.
+
+## Later change — a view's scope filter (milestone 265, req-285, SDK 1.59)
+
+A view now also owns a **lens**: the choice of the title bar's scope filter
+(board 7n — for the tickets plugin, a project). The base draws the control
+right of the view switcher and keeps the choice per view; one plugin fills it
+(`ui.registerWorkspaceScope`, a second registration is refused) and every
+plugin reads the active view's choice (`ui.workspaceScope()`,
+`onWorkspaceScopeChange`). The base attaches one meaning to it: the Files
+panel lists the choice's `sources` (vaults by name, plain folders read-only).
+
+- **Stored like the views list, not like a layout.** The choice per view is
+  `localStorage['drey.views.scope']` and is written as it is picked. It is not
+  part of the saved layout of D-6: a filter is what the view looks at, not how
+  it is arranged, so picking one neither marks the layout changed nor waits for
+  *Save layout*, and *Reset to saved layout* keeps it. *Save current layout as
+  a view…* copies the active view's choice into the new view; deleting a view
+  drops its choice; a choice whose option went away (a deleted project) reads
+  as "all" and is kept in case it comes back.
+- **Why a base slot, not a plugin title-bar action.** The Files panel and Find
+  (another plugin) follow it, and a choice per view needs the view lifecycle —
+  both base concerns. The base still knows no "project": it knows a labelled
+  choice with a colour, a count and the sources Files narrows to (ADR-0044).
+- Alternatives weighed in the concept (`project-handling-draft.md` §4): a filter
+  in every panel (S2) was declined by the owner; Mission Control on a phone or
+  iPad keeps its own, device-local filter (roadmap req-298).

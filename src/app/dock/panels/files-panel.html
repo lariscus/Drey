@@ -21,6 +21,10 @@
   }
 </ng-template>
 
+@if (scope.summary(); as summary) {
+  <div class="scope-summary">{{ summary }}</div>
+}
+
 <div class="files">
   @if (vault.vaults().length === 0) {
     <div class="vault-empty">
@@ -28,8 +32,14 @@
       <button type="button" class="primary" (click)="onAddVault()">Add vault…</button>
     </div>
   } @else {
-    <div class="tree-scroll" tabindex="0" (keydown)="onTreeKeydown($event)">
+    <div
+      class="tree-scroll"
+      [class.scoped]="scope.active() !== null"
+      tabindex="0"
+      (keydown)="onTreeKeydown($event)"
+    >
       <ng-container *ngTemplateOutlet="tree" />
+      <ng-container *ngTemplateOutlet="folderSections" />
     </div>
   }
 </div>
@@ -77,6 +87,20 @@
         </button>
       }
     }
+  </div>
+}
+
+@if (folderMenu(); as fm) {
+  <div
+    class="ctx-backdrop"
+    (click)="closeMenus()"
+    (contextmenu)="$event.preventDefault(); closeMenus()"
+  ></div>
+  <div class="ctx-menu" [style.left.px]="fm.x" [style.top.px]="fm.y">
+    @if (fm.file) {
+      <button type="button" (click)="onFolderMenuOpen()">{{ 'files.scope.open' | t }}</button>
+    }
+    <button type="button" (click)="onFolderMenuReveal()">{{ 'files.scope.reveal' | t }}</button>
   </div>
 }
 
@@ -131,7 +155,7 @@
     } @else if (node.kind === 'vault') {
       <button
         type="button"
-        class="node vault-row"
+        class="node vault-row section-head"
         [class.missing]="!node.vault.exists"
         [class.selected]="selected() === node.vault.id"
         [class.drop-target]="dropHover() === node.vault.id"
@@ -150,6 +174,9 @@
           [style.transform]="collapsedVaults().has(node.vault.id) ? 'none' : 'rotate(90deg)'"
         />
         <span class="node-name">{{ node.vault.name }}</span>
+        @if (scope.isReadOnly(node.vault.id)) {
+          <span class="read-tag" [title]="'files.scope.read_title' | t">{{ 'files.scope.read' | t }}</span>
+        }
       </button>
     } @if (node.kind === 'entry') {
       @if (isRenaming(node.vaultId, node.entry)) {
@@ -240,6 +267,69 @@
           <span class="create-ext">.md</span>
         }
       </div>
+    }
+  }
+</ng-template>
+
+<ng-template #folderSections>
+  @for (folder of scope.folders(); track folder.root) {
+    <button
+      type="button"
+      class="node vault-row section-head folder-head"
+      tabindex="-1"
+      [title]="folder.root"
+      (click)="scope.toggleSection(folder.root)"
+      (contextmenu)="openFolderMenu($event, folder.root, null)"
+    >
+      <app-icon
+        class="twist"
+        name="chevron-right"
+        [size]="14"
+        [style.transform]="scope.isSectionCollapsed(folder.root) ? 'none' : 'rotate(90deg)'"
+      />
+      <span class="node-name">{{ folder.name }}</span>
+      <span class="read-tag" [title]="'files.scope.read_title' | t">{{ 'files.scope.read' | t }}</span>
+    </button>
+    @if (!scope.isSectionCollapsed(folder.root)) {
+      @let rows = scope.rows(folder.root);
+      @if (rows === 'missing') {
+        <div class="folder-missing">{{ 'files.scope.folder_missing' | t }}</div>
+      } @else {
+        @for (row of rows; track row.rel) {
+          @if (row.type === 'directory') {
+            <button
+              type="button"
+              class="node folder"
+              tabindex="-1"
+              [style.padding-left.px]="16 + row.depth * 12"
+              [title]="scope.pathOf(row.root, row.rel)"
+              (click)="onFolderDirClick(row)"
+              (contextmenu)="openFolderMenu($event, folder.root, row)"
+            >
+              <app-icon
+                class="twist"
+                name="chevron-right"
+                [size]="14"
+                [style.transform]="scope.isExpanded(row.root, row.rel) ? 'rotate(90deg)' : 'none'"
+              />
+              <span class="node-name">{{ row.name }}</span>
+            </button>
+          } @else {
+            <button
+              type="button"
+              class="node file"
+              tabindex="-1"
+              [style.padding-left.px]="20 + row.depth * 12"
+              [title]="scope.pathOf(row.root, row.rel)"
+              (click)="onFolderFileClick(row)"
+              (contextmenu)="openFolderMenu($event, folder.root, row)"
+            >
+              <span class="twist-slot" aria-hidden="true"></span>
+              <span class="node-name">{{ row.name }}</span>
+            </button>
+          }
+        }
+      }
     }
   }
 </ng-template>

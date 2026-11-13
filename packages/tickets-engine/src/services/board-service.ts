@@ -2474,6 +2474,8 @@ export class EngineBoardService {
     /** The owner's raw words behind a tidied create (req-75 W5c); absent
      *  for a hand-typed ticket — one more Log line when set. */
     raw?: string;
+    /** req-285: the project the capture lands in; absent = none named. */
+    project?: string;
   }): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
       const vault = await this.detect();
@@ -2518,6 +2520,7 @@ export class EngineBoardService {
         actor: input.actor ?? this.owner,
         description: input.description,
         ...(input.raw !== undefined ? { rawCapture: input.raw } : {}),
+        ...(input.project !== undefined ? { project: input.project } : {}),
         chain: renderChainEntries(snap.flow ?? []),
       });
       try {
@@ -2540,7 +2543,7 @@ export class EngineBoardService {
   private async createInStore(
     store: StoreSettings,
     snap: BoardSnapshot,
-    input: { title: string; actor?: string; priority: TicketPriority; repo: string | null; repos?: readonly string[]; description: string; raw?: string },
+    input: { title: string; actor?: string; priority: TicketPriority; repo: string | null; repos?: readonly string[]; description: string; raw?: string; project?: string },
   ): Promise<{ ok: false; error: string } | { ok: true; id: string; path: string }> {
     const firstPhase = snap.pipeline[0]!.id;
     let id: string;
@@ -2558,6 +2561,7 @@ export class EngineBoardService {
         actor: input.actor ?? this.owner,
         description: input.description,
         ...(input.raw !== undefined ? { rawCapture: input.raw } : {}),
+        ...(input.project !== undefined ? { project: input.project } : {}),
         chain: renderChainEntries(snap.flow ?? []),
       });
       await this.putRecord(store, await this.storeBoard.record(store, id), text, { phase: firstPhase });

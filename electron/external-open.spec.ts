@@ -186,6 +186,14 @@ describe('external open (main side)', () => {
       expect(fs.readFileSync(stranger, 'utf-8')).toBe('keep');
     });
 
+    it('reads a file listed from a plain folder, but never writes it (req-285)', async () => {
+      const listed = write('out/listed.md', 'shown');
+      gate.admitReadOnly([listed]);
+      await expect(gate.read(listed)).resolves.toMatchObject({ content: 'shown' });
+      await expect(gate.write(listed, 'tampered')).rejects.toThrow(/cannot be written/);
+      expect(fs.readFileSync(listed, 'utf-8')).toBe('shown');
+    });
+
     it('never writes a vault file or a non-registered extension through the gate', async () => {
       const inside = write('vault/a.md', 'vault');
       const wrongExt = write('out/c.exe', 'MZ');

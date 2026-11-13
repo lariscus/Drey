@@ -28,6 +28,8 @@ import {
   NoteSaveResult,
   OpenRequest,
   PdfExportRequest,
+  PlainFolderEntry,
+  PlainFolderListRequest,
   PluginDescriptorForRenderer,
   PluginIpcEventPayload,
   PluginInstallResult,
@@ -286,6 +288,10 @@ const dreyApi: DreyApi = {
     ipcRenderer.invoke(IPC_CHANNELS.externalRead, absolutePath),
   writeExternalFile: (absolutePath: string, content: string): Promise<number> =>
     ipcRenderer.invoke(IPC_CHANNELS.externalWrite, absolutePath, content),
+  listPlainFolder: (request: PlainFolderListRequest): Promise<PlainFolderEntry[]> =>
+    ipcRenderer.invoke(IPC_CHANNELS.folderList, request),
+  revealPlainFolderPath: (request: PlainFolderListRequest): Promise<void> =>
+    ipcRenderer.invoke(IPC_CHANNELS.folderReveal, request),
   getMcpStatus: (): Promise<McpStatus> => ipcRenderer.invoke(IPC_CHANNELS.mcpStatus),
   onMcpWriteRequest: (listener: (request: McpWriteRequest) => void): (() => void) => {
     const wrapped = (_event: IpcRendererEvent, request: McpWriteRequest): void => listener(request);

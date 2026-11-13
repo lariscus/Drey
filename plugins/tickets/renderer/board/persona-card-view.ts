@@ -101,7 +101,17 @@ function chainNode(card: PersonaCardModel, i18n: I18n): HTMLElement {
 
 function topNode(card: PersonaCardModel, i18n: I18n): HTMLElement {
   const top = h('div', 'pb-card-top');
-  top.append(h('span', 'pb-card-id', card.id), h('span', 'pb-grow'));
+  top.append(h('span', 'pb-card-id', card.id));
+  // req-285: under All projects a card names its project (colour + name).
+  if (card.project !== null) {
+    const chip = h('span', 'pb-project', card.project.label);
+    const dot = h('span', 'pb-project-dot');
+    dot.style.background = card.project.color;
+    chip.prepend(dot);
+    chip.title = i18n.t('board.project_chip', { name: card.project.label });
+    top.append(chip);
+  }
+  top.append(h('span', 'pb-grow'));
   if (card.badge !== null) {
     top.append(h('span', `pb-badge pb-badge-${card.badge}`, badgeText(card.badge, i18n)));
   } else if (card.priority !== null) {

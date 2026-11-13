@@ -22,12 +22,14 @@
  *   - `ipc/mcp.ts`      -- the MCP vault server, external tool servers
  *   - `ipc/plugins.ts`  -- plugin discovery, invoke / event, plugin packages
  *   - `ipc/updates.ts`  -- the GitHub-Releases update system (ADR-0074)
+ *   - `ipc/folders.ts`  -- a project's plain folders outside the vaults (req-285)
  *
  * Each topic file holds its payload types and its slice of the bridge
  * (`AppIpc`, `VaultIpc`, ...); `DreyApi` is their sum. A new channel goes
  * into the topic file it belongs to, never into this one.
  */
 import type { AppIpc } from './ipc/app';
+import type { FoldersIpc } from './ipc/folders';
 import type { LlmIpc } from './ipc/llm';
 import type { McpIpc } from './ipc/mcp';
 import type { NotesIpc } from './ipc/notes';
@@ -47,6 +49,7 @@ export type * from './ipc/spelling';
 export type * from './ipc/mcp';
 export type * from './ipc/plugins';
 export type * from './ipc/updates';
+export type * from './ipc/folders';
 
 export type {
   PluginDescriptorForRenderer,
@@ -68,7 +71,8 @@ export interface DreyApi
     SpellingIpc,
     McpIpc,
     PluginsIpc,
-    UpdatesIpc {}
+    UpdatesIpc,
+    FoldersIpc {}
 
 declare global {
   interface Window {

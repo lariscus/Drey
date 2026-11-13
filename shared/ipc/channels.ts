@@ -70,6 +70,10 @@ export const IPC_CHANNELS = {
   vaultRefresh: 'vault:refresh',
   draftSave: 'draft:save',
   vaultPickSavePath: 'vault:pick-save-path',
+  // A project's plain folders outside the vaults (req-285): one level of
+  // one folder, read-only.
+  folderList: 'folder:list',
+  folderReveal: 'folder:reveal',
   dailyOpen: 'daily:open',
   // Files the OS hands to Drey (Explorer "Open with" / default program,
   // ADR-0054). `external:take-pending` is the renderer's cold-start PULL of

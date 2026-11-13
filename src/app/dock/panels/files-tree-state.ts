@@ -1,6 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { docKey } from '../../services/editor.service';
 import { VaultService } from '../../vault';
+import { FilesScopeState } from './files-scope';
 import {
   SelectionModifiers,
   TreeTarget,
@@ -22,6 +23,7 @@ import {
 @Injectable()
 export class FilesTreeState {
   private readonly vault = inject(VaultService);
+  private readonly scope = inject(FilesScopeState);
 
   /**
    * Folder paths the user has EXPANDED, per vault (composite keys). Folders
@@ -54,9 +56,9 @@ export class FilesTreeState {
   /** The row a Shift-range extends from (the last plain-selected row). */
   private readonly anchor = signal<string | null>(null);
 
-  /** The rows the tree shows right now, in display order. */
+  /** The rows the tree shows right now, in display order -- the vaults the project filter lets through (req-285). */
   readonly visibleNodes = computed<VisibleNode[]>(() =>
-    flattenVisible(this.vault.vaults(), this.vault.trees(), this.collapsedVaults(), this.expanded()),
+    flattenVisible(this.scope.vaults(), this.vault.trees(), this.collapsedVaults(), this.expanded()),
   );
 
   /** Drives the header toggle: "Expand all" while any folder is still collapsed. */

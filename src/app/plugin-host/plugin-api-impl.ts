@@ -56,7 +56,7 @@ import { FrontmatterViewRegistry } from './frontmatter-view-registry.service';
 import { FileOpenerRegistry } from '../services/file-opener-registry.service';
 import { DocKindRegistry } from './doc-kind-registry.service';
 import { HomeViewRouter } from '../services/home-view-router.service';
-import { ViewService } from '../views';
+import { ViewService, WorkspaceScopeService } from '../views';
 import { PluginSettingsHost } from './plugin-settings-host';
 import {
   EditorContextMenuRegistry,
@@ -104,6 +104,7 @@ export class PluginApiFactory {
   private readonly docKinds = inject(DocKindRegistry);
   private readonly homeViews = inject(HomeViewRouter);
   private readonly views = inject(ViewService);
+  private readonly workspaceScope = inject(WorkspaceScopeService);
   private readonly menuContributions = inject(MenuContributionsService);
   private readonly contextMenuItems = inject(EditorContextMenuRegistry);
   private readonly toolbarButtons = inject(ToolbarContributionsService);
@@ -373,6 +374,13 @@ export class PluginApiFactory {
         switchView: (id) => this.views.switchTo(id),
         activeViewId: () => this.views.activeId(),
         onActiveViewChange: (listener) => track(this.views.onActiveChange(listener)),
+        registerWorkspaceScope: (contrib) => {
+          const handle = this.workspaceScope.register(pluginId, contrib);
+          track(() => handle.dispose());
+          return handle;
+        },
+        workspaceScope: () => this.workspaceScope.active(),
+        onWorkspaceScopeChange: (listener) => track(this.workspaceScope.onChange(listener)),
         registerMenuContributions: (items: readonly MenuContribution[]) =>
           track(this.menuContributions.register(pluginId, items)),
         // The "Add entry" drawer it mounted into is gone (milestone 43,

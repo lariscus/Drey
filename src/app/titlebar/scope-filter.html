@@ -1,0 +1,63 @@
+<!-- i18n: catalog -->
+@if (scope.contrib(); as contrib) {
+  <div class="sf-group">
+    <button
+      type="button"
+      class="sf-btn"
+      [class.open]="open()"
+      aria-haspopup="menu"
+      [attr.aria-expanded]="open()"
+      [attr.aria-label]="contrib.label + ': ' + label()"
+      [title]="contrib.label"
+      (click)="toggle()"
+    >
+      @if (scope.active(); as active) {
+        <span class="sf-dot" [class.none]="active.color === ''" [style.background]="active.color || null" aria-hidden="true"></span>
+      } @else {
+        <span class="sf-dot" [style.background]="allDot()" aria-hidden="true"></span>
+      }
+      <span class="sf-label">{{ label() }}</span>
+      <app-icon name="chevron-down" [size]="14" />
+    </button>
+    @if (open()) {
+      <div class="sf-backdrop" appOverlayGuard (click)="open.set(false)" (contextmenu)="$event.preventDefault(); open.set(false)"></div>
+      <div class="sf-menu" role="menu" [attr.aria-label]="contrib.label">
+        <button type="button" role="menuitemradio" class="sf-item" [attr.aria-checked]="scope.active() === null" (click)="pick(null)">
+          <span class="sf-check" aria-hidden="true">
+            @if (scope.active() === null) {
+              <app-icon name="check" [size]="14" />
+            }
+          </span>
+          <span class="sf-dot sf-dot-10" [style.background]="allDot()" aria-hidden="true"></span>
+          <span class="sf-name">{{ contrib.allLabel }}</span>
+        </button>
+        @for (option of scope.choices(); track option.id) {
+          <button
+            type="button"
+            role="menuitemradio"
+            class="sf-item"
+            [attr.aria-checked]="scope.active()?.id === option.id"
+            (click)="pick(option.id)"
+          >
+            <span class="sf-check" aria-hidden="true">
+              @if (scope.active()?.id === option.id) {
+                <app-icon name="check" [size]="14" />
+              }
+            </span>
+            <span class="sf-dot sf-dot-10" [class.none]="option.color === ''" [style.background]="option.color || null" aria-hidden="true"></span>
+            <span class="sf-name">{{ option.label }}</span>
+            @if (option.count !== undefined) {
+              <span class="sf-count">{{ option.count }}</span>
+            }
+          </button>
+        }
+        @if (contrib.manageLabel; as manageLabel) {
+          <div class="sf-sep" role="separator"></div>
+          <button type="button" role="menuitem" class="sf-item" (click)="manage()">
+            <span class="sf-check" aria-hidden="true"></span>{{ manageLabel }}
+          </button>
+        }
+      </div>
+    }
+  </div>
+}

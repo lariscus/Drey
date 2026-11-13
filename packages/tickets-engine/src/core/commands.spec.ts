@@ -42,6 +42,11 @@ describe('command parsers', () => {
     });
   });
 
+  it('carries the project a capture lands in, and drops one that is no project id (req-285)', () => {
+    expect(parseCreate({ title: 'Fix', project: ' drey ' })).toEqual({ ok: true, value: { title: 'Fix', priority: 'normal', repo: null, description: '', project: 'drey' } });
+    expect(parseCreate({ title: 'Fix', project: 'Not an id' })).toEqual({ ok: true, value: { title: 'Fix', priority: 'normal', repo: null, description: '' } });
+  });
+
   it('derives an empty create title from the description (req-75 W5b)', () => {
     expect(parseCreate({ title: '  ', description: ' the outline panel should scroll\nmore' })).toEqual({
       ok: true,

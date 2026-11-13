@@ -18,6 +18,7 @@ import { taskToggleExtension, toggleInFocusedSurface } from './task-toggle.js';
 import { taskMetaExtension } from './task-meta.js';
 import { startReminders } from './reminders.js';
 import { createTasksSettingsPage, REMINDERS_ENABLED_KEY } from './settings.js';
+import { taskScopeVaults } from './task-scope.js';
 
 /** Files under here are kept out of the vault list (mirrors the main-side index). */
 const TEMPLATES_PREFIX = 'templates/';
@@ -33,20 +34,20 @@ let reminders: ReturnType<typeof startReminders> | null = null;
  * the list) never adopted it until an unrelated save. Same fold the Tags
  * plugin's search runs over dirty tabs. The merge is keyed by
  * `vaultId` + path (two vaults may hold the same relative path), and
- * `scopeVaultId` narrows it to one vault (`null` = every vault, the All
+ * `inScope` narrows it to the scope's vaults (`null` = every vault, the All
  * scope); never-located scratch tabs hold no vault content either way.
  */
 function withOpenBufferHits(
   disk: TaskRecord[],
   docs: readonly OpenDocumentInfo[],
-  scopeVaultId: string | null,
+  inScope: ReadonlySet<string> | null,
 ): TaskRecord[] {
   const dirty = docs.filter(
     (doc) =>
       doc.kind === 'text' &&
       doc.dirty &&
       doc.vaultId !== null &&
-      (scopeVaultId === null || doc.vaultId === scopeVaultId) &&
+      (inScope === null || inScope.has(doc.vaultId)) &&
       !doc.path.startsWith(TEMPLATES_PREFIX),
   );
   if (dirty.length === 0) {
@@ -189,17 +190,20 @@ const plugin: PluginRendererModule = {
             : scanTasks(state.activePath, state.activeBuffer, state.activeVault ?? '');
       } else {
         // Vault scope: exactly the registry's active vault, at pull time.
-        // All scope: every known vault — the list is scoped client-side so
-        // the active vault is never stale.
-        const disk =
-          query.scope === 'vault'
-            ? state.vaultTasks.filter((t) => t.vaultId === activeVaultId)
-            : state.vaultTasks;
-        base = withOpenBufferHits(
-          disk,
-          api.documents.list(),
-          query.scope === 'vault' ? activeVaultId : null,
+        // All scope: every known vault. Project scope (SDK 1.59): the vaults
+        // the title bar's choice names. The list is scoped client-side so
+        // the active vault and the choice are never stale.
+        const inScope = taskScopeVaults(
+          query.scope,
+          activeVaultId,
+          api.ui.workspaceScope(),
+          [...vaultNames].map(([id, name]) => ({ id, name })),
         );
+        const disk =
+          inScope === null
+            ? state.vaultTasks
+            : state.vaultTasks.filter((t) => inScope.has(t.vaultId));
+        base = withOpenBufferHits(disk, api.documents.list(), inScope);
       }
       return filterVisibleTasks(base, {
         kinds: state.kinds,
