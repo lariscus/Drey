@@ -68,7 +68,6 @@ The owner fixed the end of the current stretch ("ich habe das gefühl mit jedem 
 ### Known defects
 
 
-- **D-56 — The owner's configured Flow and Crew settings are missing in his installation** (M; (owner request, outside the list; owner's first verification round on the integrated build, 2026-11-07); **needs the owner's detail: which page is empty, what was configured before the cut-over**). Facts: the store's `_meta/personas` holds only `build-default`, `commit-default` and `you`; the default crew (E12-9d) is shipped and seeded since milestone 235 (req-256) — a board without it gets it at the engine's next start, so that half is closed; milestone 230 moves the crew keys of `config.json` / `chain.json` into `crew.md` once and the pools live in `service.json`'s slots (req-177), which seeding does not touch; the chain config in `~/.drey-engine/fleet/chain.json` still points at `ticketsVaultPath E:\projects\drey-tickets` with three pools. Done when Settings → Tickets → Flow and Crew show what the owner configured, and a cut-over migrates those settings or says what it cannot carry.
 
 
 ### Now (small, daily value)
@@ -366,6 +365,7 @@ _Rebuilt from the cloud session of 2026-11-14 (owner: "Ja, so") — its four com
   The Crew runner's share of (1)–(2) — its file writer, stamps, moves and status lines —
   left with req-176 (milestone 214); what remains here is the board and engine side.
   Three orphan helpers (`parkLine`, `phaseIdFromTitle`, `columnWorkerPin`) can go with it.
+- **req-308 — The Autopilot's tranche when there is nothing to do** (owner, 2026-11-15, finish line step 5). A tranche (req-179, milestone 221) ends after `autopilot.tranche.runs` starts, a `budgetShare` of the day's budget or `autopilot.tranche.minutes` (240) on the wall clock from its release — whichever comes first — and then pauses the Autopilot at a checkpoint with a report for the owner to release the next one. With an empty queue the clock still runs, the popover shows a tranche counting down although nothing runs, and after four idle hours the owner gets an empty checkpoint. Show "nothing to do" while no ticket is startable, count the span only while the tranche has work (or start it with the first run), and never raise a checkpoint for a tranche without a run. The manual says what a tranche is for: a brake that makes the owner look at the results after a batch.
 - **req-300 — Sort the tickets plugin and the engine into domain folders** (owner, 2026-11-14; was the cloud's "req-179" – "req-181", commits c88a8411, e69b201a, e102d146 on the milestone-209 base). The plugin's `renderer/` and `main/`, the engine's `core/` and `fleet/` sorted into domain folders, imports and docs updated, behaviour unchanged. Redo it on the current tree **as the last code change before the merge into `main`**, when no other session works in the engine, with the cloud commits as the reference for the folder names; ADR-0096's import boundaries and `eslint.size-baseline.mjs` follow the moves.
 _Added by the owner on 2026-11-14 (crew management and the flow, before the merge into `main`):_
 
