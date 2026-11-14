@@ -55,7 +55,7 @@ owner-verified (the round for 1–81 closed 2026-10-17; 82, the auto-update, and
 The owner fixed the end of the current stretch ("ich habe das gefühl mit jedem Lauf entferne ich mich weiter statt näher an das Ende zu kommen" — "Ja, so"). **Only these items count**, in this order:
 
 1. **req-257**, the runner on persona chains — milestone 247 (cursor, holder dispatch, You and notify entries, per-persona pool and breaker) and milestone 248 (send-back, questions, `### Chain`, Pia's entry).
-2. **The seven known defects** below — D-53, D-54, D-64, D-65 (milestone 249) and D-55, D-57 (milestone 250) run beside req-257; D-56 after the owner's decision on its settings half.
+2. **The seven known defects** below — D-53, D-54, D-64, D-65 (milestone 249) and D-55, D-57 (milestone 250) run beside req-257; D-56 closed without a fix on 2026-11-15 (`decisions.md`).
 3. **An interim verification round** by the owner after milestone 248, so the unverified pile stops growing.
 4. **req-270, req-271, req-273, req-274 (milestone 256), req-281 (milestone 261, with req-293 – req-296)**, then **req-268** (the live board migration, together with req-270/271), then **req-275** (ADR and specs, milestone 262). _req-270, req-271 and req-268's code side are built (milestone 254), req-273 as milestone 260; the owner runs the migration on his board himself (the Tickets panel's line, one confirmation per step)._
 5. **req-282 – req-291**, projects, Persona v3 and Models v3 (owner 2026-11-13: *"die brauche ich alle vor dem merge nach main … aktuell ist das nicht nutzbar"*), in the order of their section below — and **every correction the owner names before the merge**, each added as a row of that section.
