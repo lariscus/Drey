@@ -22,8 +22,8 @@ function fakePersona(id: string, title: string): import('../core/persona').Perso
     kind: 'agent',
     title,
     role: 'builder',
-    worker: 'claude-code',
-    models: { default: 'opus', pool: ['opus'] },
+    class: 'heavy',
+    model: null,
     color: '#a78bfa',
     summary: '',
     skills: [],
@@ -98,8 +98,8 @@ describe('DreyTicketsPort', () => {
         kind: 'agent',
         title: 'Pia',
         role: 'planner',
-        worker: 'claude-code',
-        models: { default: 'opus', pool: ['opus', 'sonnet'], router: 'off' },
+        class: 'heavy',
+        model: 'claude-code/opus',
         color: '#a78bfa',
         skills: [],
         budget: 25,
@@ -113,9 +113,8 @@ describe('DreyTicketsPort', () => {
         id: 'pia',
         title: 'Pia',
         role: 'planner',
-        worker: 'claude-code',
-        model: 'opus',
-        pool: ['opus', 'sonnet'],
+        class: 'heavy',
+        model: 'claude-code/opus',
         color: '#a78bfa',
         budget: 25,
         settings: EMPTY_PERSONA_SETTINGS,
@@ -129,7 +128,8 @@ describe('DreyTicketsPort', () => {
     vi.mocked(board.listPersonas).mockResolvedValue([{ ...fakePersona('pia', 'Pia'), kind: 'mission', role: 'custom', summary: 'Mission Control.' }]);
     const port = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false });
     const [pia] = await port.personas();
-    expect(pia).toMatchObject({ id: 'pia', kind: 'mission', title: 'Pia', role: 'custom', worker: '', model: '', pool: [], summary: 'Mission Control.' });
+    expect(pia).toMatchObject({ id: 'pia', kind: 'mission', title: 'Pia', role: 'custom', model: '', summary: 'Mission Control.' });
+    expect(pia).not.toHaveProperty('class');
     expect(pia).not.toHaveProperty('settings');
     expect(pia).not.toHaveProperty('allowed');
   });

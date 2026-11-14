@@ -469,16 +469,16 @@ what lets the signals discipline's FRICTION line reach the persona's journal; th
 did (D-61 — nothing is adopted unreviewed; req-168 made the 1:1 a session,
 "The 1:1 session" below).
 
-**Which model a persona run gets (milestone 212, D-62).** The dispatch
-pass resolves the model through `personaModelFor(persona, context)`:
-router `off` walks `models.default` then `models.pool` in order, `budget`
-the pool in order, `escalate-on-fail` the default then one pool step per
-failed run of the ticket in this phase; a pool entry whose provider pool
-(`fleet.pool.<provider>.size` minus the live runs, as the planner counts
-them at that point of the pass) has no free slot is skipped, and an entry
-may name its own provider (`kimi/k2`). The `dispatched …` log line ends
-with `— model <id>: <why>`, e.g. `— model k2: sonnet: the claude-code pool
-is full — pool fallback`. req-170 replaces this with class requests.
+**Which model a persona run gets (req-288, Persona v3; replaces D-62's `personaModelFor` and the persona's `models.pool`).**
+A persona's `persona.md` carries `class:` and an optional pinned `model:`
+(`specs/ticket-schema.md`); there is no `worker:`, no `models:`, no persona
+`min-class:`. The dispatch asks the capacity pool for the persona's class
+(*Who asks for which class* below); the pool is every enabled model of the
+model table, so the next free model of the class runs, and the harness
+follows from the model. A pinned model runs alone — no step up — while nothing
+raised the class. The 1:1 and the free session
+(`fleet/persona-harness.ts`) use the pinned model's harness, else the first
+enabled model of the persona's class in the table; no harness, no session.
 
 The caps are the plugin config keys `fleet.cap.gateFailureLines` /
 `fleet.cap.gateFailureBytes` / `fleet.cap.diffStatLines` /
@@ -723,7 +723,7 @@ wired in `fleet/compose-routing.ts` and `fleet/compose-pool.ts`; the chain asks 
 | `capacity.perSlot` | a slot's cost cap by id; a slot not named has none (req-287 retired the derived cap — the class caps and the account's `sessions` bound it) |
 | `discovery.ignored` | req-286: the `<provider>:<model>` keys of the new-model cards the owner ignored |
 | `ledgers.*` | USD defaults: a ticket's allowance when its frontmatter sets none, a persona's day when its `persona.md` sets no `budget:`, every slot's day |
-| `routing.upgradeAboveQ` | req-178, board 7l's `Upgrade above q` (default `1.3`): above this surplus the chosen slot runs the next stronger model of the persona's pool it serves; `null` = never step up |
+| `routing.upgradeAboveQ` | req-178, board 7l's `Upgrade above q` (default `1.3`): above this surplus the chosen slot runs the next stronger model of the model table it serves; `null` = never step up |
 | `routing.reservePerWindow` | req-178, board 7l's `Reserve per window` as a share (default `0.1` = 10 %): a start whose estimated share would take any window of the slot below it waits; `0` = no reserve |
 | `routing.burnRate` | req-181, board 7l's `Burn rate` as a share (default `0.2` = 20 %): at most this much of the weekly quota per day over all slots; reached = no new run starts until the day turns (see *The burn rate* below); `0` = off. A value outside 0 to below 1 is refused (422) and read as the default |
 | `migrations` | `fleet.pool.size` once req-63's sizes moved into the slots (below); `classes.v3` once req-287 moved A · B · C into the class list — each row's letter became its name and its old `sessions` left the row, the class list was written as the shipped four with each class capped at the sessions its old rows served together (a row's `sessions` is no longer read) |
@@ -744,14 +744,17 @@ ticket with a persona:
 1. a ticket pin `model:` asks for that model (its row's class), `class:`
    for exactly that class — a pin beats everything below;
 2. else the plan part's `size:` — **S → light, M → standard, L → heavy** — or, unsized,
-   the class of the persona's `models.default`;
-3. raised to the phase's floor `min-class:` (`pipeline.md`);
-4. raised, if the persona's `models.pool` holds no model of that class, to
-   the lightest stronger class it does hold — raised, never lowered.
+   the persona's `class:` (req-288);
+3. raised to the phase's floor `min-class:` (`pipeline.md`) — a ticket's
+   `class:`, the part's `size:` and the phase's floor only raise the
+   persona's class, never lower it;
+4. the persona's `model:` pin, when set and nothing raised the class, runs
+   alone (no step up); a raise takes the next free model of the raised
+   class.
 
 "Stronger" is the order of the owner's class list (req-287); a class the
 list does not hold ranks below every listed one. A ticket's `class:`, a
-phase's or persona's `min-class:` and Pia's session card name a class
+phase's `min-class:`, a persona's `class:` and Pia's session card name a class
 (the old letters read as their names).
 
 The request also carries the step's `needs:` (the phase's and the
@@ -767,7 +770,7 @@ line.
 ### Routing within the class (req-178)
 
 Two stages, then a possible step up, over every row of the class in the
-persona's pool on every slot that serves it:
+model table on every slot that serves it:
 
 1. **The filter** (hard; `SlotFit`): the
    step's needs against the row's declared capabilities (`no image input`,
@@ -789,7 +792,7 @@ persona's pool on every slot that serves it:
    pool's order.
 3. **The step up** (`StepUp`): when the chosen slot's `q` is above
    `routing.upgradeAboveQ`, it runs the next stronger model of the
-   persona's pool that **the same slot** serves (the lightest class above
+   model table that **the same slot** serves (the lightest class above
    the granted one), if that model passes the filter there too. One step,
    only upwards, never onto another slot, never on a `model:` / `class:`
    pin. **Never a smaller class** — nothing of the class passed → the
@@ -873,7 +876,7 @@ B)`), and the dispatcher goes on with the next task whose class has room.
 Every pass rebuilds the queue in dispatch order (priority class, the
 rightmost column, position), so when a run settles the next pass serves
 it front to back. `reason: config` means waiting will not help: the
-persona's pool holds no model of the class, a row's cost is above a cap,
+the model table holds no enabled model of the class, a row's cost is above a cap,
 no slot serves it — fix `service.json` or the persona.
 
 ### The three ledgers
@@ -907,7 +910,8 @@ dispatch plan's per-provider bound is now the sum of the provider's slots'
 server (`fleet.pool.opencode.probe`) and the rate-limit shrink still lower
 it. The router policies of `models.router` (`off | budget |
 escalate-on-fail`) are gone; an old `router:` key in `persona.md` is
-ignored and dropped on the next rewrite.
+ignored and dropped on the next rewrite. A persona's own model pool is gone
+as well (req-288): the pool is the model table.
 
 ## The tickets remote is not the runner
 
@@ -1047,7 +1051,7 @@ by themselves** (On), only finish what runs (Paused), or wait for the owner
   engine's `ChatService` and the `chat.*` config (the LLM over HTTP) — none
   of them reads the Autopilot, the chain status or whether the runner is
   up. A persona's 1:1 is a runner session (req-168, below), started on
-  demand like a run; an `api` persona's 1:1 takes the chat bridge.
+  demand like a run; Mission Control's persona's 1:1 takes the chat bridge, and so does an agent no harness follows for (req-288: no pin with a known harness, no model of its class — what an old `worker: api` persona migrates to).
 - **What genuinely needs the runner starts it on demand, Autopilot or not.**
   A run start (`FleetClient.start`), a message to a run (`send` — a
   reopenable ended run resumes under a fresh runner) and the Autopilot
@@ -1082,7 +1086,7 @@ A persona's 1:1 is a run record with `kind: '1:1'` (`fleet/protocol-session.ts`)
   `HeldSessionStarter` (kind `OneOnOneKind`, req-173) instead of the ticket starter: `ticketId` is the marker
   `1:1`, no `dk` (no claim), no worktree, `gate: 'none'`, no move,
   `permissionMode: 'read-only'`, `column: null`. The pool binds it like a
-  run (slot, class of the persona's default model, the persona's and the
+  run (slot, the persona's class, the persona's and the
   provider's ledgers; `ledger.noTicket` — no ticket allowance). The worker
   spawns **quiet and held** in the tickets repository; one live 1:1 per
   persona (a second start is refused). The engine composes the request
@@ -1107,8 +1111,7 @@ A persona's 1:1 is a run record with `kind: '1:1'` (`fleet/protocol-session.ts`)
   `vault_read` from Drey Service's vault MCP (req-217, milestone 234; see
   *The vault over MCP* below). `OneOnOneToolSeam` is implemented by the
   vault MCP component: it answers the three names when the endpoint listens
-  and the persona's harness takes an MCP configuration, and nothing for an
-  `api` persona; the brief's `## Tools` names exactly that answer and the
+  and the persona's harness takes an MCP configuration; the brief's `## Tools` names exactly that answer and the
   spawn path attaches exactly that. `fleet_status` / `fleet_watch` are Drey's
   own MCP server's tools (the plugin-tool registry lives in the Drey process),
   not the service's, so they are **not attached** — the 1:1 reads the board in
@@ -1267,11 +1270,11 @@ keep the column dispatch (and its ring run) as before.
 
 A board starts with five personas — **Pia** (Mission Control's own persona, `kind: mission`, req-269), **Paul** (planner), **Ben** (builder), **Ralf** (reviewer), **Tessa** (tester) — shipped as files in the package (`packages/tickets-engine/personas/<id>/`) and seeded by `CrewSeeder` (`services/crew-seeder.ts`): with "Initialize board" after the pipeline and the prompts, and once at the engine's start for a board that lacks them. What to know when reading a run, a Crew card or a log:
 
-- **Idempotent by id.** `tickets/_meta/crew.md` carries `seeded-crew: [pia, paul, ben, ralf, tessa]` after a seeding; an id in it is never seeded again (delete a persona and it stays deleted), and a persona whose folder exists is never touched. A board seeded before req-269 gets Pia alone at the next start, in front of its `order:`. One commit `personas: the default crew (req-256)` holds the persona files and `crew.md`; the engine logs one `crew: seeded the default crew (…)` line with the worker and the models.
-- **Pia runs nothing.** Her `prompt.md` opens every Mission Control turn (read from the vault on each turn — an edit applies on the next message); she has no worker, models, 1:1, free session, slot or budget. In a chain she is an entry like any persona (`entryWorkOf` → `mission-turn`): the engine runs her turn on the ticket (*Persona chains* above), never the runner.
-- **Worker and models.** The worker is `default-worker` of `crew.md`, else `opencode`. The models are read from the **model table in `service.json`** (`<service home>/service.json`, the file the runner reads — a sleeping runner does not matter): the worker's provider rows, strongest class first, the first is `models.default`, all are the `pool`. A worker the table has no model for (no table yet, `api`) leaves the parser's default and the log line says so — set it on the Persona page.
+- **Idempotent by id.** `tickets/_meta/crew.md` carries `seeded-crew: [pia, paul, ben, ralf, tessa]` after a seeding; an id in it is never seeded again (delete a persona and it stays deleted), and a persona whose folder exists is never touched. A board seeded before req-269 gets Pia alone at the next start, in front of its `order:`. One commit `personas: the default crew (req-256)` holds the persona files and `crew.md`; the engine logs one `crew: seeded the default crew (…)` line. The shipped records carry `class: heavy` and no pin; since req-288 the seeder reads neither the model table nor `default-worker`.
+- **Pia runs nothing.** Her `prompt.md` opens every Mission Control turn (read from the vault on each turn — an edit applies on the next message); she has no class, pin, 1:1, free session, slot or budget. In a chain she is an entry like any persona (`entryWorkOf` → `mission-turn`): the engine runs her turn on the ticket (*Persona chains* above), never the runner.
+- **Class and model (req-288).** A persona names a **class** of the owner's list (Settings → Models) and may pin one model of the model table (`<provider>/<model>`); absent = next free in class. The harness follows from the model. A board seeded before req-288 holds v2 records (`worker:`, `models:`, `min-class:`): at the engine's start `PersonaModelMigrator` (after the seeding and the picture backfill, before the first project's migration) rewrites them in one commit `personas: class and model replace worker and models (req-288)` — class = the table's class of the old default model (read from `service.json`; the old floor folded in, raised never lowered; without a table row the floor, else `heavy`), the old default pinned only when the pool held exactly that model. Idempotent; a patch that sends `class` or `model` migrates an unmigrated record too.
 - **The seeding changes no run.** On a chain board (*Persona chains* above) the chain's entry at the cursor says who runs; on the phase board the column's `persona:` (the ticket pin and the crew's `default-persona` retired with req-257), and the seeding sets none of them, so a phase-board column without one still runs the ring with the step prompt. A run takes Ben when a ticket's chain names him at the cursor or a phase-board column (`persona: ben` on the phase in `_meta/pipeline.md`) does; Paul, Ralf and Tessa the same, and each answers a 1:1 or a free session at once. A persona-pinned run uses the persona's `prompt.md` **instead of** the step prompt, which is why the seeded prompts end in the role's shipped step (`plan-default`, `build-default`, `review-default`, `qa-default`) — and why a Shape-mode (interactive) plan step must not be pinned to Paul yet (req-258).
-- **Pictures (req-292).** Each shipped persona and the human `you` come with a picture (`personas/<id>/avatar.png`, the package's `packages/tickets-engine/personas/<id>/avatar.png`): the seeding copies it with the persona, the creation of `you` with that persona, and at the engine's start a board seeded before the pictures gets them — every `seeded-crew:` id and `you` with a folder but no picture, one commit `personas: crew pictures`, log line `crew: gave … the shipped picture`. Never over a picture that is there; a deleted persona is not re-created; the ids join `seeded-pictures:` in `crew.md`, so a picture removed later stays removed. The persona list carries `avatarVersion`; `GET /api/personas/<id>/avatar` answers `{ok: true, dataUrl}` or 404. By hand, against a service with your own home: `curl -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/api/personas/ben/avatar`.
+- **Pictures (req-292).** Each shipped persona and the human `you` come with a picture (`personas/<id>/avatar.png`, the package's `packages/tickets-engine/personas/<id>/avatar.png`): the seeding copies it with the persona, the creation of `you` with that persona, and at the engine's start a board seeded before the pictures gets them — every `seeded-crew:` id and `you` with a folder but no picture, one commit `personas: crew pictures`, log line `crew: gave … the shipped picture`. Never over a picture that is there; the Persona page uploads and removes one (`POST /api/personas/<id>/avatar` `{dataUrl}`, a PNG data URL of at most 2 MB, commit `personas: <id> picture`; `…/avatar/remove`, commit `personas: <id> picture removed`, which for a shipped picture also lists the id in `seeded-pictures:`, req-288); a deleted persona is not re-created; the ids join `seeded-pictures:` in `crew.md`, so a picture removed later stays removed. The persona list carries `avatarVersion`; `GET /api/personas/<id>/avatar` answers `{ok: true, dataUrl}` or 404. By hand, against a service with your own home: `curl -H "Authorization: Bearer <token>" http://127.0.0.1:<port>/api/personas/ben/avatar`.
 - **A persona you delete stays deleted; a persona you edit stays edited.** Delete it from its page (*Delete persona…*, confirmed by typing its name; req-261): `personas/<id>/` goes in one commit `personas: <id> removed`, refused for `you`, for Pia (`mission` — Mission Control speaks with her prompt), for a persona with a live or held run, 1:1 or session, and for one a column (`persona:` in `pipeline.md`) pins (the crew's `default-persona` pins nobody since req-257). Nothing re-seeds, resets or updates a seeded persona; the shipped texts are in `specs/classifier-spec.md` ("The default crew's persona prompts").
 
 ## Free sessions (req-173, R12)

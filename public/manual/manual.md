@@ -1712,26 +1712,33 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   journal](#memory-journal); the tab carries the count) and **1:1** (a
   conversation with the persona, [The 1:1](#one-on-one); Ctrl+Enter sends).
   The tab stays where you left it while the page is open. On the left,
-  **Profile** (the persona's picture — or its initials —, the name, the role and **the one
+  **Profile** (the persona's picture — or its initials — with a camera
+  button: **Upload picture…** takes any image, centred and cropped to a
+  square, and **Remove picture** takes it away again — a removed picture of
+  the shipped crew stays removed; the name, the role and **the one
   line for the crew list** — the line under the name on the crew cards, in
-  Mission Control too), **Work** (the harness; the models,
-  strongest first, each with its class, its factor and how many of its
-  sessions are busy (`1 / 3 busy`: the running runs and 1:1s on that model
-  against what its accounts allow); **Add a model…** picks from the model table and the **⋮** menu moves or
-  removes a row; the **Class floor** — the lowest model class a run of the
-  persona may use, over the step's own; **Read-only** — the persona's runs
+  Mission Control too), **Model** (the persona's **class** — a segmented
+  control of the classes in your list under *Settings → Models*, such as
+  *super heavy · heavy · standard · light*; and **Model**: *Next free in class*,
+  the default, or one model of that class, each with its harness. The line
+  under it, `3 heavy models · 2 free now`, says how many enabled models serve the
+  class and how many have a free session. A ticket's class, a plan part's
+  size and the step's class floor can only raise the class a run asks for,
+  never lower it; a pinned model runs alone until one of them does. The harness
+  follows from the model — the persona has none of its own and no model list),
+  **Work** (**Read-only** — the persona's runs
   are told to change no file (an instruction in their brief, not a lock: the
   reviewer and the tester are read-only unless you switch it off);
   **Parallel · max** and **Parallel · min** — the most runs of the persona at
   once, and how many it may start when the big pool is full (both are
   enforced: a run needs room in the persona's pool and in the big one); **Leaving actions** — machine work when a
   ticket leaves the persona, `sync-main` or `commit` (see *Leaving actions*
-  below); the daily budget) and **Allowed to** (**Change notes where the
-  project allows** — the project names the vaults, see *The crew's vault* —,
-  whether its runs ask before running commands, whether it may
-  reach the network, whether it may spend past a ticket's allowance — hover a
-  row for what it means; the notes and allowance choices apply to runs now,
-  the commands and network choices are recorded for the runner). On the right,
+  below); the daily budget) and **Allowed to** (**Run commands** in the worktree,
+  **Reach the network**, **Change notes where the project allows** — the project
+  names the vaults, so the link *Vaults are set per project* opens *Settings →
+  Projects*; see *The crew's vault* — and **Spend above allowance**, past a
+  ticket's allowance — hover a row for what it means; the notes and allowance
+  choices apply to runs now, the commands and network choices are recorded for the runner). On the right,
   **Instructions** is the persona's `prompt.md` in the same editor your notes
   use — Live Preview or **Source**, with the formatting buttons above it — and
   the line above it counts what a run of this persona starts with (`≈ 2,490
@@ -1795,23 +1802,26 @@ use, and an up-chevron marks it.
 **Models, classes and the capacity pool.** Every model you let the crew
 use has a row in the model table (Settings → Tickets → **Models**, below;
 it lives in `service.json` in the background service's folder): its account,
-a **class** — **A** strongest, then **B**, then **C** — and a **cost
-factor**, what one running session of it weighs. A cap says how much may
-run at once, summed over the running sessions only: one for all accounts
-together and one per account. Before a worker starts, its ticket asks
-for a class: a part your planner sized **S**, **M** or **L** asks for C,
-B or A; a ticket without a size asks for the class of its persona's
+a **class** and a **cost factor**, what one running session of it weighs.
+The classes are your own list, strongest first — Drey starts with **super
+heavy**, **heavy**, **standard** and **light** (the older A, B and C became
+heavy, standard and light) — and each class runs **at most** the number of
+sessions you give it at once, over all accounts. The *Global cap* says how
+much may run at once in cost factors, summed over the running sessions only;
+an account may carry its own limit of sessions too. Before a worker starts,
+its ticket asks for a class: a part your planner sized **S**, **M** or
+**L** asks for light, standard or heavy; a ticket without a size asks for the class of its persona's
 default model; a column with `min-class:` in its pipeline raises that,
 and a ticket's own `class:` or `model:` decides outright. The ticket gets
 a model of exactly that class from its persona's list — **never a weaker
 one**. When nothing of that class has room, no worker starts: the
 ticket waits in the pool's queue and the background service's log says
-why (*queued · waits for a B slot*), the ticket's card on the Board and
-its Running row in the Work panel say so too (*queued · waits for a B slot ·
+why (*queued · waits for a standard slot*), the ticket's card on the Board and
+its Running row in the Work panel say so too (*queued · waits for a standard slot ·
 2nd*, the place in the queue), the next ticket whose class has
 room goes ahead, and as soon as a run ends the waiting tickets go in
 order of importance. The worker's thread names the model it got and why
-(*pool: claude-sonnet-4-5, class B, cost 1 on Claude A — size M → B*).
+(*pool: claude-sonnet-5-5, class standard, cost 1 on Claude A — size M → standard*).
 
 **Which account and model a run gets.** Within its class a run goes to
 the account with the most quota to spare (the largest `q`; equal → the
@@ -1822,43 +1832,55 @@ below the reserve kept in each quota window (10 % unless you set
 `routing.reservePerWindow`); above `q` 1.3 (`routing.upgradeAboveQ`) the
 same account runs the next stronger model of the persona's list. The
 worker's thread and the background service's log say where it went and
-why in one line (*route T-0121 → claude-a/sonnet: class B, q 1.4, est
+why in one line (*route T-0121 → claude-a/sonnet: class standard, q 1.4, est
 $0.40 · filtered: kimi (no image input)*).
 
-**Settings → Tickets → Models.** One page for everything the pool uses,
-five groups. **Model table:** a row per model — its model id, the account
-that serves it (or the runner, when it runs on any account of that
-runner), a free *category* word, its class, its cost factor and the sessions
-it may run at once on one account; click a cell to change it, **Add model…**
-starts a new row (Enter saves, Esc drops it), the cross at the row's end
-removes it. **Capacity:** the *Global cap* in cost factors, a read-only
-list of each account's cap (the largest of its rows times its sessions, unless
-`service.json` sets one), and a live line (*Now: 2.4 of 6 · Claude A 2 of 5*)
-of what the running sessions weigh. **Slots:** one card per account — what
-it costs, and one row per quota window
-(*5 h*, *7 d*, *month*) with a bar for the share left (peach once it is
-below the share kept in reserve), when the window resets (a time today, a
-weekday and time within the week, else the date), and whether the reading is *measured*, *estimated* or *unknown*;
-`q` on the right says whether the account has surplus to let a lighter
-class upgrade onto it (*upgrade allowed*) or only serves its own classes
-(*class B only*). **Add slot…** opens a row: type the account's name, pick
-its provider, and Enter adds the slot (Esc drops the row). The
-cross at a card's head removes the slot — an account you configured, or
-the stand-in account Drey assumes for a provider you never set up, which
-then gets no runs on this machine until you add a slot for it again. A slot
-the model table still names is not removed; the reason shows under the
-slots. A login folder or a quota limit is still set in `service.json`.
-**Routing:**
-*Upgrade above q* (empty: never upgrade), *Reserve per window* and *Burn
-rate* (both in percent; 0 switches them off) show the values the crew works
-with; change one and leave the field (or press Enter) and it is saved —
-there is no Save button. A value the crew cannot use (*0* for q, *100* or
-more for a share) is not saved and the reason shows under the group, red,
-until you correct it. The sentence under them is the rule: a session gets
-exactly its class or waits, never a smaller class. **Ledgers:** the three defaults for what may be spent —
-*Ticket allowance*, *Persona per day* and *Provider per day*, in dollars;
-empty means no limit. A ticket's own class is set from its row's ⋯ menu in
-the Work panel, **Class ›**: *From the persona* (no pin) or A, B or C.
+**Settings → Tickets → Models.** One page for everything the pool uses.
+You never type a model in: Drey asks the coding agents installed on this
+computer what they offer. Beside the title, *Checked 2 min ago* says when it
+last asked, and the round arrow (*Find models again*) asks again — and, only
+then, looks the models' abilities (context size, tools, images) up in the
+public model registry. Under the title the **Global cap** (− and + change
+it) and what runs now (*Now 2.4 of 6*).
+
+**Harnesses** lists each coding agent: its name and version, whether it is
+signed in (for opencode: the providers it is set up for, *zai-coding-plan,
+github-copilot*), and how many models it offers — or *not installed* with
+**Install…**.
+
+**Classes.** A model found for the first time shows as a card on top
+(*New: zai-coding-plan/glm-5.3-air*, the agent and account it runs on): pick
+its class and **Add** it, or **Ignore** it — an ignored model does not come
+back. Then one group per class, strongest first, each with **at most** −
+N + sessions at once and how many are busy (*1/2 busy*). A model's row
+shows its agent and account, what it can do (a tool icon, an image icon),
+its context size and its cost factor (click the factor to change it); move
+a model to another class by dragging its row into that group or by picking
+the class in the row's menu. The switch at the end says whether the crew
+may use it at all. **Add class** adds a class of your own — its name and
+where it sits in the order; an empty class can be removed again.
+
+**Accounts.** One row per account: its name, its agent, what it costs —
+*Subscription* (per month), *Credits* (per credit) or *Per token* (per
+million tokens) with the amount, changed right in the row — how many
+sessions it may run at once, and its quota windows (*5 h*, *7 d*, a bar
+and *78 % left*). **Add account** opens a row: name, agent, cost and
+sessions, then **Add**. The bin removes an account; when a model runs only
+on it, the row asks first (*Remove Claude B? 1 model uses only this
+account.* — **Remove** takes that model out of the classes too, **Keep**
+leaves everything as it is). A login folder or a quota limit is still set
+in `service.json`.
+
+**Routing** is one folded line (*step up above q 1.3 · reserve 10 % ·
+burn rate 80 %*); open it to change *Upgrade above q* (empty: never step
+up), *Reserve per window* and *Burn rate* (both in percent; 0 switches them
+off), and the three spending defaults *Ticket allowance*, *Persona per day*
+and *Provider per day* (dollars; empty means no limit). Every change is
+saved as you make it — there is no Save button; a value the crew cannot use
+is not saved and the reason shows in red. A session always gets exactly
+its class or waits, never a smaller class. A ticket's own class is set from
+its row's ⋯ menu in the Work panel, **Class ›**: *From the persona* (no pin)
+or one of your classes.
 
 **What a ticket, a persona and an account may spend.** Three limits,
 each counted from the runs themselves: a ticket's **allowance**

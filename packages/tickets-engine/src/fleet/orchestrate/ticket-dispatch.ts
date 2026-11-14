@@ -1,6 +1,6 @@
 import { ticketProject } from '../../contracts/projects';
 import type { BoardSnapshot, PipelinePhase, RepoRef, TicketCard } from '../../contracts/tickets';
-import { splitPoolEntry } from '../../core/persona';
+import { personaModelGuess, splitPoolEntry, type Persona } from '../../core/persona';
 import { personaRunSettingsOf } from '../../core/persona-settings';
 import { TicketsGit } from '../../core/tickets-git';
 import { isAutoPhase, nextPhaseIdOf } from '../chain';
@@ -52,14 +52,19 @@ export interface TicketDispatchDeps {
   readonly disciplines: () => Promise<DisciplineTexts>;
 }
 
-/** The harness and model a persona runs: the pool's grant (req-170), else the persona's default. */
-function harnessOf(persona: { readonly worker: string; readonly models: { readonly default: string } }, grant: PoolGrantFor | null): { worker: string; model: string } {
-  const fallback = splitPoolEntry(persona.models.default);
+/**
+ * The harness and model a persona runs: the pool's grant (req-170); without a
+ * pool its pinned model (req-288), else an unmigrated record's old default,
+ * else '' — a worker the assignment ring then decides.
+ */
+function harnessOf(persona: Persona, grant: PoolGrantFor | null): { worker: string; model: string } {
+  const pinned = persona.model === null ? null : splitPoolEntry(persona.model);
   const granted = grant?.decision ?? null;
-  if (granted === null) {
-    return { worker: fallback.provider ?? persona.worker, model: fallback.model };
+  if (granted !== null) {
+    return { worker: granted.provider, model: granted.model ?? pinned?.model ?? '' };
   }
-  return { worker: granted.provider, model: granted.model ?? fallback.model };
+  const guess = personaModelGuess(persona);
+  return { worker: guess?.provider ?? '', model: guess?.model ?? '' };
 }
 
 /** The request's pool fields: the class asked for, why, what the ledgers need, and (req-178) the needs and the routing's decision. */

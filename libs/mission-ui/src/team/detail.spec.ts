@@ -25,7 +25,7 @@ import {
   EVIDENCE_PREVIEW_CAP,
   MC_TEAM_DETAIL,
   PersonaDetail,
-  WORKER_OPTIONS,
+  CLASS_OPTIONS,
   chatIntentOf,
   contentPreviewOf,
   evidencePreviewOf,
@@ -261,18 +261,16 @@ interface DetailSurface {
   promptError: Signal<string | null>;
   setupBusy: Signal<string | null>;
   setupError: Signal<string | null>;
-  sheet: WritableSignal<'model' | 'worker' | null>;
+  sheet: WritableSignal<'model' | 'class' | null>;
   modelOptions: Signal<readonly string[]>;
-  poolWords: Signal<string>;
-  workerOptions: Signal<readonly string[]>;
+  classOptions: Signal<readonly string[]>;
   skillOn(name: string): boolean;
   onPromptInput(event: Event): void;
-  openSheet(which: 'model' | 'worker'): void;
+  openSheet(which: 'model' | 'class'): void;
   closeSheet(): void;
-  pick(kind: 'model' | 'worker', value: string): Promise<void>;
+  pick(kind: 'model' | 'class', value: string): Promise<void>;
   toggleSkill(name: string): Promise<void>;
   savePrompt(): Promise<void>;
-  poolTap(): void;
 }
 
 function surface(detail: PersonaDetail): DetailSurface {
@@ -660,7 +658,7 @@ describe('the setup tab’s pure moves', () => {
   });
 
   it('the worker sheet offers the desk’s harnesses', () => {
-    expect(WORKER_OPTIONS).toEqual(['claude-code', 'opencode', 'kimi', 'copilot']);
+    expect(CLASS_OPTIONS).toEqual(['super heavy', 'heavy', 'standard', 'light']);
   });
 });
 
@@ -899,30 +897,27 @@ describe('the memory tab', () => {
 describe('the setup tab', () => {
   const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
-  it('the model sheet offers the pool (the current model as the fallback) and picks with a PATCH', async () => {
+  it('req-288: the model sheet offers the next free model of the class and the pin; next free sends null', async () => {
     const fake = makeVm();
     const vm = surface(setup(fake));
-    expect(vm.modelOptions()).toEqual(['zai/glm-5.3', 'sonnet']);
+    expect(vm.modelOptions()).toEqual(['', 'zai/glm-5.3']);
 
     vm.openSheet('model');
     expect(vm.sheet()).toBe('model');
-    await vm.pick('model', 'sonnet');
-    expect(fake.patched).toEqual([{ model: 'sonnet' }]);
+    await vm.pick('model', '');
+    expect(fake.patched).toEqual([{ model: null }]);
     expect(vm.sheet()).toBeNull();
 
-    const bare = makeVm({ facts: { ...PIA_FACTS, pool: [], model: 'opus' } });
-    const vm2 = surface(setup(bare));
-    expect(vm2.modelOptions()).toEqual(['opus']);
-    await vm2.pick('model', 'opus');
-    expect(bare.patched).toEqual([{ model: 'opus' }]);
+    const bare = makeVm({ facts: { ...PIA_FACTS, model: '' } });
+    expect(surface(setup(bare)).modelOptions()).toEqual(['']);
   });
 
-  it('the worker sheet offers the harnesses and picks with a PATCH', async () => {
+  it('req-288: the class sheet offers the classes and picks with a PATCH', async () => {
     const fake = makeVm();
     const vm = surface(setup(fake));
-    await vm.pick('worker', 'opencode');
-    expect(fake.patched).toEqual([{ worker: 'opencode' }]);
-    expect(vm.workerOptions()).toEqual(['claude-code', 'opencode', 'kimi', 'copilot']);
+    await vm.pick('class', 'standard');
+    expect(fake.patched).toEqual([{ class: 'standard' }]);
+    expect(vm.classOptions()).toEqual(['super heavy', 'heavy', 'standard', 'light']);
   });
 
   it('the skill switch PATCHes the new list and toggles at once', async () => {
@@ -969,15 +964,6 @@ describe('the setup tab', () => {
     vm2.promptDraft.set('New text');
     await vm2.savePrompt();
     expect(vm2.promptError()).toBe('The prompt did not save.');
-  });
-
-  it('the pool row toasts the follow-up and patches nothing', () => {
-    const fake = makeVm();
-    const vm = surface(setup(fake));
-    vm.poolTap();
-    expect(fake.patched).toEqual([]);
-    expect(fake.toasts).toEqual([{ message: 'Pool editing — to come', kind: 'ok' }]);
-    expect(vm.poolWords()).toBe('zai/glm-5.3 · sonnet');
   });
 
   it('read-only devices never patch: the sheets stay closed and the rows stay still', async () => {

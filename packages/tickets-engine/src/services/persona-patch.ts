@@ -1,14 +1,17 @@
 import type { PersonaAllowedPatch } from '../contracts/persona-allowed';
 import { settingsPatchError, type PersonaSettingsPatch } from '../contracts/persona-settings-patch';
-import { PERSONA_ROLES, PERSONA_RUN_COMMANDS } from '../core/persona';
+import { classNameOf } from '../contracts/capability-class';
+import { PERSONA_ROLES, PERSONA_RUN_COMMANDS, type Persona } from '../core/persona';
+import { MIGRATION_FALLBACK_CLASS } from '../core/persona-model-migration';
 
 /** The PATCH body's shape (U4). */
 export interface PersonaPatchFields {
   title?: string;
   role?: string;
-  worker?: string;
-  model?: string;
-  pool?: readonly string[];
+  /** req-288: the capability class (a name of the owner's list). */
+  class?: string;
+  /** req-288: the pinned model as a pool entry; null or '' = the next free model of the class. */
+  model?: string | null;
   color?: string;
   skills?: readonly string[];
   prompt?: string;
@@ -45,9 +48,8 @@ const blank = (value: string | undefined): boolean => value !== undefined && val
 const RULES: readonly Rule[] = [
   [(i) => blank(i.title), 'the title is not empty'],
   [(i) => i.role !== undefined && !(PERSONA_ROLES as readonly string[]).includes(i.role), `the role is one of ${PERSONA_ROLES.join(', ')}`],
-  [(i) => blank(i.worker), 'the worker is not empty ("opencode", "claude-code", "kimi" or "api")'],
-  [(i) => blank(i.model), 'the default model is not empty'],
-  [(i) => i.pool !== undefined && (i.pool.length === 0 || i.pool.some((m) => typeof m !== 'string' || m.trim() === '')), 'the model pool is a non-empty list of model names'],
+  [(i) => i.class !== undefined && classNameOf(i.class) === null, 'the class is a class name of Settings → Models (super heavy, heavy, standard, light or a class the owner added)'],
+  [(i) => i.model !== undefined && i.model !== null && (typeof i.model !== 'string' || i.model.length > 200), 'the model is a model id of at most 200 characters, or null for the next free model of the class'],
   [(i) => i.color !== undefined && !/^#[0-9a-f]{6}$/i.test(i.color.trim()), 'the color is a #rrggbb hex value'],
   [(i) => i.skills !== undefined && i.skills.some((s) => typeof s !== 'string'), 'the skills are a list of skill names'],
   [(i) => i.prompt !== undefined && typeof i.prompt !== 'string', 'the prompt is markdown text'],
@@ -60,4 +62,29 @@ const RULES: readonly Rule[] = [
 /** The PATCH body's validation (U4): only the listed rules reject; null = the patch is writable. */
 export function personaPatchError(input: PersonaPatchFields): string | null {
   return RULES.find(([broken]) => broken(input))?.[1] ?? (input.settings !== undefined ? settingsPatchError(input.settings) : null);
+}
+
+/**
+ * A patch's `class` and `model` over the record (req-288): the sent class
+ * replaces the record's, the sent model pins it (null or '' = the next free
+ * model of the class). A record not migrated yet is migrated by the patch —
+ * its v2 keys leave — taking its old floor, else the fallback class, when
+ * only a model is sent.
+ */
+export function withModelPatch(persona: Persona, input: Pick<PersonaPatchFields, 'class' | 'model'>): Persona {
+  if (persona.kind !== 'agent' || (input.class === undefined && input.model === undefined)) {
+    return persona;
+  }
+  const { legacy, ...rest } = persona;
+  const named = input.class !== undefined ? classNameOf(input.class) : null;
+  return { ...rest, class: named ?? persona.class ?? legacy?.minClass ?? MIGRATION_FALLBACK_CLASS, model: pinAfter(persona.model, input.model) };
+}
+
+/** The pin after a patch: unsent keeps it, null or blank clears it. */
+function pinAfter(current: string | null, sent: string | null | undefined): string | null {
+  if (sent === undefined) {
+    return current;
+  }
+  const pin = (sent ?? '').trim();
+  return pin === '' ? null : pin;
 }

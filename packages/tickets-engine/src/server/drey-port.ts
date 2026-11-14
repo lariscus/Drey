@@ -71,6 +71,7 @@ import type { EstimateKey, RunEstimate } from '../core/estimate';
 import type { PromptPreviewCommand, PromptPreviewReply, SkillListReply, SkillRemoveCommand, SkillsPort, SkillToggleCommand, SkillUploadCommand, SkillUploadReply } from '../contracts/skills';
 import type { PlanPartsEdit, PlanPartsReply, PlanReleaseReply, PlanReleaseScope } from '../contracts/plan-approval';
 import type { PersonaRemoveCommand, PersonaRemovePort, PersonaRemoveReply } from '../contracts/persona-remove';
+import type { PersonaPictureRemove, PersonaPictureReply, PersonaPictureSet } from '../contracts/persona-picture';
 import type { FlowDraftReply, FlowOp, FlowReply, FlowSaveReply, FlowTarget } from '../contracts/flow';
 import type { ReviewComment } from '../core/review-feedback';
 import type { TicketDiff, TicketFileReply, WorktreeFile } from '../core/worktree-changes';
@@ -148,9 +149,8 @@ export interface RemoteBoard {
     id: string;
     title?: string;
     role?: string;
-    worker?: string;
-    model?: string;
-    pool?: readonly string[];
+    class?: string;
+    model?: string | null;
     color?: string;
     skills?: readonly string[];
     prompt?: string;
@@ -231,6 +231,8 @@ export interface DreyPortOptions {
   readonly allowBypass: () => boolean;
   /** req-292: the persona pictures — the list's `avatarVersion`, the `personaAvatar` read; absent = no pictures. */
   readonly avatars?: BoardAvatarsPort;
+  /** req-288: the owner's picture upload and removal; absent = refused. */
+  readonly pictures?: { set(cmd: PersonaPictureSet): Promise<PersonaPictureReply>; remove(cmd: PersonaPictureRemove): Promise<PersonaPictureReply> };
   /** req-293: the assistant's connection and its models (Mission Control's persona's Model choice); absent = refused. */
   readonly chatModels?: () => Promise<ChatModelsReply>;
   /** req-273: writes the crew's order (`order:` in crew.md); absent = Mission Control cannot reorder the crew. */
@@ -581,13 +583,12 @@ export class DreyTicketsPort implements TicketsRemotePort {
     const avatars: Readonly<Record<string, string>> = (await this.options.avatars?.versions(personas.map((p) => p.id))) ?? {};
     return personas.map((p) => ({
       id: p.id,
-      // req-269: only an agent carries a harness, models and run settings; the owner and Mission Control's persona do not.
+      // req-269: only an agent carries a class, a model and run settings; the owner and Mission Control's persona do not (req-288).
       ...(p.kind === 'agent' ? {} : { kind: p.kind }),
       title: p.title,
       role: p.kind === 'human' ? 'owner' : p.role,
-      worker: p.kind === 'agent' ? p.worker : '',
-      model: p.kind === 'agent' ? p.models.default : '',
-      pool: p.kind === 'agent' ? p.models.pool : [],
+      ...(p.kind === 'agent' && p.class !== null ? { class: p.class } : {}),
+      model: p.kind === 'agent' ? (p.model ?? '') : '',
       color: p.color,
       ...(avatars[p.id] !== undefined ? { avatarVersion: avatars[p.id] } : {}),
       ...(p.summary !== '' ? { summary: p.summary } : {}),
@@ -605,6 +606,14 @@ export class DreyTicketsPort implements TicketsRemotePort {
 
   personaAvatar(personaId: string): Promise<PersonaAvatarReply> {
     return this.options.avatars?.dataUrl(personaId) ?? Promise.resolve({ ok: false, error: 'persona pictures are not wired on this port' });
+  }
+
+  personaAvatarSet(cmd: PersonaPictureSet): Promise<PersonaPictureReply> {
+    return this.options.pictures?.set(cmd) ?? Promise.resolve({ ok: false, error: 'persona pictures are not writable on this port' });
+  }
+
+  personaAvatarRemove(cmd: PersonaPictureRemove): Promise<PersonaPictureReply> {
+    return this.options.pictures?.remove(cmd) ?? Promise.resolve({ ok: false, error: 'persona pictures are not writable on this port' });
   }
 
   async personaInstructions(personaId: string): Promise<{ readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string }> {

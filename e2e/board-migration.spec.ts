@@ -75,7 +75,8 @@ const PIPELINE = [
 ].join('\n');
 
 const persona = (title: string, kind: string, role: string): string =>
-  ['---', `title: ${title}`, ...(kind === 'agent' ? [] : [`kind: ${kind}`]), `role: ${role}`, 'worker: opencode', 'models:', '  default: qwen3-coder', '  pool: [qwen3-coder]', '---', ''].join('\n');
+  // req-288: v3 records — a light class, so step 3's moved floor raises the builder's class.
+  ['---', `title: ${title}`, ...(kind === 'agent' ? [] : [`kind: ${kind}`]), `role: ${role}`, ...(kind === 'agent' ? ['class: light'] : []), '---', ''].join('\n');
 
 const SEED_VAULT: Record<string, string> = {
   'tickets/_meta/pipeline.md': PIPELINE,
@@ -160,7 +161,8 @@ test('the board migration steps 3 to 5, each on the owner’s confirmation (req-
   await line.getByRole('button', { name: 'Migrate' }).click();
   await expect.poll(() => read('pipeline.md'), { timeout: 30_000 }).not.toContain('building');
   expect(read('pipeline.md')).toContain('token-budget: 40000000');
-  expect(read('personas/ben/persona.md')).toContain('min-class: B');
+  expect(read('personas/ben/persona.md')).toContain('class: standard'); // req-288: the floor raised the class
+  expect(read('personas/ben/persona.md')).not.toContain('min-class');
 
   // Step 4: the leaving actions (the engine's crew seeding wrote the order at start, so the step keeps it).
   await expect(line).toContainText('step 4 of 5', { timeout: 30_000 });

@@ -1,49 +1,46 @@
 // i18n: catalog
 /**
- * The Allowed to block (R11, req-142's page half): four rows, each a
- * permission and its choice; the explanation of a row is its tooltip, never
- * a line under it. Which vaults a run reads and writes is its project's
- * (req-283) — the persona keeps "Change notes where the project allows"
- * (`allowed: write-notes`). That switch and spend above the allowance are
- * enforced by the engine; the commands and network choices are recorded in
- * `allowed:` and not yet read by the runner (req-142's remainder), so the
- * page says nothing more about them.
+ * The Allowed to block (R11, req-142's page half; board 7k v3, req-288): Run
+ * commands as a choice, then Reach the network, Change notes where the
+ * project allows (`allowed: write-notes`, req-283) and Spend above allowance
+ * as switches; the explanation of a row is its tooltip, never a line under it.
+ * Which vaults a run reads and writes is its project's: the link under the
+ * rows opens Settings → Projects. The notes switch and spend above the
+ * allowance are enforced by the engine; the commands and network choices are
+ * recorded in `allowed:` and not yet read by the runner (req-142's remainder).
  */
 import { h } from '../desk-deps';
 import type { BlockContext } from './persona-block-context';
-import { blockHead, choiceOptions, selectOf } from './persona-dom';
-import { COMMAND_CHOICES, NETWORK_CHOICES, SPEND_CHOICES, networkValueOf, spendValueOf, writeNotesValueOf } from './persona-allowed-model';
+import { COMMAND_CHOICES } from './persona-allowed-model';
+import { switchButton } from './persona-controls';
+import { blockHead, choiceOptions, outlineButton, selectOf } from './persona-dom';
 import type { AllowedDraft } from './persona-model';
 
 function row(label: string, tip: string, control: HTMLElement): HTMLElement {
-  const node = h('div', 'persona-allow-row');
-  const name = h('span', 'persona-grow', label);
+  const node = h('div', 'persona-row persona-allow-row');
   node.title = tip;
-  node.append(name, control);
+  node.append(h('span', 'persona-grow', label), control);
   return node;
 }
 
 export function allowedBlock(ctx: BlockContext): HTMLElement {
   const { t } = ctx;
   const draft = ctx.draft();
-  const set = (next: Partial<AllowedDraft>): void => ctx.edit({ allowed: { ...ctx.draft().allowed, ...next } });
+  const set = (next: Partial<AllowedDraft>): void => ctx.change({ allowed: { ...ctx.draft().allowed, ...next } });
   const block = h('section', 'persona-block');
   block.setAttribute('aria-label', t('persona.allowed.title'));
-  const notes = selectOf(choiceOptions(t, NETWORK_CHOICES), writeNotesValueOf(draft.allowed), (value) => set({ writeNotes: value === 'on' }), 'persona-select persona-select-sm');
-  notes.setAttribute('aria-label', t('persona.allowed.notes'));
-  const commands = selectOf(choiceOptions(t, COMMAND_CHOICES), draft.allowed.runCommands, (value) => set({ runCommands: value as AllowedDraft['runCommands'] }), 'persona-select persona-select-sm');
+  const commands = selectOf(choiceOptions(t, COMMAND_CHOICES), draft.allowed.runCommands, (value) => ctx.edit({ allowed: { ...ctx.draft().allowed, runCommands: value as AllowedDraft['runCommands'] } }), 'persona-select persona-allow-select');
   commands.setAttribute('aria-label', t('persona.allowed.commands'));
-  const network = selectOf(choiceOptions(t, NETWORK_CHOICES), networkValueOf(draft.allowed), (value) => set({ network: value === 'on' }), 'persona-select persona-select-sm');
-  network.setAttribute('aria-label', t('persona.allowed.network'));
-  const spend = selectOf(choiceOptions(t, SPEND_CHOICES), spendValueOf(draft.allowed), (value) => set({ spend: value === 'allow' }), 'persona-select persona-select-sm');
-  spend.setAttribute('aria-label', t('persona.allowed.spend'));
-  const rows = h('div', 'persona-allow');
-  rows.append(
-    row(t('persona.allowed.notes'), t('persona.allowed.notes_tip'), notes),
+  const toggle = (key: 'network' | 'writeNotes' | 'spend', label: string, field: string): HTMLButtonElement =>
+    switchButton(label, draft.allowed[key], () => set({ [key]: !ctx.draft().allowed[key] }), { field });
+  const vaults = outlineButton(t('persona.allowed.vaults_link'), 'persona-link persona-allow-link', () => ctx.api.commands.run('settings.open', { category: 'projects' }));
+  block.append(
+    blockHead(t('persona.allowed.title')),
     row(t('persona.allowed.commands'), t('persona.allowed.commands_tip'), commands),
-    row(t('persona.allowed.network'), t('persona.allowed.network_tip'), network),
-    row(t('persona.allowed.spend'), t('persona.allowed.spend_tip'), spend),
+    row(t('persona.allowed.network'), t('persona.allowed.network_tip'), toggle('network', t('persona.allowed.network'), 'network')),
+    row(t('persona.allowed.notes'), t('persona.allowed.notes_tip'), toggle('writeNotes', t('persona.allowed.notes'), 'write-notes')),
+    row(t('persona.allowed.spend'), t('persona.allowed.spend_tip'), toggle('spend', t('persona.allowed.spend'), 'spend')),
+    vaults,
   );
-  block.append(blockHead(t('persona.allowed.title')), rows);
   return block;
 }

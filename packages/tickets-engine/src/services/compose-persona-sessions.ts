@@ -7,6 +7,7 @@ import { PersonaSessionContext } from './persona-session-context';
 import { PersonaSessionFiles } from './persona-session-files';
 import { PersonaSessionService, type PersonaSessionBoard, type PersonaSessionFleet } from './persona-session-service';
 import { PersonaTurnWatcher, type FleetChanges } from './persona-turn-watcher';
+import type { ModelTablePort } from './service-model-table';
 
 export interface PersonaSessionsWiring {
   readonly board: PersonaSessionBoard;
@@ -22,6 +23,8 @@ export interface PersonaSessionsWiring {
   readonly log: (message: string, level?: 'info' | 'warn' | 'error') => void;
   /** The tools attached to a 1:1 (req-217: the service's vault MCP); absent = none (no service). */
   readonly tools?: OneOnOneToolSeam;
+  /** req-288: the machine's model table (the harness follows from the model); absent = the runner's `GET /models`. */
+  readonly table?: ModelTablePort;
 }
 
 /** The persona 1:1's parts (req-168), wired once in the engine's composition. */
@@ -36,5 +39,6 @@ export function composePersonaSessions(wiring: PersonaSessionsWiring): PersonaSe
     bridge: bridgeTurnRunner(wiring.bridge),
     onChanged: wiring.changed,
     log,
+    ...(wiring.table !== undefined ? { table: wiring.table } : {}),
   });
 }

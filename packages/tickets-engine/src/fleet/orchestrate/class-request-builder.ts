@@ -1,13 +1,16 @@
 import type { PipelinePhase, TicketCard } from '../../contracts/tickets';
 import { mergeNeeds } from '../../core/model-needs';
 import { splitPoolEntry, type Persona } from '../../core/persona';
+import { migratedModelOf } from '../../core/persona-model-migration';
 import { isWorkerProvider, PART_SIZE_CLASS, type CapabilityClass, type ClassRequest, type PoolEntry, type WorkerProviderId } from '../protocol';
 
-/** What the builder needs of the pool: the class the model table gives a pool entry, and the rank of a class in the owner's list (req-287). */
+/** What the builder needs of the pool: the class the model table gives a pool entry, the rank of a class in the owner's list (req-287), and every model the router may use (req-288). */
 export interface ClassLookup {
   classOf(entry: PoolEntry): CapabilityClass | null;
   /** 0 = the strongest class; a class the list does not hold ranks below every listed one. */
   rankOf(name: CapabilityClass): number;
+  /** The table's enabled models, strongest class first (the table's order within a class); empty without a table. */
+  entries(): readonly PoolEntry[];
 }
 
 /** One dispatch as the builder reads it. */
@@ -19,83 +22,104 @@ export interface ClassRequestInput {
   readonly prefer?: string | null;
 }
 
+/** The persona's own class and pin; an unmigrated v2 record read by the migration's rule. */
+interface OwnModel {
+  readonly class: CapabilityClass | null;
+  readonly model: string | null;
+}
+
+/** The harness an untabled entry runs on when nothing names one. */
+const FALLBACK_PROVIDER: WorkerProviderId = 'claude-code';
 
 /**
- * Who asks for which class (req-170, ADR-0095's assumption as built): a
- * ticket pin `model:` asks for that model (its row's class), a pin `class:`
- * for exactly that class; otherwise the plan part's `size:` (S → light,
- * M → standard, L → heavy) or — unsized — the class of the persona's default model, raised to
- * the phase's `min-class:` floor. A size or floor the persona's pool holds
- * no model of is raised to the nearest stronger class it does hold —
- * raised, never lowered; the owner's class list ranks (req-287). req-178: the phase's and the ticket's `needs:` ride
- * along for the routing's filter; a pin forbids the step up.
+ * Who asks for which class (req-170; Persona v3, req-288): a ticket pin
+ * `model:` asks for that model alone; otherwise the persona's `class:` is the
+ * run's class, raised — never lowered — by the ticket's `class:`, the plan
+ * part's `size:` (S → light, M → standard, L → heavy) and the phase's
+ * `min-class:` floor; the owner's class list ranks (req-287). The pool is
+ * every model of the table the router may use, so the next free model of the
+ * class runs. A persona pinned to one model runs that model while nothing
+ * raised its class; a raise takes the next free model of the raised class.
+ * req-178: the phase's and the ticket's `needs:` ride along for the routing's
+ * filter; a pin forbids the step up.
  */
 export class ClassRequestBuilder {
   constructor(private readonly lookup: ClassLookup) {}
 
   build(input: ClassRequestInput): ClassRequest {
     const { card, persona } = input;
-    const provider = this.providerOf(persona);
-    const pool = persona.models.pool.map((entry) => this.entryOf(entry));
+    const own = this.ownOf(persona);
+    const pinnedEntry = own.model === null ? null : this.entryOf(own.model);
     // req-258: the persona's own needs replace the column's when its record names any.
     const needs = mergeNeeds(persona.settings.needs ?? input.phase.needs, card.meta.needs);
     const base = {
       ticket: card.id,
       persona: persona.id,
-      provider,
+      provider: this.providerOf(pinnedEntry),
       contextTokens: null,
       ...(needs !== null ? { needs } : {}),
       ledger: { allowance: card.meta.allowance ?? null, personaBudget: persona.budget, spendAboveAllowance: persona.allowed.spendAboveAllowance },
       prefer: input.prefer ?? null,
     } as const;
-    const pinnedModel = card.meta.model ?? null;
-    if (pinnedModel !== null) {
-      return { ...base, class: null, pool: [this.entryOf(pinnedModel)], why: `${card.id} pins model ${pinnedModel}` };
+    const ticketModel = card.meta.model ?? null;
+    if (ticketModel !== null) {
+      return { ...base, class: null, pool: [this.entryOf(ticketModel)], why: `${card.id} pins model ${ticketModel}` };
     }
-    const pinnedClass = card.meta.class ?? null;
-    if (pinnedClass !== null) {
-      return { ...base, class: pinnedClass, pool, why: `${card.id} pins class ${pinnedClass}` };
+    const asked = this.asked(input, own.class);
+    if (pinnedEntry !== null && !asked.raised) {
+      return { ...base, class: null, pool: [pinnedEntry], why: `${persona.id} pins model ${own.model ?? ''}` };
     }
-    const asked = this.asked(input, pool);
-    return { ...base, class: asked.class, pool, why: asked.why, stepUp: true };
+    return { ...base, class: asked.class, pool: this.poolOf(pinnedEntry), why: asked.why, stepUp: true };
   }
 
-  /** The size or the persona's default, the floor over it, the pool's own classes after. */
-  private asked(input: ClassRequestInput, pool: readonly PoolEntry[]): { class: CapabilityClass | null; why: string } {
-    const floored = this.floored(input);
-    if (floored.class === null) {
-      return { class: null, why: `${input.persona.id}'s default runs (its models are not in the model table)` };
+  /** The persona's class and pin; a v2 record (no `class:` yet) through the migration's rule. */
+  private ownOf(persona: Persona): OwnModel {
+    if (persona.class !== null || persona.legacy === undefined) {
+      return { class: persona.class, model: persona.model };
     }
-    const held = new Set(pool.map((entry) => this.lookup.classOf(entry)).filter((c): c is CapabilityClass => c !== null));
-    const raised = held.has(floored.class) ? floored.class : (this.lightestAbove(held, floored.class) ?? floored.class);
-    const step = raised !== floored.class ? `raised to ${raised}, the lightest class ${input.persona.id}'s pool holds above ${floored.class}` : null;
-    return { class: raised, why: [...floored.why, ...(step !== null ? [step] : [])].join(', ') };
+    const migrated = migratedModelOf(persona.legacy, { classOf: (provider, model) => this.lookup.classOf(this.entryOf(provider === null ? model : `${provider}/${model}`)), rank: (name) => this.lookup.rankOf(name) });
+    return { class: migrated.class, model: migrated.model };
   }
 
-  /** The size's class (or the default model's), raised to the phase's floor. */
-  private floored(input: ClassRequestInput): { class: CapabilityClass | null; why: string[] } {
-    const size = input.card.meta.size ?? null;
-    const sized = size === null ? null : PART_SIZE_CLASS[size];
-    const fallback = this.lookup.classOf(this.entryOf(input.persona.models.default));
-    const start = sized ?? fallback;
-    // req-258: the persona's own floor wins over the column's when its record names one.
-    const own = input.persona.settings.minClass;
-    const floor = own ?? input.phase.minClass ?? null;
-    const floorWhy = own !== null ? `floor ${floor} of ${input.persona.id}` : `floor ${floor} in ${input.phase.id}`;
-    if (start === null) {
-      return { class: floor, why: floor === null ? [] : [floorWhy] };
+  /** What may raise the persona's class: the ticket's class, the part's size, the phase's floor — each with why. */
+  private raisersOf(input: ClassRequestInput): readonly { readonly name: CapabilityClass; readonly why: string }[] {
+    const { card, phase } = input;
+    const size = card.meta.size ?? null;
+    const raisers: { readonly name: CapabilityClass; readonly why: string }[] = [];
+    if (card.meta.class !== undefined && card.meta.class !== null) {
+      raisers.push({ name: card.meta.class, why: `${card.id} asks for ${card.meta.class}` });
     }
-    const why = [size !== null ? `size ${size} → ${sized}` : `${input.persona.id}'s default class ${fallback}`];
-    if (floor !== null && this.lookup.rankOf(floor) < this.lookup.rankOf(start)) {
-      return { class: floor, why: [...why, floorWhy] };
+    if (size !== null) {
+      raisers.push({ name: PART_SIZE_CLASS[size], why: `size ${size} → ${PART_SIZE_CLASS[size]}` });
     }
-    return { class: start, why };
+    if (phase.minClass !== undefined && phase.minClass !== null) {
+      raisers.push({ name: phase.minClass, why: `floor ${phase.minClass} in ${phase.id}` });
+    }
+    return raisers;
   }
 
-  /** The lightest class of the set that is stronger than `than`; null when none is. */
-  private lightestAbove(held: ReadonlySet<CapabilityClass>, than: CapabilityClass): CapabilityClass | null {
-    const rank = (c: CapabilityClass): number => this.lookup.rankOf(c);
-    return [...held].filter((c) => rank(c) < rank(than)).sort((a, b) => rank(b) - rank(a))[0] ?? null;
+  /** The persona's class raised by the ticket's class, the size and the phase's floor; `raised` when one of them lifted it. */
+  private asked(input: ClassRequestInput, own: CapabilityClass | null): { class: CapabilityClass | null; why: string; raised: boolean } {
+    const { persona } = input;
+    const raisers = this.raisersOf(input);
+    let current = own;
+    const why = own === null ? [] : [`${persona.id}'s class ${own}`];
+    for (const raiser of raisers) {
+      if (current === null || this.lookup.rankOf(raiser.name) < this.lookup.rankOf(current)) {
+        current = raiser.name;
+        why.push(own === null && why.length === 0 ? raiser.why : `raised to ${raiser.name} (${raiser.why})`);
+      }
+    }
+    if (current === null) {
+      return { class: null, why: `${persona.id} names no class`, raised: false };
+    }
+    return { class: current, why: why.join(', '), raised: current !== own };
+  }
+
+  /** Every model the router may use; a machine without a table runs the pin, if there is one. */
+  private poolOf(pinned: PoolEntry | null): readonly PoolEntry[] {
+    const entries = this.lookup.entries();
+    return entries.length === 0 && pinned !== null ? [pinned] : entries;
   }
 
   private entryOf(raw: string): PoolEntry {
@@ -103,8 +127,8 @@ export class ClassRequestBuilder {
     return { provider: provider !== null && isWorkerProvider(provider) ? provider : null, model };
   }
 
-  private providerOf(persona: Persona): WorkerProviderId {
-    const head = persona.worker.split('/')[0] ?? '';
-    return isWorkerProvider(head) ? head : 'opencode';
+  /** The harness an untabled entry runs on: the pin's, else the table's first model's. */
+  private providerOf(pinned: PoolEntry | null): WorkerProviderId {
+    return pinned?.provider ?? this.lookup.entries()[0]?.provider ?? FALLBACK_PROVIDER;
   }
 }

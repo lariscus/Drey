@@ -1,10 +1,9 @@
 import type { PersonaMessage } from '../contracts/persona-session';
 import { loadPersonaSkills, type Persona } from '../core/persona';
 import { expandShippedFragments } from '../core/prompt-file';
-import { parseWorkerValue } from '../fleet/assignment';
 import { BRIEF_RUNS, composeOneOnOneBrief, type BriefRun } from '../fleet/one-on-one-brief';
 import { NO_TOOLS, type OneOnOneToolSeam } from '../fleet/one-on-one-toolset';
-import type { RunInfo } from '../fleet/protocol';
+import type { RunInfo, WorkerProviderId } from '../fleet/protocol';
 import { isTicketRun } from '../fleet/protocol-session';
 import type { EngineHost, EngineVault } from './host';
 
@@ -34,7 +33,8 @@ export function latestRunsOf(runs: readonly RunInfo[], persona: string): readonl
 export class PersonaSessionContext {
   constructor(private readonly deps: PersonaSessionContextDeps) {}
 
-  async brief(vault: EngineVault, persona: Persona, conversation: readonly PersonaMessage[]): Promise<string> {
+  /** `provider`: the harness the session runs on (req-288: it follows from the model); null = none known. */
+  async brief(vault: EngineVault, persona: Persona, conversation: readonly PersonaMessage[], provider: WorkerProviderId | null = null): Promise<string> {
     const read = (rel: string): Promise<string | null> => this.deps.host.read(vault.id, rel).catch(() => null);
     const folder = `tickets/_meta/personas/${persona.id}`;
     const [prompt, memory, skills, runs] = await Promise.all([
@@ -53,7 +53,7 @@ export class PersonaSessionContext {
       memory,
       runs: latestRunsOf(runs, persona.id),
       conversation: conversation.map((m) => ({ role: m.role, text: m.text })),
-      tools: (this.deps.tools ?? NO_TOOLS).attached({ persona: persona.id, provider: parseWorkerValue(persona.worker)?.provider ?? null }),
+      tools: (this.deps.tools ?? NO_TOOLS).attached({ persona: persona.id, provider }),
       workingDirectory: vault.path,
     });
   }

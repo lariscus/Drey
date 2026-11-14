@@ -11,10 +11,10 @@ export const AVATAR_FILE = 'avatar.png';
 /** The ids the package ships a picture for: the default crew and the human persona. */
 export const SHIPPED_AVATAR_IDS: readonly string[] = [...DEFAULT_CREW_IDS, HUMAN_PERSONA_ID];
 
-/** A picture larger than this is not served (the shipped ones are about 110 KB). */
+/** A picture larger than this is not served, nor taken by an upload (the shipped ones are about 110 KB). */
 export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 
-const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+export const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 /** `tickets/_meta/personas/<id>/avatar.png`, vault-relative. */
 export function avatarPathOf(id: string): string {
@@ -89,6 +89,27 @@ export class PersonaAvatars implements PersonaAvatarReader, PersonaAvatarWriter 
       throw error;
     }
     return avatarPathOf(id);
+  }
+
+  /** req-288: writes the owner's picture over any there; the vault path written, or null when the path escapes the vault. */
+  async write(vault: EngineVault, id: string, bytes: Buffer): Promise<string | null> {
+    const target = this.fileOf(vault, id);
+    if (target === null) {
+      return null;
+    }
+    await fsp.mkdir(path.dirname(target), { recursive: true });
+    await fsp.writeFile(target, bytes);
+    return avatarPathOf(id);
+  }
+
+  /** req-288: removes the picture; whether there was one. */
+  async remove(vault: EngineVault, id: string): Promise<boolean> {
+    const target = this.fileOf(vault, id);
+    if (target === null || (await fsp.stat(target).catch(() => null)) === null) {
+      return false;
+    }
+    await fsp.rm(target, { force: true });
+    return true;
   }
 
   private fileOf(vault: EngineVault, id: string): string | null {

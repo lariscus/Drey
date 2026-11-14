@@ -11,7 +11,7 @@ import type {
   SkillUploadCommand,
   SkillUploadReply,
 } from '../contracts/skills';
-import { personaRef, splitPoolEntry, type Persona } from '../core/persona';
+import { personaModelGuess, personaRef, type Persona } from '../core/persona';
 import { isSkillName, ownSkillsDir, SHARED_SKILLS_DIR } from '../core/skill';
 import { tokenizerFor } from '../core/token-count';
 import type { EngineVault } from './host';
@@ -149,8 +149,8 @@ export class SkillService implements SkillsPort {
     if (persona === null) {
       return ready.kit.lister.list(null, [], tokenizerFor('claude-code', null));
     }
-    const entry = splitPoolEntry(persona.models.default);
-    return ready.kit.lister.list(persona.id, persona.skills, tokenizerFor(entry.provider ?? persona.worker, entry.model));
+    const entry = personaModelGuess(persona);
+    return ready.kit.lister.list(persona.id, persona.skills, tokenizerFor(entry?.provider ?? null, entry?.model ?? null));
   }
 
   private async listFor(ready: Ready, persona: Persona): Promise<SkillListReply> {

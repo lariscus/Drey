@@ -1,15 +1,17 @@
 // i18n: catalog
 /**
- * The Work block's run settings (req-258, board 7k v2): the class floor and
- * the read-only switch side by side, the persona's pool (max and min) side
- * by side, the leaving actions as chips. Read-only is an instruction: the
- * run's brief carries the read-only rules, the harness keeps its permissions.
+ * The Work block's run settings (req-258; board 7k v3, req-288): the
+ * persona's pool (max and min) side by side, the read-only switch as a row,
+ * the leaving actions as chips. Read-only is an instruction: the run's brief
+ * carries the read-only rules, the harness keeps its permissions. The class
+ * floor folded into the Model block's class.
  */
 import type { PersonaLeavingAction } from '../../../../packages/tickets-engine/src/core/persona-settings';
 import { h } from '../desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { labelled, outlineButton, selectOf, textInput } from './persona-dom';
-import { addableActionsOf, classFloorChoices, type SettingsDraft } from './persona-settings-model';
+import { switchButton } from './persona-controls';
+import { addableActionsOf, type SettingsDraft } from './persona-settings-model';
 
 function setOf(ctx: BlockContext): (next: Partial<SettingsDraft>, repaint?: boolean) => void {
   return (next, repaint = false) => {
@@ -28,31 +30,17 @@ function pair(left: HTMLElement, right: HTMLElement): HTMLElement {
   return row;
 }
 
-function readOnlySwitch(ctx: BlockContext): HTMLElement {
+/** Read-only as the board draws it: the label, the large switch at the right. */
+function readOnlyRow(ctx: BlockContext): HTMLElement {
   const { t } = ctx;
-  const on = ctx.draft().settings.readOnly;
-  const name = ctx.draft().title;
-  const toggle = h('button', `persona-switch persona-switch-lg${on ? ' persona-switch-on' : ''}`);
-  toggle.type = 'button';
-  toggle.dataset['field'] = 'readonly';
-  toggle.setAttribute('role', 'switch');
-  toggle.setAttribute('aria-checked', String(on));
-  toggle.setAttribute('aria-label', t('persona.page.read_only'));
-  toggle.title = t('persona.page.read_only_tip', { name });
-  toggle.addEventListener('click', () => setOf(ctx)({ readOnly: !ctx.draft().settings.readOnly }, true));
-  const field = h('div', 'persona-field');
-  field.append(h('span', 'persona-muted', t('persona.page.read_only')), toggle);
-  return field;
-}
-
-function classFloor(ctx: BlockContext): HTMLElement {
-  const { t } = ctx;
-  const options = classFloorChoices(ctx.extras.table, ctx.draft().settings.minClass).map((value) => ({ value, label: value === '' ? t('persona.page.class_floor_none') : value }));
-  const select = selectOf(options, ctx.draft().settings.minClass, (value) => setOf(ctx)({ minClass: value as SettingsDraft['minClass'] }));
-  select.dataset['field'] = 'min-class';
-  const field = labelled(t('persona.page.class_floor'), select);
-  field.title = t('persona.page.class_floor_tip', { name: ctx.draft().title });
-  return field;
+  const toggle = switchButton(t('persona.page.read_only'), ctx.draft().settings.readOnly, () => setOf(ctx)({ readOnly: !ctx.draft().settings.readOnly }, true), {
+    large: true,
+    title: t('persona.page.read_only_tip', { name: ctx.draft().title }),
+    field: 'readonly',
+  });
+  const row = h('div', 'persona-row');
+  row.append(h('span', 'persona-grow', t('persona.page.read_only')), toggle);
+  return row;
 }
 
 function countField(ctx: BlockContext, key: 'parallel' | 'min'): HTMLElement {
@@ -116,5 +104,5 @@ function leavingActions(ctx: BlockContext): HTMLElement {
 
 /** The settings rows of the Work block, in board order. */
 export function workSettingsNodes(ctx: BlockContext): readonly HTMLElement[] {
-  return [pair(classFloor(ctx), readOnlySwitch(ctx)), pair(countField(ctx, 'parallel'), countField(ctx, 'min')), leavingActions(ctx)];
+  return [pair(countField(ctx, 'parallel'), countField(ctx, 'min')), readOnlyRow(ctx), leavingActions(ctx)];
 }

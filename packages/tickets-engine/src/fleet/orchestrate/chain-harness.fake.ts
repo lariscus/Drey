@@ -118,6 +118,9 @@ export function failedRecord(ticket: string, failure: string): SupervisorRecord 
 
 /** A persona file's knobs (`tickets/_meta/personas/<id>/`). */
 export interface PersonaSeed {
+  /** req-288: a v3 record's class (then `pin` is its pinned model). */
+  readonly class?: string;
+  readonly pin?: string;
   readonly worker?: string;
   readonly model?: string;
   readonly pool?: readonly string[];
@@ -200,9 +203,12 @@ export class ChainHarness {
 
   async writePersona(id: string, over: PersonaSeed = {}): Promise<void> {
     const model = over.model ?? 'opus';
-    const head = ['---', `title: ${id}`, `role: ${over.role ?? 'builder'}`, `worker: ${over.worker ?? 'opencode'}`, 'models:', `  default: ${model}`];
-    const tail = [`  pool: [${(over.pool ?? [model]).join(', ')}]`, "color: '#a78bfa'", `skills: [${(over.skills ?? []).join(', ')}]`, '---', ''];
-    await this.write(`tickets/_meta/personas/${id}/persona.md`, [...head, ...tail].join('\n'));
+    // req-288: `class` writes a v3 record (class and an optional pin); without it the v2 keys the migration reads.
+    const keys = over.class !== undefined
+      ? [`class: ${over.class}`, ...(over.pin !== undefined ? [`model: "${over.pin}"`] : [])]
+      : [`worker: ${over.worker ?? 'opencode'}`, 'models:', `  default: ${model}`, `  pool: [${(over.pool ?? [model]).join(', ')}]`];
+    const lines = ['---', `title: ${id}`, `role: ${over.role ?? 'builder'}`, ...keys, "color: '#a78bfa'", `skills: [${(over.skills ?? []).join(', ')}]`, '---', ''];
+    await this.write(`tickets/_meta/personas/${id}/persona.md`, lines.join('\n'));
     if (over.prompt != null) {
       await this.write(`tickets/_meta/personas/${id}/prompt.md`, over.prompt);
     }

@@ -85,14 +85,15 @@ describe('entryWorkOf — what happens at a chain entry (req-269)', () => {
 });
 
 describe('parsePersonaFile', () => {
-  it('reads the frontmatter with the concept defaults', () => {
+  it('reads a v2 record (no class yet) with its worker, models and floor as the legacy keys (req-288)', () => {
     expect(parsePersonaFile('pia', PIA)).toEqual({
       id: 'pia',
       kind: 'agent',
       title: 'Pia',
       role: 'planner',
-      worker: 'claude-code',
-      models: { default: 'opus', pool: ['opus', 'sonnet', 'glm-5.2'] },
+      class: null,
+      model: null,
+      legacy: { worker: 'claude-code', models: { default: 'opus', pool: ['opus', 'sonnet', 'glm-5.2'] }, minClass: null },
       color: '#a78bfa',
       summary: '',
       skills: ['repo-recherche', 'fragen-formulieren'],
@@ -105,12 +106,36 @@ describe('parsePersonaFile', () => {
   it('tolerates a sparse file and degrades unknown values', () => {
     const persona = parsePersonaFile('ben', `---\nrole: wizard\nmodels:\n  router: chaos\n---\n`);
     expect(persona.role).toBe('custom');
-    expect(persona.worker).toBe('opencode');
-    expect(persona.models.default).toBe('opus');
-    expect(persona.models.pool).toEqual(['opus']);
-    expect(persona.models).not.toHaveProperty('router'); // req-170: an old router: key is ignored
+    expect(persona.legacy).toEqual({ worker: 'opencode', models: { default: 'opus', pool: ['opus'] }, minClass: null }); // req-170: an old router: key is ignored
+    expect(persona.class).toBeNull();
     expect(persona.budget).toBeNull();
     expect(persona.allowed).toEqual({ spendAboveAllowance: false });
+  });
+
+  it('req-288: reads and writes class and the pinned model (quoted); the v2 keys never come back', () => {
+    const ben = parsePersonaFile('ben', '---\ntitle: Ben\nrole: builder\nclass: heavy\nmodel: "claude-code/claude-opus-5-5"\nworker: opencode\nmin-class: light\n---\n');
+    expect(ben).toMatchObject({ class: 'heavy', model: 'claude-code/claude-opus-5-5' });
+    expect(ben).not.toHaveProperty('legacy');
+    const text = personaFileText(ben);
+    expect(text).toContain('class: heavy\nmodel: "claude-code/claude-opus-5-5"\n');
+    expect(text).not.toMatch(/worker:|models:|min-class:/);
+    expect(personaFileText({ ...ben, model: null })).not.toContain('model:');
+    expect(parsePersonaFile('ben', '---\ntitle: Ben\nclass: B\n---\n').class).toBe('standard'); // the old letters read as names
+  });
+
+  it('req-288: a v2 record written before the migration keeps its keys, the floor included', () => {
+    const v2 = parsePersonaFile('ben', '---\ntitle: Ben\nworker: kimi\nmodels:\n  default: k2\n  pool: [k2]\nmin-class: standard\n---\n');
+    expect(v2.legacy).toEqual({ worker: 'kimi', models: { default: 'k2', pool: ['k2'] }, minClass: 'standard' });
+    const text = personaFileText({ ...v2, title: 'Benjamin' });
+    expect(text).toContain('worker: kimi\nmodels:\n  default: k2\n  pool: [k2]\nmin-class: standard\n');
+    expect(parsePersonaFile('ben', text).legacy).toEqual(v2.legacy);
+  });
+
+  it('req-288: the owner and Mission Control carry no class and drop the old placeholder keys', () => {
+    const you = parsePersonaFile('you', '---\ntitle: You\nkind: human\nworker: opencode\nmodels:\n  default: opus\n  pool: [opus]\n---\n');
+    expect(you).toMatchObject({ class: null, model: null });
+    expect(you).not.toHaveProperty('legacy');
+    expect(personaFileText(you)).not.toMatch(/worker:|models:|class:/);
   });
 
   it('rejects malformed ids', () => {

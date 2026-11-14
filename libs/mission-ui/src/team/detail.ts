@@ -162,8 +162,8 @@ export function timeWordsOf(at: string): string {
 
 // --- the setup tab's pure moves ---------------------------------------------------
 
-/** The workers the setup sheet offers (the desk's harnesses). */
-export const WORKER_OPTIONS: readonly string[] = ['claude-code', 'opencode', 'kimi', 'copilot'];
+/** req-288: the classes the setup sheet offers (the shipped list; the owner's own live in Settings → Models on the desk). */
+export const CLASS_OPTIONS: readonly string[] = ['super heavy', 'heavy', 'standard', 'light'];
 
 /** The skill list a toggle produces: the name dropped when carried, added when not. */
 export function skillsToggled(skills: readonly string[], name: string): readonly string[] {
@@ -197,8 +197,10 @@ export interface PersonaFacts {
   readonly color: string;
   /** The harness (`claude-code` | `opencode`); absent when the adapter omits it. */
   readonly worker?: string;
-  /** The default model; absent when the adapter omits it. */
+  /** req-288: the pinned model ('' = the next free model of its class); absent when the adapter omits it. */
   readonly model?: string;
+  /** req-288: the capability class; absent when the adapter omits it. */
+  readonly class?: string;
   /** The model pool (order = fallback); absent when the adapter omits it. */
   readonly pool?: readonly string[];
   /** The carried skill files; absent when the adapter omits them. */
@@ -882,28 +884,26 @@ export class PersonaDetail {
   protected readonly setupError = signal<string | null>(null);
 
   /** The open picker sheet; null = closed. */
-  protected readonly sheet = signal<'model' | 'worker' | null>(null);
+  protected readonly sheet = signal<'model' | 'class' | null>(null);
 
-  /** The model options: the pool, falling back to the current model alone. */
+  /** req-288: the model options — the next free model of the class ('') and the current pin. */
   protected readonly modelOptions = computed(() => {
-    const facts = this.persona();
-    const pool = (facts?.pool ?? []).filter((model) => model.trim() !== '');
-    if (pool.length > 0) {
-      return pool;
-    }
-    const model = facts?.model?.trim() ?? '';
-    return model === '' ? [] : [model];
+    const model = this.persona()?.model?.trim() ?? '';
+    return model === '' ? [''] : ['', model];
   });
 
-  /** The workers the setup sheet offers (the desk's harnesses). */
-  protected readonly workerOptions = computed(() => WORKER_OPTIONS);
+  /** req-288: the classes the setup sheet offers. */
+  protected readonly classOptions = computed(() => CLASS_OPTIONS);
 
-  /** The open sheet's options: the model pool, or the fixed worker list. */
+  /** The open sheet's options: the model choice, or the class list. */
   protected readonly sheetOptions = computed<readonly string[]>(() =>
-    this.sheet() === 'worker' ? WORKER_OPTIONS : this.modelOptions(),
+    this.sheet() === 'class' ? CLASS_OPTIONS : this.modelOptions(),
   );
 
-  protected readonly poolWords = computed(() => poolWordsOf(this.persona()?.pool ?? []));
+  /** An option as the sheet and the row write it: '' is the next free model of the class. */
+  protected optionLabel(option: string): string {
+    return option === '' ? this.i18n.t('persona.model.next_free') : option;
+  }
 
   protected skillOn(name: string): boolean {
     return this.skillsValue().includes(name);
@@ -913,7 +913,7 @@ export class PersonaDetail {
     this.promptDraft.set((event.target as HTMLTextAreaElement).value);
   }
 
-  protected openSheet(which: 'model' | 'worker'): void {
+  protected openSheet(which: 'model' | 'class'): void {
     if (this.readOnly()) {
       return;
     }
@@ -925,13 +925,13 @@ export class PersonaDetail {
     this.sheet.set(null);
   }
 
-  /** The model/worker pick: one PATCH, one commit, the sheet folds. */
-  protected async pick(kind: 'model' | 'worker', value: string): Promise<void> {
+  /** The model/class pick: one PATCH, one commit, the sheet folds; '' pins nothing (req-288). */
+  protected async pick(kind: 'model' | 'class', value: string): Promise<void> {
     if (this.readOnly() || this.setupBusy() !== null) {
       return;
     }
     this.sheet.set(null);
-    await this.runSetup(kind, kind === 'model' ? { model: value } : { worker: value }, value);
+    await this.runSetup(kind, kind === 'model' ? { model: value === '' ? null : value } : { class: value }, this.optionLabel(value));
   }
 
   /** A skill switch: the local list flips at once, the new list PATCHes in one commit. */
@@ -966,11 +966,6 @@ export class PersonaDetail {
     } finally {
       this.setupBusy.set(null);
     }
-  }
-
-  /** The pool row's tap: editing follows in a later milestone — the toast says so. */
-  protected poolTap(): void {
-    this.vm.toast?.('Pool editing — to come', 'ok');
   }
 
   /** One setup PATCH with the shared busy/error/toast handling. */

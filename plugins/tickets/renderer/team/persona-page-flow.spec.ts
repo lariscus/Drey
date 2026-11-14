@@ -61,12 +61,12 @@ describe('the Persona page v2: the prompt file, the proposals, the links and a f
     expect(fx.host.querySelector('[data-proposal]')).toBeNull();
   });
 
-  it('the links switch the page to its Memory and 1:1 tabs; Back goes to Crew', async () => {
+  it('the tabs switch the page to Memory and the 1:1 (board 7k v3 draws no links under Proposals); Back goes to Crew', async () => {
     await mount();
-    buttonOf('Memory · 3 →').click();
+    q<HTMLElement>('[data-tab="memory"]').click();
     expect(q('[data-tab="memory"]').getAttribute('aria-selected')).toBe('true');
     buttonOf('Instructions').click();
-    buttonOf('Talk to Ben 1:1 →').click();
+    q<HTMLElement>('[data-tab="talk"]').click();
     expect(q('[data-tab="talk"]').getAttribute('aria-selected')).toBe('true');
     buttonOf('Back to Crew').click();
     expect(fx.backs).toBe(1);

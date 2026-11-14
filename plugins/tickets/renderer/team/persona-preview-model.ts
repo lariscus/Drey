@@ -36,9 +36,9 @@ export function partLinesOf(preview: PromptPreview): readonly PartLine[] {
   return preview.parts.map((part) => ({ name: part.name, key: PART_KEYS[part.name] ?? null, tokens: part.tokens }));
 }
 
-/** What the request names: the persona's first step (the engine's default when it has none) and its strongest model. */
-export function previewRequestOf(phases: readonly string[] | undefined, pool: readonly string[]): { readonly step?: string; readonly model?: string } {
+/** What the request names: the persona's first step (the engine's default when it has none) and its pinned model (req-288; none = the engine's guess). */
+export function previewRequestOf(phases: readonly string[] | undefined, pinnedModel: string): { readonly step?: string; readonly model?: string } {
   const step = phases?.[0];
-  const model = pool[0];
-  return { ...(step === undefined ? {} : { step }), ...(model === undefined ? {} : { model }) };
+  const model = pinnedModel.trim();
+  return { ...(step === undefined ? {} : { step }), ...(model === '' ? {} : { model }) };
 }

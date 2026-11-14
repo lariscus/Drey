@@ -569,37 +569,28 @@
                 </div>
               </div>
 
-              <div class="ghead">Model &amp; Worker</div>
+              <div class="ghead">{{ 'persona.model.title' | t }}</div>
+              <button
+                type="button"
+                class="set-row"
+                (click)="openSheet('class')"
+                [disabled]="readOnly()"
+              >
+                <div class="sl">
+                  <span class="lt">{{ 'persona.model.class' | t }}</span>
+                </div>
+                <span class="val">{{ persona()?.class || '—' }}</span>
+              </button>
               <button
                 type="button"
                 class="set-row"
                 (click)="openSheet('model')"
-                [disabled]="readOnly() || modelOptions().length === 0"
-              >
-                <div class="sl">
-                  <span class="lt">Default model</span>
-                  <span class="ls">Resolution: ticket pin &gt; default</span>
-                </div>
-                <span class="val">{{ persona()?.model || '—' }}</span>
-              </button>
-              <button type="button" class="set-row" (click)="poolTap()">
-                <div class="sl">
-                  <span class="lt">Pool</span>
-                  <span class="ls">Allowed models, order = fallback</span>
-                </div>
-                <span class="val muted">{{ poolWords() || '—' }}</span>
-              </button>
-              <button
-                type="button"
-                class="set-row"
-                (click)="openSheet('worker')"
                 [disabled]="readOnly()"
               >
                 <div class="sl">
-                  <span class="lt">Worker</span>
-                  <span class="ls">Harness (repo) or direct call</span>
+                  <span class="lt">{{ 'persona.model.model' | t }}</span>
                 </div>
-                <span class="val">{{ persona()?.worker || '—' }}</span>
+                <span class="val">{{ optionLabel(persona()?.model ?? '') }}</span>
               </button>
 
               <div class="ghead">Prompt</div>
@@ -709,11 +700,11 @@
         class="sheet"
         role="dialog"
         aria-modal="true"
-        [attr.aria-label]="which === 'model' ? 'Default model' : 'Worker'"
+        [attr.aria-label]="(which === 'model' ? 'persona.model.model' : 'persona.model.class') | t"
       >
         <div class="grab" aria-hidden="true"></div>
         <div class="sheet-head">
-          <h2 class="sheet-title">{{ which === 'model' ? 'Default model' : 'Worker' }}</h2>
+          <h2 class="sheet-title">{{ (which === 'model' ? 'persona.model.model' : 'persona.model.class') | t }}</h2>
           <button type="button" class="sheet-close" aria-label="Close" (click)="closeSheet()">
             ×
           </button>
@@ -723,11 +714,11 @@
             type="button"
             class="opt"
             [class.sel]="
-              which === 'model' ? option === persona()?.model : option === persona()?.worker
+              which === 'model' ? option === (persona()?.model ?? '') : option === persona()?.class
             "
             (click)="pick(which, option)"
           >
-            <span class="dot" aria-hidden="true"></span>{{ option }}
+            <span class="dot" aria-hidden="true"></span>{{ optionLabel(option) }}
           </button>
         }
       </div>

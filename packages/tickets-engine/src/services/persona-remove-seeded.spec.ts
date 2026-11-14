@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { seededCrewOf } from '../core/crew-seed-marker';
 import { DEFAULT_CREW_IDS } from '../core/default-crew';
 import { parsePersonaFile } from '../core/persona';
-import { CrewSeederRig, modelRow } from './crew-seeder-rig.fake';
+import { CrewSeederRig } from './crew-seeder-rig.fake';
 import { PersonaRemoveService } from './persona-remove-service';
 
 /** req-261 and req-256 together: a seeded persona the owner deletes stays deleted, at every later start. */
@@ -36,7 +36,7 @@ function removal(): PersonaRemoveService {
 
 describe('a removed seeded persona', () => {
   beforeEach(async () => {
-    rig = await CrewSeederRig.create({ rows: [modelRow('glm-big', 'opencode', 'A')] });
+    rig = await CrewSeederRig.create();
     expect(await rig.seeder.seed(rig.vault)).toEqual({ kind: 'seeded', ids: [...DEFAULT_CREW_IDS] });
   });
 

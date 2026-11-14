@@ -25,9 +25,10 @@ const TABLE = {
 
 let h: ChainHarness;
 
-async function setUp(config: Record<string, unknown> = TABLE): Promise<{ rig: PoolRig; built: ReturnType<ChainHarness['build']> }> {
+async function setUp(config: Record<string, unknown> = TABLE, cls?: string): Promise<{ rig: PoolRig; built: ReturnType<ChainHarness['build']> }> {
   await h.write('tickets/_meta/pipeline.md', pipelineWithPlan('persona: ben'));
-  await h.writePersona('ben', { worker: 'claude-code', model: 'opus', pool: ['opus', 'sonnet'] });
+  // A v2 record (its old default opus: heavy, by the migration's rule) unless a v3 class is named (req-288).
+  await h.writePersona('ben', cls !== undefined ? { class: cls } : { worker: 'claude-code', model: 'opus', pool: ['opus', 'sonnet'] });
   const rig = new PoolRig([CLAUDE_A], NOW);
   await rig.load(config);
   const built = h.build({ fleet: rig.binding(fakePort()), pool: rig.dispatchPool(), now: () => NOW });
@@ -85,19 +86,39 @@ describe('the class request at dispatch (req-170)', () => {
     expect(built.orch.status().queue?.map((e) => [e.ticket, e.position])).toEqual([['T-0003', 1]]);
   });
 
-  it("asks for the part's size: M → class standard, the reason rides the request", async () => {
-    h.io.seed('T-0004', 'plan', { extensions: { size: 'M' } });
-    const { built } = await setUp();
+  it("req-288: the persona's class asks; the part's size raises it, the reason rides the request", async () => {
+    h.io.seed('T-0004', 'plan', { extensions: { size: 'L' } });
+    const { built } = await setUp(TABLE, 'standard');
     await built.orch.configure(h.config());
     await built.orch.setMaster('run');
-    expect(built.fleet.records.map((r) => [r.request.model, r.request.poolClass, r.request.poolWhy])).toEqual([['sonnet', 'standard', 'size M → standard']]);
-    expect(built.logs.find((line) => line.startsWith('dispatched T-0004'))).toContain('sonnet, class standard, cost 1 on Claude A — size M → standard');
+    expect(built.fleet.records.map((r) => [r.request.model, r.request.poolClass, r.request.poolWhy])).toEqual([['opus', 'heavy', "ben's class standard, raised to heavy (size L → heavy)"]]);
+    expect(built.logs.find((line) => line.startsWith('dispatched T-0004'))).toContain('opus, class heavy, cost 5 on Claude A');
+  });
+
+  it('req-288: a size never lowers the class', async () => {
+    h.io.seed('T-0004', 'plan', { extensions: { size: 'S' } });
+    const { built } = await setUp(TABLE, 'standard');
+    await built.orch.configure(h.config());
+    await built.orch.setMaster('run');
+    expect(built.fleet.records.map((r) => [r.request.model, r.request.poolClass])).toEqual([['sonnet', 'standard']]);
+  });
+
+  it('req-288: a pinned model runs alone — the router grants no other model of the class', async () => {
+    h.io.seed('T-0004', 'plan');
+    await h.write('tickets/_meta/pipeline.md', pipelineWithPlan('persona: ben'));
+    const rig = new PoolRig([CLAUDE_A], NOW);
+    await rig.load(TABLE);
+    await h.writePersona('ben', { class: 'standard', pin: 'claude-code/sonnet' });
+    const built = h.build({ fleet: rig.binding(fakePort()), pool: rig.dispatchPool(), now: () => NOW });
+    await built.orch.configure(h.config());
+    await built.orch.setMaster('run');
+    expect(built.fleet.records.map((r) => [r.request.provider, r.request.model, r.request.poolWhy])).toEqual([['claude-code', 'sonnet', 'ben pins model claude-code/sonnet']]);
   });
 
   it("req-178: the ticket's needs ride the start with the dispatch's route; a model without the capability is never taken", async () => {
-    h.io.seed('T-0004', 'plan', { extensions: { size: 'M', needs: 'image' } });
+    h.io.seed('T-0004', 'plan', { extensions: { needs: 'image' } });
     const vision = { ...TABLE, models: [TABLE.models[0], { ...TABLE.models[1], input: ['text', 'image'] }] };
-    const { built } = await setUp(vision);
+    const { built } = await setUp(vision, 'standard');
     await built.orch.configure(h.config());
     await built.orch.setMaster('run');
     const started = built.fleet.records[0]?.request;
@@ -106,8 +127,8 @@ describe('the class request at dispatch (req-170)', () => {
   });
 
   it('req-178: no model of the class reads images — the ticket waits on the configuration, named', async () => {
-    h.io.seed('T-0004', 'plan', { extensions: { size: 'M', needs: 'image' } });
-    const { built } = await setUp();
+    h.io.seed('T-0004', 'plan', { extensions: { needs: 'image' } });
+    const { built } = await setUp(TABLE, 'standard');
     await built.orch.configure(h.config());
     await built.orch.setMaster('run');
     expect(built.fleet.records).toEqual([]);

@@ -1,8 +1,9 @@
 import type { PersonaMessage, PersonaProposalCommand, PersonaProposalDecision, PersonaThreadReply } from '../contracts/persona-session';
 import { isMissionPersona, personaRef, type Persona } from '../core/persona';
-import { parseWorkerValue } from '../fleet/assignment';
 import { OneOnOneRequestBuilder } from '../fleet/one-on-one-request';
-import type { CapabilityClass, ModelsReply, RunInfo, RunRequest, WorkerProviderId } from '../fleet/protocol';
+import { personaHarnessOf } from '../fleet/persona-harness';
+import type { ModelRow, ModelsReply, RunInfo, RunRequest } from '../fleet/protocol';
+import type { ModelTablePort } from './service-model-table';
 import type { ApiTurnRunner } from './api-persona-turn';
 import type { EngineVault } from './host';
 import type { PersonaSessionContext } from './persona-session-context';
@@ -35,17 +36,20 @@ export interface PersonaSessionServiceDeps {
   /** The 1:1 changed on its own (a session started, an answer landed, a turn failed): clients read this session file again. */
   readonly onChanged: (file: string) => void;
   readonly log: (message: string, level?: 'info' | 'warn' | 'error') => void;
+  /** req-288: the machine's model table, read from `service.json` (no runner needed); absent = the runner's `GET /models`. */
+  readonly table?: ModelTablePort;
 }
 
 type Found = { readonly vault: EngineVault; readonly persona: Persona } | { readonly error: string };
 
 /**
- * Whether a 1:1 line goes to the chat bridge: an `api` persona, and Mission
- * Control's persona (req-294, req-296: she runs through no harness — no
- * slot, no tools; her file carries no `worker:`).
+ * Whether a 1:1 line goes to the chat bridge: Mission Control's persona
+ * (req-294, req-296: she runs through no harness — no slot, no tools), and an
+ * agent no harness follows for (req-288: no pin with a known harness, no model
+ * of its class in the table — what an `api` persona of req-168 migrates to).
  */
-function onBridge(persona: Persona): boolean {
-  return isMissionPersona(persona) || parseWorkerValue(persona.worker) === null;
+function onBridge(persona: Persona, rows: readonly ModelRow[] | null): boolean {
+  return isMissionPersona(persona) || personaHarnessOf(persona, rows) === null;
 }
 
 function messageOf(error: unknown): string {
@@ -141,7 +145,7 @@ export class PersonaSessionService {
     const id = found.persona.id;
     let outcome: TurnOutcome;
     try {
-      outcome = onBridge(found.persona) ? await this.bridgeTurn(found, earlier, text) : await this.sessionTurn(found, open, earlier, text);
+      outcome = onBridge(found.persona, await this.rows()) ? await this.bridgeTurn(found, earlier, text) : await this.sessionTurn(found, open, earlier, text);
     } catch (error) {
       outcome = { ok: false, error: messageOf(error) };
     }
@@ -181,9 +185,9 @@ export class PersonaSessionService {
   }
 
   private async startSession(found: { vault: EngineVault; persona: Persona }, open: OpenSession, earlier: readonly PersonaMessage[]): Promise<string | TurnOutcome> {
-    const instruction = await this.deps.context.brief(found.vault, found.persona, earlier);
-    const classOf = await this.classLookup();
-    const built = this.builder.build({ persona: found.persona, ticketsVaultPath: found.vault.path, chatFile: open.file, instruction, origin: 'drey:1:1', classOf });
+    const rows = await this.rows();
+    const instruction = await this.deps.context.brief(found.vault, found.persona, earlier, personaHarnessOf(found.persona, rows)?.provider ?? null);
+    const built = this.builder.build({ persona: found.persona, ticketsVaultPath: found.vault.path, chatFile: open.file, instruction, origin: 'drey:1:1', rows });
     if (!built.ok) {
       return { ok: false, error: built.error };
     }
@@ -191,10 +195,10 @@ export class PersonaSessionService {
     return started.ok ? started.run.id : { ok: false, error: started.error };
   }
 
-  /** The model table's class of a model, from the runner's `GET /models`; no table = no class asked. */
-  private async classLookup(): Promise<(provider: WorkerProviderId, model: string | null) => CapabilityClass | null> {
-    const models = (await this.deps.fleet.models?.().catch(() => null)) ?? null;
-    return (provider, model) => models?.models.find((row) => row.provider === provider && row.model === model)?.class ?? null;
+  /** The model table (req-288: the harness follows from the model): `service.json`'s rows, else the runner's `GET /models`. */
+  private async rows(): Promise<readonly ModelRow[] | null> {
+    const table = (await this.deps.table?.rows().catch(() => null)) ?? null;
+    return table ?? (await this.deps.fleet.models?.().catch(() => null))?.models ?? null;
   }
 
   private async find(personaId: string): Promise<Found> {
@@ -215,7 +219,7 @@ export class PersonaSessionService {
   private async reply(found: { persona: Persona }, open: OpenSession | null): Promise<PersonaThreadReply> {
     const id = found.persona.id;
     const runs = await this.deps.fleet.runs().catch(() => [] as readonly RunInfo[]);
-    const state = sessionStateOf({ runs, persona: id, bridge: onBridge(found.persona), answering: this.answering.has(id) });
+    const state = sessionStateOf({ runs, persona: id, bridge: onBridge(found.persona, await this.rows()), answering: this.answering.has(id) });
     const failure = this.failures.get(id);
     return {
       ok: true,

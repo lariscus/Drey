@@ -4,65 +4,77 @@ import { parsePersonaFile } from '../../core/persona';
 import type { CapabilityClass, PoolEntry } from '../protocol';
 import { ClassRequestBuilder } from './class-request-builder';
 
-const CLASSES: Readonly<Record<string, CapabilityClass>> = { opus: 'heavy', sonnet: 'standard', glm: 'standard', k2: 'light' };
+const CLASSES: Readonly<Record<string, CapabilityClass>> = { opus: 'heavy', sonnet: 'standard', 'glm-5.3': 'standard', k2: 'light' };
 const ORDER: readonly CapabilityClass[] = ['super heavy', 'heavy', 'standard', 'light'];
+const ENTRIES: readonly PoolEntry[] = [
+  { provider: 'claude-code', model: 'opus' },
+  { provider: 'claude-code', model: 'sonnet' },
+  { provider: 'opencode', model: 'glm-5.3' },
+  { provider: 'kimi', model: 'k2' },
+];
 const lookup = {
   classOf: (entry: PoolEntry): CapabilityClass | null => (entry.model === null ? null : (CLASSES[entry.model] ?? null)),
   rankOf: (name: CapabilityClass): number => (ORDER.includes(name) ? ORDER.indexOf(name) : ORDER.length),
+  entries: (): readonly PoolEntry[] => ENTRIES,
 };
 const builder = new ClassRequestBuilder(lookup);
 
-const persona = (pool: string, extra = ''): ReturnType<typeof parsePersonaFile> =>
-  parsePersonaFile('ben', `---\ntitle: Ben\nworker: claude-code\nmodels:\n  default: sonnet\n  pool: [${pool}]\nbudget: 5\n${extra}---\n`);
+const persona = (cls: string, extra = ''): ReturnType<typeof parsePersonaFile> => parsePersonaFile('ben', `---\ntitle: Ben\nclass: ${cls}\nbudget: 5\n${extra}---\n`);
 const card = (meta: Partial<TicketMeta> = {}): TicketCard => ({ id: 'T-0001', meta: { repo: null, ...meta } }) as unknown as TicketCard;
 const phase = (minClass?: CapabilityClass): PipelinePhase => ({ id: 'plan', ...(minClass !== undefined ? { minClass } : {}) }) as PipelinePhase;
 
-describe('ClassRequestBuilder — who asks for which class (req-170)', () => {
-  it('unsized: the class of the persona\'s default model; the ledger inputs come from the ticket and the persona', () => {
-    const request = builder.build({ card: card({ allowance: 2.5 }), phase: phase(), persona: persona('opus, sonnet, kimi/k2', 'allowed:\n  spend-above-allowance: true\n') });
-    expect(request).toMatchObject({ class: 'standard', why: "ben's default class standard", provider: 'claude-code' });
-    expect(request.pool).toEqual([{ provider: null, model: 'opus' }, { provider: null, model: 'sonnet' }, { provider: 'kimi', model: 'k2' }]);
+describe('ClassRequestBuilder — the persona names its class (req-170, Persona v3 req-288)', () => {
+  it("asks for the persona's class over every model the router may use; the ledger inputs come from the ticket and the persona", () => {
+    const request = builder.build({ card: card({ allowance: 2.5 }), phase: phase(), persona: persona('standard', 'allowed:\n  spend-above-allowance: true\n') });
+    expect(request).toMatchObject({ class: 'standard', why: "ben's class standard", provider: 'claude-code', stepUp: true });
+    expect(request.pool).toEqual(ENTRIES);
     expect(request.ledger).toEqual({ allowance: 2.5, personaBudget: 5, spendAboveAllowance: true });
   });
 
-  it('a size asks for its class: S → light, L → heavy', () => {
-    expect(builder.build({ card: card({ size: 'S' }), phase: phase(), persona: persona('opus, sonnet, kimi/k2') })).toMatchObject({ class: 'light', why: 'size S → light' });
-    expect(builder.build({ card: card({ size: 'L' }), phase: phase(), persona: persona('opus, sonnet') })).toMatchObject({ class: 'heavy', why: 'size L → heavy' });
+  it('a size raises the class, never lowers it: L lifts a standard persona to heavy, S leaves it standard', () => {
+    expect(builder.build({ card: card({ size: 'L' }), phase: phase(), persona: persona('standard') })).toMatchObject({ class: 'heavy', why: "ben's class standard, raised to heavy (size L → heavy)" });
+    expect(builder.build({ card: card({ size: 'S' }), phase: phase(), persona: persona('standard') })).toMatchObject({ class: 'standard', why: "ben's class standard" });
   });
 
-  it('the phase floor raises a lighter request, never lowers a stronger one', () => {
-    expect(builder.build({ card: card({ size: 'S' }), phase: phase('standard'), persona: persona('opus, sonnet, kimi/k2') })).toMatchObject({ class: 'standard', why: 'size S → light, floor standard in plan' });
-    expect(builder.build({ card: card({ size: 'L' }), phase: phase('standard'), persona: persona('opus, sonnet') })).toMatchObject({ class: 'heavy' });
+  it("the ticket's class raises too, never lowers; the phase floor the same", () => {
+    expect(builder.build({ card: card({ class: 'super heavy' }), phase: phase(), persona: persona('heavy') })).toMatchObject({ class: 'super heavy' });
+    expect(builder.build({ card: card({ class: 'light' }), phase: phase(), persona: persona('heavy') })).toMatchObject({ class: 'heavy' });
+    expect(builder.build({ card: card(), phase: phase('heavy'), persona: persona('light') })).toMatchObject({ class: 'heavy', why: "ben's class light, raised to heavy (floor heavy in plan)" });
   });
 
-  it("a class the persona's pool does not hold is raised to the lightest stronger one it holds", () => {
-    expect(builder.build({ card: card({ size: 'S' }), phase: phase(), persona: persona('opus, sonnet') })).toMatchObject({ class: 'standard', why: "size S → light, raised to standard, the lightest class ben's pool holds above light" });
-    expect(builder.build({ card: card({ size: 'L' }), phase: phase(), persona: persona('sonnet') })).toMatchObject({ class: 'heavy' }); // nothing stronger: it stays heavy and waits on the configuration
+  it('a pinned model runs alone while nothing raised the class; a raise takes the next free model of the raised class', () => {
+    const pinned = persona('heavy', 'model: "claude-code/opus"\n');
+    expect(builder.build({ card: card(), phase: phase(), persona: pinned })).toMatchObject({ class: null, pool: [{ provider: 'claude-code', model: 'opus' }], why: 'ben pins model claude-code/opus' });
+    expect(builder.build({ card: card(), phase: phase(), persona: pinned }).stepUp).toBeUndefined();
+    const raised = builder.build({ card: card({ class: 'super heavy' }), phase: phase(), persona: pinned });
+    expect(raised).toMatchObject({ class: 'super heavy', pool: ENTRIES, stepUp: true });
   });
 
-  it('a ticket pin wins: model: asks for that model alone, class: for exactly that class', () => {
-    expect(builder.build({ card: card({ model: 'opus', size: 'S' }), phase: phase('standard'), persona: persona('sonnet') })).toMatchObject({ class: null, pool: [{ provider: null, model: 'opus' }], why: 'T-0001 pins model opus' });
-    expect(builder.build({ card: card({ class: 'light' }), phase: phase('standard'), persona: persona('sonnet') })).toMatchObject({ class: 'light', why: 'T-0001 pins class light' });
+  it("a ticket's pinned model wins over everything", () => {
+    expect(builder.build({ card: card({ model: 'k2', size: 'L' }), phase: phase('heavy'), persona: persona('heavy') })).toMatchObject({ class: null, pool: [{ provider: null, model: 'k2' }], why: 'T-0001 pins model k2' });
   });
 
-  it("req-178: the phase's and the ticket's needs ride merged; the step up is allowed unless a pin decides; the last slot is preferred", () => {
+  it('an unmigrated v2 record asks by the migration rule: the class of its old default, the floor folded in', () => {
+    const v2 = parsePersonaFile('ben', '---\ntitle: Ben\nworker: claude-code\nmodels:\n  default: sonnet\n  pool: [opus, sonnet]\nmin-class: A\n---\n');
+    expect(builder.build({ card: card(), phase: phase(), persona: v2 })).toMatchObject({ class: 'heavy', pool: ENTRIES });
+    const single = parsePersonaFile('ben', '---\ntitle: Ben\nworker: opencode\nmodels:\n  default: glm-5.3\n  pool: [glm-5.3]\n---\n');
+    expect(builder.build({ card: card(), phase: phase(), persona: single })).toMatchObject({ class: null, pool: [{ provider: 'opencode', model: 'glm-5.3' }] });
+  });
+
+  it("req-178/258: the persona's needs replace the column's, the ticket's merge in; the last slot is preferred", () => {
     const needy = { ...phase(), needs: { image: true, contextTokens: 100_000 } } as PipelinePhase;
-    const request = builder.build({ card: card({ needs: { contextTokens: 200_000 } }), phase: needy, persona: persona('sonnet'), prefer: 'claude-b' });
-    expect(request).toMatchObject({ needs: { image: true, contextTokens: 200_000 }, stepUp: true, prefer: 'claude-b' });
-    expect(builder.build({ card: card(), phase: phase(), persona: persona('sonnet') })).not.toHaveProperty('needs');
-    expect(builder.build({ card: card({ class: 'standard' }), phase: phase(), persona: persona('sonnet') }).stepUp).toBeUndefined();
-    expect(builder.build({ card: card({ model: 'opus' }), phase: phase(), persona: persona('sonnet') }).stepUp).toBeUndefined();
+    expect(builder.build({ card: card({ needs: { contextTokens: 200_000 } }), phase: needy, persona: persona('standard'), prefer: 'claude-b' })).toMatchObject({ needs: { image: true, contextTokens: 200_000 }, prefer: 'claude-b' });
+    expect(builder.build({ card: card(), phase: needy, persona: persona('standard', 'needs: [tools]\n') }).needs).toEqual({ tools: true });
+    expect(builder.build({ card: card(), phase: phase(), persona: persona('standard') })).not.toHaveProperty('needs');
   });
 
-  it("req-258: the persona's own floor and needs win over the column's when its record names them", () => {
-    const floored = persona('opus, sonnet, kimi/k2', 'min-class: A\n');
-    expect(builder.build({ card: card({ size: 'S' }), phase: phase('standard'), persona: floored })).toMatchObject({ class: 'heavy', why: 'size S → light, floor heavy of ben' });
-    const needy = { ...phase(), needs: { image: true } } as PipelinePhase;
-    expect(builder.build({ card: card(), phase: needy, persona: persona('sonnet', 'needs: [tools]\n') }).needs).toEqual({ tools: true });
-    expect(builder.build({ card: card(), phase: needy, persona: persona('sonnet') }).needs).toEqual({ image: true });
+  it('a machine without a table runs the pin; a persona without one waits on the configuration (an empty pool)', () => {
+    const bare = new ClassRequestBuilder({ ...lookup, entries: () => [] });
+    expect(bare.build({ card: card({ size: 'L' }), phase: phase(), persona: persona('standard', 'model: "kimi/k2"\n') }).pool).toEqual([{ provider: 'kimi', model: 'k2' }]);
+    expect(bare.build({ card: card(), phase: phase(), persona: persona('standard') })).toMatchObject({ pool: [], provider: 'claude-code' });
   });
 
-  it('req-290: the request carries no profile, whatever the repository said', () => {
-    expect(builder.build({ card: card(), phase: phase(), persona: persona('sonnet') })).not.toHaveProperty('profile');
+  it('req-290: the request carries no profile', () => {
+    expect(builder.build({ card: card(), phase: phase(), persona: persona('standard') })).not.toHaveProperty('profile');
   });
 });

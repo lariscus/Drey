@@ -1,8 +1,8 @@
-import { splitPoolEntry, type Persona } from '../core/persona';
-import { parseWorkerValue } from './assignment';
+import type { Persona } from '../core/persona';
+import { noHarnessReason, personaHarnessOf } from './persona-harness';
 import type { EffectiveCrew, SessionOverrides } from './config/layered-config-resolver';
 import { LayeredConfigResolver } from './config/layered-config-resolver';
-import type { CapabilityClass, RunRequest, WorkerProviderId } from './protocol';
+import type { CapabilityClass, ModelRow, RunRequest, WorkerProviderId } from './protocol';
 import { FREE_SESSION_TICKET } from './protocol-session';
 
 /** What one free session's start is composed from. */
@@ -20,25 +20,14 @@ export interface FreeSessionInput {
   readonly crew: Pick<EffectiveCrew, 'permissionMode'>;
   /** The session layer: what the owner set on this session. */
   readonly overrides: SessionOverrides;
-  /** The model table's class of a model on a provider; null when the table holds no row for it. */
-  readonly classOf?: (provider: WorkerProviderId, model: string | null) => CapabilityClass | null;
+  /** The model table's rows (req-288: the harness follows from the model); null = no table. */
+  readonly rows?: readonly ModelRow[] | null;
   readonly git?: string;
   /** req-283: the project the session works in (`SessionProjectRule`); null/absent = none, no vault. */
   readonly projectId?: string | null;
 }
 
 export type FreeSessionRequestResult = { readonly ok: true; readonly request: RunRequest } | { readonly ok: false; readonly error: string };
-
-/** The persona's harness and the model it would run on: its default when that is the harness's, else its pool's first entry of it. */
-function harnessOf(persona: Persona): { provider: WorkerProviderId; model: string | null } | null {
-  const worker = parseWorkerValue(persona.worker);
-  if (worker === null) {
-    return null;
-  }
-  const entries = [persona.models.default, ...persona.models.pool].filter((entry) => entry.trim() !== '').map(splitPoolEntry);
-  const own = entries.find((entry) => entry.provider === null || entry.provider === worker.provider);
-  return { provider: worker.provider, model: worker.model ?? own?.model ?? null };
-}
 
 /**
  * The free session's start request (req-173, R12): the persona's harness,
@@ -54,12 +43,13 @@ export class FreeSessionRequestBuilder {
 
   build(input: FreeSessionInput): FreeSessionRequestResult {
     const { persona } = input;
-    const harness = harnessOf(persona);
+    const harness = personaHarnessOf(persona, input.rows ?? null);
     if (harness === null) {
-      return { ok: false, error: `${persona.id} runs on "${persona.worker}", which the runner cannot start — a free session needs a harness` };
+      return { ok: false, error: `${noHarnessReason(persona)} — a free session needs a harness` };
     }
     const session = this.resolver.session(input.crew, harness.model, input.overrides);
-    const poolClass = session.poolClass ?? input.classOf?.(harness.provider, session.model) ?? null;
+    const asked = session.model === harness.model ? harness.class : ((input.rows ?? []).find((row) => row.provider === harness.provider && row.model === session.model)?.class ?? null);
+    const poolClass = session.poolClass ?? asked;
     return { ok: true, request: this.requestOf(input, harness.provider, session, poolClass) };
   }
 

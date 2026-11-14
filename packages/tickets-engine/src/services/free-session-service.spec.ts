@@ -8,8 +8,9 @@ import { FreeSessionService } from './free-session-service';
 import type { EngineVault } from './host';
 
 const VAULT: EngineVault = { id: 'v', name: 'tickets', path: 'E:\\T', exists: true, active: true };
-const BEN = { id: 'ben', kind: 'agent', title: 'Ben', role: 'build', worker: 'claude-code', models: { default: 'claude-code/sonnet', pool: [] }, color: '#fff', skills: [], budget: null, allowed: {} } as unknown as Persona;
-const PIA = { ...BEN, id: 'pia', title: 'Pia', worker: 'api' } as Persona;
+const BEN = { id: 'ben', kind: 'agent', title: 'Ben', role: 'build', class: 'standard', model: null, color: '#fff', skills: [], budget: null, allowed: {} } as unknown as Persona;
+/** req-288: a persona whose class holds no model of the table has no harness. */
+const PIA = { ...BEN, id: 'pia', title: 'Pia', class: 'light' } as Persona;
 const PROJECTS: ProjectRecord[] = [
   { id: 'drey', name: 'Drey', color: '', repos: ['drey'], folders: [], vaults: {}, purpose: '' },
   { id: 'lariscus', name: 'Lariscus', color: '', repos: ['lariscus'], folders: [], vaults: {}, purpose: '' },
@@ -20,7 +21,7 @@ function world(crewText: string | null = null, personas: readonly Persona[] = [B
   const sends: [string, string][] = [];
   const runs: RunInfo[] = [{ id: 'R-live', ticketId: 'T-0007', state: 'running', worktreePath: 'E:\\T\\_worktrees\\T-0007' } as RunInfo];
   const crew = new LayeredConfigResolver().crew(parseCrewFile(crewText).config);
-  const models = { models: [{ provider: 'claude-code', model: 'sonnet', class: 'B' }] } as unknown as ModelsReply;
+  const models = { models: [{ provider: 'claude-code', model: 'sonnet', class: 'standard', enabled: true }] } as unknown as ModelsReply;
   const service = new FreeSessionService({
     board: { detect: async () => VAULT, listPersonas: async () => personas, listRepos: async () => ({ repos: [{ name: 'drey', url: 'x', path: 'E:\\projects\\drey' } as never] }), projectRecords: async () => PROJECTS },
     fleet: {
@@ -42,7 +43,7 @@ describe('FreeSessionService (req-173, R12)', () => {
     const w = world('---\npermission-mode: bypass\n---\n');
     expect(await w.service.start({ persona: 'ben', directory: 'E:\\T', firstLine: 'Tidy the inbox.' }, 'service-window')).toEqual({ ok: true, runId: 'R-1' });
     const request = w.starts[0]!;
-    expect(request).toMatchObject({ permissionMode: 'bypass', poolClass: 'B', origin: 'service-window', session: { kind: 'free', persona: 'ben', workingDirectory: 'E:\\T' } });
+    expect(request).toMatchObject({ permissionMode: 'bypass', provider: 'claude-code', model: 'sonnet', poolClass: 'standard', origin: 'service-window', session: { kind: 'free', persona: 'ben', workingDirectory: 'E:\\T' } });
     expect(request.instruction).toContain('This folder is the tickets repository');
     expect(request.instruction).toContain('Ben builds.');
     expect(w.sends).toEqual([['R-1', 'Tidy the inbox.']]);
@@ -79,7 +80,7 @@ describe('FreeSessionService (req-173, R12)', () => {
     expect(options).toEqual({
       ok: true,
       personas: [{ id: 'ben', title: 'Ben', worker: 'claude-code' }],
-      classes: ['B'],
+      classes: ['standard'],
       ticketsVault: 'E:\\T',
       repos: [{ name: 'drey', path: 'E:\\projects\\drey' }],
       permissionMode: 'accept-edits',

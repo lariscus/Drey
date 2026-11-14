@@ -2,23 +2,24 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { fakeHarnessDir, pathWithFakes } from './fixtures/fake-harness';
 import { test, expect, type ElectronApplication, type Page } from './fixtures/drey';
 
 /**
- * NOT a regression suite: puts the built app in the state of the R11 mockup (board 7k v2,
- * `docs/design/work-panel/crew-internals/persona-page-mockup.html`)
- * (DeskPersona) and takes the screenshot the fidelity checklist asks for.
- * Opt-in, so CI skips it:
+ * NOT a regression suite: puts the built app in the state of board 7k v3 (`DeskPersonaV3`,
+ * `docs/design/work-panel/boards/DeskPersonaV3.png`, req-288) with the tabs of v4 and takes the
+ * screenshot the fidelity checklist asks for: the picture's menu, the Model listbox and the Skills
+ * library open, as the board draws them. Opt-in, so CI skips it:
  *
  *   . .\env.ps1
  *   $env:DREY_FIDELITY_SHOTS = '1'
  *   npm run e2e:run -- fidelity-desk-persona
  *
- * Output: `test-results/fidelity/DeskPersona.png` (1440x1700, scale factor 1), and the same picture beside
- * the mockup as `docs/design/work-panel/crew-internals/persona-page-built.png` (milestone 231, retaken in
- * milestone 233 with the real skill routes, the prompt preview and the commit age: the engine runs on
- * the seeded vault; only the model table and the slots are mocked), plus `persona-page-built-preview.png`
- * with Preview full prompt open.
+ * The engine runs on the seeded vault in a home of its own, its model table the `service.json` written
+ * below (fake harnesses first on PATH, so no real CLI is asked); only the memory and journal counts are
+ * mocked. Output: `test-results/fidelity/DeskPersonaV3.png` (1440x2000, scale factor 1), copied beside
+ * the board as `docs/design/work-panel/crew-internals/persona-page-built.png`, plus
+ * `persona-page-built-preview.png` with Preview full prompt open.
  */
 const RUN = !!process.env['DREY_FIDELITY_SHOTS'];
 test.skip(!RUN, 'set DREY_FIDELITY_SHOTS=1 -- the screenshot of board 7k');
@@ -26,6 +27,32 @@ test.skip(!RUN, 'set DREY_FIDELITY_SHOTS=1 -- the screenshot of board 7k');
 const engineHome = fs.mkdtempSync(path.join(os.tmpdir(), 'drey-e2e-home-'));
 process.env['USERPROFILE'] = engineHome;
 process.env['HOME'] = engineHome;
+const harnesses = fakeHarnessDir();
+process.env['PATH'] = pathWithFakes(harnesses);
+process.env['Path'] = process.env['PATH'];
+
+/** Board 7k v3's model table: two heavy models (Claude Code, Kimi), the classes the owner keeps. */
+const SERVICE = {
+  slots: [
+    { id: 'claude-a', label: 'Claude A', provider: 'claude-code', billing: { kind: 'subscription', pricePerMonth: 90, currency: 'EUR' }, sessions: 2, login: {}, quota: 'counting' },
+    { id: 'kimi', label: 'Kimi', provider: 'kimi', billing: { kind: 'subscription', pricePerMonth: 19, currency: 'EUR' }, sessions: 2, login: {}, quota: 'counting' },
+  ],
+  classes: [
+    { name: 'super heavy', sessions: 1 },
+    { name: 'heavy', sessions: 2 },
+    { name: 'standard', sessions: 4 },
+    { name: 'light', sessions: 6 },
+  ],
+  models: [
+    { model: 'claude-opus-5-5', slot: 'claude-a', category: '', class: 'heavy', cost: 5, tools: true, context: 1_000_000 },
+    { model: 'kimi-k3.1-pro', provider: 'kimi', category: '', class: 'heavy', cost: 2, tools: true, context: 256_000 },
+    { model: 'claude-sonnet-5-5', slot: 'claude-a', category: '', class: 'standard', cost: 1, tools: true, context: 1_000_000 },
+  ],
+  capacity: { global: 6, perSlot: {} },
+  migrations: ['classes.v3'],
+};
+fs.mkdirSync(path.join(engineHome, '.drey-engine'), { recursive: true });
+fs.writeFileSync(path.join(engineHome, '.drey-engine', 'service.json'), `${JSON.stringify(SERVICE, null, 2)}\n`);
 
 test.afterAll(() => {
   try {
@@ -37,6 +64,7 @@ test.afterAll(() => {
     // no engine was started, or it is already gone
   }
   fs.rmSync(engineHome, { recursive: true, force: true });
+  fs.rmSync(harnesses, { recursive: true, force: true });
 });
 
 const OUT = path.resolve(__dirname, '..', 'test-results', 'fidelity');
@@ -73,26 +101,25 @@ const BEN = [
   'title: Ben',
   'role: builder',
   'summary: "Builds one part of a ticket, test first."',
-  'worker: claude-code',
-  'models:',
-  '  default: opus',
-  '  pool: [opus, sonnet, qwen3-coder]',
+  // req-288: board 7k v3 — heavy, the next free model of the class.
+  'class: heavy',
   "color: '#8ecbef'",
-  'skills: [go-conventions, tdd, drey-plugins]',
+  'skills: [go-conventions, test-first]',
   'budget: 5',
-  // req-258: board 7k v2's Work block — class floor B, read-only off, at most 2 at once, sync-main when a ticket leaves him.
-  'min-class: B',
+  // req-258: the Work block — read-only off, at most 2 at once, sync-main when a ticket leaves him.
   'parallel: 2',
   'leaving: [sync-main]',
   'readonly: false',
   'allowed:',
+  '  run-commands: accept-edits',
+  '  network: true',
   '  write-notes: true',
   '---',
   '',
 ].join('\n');
 
 const other = (title: string, role: string, color: string): string =>
-  ['---', `title: ${title}`, `role: ${role}`, 'worker: opencode', 'models:', '  default: qwen3-coder', '  pool: [qwen3-coder]', `color: '${color}'`, 'skills: []', 'budget: 3', '---', ''].join('\n');
+  ['---', `title: ${title}`, `role: ${role}`, 'class: heavy', `color: '${color}'`, 'skills: []', 'budget: 3', '---', ''].join('\n');
 
 /** An Agent Skills file of about `tokens` tokens at the engine's 3.5-characters-to-a-token estimate for Claude. */
 const skillText = (name: string, tokens: number): string => `---\nname: ${name}\ndescription: The ${name} skill.\n---\n\n${'x'.repeat(Math.max(0, Math.round(tokens * 3.5) - name.length - 8))}\n`;
@@ -102,10 +129,12 @@ const PROMPT = [
   '',
   'The builder on this crew. Implements exactly one part of a ticket, in its own worktree, and changes nothing outside the files the part names. Calm, terse, prefers a failing test to a paragraph.',
   '',
-  '## How you work',
-  '- Write the failing test first.',
+  '## How Ben works',
+  '- Write the failing test first, then the smallest change that turns it green.',
   '- Keep each commit small and name it after the part.',
   '- Prefer the existing helpers over new abstractions.',
+  '- Read the ADR index before adding a new component.',
+  '- Leave the worktree clean: no stray logs, no debug prints.',
   '',
   '## Done means',
   'Tests green, rebased on main, no new lint warnings, and the acceptance criteria of the part ticked in the ticket.',
@@ -136,10 +165,10 @@ const seed: Record<string, string> = {
   'tickets/_meta/personas/ben/persona.md': BEN,
   'tickets/_meta/personas/ben/prompt.md': PROMPT,
   'tickets/_meta/personas/ben/improvements.md': IMPROVEMENTS,
+  'tickets/_meta/skills/test-first/SKILL.md': skillText('test-first', 240),
   'tickets/_meta/skills/go-conventions/SKILL.md': skillText('go-conventions', 310),
-  'tickets/_meta/skills/tdd/SKILL.md': skillText('tdd', 240),
-  'tickets/_meta/skills/diff-review/SKILL.md': skillText('diff-review', 400),
-  'tickets/_meta/personas/ben/skills/drey-plugins/SKILL.md': skillText('drey-plugins', 1120),
+  'tickets/_meta/skills/playwright-e2e/SKILL.md': skillText('playwright-e2e', 520),
+  'tickets/_meta/personas/ben/skills/adr-writing/SKILL.md': skillText('adr-writing', 180),
   'tickets/_meta/personas/paul/persona.md': other('Paul', 'planner', '#f2d3e2'),
   'tickets/_meta/personas/ralf/persona.md': other('Ralf', 'reviewer', '#bfe3cd'),
   'tickets/_meta/personas/tessa/persona.md': other('Tessa', 'tester', '#f2cfae'),
@@ -182,16 +211,10 @@ async function pushFleet(app: ElectronApplication): Promise<void> {
   );
 }
 
-const row = (model: string, provider: string, category: string, cls: string, cost: number, sessions: number) => ({ model, slot: null, provider, category, class: cls, cost, sessions });
-
-/**
- * The page's data beside the record, as board 7k's sample has it: the model table with the slots that carry
- * the busy figures (a real engine would need live provider quotas), and the counts of memory and journal.
- */
+/** The counts of memory and journal as board 7k's sample has them (the model table is the real engine's). */
 async function mockBeside(app: ElectronApplication): Promise<void> {
-  const slot = (id: string, label: string, provider: string, busy: number, total: number) => ({ id, label, provider, busy, total });
   await app.evaluate(
-    ({ ipcMain }, data) => {
+    ({ ipcMain }) => {
       const registry = ipcMain as unknown as { _invokeHandlers: Map<string, (event: unknown, payload: { pluginId: string; method: string; payload?: unknown }) => unknown> };
       const original = registry._invokeHandlers.get('plugin:invoke');
       if (original === undefined) {
@@ -200,12 +223,6 @@ async function mockBeside(app: ElectronApplication): Promise<void> {
       ipcMain.removeHandler('plugin:invoke');
       ipcMain.handle('plugin:invoke', (event, payload: { pluginId: string; method: string; payload?: unknown }) => {
         if (payload.pluginId === 'tickets') {
-          if (payload.method === 'poolModels') {
-            return { ok: true, models: data.models, capacity: { global: 6, perSlot: {} }, routing: {}, ledgers: {}, now: { used: 0, global: 6, slots: [] }, queue: [], providerDay: [], errors: [], configPath: 'service.json' };
-          }
-          if (payload.method === 'slots') {
-            return { ok: true, slots: data.slots, configPath: 'service.json' };
-          }
           if (payload.method === 'personaMemory') {
             return { ok: true, entries: Array.from({ length: 12 }, (_, i) => ({ text: `lesson ${i}`, pinned: false })) };
           }
@@ -216,10 +233,7 @@ async function mockBeside(app: ElectronApplication): Promise<void> {
         return original(event, payload);
       });
     },
-    {
-      models: [row('opus', 'claude-code', 'frontier', 'A', 3, 2), row('sonnet', 'claude-code', 'everyday', 'B', 1, 3), row('qwen3-coder', 'opencode', 'bulk', 'C', 0.2, 2)],
-      slots: [slot('claude-a', 'Claude A', 'claude-code', 1, 5), slot('local', 'Local', 'opencode', 2, 2)],
-    },
+    {},
   );
 }
 
@@ -281,7 +295,7 @@ function commitSeed(vaultDir: string): void {
   git('commit', '-q', '-m', 'seed');
 }
 
-test('board 7k: the Persona page', async ({ page, electronApp, vaultDir }) => {
+test('board 7k v3: the Persona page', async ({ page, electronApp, vaultDir }) => {
   test.setTimeout(180_000);
   fs.mkdirSync(OUT, { recursive: true });
   commitSeed(vaultDir);
@@ -322,13 +336,12 @@ test('board 7k: the Persona page', async ({ page, electronApp, vaultDir }) => {
   }
   await page.locator('app-tab-bar .tab', { hasText: 'persona' }).first().click();
   await expect(page.locator('.persona-page [data-proposal]')).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator('.persona-page .persona-pool-row .persona-tag').first()).toBeVisible({ timeout: 15_000 });
-  // The page gets the whole window, as the mockup's frame does, and the height to show every block.
-  await page.keyboard.press('Control+B');
+  await expect(page.locator('.persona-page .persona-model-counts')).toContainText('2 heavy models', { timeout: 15_000 });
+  // The board keeps the Tickets dock at the left; the window gets the height to show every block.
   await electronApp.evaluate(({ BrowserWindow }) => {
     for (const win of BrowserWindow.getAllWindows()) {
       if (win.webContents.getURL().startsWith('app://')) {
-        win.setContentSize(1440, 1700);
+        win.setContentSize(1440, 2000);
       }
     }
   });
@@ -336,19 +349,29 @@ test('board 7k: the Persona page', async ({ page, electronApp, vaultDir }) => {
   // The layout is the view's saved one: no changed dot on the view tab.
   await page.locator('app-view-switcher .vs-layout').click();
   await page.getByRole('menuitem', { name: /^Save/ }).first().click();
-  await page.mouse.move(700, 880);
+  await page.mouse.move(700, 1980);
   await page.evaluate(() => {
     (document.activeElement as HTMLElement | null)?.blur();
   });
+  // The board draws three things open: the picture's menu, the Model listbox, the Skills library.
+  const left = page.locator('.persona-page .persona-left');
+  // The listbox closes on a click outside it, so it opens last.
+  await left.getByRole('button', { name: 'Change picture', exact: true }).click();
+  await left.getByRole('button', { name: 'Add from library', exact: true }).click();
+  await expect(left.locator('.persona-library [role="option"]').first()).toBeVisible();
+  await left.locator('[data-field="pinned-model"]').click();
+  await expect(left.locator('.persona-listbox [role="option"]').first()).toBeVisible();
+  await page.mouse.move(700, 1980);
   await page.waitForTimeout(500);
-  await page.screenshot({ path: path.join(OUT, 'DeskPersona.png') });
+  await page.screenshot({ path: path.join(OUT, 'DeskPersonaV3.png') });
   const docs = path.resolve(__dirname, '..', 'docs', 'design', 'work-panel', 'crew-internals');
-  fs.copyFileSync(path.join(OUT, 'DeskPersona.png'), path.join(docs, 'persona-page-built.png'));
+  fs.copyFileSync(path.join(OUT, 'DeskPersonaV3.png'), path.join(docs, 'persona-page-built.png'));
+  await page.keyboard.press('Escape');
   // Preview full prompt open: the brief, read-only, with the parts marked.
   await page.locator('.persona-page').getByRole('button', { name: 'Preview full prompt' }).click();
   await expect(page.locator('.persona-page .persona-ed-preview .cm-content')).toBeVisible({ timeout: 15_000 });
   await page.locator('.persona-page .persona-ed-preview').scrollIntoViewIfNeeded();
-  await page.mouse.move(700, 880);
+  await page.mouse.move(700, 1980);
   await page.waitForTimeout(500);
   await page.screenshot({ path: path.join(OUT, 'DeskPersonaPreview.png') });
   fs.copyFileSync(path.join(OUT, 'DeskPersonaPreview.png'), path.join(docs, 'persona-page-built-preview.png'));

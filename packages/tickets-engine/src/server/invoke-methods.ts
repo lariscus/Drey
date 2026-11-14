@@ -28,8 +28,8 @@ export const TEAM_METHODS = [
   'sharedSkills', 'personaSkills', 'personaSkillToggle', 'personaSkillRemove', 'skillUpload', 'personaPromptPreview',
   // req-261: delete a persona, confirmed by its typed title.
   'personaRemove',
-  // req-292: a persona's picture as a data URL (the Crew's circles).
-  'personaAvatar',
+  // req-292: a persona's picture as a data URL (the Crew's circles); req-288: the owner's upload and removal.
+  'personaAvatar', 'personaAvatarSet', 'personaAvatarRemove',
   // req-281/293: Mission Control's persona's instructions and the assistant's models for her Model choice.
   'personaInstructions', 'chatModels',
 ] as const;

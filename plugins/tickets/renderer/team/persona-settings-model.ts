@@ -1,21 +1,18 @@
 // i18n: catalog
 /**
  * The Work block's run settings as the Persona page edits them (req-258,
- * board 7k v2): the class floor, instructed read-only, the persona's pool
- * (max and min) and the leaving actions. DOM-free: the draft, the patch of
+ * board 7k v3): instructed read-only, the persona's pool (max and min) and
+ * the leaving actions (the class floor folded into the Model block's class,
+ * req-288). DOM-free: the draft, the patch of
  * what differs, and the choices the block offers. The record's other run
  * settings (needs, ceilings, gate) have no field on the board and are edited
  * in the file.
  */
 import type { PersonaSettingsPatch } from '../../../../packages/tickets-engine/src/contracts/persona-settings-patch';
-import { DEFAULT_CLASS_NAMES } from '../../../../packages/tickets-engine/src/contracts/capability-class';
-import type { ModelsReply } from '../../../../packages/tickets-engine/src/fleet/protocol';
-import { PERSONA_LEAVING_ACTIONS, type PersonaClass, type PersonaLeavingAction } from '../../../../packages/tickets-engine/src/core/persona-settings';
+import { PERSONA_LEAVING_ACTIONS, type PersonaLeavingAction } from '../../../../packages/tickets-engine/src/core/persona-settings';
 import type { PersonaView } from '../../shared/remote-protocol';
 
 export interface SettingsDraft {
-  /** '' = not set: the step's floor applies. */
-  readonly minClass: '' | PersonaClass;
   /** What the switch shows: the record's `readonly:`, else the role's default. */
   readonly readOnly: boolean;
   /** Whether the record holds `readonly:` — a Save writes it once the page showed it. */
@@ -27,16 +24,9 @@ export interface SettingsDraft {
   readonly leaving: readonly PersonaLeavingAction[];
 }
 
-/** The class floor's choices: not set, then the owner's class names (strongest first) from the model table, else the shipped list; a stored name the list lacks stays selectable. */
-export function classFloorChoices(table: ModelsReply | null, current: '' | PersonaClass): readonly ('' | PersonaClass)[] {
-  const names = table === null ? DEFAULT_CLASS_NAMES : table.classes.map((entry) => entry.name);
-  return ['', ...names, ...(current !== '' && !names.includes(current) ? [current] : [])];
-}
-
 export function settingsDraftOf(view: PersonaView): SettingsDraft {
   const settings = view.settings;
   return {
-    minClass: settings?.minClass ?? '',
     readOnly: view.readOnly === true,
     // An older engine sends no settings: nothing is written it did not show.
     readOnlyStored: settings === undefined || settings.readOnly !== null,
@@ -67,9 +57,6 @@ function sameList(a: readonly string[], b: readonly string[]): boolean {
  */
 export function settingsPatchOf(base: SettingsDraft, draft: SettingsDraft, anySaved = false): PersonaSettingsPatch | null {
   const patch: { -readonly [K in keyof PersonaSettingsPatch]: PersonaSettingsPatch[K] } = {};
-  if (draft.minClass !== base.minClass) {
-    patch.minClass = draft.minClass === '' ? null : draft.minClass;
-  }
   if (draft.readOnly !== base.readOnly) {
     patch.readOnly = draft.readOnly;
   }

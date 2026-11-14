@@ -43,6 +43,11 @@ export class PersonaPictures {
     }
   }
 
+  /** Whether the latest persona list says the persona has a picture (req-288: the Profile block's *Remove picture*). */
+  has(id: string): boolean {
+    return this.versions.has(id);
+  }
+
   /** The picture's data URL when it is already in memory; null otherwise (and for a persona without one). */
   urlOf(id: string | null | undefined): string | null {
     const key = this.keyOf(id);

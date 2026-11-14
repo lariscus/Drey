@@ -28,11 +28,13 @@ export interface ContextParts {
   readonly edit: (next: Partial<PersonaDraft>) => void;
   /** The page repaints after the change. */
   readonly repaint: () => void;
+  /** req-288: reads the persona list again (a picture changed outside the Save). */
+  readonly refreshPersonas: () => Promise<void>;
 }
 
 /** What a repaint of a loaded page depends on; the day's cost, the pause and the commit age do not count. */
 export const viewKeyOf = (persona: PersonaView, deps: DeskDeps): string =>
-  JSON.stringify([persona.title, persona.role, persona.worker, persona.pool, persona.color, persona.budget, persona.phases, persona.summary, persona.allowed, persona.chatModel, deps.snapshot()?.pipeline.map((phase) => phase.id)]);
+  JSON.stringify([persona.title, persona.role, persona.class, persona.model, persona.avatarVersion, persona.color, persona.budget, persona.phases, persona.summary, persona.allowed, persona.chatModel, deps.snapshot()?.pipeline.map((phase) => phase.id)]);
 
 export function blockContextOf(parts: ContextParts): BlockContext {
   const { deps, session, base } = parts;
@@ -51,5 +53,6 @@ export function blockContextOf(parts: ContextParts): BlockContext {
       parts.edit(next);
       parts.repaint();
     },
+    refreshPersonas: parts.refreshPersonas,
   };
 }

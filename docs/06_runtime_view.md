@@ -4821,7 +4821,7 @@ sequenceDiagram
     participant G as PoolGate
     participant K as LedgerCards
     D->>B: card, phase, persona, repo
-    B-->>D: {persona, class, pool strongest first, profile, ledger inputs, why}<br/>pin model:/class: > size S/M/L → C/B/A or the default's class, raised to min-class: and to the pool's classes
+    B-->>D: {persona, class, pool = the model table strongest first, profile, ledger inputs, why}<br/>pin model:/class: > the persona's class, raised (never lowered) by size S/M/L → light/standard/heavy and min-class: (req-288)
     D->>P: choose(class request)
     P->>L: ticket allowance, persona day — full?
     alt a ledger is full
@@ -5321,8 +5321,9 @@ the tool list and the callable set are cut to `vault_list`, `vault_search`, `vau
 
 The Crew tab's 1:1 pane, the Assistant's 1:1 target and Mission Control's *Talk to <name> 1:1* all send through
 `personaThreadAppend` to `PersonaSessionService` in the engine. The line lands in the persona's chat session file at once
-(one commit); the answer arrives later, when the session's turn ends. A persona with `worker: api` takes the chat bridge
-instead of a session (one call per line, the same brief as its system prompt).
+(one commit); the answer arrives later, when the session's turn ends. Mission Control's persona takes the chat bridge
+instead of a session (one call per line, the same brief as its system prompt), and so does an agent no harness follows for
+(req-288: no pin with a known harness, no model of its class — what an old `worker: api` persona migrates to).
 
 ```mermaid
 sequenceDiagram
@@ -5704,8 +5705,7 @@ sequenceDiagram
         Seed-->>Trig: refused — nothing written, the log says "seeded once it parses"
     else
         Seed->>Fold: has(vault, id) for every id the marker does not list
-        Seed->>Seed: worker and models per CrewSeedModels (provider rows, strongest class first)
-        Seed->>Seed: writes prompt.md (who + the role's step) and persona.md (worker, models) for the ids with no folder
+        Seed->>Seed: writes prompt.md (who + the role's step) and persona.md (class: heavy, no pin — req-288) for the ids with no folder
         Seed->>Crew: put(crew.md with seeded-crew: [paul, ben, ralf, tessa])
         Seed->>Git: one commit "personas: the default crew (req-256)" — the persona files and crew.md
         Seed-->>Trig: seeded [ids] — one log line (worker, models, folders that stayed)
@@ -5792,15 +5792,15 @@ sequenceDiagram
     participant TD as TicketDispatch / startRun
     participant CB as ClassRequestBuilder
     participant RC as composeRunRequest
-    Owner->>Page: Work block: class floor, read-only, parallel, leaving · Save
-    Page->>BS: personaPatch {settings: {minClass, readOnly, …}}
-    BS->>P: min-class: B · readonly: true · … · one commit "personas: <id> updated"
+    Owner->>Page: Work block: read-only, parallel, leaving (the class sits in the Model block, req-288)
+    Page->>BS: personaPatch {settings: {readOnly, …}}
+    BS->>P: readonly: true · … · one commit "personas: <id> updated"
     Owner->>Page: drag a card / Ctrl+Shift+PageDown / Move right
     Page->>BS: crewOrderSet {order: [ben, paul, ralf, tessa, you]}
     BS->>C: order: [...] · one commit "tickets: crew order"
     Note over BS,C: listPersonas follows order: — unlisted personas after it in pipeline order
     TD->>P: the resolved persona (ladder unchanged)
-    TD->>CB: class request — the persona's min-class / needs over the column's
+    TD->>CB: class request — the persona's class (raised by ticket / size / phase floor) and needs over the column's
     TD->>RC: persona.run = {readOnly, gate, maxTurns, maxWorkMin} (role defaults resolved)
     alt gate: structural (planner default)
         RC->>RC: acceptance [] · gate structural · no refusal without criteria
@@ -6328,4 +6328,60 @@ sequenceDiagram
     T-->>B: shows(card) / chip(card); load and folding from every project
     W-->>S: onWorkspaceScopeChange → This project re-runs over the project's vaults
     B->>T: New idea → create {…, project: the filtered project}
+```
+
+## 6.136 The engine's start migrates the personas to class and model; a picture upload and removal (req-288, D-67)
+
+At every engine start, after the crew seeding and the picture backfill and
+before the first project's migration (§6.131), `PersonaModelMigrator` reads
+the model table from `service.json` — no runner needed — and rewrites every
+v2 agent record in one commit. A second start finds nothing to do.
+
+```mermaid
+sequenceDiagram
+    participant E as Engine start
+    participant S as CrewSeeder
+    participant B as CrewPictures (backfill)
+    participant M as PersonaModelMigrator
+    participant T as service.json (model table)
+    participant V as Tickets vault
+    participant G as git
+    participant P as ProjectMigrator
+    E->>S: seed the default crew (ids not in seeded-crew:)
+    E->>B: shipped pictures for folders without one
+    E->>M: run()
+    M->>T: read the table (class and enabled per model)
+    M->>V: list personas/*/persona.md — skip human, mission, records with class:
+    M->>M: class = table class of models.default, raised by the old min-class; no row → floor, else heavy
+    M->>M: pin = models.default only when the pool held exactly that model
+    M->>V: rewrite class: / model:, drop worker: models: min-class:
+    M->>G: one commit "personas: class and model replace worker and models (req-288)"
+    E->>P: first-project migration
+```
+
+A persona patch that sends `class` or `model` to a record not yet migrated
+runs the same migration for that persona first.
+
+The Persona page's picture control sends a square PNG; the engine writes or
+deletes the file in one commit. Removing a shipped picture also lists the id
+in `seeded-pictures:`, so the next start's backfill does not bring it back.
+
+```mermaid
+sequenceDiagram
+    participant U as Persona page (Profile)
+    participant M as Plugin main
+    participant S as PersonaPictureService
+    participant V as Tickets vault
+    participant G as git
+    U->>U: any image → square PNG (data:image/png;base64,…)
+    U->>M: personaAvatarSet {persona, dataUrl}
+    M->>S: POST /api/personas/<id>/avatar
+    S->>S: PNG data URL, at most 2 MB, persona exists
+    S->>V: write personas/<id>/avatar.png
+    S->>G: commit "personas: <id> picture"
+    S-->>U: {ok} — avatarVersion changes, every circle repaints
+    U->>M: personaAvatarRemove {persona}
+    M->>S: POST /api/personas/<id>/avatar/remove
+    S->>V: delete avatar.png; a shipped id joins seeded-pictures: in crew.md
+    S->>G: commit "personas: <id> picture removed"
 ```

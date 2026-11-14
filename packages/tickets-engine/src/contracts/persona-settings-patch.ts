@@ -1,9 +1,7 @@
 import { parseNeeds } from '../core/model-needs';
-import { classNameOf } from './capability-class';
 import {
   PERSONA_GATES,
   PERSONA_LEAVING_ACTIONS,
-  type PersonaClass,
   type PersonaGate,
   type PersonaLeavingAction,
   type PersonaSettings,
@@ -16,7 +14,6 @@ import {
  * req-178 grammar as one line (`image, context-200k`), '' clears it.
  */
 export interface PersonaSettingsPatch {
-  readonly minClass?: PersonaClass | null;
   readonly needs?: string;
   readonly maxTurns?: number | null;
   readonly maxWorkMin?: number | null;
@@ -31,7 +28,6 @@ export interface PersonaSettingsPatch {
 export function settingsAfter(current: PersonaSettings, patch: PersonaSettingsPatch): PersonaSettings {
   const pick = <K extends keyof PersonaSettings>(key: K, sent: PersonaSettings[K] | undefined): PersonaSettings[K] => (sent === undefined ? current[key] : sent);
   return {
-    minClass: pick('minClass', patch.minClass),
     needs: patch.needs === undefined ? current.needs : parseNeeds(patch.needs).needs,
     maxTurns: pick('maxTurns', patch.maxTurns),
     maxWorkMin: pick('maxWorkMin', patch.maxWorkMin),
@@ -49,7 +45,6 @@ const positiveOrNull = (value: unknown): boolean => value === null || (typeof va
 const inList = (list: readonly string[]) => (value: unknown): boolean => value === null || (typeof value === 'string' && list.includes(value));
 
 const CHECKS: readonly Check[] = [
-  ['minClass', (value) => value === null || classNameOf(value) !== null],
   ['needs', (value) => typeof value === 'string' && parseNeeds(value).unknown.length === 0],
   ['maxTurns', positiveOrNull],
   ['maxWorkMin', positiveOrNull],

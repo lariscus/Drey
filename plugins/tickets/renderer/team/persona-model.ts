@@ -53,12 +53,13 @@ export interface PersonaDraft {
   readonly title: string;
   readonly role: string;
   readonly summary: string;
-  /** The harness (`worker`): `claude-code`, `opencode`, `kimi`, `copilot`. */
-  readonly worker: string;
+  /** req-288: the capability class (`class:`); '' = the record names none yet. */
+  readonly modelClass: string;
+  /** req-288: the pinned model (`<provider>/<model>`); '' = the next free model of the class. */
+  readonly pinnedModel: string;
   /** The daily budget as typed, dollars; '' = none. */
   readonly budget: string;
   readonly prompt: string;
-  readonly pool: readonly string[];
   readonly allowed: AllowedDraft;
   /** The Work block's run settings (req-258). */
   readonly settings: SettingsDraft;
@@ -71,10 +72,12 @@ export interface PersonaPatchKeys {
   title?: string;
   role?: string;
   summary?: string;
-  worker?: string;
+  /** req-288: the class. */
+  class?: string;
+  /** req-288: the pinned model; null = the next free model of the class. */
+  model?: string | null;
   budget?: number | null;
   prompt?: string;
-  pool?: readonly string[];
   allowed?: PersonaAllowedPatch;
   settings?: PersonaSettingsPatch;
   /** null = back to the assistant's model. */
@@ -95,18 +98,14 @@ export function draftOf(view: PersonaView, prompt: string): PersonaDraft {
     title: view.title,
     role: roleLabel(view.role),
     summary: view.summary ?? '',
-    worker: view.worker,
+    modelClass: view.class ?? '',
+    pinnedModel: view.kind === undefined || view.kind === 'agent' ? view.model : '',
     budget: view.budget === null ? '' : String(view.budget),
     prompt,
-    pool: view.pool.length > 0 ? view.pool : view.model === '' ? [] : [view.model],
     allowed: allowedOf(view),
     settings: settingsDraftOf(view),
     chatModel: view.chatModel ?? '',
   };
-}
-
-function sameList(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 /** Only the `allowed:` keys that differ: the engine replaces what it is sent. */
@@ -150,8 +149,11 @@ export function patchOf(base: PersonaDraft, draft: PersonaDraft): PersonaPatchKe
   if (draft.summary.trim() !== base.summary.trim()) {
     patch.summary = draft.summary.trim();
   }
-  if (draft.worker !== base.worker && draft.worker.trim() !== '') {
-    patch.worker = draft.worker.trim();
+  if (draft.modelClass !== base.modelClass && draft.modelClass.trim() !== '') {
+    patch.class = draft.modelClass.trim();
+  }
+  if (draft.pinnedModel.trim() !== base.pinnedModel.trim()) {
+    patch.model = draft.pinnedModel.trim() === '' ? null : draft.pinnedModel.trim();
   }
   const budget = budgetOf(draft.budget);
   if (budget !== undefined && budget !== budgetOf(base.budget)) {
@@ -159,9 +161,6 @@ export function patchOf(base: PersonaDraft, draft: PersonaDraft): PersonaPatchKe
   }
   if (draft.prompt !== base.prompt) {
     patch.prompt = draft.prompt;
-  }
-  if (!sameList(draft.pool, base.pool)) {
-    patch.pool = draft.pool;
   }
   const allowed = allowedPatchOf(base.allowed, draft.allowed);
   if (allowed !== null) {
@@ -183,7 +182,7 @@ export function isDirty(base: PersonaDraft, draft: PersonaDraft): boolean {
 
 /** The base after a Save of `draft`: what the form now shows is what the record holds. */
 export function savedBaseOf(draft: PersonaDraft): PersonaDraft {
-  return { ...draft, title: draft.title.trim(), role: roleLabel(draft.role.trim().toLowerCase()), summary: draft.summary.trim(), worker: draft.worker.trim(), budget: draft.budget.trim().replace(/^\$/, ''), settings: savedSettingsOf(draft.settings), chatModel: draft.chatModel.trim() };
+  return { ...draft, title: draft.title.trim(), role: roleLabel(draft.role.trim().toLowerCase()), summary: draft.summary.trim(), pinnedModel: draft.pinnedModel.trim(), budget: draft.budget.trim().replace(/^\$/, ''), settings: savedSettingsOf(draft.settings), chatModel: draft.chatModel.trim() };
 }
 
 /** The instructions' length as the status bar shows it. */

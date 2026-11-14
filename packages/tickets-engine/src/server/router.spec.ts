@@ -559,15 +559,15 @@ describe('route', () => {
         path: '/api/personas/pia',
         origin,
         authorization: auth,
-        body: { model: 'sonnet', pool: ['sonnet', 'haiku'], router: 'budget', color: '#ff8800', prompt: 'You are Pia.\n' }, // req-170: a stray router is no writable key
+        body: { class: 'standard', model: 'claude-code/sonnet', pool: ['sonnet', 'haiku'], router: 'budget', color: '#ff8800', prompt: 'You are Pia.\n' }, // req-170/288: a stray router or pool is no writable key
       }),
       deps,
     );
     expect(patched.status).toBe(200);
     expect(remote.personaPatch).toHaveBeenCalledWith({
       persona: 'pia',
-      model: 'sonnet',
-      pool: ['sonnet', 'haiku'],
+      class: 'standard',
+      model: 'claude-code/sonnet',
       color: '#ff8800',
       prompt: 'You are Pia.\n',
     });
@@ -575,7 +575,7 @@ describe('route', () => {
     // a body with none of the writable keys, a non-list pool and a
     // non-string title refuse; a PATCH on any other path is a 405
     expect((await route(req({ method: 'PATCH', path: '/api/personas/pia', origin, authorization: auth, body: { kind: 'human' } }), deps)).body).toMatchObject({ ok: false });
-    expect((await route(req({ method: 'PATCH', path: '/api/personas/pia', origin, authorization: auth, body: { pool: 'sonnet' } }), deps)).body).toMatchObject({ ok: false });
+    expect((await route(req({ method: 'PATCH', path: '/api/personas/pia', origin, authorization: auth, body: { class: 5 } }), deps)).body).toMatchObject({ ok: false });
     expect((await route(req({ method: 'PATCH', path: '/api/personas/pia', origin, authorization: auth, body: { title: 5 } }), deps)).body).toMatchObject({ ok: false });
     expect((await route(req({ method: 'PATCH', path: '/api/tickets/T-0001', origin, authorization: auth, body: { title: 'x' } }), deps)).status).toBe(405);
     expect((await route(req({ method: 'PATCH', path: '/api/personas/Pia%2Fx', origin, authorization: auth, body: { title: 'x' } }), deps)).status).toBe(405);

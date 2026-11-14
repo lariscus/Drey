@@ -26,12 +26,12 @@ describe('PersonaSessionContext tools (req-217)', () => {
         return ONE_ON_ONE_VAULT_TOOLS;
       },
     };
-    const brief = await context(seam).brief(VAULT, persona('claude-code'), []);
+    const brief = await context(seam).brief(VAULT, persona('claude-code'), [], 'claude-code');
     expect(asked).toEqual([{ persona: 'ben', provider: 'claude-code' }]);
     expect(brief).toContain("## Tools\n\nRead the owner's notes (the vault) with: vault_list, vault_search, vault_read. They only read.");
   });
 
-  it('an api persona is asked about with no harness, so the brief names no tool', async () => {
+  it('a session with no harness known is asked about with none, so the brief names no tool', async () => {
     const asked: OneOnOneSeat[] = [];
     const seam: OneOnOneToolSeam = { attached: (seat) => (asked.push(seat), seat.provider === null ? [] : ONE_ON_ONE_VAULT_TOOLS) };
     const brief = await context(seam).brief(VAULT, persona('api'), []);

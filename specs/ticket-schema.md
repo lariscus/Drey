@@ -369,7 +369,7 @@ of the Plan and removes it for fewer than two parts.
 | `parent` | ticket id | Optional (E10, concept v2 §5.9). Set on a ticket that is one **part** of a split plan: `parent: T-0130` names the ticket whose `### Parts` list produced it. The parent keeps the plan; the part carries its own description, builder persona and `chain:` (a per-part scope — the parent's `chain:` never leaks into a part). A value that is no ticket id, or the ticket's own id, warns and reads as no parent; whether the parent still exists is not checked (a finished parent is archived). |
 | `class` | a class name | Optional class pin (req-170): the run asks the capacity pool for exactly this class, whatever the size, the floor or the persona's default say. A name of the owner's class list in Settings → Models (req-287: shipped `super heavy`, `heavy`, `standard`, `light`; lower case, single spaces); the old letters `A`, `B`, `C` read as `heavy`, `standard`, `light` and are never written again. A value that is no name warns and reads as no pin; a name the list does not hold waits with the pool's reason. The Work row's menu (**Class ›**, req-186) writes it — one header patch, a Log line `class standard` / `class none`, one commit `tickets: <id> class <value>`; a live run refuses. Dricket: `x-class`. |
 | `model` | string | Optional model pin (req-170): the run asks the pool for this model of the model table (its row's class); it beats `class:` and every class rule. Dricket: `x-model`. |
-| `size` | `S \| M \| L` | The plan part's size (req-170), written by the release from the part's `size:` detail: the run asks for class light, standard or heavy (req-287; raised to the phase's `min-class:`). Absent = the class of the persona's default model. Dricket: `x-size`. |
+| `size` | `S \| M \| L` | The plan part's size (req-170), written by the release from the part's `size:` detail: the run asks for class light, standard or heavy (req-287; raised to the phase's `min-class:`). Absent = the persona's class (a size only raises it, req-288). Dricket: `x-size`. |
 | `allowance` | number (USD) | The ticket's ledger (req-170, absorbs req-113): once the ticket's runs have spent it, the pool grants no further run and a Needs-you card (a keyed `blocked: [ledger-ticket]` comment) says so — unless the persona's `allowed: spend-above-allowance: true`. Absent = the default of Settings → Models (`service.json` `ledgers.ticketAllowance`); `$2.50` reads too. Dricket: `x-allowance`. |
 | `needs` | a list of tokens, one line or a YAML list | What the run's model must be able to do (req-178): `image` (image input — a step that reads screenshots), `tools` (tool calls declared; every agent session uses them, so only an explicit need asks for the declaration), `context-<n>` and `output-<n>` in tokens with `k` / `m` (`context-200k`, `output-32k`, `context-1m`). Merged with the phase's `needs:` (every capability either names, the larger size). The routing's filter takes only a model whose row in Settings → Models declares it — "not declared" filters too, so the owner sees which column to fill. Written by the release from the part's `needs:` detail; canonical form one line, `needs: image, context-200k`. An unknown token warns and is left out. Absent = nothing beyond the class. Dricket: `x-needs`. |
 | `proof` | `ui \| tests` | Optional pin (E11, concept v2 §5.3). Overrides the Handover's proof declaration (see [Proof mode](#proof-mode-e11)). Absent, or any other value (a warning), means no pin; with no pin and no readable declaration the mode reads as `ui`. |
@@ -1256,7 +1256,7 @@ automatic column, ordered by priority class (the configured
 vocabulary's first half before its second — see `priorities:` above),
 then column rank — the rightmost column first, so
 finishing beats starting — then the column's derived order. A persona run asks the capacity pool for its class
-(req-170, ADR-0095: `class:` / `model:` pin, else `size:` or the persona's default class, raised to
+(req-170, ADR-0095: `class:` / `model:` pin, else the persona's `class:`, raised, never lowered, by `size:` and
 `min-class:`) and gets exactly that class or waits — queued, no process — while the next candidate whose class
 has room goes ahead; within the class the routing (req-178) filters by the phase's and the ticket's `needs:`
 and takes the slot with the largest surplus. No persona, no run (req-257, owner 2026-11-11): the ring run of a ticket nobody works is gone —
@@ -1282,7 +1282,7 @@ directory (ADR-0088 E3). One folder per persona, directly under
 ```text
 tickets/_meta/personas/
   paul/
-    persona.md        # frontmatter only: title, kind, role, summary, worker, models, color, skills, budget, the run settings (req-258), allowed
+    persona.md        # frontmatter only: title, kind, role, summary, class, model, color, skills, budget, the run settings (req-258), allowed
     prompt.md         # the persona prompt — "who Ben is" at its top; the run's instruction base when present
     memory.md         # curated memory (format and cap below)
     thread.md         # retired (req-168): migrated once into the persona's first 1:1 session, then removed
@@ -1301,17 +1301,16 @@ tickets/_meta/personas/
   | Field | Shape | Default |
   |---|---|---|
   | `title` | string | the id |
-  | `kind` | `agent \| human \| mission` | `agent` (an absent key; any other word reads as `agent`). `mission` is **Mission Control's own persona** (req-269, Pia): her `prompt.md` opens the system message of every Mission Control turn (`specs/classifier-spec.md`), an entry she holds is a Mission Control turn, never a session; her record carries no `worker:` and no `models:` (the writer leaves them out) — instead an optional **`model:`** (req-293, a double-quoted model id): the model of her chat turns on the assistant's connection, absent = the assistant's own (`chat.model`); her `memory.md` and her enabled `skills:` ride her Mission Control prompt (req-294, req-296); she has a 1:1 (req-294) that always runs over the chat bridge — no harness, no slot, no tools; she is never dispatched, offered a free session, counted toward capacity or budgeted, and never deleted (`mission`, below); the first `mission` persona in the crew's order is the one Mission Control speaks as. `human` is the owner as a crew member (E10-6): `personas/you`, created once by the board service (title = config `personas.humanName`, default `You`; editable like any title, and Settings → Tickets → Crew → *Your name* retitles it; "Initialize board" writes it with the default pipeline, whose manual columns pin it). Inert for `role`/`worker`/`models`/`skills`/`budget` — the human is never dispatched, counted toward capacity or budgeted. Written only when not `agent` |
+  | `kind` | `agent \| human \| mission` | `agent` (an absent key; any other word reads as `agent`). `mission` is **Mission Control's own persona** (req-269, Pia): her `prompt.md` opens the system message of every Mission Control turn (`specs/classifier-spec.md`), an entry she holds is a Mission Control turn, never a session; her record carries no `class:` (req-288; the writer leaves it out) — her **`model:`** (req-293, a double-quoted model id) is not a pool pin but the model of her chat turns on the assistant's connection, absent = the assistant's own (`chat.model`); her `memory.md` and her enabled `skills:` ride her Mission Control prompt (req-294, req-296); she has a 1:1 (req-294) that always runs over the chat bridge — no harness, no slot, no tools; she is never dispatched, offered a free session, counted toward capacity or budgeted, and never deleted (`mission`, below); the first `mission` persona in the crew's order is the one Mission Control speaks as. `human` is the owner as a crew member (E10-6): `personas/you`, created once by the board service (title = config `personas.humanName`, default `You`; editable like any title, and Settings → Tickets → Crew → *Your name* retitles it; "Initialize board" writes it with the default pipeline, whose manual columns pin it). Inert for `role`/`class`/`model`/`skills`/`budget` — the human is never dispatched, counted toward capacity or budgeted. Written only when not `agent` |
   | `role` | `planner \| builder \| reviewer \| tester \| custom` | `custom` |
   | `summary` | the one line for the crew list (req-144, R11): at most 200 characters, one line, written as a double-quoted YAML string so a colon cannot break the fence. The Crew cards of Drey, Mission Control (pad, phone, desk) and the Persona page's Profile block draw it as the card's line 3 in place of the role. Written only when set | none (the cards draw the role) |
-  | `worker` | the CLI harness (`claude-code`, `opencode`, `kimi`, `copilot`, `api`) | `opencode` |
-  | `models.default` | the model nothing else decides | `opus` |
-  | `models.pool` | the models the persona may run, **strongest first**; every entry must be a row of the model table (Settings → Models, `service.json`). An entry is `<model>` or `<worker provider>/<model>` (`kimi/k2`; a slash after anything else is part of the model id, `zai/glm-5.3`). At dispatch the capacity pool grants the first entry of the requested class with room (req-170); an entry the table does not hold is never granted to a class request. `models.default`'s class is the class an unsized ticket asks for | `[models.default]` |
+  | `class` | a class name of the owner's class list (Settings → Models; req-287 shipped `super heavy`, `heavy`, `standard`, `light`; the old letters `A`, `B`, `C` read as heavy, standard, light and are never written again) — **the capability class every run of the persona asks the capacity pool for** (req-288, Persona v3). A ticket's `class:`, the plan part's `size:` and the phase's `min-class:` may raise it, never lower it. Absent on `human` and `mission` records | `heavy` (shipped crew: `heavy`) |
+  | `model` | an optional **pin**: a pool entry `<provider>/<model>` of the model table, written as a double-quoted YAML scalar. Absent = *Next free in class*: the pool grants the next free enabled model of the persona's class. The harness follows from the model (the pin's prefix, else the model's table row); there is no `worker:` | absent |
+  | ~~`worker`, `models.default`, `models.pool`, `min-class`~~ | **replaced by `class` and `model` (req-288).** Read only by the one-time migration below (a v2 record is still parsed and written back unchanged until it is migrated); the persona's own model pool is gone — the pool is the model table. `min-class` folds into `class` | — |
   | ~~`models.router`~~ | **removed (req-170).** The router policies `off \| budget \| escalate-on-fail` gave way to the class request; an old `router:` line is ignored and dropped on the next rewrite | — |
   | `color` | `#rrggbb`, the chips and avatars | `#a78bfa` |
   | `skills` | the persona's **selection**: names of skill folders (`<name>/SKILL.md`, Agent Skills format) in the persona's own `skills/` folder, else the shared `_meta/skills/`, in the order the run's `## Skills` block lists them; a skill in a folder but not here is available, off. A legacy flat `<name>.md` is still read and migrated once (req-172, `_meta/skills/` below) | `[]` |
   | `budget` | USD per day — the Crew card shows the day's costs against it; the capacity pool's persona ledger (req-170): once the persona's runs of the day have spent it, it starts nothing more that day (a Needs-you card says so). Unset = `service.json` `ledgers.personaPerDay` | unset (null) |
-  | `min-class` | a class name (req-287; `A`, `B`, `C` read as heavy, standard, light) — the class floor of the persona's runs (req-258, concept §5): no run of it asks the capacity pool for a lighter class. Wins over the column's `min-class:` when set (the dispatch's *why* says `floor standard of ben`) | unset: the column's floor |
   | `needs` | the req-178 grammar (`image`, `tools`, `context-<n>`, `output-<n>`), what every run of the persona needs of its model; **replaces** the column's `needs:` when set (the ticket's are merged in as before); an unknown token reads as absent | unset: the column's |
   | `max-turns`, `max-work` | the run ceilings, turns and minutes of work; each wins over the column's key of the same name when set | unset: the column's |
   | `gate` | `commands | structural` — what decides the persona's hand-over. `commands`: the ticket's acceptance commands gate it (none is a refusal, as before). `structural`: only the structural check — the run carries no acceptance commands, its brief names none, and a ticket without runnable criteria is not refused (a plan re-run is judged by what it wrote, never by build commands that pass only after the build; req-280 proposal 4) | the role's: `structural` for `planner`, else `commands` |
@@ -1334,16 +1333,27 @@ tickets/_meta/personas/
   carries nothing and is dropped; prose `prompt.md` already holds is not duplicated; a `persona.md` without a body is skipped. A
   persona patch written over a file whose prose has not migrated yet keeps that prose in place.
 
+**Migration `worker`/`models` → `class`/`model` (req-288, once, idempotent).** At the engine's start, after the crew seeding
+and the picture backfill and before the first project's migration, `PersonaModelMigrator` (`services/persona-model-migrator.ts`)
+rewrites every v2 agent record in one commit `personas: class and model replace worker and models (req-288)`. The class is the
+model table's class of the old `models.default` (read from `service.json`, no runner needed), the old `min-class` folded in
+(raised, never lowered); with no table row it is the floor, else `heavy`. The old default becomes the `model:` pin only when the
+pool held exactly that one model. `worker:`, `models:` and `min-class:` are dropped. A persona patch that sends `class` or
+`model` to an unmigrated record migrates it too. `human` and `mission` records are not touched.
+
+**The persona patch (`PATCH /api/personas/<id>`, plugin IPC `personaPatch`).** Writable keys: `title`, `role`, `class`,
+`model` (a string, or `null` for *Next free in class*), `color`, `skills`, `prompt`, `summary`, `budget`, `allowed`,
+`settings`, `chatModel`. `worker` and `pool` are gone (req-288), and `settings.minClass` with them. The persona list
+(`GET /api/personas`, `PersonaView`) carries `class?` and `model` (the pin; `''` = next free); `worker` and `pool` left it.
+
 **The shipped default crew (req-256, decision D7; req-269).** Five personas ship as files in the package,
 `packages/tickets-engine/personas/<id>/persona.md` + `prompt.md`, and are seeded into a board:
 **`pia`** (Mission Control's persona, `kind: mission`, role `custom`, `#d9cff5` — req-269), **`paul`** (planner), **`ben`** (builder), **`ralf`** (reviewer), **`tessa`** (tester); the human
-persona `you` is written by "Initialize board", with `leaving: [commit]` (req-267). Pia's `prompt.md` is `## Who Pia is` and `## How the owner works with Pia` — the second part is the owner's to rewrite; she is seeded **as shipped** (no step below her prompt, no worker, no models). The shipped `persona.md` carries `title`, `role`, `summary:`, `color`
+persona `you` is written by "Initialize board", with `leaving: [commit]` (req-267). Pia's `prompt.md` is `## Who Pia is` and `## How the owner works with Pia` — the second part is the owner's to rewrite; she is seeded **as shipped** (no step below her prompt, no class, no pin). The shipped `persona.md` carries `title`, `role`, `summary:`, `color`
 (`#f2d3e2`, `#8ecbef`, `#bfe3cd`, `#f2cfae`), `skills: []` and the run settings that differ from nothing (req-258:
-Paul `gate: structural`, Ralf and Tessa `readonly: true`; req-267: Ben `leaving: [sync-main]`) — no `worker:` and no `models:`; the shipped `prompt.md` is the
+Paul `gate: structural`, Ralf and Tessa `readonly: true`; req-267: Ben `leaving: [sync-main]`) and, since req-288, `class: heavy` with no `model:` pin (Pia none); the shipped `prompt.md` is the
 "who it is" part (`## Who Paul is`, `## How Paul works` — the character only since req-280; what "done" means is the step prompt's). **Seeding** (`CrewSeeder`) writes the
-vault's copy: `persona.md` with the worker of `default-worker` in `_meta/crew.md` (else the fleet default `opencode`) and the
-models the machine's model table names for that worker (`service.json` → `models`: the worker's provider rows, strongest
-class first, the first is `models.default`, all of them the `pool`; none → the parser's default, and the log says so), and
+vault's copy: `persona.md` as shipped (`class: heavy`, no pin — since req-288 the seeder reads neither the model table nor the crew's default worker), and
 `prompt.md` = the shipped character part **plus the role's shipped step prompt below it**
 (`## The planning|build|review|verify step` + `plan-default` / `build-default` / `review-default` / `qa-default` without its
 version marker), because a persona's prompt replaces the step prompt as the run's instruction base. **When:** "Initialize
@@ -1373,7 +1383,14 @@ given one again, so a picture the owner removes stays removed. **The read:** the
 plugin IPC `personas`) carries `avatarVersion` — a token of the file's size and mtime, absent without a picture, so a client
 asks for nothing then — and `GET /api/personas/<id>/avatar` (remote port and plugin IPC `personaAvatar`) answers
 `{ok: true, dataUrl: "data:image/png;base64,…"}`, or 404 `{ok: false, error}` without one. Clients cache by
-`<id>@<avatarVersion>`. Uploading and removing a picture is req-288's (Persona v3).
+`<id>@<avatarVersion>`.
+
+**Uploading and removing a picture (req-288, D-67; `services/persona-picture-service.ts`).** `POST /api/personas/<id>/avatar`
+`{dataUrl}` (remote port and plugin IPC `personaAvatarSet {persona, dataUrl}`; a `data:image/png;base64,…` URL of at most 2 MB;
+the Persona page converts any image to a square PNG before it sends) writes `personas/<id>/avatar.png` in one commit
+`personas: <id> picture`. `POST /api/personas/<id>/avatar/remove` (`personaAvatarRemove {persona}`) deletes the file in one
+commit `personas: <id> picture removed`; for a shipped picture (`pia`, `paul`, `ben`, `ralf`, `tessa`, `you`) the same
+commit adds the id to `seeded-pictures:` in `crew.md`, so the start's backfill leaves it removed.
 
 **Deleting a persona (req-261).** `POST /api/personas/<id>/remove` `{confirm: <the persona's title>}` (remote port and
 plugin IPC `personaRemove`; answers `{ok: true, persona, files, warning?}` or `{ok: false, code, error, columns?,
@@ -1539,10 +1556,13 @@ chain"); on the phase board the **phase's `persona:` key** in
 (`personas.default`, `crew.md` `default-persona`) are read by nothing any
 more — no role fallback, no default (`decisions.md`).
 
-A resolved persona drives the dispatch: worker and model come from the
-persona (the model the capacity pool grants from `models.pool` for the
-requested class — req-170 — or `models.default` while no pool decides) and
-`prompt.md` replaces the handover prompt. When nothing
+A resolved persona drives the dispatch: the run asks the capacity pool for the
+persona's `class:` (raised, never lowered, by the ticket's `class:`, the part's
+`size:` and the phase's `min-class:`), the pool being every enabled model of the
+model table, so the next free model of the class runs; a persona's `model:` pin
+runs alone (no step up) while nothing raised the class, a raise takes the next free
+model of the raised class, and a ticket's own `model:` pin beats all (req-288).
+The harness follows from the model. `prompt.md` replaces the handover prompt. When nothing
 resolves, or the persona file is missing, a phase-board column still runs
 the legacy assignment ring; on a chain board no persona means no run (the
 ticket stands at You with the reason). Every run

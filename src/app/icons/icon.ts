@@ -101,7 +101,8 @@ export type IconName =
   | 'rocket'
   | 'hand'
   | 'users'
-  | 'lock';
+  | 'lock'
+  | 'camera';
 
 const ICONS: Record<IconName, readonly IconShape[]> = {
   // Lucide "play" / "pause" -- the tickets board's chain master and
@@ -299,6 +300,11 @@ const ICONS: Record<IconName, readonly IconShape[]> = {
   lock: [
     { kind: 'path', d: 'M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z' },
     { kind: 'path', d: 'M7 11V7a5 5 0 0 1 10 0v4' },
+  ],
+  // The Persona page's picture button (req-288, board 7k v3).
+  camera: [
+    { kind: 'path', d: 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z' },
+    { kind: 'circle', cx: 12, cy: 13, r: 4 },
   ],
   // Titlebar maximize (an outline square).
   square: [

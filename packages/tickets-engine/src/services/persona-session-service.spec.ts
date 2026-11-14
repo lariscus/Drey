@@ -205,7 +205,7 @@ describe('PersonaSessionService — the 1:1 as a persona session (req-168)', () 
     expect(bridgeCalls[0]!.model).toBeNull();
   });
 
-  it('an api persona talks over the chat bridge with its brief — no session is started', async () => {
+  it('an agent no harness follows for (req-288: an `api` persona migrates to one) talks over the chat bridge — no session is started', async () => {
     const service = boot();
     expect(await service.thread('anna')).toMatchObject({ session: 'bridge' });
     await service.send('anna', 'Hello');

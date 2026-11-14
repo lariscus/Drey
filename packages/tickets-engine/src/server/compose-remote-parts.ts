@@ -2,6 +2,7 @@ import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import { NOTES_VAULT_KEY } from '../contracts/notes';
 import { BoardAvatars } from '../services/board-avatars';
+import { composePersonaPictures } from '../services/compose-crew-sessions';
 import { listChatModels } from '../services/chat-model-probe';
 import { NotesService } from '../services/notes-service';
 import type { BoardParts } from './compose-board-parts';
@@ -37,6 +38,8 @@ export async function composeRemoteParts(opts: EngineOptions, config: FileConfig
     {
       allowBypass: () => remoteService?.allowBypass() ?? false,
       avatars: new BoardAvatars(board.board, board.avatars),
+      // req-288: the owner's picture upload and removal, one commit each.
+      pictures: composePersonaPictures(board, log),
       // req-293: the assistant's connection and its models, for Mission Control's persona's Model choice.
       chatModels: () => listChatModels(config),
       // req-273: Mission Control's Crew drag, the same write as Drey's Crew tab.

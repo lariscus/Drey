@@ -3,7 +3,7 @@ import type { PersonaView } from '../../shared/remote-protocol';
 import { EMPTY_PERSONA_SETTINGS } from '../../../../packages/tickets-engine/src/core/persona-settings';
 import { budgetOf, draftOf, isDirty, isMissingFileError, patchOf, personaIdOfKey, personaKeyOf, personaPathsOf, savedBaseOf, wordsOf } from './persona-model';
 
-const view: PersonaView = { id: 'ben', title: 'Ben', role: 'builder', worker: 'opencode', model: 'qwen3-coder', pool: ['qwen3-coder', 'sonnet'], color: '#8ecbef', budget: 5 };
+const view: PersonaView = { id: 'ben', title: 'Ben', role: 'builder', class: 'heavy', model: '', color: '#8ecbef', budget: 5 };
 
 describe('the persona tab key and paths', () => {
   it('round-trips the id and refuses another key', () => {
@@ -21,10 +21,11 @@ describe('the persona tab key and paths', () => {
 describe('what a Save sends', () => {
   const base = draftOf(view, 'Prompt');
 
-  it('shows the role as a label and falls back to the default model for an empty pool', () => {
+  it('shows the role as a label; req-288: the class and the pin (none = next free in class)', () => {
     expect(base.role).toBe('Builder');
-    expect(draftOf({ ...view, pool: [] }, '').pool).toEqual(['qwen3-coder']);
-    expect(draftOf({ ...view, pool: [], model: '' }, '').pool).toEqual([]);
+    expect(base).toMatchObject({ modelClass: 'heavy', pinnedModel: '' });
+    expect(draftOf({ ...view, model: 'kimi/k2' }, '').pinnedModel).toBe('kimi/k2');
+    expect(draftOf({ ...view, kind: 'mission', model: 'x' }, '').pinnedModel).toBe('');
   });
 
   it('is empty for an untouched form, also with the role typed in another case', () => {
@@ -36,12 +37,15 @@ describe('what a Save sends', () => {
     expect(patchOf(base, { ...base, role: 'Reviewer' })).toEqual({ role: 'reviewer' });
     expect(patchOf(base, { ...base, title: ' Benno ' })).toEqual({ title: 'Benno' });
     expect(patchOf(base, { ...base, prompt: 'New' })).toEqual({ prompt: 'New' });
-    expect(patchOf(base, { ...base, pool: ['qwen3-coder', 'sonnet', 'opus'] })).toEqual({ pool: ['qwen3-coder', 'sonnet', 'opus'] });
     expect(Object.keys(base)).not.toContain('skills'); // a skill switch goes to the engine at once, not with Save
   });
 
-  it('counts a reordered pool as a change: the order is the fallback order', () => {
-    expect(patchOf(base, { ...base, pool: ['sonnet', 'qwen3-coder'] })).toEqual({ pool: ['sonnet', 'qwen3-coder'] });
+  it('req-288: sends the class and the pin; next free in class is null', () => {
+    expect(patchOf(base, { ...base, modelClass: 'standard' })).toEqual({ class: 'standard' });
+    expect(patchOf(base, { ...base, pinnedModel: 'claude-code/claude-opus-5-5' })).toEqual({ model: 'claude-code/claude-opus-5-5' });
+    const pinned = draftOf({ ...view, model: 'claude-code/claude-opus-5-5' }, '');
+    expect(patchOf(pinned, { ...pinned, pinnedModel: '' })).toEqual({ model: null });
+    expect(patchOf(base, { ...base, modelClass: '' })).toEqual({});
   });
 
   it('keeps an emptied prompt: a prompt may be blanked on purpose', () => {
@@ -50,17 +54,16 @@ describe('what a Save sends', () => {
 });
 
 describe('the run settings (req-258)', () => {
-  const settings = { ...EMPTY_PERSONA_SETTINGS, minClass: 'B' as const, parallel: 2, leaving: ['sync-main' as const] };
+  const settings = { ...EMPTY_PERSONA_SETTINGS, parallel: 2, leaving: ['sync-main' as const] };
   const recorded: PersonaView = { ...view, settings: { ...settings, readOnly: false }, readOnly: false };
   const base = draftOf(recorded, 'P');
 
-  it('reads the class floor, read-only, the pool and the leaving actions off the record', () => {
-    expect(base.settings).toEqual({ minClass: 'B', readOnly: false, readOnlyStored: true, parallel: '2', min: '0', leaving: ['sync-main'] });
-    expect(draftOf(view, '').settings).toEqual({ minClass: '', readOnly: false, readOnlyStored: true, parallel: '', min: '0', leaving: [] });
+  it('reads read-only, the pool and the leaving actions off the record', () => {
+    expect(base.settings).toEqual({ readOnly: false, readOnlyStored: true, parallel: '2', min: '0', leaving: ['sync-main'] });
+    expect(draftOf(view, '').settings).toEqual({ readOnly: false, readOnlyStored: true, parallel: '', min: '0', leaving: [] });
   });
 
-  it('sends only the settings that differ; a cleared floor and an emptied cap are null', () => {
-    expect(patchOf(base, { ...base, settings: { ...base.settings, minClass: '' } })).toEqual({ settings: { minClass: null } });
+  it('sends only the settings that differ; an emptied cap is null', () => {
     expect(patchOf(base, { ...base, settings: { ...base.settings, parallel: '' } })).toEqual({ settings: { parallel: null } });
     expect(patchOf(base, { ...base, settings: { ...base.settings, min: '1', leaving: [] } })).toEqual({ settings: { min: 1, leaving: [] } });
     expect(patchOf(base, { ...base, settings: { ...base.settings, readOnly: true } })).toEqual({ settings: { readOnly: true } });
@@ -92,18 +95,16 @@ describe('the v2 fields (R11, req-171)', () => {
   const rich: PersonaView = { ...view, summary: 'Builds one part.', allowed: { spendAboveAllowance: false, writeNotes: true, runCommands: 'bypass', network: true } };
   const base = draftOf(rich, 'P');
 
-  it('reads the one line, the harness, the budget and the allowed keys off the record', () => {
+  it('reads the one line, the budget and the allowed keys off the record', () => {
     expect(base.summary).toBe('Builds one part.');
-    expect(base.worker).toBe('opencode');
     expect(base.budget).toBe('5');
     expect(base.allowed).toEqual({ writeNotes: true, runCommands: 'bypass', network: true, spend: false });
     expect(draftOf(view, '').allowed).toEqual({ writeNotes: false, runCommands: '', network: false, spend: false });
   });
 
-  it('sends the one line, the harness and the budget only when they changed', () => {
+  it('sends the one line and the budget only when they changed', () => {
     expect(patchOf(base, { ...base, summary: ' Builds. ' })).toEqual({ summary: 'Builds.' });
     expect(patchOf(base, { ...base, summary: '' })).toEqual({ summary: '' });
-    expect(patchOf(base, { ...base, worker: 'claude-code' })).toEqual({ worker: 'claude-code' });
     expect(patchOf(base, { ...base, budget: '$7.50' })).toEqual({ budget: 7.5 });
     expect(patchOf(base, { ...base, budget: '' })).toEqual({ budget: null });
     expect(patchOf(base, { ...base, budget: '$5.00' })).toEqual({});
@@ -122,6 +123,6 @@ describe('the v2 fields (R11, req-171)', () => {
   });
 
   it('makes the saved form the new base', () => {
-    expect(savedBaseOf({ ...base, title: ' Benno ', role: 'reviewer', summary: ' x ', worker: ' kimi ', budget: '$3' })).toMatchObject({ title: 'Benno', role: 'Reviewer', summary: 'x', worker: 'kimi', budget: '3' });
+    expect(savedBaseOf({ ...base, title: ' Benno ', role: 'reviewer', summary: ' x ', pinnedModel: ' kimi/k2 ', budget: '$3' })).toMatchObject({ title: 'Benno', role: 'Reviewer', summary: 'x', pinnedModel: 'kimi/k2', budget: '3' });
   });
 });

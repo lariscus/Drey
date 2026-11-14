@@ -13,7 +13,8 @@ import { chainItemsOf, parseChainItems } from './chain-list';
 import { crewOrderOf, inCrewOrder } from './crew-order';
 import { EDGE_STAGES } from './lifecycle-stages';
 import { HUMAN_PERSONA_ID, MISSION_PERSONA_ID, type Persona } from './persona';
-import { classNameOf } from '../contracts/capability-class';
+import { classNameOf, type ClassName } from '../contracts/capability-class';
+import { raisedToFloor } from './persona-model-migration';
 import { PIPELINE_PROSE, STANDARD_FLOW_LINE } from './pipeline-states';
 
 /** The run keys a working column carried that move onto the builder's record (concept §5). */
@@ -48,29 +49,32 @@ function scalar(map: YAMLMap, key: string): unknown {
 
 type MutablePatch = { -readonly [K in keyof PersonaSettingsPatch]: PersonaSettingsPatch[K] };
 
-/** `min-class` and `needs` onto the patch, where the builder sets neither. */
-function moveClassAndNeeds(found: ReadonlyMap<string, unknown>, settings: Persona['settings'], patch: MutablePatch, keys: string[]): void {
-  const minClass = found.get('min-class');
-  const minName = classNameOf(minClass);
-  if (minName !== null && settings.minClass === null) {
-    patch.minClass = minName;
+/** The builder as the move reads it: its class (or v2 keys) and its settings. */
+type MoveBuilder = Pick<Persona, 'kind' | 'class' | 'legacy' | 'settings'>;
+
+/** `needs` onto the patch where the builder sets none; `min-class` as the floor its class is raised to, when it raises it (req-288 folded the floor into `class:`). */
+function moveClassAndNeeds(found: ReadonlyMap<string, unknown>, builder: MoveBuilder, patch: MutablePatch, keys: string[]): ClassName | null {
+  const named = classNameOf(found.get('min-class'));
+  const floor = named !== null && raisedToFloor(builder, named) !== builder ? named : null;
+  if (floor !== null) {
     keys.push('min-class');
   }
   const needs = found.get('needs');
-  if (needs !== undefined && settings.needs === null) {
+  if (needs !== undefined && builder.settings.needs === null) {
     patch.needs = Array.isArray(needs) ? needs.join(', ') : String(needs);
     keys.push('needs');
   }
+  return floor;
 }
 
 /** The builder's settings patch for the moved keys — only those its record does not set already. */
-function movedPatch(found: ReadonlyMap<string, unknown>, builder: Pick<Persona, 'settings'> | null): { readonly patch: PersonaSettingsPatch; readonly keys: readonly string[] } {
+function movedPatch(found: ReadonlyMap<string, unknown>, builder: MoveBuilder | null): { readonly patch: PersonaSettingsPatch; readonly keys: readonly string[]; readonly floor: ClassName | null } {
   const patch: MutablePatch = {};
   const keys: string[] = [];
   if (builder === null) {
-    return { patch, keys };
+    return { patch, keys, floor: null };
   }
-  moveClassAndNeeds(found, builder.settings, patch, keys);
+  const floor = moveClassAndNeeds(found, builder, patch, keys);
   for (const [key, field] of [['max-turns', 'maxTurns'], ['max-work', 'maxWorkMin']] as const) {
     const value = found.get(key);
     if (typeof value === 'number' && Number.isInteger(value) && value > 0 && builder.settings[field] === null) {
@@ -78,7 +82,7 @@ function movedPatch(found: ReadonlyMap<string, unknown>, builder: Pick<Persona, 
       keys.push(key);
     }
   }
-  return { patch, keys };
+  return { patch, keys, floor };
 }
 
 /** The run keys, the token budget and the homeless keys the removed columns carried (the first column's value wins). */
@@ -136,10 +140,12 @@ export interface PipelineMigration {
   readonly text: string;
   readonly builder: string | null;
   readonly patch: PersonaSettingsPatch;
+  /** A removed column's `min-class`: the builder's class is raised to it, never lowered (req-288). */
+  readonly floor: ClassName | null;
 }
 
 /** Step 3 over `pipeline.md`; null when the file holds only the lifecycle columns and a `flow:` already. */
-export function pipelineMigrationOf(pipelineText: string, personas: readonly Pick<Persona, 'id' | 'kind' | 'settings'>[]): PipelineMigration | null {
+export function pipelineMigrationOf(pipelineText: string, personas: readonly (Pick<Persona, 'id'> & MoveBuilder)[]): PipelineMigration | null {
   const { yamlText, body, hadFence } = splitFrontmatter(pipelineText);
   const doc = parseDocument(yamlText ?? '');
   const phases = doc.get('phases');
@@ -165,7 +171,7 @@ export function pipelineMigrationOf(pipelineText: string, personas: readonly Pic
     tokenBudget,
     dropped,
   };
-  return { plan, text: `---\n${doc.toString({ lineWidth: 0 })}---\n${prose}`, builder, patch: moved.patch };
+  return { plan, text: `---\n${doc.toString({ lineWidth: 0 })}---\n${prose}`, builder, patch: moved.patch, floor: moved.floor };
 }
 
 function movedOf(builder: string | null, keys: readonly string[]): PipelineMigrationPlan['moved'] {

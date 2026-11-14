@@ -1,4 +1,4 @@
-import { parsePersonaFile, resolvePersona, splitPoolEntry, type Persona, type PersonaResolution } from '../core/persona';
+import { parsePersonaFile, personaModelGuess, resolvePersona, type Persona, type PersonaResolution } from '../core/persona';
 
 /**
  * The persona loader (ADR-0088, E3): the services read personas from the
@@ -60,11 +60,12 @@ export async function resolvePersonaForTicket(
 }
 
 /**
- * What a run started outside the chain derives from a persona: its harness
- * and its default model (an estimate, the dialog's start). The chain's
- * dispatch asks the capacity pool instead (req-170) — the class decides.
+ * What a run started outside the chain derives from a persona: the harness
+ * and model of its pin (req-288; an estimate, the dialog's start), '' when it
+ * pins none — the assignment ring then decides. The chain's dispatch asks the
+ * capacity pool instead (req-170) — the class decides.
  */
 export function deriveWorkerModel(persona: Persona): { workerChoice: string; model: string | null } {
-  const { provider, model } = splitPoolEntry(persona.models.default);
-  return { workerChoice: provider ?? persona.worker, model };
+  const guess = personaModelGuess(persona);
+  return { workerChoice: guess?.provider ?? '', model: guess?.model ?? null };
 }

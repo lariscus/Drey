@@ -824,21 +824,20 @@ describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () =>
 
     const outcome = await service.personaPatch({
       id: 'pia',
-      model: 'sonnet',
-      pool: ['sonnet', 'haiku'],
+      class: 'standard',
+      model: 'claude-code/sonnet',
       color: '#ff8800',
       skills: ['diff-review'],
       prompt: 'You are Pia, the careful planner.\n',
     });
     expect(outcome.ok).toBe(true);
     const personaMd = await fsp.readFile(path.join(vaultDir, ...PERSONA_DIR, 'persona.md'), 'utf8');
-    expect(personaMd).toContain('default: sonnet');
-    expect(personaMd).toContain('pool: [sonnet, haiku]');
-    expect(personaMd).not.toContain('router:'); // req-170: the router policies are gone, the old key drops on rewrite
+    // req-288: class and the pinned model replace worker and models; the v2 keys leave with the patch
+    expect(personaMd).toContain('class: standard\nmodel: "claude-code/sonnet"\n');
+    expect(personaMd).not.toMatch(/^(worker|models|min-class):|router:/m);
     expect(personaMd).toContain("color: '#ff8800'");
     expect(personaMd).toContain('skills: [diff-review]');
     expect(personaMd).toContain('role: builder'); // not sent — untouched
-    expect(personaMd).toContain('worker: claude-code'); // not sent — untouched
     expect(personaMd).toContain('Pia plans carefully.'); // the owner's prose survives
     expect(personaMd).not.toContain('Who Pia is: role, tone, limits');
     const promptMd = await fsp.readFile(path.join(vaultDir, ...PERSONA_DIR, 'prompt.md'), 'utf8');
@@ -846,7 +845,11 @@ describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () =>
     // the rewritten file parses back to the same persona plus the changes
     const parsed = await service.listPersonas();
     const pia = parsed.find((p) => p.id === 'pia');
-    expect(pia?.models).toEqual({ default: 'sonnet', pool: ['sonnet', 'haiku'] });
+    expect(pia).toMatchObject({ class: 'standard', model: 'claude-code/sonnet' });
+    expect(pia).not.toHaveProperty('legacy');
+    // req-288: null pins nothing — the next free model of the class
+    expect(await service.personaPatch({ id: 'pia', model: null })).toMatchObject({ ok: true });
+    expect((await service.listPersonas()).find((p) => p.id === 'pia')).toMatchObject({ class: 'standard', model: null });
     expect(pia?.skills).toEqual(['diff-review']);
   });
 
@@ -856,7 +859,7 @@ describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () =>
     const before = await fsp.readFile(path.join(vaultDir, ...PERSONA_DIR, 'persona.md'), 'utf8');
 
     expect(await service.personaPatch({ id: 'pia', color: 'red' })).toEqual({ ok: false, error: 'the color is a #rrggbb hex value' });
-    expect(await service.personaPatch({ id: 'pia', pool: [] })).toEqual({ ok: false, error: 'the model pool is a non-empty list of model names' });
+    expect(await service.personaPatch({ id: 'pia', class: 'Not a class!' })).toMatchObject({ ok: false, error: expect.stringContaining('the class is a class name') });
     expect(await service.personaPatch({ id: 'pia', title: '  ' })).toEqual({ ok: false, error: 'the title is not empty' });
     expect(await service.personaPatch({ id: 'pia', role: 'wizard' })).toMatchObject({ ok: false });
     expect(await fsp.readFile(path.join(vaultDir, ...PERSONA_DIR, 'persona.md'), 'utf8')).toBe(before);
@@ -870,7 +873,8 @@ describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () =>
     expect(outcome.ok).toBe(true);
     const personaMd = await fsp.readFile(path.join(vaultDir, ...PERSONA_DIR, 'persona.md'), 'utf8');
     expect(personaMd).toContain('title: Pia P.');
-    expect(personaMd).toContain('default: gpt-5');
+    expect(personaMd).toContain('model: "gpt-5"'); // req-288: a pin sent to a v2 record migrates it (its old floor, else heavy)
+    expect(personaMd).toContain('class: heavy');
   });
 });
 

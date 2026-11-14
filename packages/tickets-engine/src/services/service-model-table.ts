@@ -1,5 +1,5 @@
 import type { FileSystem } from '../fleet/ports/file-system';
-import type { ModelRow } from '../fleet/protocol-pool';
+import type { ClassConfig, ModelRow } from '../fleet/protocol-pool';
 import { parsePoolSettings } from '../fleet/routing/pool-config';
 import { ServiceConfigFile } from '../fleet/routing/service-config-file';
 import { parseServiceSlots } from '../fleet/routing/slot-config';
@@ -25,10 +25,19 @@ export class ServiceModelTable implements ModelTablePort {
   }
 
   async rows(): Promise<readonly ModelRow[] | null> {
+    return (await this.table())?.models ?? null;
+  }
+
+  /**
+   * req-288: the owner's classes and the model rows — what the Persona page's Model block draws
+   * while no runner is awake to answer `GET /models`; null without a readable table.
+   */
+  async table(): Promise<{ readonly ok: true; readonly classes: readonly ClassConfig[]; readonly models: readonly ModelRow[] } | null> {
     const { root, error } = await this.file.read();
     if (error !== null || !Array.isArray(root['models'])) {
       return null;
     }
-    return parsePoolSettings(root, parseServiceSlots(root).slots).settings.models;
+    const { classes, models } = parsePoolSettings(root, parseServiceSlots(root).slots).settings;
+    return { ok: true, classes, models };
   }
 }

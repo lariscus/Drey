@@ -1,4 +1,5 @@
 import type { BoardSnapshot, PipelinePhase, TicketCard } from '../../contracts/tickets';
+import { personaModelGuess } from '../../core/persona';
 import { parseWorkerValue, resolveAssignment } from '../assignment';
 import type { ChainConfig, WorkerProviderId } from '../protocol';
 import type { TicketPersona } from './board-personas';
@@ -7,8 +8,8 @@ import type { TicketPersona } from './board-personas';
  * Which provider pool a card's run counts against in the dispatch plan, for
  * one pass (req-63, E3): with the capacity pool wired (req-170) a persona's
  * card counts against none — the pool grants its class on whichever
- * provider holds it; without it the persona's harness; without a persona
- * the assignment ring decides.
+ * provider holds it; without it the harness of the persona's pinned model;
+ * otherwise the assignment ring decides.
  */
 export class PassPools {
   constructor(
@@ -20,17 +21,18 @@ export class PassPools {
 
   readonly poolOf = (card: TicketCard, phase: PipelinePhase): WorkerProviderId | null => {
     const persona = this.personas.get(card.id)?.persona ?? null;
-    const parsed = persona === null ? null : parseWorkerValue(persona.worker);
-    if (parsed !== null) {
-      return this.classPool ? null : parsed.provider;
+    if (persona !== null && this.classPool) {
+      return null;
     }
-    return this.ringPool(card, phase);
+    const guess = persona === null ? null : personaModelGuess(persona);
+    const pinned = guess === null ? null : parseWorkerValue(guess.provider ?? '');
+    return pinned !== null ? pinned.provider : this.ringPool(card, phase);
   };
 
-  /** True when the card's run asks the capacity pool for its class. */
+  /** True when the card's run asks the capacity pool for its class (req-288: every persona's run does, its harness follows from the grant). */
   asksPool(card: TicketCard): boolean {
     const persona = this.personas.get(card.id)?.persona ?? null;
-    return this.classPool && persona !== null && parseWorkerValue(persona.worker) !== null;
+    return this.classPool && persona !== null;
   }
 
   /** The assignment ring: ticket, column, repo, the configured default. */
