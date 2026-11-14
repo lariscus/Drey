@@ -14,6 +14,7 @@ import type { VerifyHarness } from '../contracts/verify';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from '../fleet/protocol';
 import { EngineBoardService } from '../services/board-service';
 import { ChatService } from '../services/chat-service';
+import { FollowupService } from '../services/followup-service';
 import { AGGREGATOR_SYSTEM_PROMPT, createChatBridge } from '../services/chat-llm';
 import { FleetClient, type RunnerLocator } from '../services/fleet-client';
 import { RunnerComponent } from '../service/runner-component';
@@ -280,6 +281,14 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
     log,
   });
   await improvements.start();
+  // A finished run's `FOLLOWUPS:` proposals become pending chat cards; the
+  // owner's confirm is what creates a ticket (services/followup-service.ts).
+  const followups = new FollowupService({ runs: () => fleet.runs(), file: (input) => chat.fileFollowups(input), log });
+  const stopFollowups = hub.subscribe((what) => {
+    if (what === 'fleet') {
+      void followups.scan();
+    }
+  });
   const stopSettling = settleCommitStepsOnFleet(
     (listener) => hub.subscribe((what) => listener(what)),
     () => board.settleCommitSteps(),
@@ -508,6 +517,7 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
       presence.dispose();
       fleet.dispose();
       stopSettling();
+      stopFollowups();
       improvements.dispose();
       verify.dispose();
       board.dispose();

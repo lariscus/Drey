@@ -53,6 +53,13 @@ describe('validateChatCommand', () => {
     ).toEqual({ kind: 'createTicket', title: 'Tidy worktrees', description: '', priority: 'normal', phase: 'ideas' });
   });
 
+  it('keeps the repo a createTicket names (a follow-up carries its source ticket\'s) and drops a blank one', () => {
+    const base = { kind: 'createTicket', title: 'Tidy', phase: 'inbox', priority: 'normal' };
+    expect(validateChatCommand({ ...base, repo: ' drey ' })).toMatchObject({ repo: 'drey' });
+    expect(validateChatCommand({ ...base, repo: '  ' })).not.toHaveProperty('repo');
+    expect(validateChatCommand({ ...base, repo: 7 })).not.toHaveProperty('repo');
+  });
+
   it('refuses shapes outside the union', () => {
     expect(validateChatCommand({ kind: 'archive', id: 'T-0086' })).toBeNull();
     expect(validateChatCommand({ kind: 'setPriority', id: 'T-0086', priority: 'yesterday' })).toBeNull();

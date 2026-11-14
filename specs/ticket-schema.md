@@ -1335,6 +1335,51 @@ commits once. The reader (`packages/tickets-engine/src/core/chat-session.ts`)
 forgives: a file without a readable frontmatter fence reads as absent,
 a half-readable one yields what it can.
 
+### Worker follow-ups (owner request 2026-11-14, req-176)
+
+A dispatched worker may propose work that is not part of its step. It
+writes nothing to the board: it ends its **last message** with a
+line-start `FOLLOWUPS:` marker and bullets, in the grammar of
+`packages/tickets-engine/src/core/followups.ts`:
+
+```markdown
+FOLLOWUPS:
+- Cache the heading tree per note
+  why: the outline rebuilds it on every keystroke
+  priority: low
+```
+
+A bullet (`-`, `*`, `1.`) is a title; the indented `why:` (alias
+`reason:`) and `priority:` lines belong to it, a wrapped detail line
+continues the reason. The **last** marker of the message counts, reading
+stops at the first unindented non-bullet line (closing prose), a marker in
+running prose or `FOLLOWUPS: none` reads as nothing. Bounded: at most 5
+proposals per run, titles distinct (case-insensitively), a title cut at 120
+and a reason at 600 characters. Interactive dialog runs and scout runs are
+not told the rule.
+
+The runner keeps what it read as `followups` in the run's `run.json` info
+(`[{title, why, priority}]`, absent when none; a later result with none
+clears it). When the run is `done`, the engine's `FollowupService` hands the
+list to the chat (`ChatService.fileFollowups`), which writes **one session
+per run**, titled `Follow-ups from T-0012`: a mission line naming the run
+(`Run R-… of T-0012 (<title>) proposes 2 follow-up tickets. Nothing is
+created until you confirm a card.` — the idempotency key: a session with
+that title that already names the run is left alone) and one pending
+`createTicket` card per proposal, one commit `tickets: follow-ups of
+T-0012 proposed (R-…)`. The card's command carries the board's capture
+phase, the source ticket's `repo` (the `createTicket` command's optional
+`repo` key, kept by the validator when non-blank), a priority of the
+board's vocabulary (the worker's word when it is one, else the
+vocabulary's default) and a description of the worker's `why` plus `Proposed
+by the worker of T-0012 (run R-…).` The iron rule above holds unchanged:
+nothing exists until the owner's confirm (the ordinary decision path),
+a dismissed card leaves nothing, and the card is never a plan part — the
+ticket gets no `parent:`, which means plan-part ownership (matching by
+title among the children, locking), not provenance.
+Runs that ended more than an hour before the engine started are not filed
+(an owner who deleted a session must not see its cards return).
+
 ## Validation (where it runs, what it checks)
 
 There is **no CI on the tickets repository** (owner's ruling,

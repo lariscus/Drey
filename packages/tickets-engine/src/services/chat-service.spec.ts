@@ -1017,3 +1017,86 @@ describe('ChatService sessions and open', () => {
     expect(await service.open(foreign)).toBeNull();
   });
 });
+
+describe('ChatService.fileFollowups — a worker\'s proposals as pending cards', () => {
+  const DRAFTS = [
+    { title: 'Cache the heading tree', why: 'It rebuilds on every keystroke.', priority: 'low' },
+    { title: 'Drop the dead export', why: '', priority: 'bogus' },
+  ];
+
+  it('files one pending createTicket card per proposal in the capture phase and creates nothing', async () => {
+    boardSnapshot = makeSnapshot();
+    (boardSnapshot.columns[1]!.tickets[0]!.meta as { title: string | null; repo?: string }).repo = 'drey';
+    service = boot();
+
+    const filed = await service.fileFollowups({ ticket: 'T-0086', runId: 'R-1', drafts: DRAFTS });
+
+    expect(filed).toMatchObject({ ok: true, filed: 2 });
+    const file = (filed as { file: string }).file;
+    expect(file).toMatch(/^tickets\/_meta\/chat\/\d{8}-\d{6}-follow-ups-from-t-0086\.md$/);
+    const session = parseSessionFile(await readOnDisk(file), file);
+    expect(session!.title).toBe('Follow-ups from T-0086');
+    expect(session!.messages[0]!.text).toContain('Run R-1 of T-0086 (Fix the CSV export) proposes 2 follow-up tickets');
+    expect(session!.proposals.map((p) => p.state)).toEqual(['pending', 'pending']);
+    expect(session!.proposals[0]!.command).toEqual({
+      kind: 'createTicket',
+      title: 'Cache the heading tree',
+      description: 'It rebuilds on every keystroke.\n\nProposed by the worker of T-0086 (run R-1).',
+      priority: 'low',
+      phase: 'inbox',
+      repo: 'drey',
+    });
+    // A priority outside the board's vocabulary falls back to its default; no why leaves the origin line alone.
+    expect(session!.proposals[1]!.command).toMatchObject({ priority: 'normal', description: 'Proposed by the worker of T-0086 (run R-1).' });
+    expect(boardCreates).toEqual([]);
+    expect(commits.map((c) => c.message)).toEqual(['tickets: follow-ups of T-0086 proposed (R-1)']);
+    expect(announced).toEqual([file]);
+  });
+
+  it('is idempotent per run, but a later run of the same ticket gets its own session', async () => {
+    service = boot();
+    const first = await service.fileFollowups({ ticket: 'T-0086', runId: 'R-1', drafts: DRAFTS });
+    const again = await service.fileFollowups({ ticket: 'T-0086', runId: 'R-1', drafts: DRAFTS });
+    const next = await service.fileFollowups({ ticket: 'T-0086', runId: 'R-2', drafts: DRAFTS });
+
+    expect(again).toEqual({ ok: true, file: (first as { file: string }).file, filed: 0 });
+    expect(next).toMatchObject({ ok: true, filed: 2 });
+    expect((next as { file: string }).file).not.toBe((first as { file: string }).file);
+    expect(commits).toHaveLength(2);
+  });
+
+  it('only the owner\'s confirm creates the ticket, with the source ticket\'s repo; a dismissal leaves nothing', async () => {
+    (boardSnapshot.columns[1]!.tickets[0]!.meta as { title: string | null; repo?: string }).repo = 'drey';
+    service = boot();
+    const filed = (await service.fileFollowups({ ticket: 'T-0086', runId: 'R-1', drafts: DRAFTS })) as { file: string };
+
+    const confirmed = await service.confirm({ file: filed.file, id: 'p-1' });
+    expect(confirmed.ok).toBe(true);
+    expect(boardCreates).toEqual([
+      {
+        title: 'Cache the heading tree',
+        description: 'It rebuilds on every keystroke.\n\nProposed by the worker of T-0086 (run R-1).',
+        priority: 'low',
+        repo: 'drey',
+        actor: ACTOR,
+      },
+    ]);
+
+    const dismissed = await service.dismiss({ file: filed.file, id: 'p-2' });
+    expect(dismissed.ok).toBe(true);
+    expect(boardCreates).toHaveLength(1);
+    const session = parseSessionFile(await readOnDisk(filed.file), filed.file);
+    expect(session!.proposals.map((p) => p.state)).toEqual(['confirmed', 'dismissed']);
+  });
+
+  it('writes nothing for no proposals and reports a missing vault', async () => {
+    service = boot();
+    expect(await service.fileFollowups({ ticket: 'T-0086', runId: 'R-1', drafts: [] })).toEqual({ ok: true, file: null, filed: 0 });
+    expect(commits).toEqual([]);
+    boardSnapshot = makeSnapshot({ vaultId: null });
+    expect(await service.fileFollowups({ ticket: 'T-0086', runId: 'R-1', drafts: DRAFTS })).toEqual({
+      ok: false,
+      error: 'no tickets vault detected',
+    });
+  });
+});

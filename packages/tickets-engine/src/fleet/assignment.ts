@@ -8,6 +8,7 @@
  * `opencode`, `claude-code`, `kimi`, `claude-code/sonnet`. An unreadable value
  * is a refusal at run start — never a guess (ADR-0076).
  */
+import { FOLLOWUPS_MARKER, MAX_FOLLOWUPS } from '../core/followups';
 import { isWorkerProvider, BLOCKED_MARKER, QUESTION_MARKER, type FleetCaps, type InteractiveMode, type WorkerProviderId } from './protocol';
 import { parseHandover } from '../contracts/tickets';
 import { capHead, capTail } from './capping';
@@ -261,6 +262,18 @@ const HANDOVER_DISCIPLINE =
   'Under 15 lines. Log lines stay one short line (under 200 characters) — detail belongs in the handover.';
 
 /**
+ * How a dispatched worker proposes work beyond its step: nothing is created
+ * by the worker — the owner sees one Mission Control card per proposal and
+ * only a confirm makes a ticket. Short on purpose: it rides every build brief.
+ */
+const FOLLOWUPS_DISCIPLINE =
+  `Follow-ups: work you found that is not part of this step (a defect elsewhere, a refactor the plan did not name) ` +
+  `stays out of the diff. Propose it instead: end your final message with \`${FOLLOWUPS_MARKER}\` and, on the lines ` +
+  `below, at most ${String(MAX_FOLLOWUPS)} bullets, each "- <title>" with optional indented "why: <one line>" and ` +
+  `"priority: <word>". The owner confirms the ones worth a ticket; you create nothing yourself. Skip it when there is ` +
+  `nothing to propose.`;
+
+/**
  * The interactive dialog's discipline (req-65): no gate, no move — the
  * conversation is the deliverable, the owner moves the ticket.
  */
@@ -439,6 +452,7 @@ export function composeInstruction(input: InstructionInput): ComposedInstruction
   parts.push(discipline);
   if (input.interactive === undefined) {
     parts.push(HANDOVER_DISCIPLINE);
+    parts.push(FOLLOWUPS_DISCIPLINE);
   }
   parts.push(ASKING);
 

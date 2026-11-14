@@ -47,7 +47,7 @@ Open work only. Everything implemented lives in
 lives in [`decisions.md`](decisions.md). When an item ships, move it to the
 changelog and delete it here — no shipped history on this page.
 
-**Status (2026-11-08):** version 0.8.1, milestones 1–151, 153–163, 165–169 and 171–212, plus req-98, req-101, req-104 (the desktop frame matches board 9a), req-126 (the frame follow-ups of wave 4.2: no strip on a one-panel bottom dock, a view badge, a view's own tabs), req-110 (the fleet runner leaves when deactivated or when Drey quits idle), req-102 (the i18n catalog, ADR-0091), req-99a, req-95a, req-95b, req-97, req-96 and req-99b built (109–111 are recorded in the changelog by the convergence audit backfill) — 1–83
+**Status (2026-11-08):** version 0.8.1, milestones 1–151, 153–163, 165–169 and 171–213, plus req-176 (worker follow-up proposals), req-98, req-101, req-104 (the desktop frame matches board 9a), req-126 (the frame follow-ups of wave 4.2: no strip on a one-panel bottom dock, a view badge, a view's own tabs), req-110 (the fleet runner leaves when deactivated or when Drey quits idle), req-102 (the i18n catalog, ADR-0091), req-99a, req-95a, req-95b, req-97, req-96 and req-99b built (109–111 are recorded in the changelog by the convergence audit backfill) — 1–83
 owner-verified (milestone 82, auto-update from GitHub Releases ADR-0074,
 end-to-end on a real install, the 0.7.0 → 0.7.1 update round included
 docs/07 checklist; milestone 83, the tickets foundation ADR-0075/0076,
@@ -799,6 +799,30 @@ rest are kept so they still match `docs/11`.
   remainder below is therefore `copilot-cli` only.
 
 ### Backlog (unordered, uncommitted)
+
+- **req-177 — worker isolation: environment and sandbox** (owner
+  request 2026-11-14, from the Hermes-style sandboxing comparison;
+  uncommitted). Today every worker inherits the runner's whole
+  environment (`nodeSpawnFn`, `procs.ts`; only `npm_*`, `INIT_CWD` and
+  `ELECTRON_RUN_AS_NODE` are scrubbed) and `permissionMode: bypass` has
+  no process boundary. In order: (1) a per-adapter `envAllow` plus a
+  common required list, as an opt-in mode (`inherit` stays the default
+  until a probe run per provider proves the list: `PATH`, home and
+  `APPDATA`, the Windows shell variables, proxy and CA variables,
+  `ANTHROPIC_*` / `CLAUDE_CONFIG_DIR`, `OPENCODE_*`, `KIMI_HOME`);
+  (2) `bypass` only with a sandbox backend; (3) an opt-in Docker backend
+  that wraps the worker spawn (mount the worktree and its `.git`
+  common dir, `--cap-drop ALL`, no-new-privileges, pid and memory
+  limits, an egress allowlist for the provider API). Open: the
+  worktree's `.git` pointer into the main repo, the `link:` folders
+  (req-56), Windows and WSL, the provider logins under `~/.claude` /
+  `~/.kimi-code`. ⚠️ Kimi's own variables and OpenCode's config
+  precedence are unverified.
+- **req-178 — follow-up proposals: reach and notice** (follow-up of
+  req-176). The cards sit in a Mission Control session; the owner is not
+  pushed anything (no Needs-you card, no phone notification), scout and
+  interactive runs are not told the `FOLLOWUPS:` rule, and a proposal
+  cannot name a `blocked-by:` between two proposals.
 
 ~~- **Req-6** — further CodeMirror 6 themes on demand (bundled set + `@uiw`
   themes since milestone 16; Cyberpunk is the third bespoke theme).~~

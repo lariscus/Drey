@@ -13,6 +13,7 @@
  */
 import { FLEET_SETTING_DEFAULTS } from '../contracts/fleet-defaults';
 import type { ShapedQuestion } from '../contracts/question-shape';
+import type { FollowupDraft } from '../core/followups';
 import type { TicketForm } from '../contracts/tickets';
 
 /** The workers of milestone 84, in fleet order (the assignment default). */
@@ -569,6 +570,13 @@ export interface RunInfo {
    * owner. Null/absent on every other end.
    */
   readonly blocked?: string | null;
+  /**
+   * The follow-up tickets the worker proposed at the end of its last
+   * message (`FOLLOWUPS:`, `core/followups.ts`). The engine files them as
+   * pending Pia cards once the run is done; nothing here touches the board.
+   * Absent when the worker proposed none.
+   */
+  readonly followups?: readonly FollowupDraft[];
   /** The worker's last error event (req-63: a rate limit shrinks the pool). */
   readonly lastError?: string | null;
   // --- token telemetry (T-0048); all optional so adopt() restores older

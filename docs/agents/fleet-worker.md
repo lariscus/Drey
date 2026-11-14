@@ -36,6 +36,11 @@ or `AGENTS.md` whole; open `CLAUDE.md` only at the section a step needs
   something that does *not* block you (a choice the plan or the repo
   settles, a point for the review), decide within the plan and write it
   into the ticket's Log instead.
+- Work you find that is not part of the plan stays out of your diff. End
+  your final message with `FOLLOWUPS:` and one `- <title>` bullet per
+  proposal (at most five; optional indented `why:` and `priority:` lines).
+  The owner sees one Mission Control card each and only a confirm makes a
+  ticket — you create nothing. Skip it when there is nothing to propose.
 - Stay inside the plan's scope. No worktree of your own; no merge into
   `main` and no push unless your phase prompt asks for it (the commit
   step does) — otherwise the runner and the owner handle that.

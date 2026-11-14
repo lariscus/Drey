@@ -356,6 +356,26 @@ a different path and keep their own rendering.
 
 ---
 
+## The worker's follow-up proposals (req-176)
+
+A dispatched (non-interactive) build run's brief carries this rule
+(`FOLLOWUPS_DISCIPLINE` in `packages/tickets-engine/src/fleet/assignment.ts`,
+after the handover rule, before the asking rule; verbatim):
+
+> Follow-ups: work you found that is not part of this step (a defect
+> elsewhere, a refactor the plan did not name) stays out of the diff.
+> Propose it instead: end your final message with `FOLLOWUPS:` and, on
+> the lines below, at most 5 bullets, each "- <title>" with optional
+> indented "why: <one line>" and "priority: <word>". The owner confirms
+> the ones worth a ticket; you create nothing yourself. Skip it when
+> there is nothing to propose.
+
+Parsed by `parseFollowups` (`core/followups.ts`) from the runner's result
+event; the format and what becomes of it are in `specs/ticket-schema.md`,
+"Worker follow-ups". No model is involved beyond the worker's own message.
+
+---
+
 ## The assistant's system prompt (milestones 76–78, ADR-0071)
 
 `buildSystemPrompt` (`plugins/assistant/main/system-prompt.ts`) builds it

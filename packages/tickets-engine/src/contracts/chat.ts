@@ -80,6 +80,8 @@ export type ChatCommand =
       readonly priority: TicketPriority;
       /** The phase the ticket is created in (e.g. `inbox` / `ideas`). */
       readonly phase: string;
+      /** The work repo the ticket names; absent = none (a follow-up carries its source ticket's). */
+      readonly repo?: string;
     }
   | { readonly kind: 'transition'; readonly id: string; readonly from: string; readonly to: string }
   | { readonly kind: 'setPriority'; readonly id: string; readonly priority: TicketPriority }

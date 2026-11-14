@@ -22,6 +22,7 @@ import * as path from 'node:path';
 import { promisify } from 'node:util';
 import { acceptanceCommands, patchTicketFile, ticketPathParts } from '../core/ticket-files';
 import { mergeWorkerChapters } from '../core/ticket-chapters';
+import { parseFollowups } from '../core/followups';
 import { hasScoutReport } from '../core/scout';
 import { TicketsGit } from '../core/tickets-git';
 import { PERSONAS_DIR } from '../core/persona';
@@ -124,6 +125,24 @@ function isActionBoundary(event: NormalizedEvent): boolean {
     (event.kind === 'note' && (event.text ?? '').startsWith('result › ')) ||
     (event.kind === 'tool' && (event.detail === 'done' || event.detail === 'failed'))
   );
+}
+
+/**
+ * The `followups` a `result` event settles on the record: what the final
+ * message proposed, and — only when an earlier turn had proposed some — an
+ * empty list when a later message proposes none, so a steered run does not
+ * keep stale proposals. Nothing for every other event and for a run that
+ * never proposed (run.json stays byte-identical).
+ */
+function followupsPatch(info: RunInfo, event: NormalizedEvent): Pick<RunInfo, 'followups'> | Record<string, never> {
+  if (event.kind !== 'result') {
+    return {};
+  }
+  const drafts = parseFollowups(event.text ?? '');
+  if (drafts.length > 0) {
+    return { followups: drafts };
+  }
+  return info.followups !== undefined && info.followups.length > 0 ? { followups: [] } : {};
 }
 
 /** What a paused worker is told when the owner hands the run back. */
@@ -1792,6 +1811,7 @@ export class RunSupervisor {
       ...(event.costUsd !== undefined ? { costUsd: event.costUsd } : {}),
       ...(event.waiting !== undefined ? { waiting: event.waiting === null ? null : { ...event.waiting, since: event.ts } } : {}),
       ...(event.blocked !== undefined ? { blocked: event.blocked } : {}),
+      ...followupsPatch(run.info, event),
       usage: telemetry.usage,
       lastTurnContext: telemetry.lastTurnContext,
       turns: telemetry.turns,

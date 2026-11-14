@@ -69,6 +69,20 @@ describe('composeInstruction — the persona line (D-60)', () => {
   });
 });
 
+describe('composeInstruction — the follow-up proposals (owner request 2026-11-14)', () => {
+  it('a dispatched run is told how to propose work beyond its step, and that it creates nothing itself', () => {
+    const { text } = composeInstruction(base({}));
+    expect(text).toContain('Follow-ups:');
+    expect(text).toContain('`FOLLOWUPS:`');
+    expect(text).toContain('at most 5 bullets');
+    expect(text).toContain('you create nothing yourself');
+  });
+
+  it('an interactive dialog run carries no follow-up rule — the owner is already in the conversation', () => {
+    expect(composeInstruction(base({ interactive: 'plan' })).text).not.toContain('Follow-ups:');
+  });
+});
+
 describe('composeScoutInstruction (E8, concept §5.6)', () => {
   function scoutBase(over: Partial<Parameters<typeof composeScoutInstruction>[0]> = {}): Parameters<typeof composeScoutInstruction>[0] {
     return {

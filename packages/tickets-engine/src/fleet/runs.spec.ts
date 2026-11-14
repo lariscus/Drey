@@ -1586,6 +1586,32 @@ describe('RunSupervisor', () => {
     expect(stored.info.blocked).toBe('merge conflict in specs/changelog.md — not resolvable');
   });
 
+  it('keeps the follow-ups a result proposes on the record, and drops them when a later result proposes none', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+    const onEvent = adapter.starts[0]!.onEvent;
+
+    onEvent({ ts: '2026-10-17T12:00:01Z', kind: 'note', text: 'working' });
+    await vi.waitFor(() => expect(sup.get(id)?.lastActivity).toBe('2026-10-17T12:00:01Z'));
+    expect(sup.get(id)).not.toHaveProperty('followups');
+
+    onEvent({
+      ts: '2026-10-17T12:00:02Z',
+      kind: 'result',
+      text: 'Done.\nFOLLOWUPS:\n- Cache the heading tree\n  why: slow\n  priority: low',
+    });
+    await vi.waitFor(() => expect(sup.get(id)?.followups).toEqual([{ title: 'Cache the heading tree', why: 'slow', priority: 'low' }]));
+    const stored = JSON.parse(await fsp.readFile(path.join(fleetRoot, 'runs', id, 'run.json'), 'utf8')) as {
+      info: { followups?: unknown };
+    };
+    expect(stored.info.followups).toEqual([{ title: 'Cache the heading tree', why: 'slow', priority: 'low' }]);
+
+    onEvent({ ts: '2026-10-17T12:00:03Z', kind: 'result', text: 'Done, nothing more to propose.' });
+    await vi.waitFor(() => expect(sup.get(id)?.followups).toEqual([]));
+  });
+
   it('folds the run telemetry into the record as events arrive', async () => {
     const { sup, adapter } = supervisor();
     const rel = await writeTicket();

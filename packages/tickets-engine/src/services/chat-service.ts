@@ -40,6 +40,7 @@ import type {
 } from '../contracts/chat';
 import { titleFromDescription, type BoardSnapshot, type TicketForm, type TicketPriority } from '../contracts/tickets';
 import { parsePlanParts } from '../core/plan-parts';
+import type { FollowupDraft } from '../core/followups';
 import { ticketRefsOf } from '../core/chat-ticket-refs';
 import { changedLinesOf, editsSummary, planDelta, planDeltaForModel, planSectionOf } from '../core/plan-delta';
 import type { PlanShadowStore } from './plan-shadow';
@@ -72,6 +73,11 @@ const TICKET_TEXT_CAP = 30_000;
 /** A named ticket's file in a mission turn, ceiling in characters (up to five ride one turn), and how many of its latest comments. */
 const NAMED_TICKET_CAP = 8_000;
 const NAMED_COMMENTS = 20;
+
+/** What filing a run's follow-up proposals did: the session written (null when there was nothing to file) and how many cards. */
+export type FollowupFiling =
+  | { readonly ok: true; readonly file: string | null; readonly filed: number }
+  | { readonly ok: false; readonly error: string };
 
 /** The result shape of a board mutation the confirm path executes. */
 export type ChatMutationResult =
@@ -319,6 +325,79 @@ export class ChatService implements ChatServicePort {
 
   async dismiss(input: { readonly file: string; readonly id: string }): Promise<ChatDecisionResult> {
     return this.decide(input, 'dismissed');
+  }
+
+  // --- worker follow-ups ---------------------------------------------------
+
+  /**
+   * Files a run's follow-up proposals as pending cards of one session of
+   * their own ("Follow-ups from T-0012"): one `createTicket` card per
+   * proposal, in the board's capture phase, naming the source ticket's
+   * repo. The iron rule holds — this writes the session file only; a
+   * ticket exists once the owner confirms its card (the shared decision
+   * path), and a dismissed card leaves nothing. Idempotent per run: a
+   * session of that title that already names the run is left alone (the
+   * engine restarts and the fleet change notices repeat).
+   */
+  async fileFollowups(input: {
+    readonly ticket: string;
+    readonly runId: string;
+    readonly drafts: readonly FollowupDraft[];
+  }): Promise<FollowupFiling> {
+    if (input.drafts.length === 0) {
+      return { ok: true, file: null, filed: 0 };
+    }
+    const found = await this.boardAndVault();
+    if (found === null) {
+      return { ok: false, error: 'no tickets vault detected' };
+    }
+    const { vault, snap } = found;
+    const first = snap.pipeline[0]?.id ?? null;
+    if (first === null) {
+      return { ok: false, error: snap.pipelineError ?? 'the pipeline is empty' };
+    }
+    const title = `Follow-ups from ${input.ticket}`;
+    for (const meta of await this.sessions()) {
+      if (meta.title !== title) {
+        continue;
+      }
+      const existing = await this.open(meta.file);
+      if (existing?.messages.some((m) => m.text.includes(input.runId)) === true) {
+        return { ok: true, file: meta.file, filed: 0 };
+      }
+    }
+
+    const source = snap.columns.flatMap((c) => c.tickets).find((t) => t.id === input.ticket) ?? null;
+    const repo = source?.meta.repo?.trim() ?? '';
+    const stamp = this.now();
+    const file = `${CHAT_DIR}/${chatFileName(stamp, title)}`;
+    const count = input.drafts.length;
+    let text = newSessionText(title, stamp);
+    text = appendMission(
+      text,
+      stamp,
+      `Run ${input.runId} of ${input.ticket}${source?.meta.title == null ? '' : ` (${source.meta.title})`} proposes ` +
+        `${String(count)} follow-up ${count === 1 ? 'ticket' : 'tickets'}. Nothing is created until you confirm a card.`,
+      null,
+    );
+    for (const draft of input.drafts) {
+      const priority =
+        draft.priority !== null && snap.priorities.order.includes(draft.priority) ? draft.priority : snap.priorities.default;
+      const origin = `Proposed by the worker of ${input.ticket} (run ${input.runId}).`;
+      const command: ChatCommand = {
+        kind: 'createTicket',
+        title: draft.title,
+        description: draft.why === '' ? origin : `${draft.why}\n\n${origin}`,
+        priority,
+        phase: first,
+        ...(repo === '' ? {} : { repo }),
+      };
+      text = appendProposal(text, stamp, summaryOf(command), command).text;
+    }
+    await this.deps.host.write(vault.id, file, text);
+    await this.commit(vault, [file], `tickets: follow-ups of ${input.ticket} proposed (${input.runId})`);
+    this.deps.host.announceChanges(vault.id, [file]);
+    return { ok: true, file, filed: count };
   }
 
   // --- the mission turn ----------------------------------------------------
@@ -734,7 +813,7 @@ export class ChatService implements ChatServicePort {
           title: command.title,
           description: command.description,
           priority: command.priority,
-          repo: null,
+          repo: command.repo ?? null,
           actor,
         });
         if (!result.ok) {

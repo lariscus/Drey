@@ -158,12 +158,14 @@ export function validateChatCommand(
     if (title === null || phase === null || priority === null) {
       return null;
     }
+    const repo = textOf(obj['repo']);
     return {
       kind: 'createTicket',
       title,
       description: textOf(obj['description']) ?? '',
       priority,
       phase,
+      ...(repo === null ? {} : { repo }),
     };
   }
   if (kind === 'transition') {

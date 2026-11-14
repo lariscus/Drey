@@ -479,7 +479,11 @@ speech bubble (**Model**), a rocket (**Mission Control**) and two heads
   Studio, an OpenAI-compatible server, OpenRouter, the Anthropic API or
   Z.ai GLM); with a CLI provider it answers with an error card saying so.
   The head's list button opens the earlier Mission Control chats, `+`
-  starts a new one.
+  starts a new one. When a worker finishes a step and found work that is
+  not part of it, a chat named *Follow-ups from T-0012* appears with one
+  card per proposal; **Confirm** creates that ticket in the first phase,
+  in the same repository, **Dismiss** leaves nothing. The worker creates
+  no ticket itself.
 - **1:1** opens a menu of the crew's agent personas. Your messages go into
   that persona's thread — a note to the persona; no run reads it until the
   1:1 becomes a conversation with the persona.

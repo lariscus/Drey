@@ -4663,3 +4663,29 @@ Every Accept goes through `acceptTicket`: a plain move from Ready to try to Done
 and push. A ticket in Done asks nothing of the owner, because the sign-off was on Ready to try. A
 board without a `ready` stage keeps its own checkpoints and the terminal column's Accept into the
 archive.
+
+## 6.99 A worker proposes follow-up tickets (req-176)
+
+```mermaid
+sequenceDiagram
+    participant W as Worker
+    participant S as Run supervisor (runner)
+    participant H as Change hub
+    participant F as FollowupService (engine)
+    participant C as ChatService
+    participant U as Owner
+    participant B as Board service
+    W-->>S: result event, last message ends "FOLLOWUPS:" + bullets
+    S->>S: parseFollowups, record run.info.followups
+    S-->>H: fleet change, the run is done
+    H->>F: scan
+    F->>C: fileFollowups {ticket, run, drafts} (once per run)
+    C->>C: write session "Follow-ups from T-0012", one pending createTicket card each, one commit
+    U->>C: Confirm a card
+    C->>B: createTicket (capture phase, the source ticket's repo, actor = owner)
+    Note over C,B: Dismiss writes the decision line only
+```
+
+The worker writes nothing to the board and cannot reach the chat: the proposal is text in its last
+message. The engine files it only after the run is `done`, and a ticket exists only after the owner's
+confirm, through the chat's one decision path.
