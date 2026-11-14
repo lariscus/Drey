@@ -366,7 +366,13 @@ treats absent as unknown):
   on fresh and on a resume that fell back fresh). A run whose worker
   ended its turn with `BLOCKED: <reason>` carries `blocked` (the
   reason) instead: no gate ran, no move was performed, and the chain
-  holds the ticket until the owner moves or starts it.
+  holds the ticket until the owner moves or starts it. A run whose last
+  message ended with `FOLLOWUPS:` and bullets (req-299) carries
+  `followups` (`[{title, why, priority}]`, at most five; absent when none,
+  emptied by a later result with none): once the run is `done`, the engine
+  files one pending Mission Control card per proposal in a session
+  `Follow-ups from T-0012` — the runner never writes them, and a ticket
+  exists only after the owner's confirm.
 
 `GET /report` groups these by ticket, phase and model (see the route
 table); the board's lanes show `ctx`/`turns`/`reads` chips per run (a
