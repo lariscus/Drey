@@ -57,6 +57,17 @@ describe('FreeSessionService (req-173, R12)', () => {
     expect(w.sends).toEqual([]);
   });
 
+  it("req-142: the persona's run-commands beats the vault's mode, the session's own choice beats both; without network: true the network is off", async () => {
+    const strict = { ...BEN, allowed: { spendAboveAllowance: false, runCommands: 'accept-edits' } } as Persona;
+    const open = { ...BEN, id: 'olga', allowed: { spendAboveAllowance: false, network: true } } as Persona;
+    const w = world('---\npermission-mode: bypass\n---\n', [strict, open]);
+    await w.service.start({ persona: 'ben', directory: 'E:\\T' }, 'drey:crew');
+    await w.service.start({ persona: 'ben', directory: 'E:\\T', permissionMode: 'bypass' }, 'drey:crew');
+    await w.service.start({ persona: 'olga', directory: 'E:\\T' }, 'drey:crew');
+    expect(w.starts.map((s) => s.permissionMode)).toEqual(['accept-edits', 'bypass', 'bypass']);
+    expect(w.starts.map((s) => s.network)).toEqual([false, false, undefined]);
+  });
+
   it('refuses a missing folder, a live worktree, an unknown persona and one without a harness — and starts nothing', async () => {
     const w = world();
     expect(await w.service.start({ persona: 'ben', directory: 'E:\\gone' }, 'x')).toMatchObject({ ok: false, error: expect.stringContaining('does not exist') });

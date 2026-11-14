@@ -137,6 +137,12 @@ export interface ProviderStart {
   readonly instruction: string;
   readonly model: string | null;
   readonly permissionMode: PermissionMode;
+  /** req-142: `false` = the persona may not reach the network; the adapter switches off what its harness can (ADR-0099). Absent = unrestricted. */
+  readonly network?: false;
+  /** req-185: the folders beyond `cwd` the worker may write (`worker-dirs.ts`); absent = none. */
+  readonly writeDirs?: readonly string[];
+  /** req-185: the run's own folder, where an adapter keeps a launch file (Claude Code's settings); absent = none is written. */
+  readonly runDir?: string;
   /** A previous run's session — the adapter resumes it when it can. */
   readonly resumeRef: string | null;
   /** Compact the resumed session before the first prompt (T-0049); only with a `resumeRef`. */

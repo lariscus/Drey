@@ -103,3 +103,12 @@ every re-run with git's "already checked out".
 ## Later change — the session's working directory is explicit (req-173, milestone 230, 2026-11-09)
 
 The working directory is a field of the session record (R12): a ticket run still works in its worktree under this ADR's home (`repos.md` `path:` + `<base>/<ticket-id>`), a review in its read-only checkout, a 1:1 in the tickets repository, and a **free session in the folder the owner named** — the tickets repository itself is allowed. A free session never prepares or removes a worktree, and its directory may not be the worktree of a live ticket run (`fleet/session/session-directory-rule.ts`); the cleanup surfaces of this ADR never touch a free session's folder.
+
+## Later change — a finished ticket's worktrees go (req-185, milestone 273, 2026-11-14)
+
+After its merge (You's `commit` leaving action) or its move into Done, a
+ticket's worktrees are removed with `git worktree remove` — the branch
+stays, a dirty tree is kept and reported
+([ADR-0099](0099-worker-trust-boundary-per-harness.md) point 5). The home
+itself stays where this ADR put it: the owner kept it (2026-11-14) rather than
+moving it under a machine-wide root (`specs/decisions.md`).

@@ -7,6 +7,7 @@
  */
 import type { PermissionMode } from '../protocol';
 import type { AcpConfigSetting, AcpModeChoice } from './acp-harness';
+import type { ProviderStart } from './contract';
 
 /** opencode's read-only agent: "Read-only agent for exploring the codebase and planning work before implementation." */
 export const OPENCODE_READ_ONLY_MODE = 'plan';
@@ -56,4 +57,28 @@ export function opencodeCapConfig(model: string | null, cap: number): string | n
   const modelID = stripVariant(model.slice(slashAt + 1).trim());
   const limit = { context: Math.floor(cap), output: Math.min(32_000, Math.floor(cap / 4)) };
   return JSON.stringify({ provider: { [providerID]: { models: { [modelID]: { limit } } } } });
+}
+
+/** The run's own permission rules for opencode (req-142): web tools denied without the network, every tool allowed in bypass; null when none. */
+export function opencodePermissionConfig(start: Pick<ProviderStart, 'permissionMode' | 'network'>): Record<string, string> | null {
+  const rules = {
+    ...(start.permissionMode === 'bypass' ? { '*': 'allow' } : {}),
+    ...(start.network === false ? { webfetch: 'deny', websearch: 'deny' } : {}),
+  };
+  return Object.keys(rules).length === 0 ? null : rules;
+}
+
+/** Said in the run's stream: opencode 2.0.32 does not list an injected config among its sources, so its rules are asked, not proven (ADR-0099). */
+export const OPENCODE_RULES_NOTE = 'run permissions asked through OPENCODE_CONFIG_CONTENT — opencode 2.0.32 does not confirm that source, so they are not proven; its shell keeps the network either way';
+
+/** The inline config a start launches with — the context cap and the run's permission rules — and its notes for the run's stream. */
+export function opencodeLaunchConfig(start: Pick<ProviderStart, 'model' | 'contextCap' | 'permissionMode' | 'network'>): { readonly content: string | null; readonly notes: readonly string[] } {
+  const cap = opencodeCapConfig(start.model, start.contextCap ?? 0);
+  const permission = opencodePermissionConfig(start);
+  const config = { ...(cap !== null ? (JSON.parse(cap) as Record<string, unknown>) : {}), ...(permission !== null ? { permission } : {}) };
+  const notes = [
+    ...(cap !== null ? [`context cap: ${Math.floor(start.contextCap!)} tokens — OpenCode compacts the session there`] : []),
+    ...(permission !== null ? [OPENCODE_RULES_NOTE] : []),
+  ];
+  return { content: Object.keys(config).length === 0 ? null : JSON.stringify(config), notes };
 }

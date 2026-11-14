@@ -1,4 +1,4 @@
-import type { Persona } from '../core/persona';
+import { networkFieldOf, personaRunAllowedOf, type Persona } from '../core/persona';
 import { noHarnessReason, personaHarnessOf } from './persona-harness';
 import type { CapabilityClass, ModelRow, RunRequest, WorkerProviderId } from './protocol';
 import { ONE_ON_ONE_TICKET } from './protocol-session';
@@ -53,6 +53,7 @@ export class OneOnOneRequestBuilder {
       baseRef: null,
       provider: harness.provider,
       permissionMode: 'read-only',
+      ...networkFieldOf(personaRunAllowedOf(persona)),
       model: harness.model,
       instruction: input.instruction,
       acceptance: [],

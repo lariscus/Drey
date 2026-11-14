@@ -95,6 +95,9 @@ import { cleanWorktrees, listOrphans, removeWorktree, type CleanupReport } from 
 import { unlinkShared } from '../fleet/worktrees';
 import { statusLogPathOf } from '../fleet/event-writer';
 import { legacyWorktreeBase, worktreeBaseFor, worktreePathFor, WORKTREES_DIR } from '../fleet/worktree-home';
+import { FinishedWorktrees } from '../fleet/orchestrate/finished-worktrees';
+import { GitWorktreeRemover } from '../fleet/git-worktree-remover';
+import { removeDoneWorktrees } from './finished-ticket-worktrees';
 import { reservedIgnoreEntries, withIgnoreEntries } from './reserved-ignore';
 import { dkTargetFor, retreatStages } from '../fleet/dk-target';
 import { trancheConfigOf } from './tranche-config';
@@ -103,7 +106,7 @@ import { type EngineHost, type EngineVaultChangeEvent, EngineVault, FleetPort } 
 import { handoverFromConfig, handoverOverrideKeys } from './handover-config';
 import type { EffectiveCrew } from '../fleet/config/layered-config-resolver';
 import { appendMemory, describeMemoryEntries, memoryPathFor, toggleMemoryPin } from './persona-store';
-import { EMPTY_PERSONA_SETTINGS, HUMAN_PERSONA_ID, humanPersona, isAgentPersona, loadPersonaSkills, personaFileText, parsePersonaFile, personaRef, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaSkill } from '../core/persona';
+import { EMPTY_PERSONA_SETTINGS, HUMAN_PERSONA_ID, humanPersona, isAgentPersona, loadPersonaSkills, personaFileText, parsePersonaFile, personaRef, personaRunAllowedOf, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaSkill } from '../core/persona';
 import { crewOrderOf, inCrewOrder, withCrewOrder } from '../core/crew-order';
 import { personaRunSettingsOf } from '../core/persona-settings';
 import { settingsAfter, type PersonaSettingsPatch } from '../contracts/persona-settings-patch';
@@ -289,6 +292,10 @@ export class TicketChangedError extends Error {
 export class EngineBoardService {
   private queueTail: Promise<unknown> = Promise.resolve();
   private readonly gitLocations = new Map<string, RepoLocation | null>();
+  /** req-185: a finished ticket's worktrees go (branch kept, dirty ones kept). */
+  private get finishedWorktrees(): FinishedWorktrees {
+    return new FinishedWorktrees(new GitWorktreeRemover(this.git));
+  }
   private emitDebounce: ReturnType<typeof setTimeout> | null = null;
   /** Who hears the debounced board change besides the renderer (the remote, req-66). */
   private readonly changeListeners = new Set<() => void>();
@@ -2823,7 +2830,9 @@ export class EngineBoardService {
       return (await this.commitActionMissing(vault, card.id)) ?? this.startCommitStep(card.id);
     }
     const terminal = snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done';
-    return this.writeChainCursor(card, decision.kind === 'done' ? { done: terminal } : { at: decision.at }, { line: decision.line, actor });
+    const written = await this.writeChainCursor(card, decision.kind === 'done' ? { done: terminal } : { at: decision.at }, { line: decision.line, actor });
+    const warning = written.ok && decision.kind === 'done' ? await this.removeWorktreesOfDone(card) : null;
+    return warning === null || !written.ok ? written : { ...written, warning };
   }
 
   /**
@@ -2917,6 +2926,9 @@ export class EngineBoardService {
       const written = await this.writeChainCursor(card, last ? { done: terminal } : { at: input.position + 1 }, { line: `Mission Control's entry at position ${input.position} of ${chain.length} is done — her card was confirmed`, actor: this.owner });
       if (written.ok) {
         await this.noteStatus(card, 'resolved', { key: MISSION_ENTRY_KEY }, this.owner);
+        if (last) {
+          await this.removeWorktreesOfDone(card);
+        }
       }
       return written;
     });
@@ -2943,7 +2955,16 @@ export class EngineBoardService {
         if (store === null || record === null || record.stage !== ACTIVE_STAGE) {
           return;
         }
-        await this.putRecord(store, record, recordToBoardFile(record, card.phase).text, { phase: card.phase }).catch((error: unknown) => this.host.log(`chain: ${card.id} could not be moved to done — ${messageOf(error)}`, 'warn'));
+        const moved = await this.putRecord(store, record, recordToBoardFile(record, card.phase).text, { phase: card.phase }).then(
+          () => true,
+          (error: unknown) => {
+            this.host.log(`chain: ${card.id} could not be moved to done — ${messageOf(error)}`, 'warn');
+            return false;
+          },
+        );
+        if (moved) {
+          await this.removeWorktreesOfDone(card);
+        }
       });
     }
   }
@@ -3029,6 +3050,9 @@ export class EngineBoardService {
         }
         const snap = await this.snapshot();
         const card = findOnBoard(snap, ticketId);
+        if (card !== null && card.meta.chain !== undefined) {
+          return this.settleChainCommit(card, snap, runId);
+        }
         if (card !== null && card.phase !== READY_STATE && snap.pipeline.some((p) => p.id === card.phase && p.claim)) {
           return { ok: true, pending: true };
         }
@@ -3050,31 +3074,43 @@ export class EngineBoardService {
   }
 
   /**
+   * D-72 (found by milestone 273's e2e): a chain ticket's sign-off (req-257) is
+   * the commit at You's last entry — once it landed the chain is through, and
+   * the engine books the ticket into Done as the owner (dk never lets the
+   * run's agent release into the terminal stage). Waits while the runner
+   * still holds the claim (D-32); nothing when the ticket is in Done already.
+   */
+  private async settleChainCommit(card: TicketCard, snap: BoardSnapshot, runId: string): Promise<BoardMutationResult & { pending?: true }> {
+    if (card.meta.claimedBy !== null) {
+      return { ok: true, pending: true };
+    }
+    const terminal = snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done';
+    if (card.phase === terminal) {
+      return { ok: true };
+    }
+    return this.writeChainCursor(card, { done: terminal }, { line: `commit step finished (run ${runId}) — the chain is through`, actor: this.owner });
+  }
+
+  /**
    * The clean-worktree removal of a terminal Accept (req-75 W3): the
    * T-0044 `worktree remove` path with `force: false` — a dirty tree
    * stays and says so; a live run keeps it untouched. Never a failed
    * accept: the ticket is already archived.
    */
   private async removeWorktreeAfterAccept(vault: EngineVault, snap: BoardSnapshot, card: TicketCard): Promise<string | null> {
-    if (card.meta.repo === null) {
-      return null;
-    }
-    const repo = snap.repos.find((r) => r.name === card.meta.repo) ?? null;
-    if (repo === null || repo.path === null) {
-      return null;
-    }
     const runs = await this.fleetRecords();
-    if (runs.some((r) => r.ticketId === card.id && !['done', 'stopped', 'failed'].includes(r.state))) {
-      return 'A run is live on the ticket — the worktree was kept';
+    const liveRun = runs.some((r) => r.ticketId === card.id && !['done', 'stopped', 'failed'].includes(r.state));
+    return removeDoneWorktrees({ finished: this.finishedWorktrees, vaultPath: vault.path, repos: snap.repos, card, liveRun });
+  }
+
+  /** req-185: a chain ticket the engine or the owner booked into Done; what was kept is a log line. */
+  private async removeWorktreesOfDone(card: TicketCard): Promise<string | null> {
+    const vault = await this.detect();
+    const warning = vault === null ? null : await this.removeWorktreeAfterAccept(vault, await this.snapshot(), card);
+    if (warning !== null) {
+      this.host.log(`${card.id}: ${warning}`, 'warn');
     }
-    const outcome = await removeWorktree(this.git, repo.path, worktreePathFor(vault.path, repo, card.id), {
-      force: false,
-      links: repo.link,
-    });
-    if (outcome.ok) {
-      return null;
-    }
-    return outcome.dirty === true ? 'The worktree has uncommitted changes and was kept' : outcome.error;
+    return warning;
   }
 
   /**
@@ -3540,6 +3576,7 @@ export class EngineBoardService {
         memory: await loader.memory(personaResolution.persona.id),
         skills: await this.personaSkillsFor(vault, personaResolution.persona),
         run: personaRunSettingsOf(personaResolution.persona),
+        allowed: personaRunAllowedOf(personaResolution.persona),
       };
     }
     const composed = composeRunRequest({

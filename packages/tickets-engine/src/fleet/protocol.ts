@@ -167,6 +167,13 @@ export interface RunRequest {
   }[];
   readonly provider: WorkerProviderId;
   readonly permissionMode: PermissionMode;
+  /**
+   * req-142: `false` = the run's persona may not reach the network (its
+   * `allowed:` lacks `network: true`) — each harness switches off what it
+   * can (ADR-0099). Absent = unrestricted: a run without a persona, a
+   * record from before req-142.
+   */
+  readonly network?: false;
   /** Provider model pin, when the assignment names one (`worker@provider/model`). */
   readonly model: string | null;
   /** The composed instruction (prompt template + ticket context, plugin-side). */

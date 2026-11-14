@@ -75,6 +75,17 @@ folder at the path would poison the next prepare.
 - **Per ticket:** the card menu's "Remove worktree…" — refuses a dirty
   tree unless the owner confirms the armed second click; refuses a live
   run; appends the ticket's Log line (one commit).
+- **After the merge or Done (req-185, milestone 273, ADR-0099):** a
+  finished ticket's worktrees go by themselves — `git worktree remove`
+  without `--force` for the ticket's repo and each further repo
+  (`orchestrate/finished-worktrees.ts`), the branch stays. The commit run
+  (You's `commit` leaving action) removes them at its green end and notes
+  each outcome on the run (`worktree removed: <path> (the branch t/<id>
+  stays)` / `worktree kept: <path> — it has uncommitted changes`); the
+  engine does the same when it books a chain ticket into Done (the owner's
+  last Accept, a chain that is through, Mission Control's last entry) and on
+  the old terminal Accept, a kept tree being the owner's warning. A live run
+  on the ticket keeps them; a folder that is not there is nothing to do.
 - **Global:** "Clean up worktrees" in the panel header — removes every
   worktree whose ticket has no live run (dirty ones kept and reported),
   then prunes every mapped repo; finally an unregistered folder under a
@@ -1494,7 +1505,7 @@ windows exist only in stream-json.
 | Claude Code | `claude -p --input-format stream-json …` | `claude` login (a slot: `CLAUDE_CONFIG_DIR`) | control interrupt | `--resume` | — (headless permission mode) | `QUESTION:` marker | per call, cost, quota windows | `--permission-mode plan` |
 | opencode | `opencode acp` | `opencode auth login` (an ACP start without a login answers `auth_required`; the free `opencode/*` models need none) | `session/cancel` | `session/resume`, else `session/load` | `session/request_permission` when opencode's own `permission` config says `ask` | `question` tool → `elicitation/create` form | per turn (prompt reply); context window and session cost (`usage_update`) | `plan` mode |
 | Kimi Code | `kimi acp` | `kimi` login (a slot: `KIMI_HOME`) | `session/cancel` | `session/load` | `session/request_permission` | AskUserQuestion (a permission request) | per call (wire log); cost from the price table | `plan` mode (2.5.2) |
-| Copilot CLI | `copilot --acp --stdio [--model <id>] [--allow-all-tools]` | `copilot login` (a slot: `COPILOT_HOME`) | `session/cancel` (github/copilot-cli#4555: a prompt may abort its background sub-agents) | `session/resume`, else `session/load` | `session/request_permission` if the installed version sends it (#845); an unattended start allows all tools at launch | `elicitation/create` if it sends one | the prompt reply's `usage` if present; slots counted | none documented — nothing allowed up front, a stream note |
+| Copilot CLI | `copilot --acp --stdio [--model <id>] [--allow-all-tools] [--add-dir <dir>]… [--allow-all-urls]` | `copilot login` (a slot: `COPILOT_HOME`) | `session/cancel` (github/copilot-cli#4555: a prompt may abort its background sub-agents) | `session/resume`, else `session/load` | `session/request_permission` if the installed version sends it (#845); an unattended start allows all tools at launch | `elicitation/create` if it sends one | the prompt reply's `usage` if present; slots counted | none documented — nothing allowed up front, a stream note |
 
 Copilot CLI fixes its settings at startup, not per session: the model rides
 `--model` (Settings lists no Copilot models; the id is typed), the tool
@@ -1520,6 +1531,36 @@ What the removed `opencode serve` adapter had and ACP does not carry:
 re-attaching a worker that outlived its runner (req-205), live text deltas
 (req-204), a steer queued behind the running turn instead of cancelling it
 (req-206), per-model-call telemetry (req-207).
+
+### The worker's boundary — permission mode, network, folders (req-142, req-185, ADR-0099)
+
+The persona's `allowed:` decides two things per run (milestone 273):
+
+- **`run-commands: accept-edits | bypass`** is the run's `permissionMode`
+  over the crew's (`request-assemble.ts`); a review stays `read-only`. A free
+  session takes its own choice, then the persona's, then the crew's; a 1:1
+  stays read-only.
+- **`network: true`** keeps the network open; without it the request
+  carries `network: false` (absent on a run without a persona and on older
+  records = unrestricted).
+
+The folders a worker may write beside `cwd` (`worker-dirs.ts`): the ticket
+file's folder (`_workcopy/` on a store, the ticket's own folder on the files
+backend) and the further repos' worktrees — never the runner's run folder
+(it holds the vault token). Per harness:
+
+| Harness | Folders | `network: false` | `bypass` |
+|---|---|---|---|
+| Claude Code | `--add-dir <dirs…>` + `--settings <run>/claude-settings.json` with `blockWritesOutsideWorkingDirectories` (not on a read-only run) | `--disallowedTools WebFetch WebSearch` + the same deny rules — hold in bypass | `--permission-mode bypassPermissions` |
+| Copilot CLI | `--add-dir <dir>` each (it confines to `cwd` itself) | no `--allow-all-urls`: each URL waits for the owner's approval | nothing more (`--allow-all-paths` would lift the folder fence) |
+| opencode | not fenced (`external_directory` unproven) | `webfetch`/`websearch` denied in `OPENCODE_CONFIG_CONTENT` — **not proven** (2.0.32 lists no such source); the stream says so | `"*": "allow"` in the same config |
+| Kimi Code | not fenced | **cannot** — its web tools live in its own `config.toml`; the stream says so | session mode `yolo` |
+
+Reads stay open everywhere. **No harness fences a shell command on native
+Windows**: `npm install`, `curl` or a script reach the network and the disk
+the OS user can. Claude Code's OS sandbox (macOS/Linux only) is not used — it
+would also fence off the repository's `.git` the worker commits into. The
+spawner quotes an argument with a space on Windows (`procs.ts` `shellArg`).
 
 ### The vault over MCP (req-167, ADR-0094)
 

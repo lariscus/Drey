@@ -1071,7 +1071,10 @@ ticket stands:
 - **In Done** it is the final report: **What was delivered** first (the
   ticket's `## Result`, when a run wrote one), then the changes. The only button is **Archive**, which
   files the ticket away and removes its worktree when clean (a dirty
-  one stays and says so).
+  one stays and says so). On the persona board a ticket's worktrees go by
+  themselves once its branch is merged (your sign-off's commit) or it
+  reaches Done — the branch stays; a worktree with uncommitted changes is
+  kept, and the run or a warning names it.
 - While an agent works the ticket, there is no card.
 
 The strip at the top of the card stays when you fold it with the chevron
@@ -1792,8 +1795,16 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   **Reach the network**, **Change notes where the project allows** — the project
   names the vaults, so the link *Vaults are set per project* opens *Settings →
   Projects*; see *The crew's vault* — and **Spend above allowance**, past a
-  ticket's allowance — hover a row for what it means; the notes and allowance
-  choices apply to runs now, the commands and network choices are recorded for the runner). On the right,
+  ticket's allowance — hover a row for what it means). Every choice applies
+  to the persona's next run. **Run commands** picks the harness permission
+  mode (*Accept edits* or *Bypass*; *Crew setting* leaves the crew's). Without
+  **Reach the network** the persona's workers lose what their harness can take
+  away: Claude Code its web search and fetch, Copilot CLI asks you for every
+  web address; opencode is asked to drop its web tools, Kimi cannot be — and on
+  Windows no harness stops a shell command (`npm install`, `curl`) from
+  reaching the network. A writing worker's file tools write only its worktree,
+  its ticket's file and the ticket's other worktrees, where the harness
+  supports it (Claude Code, Copilot CLI). On the right,
   **Instructions** is the persona's `prompt.md` in the same editor your notes
   use — Live Preview or **Source**, with the formatting buttons above it — and
   the line above it counts what a run of this persona starts with (`≈ 2,490

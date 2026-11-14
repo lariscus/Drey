@@ -2,6 +2,7 @@ import type { ProcessTable } from '../ports/process-table';
 import { ONE_ON_ONE_VAULT_TOOLS } from '../one-on-one-toolset';
 import type { RunInfo } from '../protocol';
 import { isOneOnOne, isTicketRun } from '../protocol-session';
+import { workerWriteDirsOf } from '../worker-dirs';
 import type { NormalizedEvent, ProviderAdapter, UsageTotals, WorkerHandle } from '../harness/contract';
 import type { BackgroundWork } from './background-work';
 import type { EventFold } from './event-fold';
@@ -94,6 +95,9 @@ export class ProcessSupervisor {
       instruction: plan.instruction,
       model: request.model,
       permissionMode: request.permissionMode,
+      ...(request.network === false ? { network: false as const } : {}),
+      writeDirs: workerWriteDirsOf(request),
+      runDir: run.dir,
       contextCap: this.deps.settings.contextCap(request.model),
       resumeRef: plan.resumeRef,
       ...(plan.compactFirst === true ? { compactFirst: true } : {}),

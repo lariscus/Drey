@@ -1,6 +1,6 @@
 import { ticketProject } from '../../contracts/projects';
 import type { BoardSnapshot, PipelinePhase, RepoRef, TicketCard } from '../../contracts/tickets';
-import { personaModelGuess, splitPoolEntry, type Persona } from '../../core/persona';
+import { personaModelGuess, personaRunAllowedOf, splitPoolEntry, type Persona } from '../../core/persona';
 import { personaRunSettingsOf } from '../../core/persona-settings';
 import { TicketsGit } from '../../core/tickets-git';
 import { isAutoPhase, nextPhaseIdOf } from '../chain';
@@ -274,6 +274,7 @@ export class TicketDispatch {
         memory: entry?.memory ?? '',
         skills: entry?.skills ?? [],
         run: personaRunSettingsOf(persona),
+        allowed: personaRunAllowedOf(persona),
       },
     };
   }

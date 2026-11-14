@@ -825,7 +825,7 @@
   "persona.allowed.commands.accept_edits": "Accept edits",
   "persona.allowed.commands.bypass": "Bypass",
   "persona.allowed.network": "Reach the network",
-  "persona.allowed.network_tip": "Web search and fetch, package installs.",
+  "persona.allowed.network_tip": "Web search and fetch. Shell commands keep the network.",
   "persona.allowed.spend": "Spend above allowance",
   "persona.allowed.spend_tip": "Otherwise the run waits for you.",
   "persona.allowed.vaults_link": "Vaults are set per project",
