@@ -13,6 +13,7 @@
  */
 import path from 'node:path';
 import { SHIPPED_PROMPTS_DIR } from '../core/default-prompts';
+import { FOLLOWUPS_MARKER, MAX_FOLLOWUPS } from '../core/followups';
 import { loadPromptFragments, readPromptFile, type PromptFragments } from '../core/prompt-file';
 import { BLOCKED_MARKER, QUESTION_MARKER, SEND_BACK_MARKER } from './protocol';
 
@@ -38,6 +39,12 @@ export interface DisciplineTexts {
   readonly readOnly: string;
   /** Writing runs: where the ticket lives and who writes which section. */
   readonly ticketFile: string;
+  /**
+   * req-299: dispatched runs that may propose follow-up tickets (every
+   * non-interactive run but a scout): work beyond the step goes into a final
+   * `FOLLOWUPS:` list, never into the diff.
+   */
+  readonly followups: string;
   /** Every brief: the language of what the owner reads. */
   readonly language: string;
   /** Every brief: this brief beats the repo's instructions. */
@@ -64,6 +71,7 @@ const DISCIPLINE_FILES: Readonly<Record<DisciplineName, string>> = {
   writing: 'writing.md',
   readOnly: 'read-only.md',
   ticketFile: 'ticket-file.md',
+  followups: 'followups.md',
   language: 'language.md',
   precedence: 'precedence.md',
   chain: 'chain.md',
@@ -72,7 +80,12 @@ const DISCIPLINE_FILES: Readonly<Record<DisciplineName, string>> = {
 /** Reads one discipline file with the marker placeholders substituted. */
 async function readDiscipline(dir: string, file: string): Promise<string> {
   const text = await readPromptFile(dir, path.join('disciplines', file), 'discipline');
-  return text.replaceAll('{{question}}', QUESTION_MARKER).replaceAll('{{blocked}}', BLOCKED_MARKER).replaceAll('{{sendBack}}', SEND_BACK_MARKER);
+  return text
+    .replaceAll('{{question}}', QUESTION_MARKER)
+    .replaceAll('{{blocked}}', BLOCKED_MARKER)
+    .replaceAll('{{sendBack}}', SEND_BACK_MARKER)
+    .replaceAll('{{followups}}', FOLLOWUPS_MARKER)
+    .replaceAll('{{maxFollowups}}', String(MAX_FOLLOWUPS));
 }
 
 /** Every discipline text and fragment, from the shipped prompts dir by default. */

@@ -53,6 +53,15 @@ describe('validateChatCommand', () => {
     ).toEqual({ kind: 'createTicket', title: 'Tidy worktrees', description: '', priority: 'normal', phase: 'ideas' });
   });
 
+  it('keeps a createTicket repo (req-299): trimmed, one line, blank or junk reads as none', () => {
+    const base = { kind: 'createTicket', title: 'Tidy', phase: 'inbox', priority: 'normal' };
+    expect(validateChatCommand({ ...base, repo: '  drey ' })).toMatchObject({ repo: 'drey' });
+    expect(validateChatCommand({ ...base, repo: '   ' })).not.toHaveProperty('repo');
+    expect(validateChatCommand({ ...base, repo: 'a\nb' })).not.toHaveProperty('repo');
+    expect(validateChatCommand({ ...base, repo: 42 })).not.toHaveProperty('repo');
+    expect(validateChatCommand({ ...base, repo: 'x'.repeat(81) })).not.toHaveProperty('repo');
+  });
+
   it('refuses shapes outside the union', () => {
     expect(validateChatCommand({ kind: 'archive', id: 'T-0086' })).toBeNull();
     expect(validateChatCommand({ kind: 'setPriority', id: 'T-0086', priority: 'yesterday' })).toBeNull();

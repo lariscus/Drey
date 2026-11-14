@@ -23,6 +23,7 @@ describe('the discipline files', () => {
       'asking.md',
       'chain.md',
       'completion.md',
+      'followups.md',
       'handover.md',
       'interactive.md',
       'language.md',
@@ -68,6 +69,10 @@ describe('the discipline files', () => {
     expect(texts.signals).toContain('`QUESTION:`');
     expect(texts.signals).toContain('`FRICTION: <what was missing>`');
     expect(texts.asking).toContain('`QUESTION:`');
+    // req-299: the follow-ups rule names the marker the runner parses and the bound, never a placeholder.
+    expect(texts.followups).toMatch(/^Follow-ups:/);
+    expect(texts.followups).toContain('`FOLLOWUPS:`');
+    expect(texts.followups).toContain('at most 5 bullets');
     // The parsed plan shapes (acceptanceCommands, parsePlanParts) are spelled in the one plan format.
     expect(fragments.planFormat).toContain('### Acceptance criteria');
     expect(fragments.planFormat).toContain('### Parts');

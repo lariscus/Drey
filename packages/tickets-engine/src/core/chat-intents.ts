@@ -22,6 +22,12 @@ function projectIdOf(value: unknown): string | null {
   return PROJECT_ID_PATTERN.test(id) ? id : null;
 }
 
+/** req-299: a createTicket's repo — one line, at most 80 characters; blank or junk reads as none, never a refusal. */
+function repoNameOf(value: unknown): string | null {
+  const name = typeof value === 'string' ? value.trim() : '';
+  return /^[^\r\n\0]{1,80}$/.test(name) ? name : null;
+}
+
 /** The parsed envelope — what a mission turn amounted to. */
 export interface ChatEnvelope {
   /** The mission's spoken reply; '' when the envelope carries only commands. */
@@ -167,6 +173,7 @@ export function validateChatCommand(
       return null;
     }
     const project = projectIdOf(obj['project']);
+    const repo = repoNameOf(obj['repo']);
     return {
       kind: 'createTicket',
       title,
@@ -174,6 +181,7 @@ export function validateChatCommand(
       priority,
       phase,
       ...(project === null ? {} : { project }),
+      ...(repo === null ? {} : { repo }),
     };
   }
   if (kind === 'transition') {

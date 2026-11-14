@@ -19,7 +19,7 @@ abstraction in `electron/llm/` (ADR-0047).
 | Default crew personas (the seed) | `packages/tickets-engine/personas/<id>/{persona,prompt}.md` | `services/shipped-crew-files.ts` |
 | Mission Control's persona prompt (Pia, req-269) | the vault's `tickets/_meta/personas/<the kind: mission persona>/prompt.md`, seeded from `packages/tickets-engine/personas/pia/prompt.md` — the owner's to edit | `services/mission-persona-prompt.ts` (every Mission Control turn) |
 | Crew chat prompts (Mission Control, Shape, Flow, Aggregator) | `packages/tickets-engine/prompts/crew/*.md` | `services/crew-prompts.ts` (`loadCrewPrompts`) |
-| Run brief disciplines (working, writing, read-only, ticket-file, handover, language, precedence, completion, dialog, scout, signals, asking — req-280) | `packages/tickets-engine/prompts/disciplines/*.md` — `{{question}}`/`{{blocked}}` are the protocol markers, substituted on load | `fleet/discipline-texts.ts` (`loadDisciplineTexts`) |
+| Run brief disciplines (working, writing, read-only, ticket-file, handover, follow-ups, language, precedence, completion, dialog, scout, signals, asking — req-280, req-299) | `packages/tickets-engine/prompts/disciplines/*.md` — `{{question}}`/`{{blocked}}`/`{{sendBack}}`/`{{followups}}`/`{{maxFollowups}}` are the protocol markers and the bound, substituted on load | `fleet/discipline-texts.ts` (`loadDisciplineTexts`) |
 | Shared fragments (the plan format, the chain grammar — req-280) | `packages/tickets-engine/prompts/fragments/*.md`, pulled into a prompt by `{{plan-format}}` / `{{chain-grammar}}` | `core/prompt-file.ts` (`loadPromptFragments`, `expandFragments`) |
 | Assistant role texts (`ASK_SYSTEM`, `askToolsSystem`, `liveEditSystem`, `ASK_ANSWER_SYSTEM`) | `plugins/assistant/main/ask-prompts.ts` (code; `system-prompt.ts` composes around them) | direct import |
 | Base app built-in templates (Autotag, search summary, lossless format) | `shared/config/schema.ts` (code — the renderer needs them synchronously; the user's copies live in app-config) | direct import |
@@ -459,6 +459,7 @@ is a discipline file the composer appends by run kind
 | `read-only.md` | `Read-only:` | a review (`reviewCheckout`) or a run whose persona is instructed read-only — `readonly:` on its record, else the `reviewer` and `tester` roles' default (`isReadOnlyRun`, req-258) |
 | `ticket-file.md` | `The ticket file named above …` | writing runs |
 | `handover.md` | `Handover:` | writing runs outside a dialog |
+| `followups.md` | `Follow-ups:` | every non-dialog run but a scout — writing or read-only, chain or column (req-299), after the handover (or the read-only rule), before the language |
 | `language.md` | `Language:` | every run, scout included |
 | `precedence.md` | `Precedence:` | every run, scout included |
 | `completion.md` | `Completion discipline:` | non-dialog ship runs, in the closing |
@@ -472,7 +473,7 @@ Order of a ship brief: the repo's instructions → the step (or persona)
 prompt with its fragments expanded → `## Skills` → `## Plan` → who and
 where (ticket, persona line, checkout line, phase, ticket-file line,
 description) → the rules (working; read-only, or writing + ticket-file +
-handover; language; precedence) → memory, earlier handover, diff stat, gate
+handover; follow-ups outside a dialog; language; precedence) → memory, earlier handover, diff stat, gate
 failure → the gate commands → completion or dialog → signals → the chain
 (a chain run, req-257) → asking. A
 resume repeats only the part from memory on (the rules sit in the stable
@@ -589,6 +590,39 @@ commands in its brief: the runner judges its hand-over structurally.
   bridge's envelope reader drops arrays), applies a draft's edits
   (`core/prompt-edits.ts`: each `old` must match exactly once) and stores
   the resulting text; a draft whose edits do not apply is dropped.
+
+## The worker's follow-up proposals (req-299)
+
+`prompts/disciplines/followups.md` (version 1) rides every dispatched run's
+brief except a scout and a dialog (the table above; `fleet/instruction.ts`
+`followupsPart`). **Decided with req-299:** every persona and every chain
+position is told — the reviewer and the tester find out-of-scope defects as
+often as the builder — and the cases left out are those whose final message
+is not a step's end (a dialog, a 1:1, a free session, Pia's turn) or whose
+report is the deliverable (the scout; req-302 may extend it). A persona-level
+switch was not built: a worker that proposes nothing costs nothing. As shipped
+(`{{followups}}` = `FOLLOWUPS:`, `{{maxFollowups}}` = 5):
+
+> Follow-ups: work you found that is not part of this step (a defect
+> elsewhere, a refactor the plan did not name) stays out of your diff.
+> Propose it instead: end your final message with `FOLLOWUPS:` and, on the
+> lines below, at most 5 bullets, each "- <title>" with optional indented
+> "why: <one line>" and "priority: <word>". The owner confirms the ones
+> worth a ticket in Mission Control; you create nothing yourself. Nothing to
+> propose: write no marker.
+>
+> Example: `FOLLOWUPS:` then `- Cache the heading tree per note` with the
+> indented lines `why: the outline rebuilds it on every keystroke
+> (src/app/outline.ts)` and `priority: low`.
+
+The reply is parsed by `parseFollowups` (`core/followups.ts`) from the
+`result` event of the turn — no model is involved beyond the worker's own
+message; the grammar, the bounds and what becomes of the list are in
+`specs/ticket-schema.md`, "Worker follow-ups". The cards are written by the
+engine, not by a Mission Control turn: Pia's prompt (`mission.md`) is
+unchanged; the `createTicket` example there still lists `project` only — a
+card's `repo` is for the filer (and a hand-written session), not something
+Pia is asked to guess.
 
 ## The default crew's persona prompts (req-256, milestone 235; req-269, milestone 246)
 

@@ -6632,3 +6632,36 @@ sequenceDiagram
     W-->>E: the plan with a ### Chain chapter (and its reason under Decisions)
     E->>E: the chain is applied at the run's green end (validateChain, the cursor stays locked)
 ```
+
+## 6.144 A worker proposes follow-up tickets; Mission Control files them as cards (req-299, milestone 276)
+
+```mermaid
+sequenceDiagram
+    participant W as Worker (a chain position)
+    participant S as Run supervisor (runner)
+    participant H as Change hub
+    participant F as FollowupService (engine)
+    participant G as FollowupFiler
+    participant U as Owner
+    participant C as ChatService
+    participant B as Board service
+    W-->>S: result event, the last message ends "FOLLOWUPS:" + bullets
+    S->>S: EventFold: parseFollowups, run.info.followups (cleared by a later result with none)
+    S->>S: the gate decides — green: the ticket moves on, the run is done; red or stopped: no filing
+    S-->>H: fleet change
+    H->>F: scan (once per run per process; only state done, ended within the hour)
+    F->>G: file {ticket, run, drafts}
+    G->>G: earlier "Follow-ups from T-0012" sessions: this run named? which titles already proposed?
+    G->>G: write the session, one pending createTicket card per new proposal, one commit on the engine's git queue
+    U->>C: Confirm a card (Mission Control)
+    C->>B: createTicket (capture phase, the source's repo and project, actor = the chat)
+    Note over C,B: Dismiss writes the decision line only
+```
+
+The worker writes nothing to the board and cannot reach the chat: the proposal is text in its last message,
+and the rule that asks for it is a discipline of the run brief (`prompts/disciplines/followups.md`, every
+dispatched run but a dialog and a scout). The engine files it only after the run is `done` — a red gate that
+sends the ticket back (milestone 274) leaves the run `failed`, so the position that runs again proposes
+again — and the filer writes on the same `TicketsGit` queue as the closing round's persona commits
+(milestone 272), so the two never meet at `index.lock`. A ticket exists only after the owner's confirm,
+through the chat's one decision path.

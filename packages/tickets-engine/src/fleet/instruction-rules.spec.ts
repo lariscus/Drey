@@ -74,6 +74,18 @@ describe('composeInstruction — the shared rules by run kind (req-280)', () => 
     expect(text).not.toContain(D.completion);
   });
 
+  it('the follow-ups rule rides every dispatched run, writing or read-only, once — not a dialog, not a resume (req-299)', () => {
+    const writing = composeInstruction(input());
+    expect(count(writing.text, D.followups)).toBe(1);
+    expect(writing.text).toContain('`FOLLOWUPS:`');
+    expect(writing.text.indexOf(D.handover)).toBeLessThan(writing.text.indexOf(D.followups));
+    expect(writing.text.indexOf(D.followups)).toBeLessThan(writing.text.indexOf(D.language));
+    expect(count(composeInstruction(input({ reviewCheckout: 'V:/vault/_worktrees/T-0001-review' })).text, D.followups)).toBe(1);
+    expect(count(composeInstruction(input({ personaId: 'tessa', personaRole: 'tester', readOnly: true })).text, D.followups)).toBe(1);
+    expect(composeInstruction(input({ interactive: 'plan' })).text).not.toContain(D.followups);
+    expect(writing.continuation).not.toContain(D.followups);
+  });
+
   it('a resume repeats the closing (gate, completion, signals) but not the shared rules', () => {
     const composed = composeInstruction(input());
     expect(composed.continuation).toContain(D.signals);
@@ -125,5 +137,6 @@ describe('composeScoutInstruction — the shared rules of an exploration (req-28
     }
     expect(text).not.toContain(D.writing);
     expect(text).not.toContain(D.handover);
+    expect(text).not.toContain(D.followups); // req-299 (decided): a scout's report is its deliverable; req-302 revisits
   });
 });

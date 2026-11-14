@@ -93,4 +93,22 @@ describe('EventFold — the worker events folded into the record', () => {
       expect((await storedRecord(dirs.fleet, runId)).info).toMatchObject({ execMs: 10 * 60_000, execSince: null });
     });
   });
+
+  // --- req-299: the worker's follow-up proposals ---------------------
+
+  it('a result that ends with FOLLOWUPS: lands the proposals on the record and in run.json; a later result without them clears them', async () => {
+    const { sup, adapter } = harness(dirs.fleet);
+    const runId = await startRun(sup, request());
+    const fire = adapter.starts[0]!.onEvent;
+    fire({ ts: '2026-10-17T12:00:00Z', kind: 'note', text: 'working' });
+    await waitFor(() => expect(sup.get(runId)?.lastActivity).toBe('2026-10-17T12:00:00Z'));
+    expect(sup.get(runId)?.followups).toBeUndefined(); // a run that never proposed keeps the key out of its record
+
+    fire({ ts: '2026-10-17T12:01:00Z', kind: 'result', text: 'Done.\nFOLLOWUPS:\n- Cache the tree\n  why: slow\n  priority: low' });
+    await waitFor(() => expect(sup.get(runId)?.followups).toEqual([{ title: 'Cache the tree', why: 'slow', priority: 'low' }]));
+    await waitFor(async () => expect((await storedRecord(dirs.fleet, runId)).info.followups).toHaveLength(1));
+
+    fire({ ts: '2026-10-17T12:02:00Z', kind: 'result', text: 'Fixed what the owner asked in the steer.' });
+    await waitFor(() => expect(sup.get(runId)?.followups).toEqual([]));
+  });
 });

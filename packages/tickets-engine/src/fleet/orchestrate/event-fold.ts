@@ -1,3 +1,4 @@
+import { parseFollowups } from '../../core/followups';
 import type { RunInfo } from '../protocol';
 import { MEMORY_WRITE_TOOL } from '../protocol-closing';
 import type { NormalizedEvent } from '../harness/contract';
@@ -23,6 +24,24 @@ function copiedFields(event: NormalizedEvent): Partial<RunInfo> {
   return out as Partial<RunInfo>;
 }
 
+/**
+ * The `followups` a `result` event settles on the record (req-299): what the
+ * final message proposed, and — only when an earlier turn had proposed some —
+ * an empty list when a later message proposes none, so a steered run does not
+ * keep stale proposals. Nothing for every other event and for a run that
+ * never proposed (`run.json` stays byte-identical).
+ */
+function followupsPatch(info: RunInfo, event: NormalizedEvent): Pick<RunInfo, 'followups'> | Record<string, never> {
+  if (event.kind !== 'result') {
+    return {};
+  }
+  const drafts = parseFollowups(event.text ?? '');
+  if (drafts.length > 0) {
+    return { followups: drafts };
+  }
+  return (info.followups ?? []).length > 0 ? { followups: [] } : {};
+}
+
 /** The record after one event: activity, the copied fields, the wait, the telemetry, the busy clock. */
 export function foldEvent(info: RunInfo, event: NormalizedEvent, telemetry: RunTelemetry): RunInfo {
   const next: RunInfo = {
@@ -32,6 +51,7 @@ export function foldEvent(info: RunInfo, event: NormalizedEvent, telemetry: RunT
     ...(event.activity !== undefined && event.activity !== '' ? { activity: event.activity } : {}),
     ...copiedFields(event),
     ...(event.waiting !== undefined ? { waiting: event.waiting === null ? null : { ...event.waiting, since: event.ts } } : {}),
+    ...followupsPatch(info, event),
     usage: telemetry.usage,
     lastTurnContext: telemetry.lastTurnContext,
     turns: telemetry.turns,

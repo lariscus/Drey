@@ -1,5 +1,7 @@
 import { createChatBridge } from '../services/chat-llm';
 import { loadCrewPrompts } from '../services/crew-prompts';
+import { FollowupFiler } from '../services/followup-filer';
+import { FollowupService } from '../services/followup-service';
 import { ImprovementsService } from '../services/improvements-service';
 import type { BoardParts } from './compose-board-parts';
 import type { EngineOptions } from './engine-types';
@@ -8,11 +10,15 @@ import { settleCommitStepsOnFleet } from './settle-on-fleet';
 
 type Log = NonNullable<EngineOptions['log']>;
 
-/** What reacts to the fleet's settled runs: the self-improvement loop and the commit-step settling. */
+/** What reacts to the fleet's settled runs: the self-improvement loop, the commit-step settling and the follow-up cards. */
 export interface LearningParts {
   readonly improvements: ImprovementsService;
   /** Stops the commit-step settling's subscription. */
   readonly stopSettling: () => void;
+  /** req-299: a done run's `FOLLOWUPS:` proposals as pending Mission Control cards. */
+  readonly followups: FollowupService;
+  /** Stops the follow-ups' fleet subscription. */
+  readonly stopFollowups: () => void;
 }
 
 /**
@@ -49,5 +55,12 @@ export async function composeLearningParts(config: FileConfigStore, parts: Board
     () => board.settleFinishedChains().then(() => board.settleCommitSteps()),
     log,
   );
-  return { improvements, stopSettling };
+  const filer = new FollowupFiler({ board, host: parts.host, git: parts.git, log });
+  const followups = new FollowupService({ runs: () => parts.fleet.runs(), file: (input) => filer.file(input), log });
+  const stopFollowups = hub.subscribe((what) => {
+    if (what === 'fleet') {
+      void followups.scan();
+    }
+  });
+  return { improvements, stopSettling, followups, stopFollowups };
 }

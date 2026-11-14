@@ -22,6 +22,7 @@ export const DISCIPLINES: DisciplineTexts = {
   writing: 'Changing files: the spec fixture of the writing text.',
   readOnly: 'Read-only: the spec fixture of the read-only text.',
   ticketFile: 'The ticket file named above: the spec fixture of the ticket-file text.',
+  followups: 'Follow-ups: the spec fixture of the follow-ups text. FOLLOWUPS: - <title>.',
   language: 'Language: the spec fixture of the language text.',
   precedence: 'Precedence: the spec fixture of the precedence text.',
   chain: 'The chain: the spec fixture, position {{at}} of {{length}}.\n{{positions}}\n- SEND-BACK: <position> <reason in one line>',
