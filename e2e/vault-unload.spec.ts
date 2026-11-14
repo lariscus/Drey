@@ -112,7 +112,7 @@ test.use({
 test('unloading the tickets vault empties the board everywhere; adding it again brings it back', async ({ page, electronApp }) => {
   await page.locator('app-dock-strip button[aria-label="Show Tickets"]').click();
   await expect.poll(() => readLock() !== null, { timeout: 30_000 }).toBe(true);
-  await expect.poll(async () => (await boardTicketIds().catch(() => [])).includes('T-0121'), { timeout: 30_000 }).toBe(true);
+  await expect.poll(async () => (await boardTicketIds().catch((): string[] => [])).includes('T-0121'), { timeout: 30_000 }).toBe(true);
   const panelCard = page.getByText('Outline reorder').filter({ visible: true });
   await expect(panelCard.first()).toBeVisible({ timeout: 15_000 });
 
