@@ -1017,7 +1017,22 @@ doing, and a click never touches a saved view. The ticket's card has
 **Open Review**. On the persona board a Prioritized ticket's card also carries
 **Start with Paul** — the persona at the ticket's current step: it asks once
 (*Start T-0017 with Paul?*, **Cancel** or **Start**) and then starts the chain,
-the same as dragging the card onto Paul's column. The thread's header shows the run's light and who is working,
+the same as dragging the card onto Paul's column.
+
+On the persona board the card speaks in personas, not phases. A ticket a persona
+holds shows **Flow** — its chain, `✓ Paul · ✓ Paul · Ben (3 of 6) · Ralf · Tessa ·
+You`, each done position ticked and the current one bold — then **Holder** (who
+holds it, and why when it stands at You: `You · Ben asks`) and **Cost**. An Inbox or
+Prioritized ticket has no holder yet: its card shows **Priority**, **Repo** and the
+**Flow** it will walk, `Paul → Ben → Ralf → You` (the board's standard flow while
+the ticket names no chain of its own, `none` when there is neither), with
+**Change** to edit it. Below the card the ticket reads like a page: a paragraph
+wrapped over several lines in the file flows as one (click into it to see the
+lines as written), the plan's chapters such as *Acceptance criteria* stand as
+headings, the Log shows each entry's time in your locale, and the column keeps
+its measure when you zoom the editor.
+
+The thread's header shows the run's light and who is working,
 and above its composer sits the **decision bar** (Accept, or Accept → next
 phase on a board with other checkpoints). The thread follows whichever ticket you
 click last — one tab, not one per ticket — and opens where your focus is,
