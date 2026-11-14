@@ -12,8 +12,8 @@ import {
   newSessionText,
   parseSessionFile,
   sessionSlug,
-} from '../core/chat-session';
-import type { TicketsGit } from '../core/tickets-git';
+} from '../core/chat/chat-session';
+import type { TicketsGit } from '../core/git/tickets-git';
 import { ChatService, type ChatBoardPort } from './chat-service';
 import type { EngineHost } from './host';
 

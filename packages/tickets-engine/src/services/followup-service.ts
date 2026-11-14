@@ -12,7 +12,7 @@
  */
 import type { RunInfo } from '../fleet/protocol';
 import type { FollowupFiling } from './chat-service';
-import type { FollowupDraft } from '../core/followups';
+import type { FollowupDraft } from '../core/ticket/followups';
 
 export interface FollowupServiceDeps {
   /** The fleet's run records (`FleetClient.runs`). */

@@ -47,7 +47,7 @@ Open work only. Everything implemented lives in
 lives in [`decisions.md`](decisions.md). When an item ships, move it to the
 changelog and delete it here — no shipped history on this page.
 
-**Status (2026-11-08):** version 0.8.1, milestones 1–151, 153–163, 165–169 and 171–213, plus req-176 (worker follow-up proposals), req-179 (the tickets plugin sorted into domain folders), req-98, req-101, req-104 (the desktop frame matches board 9a), req-126 (the frame follow-ups of wave 4.2: no strip on a one-panel bottom dock, a view badge, a view's own tabs), req-110 (the fleet runner leaves when deactivated or when Drey quits idle), req-102 (the i18n catalog, ADR-0091), req-99a, req-95a, req-95b, req-97, req-96 and req-99b built (109–111 are recorded in the changelog by the convergence audit backfill) — 1–83
+**Status (2026-11-08):** version 0.8.1, milestones 1–151, 153–163, 165–169 and 171–213, plus req-176 (worker follow-up proposals), req-179 and req-180 (the tickets plugin and the engine's `core/` sorted into domain folders), req-98, req-101, req-104 (the desktop frame matches board 9a), req-126 (the frame follow-ups of wave 4.2: no strip on a one-panel bottom dock, a view badge, a view's own tabs), req-110 (the fleet runner leaves when deactivated or when Drey quits idle), req-102 (the i18n catalog, ADR-0091), req-99a, req-95a, req-95b, req-97, req-96 and req-99b built (109–111 are recorded in the changelog by the convergence audit backfill) — 1–83
 owner-verified (milestone 82, auto-update from GitHub Releases ADR-0074,
 end-to-end on a real install, the 0.7.0 → 0.7.1 update round included
 docs/07 checklist; milestone 83, the tickets foundation ADR-0075/0076,
@@ -664,8 +664,8 @@ checks use a scratch store and a second instance, never `drey-tickets`.
   [`docs/design/dricket/decommission.md`](../docs/design/dricket/decommission.md)
   (part a, milestone 162, found class A empty and removed nothing). Exact scope: (1) the
   files forks of the board writers, phase-folder numbering ("Number folders", reorder
-  renumbering), the drift pass, the file IO half of `core/transition.ts` (keep its pure
-  patchers — the dricket bridge uses them), `core/phase-dirs.ts`, `core/normalize.ts`;
+  renumbering), the drift pass, the file IO half of `core/pipeline/transition.ts` (keep its pure
+  patchers — the dricket bridge uses them), `core/pipeline/phase-dirs.ts`, `core/pipeline/normalize.ts`;
   (2) run / claim stamps and takeover-as-overwrite on files, the `.status.log` writer,
   the files-only ledger writers (the ledger path in the meta vault stays),
   `FileTicketStore`, `files-guard`; (3) the `files` and `shadow` modes of
@@ -675,7 +675,7 @@ checks use a scratch store and a second instance, never `drey-tickets`.
   the `engine-main` fallback, the two `tickets-remote*` e2e specs) once Mission Control on
   the phone is verified — a product decision, nothing depends on it; (5) supersede
   `specs/ticket-schema.md` and the ADR-0076 file layout; the manual. Not in scope:
-  `core/ticket-files.ts`, `ticket-board.ts`, `legacy-bridge.ts` (the dricket path runs on them).
+  `core/ticket/ticket-files.ts`, `ticket-board.ts`, `legacy-bridge.ts` (the dricket path runs on them).
   Three orphan helpers (`parkLine`, `phaseIdFromTitle`, `columnWorkerPin`) can go with it.
 
 **What this does to running or planned items** (marks, not reordering):

@@ -8,8 +8,8 @@
  * them and the owner never waits on the header.
  */
 import type { EditorView } from '@codemirror/view';
-import { parseVerlaufEntries } from '../../../../packages/tickets-engine/src/core/verlauf';
-import type { RunEstimate } from '../../../../packages/tickets-engine/src/core/estimate';
+import { parseVerlaufEntries } from '../../../../packages/tickets-engine/src/core/chapters/history-chapter';
+import type { RunEstimate } from '../../../../packages/tickets-engine/src/core/plan/estimate';
 import type { BoardSnapshot, TicketCard, TicketIssue, TicketMeta } from '../../shared/tickets';
 import type { WorkRow } from '../work/work-groups';
 import { cardNode, type CardFacts } from './dom';

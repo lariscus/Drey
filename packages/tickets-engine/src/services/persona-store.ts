@@ -1,4 +1,4 @@
-import { PERSONAS_DIR } from '../core/persona';
+import { PERSONAS_DIR } from '../core/persona/persona';
 
 /**
  * The persona memory store (ADR-0088, E3): the one writer for

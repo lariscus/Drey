@@ -370,7 +370,7 @@ after the handover rule, before the asking rule; verbatim):
 > the ones worth a ticket; you create nothing yourself. Skip it when
 > there is nothing to propose.
 
-Parsed by `parseFollowups` (`core/followups.ts`) from the runner's result
+Parsed by `parseFollowups` (`core/ticket/followups.ts`) from the runner's result
 event; the format and what becomes of it are in `specs/ticket-schema.md`,
 "Worker follow-ups". No model is involved beyond the worker's own message.
 

@@ -1,6 +1,6 @@
 import { parse, stringify } from 'yaml';
 
-import { PIPELINE_PROSE } from '../core/pipeline-states';
+import { PIPELINE_PROSE } from '../core/pipeline/pipeline-states';
 
 /**
  * The legacy vault's `_meta/pipeline.md` -> the file of the six stages (req-99a).

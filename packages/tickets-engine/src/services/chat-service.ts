@@ -39,10 +39,10 @@ import type {
   ChatTurnResult,
 } from '../contracts/chat';
 import { titleFromDescription, type BoardSnapshot, type TicketForm, type TicketPriority } from '../contracts/tickets';
-import { parsePlanParts } from '../core/plan-parts';
-import type { FollowupDraft } from '../core/followups';
-import { ticketRefsOf } from '../core/chat-ticket-refs';
-import { changedLinesOf, editsSummary, planDelta, planDeltaForModel, planSectionOf } from '../core/plan-delta';
+import { parsePlanParts } from '../core/plan/plan-parts';
+import type { FollowupDraft } from '../core/ticket/followups';
+import { ticketRefsOf } from '../core/chat/chat-ticket-refs';
+import { changedLinesOf, editsSummary, planDelta, planDeltaForModel, planSectionOf } from '../core/plan/plan-delta';
 import type { PlanShadowStore } from './plan-shadow';
 import {
   appendMission,
@@ -58,8 +58,8 @@ import {
   decideProposal,
   newSessionText,
   parseSessionFile,
-} from '../core/chat-session';
-import { TicketsGit } from '../core/tickets-git';
+} from '../core/chat/chat-session';
+import { TicketsGit } from '../core/git/tickets-git';
 import type { EngineHost, EngineVault } from './host';
 
 /** The session files this service reads and writes — direct children only. */

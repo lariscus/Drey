@@ -9,8 +9,8 @@ import { Decoration, EditorView, ViewPlugin, WidgetType } from '@codemirror/view
 import { afterEach, describe, expect, it, vi } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- a spec builds the real catalog; the plugin itself gets it as `api.i18n`
 import { i18n } from '../../../../shared/i18n';
-import { renderVerificationSection } from '../../../../packages/tickets-engine/src/core/verification';
-import { renderVerlaufLine } from '../../../../packages/tickets-engine/src/core/verlauf';
+import { renderVerificationSection } from '../../../../packages/tickets-engine/src/core/chapters/verification';
+import { renderVerlaufLine } from '../../../../packages/tickets-engine/src/core/chapters/history-chapter';
 import type { DreyPluginApi, EditorSurfaceContext, FrontmatterViewInput } from '../../../../shared/plugin-api/renderer';
 import type { BoardSnapshot } from '../../shared/tickets';
 import { createTicketHeader, ticketLogFold } from './ticket-header';

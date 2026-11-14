@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assembleBoard } from '../core/ticket-board';
+import { assembleBoard } from '../core/ticket/ticket-board';
 import { diffBoards, renderBoardDiff } from './board-diff';
 
 const PIPELINE = `---

@@ -6,7 +6,7 @@ import { Orchestrator, type OrchestratorDeps, type SupervisorPort } from './orch
 import type { StartOutcome, StopOutcome, SupervisorRecord } from './runs';
 import type { RunInfo, RunRequest } from './protocol';
 import { normalizeFleetPools } from './protocol';
-import { newTicketFileText } from '../core/ticket-files';
+import { newTicketFileText } from '../core/ticket/ticket-files';
 
 /**
  * The fleet respects blocked-by (T-0050): the real orchestrator over a

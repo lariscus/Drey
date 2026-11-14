@@ -11,7 +11,7 @@
  * retired `videos.limitMb` (a folder total) is ignored and dropped by
  * `VideoService.prepare`.
  */
-import type { Parsed } from '../core/commands';
+import type { Parsed } from '../core/ticket/commands';
 import { CHAT_KEYS, providerLabelOf, resolveChatModel, type ChatModelConfig } from '../services/chat-model';
 import type { DeviceView } from './auth';
 

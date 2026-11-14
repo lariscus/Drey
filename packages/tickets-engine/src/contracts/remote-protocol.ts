@@ -17,14 +17,14 @@ import type {
   StopRunCommand,
   TicketIdCommand,
   TransitionCommand,
-} from '../core/commands';
+} from '../core/ticket/commands';
 import type { ChatDecisionResult, ChatShapeResult, ChatSession, ChatSplitChoice, ChatSessionMeta, ChatStreamEvent, ChatTurnResult, PlanStatus } from './chat';
 import type { FleetSnapshot } from '../services/fleet-client';
 import type { AutopilotRecord, AutopilotRefusal, ChainMaster, ChainStatus, ColumnMode, WaitQuestion } from '../fleet/protocol';
 import type { ShapedQuestion } from './question-shape';
 import type { BoardSnapshot, CreateResult, MutationResult, RecentDone, TicketCard } from './tickets';
-import type { ImprovementProposal, ImprovementState } from '../core/improvements';
-import type { Persona, PersonaRouter } from '../core/persona';
+import type { ImprovementProposal, ImprovementState } from '../core/persona/improvements';
+import type { Persona, PersonaRouter } from '../core/persona/persona';
 import type { ScoutReport } from './scout';
 
 /** What the "Needs you" list holds, in the order it shows them. */
@@ -128,11 +128,11 @@ export interface ChatChangePayload {
 // re-export keeps every existing import path working.
 export type { RefineReply, TicketReply, AttachmentReply } from './replies';
 import type { RefineReply, TicketReply, AttachmentReply } from './replies';
-import type { EstimateKey, RunEstimate } from '../core/estimate';
+import type { EstimateKey, RunEstimate } from '../core/plan/estimate';
 import type { PlanPartsEdit, PlanPartsReply, PlanReleaseReply, PlanReleaseScope } from './plan-approval';
 import type { FlowDraftReply, FlowOp, FlowReply, FlowSaveReply, FlowTarget } from './flow';
-import type { ReviewComment } from '../core/review-feedback';
-import type { TicketDiff, TicketFileReply, WorktreeFile } from '../core/worktree-changes';
+import type { ReviewComment } from '../core/review/review-feedback';
+import type { TicketDiff, TicketFileReply, WorktreeFile } from '../core/git/worktree-changes';
 
 /**
  * The host's remote surface. Every writing call carries the actor the

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- a spec builds the real catalog; the plugin itself gets it as `api.i18n`
 import { i18n } from '../../../../shared/i18n';
 import type { PlanPartCard, PlanPartsReply } from '../../../../packages/tickets-engine/src/contracts/plan-approval';
-import type { RunEstimate } from '../../../../packages/tickets-engine/src/core/estimate';
+import type { RunEstimate } from '../../../../packages/tickets-engine/src/core/plan/estimate';
 import { createPartsStore, partsNode, type PartsNodeDeps } from './parts';
 import { hasOpenParts, partsRange, partsViewOf } from './parts-model';
 

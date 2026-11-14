@@ -6,7 +6,7 @@
  * `BoardService`. Nothing is written before a save: an edit is a pure
  * function from a draft chain to a draft chain (the app keeps the draft).
  */
-import type { FlowOp } from '../core/flow-edit';
+import type { FlowOp } from '../core/pipeline/flow-edit';
 
 export type { FlowOp };
 

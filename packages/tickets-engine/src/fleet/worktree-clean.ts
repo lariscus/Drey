@@ -11,7 +11,7 @@ import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import type { Dirent } from 'node:fs';
 import type { RepoRef } from '../contracts/tickets';
-import type { TicketsGit } from '../core/tickets-git';
+import type { TicketsGit } from '../core/git/tickets-git';
 import { isUnderAnyBase, legacyWorktreeBase, worktreeBaseFor } from './worktree-home';
 import { normalizeForMatch, parseWorktreePorcelain, realPathOrNull, unlinkShared } from './worktrees';
 

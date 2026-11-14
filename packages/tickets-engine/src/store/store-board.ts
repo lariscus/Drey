@@ -2,10 +2,10 @@ import { stringify } from 'yaml';
 import { TICKETS_ARCHIVE_DIR, type BoardSnapshot, type PipelinePhase } from '../contracts/tickets';
 import type { TicketDetail } from '../ports/ticket-store';
 import { ARCHIVED_LABEL, PLACEHOLDER_LABEL } from './legacy-bridge';
-import { assembleBoard, type AssembleInput, type BoardFile } from '../core/ticket-board';
-import { recentDoneOf } from '../core/normalize';
-import { statusLinesOfComments } from '../core/status-comment';
-import { openStatusItems } from '../core/status-log';
+import { assembleBoard, type AssembleInput, type BoardFile } from '../core/ticket/ticket-board';
+import { recentDoneOf } from '../core/pipeline/normalize';
+import { statusLinesOfComments } from '../core/pipeline/status-comment';
+import { openStatusItems } from '../core/pipeline/status-log';
 
 /**
  * The board over a store's `TicketDetail[]` instead of ticket files (E14-2,

@@ -1,7 +1,7 @@
 import { mkdirSync, readdirSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import { LEGACY_PHASE_IDS } from '../core/pipeline-states';
+import { LEGACY_PHASE_IDS } from '../core/pipeline/pipeline-states';
 import { defaultExec, DkProcess } from '../store/dk-process';
 import { DricketTicketStore } from '../store/dricket-ticket-store';
 import { applyPlan, assertScratchStore, initScratchStore } from './apply';

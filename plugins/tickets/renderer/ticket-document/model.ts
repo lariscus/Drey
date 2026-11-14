@@ -11,9 +11,9 @@
  * the phone's ticket screen uses: `$1.84`, `48k`, `9 min`).
  */
 import { maskFenceLines } from '../../../../shared/markdown/fences';
-import { mergeChain } from '../../../../packages/tickets-engine/src/core/chain-delta';
-import { parseVerificationSection } from '../../../../packages/tickets-engine/src/core/verification';
-import { parseVerlaufEntries, type VerlaufEntry } from '../../../../packages/tickets-engine/src/core/verlauf';
+import { mergeChain } from '../../../../packages/tickets-engine/src/core/pipeline/chain-delta';
+import { parseVerificationSection } from '../../../../packages/tickets-engine/src/core/chapters/verification';
+import { parseVerlaufEntries, type VerlaufEntry } from '../../../../packages/tickets-engine/src/core/chapters/history-chapter';
 import { costTableOf, type CostPhase, type CostTableView } from '../../../../shared/cost-table';
 import { costInTotalText, costSoFarText } from '../../../../shared/cost-text';
 import type { I18n } from '../../../../shared/i18n/types';

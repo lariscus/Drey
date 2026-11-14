@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Orchestrator, type OrchestratorDeps, type SupervisorPort } from './orchestrator';
 import type { StartOutcome, StopOutcome, SupervisorRecord } from './runs';
 import { normalizeFleetPools, type RunInfo, type RunRequest } from './protocol';
-import { newTicketFileText } from '../core/ticket-files';
+import { newTicketFileText } from '../core/ticket/ticket-files';
 
 /**
  * The Autopilot over the chain master (req-95) against a real tickets

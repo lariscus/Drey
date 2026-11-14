@@ -1,4 +1,4 @@
-import { parseTicketFile, patchTicketFile, ticketPathParts } from '../core/ticket-files';
+import { parseTicketFile, patchTicketFile, ticketPathParts } from '../core/ticket/ticket-files';
 import type { TicketMeta } from '../contracts/tickets';
 import {
   TicketStoreError,

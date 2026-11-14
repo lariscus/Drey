@@ -3,8 +3,8 @@ import { remoteActorOf } from '../contracts/remote-protocol';
 import type { BoardSnapshot, TicketCard } from '../contracts/tickets';
 import type { ChainEntry } from '../contracts/chain';
 import type { ScoutReport } from '../contracts/scout';
-import { renderScoutReportSection } from '../core/scout';
-import { parseStatusLog, type StatusLine } from '../core/status-log';
+import { renderScoutReportSection } from '../core/chapters/scout';
+import { parseStatusLog, type StatusLine } from '../core/pipeline/status-log';
 import { BYPASS_REFUSAL, ChangeHub, DreyTicketsPort, type RemoteBoard, type RemoteFleet } from './drey-port';
 
 /**
@@ -16,7 +16,7 @@ import { BYPASS_REFUSAL, ChangeHub, DreyTicketsPort, type RemoteBoard, type Remo
 const ok = { ok: true } as const;
 
 /** A full-shaped persona for the E6 reply fakes (the reply type carries Persona). */
-function fakePersona(id: string, title: string): import('../core/persona').Persona {
+function fakePersona(id: string, title: string): import('../core/persona/persona').Persona {
   return {
     id,
     kind: 'agent',

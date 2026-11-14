@@ -6,7 +6,7 @@
  * editor renders (`libs/mission-ui/src/flow/flow.model.ts` is its twin).
  */
 import type { FlowPersona, FlowReply, FlowStepView } from '../../../../packages/tickets-engine/src/contracts/flow';
-import { isManualPhase } from '../../../../packages/tickets-engine/src/core/chain-delta';
+import { isManualPhase } from '../../../../packages/tickets-engine/src/core/pipeline/chain-delta';
 
 /** An answer the desk gave for a flow, minus the failure case. */
 export type FlowDraft = Extract<FlowReply, { readonly ok: true }>;

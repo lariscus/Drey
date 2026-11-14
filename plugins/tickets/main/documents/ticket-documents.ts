@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import type { DocumentRoute, DocumentRouteSaveResult } from '../../../../shared/plugin-api';
 import type { DocumentSaveReply, TicketDocumentLocation } from '../../../../packages/tickets-engine/src/contracts/replies';
 import { TICKETS_DIR, documentTitle } from '../../../../packages/tickets-engine/src/store/document-paths';
-import { ticketPathParts } from '../../../../packages/tickets-engine/src/core/ticket-files';
+import { ticketPathParts } from '../../../../packages/tickets-engine/src/core/ticket/ticket-files';
 import { parseDocument } from 'yaml';
 import { splitFrontmatter } from '../../../../shared/frontmatter';
 

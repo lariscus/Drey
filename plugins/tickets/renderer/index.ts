@@ -41,7 +41,7 @@ import { stepCardOf } from '../shared/step-card';
 import type { ChangesReply } from '../shared/changes';
 import { checkpointControls, headerControls, liveStateWord, threadSteps, durationWords, type ThreadStep } from './thread/thread-steps';
 import { stuckOf } from './thread/stuck';
-import type { WorktreeFile } from '../../../packages/tickets-engine/src/core/worktree-changes';
+import type { WorktreeFile } from '../../../packages/tickets-engine/src/core/git/worktree-changes';
 import { createWorkFilterStore, filterPopover, isFilterActive, NO_WORK_FILTER, type WorkFilterState } from './work/work-filter';
 import { createTicketsSettingsPage } from './settings/page';
 import { createFilesOperationsHandler, ticketsContextMenuItems } from './files-guard';

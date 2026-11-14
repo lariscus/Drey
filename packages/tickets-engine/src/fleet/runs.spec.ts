@@ -7,8 +7,8 @@ import { execShell, HANDBACK_CONTINUE, HANDOVER_CONTINUE, limitExceeded, probeEx
 import { processAlive } from './procs';
 import type { RunInfo, RunRequest, RunState } from './protocol';
 import { drainSupervisors, hasSettled, markSettled, settled, trackSupervisor, waitFor } from './run-spec-support';
-import { newTicketFileText, patchTicketFile, parseTicketFile } from '../core/ticket-files';
-import { TicketsGit, type GitExecFn } from '../core/tickets-git';
+import { newTicketFileText, patchTicketFile, parseTicketFile } from '../core/ticket/ticket-files';
+import { TicketsGit, type GitExecFn } from '../core/git/tickets-git';
 
 /**
  * The run supervisor against seams: a scripted adapter, a recorded git

@@ -5,7 +5,7 @@ import {
   parseTicketFile,
   patchTicketFile,
   ticketSections,
-} from '../../../packages/tickets-engine/src/core/ticket-files';
+} from '../../../packages/tickets-engine/src/core/ticket/ticket-files';
 import { parseHandover } from '../shared/tickets';
 import {
   composeInstruction,

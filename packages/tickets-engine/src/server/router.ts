@@ -27,12 +27,12 @@ import {
   parseStopRun,
   parseTransition,
   type Parsed,
-} from '../core/commands';
+} from '../core/ticket/commands';
 import { remoteActorOf, type ImprovementDecision, type TicketsRemotePort } from '../contracts/remote-protocol';
 import { parseAutopilotSet } from '../fleet/autopilot';
 import type { AutopilotRefusal } from '../fleet/protocol';
-import { parseReviewComments, sendBackNoteOf, type ReviewComment } from '../core/review-feedback';
-import type { PersonaRouter } from '../core/persona';
+import { parseReviewComments, sendBackNoteOf, type ReviewComment } from '../core/review/review-feedback';
+import type { PersonaRouter } from '../core/persona/persona';
 import { TICKET_ID_PATTERN } from '../contracts/tickets';
 import { parseRevoke, parseSettingsPatch, type SettingsAccess } from './settings';
 import type { DeviceRegistry, DeviceView, FailureLimiter, PairingCodes, RemoteDevice } from './auth';

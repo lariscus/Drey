@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { EngineBoardService } from './board-service';
 import type { EngineHost, EngineVault, FleetPort } from './host';
-import { TicketsGit } from '../core/tickets-git';
+import { TicketsGit } from '../core/git/tickets-git';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from '../fleet/protocol';
 import { needsOf } from '../server/needs';
 import { assertDkVersion, MIN_DK_VERSION } from '../store/dk-process';

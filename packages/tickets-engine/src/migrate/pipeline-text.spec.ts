@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
-import { STATE_IDS } from '../core/pipeline-states';
+import { STATE_IDS } from '../core/pipeline/pipeline-states';
 import { runMigrateCli } from './cli';
 import { sixStagePipelineText } from './pipeline-text';
 

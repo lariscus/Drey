@@ -1,4 +1,4 @@
-import { parsePersonaFile, resolvePersona, personaModelFor, type Persona, type PersonaModelContext, type PersonaResolution } from '../core/persona';
+import { parsePersonaFile, resolvePersona, personaModelFor, type Persona, type PersonaModelContext, type PersonaResolution } from '../core/persona/persona';
 
 /**
  * The persona loader (ADR-0088, E3): the services read personas from the

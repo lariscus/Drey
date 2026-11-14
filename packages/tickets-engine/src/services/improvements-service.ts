@@ -21,7 +21,7 @@ import {
   validateDraft,
   type FrictionLine,
   type ImprovementDraft,
-} from '../core/improvements';
+} from '../core/persona/improvements';
 
 /** A repeat aggregation waits for this many settled runs after the last one. */
 const SETTLED_RUNS_THRESHOLD = 5;

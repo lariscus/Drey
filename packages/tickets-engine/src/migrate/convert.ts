@@ -1,4 +1,4 @@
-import { CLAIM_STATE_IDS, LEGACY_PHASE_STATES, stateOfPhase, STATE_IDS } from '../core/pipeline-states';
+import { CLAIM_STATE_IDS, LEGACY_PHASE_STATES, stateOfPhase, STATE_IDS } from '../core/pipeline/pipeline-states';
 import { toDricketId } from '../store/ids';
 import { ARCHIVED_LABEL } from '../store/legacy-bridge';
 import { ticketNumber, type LegacyTicket, type LegacyVault } from './legacy-vault';

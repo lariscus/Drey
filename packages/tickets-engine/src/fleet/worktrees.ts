@@ -26,7 +26,7 @@
  */
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
-import type { TicketsGit } from '../core/tickets-git';
+import type { TicketsGit } from '../core/git/tickets-git';
 import type { RunRequest, WorktreeOutcome } from './protocol';
 
 /** The exec seam the state machine drives (a `TicketsGit` instance). */

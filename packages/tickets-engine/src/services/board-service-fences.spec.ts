@@ -4,9 +4,9 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EngineBoardService } from './board-service';
 import type { EngineHost, EngineVault, FleetPort } from './host';
-import { TicketsGit } from '../core/tickets-git';
-import { newTicketFileText } from '../core/ticket-files';
-import { planSectionOf } from '../core/plan-delta';
+import { TicketsGit } from '../core/git/tickets-git';
+import { newTicketFileText } from '../core/ticket/ticket-files';
+import { planSectionOf } from '../core/plan/plan-delta';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from '../fleet/protocol';
 
 /**

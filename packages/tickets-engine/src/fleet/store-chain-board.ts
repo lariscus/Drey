@@ -1,7 +1,7 @@
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import type { BoardSnapshot, TicketCard } from '../contracts/tickets';
-import { patchTicketFile, type TransitionPatch } from '../core/ticket-files';
+import { patchTicketFile, type TransitionPatch } from '../core/ticket/ticket-files';
 import { TicketStoreError, type PutOptions, type TicketDetail } from '../ports/ticket-store';
 import type { WriteOutcome } from '../store/dricket-file-store';
 import { DricketFileStore } from '../store/dricket-file-store';

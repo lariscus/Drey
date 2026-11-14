@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { TicketsGit } from '../core/tickets-git';
+import { TicketsGit } from '../core/git/tickets-git';
 import type { RepoRef } from '../contracts/tickets';
 import { legacyWorktreeBase, WORKTREES_DIR } from './worktree-home';
 import { cleanWorktrees, listOrphans, removeWorktree } from './worktree-clean';

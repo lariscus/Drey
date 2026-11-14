@@ -9,7 +9,7 @@
  * is absent, as the changelog's Fidelity block lists it. Plain DOM over
  * `persona-model.ts`.
  */
-import type { ImprovementProposal } from '../../../../packages/tickets-engine/src/core/improvements';
+import type { ImprovementProposal } from '../../../../packages/tickets-engine/src/core/persona/improvements';
 import type { PersonaImprovementsReply, PersonaView } from '../../shared/remote-protocol';
 import { h, type DeskDeps } from '../board/desk-deps';
 import {

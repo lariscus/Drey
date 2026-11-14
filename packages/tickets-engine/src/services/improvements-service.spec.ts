@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatBridge } from '../contracts/chat';
-import type { FrictionLine, ImprovementDraft } from '../core/improvements';
+import type { FrictionLine, ImprovementDraft } from '../core/persona/improvements';
 import {
   ImprovementsService,
   extractJsonArray,

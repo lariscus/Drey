@@ -5,11 +5,11 @@ import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { EngineBoardService } from './board-service';
 import type { EngineHost, EngineVault, FleetPort } from './host';
-import { TicketsGit } from '../core/tickets-git';
+import { TicketsGit } from '../core/git/tickets-git';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools, type ChainConfig, type RunRequest } from '../fleet/protocol';
 import { assertDkVersion, MIN_DK_VERSION } from '../store/dk-process';
 import { toDricketId } from '../store/ids';
-import { openStatusItems } from '../core/status-log';
+import { openStatusItems } from '../core/pipeline/status-log';
 
 /**
  * E14-4b: the board's write moves against a REAL `dk` and a SCRATCH store —

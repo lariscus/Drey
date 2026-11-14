@@ -3,8 +3,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FleetEventWriter, SCAN_CACHE_MS, statusLogPathOf, statusPathFor } from './event-writer';
-import { LEDGER_FILE, parseLedger } from '../core/ledger';
-import { parseStatusLog } from '../core/status-log';
+import { LEDGER_FILE, parseLedger } from '../core/pipeline/ledger';
+import { parseStatusLog } from '../core/pipeline/status-log';
 
 /**
  * The runner's E7 event writer against a real temp vault: the promise

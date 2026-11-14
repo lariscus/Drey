@@ -13,7 +13,7 @@
  */
 import { FLEET_SETTING_DEFAULTS } from '../contracts/fleet-defaults';
 import type { ShapedQuestion } from '../contracts/question-shape';
-import type { FollowupDraft } from '../core/followups';
+import type { FollowupDraft } from '../core/ticket/followups';
 import type { TicketForm } from '../contracts/tickets';
 
 /** The workers of milestone 84, in fleet order (the assignment default). */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { renderVerificationSection } from '../../../../packages/tickets-engine/src/core/verification';
-import { renderVerlaufLine } from '../../../../packages/tickets-engine/src/core/verlauf';
+import { renderVerificationSection } from '../../../../packages/tickets-engine/src/core/chapters/verification';
+import { renderVerlaufLine } from '../../../../packages/tickets-engine/src/core/chapters/history-chapter';
 import type { VerificationReport } from '../../../../packages/tickets-engine/src/contracts/verify';
 import {
   assetUrl,
@@ -18,7 +18,7 @@ import {
 } from './model';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- a spec builds the real catalog; the plugin itself gets it as `api.i18n`
 import { i18n } from '../../../../shared/i18n';
-import { parseVerlaufEntries } from '../../../../packages/tickets-engine/src/core/verlauf';
+import { parseVerlaufEntries } from '../../../../packages/tickets-engine/src/core/chapters/history-chapter';
 import type { PipelinePhase, TicketCard } from '../../shared/tickets';
 
 const report: VerificationReport = {

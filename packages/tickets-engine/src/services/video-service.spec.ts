@@ -2,7 +2,7 @@ import { promises as fsp } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { TicketsGit } from '../core/tickets-git';
+import type { TicketsGit } from '../core/git/tickets-git';
 import type { EngineBoardService } from './board-service';
 import type { EngineHost } from './host';
 import {

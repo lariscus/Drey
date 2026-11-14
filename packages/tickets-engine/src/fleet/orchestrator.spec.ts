@@ -17,8 +17,8 @@ import {
 } from './orchestrator';
 import type { StartOutcome, StopOutcome, SupervisorRecord } from './runs';
 import { normalizeFleetPools, type FleetPools, type RunInfo, type RunRequest } from './protocol';
-import { newTicketFileText } from '../core/ticket-files';
-import { listTicketDirs } from '../core/phase-dirs';
+import { newTicketFileText } from '../core/ticket/ticket-files';
+import { listTicketDirs } from '../core/pipeline/phase-dirs';
 import { stripPhasePrefix } from '../contracts/tickets';
 
 /**

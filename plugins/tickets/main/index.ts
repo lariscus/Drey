@@ -34,11 +34,11 @@ import {
   parseTicketId,
   parseTransition,
   parseUnarchive,
-} from '../../../packages/tickets-engine/src/core/commands';
-import { parseTicketFile, patchHeaderFields, type HeaderPatch } from '../../../packages/tickets-engine/src/core/ticket-files';
-import { parseReviewComments, sendBackNoteOf } from '../../../packages/tickets-engine/src/core/review-feedback';
-import { personaModelFor } from '../../../packages/tickets-engine/src/core/persona';
-import { planWorktreeRemoval } from '../../../packages/tickets-engine/src/core/worktree-removal';
+} from '../../../packages/tickets-engine/src/core/ticket/commands';
+import { parseTicketFile, patchHeaderFields, type HeaderPatch } from '../../../packages/tickets-engine/src/core/ticket/ticket-files';
+import { parseReviewComments, sendBackNoteOf } from '../../../packages/tickets-engine/src/core/review/review-feedback';
+import { personaModelFor } from '../../../packages/tickets-engine/src/core/persona/persona';
+import { planWorktreeRemoval } from '../../../packages/tickets-engine/src/core/git/worktree-removal';
 import { captureTidyMessages, parseCaptureTidy } from '../shared/capture-tidy';
 import type { AttachmentReply, RefineReply, TicketReply } from '../shared/remote-protocol';
 import { hostVaultIdMapper } from './engine/host-vault-id';

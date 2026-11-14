@@ -4,8 +4,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { DEFAULT_PIPELINE_TEXT } from '../core/pipeline-states';
-import { TicketsGit } from '../core/tickets-git';
+import { DEFAULT_PIPELINE_TEXT } from '../core/pipeline/pipeline-states';
+import { TicketsGit } from '../core/git/tickets-git';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools, type RunInfo, type RunRequest } from '../fleet/protocol';
 import { assertDkVersion, MIN_DK_VERSION } from '../store/dk-process';
 import { EngineBoardService } from './board-service';

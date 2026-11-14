@@ -3,7 +3,7 @@ import path from 'node:path';
 import { deflateSync } from 'node:zlib';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/drey';
-import { renderVerificationSection } from '../packages/tickets-engine/src/core/verification';
+import { renderVerificationSection } from '../packages/tickets-engine/src/core/chapters/verification';
 
 /**
  * The ticket as a document (E13-6): the header strip, `## Verification` as

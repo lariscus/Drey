@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { deflateSync } from 'node:zlib';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures/drey';
-import { renderVerificationSection } from '../packages/tickets-engine/src/core/verification';
+import { renderVerificationSection } from '../packages/tickets-engine/src/core/chapters/verification';
 
 // A home of its own, so the plugin spawns an engine for the seeded vault
 // instead of adopting the owner's live one (see desk-board-team.spec.ts).

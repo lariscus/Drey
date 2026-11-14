@@ -2,7 +2,7 @@ import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { newTicketFileText } from '../core/ticket-files';
+import { newTicketFileText } from '../core/ticket/ticket-files';
 import type { PutOptions, TicketDetail } from '../ports/ticket-store';
 import { detailFromContent } from '../store/dricket-ticket-store';
 import { Orchestrator, type OrchestratorDeps, type StartOptions, type SupervisorPort } from './orchestrator';

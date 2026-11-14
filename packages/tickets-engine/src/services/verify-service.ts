@@ -24,10 +24,10 @@ import {
   type VerifyStatus,
 } from '../contracts/verify';
 import type { BoardSnapshot, TicketCard } from '../contracts/tickets';
-import { resolveProofMode } from '../core/proof-mode';
-import { parseVerificationSection, renderVerificationSection, upsertVerificationSection } from '../core/verification';
-import { acceptanceCommands, withLogLine } from '../core/ticket-files';
-import { TicketsGit } from '../core/tickets-git';
+import { resolveProofMode } from '../core/review/proof-mode';
+import { parseVerificationSection, renderVerificationSection, upsertVerificationSection } from '../core/chapters/verification';
+import { acceptanceCommands, withLogLine } from '../core/ticket/ticket-files';
+import { TicketsGit } from '../core/git/tickets-git';
 import { nextPhaseIdOf } from '../fleet/chain';
 import { worktreePathFor } from '../fleet/worktree-home';
 import type { EngineBoardService, LedgerEvents } from './board-service';

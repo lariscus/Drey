@@ -6,7 +6,7 @@
  * `planPartsEdit`, no direct file write. The release is the decision card's
  * (canvas decisions 16, 28): the block only links to it.
  */
-import type { RunEstimate } from '../../../../packages/tickets-engine/src/core/estimate';
+import type { RunEstimate } from '../../../../packages/tickets-engine/src/core/plan/estimate';
 import type { PlanPartsEdit, PlanPartsReply } from '../../../../packages/tickets-engine/src/contracts/plan-approval';
 import type { I18n } from '../../../../shared/i18n/types';
 import { avatarNode, decisionLinkNode } from './dom';

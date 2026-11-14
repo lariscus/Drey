@@ -16,7 +16,7 @@ import {
   type RepoRef,
   type TicketCard,
 } from '../contracts/tickets';
-import { acceptanceCommands, acceptanceFinding, ticketSections } from '../core/ticket-files';
+import { acceptanceCommands, acceptanceFinding, ticketSections } from '../core/ticket/ticket-files';
 import { composeInstruction, composeScoutInstruction, parseWorkerValue, resolveAssignment, type Truncation } from './assignment';
 import { isAutoPhase } from './chain';
 import { personaMemorySection, personaSkillsSection } from './context-pack';

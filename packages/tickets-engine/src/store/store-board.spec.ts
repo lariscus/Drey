@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { assembleBoard } from '../core/ticket-board';
-import { parseTicketFile } from '../core/ticket-files';
+import { assembleBoard } from '../core/ticket/ticket-board';
+import { parseTicketFile } from '../core/ticket/ticket-files';
 import type { TicketDetail } from '../ports/ticket-store';
 import { diffBoards } from './board-diff';
 import { assembleBoardFromRecords, recordToBoardFile, resolvePhase } from './store-board';

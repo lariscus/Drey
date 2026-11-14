@@ -1,7 +1,7 @@
 import { stringify } from 'yaml';
 
 import { DEFAULT_RANK, phaseDirectoryName } from '../contracts/tickets';
-import { legacyPhaseOfState } from '../core/pipeline-states';
+import { legacyPhaseOfState } from '../core/pipeline/pipeline-states';
 import { flatList, flatText, parseFlatDocument } from '../store/flat-frontmatter';
 import { toDisplayId } from '../store/ids';
 import { ARCHIVED_LABEL } from '../store/legacy-bridge';

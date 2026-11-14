@@ -3,8 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test, expect } from './fixtures/drey';
-import { renderVerificationSection } from '../packages/tickets-engine/src/core/verification';
-import { renderVerlaufLine } from '../packages/tickets-engine/src/core/verlauf';
+import { renderVerificationSection } from '../packages/tickets-engine/src/core/chapters/verification';
+import { renderVerlaufLine } from '../packages/tickets-engine/src/core/chapters/history-chapter';
 
 /**
  * D-23, the rest: a ticket document of a dricket store shows what a files-backend

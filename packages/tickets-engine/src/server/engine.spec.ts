@@ -7,7 +7,7 @@ import * as path from 'node:path';
 import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ChatBridge, ChatDecisionResult, ChatSessionMeta, ChatStreamEvent, ChatTurnResult } from '../contracts/chat';
-import { CHAT_DIR, parseSessionFile } from '../core/chat-session';
+import { CHAT_DIR, parseSessionFile } from '../core/chat/chat-session';
 import type { VerifyHarness, VerifyRunInput, VerifyRunResult, VerifyStatus } from '../contracts/verify';
 import { createEngine, type Engine } from './engine';
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { newTicketFileText, parseTicketFile } from '../core/ticket-files';
+import { newTicketFileText, parseTicketFile } from '../core/ticket/ticket-files';
 import { FileTicketStore, type FileTicketIo } from './file-ticket-store';
 
 const NOW = new Date('2026-11-04T10:00:00Z');

@@ -8,7 +8,7 @@
  * `opencode`, `claude-code`, `kimi`, `claude-code/sonnet`. An unreadable value
  * is a refusal at run start — never a guess (ADR-0076).
  */
-import { FOLLOWUPS_MARKER, MAX_FOLLOWUPS } from '../core/followups';
+import { FOLLOWUPS_MARKER, MAX_FOLLOWUPS } from '../core/ticket/followups';
 import { isWorkerProvider, BLOCKED_MARKER, QUESTION_MARKER, type FleetCaps, type InteractiveMode, type WorkerProviderId } from './protocol';
 import { parseHandover } from '../contracts/tickets';
 import { capHead, capTail } from './capping';

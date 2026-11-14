@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadPersonaSkills } from '../core/persona';
+import { loadPersonaSkills } from '../core/persona/persona';
 
 /** D-46: `persona.skills` names files; this is where a name is looked for, nearest first. */
 describe('loadPersonaSkills', () => {

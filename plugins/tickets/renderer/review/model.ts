@@ -5,9 +5,9 @@
  * footer. The comment shape is the engine's own `ReviewComment` -- the
  * Handover feedback of E11-3 -- never a second definition.
  */
-import type { ReviewComment } from '../../../../packages/tickets-engine/src/core/review-feedback';
-import { MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS } from '../../../../packages/tickets-engine/src/core/review-feedback';
-import type { TicketDiff } from '../../../../packages/tickets-engine/src/core/worktree-changes';
+import type { ReviewComment } from '../../../../packages/tickets-engine/src/core/review/review-feedback';
+import { MAX_REVIEW_COMMENTS, MAX_REVIEW_COMMENT_CHARS } from '../../../../packages/tickets-engine/src/core/review/review-feedback';
+import type { TicketDiff } from '../../../../packages/tickets-engine/src/core/git/worktree-changes';
 import { countsOf, viewedKeyOf } from './patch';
 
 export interface ReviewFile {

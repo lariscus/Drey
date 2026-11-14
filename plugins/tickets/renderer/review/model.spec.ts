@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ReviewComment } from '../../../../packages/tickets-engine/src/core/review-feedback';
-import { MAX_REVIEW_COMMENTS } from '../../../../packages/tickets-engine/src/core/review-feedback';
+import type { ReviewComment } from '../../../../packages/tickets-engine/src/core/review/review-feedback';
+import { MAX_REVIEW_COMMENTS } from '../../../../packages/tickets-engine/src/core/review/review-feedback';
 import {
   EMPTY_MARKS,
   commentsOfFile,

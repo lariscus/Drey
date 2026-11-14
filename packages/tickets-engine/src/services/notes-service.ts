@@ -31,7 +31,7 @@ import type {
   NotesRecentReply,
   NotesSearchReply,
 } from '../contracts/notes';
-import { isNoteFileName, isServedChild, isServedPath, parseNoteFolder, parseNotePath } from '../core/note-path';
+import { isNoteFileName, isServedChild, isServedPath, parseNoteFolder, parseNotePath } from '../core/ticket/note-path';
 
 /** Same slack as `note:save`: two reads of one mtime may differ this much. */
 const MTIME_TOLERANCE_MS = 2;

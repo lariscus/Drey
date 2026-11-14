@@ -16,7 +16,7 @@
  * say. Commands stay empty either way.
  */
 import type { ChatBridge, ChatCommand, ChatModelFailure, ChatShapeReply, ChatStreamEvent } from '../contracts/chat';
-import { parseEnvelope, type ChatEnvelope } from '../core/chat-intents';
+import { parseEnvelope, type ChatEnvelope } from '../core/chat/chat-intents';
 import { causeOf, chatFailure, chatRequest, deltaOf, httpReason, resolveChatModel, type ChatDialect } from './chat-model';
 
 /** A shape turn may read the repository this many times before it must answer. */

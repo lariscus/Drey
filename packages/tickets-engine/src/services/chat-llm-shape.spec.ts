@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatStreamEvent } from '../contracts/chat';
-import { parseEnvelope } from '../core/chat-intents';
+import { parseEnvelope } from '../core/chat/chat-intents';
 import { createChatBridge, SHAPE_SYSTEM_PROMPT } from './chat-llm';
 
 /**

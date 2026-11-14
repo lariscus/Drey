@@ -292,7 +292,7 @@ follows the plan and is never fixed; one part means no `### Parts`
 chapter at all ("Keep as one"). The parser is tolerant (an unreadable
 line is skipped with a warning, never a guess).
 
-The canonical shape (`core/plan-parts.ts`):
+The canonical shape (`core/plan/plan-parts.ts`):
 
 ```markdown
 ### Parts
@@ -510,7 +510,7 @@ sessions are own line grammars, not ticket documents, and not covered.
   prefix exactly; the recommendation may be absent), keys in order,
   flipped to `- [x]` by the owner as decisions are made. The whole
   `### Decisions` block stays absent when nothing is open. The engine
-  reads the section tolerantly (`core/scout.ts`, the asymmetric-
+  reads the section tolerantly (`core/chapters/scout.ts`, the asymmetric-
   tolerance rule): an absent or partially unreadable section means
   "no report yet", never a guess. The engine raises the parsed report
   as a card in "Needs you" (`kind: report`); a promoted ticket keeps
@@ -594,7 +594,7 @@ sessions are own line grammars, not ticket documents, and not covered.
   has no shot, no `### Video` and marks every criterion
   `- [x] \`cmd\` — checked by the machine gate` (no app was started; the
   gate that let the ticket reach the verify phase stands in). The proof card
-  reads the section tolerantly (`core/verification.ts`); an absent
+  reads the section tolerantly (`core/chapters/verification.ts`); an absent
   section means "not verified yet". The engine's verify step is a
   machine step, not an agent run: it launches the ticket worktree's
   built app (repos.md `launch:`, else the `dev.ps1 -Built -Multi`
@@ -721,7 +721,7 @@ gate itself is not editable in a part's flow).
 as strings: an insert after a gate, a removal (a strike for a standard gate,
 dropping an insert), a restore, move earlier / later, a persona, the notify
 rule, a reset to the standard flow. Every edit takes the draft delta and
-returns the next one (`core/flow-edit.ts`, `applyFlowOp`); the delta is
+returns the next one (`core/pipeline/flow-edit.ts`, `applyFlowOp`); the delta is
 regenerated canonically from the edited arrangement — standard gates that
 kept their relative order stay silent (the longest in-order run), the
 others get `move`, new gates `insert`, then `skip` / `notify` / `assign`
@@ -739,7 +739,7 @@ Phase ids are the pipeline's id grammar (`[a-z][a-z0-9-]*`),
 persona names bare lowercase words.
 
 **The write guard** (`validateChain`,
-`packages/tickets-engine/src/core/chain-delta.ts`) runs where a
+`packages/tickets-engine/src/core/pipeline/chain-delta.ts`) runs where a
 write is decided — the board service's `setChain`, the chat
 command's execution — never on render. It refuses, with the reason:
 a phase or anchor the pipeline does not contain; a phase anchored
@@ -776,7 +776,7 @@ committed per line). The reader skips a line it cannot parse. Shape:
 (one line per completed run with its effective tokens and cost — the
 source of the ticket cards' cost and the persona day budgets).
 `phase`, `merged` and `archived` carry no persona, model or cost.
-The code is `core/ledger.ts` (`LEDGER_FILE`).
+The code is `core/pipeline/ledger.ts` (`LEDGER_FILE`).
 
 ### The ticket status log (E7)
 
@@ -829,7 +829,7 @@ Prose for humans. The board follows this file on refresh.
 
 **The shipped default (req-99a, owner decisions 2026-11-06)** — what "Initialize board"
 writes on an empty tickets repository, and the stages the dricket import writes
-(`core/pipeline-states.ts`): **Inbox** (the owner's triage queue, the capture target) ·
+(`core/pipeline/pipeline-states.ts`): **Inbox** (the owner's triage queue, the capture target) ·
 **Shaping** · **Prioritized** · **Building** (agent, `build-default`; the only `claim`
 stage: plan, build, review and test are phases of the chain inside it) · **Ready to try**
 (id `ready`, the owner's checkpoint, see "Agent lane rules") · **Done**. The manual columns
@@ -1081,7 +1081,7 @@ tickets/_meta/personas/
 
 **The improvement loop (E6).** Two more files may live in the persona
 directory — the worker's findings and the aggregation's proposals (the
-format's grammar lives in the engine's `core/improvements.ts`, the
+format's grammar lives in the engine's `core/persona/improvements.ts`, the
 trigger and the owner's apply in
 [ADR-0088](../docs/09_architecture_decisions/0088-tickets-engine-package-cut.md)'s
 E6 record):
@@ -1314,7 +1314,7 @@ line is skipped, never guessed — the asymmetric-tolerance rule):
 **The one exception — the shared plan (E10-3).** In a shape session
 Paul's turn may carry a new `## Plan` chapter, which the engine writes
 into the ticket right away (`tickets: <id> plan`): only that chapter
-changes (`core/plan-section.ts`; a `## ` line inside the text is demoted
+changes (`core/chapters/plan-section.ts`; a `## ` line inside the text is demoted
 to `###` so it cannot swallow the next chapter), and a live run on the
 ticket refuses the write. The plan is the document the owner edits beside
 the dialog; the next message carries only the owner's own edits back
@@ -1331,7 +1331,7 @@ executed mutation.
 Every session write is exactly **one git commit**, message
 `tickets: chat <file>` — the owner turn (owner line, thought, mission
 reply and its proposal lines) commits once; a confirm/dismiss decision
-commits once. The reader (`packages/tickets-engine/src/core/chat-session.ts`)
+commits once. The reader (`packages/tickets-engine/src/core/chat/chat-session.ts`)
 forgives: a file without a readable frontmatter fence reads as absent,
 a half-readable one yields what it can.
 
@@ -1340,7 +1340,7 @@ a half-readable one yields what it can.
 A dispatched worker may propose work that is not part of its step. It
 writes nothing to the board: it ends its **last message** with a
 line-start `FOLLOWUPS:` marker and bullets, in the grammar of
-`packages/tickets-engine/src/core/followups.ts`:
+`packages/tickets-engine/src/core/ticket/followups.ts`:
 
 ```markdown
 FOLLOWUPS:

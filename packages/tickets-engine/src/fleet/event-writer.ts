@@ -10,9 +10,9 @@
  */
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
-import { LEDGER_FILE, renderLedgerLine, type LedgerWrite } from '../core/ledger';
-import { appendStatusLine, type StatusVerb } from '../core/status-log';
-import { listTicketDirs } from '../core/phase-dirs';
+import { LEDGER_FILE, renderLedgerLine, type LedgerWrite } from '../core/pipeline/ledger';
+import { appendStatusLine, type StatusVerb } from '../core/pipeline/status-log';
+import { listTicketDirs } from '../core/pipeline/phase-dirs';
 
 export interface FleetEventWriterDeps {
   /** The tickets vault root (the runner reads it directly). */

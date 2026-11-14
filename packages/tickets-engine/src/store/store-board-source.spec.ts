@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { assembleBoard } from '../core/ticket-board';
+import { assembleBoard } from '../core/ticket/ticket-board';
 import { TicketStoreError, type TicketDetail, type TicketRecord, type TicketStore } from '../ports/ticket-store';
 import { StoreBoardSource } from './store-board-source';
 import { StoreReader } from './store-reader';

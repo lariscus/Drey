@@ -10,7 +10,7 @@ import { applyPlan, assertScratchStore, initScratchStore, scratchConfigToml } fr
 import { buildPlan, DEFAULT_MIGRATION_CONFIG, rewriteAttachmentLinks, stageOfLegacyPhase, type ConversionPlan, type MigrationConfig } from './convert';
 import { stubDocument } from './dricket-doc';
 import { parseLegacyTicket, readLegacyVault, type LegacyTicket } from './legacy-vault';
-import { LEGACY_PHASE_IDS } from '../core/pipeline-states';
+import { LEGACY_PHASE_IDS } from '../core/pipeline/pipeline-states';
 import { reverseTicket } from './reverse';
 import { collectStoreRows, rowsFromLegacy, rowsFromRecords, shadowDiff } from './shadow-diff';
 

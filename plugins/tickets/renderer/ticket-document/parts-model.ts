@@ -4,7 +4,7 @@
  * cards come from the engine's plan routes (E10-4); nothing here writes the file.
  */
 import { maskFenceLines } from '../../../../shared/markdown/fences';
-import type { RunEstimate } from '../../../../packages/tickets-engine/src/core/estimate';
+import type { RunEstimate } from '../../../../packages/tickets-engine/src/core/plan/estimate';
 import type { PartState, PlanPartCard, PlanPartsReply } from '../../../../packages/tickets-engine/src/contracts/plan-approval';
 import { estimateText, noEstimateText } from '../../../../shared/cost-text';
 import type { I18n } from '../../../../shared/i18n/types';

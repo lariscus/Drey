@@ -17,10 +17,10 @@ import type { NeedItem, NeedKind } from '../contracts/remote-protocol';
 import type { ScoutReport } from '../contracts/scout';
 import { scoutNeedText } from '../contracts/scout';
 import type { BoardSnapshot, TicketCard } from '../contracts/tickets';
-import { mergeChain } from '../core/chain-delta';
-import { READY_STATE } from '../core/pipeline-states';
-import { slugStatusKey } from '../core/status-comment';
-import type { OpenStatusItem } from '../core/status-log';
+import { mergeChain } from '../core/pipeline/chain-delta';
+import { READY_STATE } from '../core/pipeline/pipeline-states';
+import { slugStatusKey } from '../core/pipeline/status-comment';
+import type { OpenStatusItem } from '../core/pipeline/status-log';
 import type { RunInfo, RunState } from '../fleet/protocol';
 
 const LIVE: ReadonlySet<RunState> = new Set(['starting', 'running', 'stopping', 'detached']);

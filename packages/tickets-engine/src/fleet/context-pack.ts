@@ -6,8 +6,8 @@
  */
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
-import { PERSONAS_DIR } from '../core/persona';
-import type { TicketsGit } from '../core/tickets-git';
+import { PERSONAS_DIR } from '../core/persona/persona';
+import type { TicketsGit } from '../core/git/tickets-git';
 
 /**
  * The work repo's agent instructions — the stable in-repo prefix every

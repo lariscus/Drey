@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { phaseWithoutPoolKeys, type PipelinePhase, type RepoRef, type TicketCard } from '../contracts/tickets';
-import { parseRepos } from '../core/ticket-board';
+import { parseRepos } from '../core/ticket/ticket-board';
 import { composeRunRequest } from './request';
 import {
   isUnderAnyBase,

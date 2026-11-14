@@ -12,7 +12,7 @@
  * `usage.record` lines) after each turn, and the cost is computed from the
  * editorial price table.
  */
-import { costOf } from '../core/model-prices';
+import { costOf } from '../core/config/model-prices';
 import { parseShapedQuestion } from '../contracts/question-shape';
 import type { RunnerProcess, SpawnFn } from './procs';
 import {

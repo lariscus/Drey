@@ -137,7 +137,7 @@ describe.skipIf(!found.ok)('the board over a real dk store', { timeout: 120_000 
 
   it('writes the shadow report against a files board that differs', async () => {
     const reportDir = path.join(root, 'shadow');
-    const { assembleBoard } = await import('../core/ticket-board');
+    const { assembleBoard } = await import('../core/ticket/ticket-board');
     const shown = assembleBoard({
       ...BASE,
       files: [
