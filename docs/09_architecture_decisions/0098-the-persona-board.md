@@ -3,7 +3,7 @@
 ## Status
 
 Accepted — built (owner-approved concept 2026-11-11; milestones 237, 239,
-243 – 248, 254 – 256, 260, 261, 272; the documentation row req-275 is milestone
+243 – 248, 254 – 256, 260, 261, 274; the documentation row req-275 is milestone
 262). Later change of three ADRs, each of which carries a pointer back to
 this one:
 
@@ -267,7 +267,7 @@ The concept was approved with open readings; the code decided them.
   `allowed: write-notes`) are other rows (req-282 – req-291), not this
   ADR's.
 
-## Later change — a red gate sends back, Start on the card, the queue in the report (milestone 272, 2026-11-14)
+## Later change — a red gate sends back, Start on the card, the queue in the report (milestone 274, 2026-11-14)
 
 Three rows the owner added to finish line step 5 before the merge into
 `main` (req-78, req-120, req-148).

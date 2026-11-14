@@ -1,4 +1,5 @@
 import type { RunInfo } from '../protocol';
+import { MEMORY_WRITE_TOOL } from '../protocol-closing';
 import type { NormalizedEvent } from '../harness/contract';
 import { frictionOf, sendBackOf } from '../harness/event-text';
 import { foldExecSpan } from '../run/exec-span';
@@ -41,6 +42,11 @@ export function foldEvent(info: RunInfo, event: NormalizedEvent, telemetry: RunT
   return foldExecSpan(info, next, event.ts);
 }
 
+/** The vault MCP's audit of a `memory_write` that went through (req-226): the run saved its lesson. */
+function isLessonSaved(event: NormalizedEvent): boolean {
+  return event.kind === 'tool' && event.detail === 'audit' && event.audit?.verdict === 'allowed' && (event.tool ?? '').endsWith(`__${MEMORY_WRITE_TOOL}`);
+}
+
 /** An event that closes one tool call — the safe point to pause at. */
 function isActionBoundary(event: NormalizedEvent): boolean {
   return (event.kind === 'note' && (event.text ?? '').startsWith('result › ')) || (event.kind === 'tool' && (event.detail === 'done' || event.detail === 'failed'));
@@ -74,6 +80,9 @@ export class EventFold {
       run.blocked = event.blocked ?? null;
       run.friction = frictionOf(event.text ?? ''); // req-169: the closing round's `friction` signal
       run.sendBack = run.request.cursor !== undefined ? sendBackOf(event.text ?? '') : null; // req-257: a chain run's verdict
+    }
+    if (isLessonSaved(event)) {
+      run.lessonWritten = true;
     }
     if (run.softPause === true && isActionBoundary(event)) {
       run.softPause = false; // the action the owner waited for has finished: pause now

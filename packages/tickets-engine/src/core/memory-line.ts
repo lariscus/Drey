@@ -93,3 +93,27 @@ export function memoryEntriesOf(fileText: string): readonly MemoryEntryText[] {
       return { text: bare.startsWith('- ') ? bare.slice(2).trim() : bare, pinned };
     });
 }
+
+/** A lesson compared loosely: whitespace, case and a trailing full stop do not make it new. */
+function lessonKey(text: string): string {
+  return text.replace(/\s+/g, ' ').trim().replace(/[.…]+$/, '').toLowerCase();
+}
+
+/**
+ * Does the memory already hold this persona's lesson (req-226)? The closing
+ * round must not write again what the run saved itself through
+ * `memory_write`, and a second identical line never earns a slot under the
+ * cap. `line` is a stored persona line (`personaLessonLine`).
+ */
+export function holdsLesson(fileText: string, line: string): boolean {
+  const wanted = parseMemoryLine(line.startsWith('- ') ? line.slice(2) : line);
+  if (wanted.author.kind !== 'persona') {
+    return false;
+  }
+  const persona = wanted.author.persona;
+  const key = lessonKey(wanted.lesson);
+  return memoryEntriesOf(fileText).some((entry) => {
+    const held = parseMemoryLine(entry.text);
+    return held.author.kind === 'persona' && held.author.persona === persona && lessonKey(held.lesson) === key;
+  });
+}

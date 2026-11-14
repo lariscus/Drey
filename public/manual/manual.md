@@ -1540,8 +1540,15 @@ page, and the Memory pane of the persona in Mission Control):
 A smooth run writes nothing. When a run was noteworthy, the persona is
 asked once more after its gate — in the same session, without changing
 anything — and the answer becomes the journal entry and, at most, one new
-memory line. When it suggests changing its instructions or model, that
-appears as a proposal you accept or dismiss; nothing changes without you.
+memory line. A persona may also save that one lesson, and one journal
+note, itself while it works, so nothing it learned is lost before the
+run ends; it then adds no second lesson afterwards, and a lesson its
+memory already holds is never written twice. When it suggests changing
+its instructions or model, that appears as a proposal you accept or
+dismiss; nothing changes without you. Everything a run writes into its
+persona's memory, journal and proposals is committed in the tickets
+repository — one commit per run's look back — so there is nothing left
+for you to commit.
 Which signals count is the `closing-signals:` line in the tickets
 repository's `_meta/pipeline.md` (all five by default, `none` for none).
 The findings a worker used to write into a separate friction file moved

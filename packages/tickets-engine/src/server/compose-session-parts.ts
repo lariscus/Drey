@@ -16,6 +16,7 @@ import { ProjectMigrator } from '../services/project-migrator';
 import { PersonaRemoveService } from '../services/persona-remove-service';
 import { ProjectService } from '../services/project-service';
 import { PersonaRecords } from '../services/persona-records';
+import { PersonaRunRecords } from '../services/persona-run-records';
 import { PersonaSessionService } from '../services/persona-session-service';
 import { FilePlanShadowStore } from '../services/plan-shadow';
 import { composeSkills } from '../services/compose-skills';
@@ -32,6 +33,8 @@ export interface SessionParts {
   readonly chat: ChatService;
   readonly personaSessions: PersonaSessionService;
   readonly personaRecords: PersonaRecords;
+  /** req-225/226: the runs' persona writes (closing round, memory_write, journal_write), one commit each. */
+  readonly personaRunRecords: PersonaRunRecords;
   readonly skills: SkillService;
   /** req-289: Settings → Skills library — the listing and the GitHub sources. */
   readonly skillLibrary: SkillLibraryService;
@@ -104,6 +107,7 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
     table: serviceModelTable(opts.home),
   });
   const personaRecords = new PersonaRecords({ board, host, git, log });
+  const personaRunRecords = new PersonaRunRecords({ board, host, git });
   const { skills, library: skillLibrary } = composeSkills({ board, host, git, env: process.env, ...(opts.github === undefined ? {} : { github: opts.github }) });
   const personaRemoval = new PersonaRemoveService({ board, fleet, host, git, pins: new PersonaPinReader(host, parts.crew.crewFiles) });
   const projects = new ProjectService({ board, host, git, changed: () => board.announceChanged() });
@@ -115,7 +119,7 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
     models: opts.seedDefaultCrew === false ? null : new PersonaModelMigrator({ board, host, git, table: serviceModelTable(opts.home), log }),
     projects: (opts.migrateProjects ?? opts.seedDefaultCrew !== false) ? new ProjectMigrator({ board, host, git, log }) : null,
   });
-  return { chat, personaSessions, personaRecords, skills, skillLibrary, personaRemoval, projects, modelTable: serviceModelTable(opts.home), startupWork };
+  return { chat, personaSessions, personaRecords, personaRunRecords, skills, skillLibrary, personaRemoval, projects, modelTable: serviceModelTable(opts.home), startupWork };
 }
 
 /** The one-time migrations of the engine's start. */

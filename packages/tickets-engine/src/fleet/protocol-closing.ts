@@ -23,3 +23,12 @@ export const FRICTION_MARKER = 'FRICTION:';
 
 /** The longest friction report the runner keeps. */
 export const FRICTION_MAX = 300;
+
+/**
+ * The worker's own persona writes during the run (req-226), served by Drey
+ * Service's vault MCP beside the vault tools: one memory lesson and one
+ * journal note per run, in the closing round's line form and caps. A run
+ * whose worker saved its lesson writes none in its closing round.
+ */
+export const MEMORY_WRITE_TOOL = 'memory_write';
+export const JOURNAL_WRITE_TOOL = 'journal_write';

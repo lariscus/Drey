@@ -25,7 +25,8 @@
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import { SERVICE_PREF_DEFAULTS, type ServicePrefs } from '../../../../shared/service-settings';
-import type { ServiceHostOptions } from './service-host-options';
+import { staySpans, type ServiceHostOptions } from './service-host-options';
+import { PERSONA_RUN_METHODS, type ClosingRoundWritten } from '../contracts/persona-run-records';
 import { createEngine, type Engine } from '../server/engine';
 import { FileConfigStore } from '../server/file-config';
 import { componentRecords } from './component-records';
@@ -85,13 +86,13 @@ export class ServiceHost {
     this.logFiles = new DailyLogFiles(opts.home, new NodeLogFileSystem());
     this.serviceLog = new ServiceLog({ sink: opts.logSink ?? this.logFiles, ...(opts.stdout === undefined ? {} : { mirror: opts.stdout }) });
     this.settings = new ServiceSettingsReader(() => this.engine?.config ?? null);
-    this.stay = new ServiceStay({ idleMs: opts.idleMs, ...(opts.now === undefined ? {} : { now: opts.now }), ...spans(opts) });
+    this.stay = new ServiceStay({ idleMs: opts.idleMs, ...(opts.now === undefined ? {} : { now: opts.now }), ...staySpans(opts) });
     this.windows = opts.spawnWindow === undefined ? null : new WindowProcesses({ spawn: opts.spawnWindow, log: (m, l) => this.log('window', m, l) });
     this.logRoutes = new LogRoutes(this.serviceLog);
     const ownConfig = new FileConfigStore(path.join(opts.home, 'config.json'));
     this.vaultMcp = composeVaultMcp({
       config: { get: (key) => (this.engine?.config ?? ownConfig).get(key) },
-      invoke: () => (this.engine === null ? null : (method) => this.engine!.invoke(method)),
+      invoke: () => (this.engine === null ? null : (method, payload) => this.engine!.invoke(method, payload)),
       hostedVault: opts.vaultPath,
       build: opts.build,
       log: (message, level) => this.log('mcp', message, level ?? 'info'),
@@ -109,6 +110,8 @@ export class ServiceHost {
       governorSettings: () => ({ heavySeats: this.prefs.heavySeats, reserve: this.prefs.reserve, lowPriority: this.prefs.lowPriority, quietHours: this.prefs.quietHours }),
       ...(opts.startRunner === undefined ? {} : { start: opts.startRunner }),
       vault: this.vaultMcp,
+      // req-225: the closing round's records go to the engine's one writer of the tickets repository.
+      personaRecords: { closingRound: async (write) => (this.engine === null ? null : ((await this.engine.invoke(PERSONA_RUN_METHODS.closingRound, write)) as ClosingRoundWritten)) },
     });
     this.lockWriter = new LockWriter(opts.home, (message) => this.log('service', message, 'error'));
     this.legacyGate = new LegacyRunnerGate(opts.home, this.runner, (c, m, l) => this.log(c, m, l), opts.legacy);
@@ -349,11 +352,4 @@ export class ServiceHost {
     this.control?.close();
     setTimeout(() => this.opts.exit(0), 50).unref?.();
   }
-}
-
-function spans(opts: ServiceHostOptions): { withDreyGraceMs?: number; firstDreyWaitMs?: number } {
-  return {
-    ...(opts.withDreyGraceMs === undefined ? {} : { withDreyGraceMs: opts.withDreyGraceMs }),
-    ...(opts.firstDreyWaitMs === undefined ? {} : { firstDreyWaitMs: opts.firstDreyWaitMs }),
-  };
 }

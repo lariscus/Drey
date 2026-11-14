@@ -12,6 +12,7 @@ import { LinkRewriter } from '../../../../../shared/link-rewriter';
 import { cleanPath, fail, VaultTools, type McpToolDef, type McpToolResult, type VaultCallOptions, type VaultToolDeps } from '../../../../../shared/vault-tools';
 import { DiskToolVault, type VaultSite } from './disk-tool-vault';
 import { ChangeCollector } from './change-collector';
+import type { PersonaRecordTools } from './persona-record-tools';
 import type { ProjectRights } from './project-rights';
 import type { TokenSession } from './run-tokens';
 import { VaultCallAuditor } from './vault-call-auditor';
@@ -35,6 +36,8 @@ export interface VaultMcpCallsDeps {
    * engine's paths channel tells Drey's vault round (req-213).
    */
   readonly changed?: (change: VaultPathsChange) => void;
+  /** req-226: `memory_write` / `journal_write` for a ticket run's persona; absent = not served. */
+  readonly records?: PersonaRecordTools;
 }
 
 export class VaultMcpCalls {
@@ -43,11 +46,17 @@ export class VaultMcpCalls {
   /** What a worker is offered: the six tools, never `vault_delete`; a session with a tool cut (a 1:1) sees the cut. */
   async list(session?: TokenSession): Promise<McpToolDef[]> {
     const tools = this.toolsOver(new DiskToolVault(await this.deps.vaults.current(), this.deps.disk));
-    return tools.list(await this.optionsOf(tools, session?.grant.tools));
+    return [...(await tools.list(await this.optionsOf(tools, session?.grant.tools))), ...(this.deps.records?.list(session) ?? [])];
   }
 
   async call(session: TokenSession, name: string, args: Readonly<Record<string, unknown>>): Promise<McpToolResult> {
     const timer = this.deps.auditor.start();
+    const records = this.deps.records;
+    if (records?.handles(name) === true) {
+      const result = await records.call(session, name, args);
+      this.deps.auditor.audit(session, { name, target: records.targetOf(session, name), result, timer });
+      return result;
+    }
     // req-283: only what the token's project reaches exists for this call — any other vault is "not available".
     const { sites, grant } = await this.deps.rights.reachOf(session.grant, await this.deps.vaults.current());
     const vault = new DiskToolVault(sites, this.deps.disk);

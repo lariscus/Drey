@@ -75,8 +75,8 @@ export class VaultMcpComponent implements WorkerVaultGate, VaultMcpHandler {
       request.emit({ ts: this.deps.now().toISOString(), kind: 'note', detail: 'runner', text: `${why} — this run has no vault` });
       return null;
     }
-    const { emit, runId, ticketId, persona, readOnly, scope, tools } = request;
-    const token = this.deps.tokens.mint({ runId, ticketId, persona, readOnly, scope, ...(tools === undefined ? {} : { tools }), emit });
+    const { emit, runId, ticketId, persona, readOnly, scope, tools, records } = request;
+    const token = this.deps.tokens.mint({ runId, ticketId, persona, readOnly, scope, ...(tools === undefined ? {} : { tools }), ...(records === undefined ? {} : { records }), emit });
     const launch = describe({ name: VAULT_MCP_NAME, url: `http://127.0.0.1:${this.port}/mcp`, token, runDir: request.runDir });
     try {
       launch.files.forEach((file) => this.deps.files.write(file.path, file.text));
