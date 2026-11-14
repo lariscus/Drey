@@ -29,6 +29,14 @@ at once):
 | **gateway** | the remote gateway for phone and iPad (ADR-0086), inside the engine | `running` (address, paired devices), `stopped` (remote access off) or `failed` (why it does not listen) |
 | **mcp** | the **vault MCP for the workers** (req-167, [ADR-0094](../../docs/09_architecture_decisions/0094-vault-mcp-served-by-drey-service.md)): the ADR-0071 vault tools without `vault_delete`, Streamable HTTP on a loopback port of its own (`/mcp`), a bearer token per worker carrying its project — it reads the project's vaults and plain folders and writes where the project says Write and the persona has `write-notes` (req-283) — every call audited on the run's stream ([FLEET.md](FLEET.md) *The vault over MCP*); a 1:1's token reads every project's vaults read-only with the three read tools (req-217, req-283), a ticket run's persona also gets `memory_write` / `journal_write` into its own records (req-226; written by the engine, one commit each), and a worker's write is announced to Drey's vault round through the engine's paths channel (req-213). Drey's own MCP server for other programs (Claude Desktop, the stdio bridge) still runs in the Drey process — req-212 moves it | `running` (`127.0.0.1:<port> · <n> workers`) as long as the service runs, `failed` with the reason when it cannot listen; no start / stop / restart — live workers hold its address |
 
+The runner's workers run as the OS user that runs the service: on native
+Windows no harness fences a worker's shell commands, so a worker reaches the
+disk and the network that user can. What each harness does confine — the
+persona's permission mode and network switch, the folders a worker may write,
+and a finished ticket's worktrees removed after its merge — is
+[ADR-0099](../../docs/09_architecture_decisions/0099-worker-trust-boundary-per-harness.md)
+and [FLEET.md](FLEET.md) *The worker's boundary* (milestone 273).
+
 Settings → Background service (milestone 216) shows the components and drives
 the runner, the gateway and Drey's MCP server; the tray icon and the service
 window (milestone 222, below) show and drive all of it too. A terminal sees
@@ -318,5 +326,5 @@ Code: `packages/tickets-engine/src/service/` (`service-host.ts`,
 `service-lock.ts`, `legacy.ts`, `launch.ts`, `service-main.ts`); the tray and
 window `electron/service-window/` + `apps/service-window/`; the client `plugins/tickets/main/service-lifecycle.ts`;
 the Drey-gone signal `packages/tickets-engine/src/server/drey-presence.ts`.
-Docs: ADR-0092, docs/05 §5.0, docs/06 "Drey Service: start, adopt, hand over",
+Docs: ADR-0092, ADR-0099 (the workers' boundary), docs/05 §5.0, docs/06 "Drey Service: start, adopt, hand over",
 docs/07 (the packaged layout).

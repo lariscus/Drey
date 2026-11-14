@@ -36,7 +36,7 @@ import { parseTicketFile, ticketPathParts } from './ticket-files';
 import { ticketProjectIssues } from './ticket-project';
 import { pipelinePhaseOf } from './pipeline-phase';
 import { CLOSING_SIGNALS_KEY, parseClosingSignals, type ClosingSignal } from './closing-signals';
-import { FLOW_KEY, parsePipelineFlow } from './pipeline-flow';
+import { FLOW_KEY, PROPOSE_FLOW_KEY, parsePipelineFlow, parseProposeFlow } from './pipeline-flow';
 import type { ChainEntry } from '../contracts/chain';
 
 const PHASE_ID = /^[a-z][a-z0-9-]*$/;
@@ -56,6 +56,8 @@ export interface PipelineParse {
   readonly closingSignals?: readonly ClosingSignal[];
   /** req-266: `flow:` — the standard flow; set on a successful parse (empty = none). */
   readonly flow?: readonly ChainEntry[];
+  /** E10-5b: `propose-flow:` — the plan persona proposes a flow for every new plan; set on a successful parse. */
+  readonly proposeFlow?: boolean;
 }
 
 export function parsePipeline(text: string): PipelineParse {
@@ -110,7 +112,8 @@ export function parsePipeline(text: string): PipelineParse {
   }
   const closingSignals = parseClosingSignals(root[CLOSING_SIGNALS_KEY], issues);
   const flow = parsePipelineFlow(root[FLOW_KEY], issues);
-  return { phases, pushRemote, priorities, error: null, issues, closingSignals, flow };
+  const proposeFlow = parseProposeFlow(root[PROPOSE_FLOW_KEY], issues);
+  return { phases, pushRemote, priorities, error: null, issues, closingSignals, flow, proposeFlow };
 }
 
 // --- pipeline.md patching (the settings dialog's writer, M85) ----------------
@@ -679,6 +682,7 @@ export function assembleBoard(input: AssembleInput): BoardSnapshot {
     pushRemote: pipelineParse.pushRemote,
     ...(pipelineParse.closingSignals !== undefined ? { closingSignals: pipelineParse.closingSignals } : {}),
     ...(pipelineParse.flow !== undefined && pipelineParse.flow.length > 0 ? { flow: pipelineParse.flow } : {}),
+    ...(pipelineParse.proposeFlow === true ? { proposeFlow: true } : {}),
     priorities: pipelineParse.priorities,
     repos: reposParse.repos,
     reposError: reposParse.error,

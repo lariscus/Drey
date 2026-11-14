@@ -211,3 +211,12 @@ none). The price of the session layer: a reviewer can no longer write its
 verdict into the ticket — it is the final message, and the Handover note a
 reviewer used to leave is roadmap req-199. Rejected alternatives:
 `specs/decisions.md`.
+
+## Later change — the worker's trust boundary per harness (req-142, req-185, milestone 273, 2026-11-14)
+
+"The worktree plus the permission mode is the boundary" is now a table per
+harness: [ADR-0099](0099-worker-trust-boundary-per-harness.md). The persona's
+`allowed: run-commands` beats the crew's `permissionMode`, its `network`
+switch rides the request, Claude Code and Copilot CLI write only the worktree
+and the named folders, and no harness fences a shell command on native
+Windows.

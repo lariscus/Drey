@@ -24,7 +24,8 @@ import { newTicketFileText, parseTicketFile, patchTicketFile, patchBlockedBy, pa
 import { withPlanSection } from '../core/plan-section';
 import { parsePlanChain } from '../core/plan-chain';
 import { applyFlowOp, type FlowOp } from '../core/flow-edit';
-import type { FlowReply, FlowSaveReply, FlowStepView, FlowTarget, FlowScope } from '../contracts/flow';
+import { STANDARD_FLOW_ID, type FlowReply, type FlowSaveReply, type FlowStepView, type FlowTarget, type FlowScope } from '../contracts/flow';
+import { patchPipelineFlow } from '../core/pipeline-flow-patch';
 import { allowedAfter, type PersonaAllowedPatch } from '../contracts/persona-allowed';
 import { BUILDING_STATE, DEFAULT_PIPELINE_TEXT, READY_STATE, STANDARD_FLOW_LINE } from '../core/pipeline-states';
 import { parseChainItems, renderChainEntries, unreadableEntryMessage } from '../core/chain-list';
@@ -96,6 +97,9 @@ import { cleanWorktrees, listOrphans, removeWorktree, type CleanupReport } from 
 import { unlinkShared } from '../fleet/worktrees';
 import { statusLogPathOf } from '../fleet/event-writer';
 import { legacyWorktreeBase, worktreeBaseFor, worktreePathFor, WORKTREES_DIR } from '../fleet/worktree-home';
+import { FinishedWorktrees } from '../fleet/orchestrate/finished-worktrees';
+import { GitWorktreeRemover } from '../fleet/git-worktree-remover';
+import { removeDoneWorktrees } from './finished-ticket-worktrees';
 import { reservedIgnoreEntries, withIgnoreEntries } from './reserved-ignore';
 import { dkTargetFor, retreatStages } from '../fleet/dk-target';
 import { trancheConfigOf } from './tranche-config';
@@ -104,7 +108,7 @@ import { type EngineHost, type EngineVaultChangeEvent, EngineVault, FleetPort } 
 import { handoverFromConfig, handoverOverrideKeys } from './handover-config';
 import type { EffectiveCrew } from '../fleet/config/layered-config-resolver';
 import { appendMemory, describeMemoryEntries, memoryPathFor, toggleMemoryPin } from './persona-store';
-import { EMPTY_PERSONA_SETTINGS, HUMAN_PERSONA_ID, humanPersona, isAgentPersona, loadPersonaSkills, personaFileText, parsePersonaFile, personaRef, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaSkill } from '../core/persona';
+import { EMPTY_PERSONA_SETTINGS, HUMAN_PERSONA_ID, humanPersona, isAgentPersona, loadPersonaSkills, personaFileText, parsePersonaFile, personaRef, personaRunAllowedOf, PERSONAS_DIR, PERSONA_ROLES, type Persona, type PersonaSkill } from '../core/persona';
 import { crewOrderOf, inCrewOrder, withCrewOrder } from '../core/crew-order';
 import { personaRunSettingsOf } from '../core/persona-settings';
 import { settingsAfter, type PersonaSettingsPatch } from '../contracts/persona-settings-patch';
@@ -174,8 +178,11 @@ function oneMemoryLine(text: string): string {
 /** The readable refusal every persona-scoped method shares. */
 /** The flow editor's frame (E10-5, req-266): the chain being edited and how much of it is locked. */
 interface FlowFrame {
-  readonly vault: EngineVault;
-  readonly card: TicketCard;
+  /** The id the reply names: the ticket's, or {@link STANDARD_FLOW_ID}. */
+  readonly ticketId: string;
+  /** Null for the standard flow (E10-5b): no ticket file behind it. */
+  readonly vault: EngineVault | null;
+  readonly card: TicketCard | null;
   readonly text: string;
   readonly title: string;
   readonly scope: FlowScope;
@@ -290,6 +297,10 @@ export class TicketChangedError extends Error {
 export class EngineBoardService {
   private queueTail: Promise<unknown> = Promise.resolve();
   private readonly gitLocations = new Map<string, RepoLocation | null>();
+  /** req-185: a finished ticket's worktrees go (branch kept, dirty ones kept). */
+  private get finishedWorktrees(): FinishedWorktrees {
+    return new FinishedWorktrees(new GitWorktreeRemover(this.git));
+  }
   private emitDebounce: ReturnType<typeof setTimeout> | null = null;
   /** Who hears the debounced board change besides the renderer (the remote, req-66). */
   private readonly changeListeners = new Set<() => void>();
@@ -1688,6 +1699,9 @@ export class EngineBoardService {
    * `### Parts` (none = the standard flow), nothing locked.
    */
   private async flowFrame(target: FlowTarget): Promise<FlowFrame | { readonly error: string }> {
+    if (target.id === STANDARD_FLOW_ID) {
+      return this.standardFlowFrame(target);
+    }
     const found = await this.findCard(target.id);
     if (found === null) {
       return { error: `${target.id} is not on the board` };
@@ -1700,6 +1714,7 @@ export class EngineBoardService {
       const own = card.meta.chain ?? [];
       const saved = own.length > 0 ? own : standard;
       return {
+        ticketId: target.id,
         vault,
         card,
         text,
@@ -1720,6 +1735,7 @@ export class EngineBoardService {
     const released = lockedIndices(matchPartTickets(parts, this.childrenOf(snap, target.id))).has(target.part);
     const own = partChainEntries(part);
     return {
+      ticketId: target.id,
       vault,
       card,
       text,
@@ -1733,13 +1749,22 @@ export class EngineBoardService {
     };
   }
 
+  /** E10-5b: the standard flow as a frame — pipeline.md's `flow:`, nothing locked, no ticket file behind it. */
+  private async standardFlowFrame(target: FlowTarget): Promise<FlowFrame | { readonly error: string }> {
+    if (target.part !== null) {
+      return { error: 'the standard flow has no parts' };
+    }
+    const standard = (await this.snapshot()).flow ?? [];
+    return { ticketId: STANDARD_FLOW_ID, vault: null, card: null, text: '', title: 'Default flow', scope: { kind: 'standard' }, saved: standard, standard, locked: 0, part: null, readOnly: null };
+  }
+
   /** A flow frame's chain as the editor shows it: the positions from the current one on, with the crew. */
   private async flowReply(frame: FlowFrame, entries: readonly ChainEntry[]): Promise<FlowReply> {
     await this.ensureHumanPersona();
     const personas = await this.listPersonas();
     return {
       ok: true,
-      ticket: frame.card.id,
+      ticket: frame.ticketId,
       title: frame.title,
       scope: frame.scope,
       chain: renderChainEntries(entries),
@@ -1798,6 +1823,9 @@ export class EngineBoardService {
    * live run and a chain that does not hold refuse.
    */
   async saveFlow(input: FlowTarget & { chain: readonly string[]; actor?: string }): Promise<FlowSaveReply> {
+    if (input.id === STANDARD_FLOW_ID) {
+      return input.part === null ? this.setStandardFlow({ chain: input.chain }) : { ok: false, error: 'the standard flow has no parts' };
+    }
     if (input.part === null) {
       return this.setChain({ id: input.id, chain: input.chain, ...(input.actor === undefined ? {} : { actor: input.actor }) });
     }
@@ -1809,6 +1837,9 @@ export class EngineBoardService {
       }
       if (frame.readOnly !== null) {
         return { ok: false, error: frame.readOnly };
+      }
+      if (frame.vault === null || frame.card === null) {
+        return { ok: false, error: 'the standard flow has no parts' };
       }
       const entries = await this.flowEntriesOf(input.chain, frame);
       if ('error' in entries) {
@@ -1833,6 +1864,53 @@ export class EngineBoardService {
     });
   }
 
+  /**
+   * E10-5b: the standard flow and the proposal switch in `_meta/pipeline.md` (the settings page's
+   * default flow): `chain` replaces `flow:` (checked like every chain write; an empty list removes
+   * the key — a new ticket then carries no chain), `proposeFlow` sets `propose-flow:`. Existing tickets
+   * keep their own chains. One commit `tickets: default flow` / `tickets: propose flow on|off`.
+   */
+  setStandardFlow(input: { chain?: readonly string[]; proposeFlow?: boolean }): Promise<FlowSaveReply> {
+    return this.enqueue(async (): Promise<FlowSaveReply> => {
+      const vault = await this.detect();
+      const text = vault === null ? null : await this.readOptional(vault.id, PIPELINE_PATH);
+      if (vault === null || text === null) {
+        return { ok: false, error: 'tickets/_meta/pipeline.md is missing' };
+      }
+      let canonical: readonly string[] | undefined;
+      if (input.chain !== undefined) {
+        const parsed = parseChainItems(input.chain);
+        if (!parsed.ok) {
+          return { ok: false, error: unreadableEntryMessage(parsed.bad) };
+        }
+        const refusal = parsed.entries.length === 0 ? null : validateChain(parsed.entries, { ...(await this.chainGuardIds()), saved: [], locked: 0 });
+        if (refusal !== null) {
+          return { ok: false, error: refusal };
+        }
+        canonical = renderChainEntries(parsed.entries);
+      }
+      let patched: string;
+      try {
+        patched = patchPipelineFlow(text, { ...(canonical === undefined ? {} : { flow: canonical }), ...(input.proposeFlow === undefined ? {} : { proposeFlow: input.proposeFlow }) });
+      } catch (error) {
+        return { ok: false, error: messageOf(error) };
+      }
+      if (patched === text.replace(/\r\n/g, '\n')) {
+        return { ok: true };
+      }
+      try {
+        await this.host.write(vault.id, PIPELINE_PATH, patched);
+      } catch (error) {
+        return { ok: false, error: `write failed: ${messageOf(error)}` };
+      }
+      const what = canonical !== undefined ? 'default flow' : `propose flow ${input.proposeFlow === true ? 'on' : 'off'}`;
+      const warning = await this.commit(vault, [PIPELINE_PATH], `tickets: ${what}`);
+      this.host.announceChanges(vault.id, [PIPELINE_PATH]);
+      this.announceChanged();
+      return { ok: true, ...(warning === null ? {} : { warning }) };
+    });
+  }
+
   /** What Paul reads before he drafts a flow (E10-5): the standard flow, the chain now, the crew. */
   async flowDraftContext(target: FlowTarget): Promise<{ readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string }> {
     const frame = await this.flowFrame(target);
@@ -1845,6 +1923,9 @@ export class EngineBoardService {
     const reply = await this.flowReply(frame, frame.saved);
     if (!reply.ok) {
       return reply;
+    }
+    if (target.id === STANDARD_FLOW_ID) {
+      return { ok: true, text: flowDraftText({ ticket: null, title: frame.title, plan: '', standard: renderChainEntries(frame.standard), steps: reply.steps, saved: reply.saved, personas: reply.personas }) };
     }
     const plan = frame.part !== null ? `\nThis flow belongs to part "${frame.part.title}"${frame.part.reason === null ? '' : ` — ${frame.part.reason}`}.` : '';
     return {
@@ -2385,7 +2466,7 @@ export class EngineBoardService {
       return null;
     }
     const loop = { ...(card.meta.returnTo !== undefined ? { returnTo: card.meta.returnTo } : {}), ...(card.meta.redBacks !== undefined ? { redBacks: card.meta.redBacks } : {}) }; // req-78
-    const cursor = runCursorOf({ chain, at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.chainGuardIds(), redLoop: loop });
+    const cursor = runCursorOf({ chain, at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.chainGuardIds(), redLoop: loop, proposeFlow: snap.proposeFlow === true });
     const persona = placement.lookup(chain[cursor.at - 1]!.persona);
     return { persona: persona?.kind === 'agent' ? persona.id : null, cursor };
   }
@@ -2837,7 +2918,9 @@ export class EngineBoardService {
       return (await this.commitActionMissing(vault, card.id)) ?? this.startCommitStep(card.id);
     }
     const terminal = snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done';
-    return this.writeChainCursor(card, decision.kind === 'done' ? { done: terminal } : { at: decision.at, returned: decision.returned }, { line: decision.line, actor });
+    const written = await this.writeChainCursor(card, decision.kind === 'done' ? { done: terminal } : { at: decision.at, returned: decision.returned }, { line: decision.line, actor });
+    const warning = written.ok && decision.kind === 'done' ? await this.removeWorktreesOfDone(card) : null;
+    return warning === null || !written.ok ? written : { ...written, warning };
   }
 
   /**
@@ -2935,6 +3018,9 @@ export class EngineBoardService {
       const written = await this.writeChainCursor(card, last ? { done: terminal } : { at: back.at, returned: back.returned }, { line: `Mission Control's entry at position ${input.position} of ${chain.length} is done — her card was confirmed`, actor: this.owner });
       if (written.ok) {
         await this.noteStatus(card, 'resolved', { key: MISSION_ENTRY_KEY }, this.owner);
+        if (last) {
+          await this.removeWorktreesOfDone(card);
+        }
       }
       return written;
     });
@@ -2961,7 +3047,16 @@ export class EngineBoardService {
         if (store === null || record === null || record.stage !== ACTIVE_STAGE) {
           return;
         }
-        await this.putRecord(store, record, recordToBoardFile(record, card.phase).text, { phase: card.phase }).catch((error: unknown) => this.host.log(`chain: ${card.id} could not be moved to done — ${messageOf(error)}`, 'warn'));
+        const moved = await this.putRecord(store, record, recordToBoardFile(record, card.phase).text, { phase: card.phase }).then(
+          () => true,
+          (error: unknown) => {
+            this.host.log(`chain: ${card.id} could not be moved to done — ${messageOf(error)}`, 'warn');
+            return false;
+          },
+        );
+        if (moved) {
+          await this.removeWorktreesOfDone(card);
+        }
       });
     }
   }
@@ -3047,6 +3142,9 @@ export class EngineBoardService {
         }
         const snap = await this.snapshot();
         const card = findOnBoard(snap, ticketId);
+        if (card !== null && card.meta.chain !== undefined) {
+          return this.settleChainCommit(card, snap, runId);
+        }
         if (card !== null && card.phase !== READY_STATE && snap.pipeline.some((p) => p.id === card.phase && p.claim)) {
           return { ok: true, pending: true };
         }
@@ -3068,31 +3166,43 @@ export class EngineBoardService {
   }
 
   /**
+   * D-72 (found by milestone 273's e2e): a chain ticket's sign-off (req-257) is
+   * the commit at You's last entry — once it landed the chain is through, and
+   * the engine books the ticket into Done as the owner (dk never lets the
+   * run's agent release into the terminal stage). Waits while the runner
+   * still holds the claim (D-32); nothing when the ticket is in Done already.
+   */
+  private async settleChainCommit(card: TicketCard, snap: BoardSnapshot, runId: string): Promise<BoardMutationResult & { pending?: true }> {
+    if (card.meta.claimedBy !== null) {
+      return { ok: true, pending: true };
+    }
+    const terminal = snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done';
+    if (card.phase === terminal) {
+      return { ok: true };
+    }
+    return this.writeChainCursor(card, { done: terminal }, { line: `commit step finished (run ${runId}) — the chain is through`, actor: this.owner });
+  }
+
+  /**
    * The clean-worktree removal of a terminal Accept (req-75 W3): the
    * T-0044 `worktree remove` path with `force: false` — a dirty tree
    * stays and says so; a live run keeps it untouched. Never a failed
    * accept: the ticket is already archived.
    */
   private async removeWorktreeAfterAccept(vault: EngineVault, snap: BoardSnapshot, card: TicketCard): Promise<string | null> {
-    if (card.meta.repo === null) {
-      return null;
-    }
-    const repo = snap.repos.find((r) => r.name === card.meta.repo) ?? null;
-    if (repo === null || repo.path === null) {
-      return null;
-    }
     const runs = await this.fleetRecords();
-    if (runs.some((r) => r.ticketId === card.id && !['done', 'stopped', 'failed'].includes(r.state))) {
-      return 'A run is live on the ticket — the worktree was kept';
+    const liveRun = runs.some((r) => r.ticketId === card.id && !['done', 'stopped', 'failed'].includes(r.state));
+    return removeDoneWorktrees({ finished: this.finishedWorktrees, vaultPath: vault.path, repos: snap.repos, card, liveRun });
+  }
+
+  /** req-185: a chain ticket the engine or the owner booked into Done; what was kept is a log line. */
+  private async removeWorktreesOfDone(card: TicketCard): Promise<string | null> {
+    const vault = await this.detect();
+    const warning = vault === null ? null : await this.removeWorktreeAfterAccept(vault, await this.snapshot(), card);
+    if (warning !== null) {
+      this.host.log(`${card.id}: ${warning}`, 'warn');
     }
-    const outcome = await removeWorktree(this.git, repo.path, worktreePathFor(vault.path, repo, card.id), {
-      force: false,
-      links: repo.link,
-    });
-    if (outcome.ok) {
-      return null;
-    }
-    return outcome.dirty === true ? 'The worktree has uncommitted changes and was kept' : outcome.error;
+    return warning;
   }
 
   /**
@@ -3558,6 +3668,7 @@ export class EngineBoardService {
         memory: await loader.memory(personaResolution.persona.id),
         skills: await this.personaSkillsFor(vault, personaResolution.persona),
         run: personaRunSettingsOf(personaResolution.persona),
+        allowed: personaRunAllowedOf(personaResolution.persona),
       };
     }
     const composed = composeRunRequest({

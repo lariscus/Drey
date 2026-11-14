@@ -26,15 +26,27 @@ function run(over: Partial<ProviderStart> = {}, offer: Record<string, unknown> =
 
 describe('Copilot CLI over ACP (req-182)', () => {
   it('launches `copilot --acp --stdio` with the model and the tool permission fixed at startup', () => {
-    expect(copilotArgs({ model: 'claude-sonnet-4.5', permissionMode: 'accept-edits' })).toEqual(['--acp', '--stdio', '--model', 'claude-sonnet-4.5', '--allow-all-tools']);
-    expect(copilotArgs({ model: null, permissionMode: 'bypass' })).toEqual(['--acp', '--stdio', '--allow-all-tools']);
-    expect(copilotArgs({ model: '  ', permissionMode: 'read-only' })).toEqual(['--acp', '--stdio']);
+    expect(copilotArgs({ model: 'claude-sonnet-4.5', permissionMode: 'accept-edits' })).toEqual(['--acp', '--stdio', '--model', 'claude-sonnet-4.5', '--allow-all-tools', '--allow-all-urls']);
+    expect(copilotArgs({ model: null, permissionMode: 'bypass' })).toEqual(['--acp', '--stdio', '--allow-all-tools', '--allow-all-urls']);
+    expect(copilotArgs({ model: '  ', permissionMode: 'read-only' })).toEqual(['--acp', '--stdio', '--allow-all-urls']);
+  });
+
+  it('req-185 / req-142: the folders beyond cwd ride as --add-dir; without the network no URL is allowed up front', () => {
+    expect(copilotArgs({ model: null, permissionMode: 'accept-edits', network: false, writeDirs: ['T:/tickets/_workcopy', 'S:/site-wt/T-1'] })).toEqual([
+      '--acp',
+      '--stdio',
+      '--allow-all-tools',
+      '--add-dir',
+      'T:/tickets/_workcopy',
+      '--add-dir',
+      'S:/site-wt/T-1',
+    ]);
   });
 
   it('sets no model over the session: the pin rode the launch', async () => {
     const r = run({ model: 'gpt-5' });
     await ticks();
-    expect(r.spawned[0]).toMatchObject({ cmd: 'copilot', args: ['--acp', '--stdio', '--model', 'gpt-5', '--allow-all-tools'] });
+    expect(r.spawned[0]).toMatchObject({ cmd: 'copilot', args: ['--acp', '--stdio', '--model', 'gpt-5', '--allow-all-tools', '--allow-all-urls'] });
     expect(r.sent('session/set_config_option')).toBe(0);
   });
 

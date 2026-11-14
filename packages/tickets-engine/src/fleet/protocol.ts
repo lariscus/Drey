@@ -122,6 +122,8 @@ export interface RunCursor {
   readonly maxRed?: number;
   /** req-78: the red gate this entry was reached by — its position, persona and failure, for the brief; absent = none. */
   readonly redBack?: { readonly from: number; readonly persona: string; readonly failure: string | null };
+  /** E10-5b: the board proposes a flow for every new plan (pipeline.md `propose-flow:`) — a plan run's brief makes `### Chain` a chapter every plan carries. */
+  readonly proposeFlow?: boolean;
 }
 
 export interface RunRequest {
@@ -175,6 +177,13 @@ export interface RunRequest {
   }[];
   readonly provider: WorkerProviderId;
   readonly permissionMode: PermissionMode;
+  /**
+   * req-142: `false` = the run's persona may not reach the network (its
+   * `allowed:` lacks `network: true`) — each harness switches off what it
+   * can (ADR-0099). Absent = unrestricted: a run without a persona, a
+   * record from before req-142.
+   */
+  readonly network?: false;
   /** Provider model pin, when the assignment names one (`worker@provider/model`). */
   readonly model: string | null;
   /** The composed instruction (prompt template + ticket context, plugin-side). */

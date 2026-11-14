@@ -27,13 +27,22 @@ export const COPILOT_READ_ONLY_MODE = 'plan';
 export const COPILOT_NOT_READ_ONLY_NOTE =
   'copilot offers no read-only mode and approves its tools itself — read-only is not enforced in the session; the review checkout’s read-only files are the guard';
 
-/** The launch arguments: ACP on stdio, the model pin, the tool permission. */
-export function copilotArgs(start: Pick<ProviderStart, 'model' | 'permissionMode'>): string[] {
+/**
+ * The launch arguments: ACP on stdio, the model pin, the tool permission, the
+ * folders beyond `cwd` (req-185: Copilot confines its file access to `cwd` and
+ * these), and the URLs (req-142): every URL is allowed while the network is
+ * open; without it each URL — `web_fetch` or a shell `curl` — waits for the
+ * owner's approval. `bypass` adds nothing: Copilot's `--allow-all-paths`
+ * would lift the folder confinement, not a prompt.
+ */
+export function copilotArgs(start: Pick<ProviderStart, 'model' | 'permissionMode' | 'network' | 'writeDirs'>): string[] {
   return [
     '--acp',
     '--stdio',
     ...(start.model !== null && start.model.trim() !== '' ? ['--model', start.model.trim()] : []),
     ...(start.permissionMode === 'read-only' ? [] : ['--allow-all-tools']),
+    ...(start.writeDirs ?? []).flatMap((dir) => ['--add-dir', dir]),
+    ...(start.network === false ? [] : ['--allow-all-urls']),
   ];
 }
 

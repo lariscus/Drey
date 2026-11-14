@@ -23,6 +23,7 @@ export function runCursorOf(input: {
   readonly sentBack?: { readonly from: number; readonly to: number } | undefined;
   readonly crew?: RunCursor['crew'];
   readonly redLoop?: Pick<RunCursor, 'returnTo' | 'redBacks' | 'maxRed' | 'redBack'>;
+  readonly proposeFlow?: boolean;
 }): RunCursor {
   const length = input.chain.length;
   const loop = input.redLoop ?? {};
@@ -36,5 +37,6 @@ export function runCursorOf(input: {
     ...(loop.redBacks !== undefined && loop.redBacks > 0 ? { redBacks: loop.redBacks } : {}),
     ...(loop.maxRed !== undefined ? { maxRed: loop.maxRed } : {}),
     ...(loop.redBack !== undefined ? { redBack: loop.redBack } : {}),
+    ...(input.proposeFlow === true ? { proposeFlow: true } : {}),
   };
 }

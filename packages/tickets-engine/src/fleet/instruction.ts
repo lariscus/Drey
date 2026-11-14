@@ -129,6 +129,8 @@ export interface InstructionInput {
     readonly entries: readonly string[];
     /** req-78: the red gate that sent the ticket to this position — the brief's "Sent back by a red gate" part. */
     readonly redBack?: { readonly from: number; readonly persona: string; readonly failure: string | null };
+    /** E10-5b: the plan run's brief asks for `### Chain` in every plan. */
+    readonly proposeFlow?: boolean;
   };
 }
 
@@ -156,7 +158,7 @@ export interface InstructionInput {
  * marked inside the text (bookkeeping the model does not need).
  */
 export function composeInstruction(input: InstructionInput): ComposedInstruction {
-  const head = briefHead({ ...input, prompt: expandFragments(input.prompt, input.disciplines.fragments) });
+  const head = briefHead({ ...input, prompt: expandFragments(input.prompt, input.disciplines.fragments, { proposeFlow: input.chain?.proposeFlow === true }) });
   const persona = personaLine(input.personaId, input.personaRole);
   const description = input.description.trim();
   const truncations: Truncation[] = [];

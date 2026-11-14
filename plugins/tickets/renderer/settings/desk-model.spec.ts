@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { PipelinePhase } from '../../../../packages/tickets-engine/src/contracts/tickets';
 import type { PersonaView } from '../../shared/remote-protocol';
-import { autopilotStateOf, budgetLineOf, maxMbOf, missingShippedPrompts, parseDeskVideos, standardFlowOf, usd } from './desk-model';
+import { autopilotStateOf, budgetLineOf, maxMbOf, missingShippedPrompts, parseDeskVideos, defaultFlowLine, usd } from './desk-model';
 
 const persona = (id: string, extra: Partial<PersonaView> = {}): PersonaView => ({
   id,
@@ -14,20 +14,12 @@ const persona = (id: string, extra: Partial<PersonaView> = {}): PersonaView => (
   ...extra,
 });
 
-const phase = (id: string, handover: string, who: string | null): PipelinePhase =>
-  ({ id, title: id.charAt(0).toUpperCase() + id.slice(1), handover, persona: who }) as unknown as PipelinePhase;
-
 describe('desk settings model', () => {
-  it('strings the agent phases into the standard flow with their persona', () => {
-    const flow = standardFlowOf(
-      [phase('inbox', 'manual', null), phase('plan', 'agent plan', 'paul'), phase('build', 'agent build', 'ben'), phase('ready', 'manual', null), phase('review', 'agent review', null)],
-      [persona('paul'), persona('ben')],
-    );
-    expect(flow).toEqual([
-      { id: 'plan', title: 'Plan', who: 'Paul' },
-      { id: 'build', title: 'Build', who: 'Ben' },
-      { id: 'review', title: 'Review', who: null },
-    ]);
+  it('strings the flow of pipeline.md into one line of persona titles, the interactive entry marked', () => {
+    const entry = (id: string, mode: 'shape' | null = null) => ({ persona: id, mode, notify: false });
+    expect(defaultFlowLine([entry('paul', 'shape'), entry('paul'), entry('ben'), entry('zed')], [persona('paul'), persona('ben')])).toBe('Paul (shape) → Paul → Ben → zed');
+    expect(defaultFlowLine([], [persona('paul')])).toBe('No default flow');
+    expect(defaultFlowLine(undefined, [])).toBe('No default flow');
   });
 
   it('adds the daily budgets up, leaves the owner out, and says when there are none', () => {

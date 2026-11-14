@@ -6,24 +6,23 @@
  * here.
  */
 import { parseHandover, type PipelinePhase } from '../../../../packages/tickets-engine/src/contracts/tickets';
+import type { ChainEntry } from '../../../../packages/tickets-engine/src/contracts/chain';
 import type { PersonaView } from '../../shared/remote-protocol';
 
-export interface FlowStripItem {
-  readonly id: string;
-  readonly title: string;
-  /** The persona's name when the phase names one; null = the ladder decides. */
-  readonly who: string | null;
-}
-
-/** The standard flow: the phases an agent works, in column order, with their persona. */
-export function standardFlowOf(pipeline: readonly PipelinePhase[], personas: readonly PersonaView[]): readonly FlowStripItem[] {
-  return pipeline
-    .filter((phase) => parseHandover(phase.handover).mode === 'agent')
-    .map((phase) => ({
-      id: phase.id,
-      title: phase.title,
-      who: phase.persona === null ? null : (personas.find((p) => p.id === phase.persona)?.title ?? phase.persona),
-    }));
+/**
+ * The default flow as the Flow row says it (E10-5b): pipeline.md's `flow:`, the personas in order with
+ * the interactive entry marked — `Paul (shape) → Paul → Ben → Ralf → Tessa → You`.
+ */
+export function defaultFlowLine(flow: readonly ChainEntry[] | undefined, personas: readonly PersonaView[]): string {
+  if (flow === undefined || flow.length === 0) {
+    return 'No default flow';
+  }
+  return flow
+    .map((entry) => {
+      const title = personas.find((p) => p.id === entry.persona)?.title ?? entry.persona;
+      return entry.mode === 'shape' ? `${title} (shape)` : title;
+    })
+    .join(' → ');
 }
 
 /**

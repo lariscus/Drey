@@ -8,7 +8,7 @@ import { createDeskSettings } from './desk-settings';
 
 const videos = (inGit: boolean, maxMb = 25, existing = 0) => ({ ok: true, devices: [], engine: { videos: { inGit, maxMb, existing, notice: null } } });
 
-function setup(settingsReply: unknown = videos(false)) {
+function setup(settingsReply: unknown = videos(false), proposeFlow = false) {
   const invoke = vi.fn((method: string) => {
     if (method === 'personas') {
       return Promise.resolve([
@@ -37,6 +37,12 @@ function setup(settingsReply: unknown = videos(false)) {
       { phase: { id: 'inbox' }, tickets: [{ id: 'T-0001', meta: { title: 'Idea' } }] },
       { phase: { id: 'build' }, tickets: [{ id: 'T-0002', meta: { title: 'Voice capture' } }] },
     ],
+    flow: [
+      { persona: 'paul', mode: 'shape', notify: false },
+      { persona: 'paul', mode: null, notify: false },
+      { persona: 'you', mode: null, notify: false },
+    ],
+    ...(proposeFlow ? { proposeFlow: true } : {}),
   } as unknown as BoardSnapshot;
   desk.update(snapshot);
   return { desk, invoke, hooks };
@@ -55,7 +61,7 @@ describe('Settings → Tickets desk rows', () => {
     await settle();
     expect(desk.root.querySelector('.tset-set-controls')?.textContent).toContain('Paul');
     expect(desk.root.textContent).not.toContain('Paul, You');
-    expect(desk.root.querySelector('[aria-label="Standard flow"]')?.textContent).toBe('Build');
+    expect(desk.root.querySelector('[aria-label="Default flow"]')?.textContent).toBe('Paul (shape) → Paul → You');
     expect(desk.root.textContent).toContain('$10 across 1 persona · $1 spent today');
     button(desk.root, 'Edit crew').click();
     expect(hooks.openTeam).toHaveBeenCalled();
@@ -65,18 +71,42 @@ describe('Settings → Tickets desk rows', () => {
     const { desk } = setup();
     await settle();
     const names = [...desk.root.querySelectorAll('.tset-set-name')].map((n) => n.textContent);
-    expect(names).toEqual(['Personas', 'Your name', 'Default flow', 'Autopilot', 'Resume paused autopilot at', 'Daily budget', 'Runners']);
+    expect(names).toEqual(['Personas', 'Your name', 'Default flow', 'Propose a flow for every new plan', 'Autopilot', 'Resume paused autopilot at', 'Daily budget', 'Runners']);
     expect([...desk.root.querySelectorAll('h3')].map((h) => h.textContent)).toEqual(['Crew', 'Flow', 'Autopilot', 'Budget and runners']);
     expect([...document.querySelectorAll('section')].map((n) => (n as HTMLElement).dataset['settingsSection'])).toEqual(['crew', 'flow', 'autopilot', 'budget', 'videos']);
   });
 
-  it('opens the flow editor on the picked ticket, not an inbox idea', async () => {
+  it('opens the flow editor on the default flow itself, with no ticket to pick', async () => {
     const { desk, hooks } = setup();
     await settle();
-    const options = [...desk.root.querySelectorAll('select[aria-label="Ticket to edit the flow of"] option')].map((o) => (o as HTMLOptionElement).value);
-    expect(options).toEqual(['T-0002']);
+    expect(desk.root.querySelector('select')).toBeNull();
     button(desk.root, 'Open flow editor').click();
-    expect(hooks.openFlow).toHaveBeenCalledWith('T-0002');
+    expect(hooks.openFlow).toHaveBeenCalledWith('standard');
+  });
+
+  it('shows the proposal switch as the board has it and writes it through the engine (E10-5b)', async () => {
+    const { desk, invoke } = setup(videos(false), true);
+    await settle();
+    const propose = desk.root.querySelector<HTMLInputElement>('#tset-propose-flow')!;
+    expect(propose.checked).toBe(true);
+    invoke.mockImplementation(() => Promise.resolve({ ok: true }));
+    propose.checked = false;
+    propose.dispatchEvent(new Event('change'));
+    await settle();
+    expect(invoke).toHaveBeenCalledWith('setStandardFlow', { proposeFlow: false });
+    expect(desk.root.querySelector('#tset-propose-flow ~ .field-hint, .tset-set .field-hint')?.textContent ?? '').toBe('');
+  });
+
+  it('puts the switch back and says why when the engine refuses it', async () => {
+    const { desk, invoke } = setup();
+    await settle();
+    invoke.mockImplementation(() => Promise.resolve({ ok: false, error: 'tickets/_meta/pipeline.md is missing' }));
+    const propose = desk.root.querySelector<HTMLInputElement>('#tset-propose-flow')!;
+    propose.checked = true;
+    propose.dispatchEvent(new Event('change'));
+    await settle();
+    expect(propose.checked).toBe(false);
+    expect(desk.root.textContent).toContain('pipeline.md is missing');
   });
 
   it('turning videos in Git on asks first, then patches with the confirmation', async () => {

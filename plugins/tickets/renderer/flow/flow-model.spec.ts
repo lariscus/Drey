@@ -123,7 +123,9 @@ describe('flow model', () => {
     expect(flowKeyOf({ ticketId: 'T-0130', part: 2 })).toBe('flow://T-0130/2');
     expect(flowTargetOfKey('flow://T-0130/2')).toEqual({ ticketId: 'T-0130', part: 2 });
     expect(flowTargetOfKey('flow://T-0130')).toEqual({ ticketId: 'T-0130', part: null });
+    expect(flowTargetOfKey('flow://standard')).toEqual({ ticketId: 'standard', part: null });
     expect(flowTargetOfKey('review://T-0130')).toBeNull();
     expect(flowTitleOf({ ticketId: 'T-0130', part: 0 })).toBe('Flow · T-0130 · Part 1');
+    expect(flowTitleOf({ ticketId: 'standard', part: null })).toBe('Flow · Default');
   });
 });

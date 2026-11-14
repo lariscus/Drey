@@ -73,7 +73,7 @@ function shipInstructionInput(plan: RunPlan): InstructionInput {
 
 /** req-257: the brief's chain part from the run's cursor; req-78: with the red gate that sent the ticket here. */
 function chainPartOf(cursor: NonNullable<ComposeRunInput['cursor']>): NonNullable<InstructionInput['chain']> {
-  return { at: cursor.at, length: cursor.length, entries: cursor.entries ?? [], ...(cursor.redBack !== undefined ? { redBack: cursor.redBack } : {}) };
+  return { at: cursor.at, length: cursor.length, entries: cursor.entries ?? [], ...(cursor.redBack !== undefined ? { redBack: cursor.redBack } : {}), ...(cursor.proposeFlow === true ? { proposeFlow: true } : {}) };
 }
 
 function titleOf(input: ComposeRunInput): string {

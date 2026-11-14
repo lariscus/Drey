@@ -1074,7 +1074,10 @@ ticket stands:
 - **In Done** it is the final report: **What was delivered** first (the
   ticket's `## Result`, when a run wrote one), then the changes. The only button is **Archive**, which
   files the ticket away and removes its worktree when clean (a dirty
-  one stays and says so).
+  one stays and says so). On the persona board a ticket's worktrees go by
+  themselves once its branch is merged (your sign-off's commit) or it
+  reaches Done — the branch stays; a worktree with uncommitted changes is
+  kept, and the run or a warning names it.
 - While an agent works the ticket, there is no card.
 
 The strip at the top of the card stays when you fold it with the chevron
@@ -1181,7 +1184,11 @@ not like it. The draft is written by the persona of the ticket's planning step
 (the first step whose persona hands over a plan), else the one that holds
 *Shape*, speaking with its own instructions; a chain with neither gets the
 answer *No persona is assigned to plan T-…* and nothing is drafted. Nothing is written until **Save flow**; *Reset to standard flow*
-puts the standard flow back behind the steps that have begun. The current step
+puts the standard flow back behind the steps that have begun. *Open flow editor*
+under **Default flow** in Settings → Tickets opens this tab on the standard flow
+itself (**Flow · Default**, no ticket, nothing locked, no reset): *Save flow*
+there changes the flow every **new** ticket is created with; tickets that exist
+keep their own. The current step
 and the ones before it cannot change, and the whole flow is read-only while a
 run is live on the ticket.
 
@@ -1812,8 +1819,16 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   **Reach the network**, **Change notes where the project allows** — the project
   names the vaults, so the link *Vaults are set per project* opens *Settings →
   Projects*; see *The crew's vault* — and **Spend above allowance**, past a
-  ticket's allowance — hover a row for what it means; the notes and allowance
-  choices apply to runs now, the commands and network choices are recorded for the runner). On the right,
+  ticket's allowance — hover a row for what it means). Every choice applies
+  to the persona's next run. **Run commands** picks the harness permission
+  mode (*Accept edits* or *Bypass*; *Crew setting* leaves the crew's). Without
+  **Reach the network** the persona's workers lose what their harness can take
+  away: Claude Code its web search and fetch, Copilot CLI asks you for every
+  web address; opencode is asked to drop its web tools, Kimi cannot be — and on
+  Windows no harness stops a shell command (`npm install`, `curl`) from
+  reaching the network. A writing worker's file tools write only its worktree,
+  its ticket's file and the ticket's other worktrees, where the harness
+  supports it (Claude Code, Copilot CLI). On the right,
   **Instructions** is the persona's `prompt.md` in the same editor your notes
   use — Live Preview or **Source**, with the formatting buttons above it — and
   the line above it counts what a run of this persona starts with (`≈ 2,490
@@ -2501,10 +2516,14 @@ And the assistant can drive runs: ask it about the fleet — it sees
 
 Settings → Tickets starts with the things you decide about the crew:
 **Crew** shows the personas as chips; you are the human persona, called *You* until you type another name into **Your name** (it applies to every column you work, the flow editor, Crew and the phone); *Edit crew* opens the
-Crew tab. **Default flow** shows the standard flow, the columns an agent
-works with who does each; a flow is changed per ticket, so pick a ticket
-next to *Open flow editor* to open its Flow tab (the standard flow itself is
-set below, in the pipeline table). **Autopilot** is the state (*On*, *Paused*, *Off*) and *Resume paused autopilot at*;
+Crew tab. **Default flow** shows the standard flow a new ticket is created with, the
+personas in order (*Paul (shape) → Paul → Ben → Ralf → Tessa → You*);
+*Open flow editor* opens it in the Flow tab, where you edit and save it like a
+ticket's flow. **Propose a flow for every new plan** (off by default) lets the
+persona that writes the plan add a *Chain* chapter to every new plan — starting
+from the default flow, with the reason in the plan's *Decisions* — instead of
+only when a ticket's way should differ; you still approve the plan, and the
+chain is applied when the plan's run ends. **Autopilot** is the state (*On*, *Paused*, *Off*) and *Resume paused autopilot at*;
 **Models** is the capacity pool (see *Models, classes and the capacity pool*);
 **Budget and runners** shows the daily
 budgets of the personas added up with today's spending, and the sessions each

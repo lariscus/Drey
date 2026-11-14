@@ -3,7 +3,7 @@ import { hostname } from 'node:os';
 import type { PipelinePhase, RepoRef } from '../contracts/tickets';
 import type { ComposedInstruction } from './instruction-parts';
 import type { ClosingSignal } from '../core/closing-signals';
-import { HUMAN_PERSONA_ID } from '../core/persona';
+import { HUMAN_PERSONA_ID, networkFieldOf } from '../core/persona';
 import type { PersonaRunSettings } from '../core/persona-settings';
 import { DEFAULT_CLOSING_SPEC, type RunRequest } from './protocol';
 import type { RunPlan } from './request-plan';
@@ -26,7 +26,7 @@ type WhereParts = Pick<
 >;
 type WorkParts = Pick<
   RunRequest,
-  'provider' | 'model' | 'permissionMode' | 'instruction' | 'continuationInstruction' | 'briefDigest' | 'acceptance' | 'gate' | 'git'
+  'provider' | 'model' | 'permissionMode' | 'network' | 'instruction' | 'continuationInstruction' | 'briefDigest' | 'acceptance' | 'gate' | 'git'
 >;
 type MoveParts = Pick<RunRequest, 'nextPhase' | 'nextPhaseDir' | 'pushRemote' | 'claimIdentity' | 'cursor'>;
 type OptionalParts = Pick<RunRequest, 'limits' | 'recordWorker' | 'column' | 'handover' | 'interactive' | 'dk' | 'parkFor' | 'leaving' | 'machine' | 'reviewCheckout' | 'closing'>;
@@ -63,8 +63,9 @@ function workParts(plan: RunPlan, worker: RunWorkerPin, instruction: ComposedIns
   return {
     provider: worker.provider,
     model: worker.model,
-    // req-183: a review's session runs read-only, whatever the board's setting says.
-    permissionMode: plan.reviewCheckout !== null ? 'read-only' : input.permissionMode,
+    // req-183: a review's session runs read-only, whatever the board's setting says; req-142: else the persona's `run-commands:` beats the crew's.
+    permissionMode: plan.reviewCheckout !== null ? 'read-only' : (input.persona?.allowed?.runCommands ?? input.permissionMode),
+    ...networkFieldOf(input.persona?.allowed),
     instruction: instruction.text,
     continuationInstruction: instruction.continuation,
     briefDigest: createHash('sha256').update(instruction.stable).digest('hex'),

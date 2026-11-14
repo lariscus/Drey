@@ -9,6 +9,7 @@
  */
 import type { PipelinePhase, RepoRef, TicketCard } from '../contracts/tickets';
 import type { ClosingSignal } from '../core/closing-signals';
+import type { PersonaRunAllowed } from '../core/persona';
 import type { PersonaRunSettings } from '../core/persona-settings';
 import { acceptanceCommands } from '../core/ticket-files';
 import type { Truncation } from './assignment';
@@ -149,6 +150,8 @@ export interface PersonaDispatch {
    * today's behaviour: the column decides.
    */
   readonly run?: PersonaRunSettings;
+  /** req-142: the persona's `allowed:` as a run takes it — its permission mode and the network switch. Absent = the crew decides, network open. */
+  readonly allowed?: PersonaRunAllowed;
 }
 
 export type ComposeRunResult =

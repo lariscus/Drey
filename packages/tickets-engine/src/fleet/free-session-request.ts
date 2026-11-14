@@ -1,4 +1,4 @@
-import type { Persona } from '../core/persona';
+import { networkFieldOf, personaRunAllowedOf, type Persona } from '../core/persona';
 import { noHarnessReason, personaHarnessOf } from './persona-harness';
 import type { EffectiveCrew, SessionOverrides } from './config/layered-config-resolver';
 import { LayeredConfigResolver } from './config/layered-config-resolver';
@@ -66,6 +66,7 @@ export class FreeSessionRequestBuilder {
       baseRef: null,
       provider,
       permissionMode: session.permissionMode,
+      ...networkFieldOf(personaRunAllowedOf(persona)),
       model: session.model,
       instruction: input.instruction,
       acceptance: [],

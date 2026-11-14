@@ -35,6 +35,7 @@ export const TICKETS_ENTRIES: readonly PluginSettingsEntry[] = [
   e('crew', 'team', 'Crew', 'Personas, default crew'),
   e('crew', 'humanName', 'Your name', 'The human persona'),
   e('flow', 'flow', 'Default flow', 'Standard flow, flow editor'),
+  e('flow', 'flow.propose', 'Propose a flow for every new plan', 'The plan persona writes a flow into each new plan'),
   e('autopilot', 'autopilot', 'Autopilot', 'On, paused or off: whether the chain starts new runs'),
   e('autopilot', 'autopilot.resumeAt', 'Resume paused autopilot at', 'The time a paused autopilot starts again'),
   e('budget', 'budget', 'Daily budget', 'Pause new runs when it is spent'),

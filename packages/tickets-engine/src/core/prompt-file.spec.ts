@@ -31,17 +31,27 @@ describe('readPromptFile', () => {
 
 describe('the fragments', () => {
   it('replace every placeholder; a text without one, and null, stay as they are', () => {
-    const fragments = { planFormat: 'PLAN', chainGrammar: 'CHAIN' };
+    const fragments = { planFormat: 'PLAN', chainGrammar: 'CHAIN', flowProposal: 'PROPOSE' };
     expect(expandFragments('a {{plan-format}} b {{chain-grammar}} c {{plan-format}}', fragments)).toBe('a PLAN b CHAIN c PLAN');
     expect(expandFragments('plain', fragments)).toBe('plain');
     expect(expandFragments(null, fragments)).toBeNull();
+  });
+
+  it('expand the flow proposal only while the board proposes a flow (E10-5b)', () => {
+    const fragments = { planFormat: 'PLAN', chainGrammar: 'CHAIN', flowProposal: 'PROPOSE' };
+    expect(expandFragments('{{plan-format}}', fragments)).toBe('PLAN');
+    expect(expandFragments('{{plan-format}}', fragments, { proposeFlow: false })).toBe('PLAN');
+    expect(expandFragments('a {{plan-format}} b', fragments, { proposeFlow: true })).toBe('a PLAN\n\nPROPOSE b');
+    expect(expandFragments('x {{flow-proposal}}', fragments, { proposeFlow: true })).toBe('x PROPOSE');
+    expect(expandFragments('x {{flow-proposal}}', fragments)).toBe('x ');
   });
 
   it('load from <dir>/fragments/ without their markers', async () => {
     await fsp.mkdir(path.join(dir, 'fragments'));
     await fsp.writeFile(path.join(dir, 'fragments', 'plan-format.md'), '<!-- drey-prompt-version: 1 -->\nPLAN\n', 'utf8');
     await fsp.writeFile(path.join(dir, 'fragments', 'chain-grammar.md'), 'CHAIN\n', 'utf8');
-    expect(await loadPromptFragments(dir)).toEqual({ planFormat: 'PLAN', chainGrammar: 'CHAIN' });
+    await fsp.writeFile(path.join(dir, 'fragments', 'flow-proposal.md'), '<!-- drey-prompt-version: 1 -->\nPROPOSE\n', 'utf8');
+    expect(await loadPromptFragments(dir)).toEqual({ planFormat: 'PLAN', chainGrammar: 'CHAIN', flowProposal: 'PROPOSE' });
     expect(await expandShippedFragments('x {{chain-grammar}}', dir)).toBe('x CHAIN');
   });
 

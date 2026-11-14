@@ -38,9 +38,19 @@ export function scrubInheritedEnv(env: NodeJS.ProcessEnv): readonly string[] {
   return removed;
 }
 
+/**
+ * One argument as the Windows shell must see it (req-185): the shell joins
+ * the argv with spaces unquoted, so a path with a space (`--add-dir`,
+ * `--settings`, `--mcp-config`) would split; it goes in double quotes, which
+ * the program's own argv parsing strips again. Elsewhere there is no shell.
+ */
+export function shellArg(arg: string, windows: boolean = isWindows): string {
+  return windows && /[\s&|<>^]/.test(arg) && !arg.includes('"') ? `"${arg}"` : arg;
+}
+
 export function nodeSpawnFn(): SpawnFn {
   return (cmd, args, opts) => {
-    const child = spawn(cmd, args, {
+    const child = spawn(cmd, args.map((arg) => shellArg(arg)), {
       cwd: opts.cwd,
       env: opts.env === undefined ? undefined : { ...process.env, ...opts.env },
       // Own process group on POSIX so the tree-kill reaches grandchildren;

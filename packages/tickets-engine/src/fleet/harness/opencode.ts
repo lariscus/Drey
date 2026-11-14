@@ -13,7 +13,7 @@ import { AcpAdapter } from './acp-adapter';
 import type { AcpHarness } from './acp-harness';
 import { PromptUsageMeter } from './acp-usage';
 import type { NowFn, ProviderAdapter } from './contract';
-import { opencodeCapConfig, opencodeModeFor, opencodeModelSettings } from './opencode-settings';
+import { opencodeLaunchConfig, opencodeModeFor, opencodeModelSettings } from './opencode-settings';
 
 export function opencodeHarness(): AcpHarness {
   return {
@@ -21,10 +21,11 @@ export function opencodeHarness(): AcpHarness {
     label: 'OpenCode',
     agent: 'opencode',
     launch: (start) => {
-      const cap = opencodeCapConfig(start.model, start.contextCap ?? 0);
-      return cap === null
-        ? { command: 'opencode', args: ['acp'] }
-        : { command: 'opencode', args: ['acp'], env: { OPENCODE_CONFIG_CONTENT: cap }, note: `context cap: ${Math.floor(start.contextCap!)} tokens — OpenCode compacts the session there` };
+      const config = opencodeLaunchConfig(start);
+      const note = config.notes.length > 0 ? { note: config.notes.join(' · ') } : {};
+      return config.content === null
+        ? { command: 'opencode', args: ['acp'], ...note }
+        : { command: 'opencode', args: ['acp'], env: { OPENCODE_CONFIG_CONTENT: config.content }, ...note };
     },
     clientCapabilities: { elicitation: { form: {} } },
     resume: ['resume', 'load'],

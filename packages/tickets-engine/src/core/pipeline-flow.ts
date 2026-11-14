@@ -22,3 +22,21 @@ export function parsePipelineFlow(raw: unknown, issues: TicketIssue[]): readonly
   }
   return parsed.entries;
 }
+
+export const PROPOSE_FLOW_KEY = 'propose-flow';
+
+/**
+ * E10-5b: `propose-flow: true` — the plan persona proposes a flow for every
+ * new plan (its brief makes `### Chain` a chapter every plan carries). Absent
+ * or `false` = off; any other value reads as off with a warning.
+ */
+export function parseProposeFlow(raw: unknown, issues: TicketIssue[]): boolean {
+  if (raw === undefined || raw === null || raw === false) {
+    return false;
+  }
+  if (raw === true) {
+    return true;
+  }
+  issues.push({ level: 'warning', message: `pipeline.md ${PROPOSE_FLOW_KEY}: must be true or false — read as false` });
+  return false;
+}

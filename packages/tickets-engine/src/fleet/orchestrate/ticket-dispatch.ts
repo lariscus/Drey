@@ -1,6 +1,6 @@
 import { ticketProject } from '../../contracts/projects';
 import type { BoardSnapshot, PipelinePhase, RepoRef, TicketCard } from '../../contracts/tickets';
-import { personaModelGuess, splitPoolEntry, type Persona } from '../../core/persona';
+import { personaModelGuess, personaRunAllowedOf, splitPoolEntry, type Persona } from '../../core/persona';
 import { personaRunSettingsOf } from '../../core/persona-settings';
 import { TicketsGit } from '../../core/tickets-git';
 import { isAutoPhase, nextPhaseIdOf } from '../chain';
@@ -208,7 +208,7 @@ export class TicketDispatch {
     const { card, workingPhaseId } = planned;
     const { target, parkFor } = got;
     // req-257: a chain run hands on by its cursor (the column follows the holder), never by a move.
-    const cursor = chained(config, card) ? await this.cursorOf(config, card, target.phase) : null;
+    const cursor = chained(config, card) ? await this.cursorOf(config, card, { phase: target.phase, proposeFlow: snap.proposeFlow === true }) : null;
     // E10-6: a manual step after this gate parks the ticket on a green gate — it moves only as far as the working column.
     const nextPhaseId = cursor !== null ? null : moveTargetOf(snap, card, workingPhaseId, parkFor);
     const context = await this.context(config, card, target.repo, retryOf(cursor, workingPhaseId));
@@ -247,16 +247,17 @@ export class TicketDispatch {
   }
 
   /**
-   * req-257: the chain entry the run works — position, the entries, the send-back used, the crew a plan run's `### Chain` may name;
+   * req-257: the chain entry the run works — position, the entries, the send-back used, the crew a plan run's `### Chain` may name
+   * (E10-5b: and whether every plan proposes one);
    * req-78: the red-gate loop — where a green end returns, the loop's count and bound, and the red gate that sent the ticket here.
    */
-  private async cursorOf(config: ChainConfig, card: TicketCard, phase: PipelinePhase): Promise<RunCursor> {
+  private async cursorOf(config: ChainConfig, card: TicketCard, run: { readonly phase: PipelinePhase; readonly proposeFlow: boolean }): Promise<RunCursor> {
     const chain = card.meta.chain ?? [];
     const { returnTo, redBacks } = card.meta;
     const from = returnTo !== undefined && returnTo > (card.meta.at ?? 1) ? returnTo : null;
     const redBack = from === null ? undefined : { from, persona: chain[from - 1]?.persona ?? '?', failure: this.deps.directory.lastGateFailureAt(card.id, from) };
-    const redLoop = { ...(returnTo !== undefined ? { returnTo } : {}), ...(redBacks !== undefined ? { redBacks } : {}), maxRed: phase.maxRed ?? DEFAULT_MAX_RED, ...(redBack !== undefined ? { redBack } : {}) };
-    return runCursorOf({ chain, at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.deps.personas.crewGuard(config), redLoop });
+    const redLoop = { ...(returnTo !== undefined ? { returnTo } : {}), ...(redBacks !== undefined ? { redBacks } : {}), maxRed: run.phase.maxRed ?? DEFAULT_MAX_RED, ...(redBack !== undefined ? { redBack } : {}) };
+    return runCursorOf({ chain, at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.deps.personas.crewGuard(config), redLoop, proposeFlow: run.proposeFlow });
   }
 
   /** The context pack (T-0048): the repo's instructions, the worktree's diff stat and a retry's gate failure (its column's, a chain run's own position's — req-78); a scout run has neither worktree nor gate. */
@@ -289,6 +290,7 @@ export class TicketDispatch {
         memory: entry?.memory ?? '',
         skills: entry?.skills ?? [],
         run: personaRunSettingsOf(persona),
+        allowed: personaRunAllowedOf(persona),
       },
     };
   }

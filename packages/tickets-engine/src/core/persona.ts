@@ -64,11 +64,17 @@ export interface PersonaAllowed {
   readonly spendAboveAllowance: boolean;
   /**
    * `run-commands: accept-edits | bypass` (req-171, the page's "Run commands
-   * in the worktree"): recorded, not yet enforced — the runner takes the
-   * crew's `permissionMode` (req-142's remainder).
+   * in the worktree"): the harness permission mode of the persona's runs and
+   * free sessions — it beats the crew's `permissionMode` (req-142); a review
+   * stays read-only, a free session's own choice beats it. Absent = the crew's.
    */
   readonly runCommands?: PersonaRunCommands;
-  /** `network: true` (req-171, "Reach the network"): recorded, not yet enforced (req-142's remainder). */
+  /**
+   * `network: true` (req-171, "Reach the network"): absent = the persona's
+   * workers run with the network switched off as far as each harness can
+   * enforce it (req-142, ADR-0099) — Claude Code's web tools, Copilot CLI's
+   * URL approval; on native Windows no harness confines a shell command.
+   */
   readonly network?: boolean;
   /**
    * `write-notes: true` (req-282, concept §3): the persona may change notes
@@ -414,3 +420,19 @@ export { splitPoolEntry } from './pool-entry';
 export { EMPTY_PERSONA_SETTINGS, type PersonaSettings } from './persona-settings';
 
 export { loadPersonaSkills, type LoadedSkills, type PersonaSkill } from './skill-load';
+
+/** req-142: what one run takes from a persona's `allowed:` — the permission mode beating the crew's (absent = the crew's) and the network switch. */
+export interface PersonaRunAllowed {
+  readonly runCommands?: PersonaRunCommands;
+  readonly network: boolean;
+}
+
+export function personaRunAllowedOf(persona: { readonly allowed: PersonaAllowed }): PersonaRunAllowed {
+  const { runCommands, network } = persona.allowed;
+  return { ...(runCommands !== undefined ? { runCommands } : {}), network: network === true };
+}
+
+/** The request's `network` key (req-142): `false` only when a persona forbids it; absent = unrestricted, as before. */
+export function networkFieldOf(allowed: PersonaRunAllowed | null | undefined): { readonly network?: false } {
+  return allowed !== null && allowed !== undefined && !allowed.network ? { network: false } : {};
+}

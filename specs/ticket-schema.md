@@ -820,7 +820,12 @@ it is **copied into a ticket at creation** (`chain:` plus `at: 1`, every
 creation path: capture, the chat's createTicket, a released plan part
 without a chain of its own), and is then the ticket's own — a later change
 of `flow:` never reshuffles existing tickets. A pipeline without `flow:`
-creates tickets without a chain.
+creates tickets without a chain. The settings page edits it in the flow editor
+itself: the editor's ticket id `standard` (`FlowScope` `standard`, tab key
+`flow://standard`) shows `flow:` with nothing locked, the same edits and Paul's
+draft apply, and "Save flow" rewrites the key in `pipeline.md` (a yaml document
+edit that keeps the other keys and the body; an empty list removes it) instead of
+a ticket header — checked by the same write guard; a part does not exist there.
 
 **The write guard** (`validateChain`, `core/chain-validate.ts`) runs where a
 write is decided — `setChain`, the flow editor, a part's chain, the plan's
@@ -1169,7 +1174,20 @@ the old phase stays in `x-legacy-phase`. `migrate-tickets --pipeline-out` writes
   (`flow: paul:shape; paul; ben; ralf; tessa; you`), or a YAML list. Copied
   into the ticket at creation and the ticket's own from then on; absent = new
   tickets carry no chain. An unreadable entry drops the whole key with a
-  warning. Read by `core/pipeline-flow.ts`.
+  warning. Read by `core/pipeline-flow.ts`; written by the settings page's
+  default flow (`BoardService.setStandardFlow`, one commit `tickets: default flow`).
+- `propose-flow`: optional (E10-5b) — `true` makes the plan persona propose a
+  flow for **every new plan**: a plan run's brief closes the plan format with
+  `prompts/fragments/flow-proposal.md`, which turns the optional `### Chain`
+  chapter into one every plan carries, starting from the chain the ticket
+  carries (the standard flow, copied at creation) and giving the reason in
+  `### Decisions`. The chapter is then applied like any plan chain
+  (`validateChain`, the green end of the run). Absent or `false` = off (`### Chain`
+  only when the way should differ); any other value reads as off with a
+  warning. Written by the settings page's switch (`setStandardFlow`, one commit
+  `tickets: propose flow on|off`; off removes the key). Read by
+  `core/pipeline-flow.ts` (`parseProposeFlow`) into `BoardSnapshot.proposeFlow`,
+  carried to the run as `RunCursor.proposeFlow`.
 - `token-budget`: optional (req-268) — the board's daily token budget once the
   pipeline holds only the lifecycle columns: step 3 of the board migration
   keeps the old working column's `token-budget` here (concept §5: it stays a
@@ -1363,7 +1381,7 @@ tickets/_meta/personas/
   | `min` | runs the persona may start while the big pool is full, overrunning it on purpose (concept §9); config and the Persona page only. **Recorded, not yet enforced** (req-257). Written only when above 0 | `0` |
   | `leaving` | the leaving actions, in order: `sync-main` (merge `main` into the branch when a ticket leaves the persona) and `commit` (the merge into `main` after the owner's sign-off). Run since req-267, inside the claim, on a heavy governor seat, no model: `sync-main` at the end of a green run of the persona, after the gate and the closing round, before the hand-on — the integration branch's git upstream (fetched; the local branch without one) merged into the ticket's branch, the card reading `merging main`; a conflict is aborted and ends the run red with the conflict as its gate failure (no send-back). `commit` on the human persona is the sign-off's merge ("Accept on Ready to try" above), the card reading `committing`. Seeded: the shipped Ben `[sync-main]`, the You a new board writes `[commit]`. An unknown name is dropped | `[]` |
   | `readonly` | `true | false` — **instructed read-only** (req-258): the run's brief carries the read-only discipline instead of the writing rules, the ticket-file duties and the handover. An instruction, not a lock: the worktree, the harness session and its permissions stay as they are (a technical lock needs a harness change — `decisions.md`). The review run's detached read-only checkout and read-only session (req-183) stay tied to the `review` phase and the `reviewer` role | the role's: `true` for `reviewer` and `tester`, else `false` |
-  | `allowed` | a map; four keys. `write-notes: true` (req-282, enforced since req-283) — the persona may change notes where its run's project grants `write` (the concept's intersection: project per vault ∧ this switch ∧ the run not read-only; the vaults themselves are the project's, `_meta/projects/` below) — a refusal reaches the model as `Error: <persona> may not write vault "<id>" (allowed: read)` and the run's stream as an audit line; `vault_move` counts as writing; written by the first project's migration for every persona that named `write-vaults`, and by the Persona page's "Change notes where the project allows". `spend-above-allowance: true` — the persona runs on past a ticket's `allowance:` instead of waiting for the owner (req-170). The retired `write-vaults: [<vault id>, …]` (req-167; device ids) grants nothing since req-283: it is read only by the first project's migration, never written back, and dropped from every persona file by the engine's start once a project exists (one commit, `personas: drop write-vaults — the vault rights are the project's (req-283)`). `run-commands: accept-edits \| bypass` — the harness permission mode the persona's runs may take (the Persona page's "Run commands in the worktree"; absent = the crew's `permissionMode`) and `network: true` — it may reach the network (web search and fetch, package installs): both are **recorded and not yet read by the runner** (req-142's enforcement remainder; the page shows no more about them than the choice). Each key written only when set | nothing beyond: reads its project's vaults, writes none |
+  | `allowed` | a map; four keys. `write-notes: true` (req-282, enforced since req-283) — the persona may change notes where its run's project grants `write` (the concept's intersection: project per vault ∧ this switch ∧ the run not read-only; the vaults themselves are the project's, `_meta/projects/` below) — a refusal reaches the model as `Error: <persona> may not write vault "<id>" (allowed: read)` and the run's stream as an audit line; `vault_move` counts as writing; written by the first project's migration for every persona that named `write-vaults`, and by the Persona page's "Change notes where the project allows". `spend-above-allowance: true` — the persona runs on past a ticket's `allowance:` instead of waiting for the owner (req-170). The retired `write-vaults: [<vault id>, …]` (req-167; device ids) grants nothing since req-283: it is read only by the first project's migration, never written back, and dropped from every persona file by the engine's start once a project exists (one commit, `personas: drop write-vaults — the vault rights are the project's (req-283)`). `run-commands: accept-edits \| bypass` — the harness permission mode of the persona's runs and free sessions (the Persona page's "Run commands"; absent = the crew's `permissionMode`): it beats the crew's, a review stays read-only, a free session's own choice beats it (req-142, milestone 273). `network: true` — the persona's workers keep the network; without it their requests carry `network: false` and each harness switches off what it can — Claude Code's web tools, Copilot CLI's URL approvals; opencode is asked, Kimi cannot, and no shell command is fenced on native Windows (ADR-0099). Each key written only when set | nothing beyond: reads its project's vaults, writes none |
 
 - `prompt.md` — the longform persona prompt, free Markdown, **the one prose of the persona** (R11, req-171: one prose, not two).
   The "who Ben is" part stands at its top, as a `## Who Ben is` section; `persona.md` keeps the frontmatter and nothing below
