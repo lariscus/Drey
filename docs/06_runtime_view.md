@@ -6706,3 +6706,33 @@ sends the ticket back (milestone 274) leaves the run `failed`, so the position t
 again — and the filer writes on the same `TicketsGit` queue as the closing round's persona commits
 (milestone 272), so the two never meet at `index.lock`. A ticket exists only after the owner's confirm,
 through the chat's one decision path.
+
+## 6.145 Unloading a tickets vault: the board goes everywhere at once (D-73, milestone 279)
+
+```mermaid
+sequenceDiagram
+    participant U as Owner (Files panel → Remove)
+    participant M as VaultManager (main)
+    participant P as Tickets plugin (main)
+    participant E as Engine config + FsEngineHost
+    participant H as Change hub
+    participant C as Clients (Drey panel, Mission Control, phone)
+    U->>M: removeVault(id) — the registry loses the entry, the folder stays on disk
+    M-->>P: vault round (refresh, every vault)
+    P->>E: configSet vaults.registered = the registered vaults (awaited first)
+    E->>E: HostedVault.loaded(): the hosted folder is not named → unloaded
+    E-->>H: board (the loaded state flipped)
+    P->>E: onVaultEvent → the board service announces a change
+    H-->>C: board changed
+    C->>E: snapshot
+    E->>E: listVaults() = [] → no tickets vault → the empty board
+    E-->>C: vaultId null, no cards
+    Note over U,C: Add vault with the same folder: the registry names it again, the same flip emits board, the tickets are back
+```
+
+The engine hosts one vault folder for the life of the service; whether that folder is *loaded* is Drey's
+registry, pushed under `vaults.registered` (req-167) — the same key the workers' vault MCP reads. Unloaded
+means the host lists no vault, so every reader of the board (`detect`, `listProjects`, the chat, the verify
+service) finds none; the files are never deleted. With no key (no Drey ever named a registry) the vault is
+loaded. The `board` IPC awaits the registry push before it reads, so a fetch right after a removal cannot
+see the old list.

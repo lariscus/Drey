@@ -323,7 +323,8 @@ const plugin: MainPluginModule = {
     });
     ctx.ipc.handle('board', async () => {
       await syncStoreConfig(client, engineCtx).catch(() => undefined);
-      void pushNotesVault();
+      // D-73: awaited, so a vault Drey just unloaded is unloaded for the board this fetch reads.
+      await pushNotesVault();
       void documents.refresh().catch(() => undefined);
       const snap = await board.refresh();
       priorities = snap.priorities;
@@ -1040,7 +1041,14 @@ const plugin: MainPluginModule = {
 
     // Everything that can change the board: external rounds, saves of
     // ticket files, our own announces (the debounced emit coalesces).
-    ctx.vault.onChanged((event) => board.onVaultEvent(event));
+    // A registry mutation (vault added, removed, switched) is a `refresh` round of every vault: the engine
+    // hears the new registry first (D-73: an unloaded vault leaves its board), then the round.
+    ctx.vault.onChanged((event) => {
+      const registryRound = event.kind === 'refresh' && event.vaultId === undefined;
+      void (registryRound ? pushNotesVault() : Promise.resolve())
+        .then(() => board.onVaultEvent(event))
+        .catch((error: unknown) => ctx.log(`engine vault round failed: ${messageOf(error)}`, 'warn'));
+    });
     ctx.save.onNoteSaved((event) => {
       if (event.path.startsWith('tickets/')) {
         board.announceChanged();

@@ -72,7 +72,8 @@ skills: []
 async function migrator(registered: unknown): Promise<{ migrator: ProjectMigrator; host: FsEngineHost }> {
   const config = new FileConfigStore(path.join(home, 'config.json'));
   if (registered !== undefined) {
-    await config.set(VAULTS_KEY, registered);
+    // D-73: the hosted vault is one of the registered ones (else it is unloaded and the board has none).
+    await config.set(VAULTS_KEY, [...(registered as unknown[]), { id: 'vhost', name: 'board', path: vaultDir(), active: false }]);
   }
   const host = new FsEngineHost(vaultDir(), config, new ChangeHub(), () => undefined, home);
   const board = {

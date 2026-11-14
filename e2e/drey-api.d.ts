@@ -21,6 +21,8 @@ interface DreyApiForE2E {
   listVaults(): Promise<
     Array<{ id: string; name: string; path: string; exists: boolean; active: boolean }>
   >;
+  removeVault(vaultId: string): Promise<void>;
+  addVault(): Promise<{ id: string; name: string; path: string } | null>;
   getConfig(): Promise<{
     appearance: { accent: string };
     daily: { dir: string };
