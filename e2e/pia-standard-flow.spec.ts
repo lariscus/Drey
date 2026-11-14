@@ -141,7 +141,7 @@ test('Pia sets the standard flow with a card and knows the owner as Henrik (req-
   const pipeline = path.join(vaultDir, 'tickets', '_meta', 'pipeline.md');
   expect(fs.readFileSync(pipeline, 'utf8')).toMatch(/^flow: paul:shape; ben; ralf; tessa; you\s*$/m);
   await card.locator('.target-card-btn', { hasText: 'Confirm' }).click();
-  await expect(card).toContainText('Confirmed', { timeout: 30_000 });
+  await expect(card).toContainText('Done — ok', { timeout: 30_000 });
   await expect.poll(() => fs.readFileSync(pipeline, 'utf8'), { timeout: 30_000 }).toMatch(/^flow: paul:shape; ben; you\s*$/m);
   stopEngine();
 });
