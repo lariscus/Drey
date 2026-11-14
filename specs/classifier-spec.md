@@ -331,7 +331,7 @@ create as a `raw capture:` Log line (ticket-schema).
   `fleet/skills-section.ts`, her enabled skills from her own folder or the shared pool, in
   `skills:` order); each part left out when empty, the whole part left out when all are (the
   turn then opens with the prompt alone; the composer is `services/mission-persona-text.ts`).
-  A blank line, then the prompt (`mission.md`, unchanged at version 3: the intents
+  A blank line, then the prompt (`mission.md`, version 4 since req-298: the intents
   and the contract), then `## Board digest` — or, on **Pia's entry in a ticket's chain** (req-257:
   a session titled `<her title> — T-0123, position 2 of 4`, `services/mission-entry-turns.ts`),
   `## Ticket <id>` and the ticket's text (capped like a shape turn's) in the digest's place. Her
@@ -370,6 +370,32 @@ create as a `raw capture:` Log line (ticket-schema).
   (<repo>); …` (`repos.md` `path:`) — `FreeSessionService.promptContext`. The
   card (`Start a session of ben in E:/projects/drey`) starts nothing until the
   owner confirms; Pia never sets a permission mode (the vault's applies).
+  **req-298 — the board's projects** (`core/chat-projects.ts`, milestone 271):
+  after the digest (before `## Sessions you may propose`) rides `## Projects`
+  on a board with project records — one line `<id> "<name>" · …` (the
+  snapshot's `projects`, sorted by id), then one rule line: with one project
+  *"The board has one project: every new ticket goes to "<id>"."*; with a
+  project filter the client sent (`project` on `POST /api/chat/sessions` and
+  `…/messages` — Mission Control's device-local filter, the desktop title
+  bar's through `mcStart` / `mcSend`) *"The owner's project filter is <name>:
+  a new ticket goes to "<id>" unless the owner names another project."*; under
+  all projects (no `project`, *Unassigned*, or an id the board does not have)
+  *"The owner's project filter is all projects: unless the owner named the
+  project, ask which project the new ticket belongs to before you propose
+  it."* No block on a board without records. `mission.md` v4 adds to the
+  create intent *"…and the project the "Projects" block settles; when that
+  block tells you to ask, ask which project first and propose the ticket once
+  the owner has named it."*, an optional `"project"` field in the
+  `createTicket` example (*"<optional, a project id from the Projects
+  block>"*) and the rule *"Project ids come only from the "Projects" block —
+  never invent one; a board without that block has no projects, and a
+  createTicket then names none."* The parser (`validateChatCommand`) keeps a
+  `project` that matches the project-id grammar and drops anything else
+  without refusing the card; after the turn the service settles each
+  createTicket card's project (`withCommandProject`): a project the board
+  knows stays, else the filter's, else the board's only one, else none — so
+  the card names it before the owner confirms, and the confirm passes it to
+  `createTicket` (`project:` / `x-project`).
 - **The Mission Control bridge's provider call** (`packages/tickets-engine/src/services/chat-model.ts`,
   `chat-llm.ts`, D-1 / milestone 131; since req-269 one turn is `chat-turn.ts`, its system message
   `chat-system-prompt.ts` `chatSystemOf` — the persona prompt rides only a mission turn of the
@@ -526,7 +552,7 @@ commands in its brief: the runner judges its hand-over structurally.
   when any criterion failed. Guidance only — the machine verify step
   (`services/verify-service.ts`) writes `## Verification` on its own.
 - **The crew prompts:** mission lists every command with its fields and an
-  example (`createTicket` title, phase, priority, description?;
+  example (`createTicket` title, phase, priority, project? (req-298, mission.md version 4), description?;
   `transition` id, from, to; `setPriority` id, priority; `promote` id;
   `setChain` id, chain — the whole persona list, empty = the standard flow
   (req-266, mission.md version 3); `setBlockedBy` id, blockedBy; `startSession`
