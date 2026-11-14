@@ -20,6 +20,7 @@ import { actionBarOf, chainOf, costSummary, flowItemsOf, pageShapeOf, statusOf, 
 import { hasOpenParts } from './parts-model';
 import { cardStartOf } from './start-model';
 import { personaPictures } from '../team/persona-pictures';
+import { holdCardOf, titleOfSnapshot } from './hold-card';
 
 export interface TicketStripDeps {
   /** The catalog (`api.i18n`): every word of the card comes through it. */
@@ -143,20 +144,31 @@ export function createTicketStrip(deps: TicketStripDeps): TicketStrip {
         const need = row?.need ?? null;
         const own = meta() ?? card.meta;
         const pinned = worker?.personaId === null ? undefined : personas?.find((p) => p.id === worker?.personaId);
+        // A persona board (7a v2): the chain of personas and its holder instead of phases and a worker.
+        const held = holdCardOf(deps.i18n, snapshot, card, titleOfSnapshot(snapshot, personas ?? []));
+        const shaper = held?.holder?.shape === true ? held.holder.persona : null;
+        const shaperColor =
+          shaper === null ? '' : (snapshot.lanes?.find((lane) => lane.persona === shaper)?.color || personas?.find((p) => p.id === shaper)?.color) ?? '';
         const facts: CardFacts = {
           shape,
           id: own.id ?? card.id,
           pill: { label: phaseTitleOrArchive(status.label, card.phase), tone: status.pill },
           kind: status.kind,
           issues: issuesBadge(issues()),
-          flow: flowItemsOf(deps.i18n, chain, card.phase, planToAccept),
+          flow: held?.flow ?? flowItemsOf(deps.i18n, chain, card.phase, planToAccept),
+          personaBoard: held !== null,
+          holder: held?.holder ?? null,
           priority: own.priority === null || own.priority === undefined ? deps.i18n.t('ticket.card.none') : titleCase(own.priority),
           worker: shape === 'early' ? (own.worker ?? deps.i18n.t('ticket.card.default')) : (worker?.who ?? deps.i18n.t('ticket.card.none')),
           workerNote: shape === 'early' && own.worker !== null ? `· ${own.persona ?? deps.i18n.t('ticket.card.default')}` : '',
           avatar:
-            card.phase === 'shaping' && !planToAccept && worker !== null
-              ? { color: pinned?.color ?? '', name: worker.who, ...(pinned === undefined ? {} : { id: pinned.id }) }
-              : null,
+            held !== null
+              ? shaper === null
+                ? null
+                : { color: shaperColor, name: held.holder?.label ?? shaper, id: shaper }
+              : card.phase === 'shaping' && !planToAccept && worker !== null
+                ? { color: pinned?.color ?? '', name: worker.who, ...(pinned === undefined ? {} : { id: pinned.id }) }
+                : null,
           repo: own.repo ?? deps.i18n.t('ticket.card.none'),
           branch: own.branch ?? '',
           cost: [cost.label, estimate].filter((part): part is string => part !== null).join(' · '),

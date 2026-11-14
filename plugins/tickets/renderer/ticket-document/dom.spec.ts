@@ -122,6 +122,8 @@ describe('cardNode', () => {
     worker: 'Tessa',
     workerNote: '',
     avatar: null,
+    personaBoard: false,
+    holder: null,
     repo: 'drey',
     branch: 't/T-0118',
     cost: '$1.84 in total · est. $1.50–2.40 · from 3 runs',
@@ -161,6 +163,56 @@ describe('cardNode', () => {
     expect(node.querySelector('.tickets-card-branch')?.textContent).toBe('t/T-0118');
     node.querySelector<HTMLButtonElement>('.tickets-doc-flow')!.click();
     expect(a.onFlow).toHaveBeenCalledTimes(1);
+  });
+
+  it('7a v2: on a persona board the Flow row is the chain of personas and Holder replaces Worker', () => {
+    const node = cardNode(
+      actions(),
+      facts({
+        personaBoard: true,
+        holder: { label: 'You · Ben asks', persona: 'you', shape: false },
+        flow: [
+          { title: 'Paul', state: 'past', note: null },
+          { title: 'Ben', state: 'current', note: '(2 of 3)' },
+          { title: 'You', state: 'future', note: null },
+        ],
+      }),
+    );
+    expect(grid(node)).toEqual(['Flow', 'Holder', 'Cost']);
+    expect(Array.from(node.querySelector('.tickets-doc-chain')!.children).map((c) => c.textContent)).toEqual(['✓ Paul', '·', 'Ben', '(2 of 3)', '·', 'You', 'Change']);
+    expect(node.querySelector('.tickets-doc-step.is-current')?.textContent).toBe('Ben');
+    expect(node.textContent).toContain('You · Ben asks');
+    expect(node.textContent).not.toContain('Tessa');
+  });
+
+  it('7a v2: a ticket in Done has walked its chain and has no holder row', () => {
+    const node = cardNode(actions(), facts({ personaBoard: true, holder: null, flow: [{ title: 'Ben', state: 'past', note: null }] }));
+    expect(grid(node)).toEqual(['Flow', 'Cost']);
+  });
+
+  it('9a on a persona board: Priority and Repo, the chain in arrows with Change, no Worker', () => {
+    const a = actions();
+    const node = cardNode(
+      a,
+      facts({
+        shape: 'early',
+        personaBoard: true,
+        decide: false,
+        canReview: false,
+        flow: ['Paul', 'Ben', 'You'].map((title) => ({ title, state: 'future' as const, note: null })),
+      }),
+    );
+    expect(grid(node)).toEqual(['Priority', 'Repo', 'Flow']);
+    expect(node.textContent).toContain('Paul → Ben → You');
+    expect(node.textContent).not.toContain('Tessa');
+    expect(node.querySelectorAll('.tickets-card-wide')).toHaveLength(1);
+    node.querySelector<HTMLButtonElement>('.tickets-doc-flow')!.click();
+    expect(a.onFlow).toHaveBeenCalledTimes(1);
+  });
+
+  it('9a on a persona board: a ticket with no chain and no standard flow says so', () => {
+    const node = cardNode(actions(), facts({ shape: 'early', personaBoard: true, decide: false, canReview: false, flow: [] }));
+    expect(node.querySelectorAll('.tickets-card-value')[2]?.textContent).toBe('none Change');
   });
 
   it('7b: the worker is a picture', () => {

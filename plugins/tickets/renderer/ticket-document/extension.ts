@@ -22,6 +22,7 @@ import { partsRange } from './parts-model';
 import { markGroupsOf, type ShapeMarks } from './shape';
 import { planHeadingEnd } from './shape';
 import { cardOfDocument, logSectionRange, ticketIdOfPath, ticketIdOfText } from '../ticket-header';
+import { logStampsOf, wrappedParagraphsOf } from './prose-lines';
 
 export interface TicketDocumentActions {
   openThread(card: TicketCard): void;
@@ -139,6 +140,39 @@ export function createTicketDocumentExtension(deps: TicketDocumentDeps): TicketD
     override toDOM(): HTMLElement {
       const node = document.createElement('span');
       node.className = 'tickets-doc-log-count';
+      node.textContent = this.words;
+      return node;
+    }
+  }
+
+  /** A soft line break of the file: the paragraph flows on as one (boards 9a, 7a v2). */
+  class SoftBreak extends WidgetType {
+    override eq(other: import('@codemirror/view').WidgetType): boolean {
+      return other instanceof SoftBreak;
+    }
+    override toDOM(): HTMLElement {
+      const node = document.createElement('span');
+      node.className = 'tickets-doc-soft-break';
+      node.textContent = ' ';
+      return node;
+    }
+  }
+
+  /** A Log entry's timestamp as a time in the owner's locale; the stamp as written shows under the caret. */
+  class LogTime extends WidgetType {
+    constructor(
+      private readonly words: string,
+      private readonly iso: string,
+    ) {
+      super();
+    }
+    override eq(other: import('@codemirror/view').WidgetType): boolean {
+      return other instanceof LogTime && other.words === this.words && other.iso === this.iso;
+    }
+    override toDOM(): HTMLElement {
+      const node = document.createElement('time');
+      node.className = 'tickets-doc-log-time';
+      node.dateTime = this.iso;
       node.textContent = this.words;
       return node;
     }
@@ -296,8 +330,11 @@ export function createTicketDocumentExtension(deps: TicketDocumentDeps): TicketD
           } else {
             lineClass(from, 'tickets-doc-h2');
           }
-        } else if (level === 3 && inPlan && shape === 'flow') {
+        } else if (level === 3 && inPlan) {
+          // The plan's chapters (`### Acceptance criteria`) read as the board's section heads, 9a and row 7 alike.
           lineClass(from, 'tickets-doc-h2');
+        } else if (level >= 3) {
+          lineClass(from, 'tickets-doc-h3');
         } else if (line.trim() === '' && !caretLines.has(index + 1)) {
           const before = (scan[index - 1] ?? '').trim();
           const after = (scan[index + 1] ?? '').trim();
@@ -307,6 +344,7 @@ export function createTicketDocumentExtension(deps: TicketDocumentDeps): TicketD
       }
 
       // The plan's marks (E13-9, board 7b): a bar down the lines, the note under them.
+      const notesAt: number[] = [];
       if (deps.shape !== undefined) {
         deps.shape.want(id, text);
         const marks = deps.shape.marks(id);
@@ -318,6 +356,7 @@ export function createTicketDocumentExtension(deps: TicketDocumentDeps): TicketD
             }
             const stands = replaced.find((range) => group.end >= range.from && group.end <= range.to && !touched(range));
             const noteAt = stands?.to ?? group.end;
+            notesAt.push(noteAt);
             const note = group.by === 'you' ? { paul: null, you: marks.you, youDetail: marks.youDetail } : { paul: marks.paul, you: null, youDetail: null };
             ranges.push(
               Decoration.widget({
@@ -340,6 +379,17 @@ export function createTicketDocumentExtension(deps: TicketDocumentDeps): TicketD
         }
       }
 
+      // A paragraph the file wraps reads as one (boards 9a, 7a v2); under the caret its lines show as written.
+      for (const paragraph of wrappedParagraphsOf(text, frontmatterEnd)) {
+        const crosses = (range: TextRange): boolean => range.from < paragraph.to && range.to > paragraph.from;
+        if (touched(paragraph) || replaced.some(crosses) || notesAt.some((at) => at >= paragraph.from && at < paragraph.to)) {
+          continue;
+        }
+        for (const soft of paragraph.breaks) {
+          ranges.push(Decoration.replace({ widget: new SoftBreak() }).range(soft.from, soft.to));
+        }
+      }
+
       // The Log's head (board 9a): chevron, the word, how many entries lie folded.
       if (logRange !== null) {
         const headEnd = logRange.from;
@@ -352,6 +402,13 @@ export function createTicketDocumentExtension(deps: TicketDocumentDeps): TicketD
         lineClass(headStart, 'tickets-doc-log');
         ranges.push(Decoration.widget({ side: -1, widget: new LogChevron(folded, logRange) }).range(headStart));
         ranges.push(Decoration.widget({ side: 1, widget: new LogCount(deps.api.i18n.t('ticket.log.entries', { n: entries })) }).range(headEnd));
+        // Each entry's stamp as a time (`Oct 18, 2026, 1:12 PM`), not the quoted ISO string.
+        for (const stamp of logStampsOf(text, logRange)) {
+          if (!caretLines.has(state.doc.lineAt(stamp.from).number)) {
+            const words = deps.api.i18n.formatDateTime(stamp.at);
+            ranges.push(Decoration.replace({ widget: new LogTime(words, stamp.at.toISOString()) }).range(stamp.from, stamp.to));
+          }
+        }
       }
 
       return Decoration.set(ranges, true);

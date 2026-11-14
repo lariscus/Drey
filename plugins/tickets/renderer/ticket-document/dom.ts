@@ -7,6 +7,7 @@
  */
 import type { I18n } from '../../../../shared/i18n/types';
 import type { CostTableView, FlowItem, PageShape, PillTone, ProofView } from './model';
+import type { HolderFact } from './hold-card';
 import { assetUrl, offsetWords } from './model';
 import { personaPictureNode } from '../team/persona-picture';
 
@@ -252,6 +253,13 @@ export interface CardFacts {
   readonly workerNote: string;
   /** 7b: the persona as a picture; null = the name alone. */
   readonly avatar: { readonly color: string; readonly name: string; readonly id?: string } | null;
+  /**
+   * A persona board (7a v2): the Flow row is the chain of personas and the Holder row
+   * replaces Worker; Inbox and Prioritized (9a) keep Priority and Repo, no Worker.
+   */
+  readonly personaBoard: boolean;
+  /** 7a v2: who holds the ticket; null in a lifecycle column or on the phase board. */
+  readonly holder: HolderFact | null;
   readonly repo: string;
   readonly branch: string;
   /** `$1.84 in total · est. $1.50–2.40 · from 3 runs`; '' while nothing is known. */
@@ -406,7 +414,8 @@ export function cardNode(actions: CardActions, facts: CardFacts): HTMLElement {
   const label = (text: string): HTMLElement => el('span', 'tickets-card-label', text);
   if (facts.shape === 'early') {
     const flow = el('span', 'tickets-card-value');
-    flow.append(document.createTextNode(facts.flow.map((item) => item.title).join(' → ')));
+    const chain = facts.flow.map((item) => item.title).join(' → ');
+    flow.append(document.createTextNode(chain === '' ? i18n.t('ticket.card.none') : chain));
     const change = changeLink(actions);
     if (change !== null) {
       flow.append(' ', change);
@@ -418,6 +427,20 @@ export function cardNode(actions: CardActions, facts: CardFacts): HTMLElement {
     const repo = el('span', 'tickets-card-value', facts.repo);
     if (facts.branch !== '') {
       repo.append(' ', el('span', 'tickets-card-branch', facts.branch));
+    }
+    if (facts.personaBoard) {
+      // Persona v3 has no worker: Priority and Repo share the first row, the chain spans the second.
+      flow.classList.add('tickets-card-wide');
+      grid.append(
+        label(i18n.t('ticket.card.priority')),
+        el('span', 'tickets-card-value is-control', facts.priority),
+        label(i18n.t('ticket.card.repo')),
+        repo,
+        label(i18n.t('ticket.card.flow')),
+        flow,
+      );
+      root.append(grid);
+      return finish(root, facts);
     }
     grid.append(
       label(i18n.t('ticket.card.priority')),
@@ -440,20 +463,26 @@ export function cardNode(actions: CardActions, facts: CardFacts): HTMLElement {
       flow.append(item);
     }
     grid.append(label(i18n.t('ticket.card.flow')), flow);
-    grid.append(label(i18n.t('ticket.card.worker')));
-    const worker = el('span', 'tickets-card-value tickets-card-wide');
-    if (facts.avatar !== null) {
-      worker.append(avatarNode(facts.avatar.color, facts.avatar.name, 24, facts.avatar.id ?? null));
-    } else {
-      worker.textContent = facts.worker;
+    if (!facts.personaBoard || facts.holder !== null) {
+      grid.append(label(i18n.t(facts.personaBoard ? 'ticket.hold.holder' : 'ticket.card.worker')));
+      const worker = el('span', 'tickets-card-value tickets-card-wide');
+      if (facts.avatar !== null) {
+        worker.append(avatarNode(facts.avatar.color, facts.avatar.name, 24, facts.avatar.id ?? null));
+      } else {
+        worker.textContent = facts.holder?.label ?? facts.worker;
+      }
+      grid.append(worker);
     }
-    grid.append(worker);
     if (facts.cost !== '') {
       grid.append(label(i18n.t('ticket.card.cost')), el('span', 'tickets-card-muted tickets-card-wide tickets-doc-cost-fact', facts.cost));
     }
   }
   root.append(grid);
+  return finish(root, facts);
+}
 
+/** The line under the grid: why the ticket waits on the owner. */
+function finish(root: HTMLElement, facts: CardFacts): HTMLElement {
   if (facts.gate !== '') {
     root.append(el('p', 'tickets-doc-gate', facts.gate));
   }

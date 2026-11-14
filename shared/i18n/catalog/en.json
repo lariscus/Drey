@@ -118,6 +118,7 @@
   "ticket.card.change_hint": "Open the flow editor for this ticket",
   "ticket.card.default": "default",
   "ticket.card.none": "none",
+  "ticket.card.holder_note": "{name} · {note}",
   "ticket.card.title_label": "Ticket title",
   "ticket.card.raw": "Edit the frontmatter as YAML",
   "ticket.card.phase_hint": "Phase: move the card on the board to change it",
