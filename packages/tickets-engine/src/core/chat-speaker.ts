@@ -4,10 +4,11 @@
  *
  * - **Shape** is the chain's interactive entry — the one marked `:shape`, in
  *   the ticket's own chain, else in the standard flow a ticket is copied
- *   from (`paul:shape; paul; ben; …` by default; a ticket created before
+ *   from (`paul:shape; ben; …` by default; a ticket created before
  *   chains carries none).
  * - **Flow** is the persona of the ticket's **plan entry**: the first
- *   ordinary entry (of the chain, else of the standard flow) whose persona
+ *   entry (of the chain, else of the standard flow — a `:shape` entry too:
+ *   since req-305 it shapes and then plans at one position) whose persona
  *   hands over a plan, not code — its gate is structural ({@link personaGate},
  *   the planner's default); without one it is the shape persona.
  *
@@ -34,7 +35,7 @@ export function shapeSpeakerOf(chain: readonly ChainEntry[], standard: readonly 
 /** The persona of the ticket's plan entry, else the shape persona. */
 export function flowSpeakerOf(chain: readonly ChainEntry[], standard: readonly ChainEntry[], personas: readonly Persona[]): Persona | null {
   for (const entry of chain.length > 0 ? chain : standard) {
-    const persona = entry.mode === null ? agentOf(entry.persona, personas) : null;
+    const persona = agentOf(entry.persona, personas);
     if (persona !== null && personaGate(persona) === 'structural') {
       return persona;
     }

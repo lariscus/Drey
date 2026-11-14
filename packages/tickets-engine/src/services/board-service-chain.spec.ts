@@ -229,6 +229,14 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     expect(field(last.dkId, 'x-at')).toBe('4');
   });
 
+  it('Accept at a :shape entry ends the shaping: the entry loses its mode, the cursor stays (req-305)', async () => {
+    const { id, dkId } = chained('Shaped', 'ben:shape;you', 1);
+    expect(await service.acceptTicket({ id })).toMatchObject({ ok: true });
+    expect(field(dkId, 'x-chain')).toBe('ben;you');
+    expect(field(dkId, 'x-at')).toBe('1');
+    expect(field(dkId, 'stage')).toBe('active');
+  });
+
   it('Send back at You goes to the nearest earlier agent position, never marking the one send-back', async () => {
     const { id, dkId } = chained('Back', 'ben;you;ralf;you', 4);
     expect(await service.sendBack({ id, note: 'the login test fails' })).toMatchObject({ ok: true });

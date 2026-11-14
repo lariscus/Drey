@@ -37,8 +37,8 @@ ticket's branch, push); when that is green the ticket lands in Done. See
 specs/ticket-schema.md. Edit freely; the board follows on refresh.
 `;
 
-/** The standard flow of the shipped crew (concept §2): shape and plan with Paul, Ben builds, Ralf reviews, Tessa tests, You accept. */
-export const STANDARD_FLOW_LINE = 'paul:shape; paul; ben; ralf; tessa; you';
+/** The standard flow of the shipped crew (concept §2): Paul shapes with the owner and then plans (one entry), Ben builds, Ralf reviews, Tessa tests, You accept. */
+export const STANDARD_FLOW_LINE = 'paul:shape; ben; ralf; tessa; you';
 
 /** The `_meta/pipeline.md` "Initialize board" writes. */
 export const DEFAULT_PIPELINE_TEXT = `---

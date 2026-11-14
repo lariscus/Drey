@@ -216,6 +216,10 @@ export function validateChatCommand(
     }
     return { kind: 'setChain', id, chain };
   }
+  if (kind === 'setStandardFlow') {
+    const chain = chainOf(obj['chain']);
+    return chain === null || chain.length === 0 ? null : { kind: 'setStandardFlow', chain };
+  }
   if (kind === 'setBlockedBy') {
     const id = ticketIdOf(obj['id']);
     const blockedBy = blockersOf(obj['blockedBy']);

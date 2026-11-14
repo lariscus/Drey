@@ -47,6 +47,7 @@ const SET_CHAIN: ChatCommand = {
   chain: ['insert design(pia, notify) after review', 'skip verify'],
 };
 const RETURN_TO_STANDARD: ChatCommand = { kind: 'setChain', id: 'T-0086', chain: [] };
+const SET_STANDARD_FLOW: ChatCommand = { kind: 'setStandardFlow', chain: ['paul:shape', 'ben', 'you'] };
 const SET_BLOCKERS: ChatCommand = { kind: 'setBlockedBy', id: 'T-0086', blockedBy: ['T-0001', 'T-0003'] };
 const CLEAR_BLOCKERS: ChatCommand = { kind: 'setBlockedBy', id: 'T-0086', blockedBy: [] };
 
@@ -89,6 +90,7 @@ let boardTransitions: unknown[];
 let boardPriorities: unknown[];
 let boardForms: unknown[];
 let boardChains: unknown[];
+let boardStandardFlows: unknown[];
 let boardBlockers: unknown[];
 let boardCreateResult: unknown;
 let boardTransitionResult: unknown;
@@ -169,6 +171,7 @@ beforeEach(async () => {
   boardPriorities = [];
   boardForms = [];
   boardChains = [];
+  boardStandardFlows = [];
   boardBlockers = [];
   boardCreateResult = { ok: true, id: 'T-0103', path: 'tickets/10-inbox/T-0103.md' };
   boardTransitionResult = { ok: true, path: 'tickets/30-review/T-0086.md' };
@@ -222,6 +225,10 @@ function boot(): ChatService {
     setChain: async (input: unknown) => {
       boardChains.push(input);
       return boardSetChainResult;
+    },
+    setStandardFlow: async (input: unknown) => {
+      boardStandardFlows.push(input);
+      return { ok: true as const };
     },
     setBlockedBy: async (input: unknown) => {
       boardBlockers.push(input);
@@ -278,6 +285,8 @@ async function seedSession(
               ? command.chain.length === 0
                 ? `Return ${command.id} to the standard flow`
                 : `Set ${command.id} chain to ${command.chain.length} ${command.chain.length === 1 ? 'entry' : 'entries'}`
+              : command.kind === 'setStandardFlow'
+                ? `Set the standard flow to ${command.chain.join('; ')}`
               : command.kind === 'setBlockedBy'
                 ? command.blockedBy.length === 0
                   ? `Clear ${command.id} blockers`
@@ -463,6 +472,26 @@ describe('ChatService start and send', () => {
     expect(await readOnDisk(result.file!)).toContain(
       'proposal p-1 pending — Return T-0086 to the standard flow',
     );
+  });
+
+  it('a setStandardFlow command from the mission renders as the standard flow card (req-306)', async () => {
+    service = boot();
+    bridgeReply = { say: 'Paul shapes and plans, then Ben.', thought: null, commands: [SET_STANDARD_FLOW] };
+
+    const result = await service.start({ title: 'Flow', text: 'change the standard flow' });
+
+    expect(result.proposals).toEqual([
+      {
+        id: 'p-1',
+        state: 'pending',
+        summary: 'Set the standard flow to paul:shape; ben; you',
+        command: SET_STANDARD_FLOW,
+        at: expect.any(String),
+        decidedAt: null,
+        outcome: null,
+      },
+    ]);
+    expect(boardStandardFlows).toEqual([]);
   });
 
   it('a setBlockedBy command from the mission renders as the blockers card', async () => {
@@ -795,6 +824,18 @@ describe('ChatService confirm and dismiss', () => {
     expect(text).toContain("- '2026-11-02T09:00:00.000Z' proposal p-1 confirmed — Set T-0086 chain to 2 entries → ok");
     // The pending card and its command block stay as history.
     expect(text).toContain('proposal p-1 pending — Set T-0086 chain to 2 entries');
+  });
+
+  it('confirm on a setStandardFlow writes the board flow and no ticket chain (req-306)', async () => {
+    const { file } = await seedSession([SET_STANDARD_FLOW]);
+    service = boot();
+
+    const result = await service.confirm({ file, id: 'p-1' });
+
+    expect(result.ok).toBe(true);
+    expect(boardStandardFlows).toEqual([{ chain: ['paul:shape', 'ben', 'you'] }]);
+    expect(boardChains).toEqual([]);
+    expect(result.proposal).toMatchObject({ state: 'confirmed', outcome: 'ok' });
   });
 
   it('confirm on a return-to-standard setChain executes with an empty chain', async () => {

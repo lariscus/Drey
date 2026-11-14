@@ -2918,7 +2918,13 @@ export class EngineBoardService {
       return (await this.commitActionMissing(vault, card.id)) ?? this.startCommitStep(card.id);
     }
     const terminal = snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done';
-    const written = await this.writeChainCursor(card, decision.kind === 'done' ? { done: terminal } : { at: decision.at, returned: decision.returned }, { line: decision.line, actor });
+    const target =
+      decision.kind === 'done'
+        ? { done: terminal }
+        : decision.kind === 'shaped'
+          ? { at: decision.at, chain: decision.entries }
+          : { at: decision.at, returned: decision.returned };
+    const written = await this.writeChainCursor(card, target, { line: decision.line, actor });
     const warning = written.ok && decision.kind === 'done' ? await this.removeWorktreesOfDone(card) : null;
     return warning === null || !written.ok ? written : { ...written, warning };
   }
@@ -2927,7 +2933,7 @@ export class EngineBoardService {
    * req-257: one owner write of a chain ticket's cursor on the store — `x-at` moved (the stage stays
    * `active`), or the ticket to `done` — with the status line, one `put`.
    */
-  private async writeChainCursor(card: TicketCard, target: { readonly at: number; readonly returned?: boolean } | { readonly done: string }, why: { readonly line: string; readonly actor: string; readonly text?: string }): Promise<BoardMutationResult> {
+  private async writeChainCursor(card: TicketCard, target: { readonly at: number; readonly returned?: boolean; readonly chain?: readonly string[] } | { readonly done: string }, why: { readonly line: string; readonly actor: string; readonly text?: string }): Promise<BoardMutationResult> {
     const store = this.dricket;
     if (store === null) {
       return { ok: false, error: 'the cursor of a chain lives on a dricket store' };
@@ -2935,7 +2941,8 @@ export class EngineBoardService {
     try {
       const record = await this.storeBoard.record(store, card.id);
       const legacy = why.text ?? recordToBoardFile(record, card.phase).text;
-      const moved = 'at' in target ? (setDocumentField(legacy, 'at', String(target.at)) ?? legacy) : legacy;
+      const moved =
+        'at' in target ? (target.chain !== undefined ? withChainAndCursor(legacy, target.chain, target.at) : (setDocumentField(legacy, 'at', String(target.at)) ?? legacy)) : legacy;
       // req-78: every owner write of the cursor uses or drops a red gate's return; only a return keeps the loop's count.
       const loopKeys = 'at' in target && target.returned === true ? ['return-to'] : ['return-to', 'red-backs'];
       const settled = loopKeys.reduce((doc, key) => setDocumentField(doc, key, null) ?? doc, moved);

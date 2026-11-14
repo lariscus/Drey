@@ -65,6 +65,7 @@ import {
 import { TicketsGit } from '../core/tickets-git';
 import type { ChatVoiceSource } from './chat-voices';
 import type { EngineHost, EngineVault } from './host';
+import type { MissionCrewSource } from './mission-crew-block';
 
 /** The session files this service reads and writes — direct children only. */
 const CHAT_FILE_PATTERN = /^tickets\/_meta\/chat\/[^/]+\.md$/;
@@ -133,6 +134,8 @@ export interface ChatBoardPort {
     | { readonly ok: true; readonly text: string; readonly comments?: readonly { readonly author: string; readonly at: string; readonly text: string }[] }
     | { readonly ok: false; readonly error: string }
   >;
+  /** req-306: the standard flow (`flow:` in `pipeline.md`) replaced by the given chain. */
+  setStandardFlow(input: { readonly chain: readonly string[] }): Promise<ChatMutationResult>;
   /** T-0050: the whole `blocked-by:` list replacement (empty = cleared). */
   setBlockedBy(input: { readonly id: string; readonly blockedBy: readonly string[]; readonly actor?: string }): Promise<ChatMutationResult>;
 }
@@ -159,6 +162,8 @@ export interface ChatServiceDeps {
   readonly modelName?: () => Promise<string | undefined>;
   /** req-272: who speaks in a shape turn and a flow draft — the assigned persona's prompt and the crew; absent = the wrappers speak alone. */
   readonly voices?: ChatVoiceSource;
+  /** req-306: the `## Crew` block of a mission turn — every persona, the owner by name; absent = none. */
+  readonly crewBlock?: MissionCrewSource;
   /** req-173: the free sessions Pia's startSession card starts once confirmed; absent = the card refuses. */
   readonly sessions?: {
     start(ask: { persona: string; directory: string; poolClass?: ClassName | null; firstLine?: string }, origin: string): Promise<{ ok: true; runId: string } | { ok: false; error: string }>;
@@ -182,6 +187,8 @@ function summaryOf(command: ChatCommand): string {
       return command.chain.length === 0
         ? `Return ${command.id} to the standard flow`
         : `Set ${command.id} chain to ${command.chain.length} ${command.chain.length === 1 ? 'entry' : 'entries'}`;
+    case 'setStandardFlow':
+      return `Set the standard flow to ${command.chain.join('; ')}`;
     case 'setBlockedBy':
       return command.blockedBy.length === 0
         ? `Clear ${command.id} blockers`
@@ -833,6 +840,10 @@ export class ChatService implements ChatServicePort {
         const result = await this.deps.board.setChain({ id: command.id, chain: command.chain, actor });
         return result.ok ? { ok: true, outcome: 'ok' } : { ok: false, error: result.error };
       }
+      case 'setStandardFlow': {
+        const result = await this.deps.board.setStandardFlow({ chain: command.chain });
+        return result.ok ? { ok: true, outcome: 'ok' } : { ok: false, error: result.error };
+      }
       case 'setBlockedBy': {
         const result = await this.deps.board.setBlockedBy({ id: command.id, blockedBy: command.blockedBy, actor });
         return result.ok ? { ok: true, outcome: 'ok' } : { ok: false, error: result.error };
@@ -848,10 +859,11 @@ export class ChatService implements ChatServicePort {
     }
   }
 
-  /** req-173: the digest plus the personas and folders a startSession card may name. */
+  /** req-173 / req-306: the digest plus the crew (the owner by name) and the personas and folders a startSession card may name. */
   private async withSessions(digest: string): Promise<string> {
-    const block = (await this.deps.sessions?.promptContext().catch(() => null)) ?? null;
-    return block === null ? digest : `${digest}\n\n${block}`;
+    const crew = (await this.deps.crewBlock?.text().catch(() => null)) ?? null;
+    const sessions = (await this.deps.sessions?.promptContext().catch(() => null)) ?? null;
+    return [digest, crew, sessions].filter((block): block is string => block !== null).join('\n\n');
   }
 
   // --- the host plumbing ----------------------------------------------------

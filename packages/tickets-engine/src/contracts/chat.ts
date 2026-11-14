@@ -111,6 +111,12 @@ export type ChatCommand =
    */
   | { readonly kind: 'setChain'; readonly id: string; readonly chain: readonly string[] }
   /**
+   * req-306: replace the board's standard flow (`flow:` in `_meta/pipeline.md`) with the given
+   * canonical entries — the chain every NEW ticket is copied from; existing tickets keep their own.
+   * Never empty (a flow names at least one persona); checked like every chain write at execution.
+   */
+  | { readonly kind: 'setStandardFlow'; readonly chain: readonly string[] }
+  /**
    * T-0050 (T0): replace the ticket's whole `blocked-by:` list with the
    * given ticket ids — the ticket waits until every one of them reaches
    * the pipeline's terminal phase. An empty list clears the blockers (the

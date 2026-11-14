@@ -36,7 +36,7 @@ describe('step 3: the pipeline keeps the lifecycle columns', () => {
     expect(out.floor).toBe('standard'); // req-288: the column's floor raises the builder's class
     const parsed = parsePipeline(out.text);
     expect(parsed.phases.map((p) => [p.id, p.persona])).toEqual([['inbox', null], ['prioritized', null], ['done', null]]);
-    expect(parsed.flow?.map((e) => e.persona)).toEqual(['paul', 'paul', 'ben', 'ralf', 'tessa', 'you']);
+    expect(parsed.flow?.map((e) => e.persona)).toEqual(['paul', 'ben', 'ralf', 'tessa', 'you']);
     expect(out.text).toContain('token-budget: 40000000');
     expect(out.text).not.toContain('build-default');
     expect(out.text.endsWith("---\nThe owner's own words stay.\n")).toBe(true);
