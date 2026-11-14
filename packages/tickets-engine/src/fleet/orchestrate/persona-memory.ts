@@ -1,4 +1,4 @@
-import { personaLessonLine } from '../../core/memory-line';
+import { holdsLesson, personaLessonLine } from '../../core/memory-line';
 import { PERSONAS_DIR } from '../../core/persona';
 import type { Clock } from '../ports/clock';
 import type { FileSystem } from '../ports/file-system';
@@ -18,8 +18,10 @@ export const PERSONA_MEMORY_LINE_CAP = 200;
  * `tickets/_meta/personas/<persona>/memory.md`, written directly — no
  * proposal card for memory. The next dispatch of the persona reads it back
  * as the instruction's `## Memory` slice. At most one line per round; a
- * smooth run writes nothing (the per-run outcome line of E3 is gone). Every
- * failure is a log line, never a thrown error.
+ * smooth run writes nothing (the per-run outcome line of E3 is gone). A
+ * lesson the memory already holds is not written twice (req-226). The
+ * standalone runner's plain write — in Drey Service the engine writes and
+ * commits it (req-225). Every failure is a log line, never a thrown error.
  */
 export class PersonaMemory {
   constructor(
@@ -44,6 +46,9 @@ export class PersonaMemory {
     try {
       const abs = this.fs.join(run.request.ticketsVaultPath, PERSONAS_DIR, persona, 'memory.md');
       const existing = await this.fs.readTextOrNull(abs);
+      if (existing !== null && holdsLesson(existing, entry)) {
+        return null;
+      }
       await this.fs.mkdirp(this.fs.dirname(abs));
       await this.fs.writeText(abs, withEntry(existing, entry));
       return entry;

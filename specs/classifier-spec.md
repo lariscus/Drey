@@ -24,6 +24,7 @@ abstraction in `electron/llm/` (ADR-0047).
 | Assistant role texts (`ASK_SYSTEM`, `askToolsSystem`, `liveEditSystem`, `ASK_ANSWER_SYSTEM`) | `plugins/assistant/main/ask-prompts.ts` (code; `system-prompt.ts` composes around them) | direct import |
 | Base app built-in templates (Autotag, search summary, lossless format) | `shared/config/schema.ts` (code — the renderer needs them synchronously; the user's copies live in app-config) | direct import |
 | The closing round's prompt | `packages/tickets-engine/src/fleet/closing-round-prompt.ts` (a builder with per-run facts, code) | direct import |
+| The worker's persona tools (`memory_write`, `journal_write` — req-226) | `packages/tickets-engine/src/service/vault-mcp/persona-record-tools.ts` (the tool descriptions, code) | direct import |
 
 The rule of the map: a prompt's **text** is edited in its file of record,
 nothing else is a second copy. The loaders drop exactly the one trailing
@@ -829,6 +830,16 @@ Answer with exactly one JSON object and nothing outside it — no prose, no mark
 - proposal: null, or a change the owner decides: {"target":"prompt.md","title":"...","edits":[{"old":"...","new":"..."}]} when the persona's prompt should change — each "old" copied exactly from the prompt you were given and found there once, "new" its replacement, the smallest edits that do it — or {"target":"models.default","title":"...","content":"<model id>"} when the model should.
 ````
 
+When the worker already saved its lesson with `memory_write` during the
+run (req-226 — the vault MCP's `allowed` audit line on the run's stream),
+the `lesson:` line reads instead:
+
+````text
+- lesson: null — you already saved this run's one lesson with memory_write while you worked.
+````
+
+and the runner writes no lesson from the answer, whatever it says.
+
 - **The parser** (`parseClosingAnswer`): the first `{` to the last `}` of
   the turn's `result` text, fences and prose around it tolerated; nothing
   parses → the entry notes *the answer did not parse* and no lesson is
@@ -844,10 +855,14 @@ Answer with exactly one JSON object and nothing outside it — no prose, no mark
   is dropped, never guessed.
 - **What it writes:** one journal entry (`reviews.md`) with the runner's
   facts and the finding; at most one memory line
-  `- <date> · <ticket> · <persona>/<model> · <lesson>`; a proposal as an
+  `- <date> · <ticket> · <persona>/<model> · <lesson>` (none when the
+  persona's memory already holds the same lesson); a proposal as an
   **open** `improvements.md` proposal (the owner's 1:1 card) — never
   adopted. The journal entry's `friction:` is the worker's own
-  `FRICTION:` line, else the round's `friction`.
+  `FRICTION:` line, else the round's `friction`, else the note of the
+  run's own `journal_write` entry, whose place the round's entry takes.
+  In Drey Service the three files are one commit of the engine's
+  (`personas: <id> closing round <ticket>`, req-225).
 - **No round:** a run without a session ref, a harness that cannot resume
   it, a round past its 10-minute bound — the entry is written from the
   runner's facts with `note: round skipped — <why>`, no lesson. A 1:1, a
@@ -861,6 +876,32 @@ Answer with exactly one JSON object and nothing outside it — no prose, no mark
   improvement loop reads it. It goes before a `BLOCKED:` line. Nothing to
   report: no line."* The runner reads the last line-start `FRICTION:` line
   (`harness/event-text.ts` `frictionOf`, 300 characters).
+
+## The worker's persona tools (req-226)
+
+A ticket run with a persona is offered two tools by Drey Service's vault
+MCP beside the vault tools (`service/vault-mcp/persona-record-tools.ts`).
+No brief names them — what they do is in their descriptions, the texts the
+model sees (`<max>` is 200 for both, the closing round's caps
+`CLOSING_LESSON_MAX` / `CLOSING_FRICTION_MAX`):
+
+````text
+memory_write {lesson: string}
+Save one lesson to your persona memory now, while you remember it: one concrete, reusable rule the NEXT run of yours should know — not a story of this run. One line, at most <max> characters, once per run; it is that run's lesson, so the closing round asks for none. A wrong lesson misleads every later run: when in doubt, do not write.
+
+journal_write {note: string}
+Note in your persona journal where this run stumbled: what you lacked, guessed or hit twice. One line, at most <max> characters, once per run. The journal is the owner's evidence; it is never read back into a run.
+````
+
+- **The answers:** `Saved to your memory:` / `Saved to your journal:` and
+  the stored line (a commit warning in parentheses after it); failures are
+  `Error: …` — `<tool> needs a non-empty "lesson" | "note" — one line`,
+  `this run already used <tool> — once per run`, `your memory already holds
+  this lesson — nothing was written`, `the record could not be written
+  (<why>)`, `<tool> is not available to this call`.
+- **The text** is flattened to one line and capped before it is written;
+  the author is always the token's persona, the ticket, harness and model
+  its run's.
 
 ## The free session brief (req-173, R12)
 

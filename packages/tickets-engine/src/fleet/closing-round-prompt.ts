@@ -26,6 +26,8 @@ export interface ClosingRoundFacts {
   readonly costUsd: number | null;
   readonly typicalCostUsd: number | null;
   readonly friction: string | null;
+  /** The worker saved its one lesson through `memory_write` during the run (req-226); absent = it did not. */
+  readonly lessonWritten?: boolean;
 }
 
 export type ClosingProposalTarget = 'prompt.md' | 'models.default';
@@ -84,7 +86,9 @@ export function closingRoundPrompt(facts: ClosingRoundFacts): string {
     '{"finding":{"cause":"model|prompt|task|environment","text":"..."},"friction":"...","lesson":"...","proposal":null}',
     `- finding: where the run stumbled and why. cause "model" when a stronger or different model would have avoided it, "prompt" when the brief, the prompt or the skills lacked something, "task" when the ticket itself was unclear or wrong, "environment" for the repo, the tools or the machine. At most ${CLOSING_FINDING_MAX} characters; null when nothing stumbled.`,
     `- friction: what you lacked, guessed or hit twice — one line, at most ${CLOSING_FRICTION_MAX} characters; null when nothing.`,
-    `- lesson: one line the NEXT run of this persona should know — a concrete, reusable rule, not a story of this run; at most ${CLOSING_LESSON_MAX} characters. A wrong lesson misleads every later run: when in doubt, null.`,
+    facts.lessonWritten === true
+      ? "- lesson: null — you already saved this run's one lesson with memory_write while you worked."
+      : `- lesson: one line the NEXT run of this persona should know — a concrete, reusable rule, not a story of this run; at most ${CLOSING_LESSON_MAX} characters. A wrong lesson misleads every later run: when in doubt, null.`,
     '- proposal: null, or a change the owner decides: {"target":"prompt.md","title":"...","edits":[{"old":"...","new":"..."}]} when the persona\'s prompt should change — each "old" copied exactly from the prompt you were given and found there once, "new" its replacement, the smallest edits that do it — or {"target":"models.default","title":"...","content":"<model id>"} when the model should.',
   ].join('\n');
 }

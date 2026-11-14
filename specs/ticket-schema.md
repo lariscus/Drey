@@ -1424,7 +1424,11 @@ it was first offered (spec: `persona-remove-seeded.spec.ts`). Removals queue.
   (`<date> · <ticket> · handed-over · <n> tokens`), hand-written lessons —
   stay as they are and read with no author; nothing rewrites them.
   Writers: the **closing round** (below) appends at most one persona
-  lesson per noteworthy run, directly (no proposal card); a smooth run
+  lesson per noteworthy run, directly (no proposal card), or the run's
+  worker writes that one lesson itself during the run with the
+  `memory_write` tool (req-226, below) — then the closing round writes
+  none; a lesson this persona's memory already holds (same text, case and
+  a trailing full stop aside) is never written twice. A smooth run
   and a 1:1 write none, and no run writes an outcome line any more. The
   owner's lines come from the Memory tab (`personaMemoryAppend`), the
   confirmed `personaLearn` and a decided improvement's lesson, each in
@@ -1482,7 +1486,12 @@ is kept apart from its *lesson*:
   or — · gate <green|red|none> · $<cost> or —`; the fields are optional:
   `signals:` (of `red-gate, retry, steer, cost, friction`), `friction:`
   (the worker's own report, one line), `finding (<model|prompt|task|environment>):`
-  (the closing round's verdict), `note:` (why an entry has no finding).
+  (the closing round's verdict), `note:` (why an entry has no finding, or
+  `written during the run` on an entry the worker wrote with
+  `journal_write` — req-226: `gate none`, no cost or signals, its note as
+  `friction:`; the run's closing round takes that entry's place, keeping
+  the note as `friction:` when the round brought none, so a run keeps one
+  entry).
   A block whose head does not parse is kept verbatim on every rewrite but
   not listed. `GET /api/personas/<id>/journal` lists the entries oldest
   first; `POST /api/personas/<id>/journal/remove` `{index, at}` removes one
@@ -1502,8 +1511,29 @@ is kept apart from its *lesson*:
   journal entry, at most one memory lesson, and a prompt or model change
   only as an **open** proposal in `improvements.md`. Without a session to
   resume (or past its 10-minute bound) the entry holds the runner's facts
-  and a `note:`. A smooth run writes nothing. The runner's writes are
-  plain file writes in the tickets repository (not committed — req-225).
+  and a `note:`. A smooth run writes nothing. **One commit per round**
+  (req-225): in Drey Service the runner hands the round's journal entry,
+  lesson and proposal to the engine (`personaClosingRound`), whose one
+  writer of the tickets repository writes the files and commits exactly
+  them as `personas: <id> closing round <ticket>` — on the engine's git
+  queue, so no second git races the board's commits for `index.lock`. A
+  standalone runner, a run in a vault the engine does not hold, or a
+  round while the engine is down writes the same files plainly
+  (uncommitted).
+- **`memory_write` / `journal_write`** (req-226) — a ticket run's worker
+  with a persona may write into its own records during the run through
+  Drey Service's vault MCP (`specs/classifier-spec.md`, *The worker's
+  persona tools*): **one** lesson to `memory.md` in the persona line form
+  (`<date> · <ticket> · <persona>/<model> · <lesson>`, the lesson at most
+  200 characters, like the closing round's) and **one** note to
+  `reviews.md` (at most 200 characters), each once per run — a second call
+  is refused. Only the token's own persona is written, never another's;
+  a 1:1, a free session and a run without a persona are not offered the
+  tools. Each write is one commit of the engine's (`personas: <id> memory
+  +1 (<ticket>)`, `personas: <id> journal +1 (<ticket>)`) and audited on
+  the run's stream like every vault call. A lesson the memory already
+  holds is refused (`your memory already holds this lesson`) and gives the
+  run its turn back.
 - `friction.md` — **retired (req-169).** The worker's former write path
   (`- <YYYY-MM-DD> · <ticketId> · <what was missing>`) is no longer
   asked for; a file that still exists migrates **once** into the start of

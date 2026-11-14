@@ -1144,15 +1144,39 @@ looks at the run once:
   answer; the round's tokens and cost are added to the record before the
   settle. Bounded at 10 minutes; a refused resume or an exit without an
   answer skips it.
-- **What it writes** (into the tickets repository, plain writes, not
-  committed — req-225): one `reviews.md` entry (`PersonaJournalWriter`),
-  at most one `memory.md` lesson (`PersonaMemory.appendLesson`), an open
-  `improvements.md` proposal when the answer carries one
-  (`RoundProposalWriter`). Two runner notes frame it in the transcript:
-  `closing round — red-gate, retry` and `closing round done — journal
-  entry written, one memory lesson` (or `… skipped — <why>; the journal
-  holds the run's facts`). A failure is a log line; the run settles as
-  it would have.
+- **What it writes** — one `reviews.md` entry, at most one `memory.md`
+  lesson, an open `improvements.md` proposal when the answer carries one,
+  through the `ClosingRoundRecords` port (`closing-round-records.ts`):
+  - **in Drey Service, one commit** (req-225): `EngineRoundRecords` hands
+    the round to the engine over the channel the service passes in
+    (`RunnerDeps.personaRecords` → the invoke method
+    `personaClosingRound`); the engine's `PersonaRunRecords`
+    (`services/persona-run-records.ts`) writes the three files and commits
+    exactly them as `personas: <id> closing round <ticket>` on the
+    engine's one `TicketsGit` queue — the runner never runs git in the
+    tickets repository, so it cannot collide with the board's commits on
+    `index.lock` (D-65);
+  - **plainly** (`DiskRoundRecords`: `PersonaJournalWriter`,
+    `PersonaMemory.appendLesson`, `RoundProposalWriter`, uncommitted) for
+    a standalone runner, and as the fallback when the engine is down or
+    answers `foreign` (the run's vault is not the engine's).
+  A run whose worker saved its lesson with `memory_write` (the vault MCP's
+  `allowed` audit line on the stream sets `run.lessonWritten`, req-226)
+  writes no lesson here, and its prompt says so; a lesson the memory
+  already holds is not written twice; a run's own `journal_write` entry is
+  replaced by the round's (one entry per run). Two runner notes frame it
+  in the transcript: `closing round — red-gate, retry` and `closing round
+  done — journal entry written, one memory lesson (one commit)` (or `…,
+  the run saved its lesson itself`, or `… skipped — <why>; the journal
+  holds the run's facts`). A failure is a log line; the run settles as it
+  would have.
+- **The worker's own writes during the run** (req-226): a ticket run with
+  a persona gets `records` on its vault grant (`process-supervisor.ts`
+  `recordsOf`: the harness and model), and Drey Service's vault MCP offers
+  it `memory_write` and `journal_write` beside the vault tools
+  (`service/vault-mcp/persona-record-tools.ts`), once each per run
+  (`RecordQuota` on the token), written by the engine's
+  `PersonaRunRecords` (one commit each) and audited like every vault call.
 - **Never** for a 1:1, an interactive dialog, a blocked, scout or
   no-result run. No run writes the old per-run outcome line into
   `memory.md` any more.
@@ -1533,6 +1557,14 @@ and a warning in the service log; a write from a read the disk has moved
 past is refused too (ADR-0060). No `tickets/`, `chats/` or dot-folder is
 reachable. The retired `allowed: write-vaults` grants nothing; the engine's
 start drops it from the persona files once a project exists.
+A **ticket run with a persona** is offered two more tools on the same
+server (req-226): `memory_write` (`lesson`) and `journal_write` (`note`),
+written into its own persona's `memory.md` / `reviews.md` — never another
+persona's, whatever the arguments say — once each per run, by the engine's
+one writer (one commit each; see *The closing round*). Their audit line
+names the persona file (`tickets/_meta/personas/<id>/memory.md`); a second
+call is `Error: this run already used <tool> — once per run` (verdict
+`refused`).
 A **1:1's token** reads **every project's** vaults and folders (a vault no
 project names is not read), is read-only in the grant itself and carries a tool cut
 (`VaultGrant.tools`): the list offers `vault_list`, `vault_search`,

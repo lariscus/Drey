@@ -215,3 +215,21 @@ better".
 ## Later change (2026-11-09 — milestone 230, req-173): the 1:1 is one kind of held session
 
 `OneOnOneStarter` became `HeldSessionStarter` with a kind per held session — `OneOnOneKind` (one live 1:1 per persona, the tickets repository, read-only, its chat file) and req-173's `FreeSessionKind`; the 1:1's behaviour is unchanged. Its record is a session record (ADR-0092 later change): kind `1:1`, the tickets repository as its working directory, state `held` while it waits for the owner's next line. The idle span is one constant for every held session (`HELD_SESSION_IDLE_MS` = `ONE_ON_ONE_IDLE_MS`, req-219).
+
+## Later change (2026-11-14 — req-225, req-226): the run's persona writes are the engine's commits; the worker may write its lesson itself
+
+Point 5 of "Built differently" no longer holds. **The engine is the one writer of the tickets repository**: in
+Drey Service the runner hands a closing round's journal entry, lesson and proposal to the engine
+(`PersonaRunRecords`, invoke method `personaClosingRound`), which writes them and commits exactly those files as
+`personas: <id> closing round <ticket>` on its one `TicketsGit` queue. Considered: the runner committing over its
+own git — rejected, a second git process in the same repository is the `index.lock` collision D-65 met, and the
+runner's read-modify-write of `memory.md` would race the board's own writes. A standalone runner, a run in a vault
+the engine does not hold, or a round while the engine is down keeps the plain writes.
+
+R14's later item is built: **`memory_write` / `journal_write`** on Drey Service's vault MCP (ADR-0094) let a ticket
+run's worker save its one lesson and one journal note during the run, scoped to the token's own persona, once each,
+in the closing round's line form and caps, through the same engine writer (one commit each), audited on the run's
+stream. A run that saved its lesson gets none from its closing round (the vault MCP's audit line tells the runner),
+a lesson the memory already holds is never written twice, and the round's journal entry takes the place of the
+run's own note — still one entry per run, as the report counts them.
+

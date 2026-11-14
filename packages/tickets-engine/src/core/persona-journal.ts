@@ -53,6 +53,8 @@ export const JOURNAL_ENTRY_CAP = 200;
 export const JOURNAL_FRICTION_MAX = 300;
 export const JOURNAL_FINDING_MAX = 500;
 export const JOURNAL_NOTE_MAX = 200;
+/** The `note:` of an entry the worker wrote itself through `journal_write` (req-226); its closing round merges into it. */
+export const RUN_JOURNAL_NOTE = 'written during the run';
 
 const NONE = '—';
 const HEAD = /^- (\S+) · (T-\d{4,}|—) · ([a-z0-9][a-z0-9-]{0,63}) · (\S+) · gate (green|red|none) · (\$\d+(?:\.\d+)?|—)$/;

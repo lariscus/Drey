@@ -1,14 +1,14 @@
 import type { ProcessTable } from '../ports/process-table';
 import { ONE_ON_ONE_VAULT_TOOLS } from '../one-on-one-toolset';
 import type { RunInfo } from '../protocol';
-import { isOneOnOne } from '../protocol-session';
+import { isOneOnOne, isTicketRun } from '../protocol-session';
 import type { NormalizedEvent, ProviderAdapter, UsageTotals, WorkerHandle } from '../harness/contract';
 import type { BackgroundWork } from './background-work';
 import type { EventFold } from './event-fold';
 import type { HandoverSettings } from './handover-settings';
 import { messageOf, type LiveRun } from './live-run';
 import type { RunRepository } from './run-repository';
-import type { VaultGrantRequest, WorkerVaultAccess, WorkerVaultGate } from './worker-vault';
+import type { PersonaRecordsGrant, VaultGrantRequest, WorkerVaultAccess, WorkerVaultGate } from './worker-vault';
 
 /** Where the worker works: a session's explicit directory (req-168, R12), a review's read-only checkout (req-183), else the run's worktree. */
 function workFolderOf(info: RunInfo): string {
@@ -161,6 +161,7 @@ export class ProcessSupervisor {
       scope: oneOnOne ? { kind: 'every-project' } : { kind: 'project', project: run.request.projectId ?? null },
       // A 1:1 is offered the read cut only (req-217); a free session has its persona's rights, a run the full set.
       ...(oneOnOne ? { tools: ONE_ON_ONE_VAULT_TOOLS } : {}),
+      ...recordsOf(run),
       runDir: run.dir,
       harness: adapter.label,
       emit: (event) => this.deps.events.onEvent(run, event),
@@ -250,4 +251,10 @@ export class ProcessSupervisor {
     run.usageBase = base;
     this.deps.background.track(this.deps.repo.persist(run));
   }
+}
+
+/** req-226: a ticket run with a persona writes its own lesson and journal note; a 1:1 and a free session do not. */
+function recordsOf(run: LiveRun): { records?: PersonaRecordsGrant } {
+  const persona = run.info.persona ?? null;
+  return persona === null || !isTicketRun(run.request) ? {} : { records: { harness: run.info.provider, model: run.info.model ?? run.request.model ?? 'unknown' } };
 }

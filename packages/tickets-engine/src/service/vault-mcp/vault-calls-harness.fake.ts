@@ -5,9 +5,10 @@
  */
 import type { ProjectRecord } from '../../contracts/projects';
 import type { NormalizedEvent } from '../../fleet/harness/contract';
-import type { VaultScope } from '../../fleet/orchestrate/worker-vault';
+import type { PersonaRecordsGrant, VaultScope } from '../../fleet/orchestrate/worker-vault';
 import type { VaultSite } from './disk-tool-vault';
 import { MemoryVaultDisk } from './memory-vault-disk.fake';
+import { PersonaRecordTools, type PersonaRecordsPort } from './persona-record-tools';
 import { ProjectRights, type RightsSource } from './project-rights';
 import { RunTokens, type TokenSession } from './run-tokens';
 import { VaultCallAuditor } from './vault-call-auditor';
@@ -33,6 +34,9 @@ export interface HarnessOptions {
   readonly readOnly?: boolean;
   readonly tools?: readonly string[];
   readonly scope?: VaultScope;
+  /** req-226: the grant's persona writes and the engine's writer behind the two tools. */
+  readonly records?: PersonaRecordsGrant;
+  readonly port?: PersonaRecordsPort;
 }
 
 /** The board as the rights read it: ben may change notes, ralf may not; the records can change between calls. */
@@ -68,10 +72,12 @@ export function harness(options: HarnessOptions = {}) {
     rights: new ProjectRights(board, disk),
     auditor: new VaultCallAuditor({ now: () => new Date(Date.UTC(2026, 10, 9, 12, 0, 0, (clock += 5))), log: (m) => logged.push(m) }),
     changed: (change) => changes.push(change),
+    ...(options.port === undefined ? {} : { records: new PersonaRecordTools(options.port) }),
   });
   const tokens = new RunTokens({ token: () => 'tok', hash: (t) => t });
   const { persona = 'ben', readOnly = false, tools, scope = { kind: 'project', project: 'drey' } } = options;
-  const grant = { runId: 'run-1', ticketId: 'T-9', persona, readOnly, scope, ...(tools === undefined ? {} : { tools }), emit: (e: NormalizedEvent) => events.push(e) };
+  const records = options.records === undefined ? {} : { records: options.records };
+  const grant = { runId: 'run-1', ticketId: 'T-9', persona, readOnly, scope, ...(tools === undefined ? {} : { tools }), ...records, emit: (e: NormalizedEvent) => events.push(e) };
   const session: TokenSession = tokens.resolve(tokens.mint(grant))!;
   const call = async (name: string, args: Record<string, unknown>): Promise<{ text: string; isError: boolean }> => {
     const result = await calls.call(session, name, args);

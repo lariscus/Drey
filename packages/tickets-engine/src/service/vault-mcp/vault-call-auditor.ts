@@ -14,7 +14,7 @@ import { targetLabel, type VaultCallTarget } from './vault-call-target';
 export const VAULT_MCP_NAME = 'drey';
 
 // req-283: a vault outside the token's project is "not available" — a refusal like a write the grant leaves read-only.
-const REFUSALS = [/ may not write vault "/, / since you read it /, /^Error: vault "[^"]*" is not available to this call/, /^Error: no vault is available to this call/];
+const REFUSALS = [/ may not write vault "/, / since you read it /, /^Error: this run already used /, /^Error: vault "[^"]*" is not available to this call/, /^Error: no vault is available to this call/];
 const MAX_TEXT = 240;
 
 export interface VaultCallAuditorDeps {

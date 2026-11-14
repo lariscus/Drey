@@ -45,6 +45,7 @@ import { nodeKimiUsageReader } from './harness/kimi-usage';
 import type { Orchestrator, FleetEvents } from './orchestrator';
 import type { RunSupervisor } from './orchestrate/run-supervisor';
 import { SupervisorSet } from './orchestrate/supervisor-set';
+import type { PersonaRecordsChannel } from './orchestrate/engine-round-records';
 import type { WorkerVaultGate } from './orchestrate/worker-vault';
 import { freePort, nodeSpawnFn, scrubInheritedEnv } from './procs';
 import type { GovernorSettings, PoolLoad, RunnerDescriptor, SlotView, WorkerProviderId } from './protocol';
@@ -97,6 +98,8 @@ export interface RunnerDeps {
   readonly governorSettings?: () => GovernorSettings;
   /** req-167: Drey Service's vault MCP for the workers; absent = no worker gets a vault (the standalone runner). */
   readonly vault?: WorkerVaultGate;
+  /** req-225: the engine's writer of the closing round's records (one commit per round); absent = plain writes. */
+  readonly personaRecords?: PersonaRecordsChannel;
 }
 
 /** What `startRunner` hands back: the spec reads the descriptor and ends the runner through it. */
@@ -158,6 +161,13 @@ interface FleetContext {
   readonly governor: Governor;
   /** req-167: the service's vault MCP gate. */
   readonly vault?: WorkerVaultGate;
+  /** req-225: the engine's writer of the closing round's records. */
+  readonly personaRecords?: PersonaRecordsChannel;
+}
+
+/** Drey Service's seams of a run (req-167, req-225): absent for the standalone runner. */
+function serviceSeamsOf(from: { vault?: WorkerVaultGate; personaRecords?: PersonaRecordsChannel }): { vault?: WorkerVaultGate; personaRecords?: PersonaRecordsChannel } {
+  return { ...(from.vault !== undefined ? { vault: from.vault } : {}), ...(from.personaRecords !== undefined ? { personaRecords: from.personaRecords } : {}) };
 }
 
 /** The service home: `--home`, else the parent of a `<home>/fleet` root, else the root itself (a spec's temp root). */
@@ -234,7 +244,7 @@ function composeFleet(ctx: FleetContext): { supervisors: SupervisorSet; orchestr
         secondOpinion: (request) => orchestrator.secondOpinion(request),
         slots: routing.gate,
         seats,
-        ...(ctx.vault !== undefined ? { vault: ctx.vault } : {}),
+        ...serviceSeamsOf(ctx),
       }),
     ]),
   );
@@ -320,7 +330,7 @@ export async function startRunner(args: Args, deps: RunnerDeps = {}): Promise<Ru
   const capacity = new PoolCapacity(fetchTotalSlots, SYSTEM_CLOCK, log.line);
   const routing = routingFor(args, deps, { log: log.line, hub, capacity });
   const governor = await governorOf(args, deps, { log: log.line, hub, routing });
-  const { supervisors, orchestrator } = composeFleet({ root: args.root, log: log.line, events: ledger.events, hub, routing, capacity, governor, ...(deps.vault !== undefined ? { vault: deps.vault } : {}) });
+  const { supervisors, orchestrator } = composeFleet({ root: args.root, log: log.line, events: ledger.events, hub, routing, capacity, governor, ...serviceSeamsOf(deps) });
   await supervisors.adoptAll();
   seedRouting(routing, supervisors, governor);
   await routing.start();

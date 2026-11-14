@@ -1,22 +1,19 @@
 import { costOf } from '../../core/model-prices';
-import { renderJournalEntry, type JournalEntry, type JournalGate } from '../../core/persona-journal';
+import type { JournalEntry, JournalGate } from '../../core/persona-journal';
 import { closingRoundPrompt, parseClosingAnswer, type ClosingAnswer } from '../closing-round-prompt';
 import type { Clock } from '../ports/clock';
 import { isOneOnOne } from '../protocol-session';
 import { shortGateLine } from '../run/run-summary';
 import type { ClosingAssessment, ClosingSignalRule } from './closing-signal-rule';
+import type { ClosingRoundRecords, RoundRecorded } from './closing-round-records';
 import { messageOf, type LiveRun } from './live-run';
-import type { PersonaJournalWriter } from './persona-journal-writer';
-import type { PersonaMemory } from './persona-memory';
 import type { ClosingRoundAsker, RoundReply, RoundUsage } from './resume-round-asker';
-import type { RoundProposalWriter } from './round-proposal-writer';
 
 export interface ClosingRoundDeps {
   readonly rule: ClosingSignalRule;
   readonly asker: ClosingRoundAsker;
-  readonly journal: PersonaJournalWriter;
-  readonly memory: PersonaMemory;
-  readonly proposals: RoundProposalWriter;
+  /** Where the journal entry, the lesson and the proposal go: the engine's one commit, or plain writes (req-225). */
+  readonly records: ClosingRoundRecords;
   readonly clock: Clock;
   /** The runner's own line in the run's transcript. */
   readonly note: (run: LiveRun, what: string) => Promise<void>;
@@ -62,9 +59,11 @@ function withRoundUsage(run: LiveRun, usage: RoundUsage): void {
  * steer, cost outlier, reported friction) is asked once where it stumbled;
  * the finding goes to the persona's journal (`reviews.md`), at most one
  * lesson straight into `memory.md`, a prompt or model change only as an
- * open proposal. A smooth run costs no round and writes nothing. A round
- * that cannot run still journals the runner's facts and says why. Nothing
- * here fails the run: every error is a log line.
+ * open proposal — in Drey Service as one commit of the engine's (req-225).
+ * A run whose worker saved its lesson through `memory_write` (req-226) gets
+ * no second one here. A smooth run costs no round and writes nothing. A
+ * round that cannot run still journals the runner's facts and says why.
+ * Nothing here fails the run: every error is a log line.
  */
 export class ClosingRound {
   constructor(private readonly deps: ClosingRoundDeps) {}
@@ -93,11 +92,9 @@ export class ClosingRound {
       withRoundUsage(run, reply.usage);
     }
     const entry = this.entryOf({ run, persona, assessment, answer, reply });
-    const vault = run.request.ticketsVaultPath;
-    await this.deps.journal.append(vault, entry);
-    const lesson = answer === null || answer.lesson === null ? null : await this.deps.memory.appendLesson(run, answer.lesson);
-    const proposal = answer === null || answer.proposal === null ? null : await this.deps.proposals.add(vault, persona, answer.proposal, renderJournalEntry(entry)[0]!.slice(2));
-    await this.deps.note(run, this.summaryOf(reply, answer, lesson, proposal));
+    const lesson = run.lessonWritten === true ? null : (answer?.lesson ?? null);
+    const recorded = await this.deps.records.write(run, { persona, entry, lesson, proposal: answer?.proposal ?? null });
+    await this.deps.note(run, this.summaryOf(run, { reply, answer, recorded }));
   }
 
   private promptOf(run: LiveRun, assessment: ClosingAssessment): string {
@@ -111,6 +108,7 @@ export class ClosingRound {
       costUsd: assessment.costUsd,
       typicalCostUsd: assessment.typicalCostUsd,
       friction: run.friction ?? null,
+      lessonWritten: run.lessonWritten === true,
     });
   }
 
@@ -132,11 +130,14 @@ export class ClosingRound {
     };
   }
 
-  private summaryOf(reply: RoundReply, answer: ClosingAnswer | null, lesson: string | null, proposal: string | null): string {
+  private summaryOf(run: LiveRun, round: { reply: RoundReply; answer: ClosingAnswer | null; recorded: RoundRecorded }): string {
+    const { reply, answer, recorded } = round;
+    const commit = recorded.committed ? ' (one commit)' : '';
     if (reply.kind === 'skipped') {
-      return `closing round skipped — ${reply.reason}; the journal holds the run's facts`;
+      return `closing round skipped — ${reply.reason}; the journal holds the run's facts${commit}`;
     }
-    const parts = ['journal entry written', lesson !== null ? 'one memory lesson' : 'no lesson', ...(proposal !== null ? [`proposal ${proposal} for the 1:1`] : [])];
-    return `closing round done — ${answer === null ? 'the answer did not parse; ' : ''}${parts.join(', ')}`;
+    const lesson = recorded.lesson !== null ? 'one memory lesson' : run.lessonWritten === true ? 'the run saved its lesson itself' : 'no lesson';
+    const parts = ['journal entry written', lesson, ...(recorded.proposal !== null ? [`proposal ${recorded.proposal} for the 1:1`] : [])];
+    return `closing round done — ${answer === null ? 'the answer did not parse; ' : ''}${parts.join(', ')}${commit}`;
   }
 }
