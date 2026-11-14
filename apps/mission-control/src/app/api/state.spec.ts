@@ -736,6 +736,52 @@ describe('chat', () => {
   });
 });
 
+describe("Mission Control's project filter (req-298)", () => {
+  afterEach(() => localStorage.removeItem('mc.project-filter'));
+
+  const TWO = [
+    { id: 'drey', name: 'Drey', color: '#8ecbef' },
+    { id: 'lariscus', name: 'Lariscus', color: '#f2cfae' },
+  ];
+
+  it("keeps the choice on this device, and Pia's new tickets go to the filter's project", async () => {
+    const { desk, data } = makeDesk();
+    data.board = { columns: [{ phase: { id: 'inbox', title: 'Inbox' }, tickets: [] }], projects: TWO };
+    desk.on('POST', '/api/chat/sessions', () => ({ ok: true, file: FILE_A, say: 'Asked', proposals: [] }));
+    desk.on('POST', `/api/chat/sessions/${enc(FILE_A)}/messages`, () => ({ ok: true, file: FILE_A, say: 'Done', proposals: [] }));
+    const state = makeState(desk);
+    await state.boot({ pairCode: null, token: 'tok' });
+    await waitFor(() => expect(state.work().projects.map((project) => project.id)).toEqual(['drey', 'lariscus']));
+
+    await state.newSession('capture under all projects');
+    expect(desk.callsOf('POST', '/api/chat/sessions')[0]!.body).toEqual({ text: 'capture under all projects' });
+
+    state.setProjectFilter('lariscus');
+    expect(localStorage.getItem('mc.project-filter')).toBe('lariscus');
+    expect(makeState(desk).projectFilter()).toBe('lariscus');
+    await state.send('capture it');
+    expect(desk.callsOf('POST', `/api/chat/sessions/${enc(FILE_A)}/messages`).at(-1)!.body).toEqual({ text: 'capture it', project: 'lariscus' });
+
+    state.setProjectFilter('_unassigned');
+    await state.send('and this');
+    expect(desk.callsOf('POST', `/api/chat/sessions/${enc(FILE_A)}/messages`).at(-1)!.body).toEqual({ text: 'and this' });
+    state.setProjectFilter(null);
+    expect(localStorage.getItem('mc.project-filter')).toBeNull();
+  });
+
+  it('a stored project the board no longer has sends nothing', async () => {
+    localStorage.setItem('mc.project-filter', 'gone');
+    const { desk, data } = makeDesk();
+    data.board = { columns: [{ phase: { id: 'inbox', title: 'Inbox' }, tickets: [] }], projects: TWO };
+    desk.on('POST', '/api/chat/sessions', () => ({ ok: true, file: FILE_A, say: 'Asked', proposals: [] }));
+    const state = makeState(desk);
+    await state.boot({ pairCode: null, token: 'tok' });
+    await waitFor(() => expect(state.work().projects).toHaveLength(2));
+    await state.newSession('capture');
+    expect(desk.callsOf('POST', '/api/chat/sessions')[0]!.body).toEqual({ text: 'capture' });
+  });
+});
+
 describe('prefillChat (E8, E9)', () => {
   it('fills the one-shot prefill and switches to the chat tab', () => {
     const { desk } = makeDesk();

@@ -130,6 +130,9 @@
                           <span class="ph-change-id">{{ id }}</span>
                         }
                         <span class="ph-change-line">{{ changeOf(proposal).text }}</span>
+                        @if (proposalProjectOf(proposal); as chip) {
+                          <span class="ph-change-proj"><i [style.background]="chip.color" aria-hidden="true"></i>{{ chip.label }}</span>
+                        }
                       </div>
                       @if (cardError(proposal.id); as error) {
                         <p class="inline-error">{{ error }}</p>
@@ -591,6 +594,9 @@
           }
           <span class="dl-add">+ # {{ detail.title }}</span>
           <span class="dl-add">+ phase: {{ detail.phase }}</span>
+          @if (proposal.project; as project) {
+            <span class="dl-add">+ project: {{ project }}</span>
+          }
         </div>
       }
       @case ('blocked') {

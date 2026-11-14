@@ -36,6 +36,10 @@ import { Menu, type MenuPlace } from '@mission-ui/shell/menu';
 import { Panes } from '@mission-ui/shell/panes';
 import { PadChats } from '@mission-ui/shell/pad-chats';
 import type { SessionMeta } from '@mission-ui/api/dto';
+import { ProjectFilter } from '@mission-ui/work/project-filter';
+import { workProjectChoicesOf, workProjectScopeOf } from '@mission-ui/work/project-scope';
+import { filterShownOf, type McProjectFilter } from '@mission-ui/work/projects';
+import { McI18n } from '@mission-ui/i18n/i18n.service';
 
 export type { McTab };
 
@@ -158,6 +162,7 @@ export function tabOfPlace(place: ShellArea | MenuPlace): McTab {
     AutopilotChip,
     Menu,
     PadChats,
+    ProjectFilter,
   ],
   providers: [
     {
@@ -199,6 +204,15 @@ export class App {
   protected readonly personaOpen = this.state.personaDetail;
   /** The Work tab's needs counter: the needs count. */
   protected readonly needsCount = computed(() => this.state.needs().length);
+
+  private readonly i18n = inject(McI18n);
+  /** req-298: this device's project filter — the iPad header and the desk's top nav draw it beside the area switch (board 7n's place). */
+  protected readonly projectScope = computed(() => workProjectScopeOf(this.state.board(), this.state.projectFilter()));
+  protected readonly projectFilterShown = computed(() => filterShownOf(this.projectScope().projects));
+  protected readonly projectChoices = computed(() => workProjectChoicesOf(this.projectScope(), this.i18n.t('projects.filter.unassigned')));
+  protected pickProject(filter: McProjectFilter): void {
+    this.state.setProjectFilter(filter);
+  }
   /** The menu's Crew row: how many runs the watchdog flagged as stuck (board 10b). */
   protected readonly stuckCount = computed(() =>
     stuckCountOf(this.state.team().personas as unknown as readonly Pick<McTeamPersona, 'liveRuns'>[] | null),

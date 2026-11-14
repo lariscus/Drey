@@ -47,7 +47,7 @@ Open work only. Everything implemented lives in
 lives in [`decisions.md`](decisions.md). When an item ships, move it to the
 changelog and delete it here — no shipped history on this page.
 
-**Status (2026-11-14):** version 0.8.1, milestones 1–270 built (1–21 in `docs/milestones-done.md`; 109–111 recorded by the convergence audit backfill), plus the requirements the changelog records without a milestone number (req-95a, req-95b, req-96, req-97, req-98, req-99a, req-99b, req-101, req-102, req-104, req-110, req-126 among them). Milestones 1–83 are
+**Status (2026-11-14):** version 0.8.1, milestones 1–271 built (1–21 in `docs/milestones-done.md`; 109–111 recorded by the convergence audit backfill), plus the requirements the changelog records without a milestone number (req-95a, req-95b, req-96, req-97, req-98, req-99a, req-99b, req-101, req-102, req-104, req-110, req-126 among them). Milestones 1–83 are
 owner-verified (the round for 1–81 closed 2026-10-17; 82, the auto-update, and 83, the tickets foundation, on real use). From milestone 84 on, the changelog marks each entry that still awaits the owner's round — nearly all of them; that round is finish line step 6 below. Milestone and requirement ids are assigned when work starts; the next free ones follow from the top of `changelog.md`. Of the architectural cleanup, A1–A6 and A10–A12 shipped; A7–A9 remain.
 
 ### Finish line (owner, 2026-11-12)
@@ -368,7 +368,7 @@ checks use a scratch store and a second instance, never `drey-tickets`.
 
 _Owner request 2026-11-13, outside the list: the design round after his verification of milestones 242–251 — the draft, his answers and the boards 7k v3, 7l v3, 7m, 7n and 7o, accepted the same day ([the concept](../docs/design/work-panel/project-handling-draft.md), [boards](../docs/design/work-panel/boards/README.md)). **Part of the finish line** (step 5, owner 2026-11-13: needed before the merge into `main`), in this order; the corrections the owner names before the merge are added here as rows. Quotas, the capacity pool, the slots and the routing stay cross-project._
 
-- **req-298 — The project filter in Mission Control, and Pia's projects** (split from req-285 on 2026-11-13: the desktop half shipped as milestone 267; no board of its own — desk, iPad and phone draw the filter in their own frame, board 7n's look). Mission Control (desk, iPad, phone) gets **its own** project filter (device-local, not the desktop view's): the Work list and board, the Review list and capture follow it (`POST /api/tickets` already takes `project`, milestone 267), under *All projects* a card carries the project chip, columns, load and the pool chip count every project; `parseWork` maps the snapshot's `projects`. **Pia names the project of a ticket she creates**: her `createTicket` proposal card carries `project` (the filter's project in Mission Control, else asked when it is *All*), the confirm passes it to `createTicket`, and her system prompt lists the board's projects (`specs/classifier-spec.md`).
+No open row: every row of step 5 shipped (milestones 263–271, the last req-298 on 2026-11-14).
 
 ### Next
 

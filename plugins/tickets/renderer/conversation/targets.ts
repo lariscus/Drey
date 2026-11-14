@@ -64,6 +64,8 @@ export interface ConversationDeps {
   words?: PersonaWords;
   /** req-168: fires on every board and fleet change; returns the unsubscribe. Absent = the 1:1 is read on calls only. */
   subscribeChanges?(listener: (what: 'board' | 'fleet') => void): () => void;
+  /** req-298: the title bar's project — Pia's new tickets go there; undefined (or absent) = all projects, she asks. */
+  project?(): string | undefined;
 }
 
 /** The words of a spec without a catalog: the key itself, the time as HH:MM. */
@@ -308,7 +310,8 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
     thread: async () => decorated(await read()),
     send: async (text, options) => {
       lastError = null;
-      const reference = options?.context === undefined || options.context === '' ? {} : { context: options.context };
+      const project = deps.project?.();
+      const reference = { ...(options?.context === undefined || options.context === '' ? {} : { context: options.context }), ...(project === undefined ? {} : { project }) };
       const shape = deps.shape?.current() ?? null;
       if (shape !== null && deps.shape !== undefined) {
         // Paul reads the file: whatever the owner typed into the plan goes to disk first.

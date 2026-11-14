@@ -141,6 +141,11 @@
   background: var(--panel-2);
 }
 
+/* req-298: the project filter, its own group 6 px right of the tabs (board 7n's place). */
+.topnav-filter {
+  margin-left: 6px;
+}
+
 .nt.icon {
   justify-content: center;
   width: 44px;

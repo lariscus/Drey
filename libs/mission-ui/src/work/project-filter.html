@@ -1,0 +1,56 @@
+<div class="pf-group">
+  <button
+    type="button"
+    class="pf-btn"
+    [class.open]="open()"
+    aria-haspopup="menu"
+    [attr.aria-expanded]="open()"
+    [attr.aria-label]="'mc.project_filter.aria' | t: { name: active()?.label ?? ('projects.filter.all' | t) }"
+    [attr.title]="'projects.filter.label' | t"
+    (click)="toggle()"
+  >
+    @if (active(); as choice) {
+      <span class="pf-dot" [class.none]="choice.color === ''" [style.background]="choice.color || null" aria-hidden="true"></span>
+      <span class="pf-label">{{ choice.label }}</span>
+    } @else {
+      <span class="pf-dot" [style.background]="allDot()" aria-hidden="true"></span>
+      <span class="pf-label">{{ 'projects.filter.all' | t }}</span>
+    }
+    <mc-ph-icon name="chev-down" [size]="face() === 'pad' ? 18 : 16" />
+  </button>
+  @if (open()) {
+    <div class="pf-backdrop" (click)="close()"></div>
+    <div class="pf-menu" role="menu" [attr.aria-label]="'projects.filter.label' | t">
+      <button type="button" role="menuitemradio" class="pf-item" [attr.aria-checked]="value() === null" (click)="choose(null)">
+        <span class="pf-check" aria-hidden="true">
+          @if (value() === null) {
+            <mc-ph-icon name="check" [size]="16" />
+          }
+        </span>
+        <span class="pf-dot pf-dot-10" [style.background]="allDot()" aria-hidden="true"></span>
+        <span class="pf-name">{{ 'projects.filter.all' | t }}</span>
+      </button>
+      @for (choice of choices(); track choice.id) {
+        <button
+          type="button"
+          role="menuitemradio"
+          class="pf-item"
+          [attr.data-project]="choice.id"
+          [attr.aria-checked]="value() === choice.id"
+          (click)="choose(choice.id)"
+        >
+          <span class="pf-check" aria-hidden="true">
+            @if (value() === choice.id) {
+              <mc-ph-icon name="check" [size]="16" />
+            }
+          </span>
+          <span class="pf-dot pf-dot-10" [class.none]="choice.color === ''" [style.background]="choice.color || null" aria-hidden="true"></span>
+          <span class="pf-name">{{ choice.label }}</span>
+          @if (choice.count !== undefined) {
+            <span class="pf-count">{{ choice.count }}</span>
+          }
+        </button>
+      }
+    </div>
+  }
+</div>

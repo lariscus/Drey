@@ -65,7 +65,7 @@ export function recentDoneOf(
   nowMs: number,
 ): RecentDone[] {
   const prefix = `${TICKETS_ARCHIVE_DIR}/`;
-  const found: { id: string; title: string | null; at: string; t: number }[] = [];
+  const found: (RecentDone & { t: number })[] = [];
   for (const file of files) {
     if (!file.path.startsWith(prefix) || !file.path.endsWith('.md') || file.path.slice(prefix.length).includes('/')) {
       continue;
@@ -78,17 +78,18 @@ export function recentDoneOf(
     if (Number.isNaN(t) || nowMs - t > RECENT_DONE_MS) {
       continue;
     }
-    found.push({
-      id: file.path.slice(prefix.length, -'.md'.length),
-      title: parseTicketFile(file.text, file.path).meta.title,
-      at,
-      t,
-    });
+    const meta = parseTicketFile(file.text, file.path).meta;
+    found.push({ id: file.path.slice(prefix.length, -'.md'.length), title: meta.title, at, ...projectOf(meta), t });
   }
   return found
     .sort((a, b) => (a.t !== b.t ? b.t - a.t : a.id < b.id ? -1 : 1))
     .slice(0, RECENT_DONE_MAX)
-    .map(({ id, title, at }) => ({ id, title, at }));
+    .map(({ t: _t, ...entry }) => entry);
+}
+
+/** req-298: a done row's project — the ticket's own `project:`, left out when it names none. */
+function projectOf(meta: { readonly project?: string }): { project?: string } {
+  return meta.project === undefined || meta.project === '' ? {} : { project: meta.project };
 }
 
 const LOG_STAMP = /^- '?(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)'?/gm;
@@ -124,7 +125,7 @@ export function withTerminalTickets(
     }
     const t = Date.parse(at);
     if (!Number.isNaN(t) && nowMs - t <= RECENT_DONE_MS) {
-      found.push({ id: card.id, title: card.meta.title, at });
+      found.push({ id: card.id, title: card.meta.title, at, ...projectOf(card.meta) });
     }
   }
   return found
@@ -147,7 +148,7 @@ export function archivedEntriesOf(
 ): RecentDone[] {
   const prefix = `${TICKETS_ARCHIVE_DIR}/`;
   const words = (options.query ?? '').toLowerCase().split(/\s+/).filter((w) => w !== '');
-  const found: { id: string; title: string | null; at: string; t: number }[] = [];
+  const found: (RecentDone & { t: number })[] = [];
   for (const file of files) {
     if (!file.path.startsWith(prefix) || !file.path.endsWith('.md') || file.path.slice(prefix.length).includes('/')) {
       continue;

@@ -375,6 +375,8 @@ export interface RecentDone {
   readonly title: string | null;
   /** The newest `— archived` Log stamp, as written. */
   readonly at: string;
+  /** req-298: the ticket's own `project:`; absent = none named (Mission Control's filter reads it). */
+  readonly project?: string;
 }
 
 /** The whole board, rebuilt from files on every fetch — no stored state. */

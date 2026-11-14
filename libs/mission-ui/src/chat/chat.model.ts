@@ -107,7 +107,7 @@ export function disconnectedChatState(): McChatState {
     chatPrefill: signal<string | null>(null),
     chat: signal<ChatStateView>({ sessions: [], active: null }),
     board: signal<unknown>(null),
-    work: signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG }),
+    work: signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG, projects: [] }),
     openSession: async () => {},
     newSession: async () => refuse(),
     send: async () => refuse(),

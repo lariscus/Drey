@@ -6456,3 +6456,34 @@ sequenceDiagram
     V->>R: release
     Note over V: modified() = working layout vs saved, by content
 ```
+
+## 6.139 Mission Control's own project filter, and Pia's project of a new ticket (req-298, milestone 271)
+
+The filter is the device's own: `McState.projectFilter` (localStorage
+`mc.project-filter`) is read by the Work list, which builds its groups for
+every project first and narrows the rows after, and by the chat, which
+sends the filter's project with each turn. The engine lists the board's
+projects for Pia and settles her card's project before the owner sees it.
+
+```mermaid
+sequenceDiagram
+    participant O as Owner (phone / iPad / desk)
+    participant S as McState (device)
+    participant W as Work list (mc-work)
+    participant G as Gateway (router.ts)
+    participant C as ChatService
+    participant B as BoardService
+    O->>S: pick Drey in mc-project-filter
+    S->>S: projectFilter = 'drey' (localStorage)
+    S-->>W: projectScope → rows of Drey; loads from every project
+    O->>S: "capture: …" in Mission Control
+    S->>G: POST /api/chat/sessions/<file>/messages {text, project: 'drey'}
+    G->>C: send({file, text, project})
+    C->>C: digest + "## Projects" (ids, names, the filter's rule)
+    C->>C: model turn → createTicket card; withCommandProject → project 'drey'
+    C-->>S: proposal {command: {kind: createTicket, …, project: 'drey'}}
+    O->>S: Confirm
+    S->>G: POST …/proposals/p-1/confirm
+    G->>C: confirm → execute
+    C->>B: createTicket({…, project: 'drey'}) → project: / x-project
+```

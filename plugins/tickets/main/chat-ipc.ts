@@ -22,6 +22,12 @@ const contextOf = (payload: unknown): { context?: string } => {
   return typeof value === 'string' && value.trim() !== '' ? { context: value.slice(0, CONTEXT_MAX) } : {};
 };
 
+/** req-298: the title bar's project filter; anything but a project id = all projects. */
+const projectOf = (payload: unknown): { project?: string } => {
+  const value = (payload as Record<string, unknown> | null)?.['project'];
+  return typeof value === 'string' && /^[a-z0-9][a-z0-9-]*$/.test(value) ? { project: value } : {};
+};
+
 const bad = (what: string): { ok: false; error: string } => ({ ok: false, error: `bad ${what} payload` });
 
 function field(payload: unknown, key: string): string | null {
@@ -46,7 +52,7 @@ export function registerChatIpc(ctx: Pick<MainPluginContext, 'ipc'>, invoke: Inv
     if (ticket !== null && !TICKET_ID_PATTERN.test(ticket)) {
       return bad('ticket');
     }
-    return invoke('chatStart', { text, ...(ticket === null ? {} : { ticket }), ...contextOf(payload) });
+    return invoke('chatStart', { text, ...(ticket === null ? {} : { ticket }), ...contextOf(payload), ...projectOf(payload) });
   });
   ctx.ipc.handle('mcPlanStatus', (payload) => {
     const ticket = field(payload, 'ticket');
@@ -62,7 +68,7 @@ export function registerChatIpc(ctx: Pick<MainPluginContext, 'ipc'>, invoke: Inv
     const text = field(payload, 'text');
     return file === null || text === null || !CHAT_FILE_PATTERN.test(file)
       ? bad('message')
-      : invoke('chatSend', { file, text, ...contextOf(payload) });
+      : invoke('chatSend', { file, text, ...contextOf(payload), ...projectOf(payload) });
   });
   ctx.ipc.handle('mcDecide', (payload) => {
     const file = field(payload, 'file');

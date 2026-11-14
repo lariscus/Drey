@@ -10,6 +10,7 @@ import { autopilotSwitchViewOf, autopilotViewOf, type AutopilotView } from '../.
 import { burnRateHoldOf, type BurnRateHoldView } from '../../../../shared/burn-rate';
 import { trancheViewOf, type TrancheView } from '../../../../shared/tranche';
 import { maskFences } from '../../../../shared/markdown/fences';
+import { projectsOf, type McProject } from '../work/projects';
 
 // --- Work ------------------------------------------------------------------
 
@@ -66,6 +67,8 @@ export interface TicketCardView {
   readonly blocked: readonly string[];
   /** The settled-run usage off the ledger; absent when the desk has none — the cost slots hide. */
   readonly usage?: McTicketUsage;
+  /** req-298: the ticket's own `project:`; null when it names none. */
+  readonly project: string | null;
 }
 
 /** One board column as a card group. */
@@ -79,6 +82,8 @@ export interface WorkView {
   readonly groups: readonly GroupView[];
   /** The board's priority vocabulary; the default list when the desk omits or junks it. */
   readonly priorities: McPriorityConfig;
+  /** req-298: the board's projects (the snapshot's `projects`); [] on a board without project records. */
+  readonly projects: readonly McProject[];
 }
 
 // --- Needs -----------------------------------------------------------------
@@ -702,6 +707,8 @@ export interface ChatProposalView {
    * present exactly on a setChain proposal.
    */
   readonly chain?: { readonly id: string; readonly chain: readonly string[] };
+  /** req-298: the project a createTicket card names; absent on every other card and on a create without one. */
+  readonly project?: string;
 }
 
 export interface ActiveSession {
@@ -1047,6 +1054,7 @@ function cardOf(raw: unknown, phaseFallback: string): TicketCardView {
     claimedBy: strOrNull(meta['claimedBy']),
     blocked: strArray(card['blocked']),
     ...(usage !== undefined ? { usage } : {}),
+    project: strOrNull(meta['project']),
   };
 }
 
@@ -1054,7 +1062,7 @@ function cardOf(raw: unknown, phaseFallback: string): TicketCardView {
 export function parseWork(json: unknown): WorkView {
   const board = rec(json);
   if (board === null) {
-    return { groups: [], priorities: DEFAULT_PRIORITY_CONFIG };
+    return { groups: [], priorities: DEFAULT_PRIORITY_CONFIG, projects: [] };
   }
   const groups: GroupView[] = [];
   for (const raw of arr(board['columns'])) {
@@ -1076,6 +1084,7 @@ export function parseWork(json: unknown): WorkView {
   return {
     groups,
     priorities: parsePriorities(board['priorities']),
+    projects: projectsOf(board),
   };
 }
 
@@ -1609,6 +1618,7 @@ function proposalOf(raw: unknown): ChatProposalView | null {
   const id = str(proposal['id']);
   const state = str(proposal['state']);
   const chain = chainCommandOf(proposal['command']);
+  const project = createProjectOf(proposal['command']);
   return {
     id,
     state: state === 'confirmed' || state === 'dismissed' ? state : 'pending',
@@ -1617,7 +1627,14 @@ function proposalOf(raw: unknown): ChatProposalView | null {
     decidedAt: strOrNull(proposal['decidedAt']),
     outcome: strOrNull(proposal['outcome']),
     ...(chain !== undefined ? { chain } : {}),
+    ...(project !== null ? { project } : {}),
   };
+}
+
+/** req-298: the project of a createTicket command block; null for another kind or a create that names none. */
+function createProjectOf(raw: unknown): string | null {
+  const command = rec(raw);
+  return command !== null && str(command['kind']) === 'createTicket' ? strOrNull(command['project']) : null;
 }
 
 /**

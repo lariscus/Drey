@@ -81,6 +81,11 @@ export type ChatCommand =
       readonly priority: TicketPriority;
       /** The phase the ticket is created in (e.g. `inbox` / `ideas`). */
       readonly phase: string;
+      /**
+       * req-298: the project the ticket belongs to (a project id of the
+       * board); absent = none named (Unassigned on a board with several).
+       */
+      readonly project?: string;
     }
   | { readonly kind: 'transition'; readonly id: string; readonly from: string; readonly to: string }
   | { readonly kind: 'setPriority'; readonly id: string; readonly priority: TicketPriority }
@@ -156,11 +161,13 @@ export interface ChatServicePort {
   /**
    * Sends one owner message: appends it, runs the mission turn (LLM
    * stream → events), appends the reply, and returns the finished
-   * session slice. The stream arrives through `onEvent`.
+   * session slice. The stream arrives through `onEvent`. `project`
+   * (req-298) is the project filter the owner's client stands on — a
+   * project id; absent = all projects (Pia then asks for a new ticket's).
    */
-  send(input: { readonly file: string; readonly text: string; readonly planEdits?: boolean; readonly context?: string; readonly signal?: AbortSignal }): Promise<ChatTurnResult>;
+  send(input: { readonly file: string; readonly text: string; readonly planEdits?: boolean; readonly context?: string; readonly project?: string; readonly signal?: AbortSignal }): Promise<ChatTurnResult>;
   /** Starts a fresh session and sends the first message; `ticket` makes it a shape session for that ticket's plan. */
-  start(input: { readonly title?: string; readonly text: string; readonly ticket?: string; readonly context?: string; readonly signal?: AbortSignal }): Promise<ChatTurnResult>;
+  start(input: { readonly title?: string; readonly text: string; readonly ticket?: string; readonly context?: string; readonly project?: string; readonly signal?: AbortSignal }): Promise<ChatTurnResult>;
   /** Where the shared plan of a ticket stands: version, the owner's edits since the model's last turn, the line marks (E10-2). */
   planStatus(ticket: string): Promise<PlanStatus>;
   /**

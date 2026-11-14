@@ -284,8 +284,8 @@ export interface TicketsRemotePort extends SkillsPort, PersonaRemovePort {
   /** The Mission Control chat surface (E5a) — the service's port verbatim. */
   chatSessions(): Promise<readonly ChatSessionMeta[]>;
   chatOpen(file: string): Promise<ChatSession | null>;
-  chatSend(input: { readonly file: string; readonly text: string; readonly planEdits?: boolean }): Promise<ChatTurnResult>;
-  chatStart(input: { readonly title?: string; readonly text: string; readonly ticket?: string }): Promise<ChatTurnResult>;
+  chatSend(input: { readonly file: string; readonly text: string; readonly planEdits?: boolean; readonly project?: string }): Promise<ChatTurnResult>;
+  chatStart(input: { readonly title?: string; readonly text: string; readonly ticket?: string; readonly project?: string }): Promise<ChatTurnResult>;
   /** The shared plan's state: version, the owner's edits since the model's last turn, the line marks (E10-2). */
   planStatus(ticket: string): Promise<PlanStatus>;
   chatConfirm(input: { readonly file: string; readonly id: string }): Promise<ChatDecisionResult>;

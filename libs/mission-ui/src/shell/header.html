@@ -14,19 +14,23 @@
     </svg>
   </button>
 
-  <nav class="switch" [attr.aria-label]="'shell.area' | t">
-    @if (notesEnabled()) {
-      <button type="button" class="sw" [class.on]="area() === 'notes' && !settingsOn()" [attr.aria-current]="area() === 'notes' && !settingsOn() ? 'page' : null" (click)="areaChange.emit('notes')">
-        {{ 'shell.notes' | t }}
+  <div class="mid">
+    <nav class="switch" [attr.aria-label]="'shell.area' | t">
+      @if (notesEnabled()) {
+        <button type="button" class="sw" [class.on]="area() === 'notes' && !settingsOn()" [attr.aria-current]="area() === 'notes' && !settingsOn() ? 'page' : null" (click)="areaChange.emit('notes')">
+          {{ 'shell.notes' | t }}
+        </button>
+      }
+      <button type="button" class="sw" [class.on]="area() === 'work' && !settingsOn()" [attr.aria-current]="area() === 'work' && !settingsOn() ? 'page' : null" (click)="areaChange.emit('work')">
+        {{ 'shell.work' | t }}
       </button>
-    }
-    <button type="button" class="sw" [class.on]="area() === 'work' && !settingsOn()" [attr.aria-current]="area() === 'work' && !settingsOn() ? 'page' : null" (click)="areaChange.emit('work')">
-      {{ 'shell.work' | t }}
-    </button>
-    <button type="button" class="sw" [class.on]="area() === 'crew' && !settingsOn()" [attr.aria-current]="area() === 'crew' && !settingsOn() ? 'page' : null" (click)="areaChange.emit('crew')">
-      {{ 'shell.crew' | t }}
-    </button>
-  </nav>
+      <button type="button" class="sw" [class.on]="area() === 'crew' && !settingsOn()" [attr.aria-current]="area() === 'crew' && !settingsOn() ? 'page' : null" (click)="areaChange.emit('crew')">
+        {{ 'shell.crew' | t }}
+      </button>
+    </nav>
+    <!-- req-298: the project filter, its own group 6 px right of the switch (board 7n's place); the switch stays centred. -->
+    <div class="scope-slot"><ng-content select="[scope]" /></div>
+  </div>
 
   <div class="end">
     <div class="autopilot-slot"><ng-content select="[autopilot]" /></div>

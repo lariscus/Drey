@@ -929,6 +929,21 @@ project — the Crew and its quotas are shared. Under *All projects* each
 card names its project. Every view remembers its own choice, so a view you
 save while a project is picked opens filtered.
 
+**Mission Control has a project filter of its own.** On the iPad it sits
+right of *Notes · Work · Crew* in the header, on the desk right of the tabs,
+on the phone at the end of the cost line above the Work list. It offers the
+same choices (without *Manage projects…*) and belongs to that device alone:
+picking Drey on the phone leaves the desktop's choice, and every other
+device's, as it was, and the phone remembers it. The Work list follows it —
+Needs you, the persona groups, Prioritized, Inbox and Done this week — while
+a persona's load (*Paul · 1/1*, in the group's tooltip) still counts every
+project. Under *All projects* each row names its project. **Pia names the
+project of every ticket she creates:** her card shows it before you confirm
+(*Home lab* under the title on the phone, `project:` in the card on the
+desk). With a project picked she puts new tickets there; under *All
+projects* she asks which project first, unless you said it. The desktop's
+Mission Control conversation does the same with the title bar's choice.
+
 **The crew a new board starts with.** The same step adds **Pia** (Mission
 Control's own persona, below) and four crew members next to *You*: **Paul**
 (plans), **Ben** (builds), **Ralf** (reviews) and **Tessa** (tests). They appear on the Crew tab, in Mission Control's team list and in the

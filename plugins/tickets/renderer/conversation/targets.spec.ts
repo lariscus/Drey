@@ -69,6 +69,21 @@ describe('the Mission Control target', () => {
     expect(calls.some((c) => c.method === 'mcStart' && (c.payload as { text: string }).text === 'Fresh')).toBe(true);
   });
 
+  it("sends the title bar's project with the turn, nothing under all projects (req-298)", async () => {
+    let project: string | undefined = 'drey';
+    const { deps: d, calls } = deps({ project: () => project });
+    const mission = createConversationProvider(d).targets()[0]!;
+    await mission.thread();
+    await mission.send('Capture it');
+    project = undefined;
+    await mission.send('And this');
+    const sends = calls.filter((c) => c.method === 'mcSend').map((c) => c.payload);
+    expect(sends).toEqual([
+      { file: FILE, text: 'Capture it', project: 'drey' },
+      { file: FILE, text: 'And this' },
+    ]);
+  });
+
   it('shows a refused turn as the failure card, not as a message', async () => {
     const { deps: d } = deps({
       invoke: (method) =>

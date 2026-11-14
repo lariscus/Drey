@@ -32,6 +32,20 @@ import {
 } from './dto';
 
 describe('parseWork', () => {
+  it("maps the snapshot's projects and each card's own project (req-298)", () => {
+    const work = parseWork({
+      projects: [{ id: 'drey', name: 'Drey', color: '#8ecbef' }, { id: 'lab', name: '', color: 'none' }, { name: 'no id' }],
+      columns: [{ phase: { id: 'inbox', title: 'Inbox' }, tickets: [{ id: 'T-1', meta: { project: 'drey' } }, { id: 'T-2', meta: {} }] }],
+    });
+    expect(work.projects).toEqual([
+      { id: 'drey', name: 'Drey', color: '#8ecbef' },
+      { id: 'lab', name: 'lab', color: '#8ecbef' },
+    ]);
+    expect(work.groups[0]!.cards.map((card) => card.project)).toEqual(['drey', null]);
+    expect(parseWork({ columns: [] }).projects).toEqual([]);
+    expect(parseWork(null).projects).toEqual([]);
+  });
+
   it('maps columns to card groups', () => {
     const board = {
       columns: [
@@ -72,6 +86,7 @@ describe('parseWork', () => {
               personaId: 'pia',
               claimedBy: 'owner@phone',
               blocked: ['T-2'],
+              project: null,
             },
             {
               id: 'T-2',
@@ -81,12 +96,14 @@ describe('parseWork', () => {
               personaId: null,
               claimedBy: null,
               blocked: [],
+              project: null,
             },
           ],
         },
         { id: 'done', title: 'Done', cards: [] },
       ],
       priorities: DEFAULT_PRIORITY_CONFIG,
+      projects: [],
     });
   });
 
@@ -179,7 +196,7 @@ describe('parseWork', () => {
   });
 
   it('never throws on junk', () => {
-    const bare = { groups: [], priorities: DEFAULT_PRIORITY_CONFIG };
+    const bare = { groups: [], priorities: DEFAULT_PRIORITY_CONFIG, projects: [] };
     expect(parseWork(null)).toEqual(bare);
     expect(parseWork(undefined)).toEqual(bare);
     expect(parseWork('board')).toEqual(bare);
@@ -961,6 +978,13 @@ describe('parseProposal', () => {
       decidedAt: null,
       outcome: null,
     });
+  });
+
+  it("carries a createTicket card's project (req-298); a create without one carries none", () => {
+    const create = { kind: 'createTicket', title: 'CSV', phase: 'inbox', priority: 'normal', description: '' };
+    expect(parseProposal({ id: 'p-7', summary: 'Create ticket "CSV" in inbox', state: 'pending', command: { ...create, project: 'home-lab' } })).toMatchObject({ project: 'home-lab' });
+    expect(parseProposal({ id: 'p-8', summary: 'Create ticket "CSV" in inbox', state: 'pending', command: create })).not.toHaveProperty('project');
+    expect(parseProposal({ id: 'p-9', summary: 'Move T-1', state: 'pending', command: { kind: 'transition', project: 'drey' } })).not.toHaveProperty('project');
   });
 
   it('carries a setBlockedBy proposal by its summary alone — no compare payload', () => {

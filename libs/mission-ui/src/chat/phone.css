@@ -122,6 +122,21 @@
     font-size: var(--ph-17);
     line-height: 24px;
   }
+  /* req-298: the project a new ticket goes to, as a row chip (dot + name). */
+  .ph-change-proj {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    font-size: var(--ph-15);
+    line-height: 20px;
+    color: var(--text-2);
+  }
+  .ph-change-proj i {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
   .ph-change-acts {
     display: flex;
     gap: 8px;

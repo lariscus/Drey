@@ -19,6 +19,7 @@ import {
   type McTicketUsage,
 } from '../api/dto';
 import type { McChainWaits } from './hold';
+import type { McProjectFilter } from './projects';
 
 // --- the consumed device-state surface ---------------------------------------
 
@@ -126,6 +127,8 @@ export interface McTicketMeta {
   readonly claimedBy?: string | null;
   /** The `blocked-by:` ids as written. */
   readonly blockedBy?: readonly string[];
+  /** req-298: the ticket's own `project:`; absent = none named. */
+  readonly project?: string | null;
   /** phase id → the newest `entered-<phase>` stamp (the row's age); absent = no age. */
   readonly entered?: Readonly<Record<string, string>>;
   /** When the ticket was claimed (the age's fallback). */
@@ -189,6 +192,8 @@ export interface McDoneEntry {
   readonly title: string | null;
   /** The newest `— archived` Log stamp; '' when the Log has none. */
   readonly at: string;
+  /** req-298: the ticket's own `project:` (Done this week's rows); absent = none named or not sent. */
+  readonly project?: string;
 }
 
 export interface McBoard {
@@ -285,6 +290,10 @@ export interface McWorkState {
   readonly waits?: McChainWaits | null;
   /** req-273: the personas the owner paused (a held card says so); absent = none known. */
   readonly pausedPersonas?: readonly string[];
+  /** req-298: this device's project filter — a project id, `_unassigned`, null = all; absent = no filter. */
+  readonly projectFilter?: McProjectFilter;
+  /** req-298: picks the filter on this device. */
+  setProjectFilter?(filter: McProjectFilter): void;
   moveTicket(ticketId: string, phaseId: string): Promise<McMoveResult>;
   /** The archive of any age, newest first, for "Show older" (E13-21); absent = no such list. */
   loadArchive?(): Promise<readonly McDoneEntry[]>;
