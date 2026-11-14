@@ -6,7 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { DEFAULT_PIPELINE_TEXT } from '../core/pipeline-states';
 import { TicketsGit } from '../core/tickets-git';
-import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools, type RunInfo, type RunRequest } from '../fleet/protocol';
+import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools, type ChainConfig, type RunInfo, type RunRequest } from '../fleet/protocol';
 import { assertDkVersion, MIN_DK_VERSION } from '../store/dk-process';
 import { EngineBoardService } from './board-service';
 import type { EngineHost, EngineVault, FleetPort } from './host';
@@ -85,6 +85,8 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
   let service: EngineBoardService;
   const saved: Record<string, string | undefined> = {};
   const started: RunRequest[] = [];
+  const configured: ChainConfig[] = [];
+  let runnerReachable = true;
 
   const envSet = (key: string, value: string): void => {
     if (!(key in saved)) {
@@ -149,7 +151,10 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
         started.push(request);
         return { ok: true, run: runInfo(`R-${started.length}`, request.ticketId, 'running') };
       },
-      configureChain: async () => undefined,
+      configureChain: async (chain) => {
+        configured.push(chain);
+        return runnerReachable;
+      },
     };
     const config = { backend: 'dricket', 'dk.path': bin === 'dk' ? '' : bin, 'dk.store': storeDir, 'dk.dataDir': path.join(root, 'data') };
     service = new EngineBoardService(
@@ -308,5 +313,27 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     expect(readFileSync(path.join(root, 'meta', 'tickets', '_meta', 'crew.md'), 'utf8')).toContain('order: [pia, ben, ralf, you]');
     expect(readFileSync(path.join(root, 'meta', 'tickets', '_meta', 'personas', 'ben', 'persona.md'), 'utf8')).toContain('leaving: [sync-main]');
     expect((await service.snapshot()).boardMigration).toBeUndefined();
+  });
+
+  it('req-78 found it: a persona board with no agent column is still pointed at by the runner, again after the runner lost its config', async () => {
+    expect((await service.snapshot()).pipeline.map((p) => p.id)).toEqual(['inbox', 'prioritized', 'done']); // the migration spec above ran step 3
+    (service as unknown as { lastChainConfig: string | null }).lastChainConfig = null; // a restarted runner knows nothing
+    configured.length = 0;
+    await service.snapshot();
+    expect(configured).toHaveLength(1);
+    expect(configured[0]).toMatchObject({ store: { lifecycle: true } });
+  });
+
+  it('sends the config again with the next snapshot while no runner was reachable (the Autopilot starts it later)', async () => {
+    (service as unknown as { lastChainConfig: string | null }).lastChainConfig = null;
+    configured.length = 0;
+    runnerReachable = false;
+    await service.snapshot();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    runnerReachable = true;
+    await service.snapshot();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await service.snapshot(); // reached: the same text is not sent a third time
+    expect(configured).toHaveLength(2);
   });
 });

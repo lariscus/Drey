@@ -496,7 +496,7 @@ export class EngineBoardService {
     // points the runner at this vault (M85). Cheap and idempotent —
     // the runner re-reads the vault on every dispatch pass anyway.
     await this.refreshHandover(snapshot);
-    await this.syncChainConfig(vault, snapshot.pipeline);
+    await this.syncChainConfig(vault, snapshot.pipeline, snapshot.lanes !== undefined);
     return snapshot;
   }
 
@@ -809,10 +809,16 @@ export class EngineBoardService {
     };
   }
 
-  /** Keeps the runner's chain config in step with the pipeline (never spawns). */
+  /**
+   * Keeps the runner's chain config in step with the pipeline (never spawns). A persona board
+   * (`personaBoard`, a lifecycle store) is configured whatever its pipeline holds: after the board
+   * migration the pipeline is Inbox, Prioritized and Done only, no agent column, and the chain
+   * walks by the holders (req-78 found it: a restarted runner was never pointed at the vault).
+   */
   private async syncChainConfig(
     vault: { readonly path: string } | null,
     pipeline: readonly PipelinePhase[],
+    personaBoard = false,
   ): Promise<ChainConfig | null> {
     const dricket = this.dricket;
     if (dricket !== null && (dricket.dkStore === '' || checkoutOf(dricket) === null)) {
@@ -820,7 +826,7 @@ export class EngineBoardService {
     }
     const defaultPersona = await this.defaultPersonaOf();
     const chain: ChainConfig | null =
-      vault !== null && pipeline.some((phase) => isAutoPhase(phase))
+      vault !== null && (personaBoard || pipeline.some((phase) => isAutoPhase(phase)))
         ? {
             ticketsVaultPath: vault.path,
             ...(dricket !== null ? { store: await this.chainStoreOf(dricket) } : {}),
@@ -840,7 +846,13 @@ export class EngineBoardService {
     }
     this.lastChainConfig = json;
     if (chain !== null) {
-      void this.fleet.configureChain(chain);
+      // No runner reachable (the Autopilot's first switch-on starts it later): forget the sent state, so the
+      // next snapshot sends the config again — it is the same text, and would otherwise never be re-sent.
+      void this.fleet.configureChain(chain).then((sent) => {
+        if (sent === false && this.lastChainConfig === json) {
+          this.lastChainConfig = null;
+        }
+      });
     }
     return chain;
   }

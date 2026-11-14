@@ -13,7 +13,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { fakeHarnessDir, pathWithFakes } from './fake-harness';
 import { dkOf, type StoreDirs } from './persona-board-seed';
 
@@ -218,6 +218,40 @@ export function ticketShown(env: CrewRunEnv, dkId: string): string {
   return JSON.stringify(JSON.parse(dkOf(env)(['show', dkId, '--json'])) as unknown);
 }
 
+/** The text of every file under a `comments/` directory of the store's checkout (the `.git` folder skipped). */
+function commentFiles(dir: string, inComments = false): string[] {
+  const out: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory() && entry.name !== '.git') {
+      out.push(...commentFiles(full, inComments || entry.name === 'comments'));
+    } else if (entry.isFile() && inComments) {
+      out.push(fs.readFileSync(full, 'utf8'));
+    }
+  }
+  return out;
+}
+
+/**
+ * Everything the store says about the ticket: `dk show`, the comment files `dk comment` wrote under
+ * `comments/` in the store's checkout (a run's release comment is one; dk cannot list them yet), the store's
+ * commit messages and `dk inbox` — a spec matches on it without knowing which of them carries a status comment.
+ */
+export function ticketHistory(env: CrewRunEnv, dkId: string): string {
+  const parts = [ticketShown(env, dkId), ...commentFiles(env.storeDir)];
+  try {
+    parts.push(execFileSync('git', ['log', '--all', '--format=%B'], { cwd: env.storeDir, encoding: 'utf8', windowsHide: true, stdio: 'pipe' }));
+  } catch {
+    // no history readable yet
+  }
+  try {
+    parts.push(dkOf(env)(['inbox', dkId, '--json']));
+  } catch {
+    // dk has nothing to say
+  }
+  return parts.join('\n');
+}
+
 /** The fake harness's log: one entry per user message a fake Claude Code got. */
 export function harnessTurns(env: CrewRunEnv): { readonly cwd: string; readonly rule: string | null; readonly text: string }[] {
   try {
@@ -229,6 +263,27 @@ export function harnessTurns(env: CrewRunEnv): { readonly cwd: string; readonly 
   } catch {
     return [];
   }
+}
+
+/**
+ * The Tickets panel in the Work view. Since milestone 270 the view opens on the Board with the left
+ * dock folded, so the panel is only an icon: unfold the dock, then (if the panel is still hidden) its
+ * strip icon. Returns the visible panel.
+ */
+export async function showTicketsPanel(page: Page): Promise<Locator> {
+  const panel = page.locator('.tickets-panel').filter({ visible: true });
+  if (await panel.first().waitFor({ state: 'visible', timeout: 3_000 }).then(() => true, () => false)) {
+    return panel;
+  }
+  const unfold = page.locator('app-titlebar button[aria-label="Show left dock"]');
+  if ((await unfold.count()) > 0) {
+    await unfold.click();
+  }
+  if (!(await panel.first().waitFor({ state: 'visible', timeout: 3_000 }).then(() => true, () => false))) {
+    await page.locator('app-dock-strip button[aria-label="Show Tickets"]').click();
+  }
+  await panel.first().waitFor({ state: 'visible', timeout: 30_000 });
+  return panel;
 }
 
 /** The Autopilot from the status bar's popover. */

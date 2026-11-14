@@ -13,7 +13,7 @@ import {
   setAutopilot,
   stopEngine,
   ticketField,
-  ticketShown,
+  ticketHistory,
   writeServiceJson,
   writeTicketsConfig,
 } from './fixtures/crew-run';
@@ -27,7 +27,7 @@ import {
  * comment. Paul's fake run (its brief says it was sent back by a red gate)
  * writes `green.txt` and ends green: the cursor returns straight to 2, the
  * return mark gone, the count kept. Tessa runs again after her cool-down, her
- * gate is green, and the ticket reaches You. Everything lives in a temp home;
+ * gate is green, and the ticket reaches You with the loop over (the count gone). Everything lives in a temp home;
  * the owner's `~/.drey-engine` and boards are never touched. Skipped when
  * `dk` is missing.
  */
@@ -84,8 +84,8 @@ test('a red gate sends the ticket back to the planner, and the planner\'s green 
   const tessaTurn = harnessTurns(env).find((turn) => turn.rule === null);
   expect(tessaTurn, 'Tessa ran first, on the fake harness').toBeDefined();
   expect(path.basename(tessaTurn!.cwd)).toBe('T-0001');
-  await expect.poll(() => ticketShown(env, ID), { timeout: 30_000 }).toContain('red gate at position 2 (tessa)');
-  expect(ticketShown(env, ID)).toContain('sent back to 1 (paul) (red 1 of 2)');
+  await expect.poll(() => ticketHistory(env, ID), { timeout: 30_000 }).toContain('red gate at position 2 (tessa)');
+  expect(ticketHistory(env, ID)).toContain('sent back to 1 (paul) (red 1 of 2)');
 
   // Paul's brief names the red gate; his green run returns the cursor straight to 2.
   await expect.poll(() => harnessTurns(env).some((turn) => turn.rule === 'Sent back by a red gate'), { timeout: 120_000, intervals: [1_000] }).toBe(true);
@@ -97,6 +97,6 @@ test('a red gate sends the ticket back to the planner, and the planner\'s green 
 
   // Tessa again (after her cool-down): the file Paul's run wrote turns the gate green, the ticket reaches You.
   await expect.poll(() => ticketField(env, ID, 'x-at'), { timeout: 180_000, intervals: [2_000] }).toBe('3');
-  expect(ticketField(env, ID, 'x-red-backs')).toBe('1');
+  expect(ticketField(env, ID, 'x-red-backs')).toBeNull(); // Tessa's green end is no return: it ends the loop and its count
   expect(harnessTurns(env).filter((turn) => turn.rule === null).length).toBeGreaterThanOrEqual(2);
 });

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test, expect } from './fixtures/drey';
+import { showTicketsPanel } from './fixtures/crew-run';
 
 /**
  * The sweep of 2026-11-05 (roadmap D-11 to D-22) in the RUNNING app, on a SCRATCH
@@ -123,7 +124,8 @@ test('the sweep defects on the store', async ({ page, electronApp }, testInfo) =
   const tabs = page.locator('[role="tablist"][aria-label="Views"] [role="tab"]');
   await expect(tabs).toHaveText(['Notes', 'Work', 'Crew'], { timeout: 30_000 });
   await tabs.filter({ hasText: 'Work' }).click();
-  const panel = page.locator('.tickets-panel').filter({ visible: true });
+  // Since milestone 270 the Work view opens on the Board with the left dock folded: show the panel first.
+  const panel = await showTicketsPanel(page);
   const row = (id: string) => panel.locator(`.work-row[data-id="${id}"]`);
   await expect(row('T-0002')).toBeVisible({ timeout: 30_000 });
   const shot = async (name: string): Promise<void> => {
@@ -242,6 +244,8 @@ test('the sweep defects on the store', async ({ page, electronApp }, testInfo) =
   await done.getByText('Rename a folder without losing links').click();
   await expect(page.locator('app-tab-bar').filter({ visible: true }).getByText('T-0006 · Rename a folder without losing links', { exact: true })).toBeVisible({ timeout: 15_000 });
   await shot('done-this-week');
-  // D-15: the Assistant's chip calls the document what its tab does.
+  // D-15: the Assistant's chip calls the document what its tab does. Since milestone 270 the Work view's Assistant
+  // targets Mission Control, which attaches no document chip: switch to the Model target first.
+  await page.locator('.assistant-target[aria-label="Model"]').filter({ visible: true }).click();
   await expect(page.locator('.composer-chips .chip-name').filter({ visible: true }).first()).toHaveText('T-0006 · Rename a folder without losing links', { timeout: 15_000 });
 });

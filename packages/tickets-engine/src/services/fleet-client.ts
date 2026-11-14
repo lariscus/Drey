@@ -204,14 +204,16 @@ export class FleetClient {
   /** Points the runner at a tickets vault. Never spawns: a snapshot
    *  read must not bring a runner up; the next explicit interaction
    *  will. A configured chain re-points here when the board moves. */
-  async configureChain(config: ChainConfig): Promise<void> {
+  async configureChain(config: ChainConfig): Promise<boolean> {
     try {
       if (await this.conn.adopt()) {
         await this.conn.post('/chain/config', config);
+        return true;
       }
     } catch {
       // the runner is gone; the next start re-configures
     }
+    return false;
   }
 
   /** E14-5b: releases the agent claims of this host that no live run of the runner holds. */

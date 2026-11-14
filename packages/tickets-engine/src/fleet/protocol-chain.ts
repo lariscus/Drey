@@ -109,6 +109,8 @@ export function normalizeChainStore(value: unknown): ChainStoreConfig | null {
     dkDataDir: text('dkDataDir', 'dataDir'),
     dkCheckout: text('dkCheckout', 'checkout'),
     trailers: v['trailers'] === true,
+    // req-78 found it: dropped here, a lifecycle store reached the runner as a phase-stage store and nothing dispatched by holder.
+    ...(v['lifecycle'] === true ? { lifecycle: true } : {}),
   };
 }
 
