@@ -344,6 +344,24 @@ export function parseFlowSave(payload: unknown): Parsed<FlowSaveCommand> {
   return target === null || chain === null ? refuse('bad flow payload') : ok({ ...target, chain });
 }
 
+export interface StandardFlowCommand {
+  /** The standard flow's entries; absent = the chain stays. */
+  readonly chain?: readonly string[];
+  /** The proposal switch; absent = it stays. */
+  readonly proposeFlow?: boolean;
+}
+
+/** The settings page's default flow (E10-5b): the standard flow, the proposal switch, or both. */
+export function parseStandardFlow(payload: unknown): Parsed<StandardFlowCommand> {
+  const p = record(payload);
+  const chain = p['chain'] === undefined ? undefined : chainStringsOf(p['chain']);
+  const propose = p['proposeFlow'];
+  if (chain === null || (propose !== undefined && typeof propose !== 'boolean') || (chain === undefined && propose === undefined)) {
+    return refuse('bad standard flow payload');
+  }
+  return ok({ ...(chain === undefined ? {} : { chain }), ...(propose === undefined ? {} : { proposeFlow: propose }) });
+}
+
 export interface FlowDraftCommand {
   readonly id: string;
   readonly part: number | null;

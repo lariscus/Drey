@@ -22,6 +22,7 @@ export function runCursorOf(input: {
   readonly at: number | undefined;
   readonly sentBack?: { readonly from: number; readonly to: number } | undefined;
   readonly crew?: RunCursor['crew'];
+  readonly proposeFlow?: boolean;
 }): RunCursor {
   const length = input.chain.length;
   return {
@@ -30,5 +31,6 @@ export function runCursorOf(input: {
     entries: renderChainEntries(input.chain),
     ...(input.sentBack !== undefined ? { sentBack: input.sentBack } : {}),
     ...(input.crew !== undefined ? { crew: input.crew } : {}),
+    ...(input.proposeFlow === true ? { proposeFlow: true } : {}),
   };
 }

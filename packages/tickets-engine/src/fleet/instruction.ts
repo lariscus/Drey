@@ -123,7 +123,7 @@ export interface InstructionInput {
    * length and the entries — so the brief lists the positions and the
    * `SEND-BACK:` marker. Absent = a column run, no section.
    */
-  readonly chain?: { readonly at: number; readonly length: number; readonly entries: readonly string[] };
+  readonly chain?: { readonly at: number; readonly length: number; readonly entries: readonly string[]; readonly proposeFlow?: boolean };
 }
 
 /**
@@ -150,7 +150,7 @@ export interface InstructionInput {
  * marked inside the text (bookkeeping the model does not need).
  */
 export function composeInstruction(input: InstructionInput): ComposedInstruction {
-  const head = briefHead({ ...input, prompt: expandFragments(input.prompt, input.disciplines.fragments) });
+  const head = briefHead({ ...input, prompt: expandFragments(input.prompt, input.disciplines.fragments, { proposeFlow: input.chain?.proposeFlow === true }) });
   const persona = personaLine(input.personaId, input.personaRole);
   const description = input.description.trim();
   const truncations: Truncation[] = [];

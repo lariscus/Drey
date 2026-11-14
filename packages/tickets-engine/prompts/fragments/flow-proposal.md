@@ -1,0 +1,2 @@
+<!-- drey-prompt-version: 1 -->
+This board proposes a flow for every plan, so the `### Chain` chapter above is not optional here: write it in every plan. Start from the chain the context lists (the standard flow, unless this ticket carries its own) and change only what this plan needs — a review added for a risky change, the owner earlier where a decision is open, a position dropped for a trivial one; a chain that needs no change is written out whole too. Give the reason in one line in `### Decisions`.

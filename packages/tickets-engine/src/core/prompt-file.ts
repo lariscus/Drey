@@ -35,6 +35,7 @@ export async function readPromptFile(dir: string, rel: string, what: string): Pr
 const FRAGMENT_FILES: Readonly<Record<keyof PromptFragments, string>> = {
   planFormat: 'plan-format.md',
   chainGrammar: 'chain-grammar.md',
+  flowProposal: 'flow-proposal.md',
 };
 
 /** Every shared fragment, from `<dir>/fragments/`. */
@@ -42,6 +43,7 @@ export async function loadPromptFragments(dir: string): Promise<PromptFragments>
   return {
     planFormat: await readPromptFile(dir, path.join('fragments', FRAGMENT_FILES.planFormat), 'fragment'),
     chainGrammar: await readPromptFile(dir, path.join('fragments', FRAGMENT_FILES.chainGrammar), 'fragment'),
+    flowProposal: await readPromptFile(dir, path.join('fragments', FRAGMENT_FILES.flowProposal), 'fragment'),
   };
 }
 

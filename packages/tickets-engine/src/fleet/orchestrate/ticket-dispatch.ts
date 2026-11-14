@@ -202,7 +202,7 @@ export class TicketDispatch {
     const { card, workingPhaseId } = planned;
     const { target, parkFor } = got;
     // req-257: a chain run hands on by its cursor (the column follows the holder), never by a move.
-    const cursor = chained(config, card) ? await this.cursorOf(config, card) : null;
+    const cursor = chained(config, card) ? await this.cursorOf(config, card, snap.proposeFlow === true) : null;
     // E10-6: a manual step after this gate parks the ticket on a green gate — it moves only as far as the working column.
     const nextPhaseId = cursor !== null ? null : moveTargetOf(snap, card, workingPhaseId, parkFor);
     const context = await this.context(config, card, target.repo, workingPhaseId);
@@ -241,8 +241,8 @@ export class TicketDispatch {
   }
 
   /** req-257: the chain entry the run works — position, the entries, the send-back used, the crew a plan run's `### Chain` may name. */
-  private async cursorOf(config: ChainConfig, card: TicketCard): Promise<RunCursor> {
-    return runCursorOf({ chain: card.meta.chain ?? [], at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.deps.personas.crewGuard(config) });
+  private async cursorOf(config: ChainConfig, card: TicketCard, proposeFlow: boolean): Promise<RunCursor> {
+    return runCursorOf({ chain: card.meta.chain ?? [], at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.deps.personas.crewGuard(config), proposeFlow });
   }
 
   /** The context pack (T-0048): the repo's instructions, the worktree's diff stat and a retry's gate failure; a scout run has neither worktree nor gate. */
