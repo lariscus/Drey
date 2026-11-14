@@ -8,6 +8,8 @@ import type { Clock } from './ports/clock';
 import type { BackgroundWork } from './orchestrate/background-work';
 import { CommitAction } from './orchestrate/commit-action';
 import { CommitRun } from './orchestrate/commit-run';
+import { FinishedWorktrees } from './orchestrate/finished-worktrees';
+import { GitWorktreeRemover } from './git-worktree-remover';
 import type { GateSeats } from './orchestrate/gate-runner';
 import type { LeavingGit } from './orchestrate/leaving-git';
 import { MainRef } from './orchestrate/main-ref';
@@ -52,5 +54,6 @@ export interface CommitRunWiring extends LeavingWiring {
 export function commitRunOf(w: CommitRunWiring): CommitRun {
   const action = new CommitAction(w.git, new MainRef(w.git));
   const { machine, repo, streams, claims, bookkeeper, settler, background, clock, log, retiring } = w;
-  return new CommitRun({ machine, repo, streams, claims, bookkeeper, settler, action, background, clock, log, retiring, ...seatsOf(w.seats) });
+  const finished = new FinishedWorktrees(new GitWorktreeRemover(w.git));
+  return new CommitRun({ machine, repo, streams, claims, bookkeeper, settler, action, background, clock, log, retiring, finished, ...seatsOf(w.seats) });
 }

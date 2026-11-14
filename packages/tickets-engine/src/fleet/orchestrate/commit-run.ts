@@ -6,6 +6,7 @@ import { INITIAL_RUN_STATE, isTerminal } from '../run/run-state';
 import type { RunStateMachine } from '../run/run-state-machine';
 import type { BackgroundWork } from './background-work';
 import { commitLine, type CommitAction, type CommitOutcome } from './commit-action';
+import { finishedLines, targetsOfRequest, type FinishedWorktrees } from './finished-worktrees';
 import type { GateSeat, GateSeats } from './gate-runner';
 import { messageOf, newLiveRun, type LiveRun } from './live-run';
 import { newRunInfo } from './opening-notes';
@@ -32,6 +33,8 @@ export interface CommitRunDeps {
   readonly retiring: () => boolean;
   /** The governor's heavy seats (req-180); absent = no governor (a spec). */
   readonly seats?: GateSeats;
+  /** req-185: the landed ticket's worktrees go (branch kept, a dirty one kept); absent = they stay (a spec). */
+  readonly finished?: FinishedWorktrees;
 }
 
 /**
@@ -158,7 +161,19 @@ export class CommitRun {
         return this.deps.settler.finish(run, 'failed');
       }
     }
+    await this.removeWorktrees(run);
     return this.deps.settler.finish(run, 'done');
+  }
+
+  /** req-185: the work is on main — the ticket's worktrees go, each outcome a note on the run. */
+  private async removeWorktrees(run: LiveRun): Promise<void> {
+    if (this.deps.finished === undefined) {
+      return;
+    }
+    const report = await this.deps.finished.removeAll(targetsOfRequest(run.request));
+    for (const line of finishedLines(report, run.request.branch)) {
+      await this.deps.bookkeeper.note(run, line);
+    }
   }
 
   private async seat(run: LiveRun): Promise<GateSeat | null> {

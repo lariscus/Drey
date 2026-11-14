@@ -1,3 +1,5 @@
+import { promises as fsp } from 'node:fs';
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { RunRequest } from '../protocol';
 import { settled } from './run-spec-support';
@@ -111,6 +113,31 @@ describe("You's commit as a machine run (req-267)", () => {
     expect(git.calls).toContain('update-ref refs/heads/main merge000000 base0000000');
     expect(sup.get(id)?.gateResult).toBe('green');
     expect((await runnerNotes(dirs.fleet, id)).join('\n')).toContain('commit: merged into main');
+  });
+
+  it('req-185: after the landed merge the ticket\'s worktree goes with real git and the run says so; the branch stays', async () => {
+    const worktree = path.join(dirs.vault, 'wt-T-0001');
+    await fsp.mkdir(worktree);
+    const git = scriptedGit([{ when: `worktree remove ${worktree}`, out: '' }, ...LOCAL, { when: 'merge --no-ff', out: '' }, { when: 'rev-parse --verify HEAD', out: 'merge000000\n' }]);
+    const { sup } = harness(dirs.fleet, { ticketsGit: git });
+    const outcome = await sup.start(commit({ worktreePath: worktree }));
+    const id = outcome.ok ? outcome.run.id : '';
+    await settled(sup, id, 'done');
+    expect(git.calls).toContain(`worktree remove ${worktree}`);
+    expect(git.calls.some((c) => c.startsWith('branch -D') || c.startsWith('branch -d'))).toBe(false);
+    expect((await runnerNotes(dirs.fleet, id)).join('\n')).toContain(`worktree removed: ${worktree} (the branch t/T-0001 stays)`);
+  });
+
+  it('req-185: a worktree git refuses to remove is kept and named on the run', async () => {
+    const worktree = path.join(dirs.vault, 'wt-T-0001');
+    await fsp.mkdir(worktree);
+    const git = scriptedGit([{ when: `worktree remove ${worktree}`, fail: 'locked working tree' }, ...LOCAL, { when: 'merge --no-ff', out: '' }, { when: 'rev-parse --verify HEAD', out: 'merge000000\n' }]);
+    const { sup } = harness(dirs.fleet, { ticketsGit: git });
+    const outcome = await sup.start(commit({ worktreePath: worktree }));
+    const id = outcome.ok ? outcome.run.id : '';
+    await settled(sup, id, 'done');
+    expect(sup.get(id)?.gateResult).toBe('green');
+    expect((await runnerNotes(dirs.fleet, id)).join('\n')).toContain(`worktree kept: ${worktree} — locked working tree`);
   });
 
   it('a conflict ends red with the reason; nothing moves the branch', async () => {

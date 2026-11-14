@@ -6534,3 +6534,43 @@ sequenceDiagram
 
 Pia's memory and a 1:1's accepted memory proposal were already the engine's writes (board service, one commit each);
 nothing outside the runner wrote a persona file uncommitted.
+
+## 6.141 A worker starts inside its persona's boundary; a merged ticket's worktrees go (req-142, req-185, milestone 273)
+
+The persona's `allowed:` reaches the harness's command line; the folders a
+writing worker may use beside its worktree come from the request; the commit
+run's green end and the engine's Done moves remove the ticket's worktrees
+(ADR-0099).
+
+```mermaid
+sequenceDiagram
+    participant TD as TicketDispatch / BoardService
+    participant RQ as composeRunRequest
+    participant PS as ProcessSupervisor
+    participant AD as Harness adapter
+    participant CR as CommitRun
+    participant FW as FinishedWorktrees
+    participant G as git
+    TD->>RQ: persona {…, allowed: {runCommands?, network}}
+    RQ-->>TD: RunRequest {permissionMode: persona's run-commands ?? crew's (review: read-only), network: false unless allowed}
+    TD->>PS: start → spawn(run)
+    PS->>AD: ProviderStart {permissionMode, network, writeDirs (ticket file's folder, further worktrees), runDir}
+    alt Claude Code
+        AD->>AD: write <runDir>/claude-settings.json (blockWritesOutsideWorkingDirectories; deny WebFetch/WebSearch without the network)
+        AD->>AD: claude -p … --add-dir <dirs> --permission-mode … [--disallowedTools WebFetch WebSearch] --settings <file>
+    else Copilot CLI
+        AD->>AD: copilot --acp --stdio --allow-all-tools --add-dir <dir>… [--allow-all-urls only with the network]
+    else opencode / Kimi
+        AD->>AD: opencode: OPENCODE_CONFIG_CONTENT {permission} + a stream note (not proven) · Kimi: a stream note (cannot)
+    end
+    Note over CR: the owner's sign-off → You's commit as a machine run
+    CR->>G: merge into main (CommitAction) → landed
+    CR->>FW: removeAll(the request's worktree + further repos')
+    FW->>G: status --porcelain · unlink link: junctions · worktree remove <path> (never --force)
+    FW-->>CR: removed / kept (dirty, git's refusal)
+    CR->>CR: a note per worktree on the run · finish done (the branch stays)
+    TD->>TD: settleCommitSteps → settleChainCommit (D-72): claim released → the chain's cursor into Done as the owner
+    Note over TD: the engine books a chain ticket into Done (last Accept, chain through, Mission Control's last entry)
+    TD->>FW: removeDoneWorktrees (none while a run is live) → a kept tree is the owner's warning
+```
+

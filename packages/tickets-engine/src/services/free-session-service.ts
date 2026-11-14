@@ -163,8 +163,10 @@ export class FreeSessionService {
   private async requestOf(at: { vault: EngineVault; persona: Persona; ask: FreeSessionAsk; origin: string; directory: string; ticketsVault: boolean; projectId: string | null }): Promise<{ ok: true; request: RunRequest } | { ok: false; error: string }> {
     const { vault, persona, ask } = at;
     const [crew, rows] = await Promise.all([this.deps.crew.effective(vault), this.models()]);
+    // req-142: the session's own choice, else the persona's `run-commands:`, else the crew's.
+    const asked = ask.permissionMode ?? persona.allowed.runCommands;
     const overrides = {
-      ...(ask.permissionMode !== undefined ? { permissionMode: ask.permissionMode } : {}),
+      ...(asked !== undefined ? { permissionMode: asked } : {}),
       ...(ask.model !== undefined ? { model: ask.model } : {}),
       ...(ask.poolClass !== undefined && ask.poolClass !== null ? { poolClass: ask.poolClass } : {}),
     };
