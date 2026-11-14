@@ -1022,6 +1022,11 @@ function chainEntryOf(raw: unknown): McChainEntry | null {
   return { persona, mode: entry['mode'] === 'shape' ? 'shape' : null, notify: entry['notify'] === true };
 }
 
+/** req-306: the board's standard flow (`flow` of the snapshot) as entry views; none when the board carries no flow. */
+export function standardFlowOf(board: unknown): readonly McChainEntry[] {
+  return chainEntriesOf(rec(board)?.['flow']);
+}
+
 /** The `chain:` list's wire JSON as entry views; junk entries drop out, never a throw. */
 export function chainEntriesOf(raw: unknown): readonly McChainEntry[] {
   return arr(raw)

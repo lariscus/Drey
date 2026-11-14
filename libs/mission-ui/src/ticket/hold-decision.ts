@@ -117,7 +117,7 @@ export class TicketHoldFace {
     if (found === null || entries.length === 0) {
       return null;
     }
-    return positionCostViewOf(this.i18n, positionCostsOf(entries, found.hold, this.modes()), found.hold.length, this.titleOf);
+    return positionCostViewOf(this.i18n, positionCostsOf(entries, found.hold), found.hold.length, this.titleOf);
   });
 
   // --- the decision ------------------------------------------------------------------

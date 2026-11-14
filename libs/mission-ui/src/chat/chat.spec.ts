@@ -250,6 +250,19 @@ describe('proposalDetailOf', () => {
     });
   });
 
+  it('req-306: reads a standard flow card’s entries off the canonical list in the summary', () => {
+    expect(proposalDetailOf('Set the standard flow to paul:shape; ben; ralf(notify); you')).toEqual({
+      kind: 'standard-flow',
+      entries: [
+        { persona: 'paul', mode: 'shape', notify: false },
+        { persona: 'ben', mode: null, notify: false },
+        { persona: 'ralf', mode: null, notify: true },
+        { persona: 'you', mode: null, notify: false },
+      ],
+    });
+    expect(proposalDetailOf('Set the standard flow to ')).toBeNull();
+  });
+
   it('reads a blocked-by card’s id list', () => {
     expect(proposalDetailOf('Block T-0002 by T-0001, T-0003')).toEqual({
       kind: 'blocked',

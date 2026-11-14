@@ -39,7 +39,6 @@ function setup(settingsReply: unknown = videos(false), proposeFlow = false) {
     ],
     flow: [
       { persona: 'paul', mode: 'shape', notify: false },
-      { persona: 'paul', mode: null, notify: false },
       { persona: 'you', mode: null, notify: false },
     ],
     ...(proposeFlow ? { proposeFlow: true } : {}),
@@ -61,7 +60,7 @@ describe('Settings → Tickets desk rows', () => {
     await settle();
     expect(desk.root.querySelector('.tset-set-controls')?.textContent).toContain('Paul');
     expect(desk.root.textContent).not.toContain('Paul, You');
-    expect(desk.root.querySelector('[aria-label="Default flow"]')?.textContent).toBe('Paul (shape) → Paul → You');
+    expect(desk.root.querySelector('[aria-label="Default flow"]')?.textContent).toBe('Paul (shape) → You');
     expect(desk.root.textContent).toContain('$10 across 1 persona · $1 spent today');
     button(desk.root, 'Edit crew').click();
     expect(hooks.openTeam).toHaveBeenCalled();

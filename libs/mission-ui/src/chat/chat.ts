@@ -37,7 +37,7 @@ import {
   disconnectedChatState,
   type McChatState,
 } from './chat.model';
-import { parseBoardCard, type ChatMessageView, type McChainEntry, type SessionMeta } from '../api/dto';
+import { parseBoardCard, standardFlowOf, type ChatMessageView, type McChainEntry, type SessionMeta } from '../api/dto';
 import { DEFAULT_PROJECT_COLOR, projectsOf, type McProjectChip } from '../work/projects';
 import {
   chainStepsOf,
@@ -327,7 +327,9 @@ export type ProposalDetail =
   | { readonly kind: 'create'; readonly title: string; readonly phase: string }
   | { readonly kind: 'blocked'; readonly id: string; readonly ids: readonly string[] }
   | { readonly kind: 'priority'; readonly id: string; readonly to: string }
-  | { readonly kind: 'promote'; readonly id: string };
+  | { readonly kind: 'promote'; readonly id: string }
+  /** req-306: the board's standard flow replaced — the proposed entries, canonical text as the summary carries them. */
+  | { readonly kind: 'standard-flow'; readonly entries: readonly ChainEntryView[] };
 
 const TRANSITION_SUMMARY = /^Move (\S+) from (\S+) to (\S+)$/;
 const CREATE_SUMMARY = /^Create ticket "([^"]+)" in (\S+)$/;
@@ -335,6 +337,7 @@ const BLOCKED_SUMMARY = /^Block (\S+) by (.+)$/;
 const CLEARED_SUMMARY = /^Clear (\S+) blockers$/;
 const PRIORITY_SUMMARY = /^Set (\S+) priority to (\S+)$/;
 const PROMOTE_SUMMARY = /^Promote (\S+) to a ship ticket$/;
+const STANDARD_FLOW_SUMMARY = /^Set the standard flow to (.+)$/;
 
 export function proposalDetailOf(summary: string): ProposalDetail | null {
   let match = TRANSITION_SUMMARY.exec(summary);
@@ -364,6 +367,14 @@ export function proposalDetailOf(summary: string): ProposalDetail | null {
   match = PROMOTE_SUMMARY.exec(summary);
   if (match !== null) {
     return { kind: 'promote', id: match[1]! };
+  }
+  match = STANDARD_FLOW_SUMMARY.exec(summary);
+  if (match !== null) {
+    const entries = match[1]!
+      .split(';')
+      .map((entry) => parseChainEntryView(entry.trim()))
+      .filter((entry): entry is ChainEntryView => entry !== null);
+    return entries.length === 0 ? null : { kind: 'standard-flow', entries };
   }
   return null;
 }
@@ -1419,7 +1430,11 @@ export class Chat {
   protected chainCompareFor(proposal: TimelineProposal): ChainCompare | null {
     const chain = proposal.chain;
     if (chain === undefined) {
-      return null;
+      const detail = proposalDetailOf(proposal.summary);
+      // req-306: the standard flow card — the board's `flow:` before, the proposed one after; no cursor (a flow has none).
+      return detail?.kind === 'standard-flow'
+        ? { before: chainStepsOf(standardFlowOf(this.state.board()), [], 'inbox', undefined), after: chainStepsOf(detail.entries, [], 'inbox', undefined) }
+        : null;
     }
     const card = parseBoardCard(this.state.board(), chain.id);
     return chainCompareOf(this.chainPhases(), card?.phase ?? '', card?.chain ?? [], chain.chain, card?.at);
@@ -1460,6 +1475,8 @@ export class Chat {
       return `${proposal.chain.id} · Chain`;
     }
     switch (proposalDetailOf(proposal.summary)?.kind) {
+      case 'standard-flow':
+        return 'Standard flow · confirmation';
       case 'create':
         return 'New ticket · confirmation';
       case 'transition':

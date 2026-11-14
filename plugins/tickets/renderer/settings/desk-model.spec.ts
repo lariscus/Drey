@@ -17,7 +17,7 @@ const persona = (id: string, extra: Partial<PersonaView> = {}): PersonaView => (
 describe('desk settings model', () => {
   it('strings the flow of pipeline.md into one line of persona titles, the interactive entry marked', () => {
     const entry = (id: string, mode: 'shape' | null = null) => ({ persona: id, mode, notify: false });
-    expect(defaultFlowLine([entry('paul', 'shape'), entry('paul'), entry('ben'), entry('zed')], [persona('paul'), persona('ben')])).toBe('Paul (shape) → Paul → Ben → zed');
+    expect(defaultFlowLine([entry('paul', 'shape'), entry('ben'), entry('zed')], [persona('paul'), persona('ben')])).toBe('Paul (shape) → Ben → zed');
     expect(defaultFlowLine([], [persona('paul')])).toBe('No default flow');
     expect(defaultFlowLine(undefined, [])).toBe('No default flow');
   });

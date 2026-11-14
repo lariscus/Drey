@@ -120,6 +120,19 @@ function topNode(card: PersonaCardModel, i18n: I18n): HTMLElement {
   return top;
 }
 
+/** req-305: the Shape chat's end — one button, the same Accept the engine reads at a `:shape` entry. */
+function shapingNode(card: PersonaCardModel, actions: CardActions, i18n: I18n): HTMLElement {
+  const row = h('div', 'pb-decide');
+  const done = h('button', 'pb-decide-accept pb-shaping-done', i18n.t('board.shaping_done'));
+  done.type = 'button';
+  done.addEventListener('click', (event) => {
+    event.stopPropagation();
+    actions.accept(card);
+  });
+  row.append(done);
+  return row;
+}
+
 function decideNode(card: PersonaCardModel, actions: CardActions, i18n: I18n): HTMLElement {
   const row = h('div', 'pb-decide');
   const accept = h('button', 'pb-decide-accept', i18n.t('board.accept'));
@@ -191,6 +204,9 @@ export function personaCardNode(card: PersonaCardModel, actions: CardActions, i1
     const line = h('div', 'pb-status');
     line.append(h('span', `pb-dot pb-dot-${card.dot}`), h('span', 'pb-status-text', statusText(card.status, i18n, nameOf)));
     node.append(line);
+  }
+  if (card.shaping) {
+    node.append(shapingNode(card, actions, i18n));
   }
   return node;
 }

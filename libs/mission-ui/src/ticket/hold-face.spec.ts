@@ -127,14 +127,13 @@ describe('the send-back targets', () => {
 });
 
 describe('the cost by position', () => {
-  it('places each run at its persona’s position; a shape entry is a chat and takes none', () => {
+  it('places each run at its persona’s next position (the chain here names Paul twice)', () => {
     const costs = positionCostsOf(
       [run('paul', '16k', '3m', 0.25), run('ben', '88k', '14m', 0.94), run('ralf', '30k', '5m', 0.32), run('tessa', '24k', '6m', 0.27)],
       HOLD,
-      MODES,
     );
     expect(costs.map((row) => [row.position, row.persona, row.tokens, row.minutes, row.cost])).toEqual([
-      [2, 'paul', 16_000, 3, 0.25],
+      [1, 'paul', 16_000, 3, 0.25],
       [3, 'ben', 88_000, 14, 0.94],
       [4, 'ralf', 30_000, 5, 0.32],
       [5, 'tessa', 24_000, 6, 0.27],
@@ -145,7 +144,6 @@ describe('the cost by position', () => {
     const costs = positionCostsOf(
       [run('ben', '50k', '10m', 0.5), run('ralf', '10k', '2m', 0.1), run('ben', '20k', '4m', 0.2), run('ralf', '5k', '1m', 0.05)],
       { chain: HOLD.chain, position: 5 },
-      MODES,
     );
     expect(costs.map((row) => [row.position, row.tokens, row.minutes])).toEqual([
       [3, 70_000, 14],
@@ -154,30 +152,30 @@ describe('the cost by position', () => {
   });
 
   it('keeps a run of a persona the chain does not name apart, at the end', () => {
-    const costs = positionCostsOf([run('nina', '1k', '1m', 0.01), run('ben', '2k', '1m', 0.02)], HOLD, MODES);
+    const costs = positionCostsOf([run('nina', '1k', '1m', 0.01), run('ben', '2k', '1m', 0.02)], HOLD);
     expect(costs.map((row) => [row.position, row.persona])).toEqual([
       [3, 'ben'],
       [null, 'nina'],
     ]);
   });
 
-  it('gives a shape entry the run when its persona holds no other position', () => {
-    expect(positionOfRun('paul', ['paul', 'ben', 'you'], ['shape', null, null], 0, 3)).toBe(1);
+  it('req-305: a shape entry is one position of its persona’s run — Paul’s run sits at position 1 of a flow that names him once', () => {
+    expect(positionOfRun('paul', ['paul', 'ben', 'you'], 0, 3)).toBe(1);
   });
 
   it('takes a later position of the same persona only up to the cursor', () => {
-    expect(positionOfRun('ben', ['paul', 'ben', 'ralf', 'ben', 'you'], [null, null, null, null, null], 3, 3)).toBe(2);
-    expect(positionOfRun('ben', ['paul', 'ben', 'ralf', 'ben', 'you'], [null, null, null, null, null], 3, 5)).toBe(4);
+    expect(positionOfRun('ben', ['paul', 'ben', 'ralf', 'ben', 'you'], 3, 3)).toBe(2);
+    expect(positionOfRun('ben', ['paul', 'ben', 'ralf', 'ben', 'you'], 3, 5)).toBe(4);
   });
 
   it('words the rows and the total as the board writes them', () => {
-    const view = positionCostViewOf(i18n, positionCostsOf([run('paul', '16k', '3m', 0.25), run('ben', '88k', '14m', 0.94)], HOLD, MODES), 6, titleOf);
-    expect(view.rows[0]).toEqual({ label: '2 of 6 · Paul', model: 'sonnet', tokens: '16k', time: '3m', cost: '$0.25', sub: 'sonnet · 16k · 3m', bad: false });
+    const view = positionCostViewOf(i18n, positionCostsOf([run('paul', '16k', '3m', 0.25), run('ben', '88k', '14m', 0.94)], HOLD), 6, titleOf);
+    expect(view.rows[0]).toEqual({ label: '1 of 6 · Paul', model: 'sonnet', tokens: '16k', time: '3m', cost: '$0.25', sub: 'sonnet · 16k · 3m', bad: false });
     expect(view.total).toEqual({ tokens: '104k', time: '17m', cost: '$1.19', sub: '104k · 17m' });
   });
 
   it('never counts an unknown figure as zero', () => {
-    const view = positionCostViewOf(i18n, positionCostsOf([run('ben', '', '', null, '')], HOLD, MODES), 6, titleOf);
+    const view = positionCostViewOf(i18n, positionCostsOf([run('ben', '', '', null, '')], HOLD), 6, titleOf);
     expect(view.rows[0]).toMatchObject({ model: '', tokens: '', time: '', cost: '—', sub: '' });
     expect(view.total).toEqual({ tokens: '', time: '', cost: '—', sub: '' });
   });

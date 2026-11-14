@@ -1293,6 +1293,7 @@
   "board.cell.again": "{name} · runs again",
   "board.cell.missing": "no persona",
   "board.accept": "Accept",
+  "board.shaping_done": "Shaping done",
   "board.send_back": "Send back…",
   "board.send_back_confirm": "Send back",
   "board.sendback.title": "Send {id} back to",

@@ -28,6 +28,7 @@ import {
   parseTicketDiff,
   parseVerlaufEntries,
   parseVerification,
+  standardFlowOf,
   parseWork,
 } from './dto';
 
@@ -1757,5 +1758,17 @@ describe('Mission Control persona reads (req-281, req-293, req-296)', () => {
     ]);
     expect(parsePersonaSkills({ ok: false, code: 'no_persona', error: 'x' })).toBeNull();
     expect(parsePersonaSkills({ ok: true })).toBeNull();
+  });
+});
+
+describe('standardFlowOf (req-306)', () => {
+  it('reads the board’s flow entries, dropping junk, and is empty without a flow', () => {
+    expect(standardFlowOf({ flow: [{ persona: 'paul', mode: 'shape', notify: false }, 'ben', 4, { persona: 'you', mode: null, notify: true }] })).toEqual([
+      { persona: 'paul', mode: 'shape', notify: false },
+      { persona: 'ben', mode: null, notify: false },
+      { persona: 'you', mode: null, notify: true },
+    ]);
+    expect(standardFlowOf({})).toEqual([]);
+    expect(standardFlowOf(null)).toEqual([]);
   });
 });
