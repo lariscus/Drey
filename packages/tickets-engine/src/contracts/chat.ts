@@ -86,6 +86,11 @@ export type ChatCommand =
        * board); absent = none named (Unassigned on a board with several).
        */
       readonly project?: string;
+      /**
+       * req-299: the work repo the ticket names (a `repos.md` name); absent =
+       * none. A worker's follow-up card carries its source ticket's.
+       */
+      readonly repo?: string;
     }
   | { readonly kind: 'transition'; readonly id: string; readonly from: string; readonly to: string }
   | { readonly kind: 'setPriority'; readonly id: string; readonly priority: TicketPriority }
