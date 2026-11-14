@@ -401,6 +401,8 @@ export interface BoardSnapshot extends PersonaBoardFields, BoardProjects {
   readonly closingSignals?: readonly ('red-gate' | 'retry' | 'steer' | 'cost' | 'friction')[];
   /** req-266: pipeline.md's `flow:` — the standard flow a new ticket's chain is copied from; absent/empty = none. */
   readonly flow?: readonly ChainEntry[];
+  /** E10-5b: pipeline.md's `propose-flow:` — the plan persona proposes a flow for every new plan; absent = off. */
+  readonly proposeFlow?: boolean;
   /**
    * The board's priority vocabulary — the order IS the weight: pipeline.md's
    * `priorities:` on the files backend, the store's `dricket.toml` on dricket (D-11).

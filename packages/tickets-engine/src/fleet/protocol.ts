@@ -114,6 +114,8 @@ export interface RunCursor {
   readonly sentBack?: { readonly from: number; readonly to: number };
   /** Who a plan run's `### Chain` may name (the crew, `you` included) and who takes no mode; absent = the plan's chain is not applied. */
   readonly crew?: { readonly personas: readonly string[]; readonly modeless: readonly string[] };
+  /** E10-5b: the board proposes a flow for every new plan (pipeline.md `propose-flow:`) — a plan run's brief makes `### Chain` a chapter every plan carries. */
+  readonly proposeFlow?: boolean;
 }
 
 export interface RunRequest {

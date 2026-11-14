@@ -1,4 +1,4 @@
-import { parseFlowDraft, parseFlowEdit, parseFlowSave, parsePlanPartsEdit, type Parsed } from '../core/commands';
+import { parseFlowDraft, parseFlowEdit, parseFlowSave, parsePlanPartsEdit, parseStandardFlow, type Parsed } from '../core/commands';
 import { remoteActorOf } from '../contracts/remote-protocol';
 import type { EngineParts } from './engine-parts';
 import type { InvokeTable } from './invoke-table';
@@ -41,6 +41,8 @@ export function addRemoteMethods(table: InvokeTable, parts: EngineParts): void {
   table.set('flowEdit', flowWrite(parseFlowEdit, (cmd) => remotePort.flowEdit(cmd)));
   table.set('flowDraft', flowWrite(parseFlowDraft, (cmd) => remotePort.flowDraft(cmd)));
   table.set('flowSave', flowWrite(parseFlowSave, (cmd) => remotePort.flowSave(cmd, remoteActorOf('Drey'))));
+  // E10-5b: the settings page's default flow and the proposal switch (pipeline.md's `flow:` / `propose-flow:`).
+  table.set('setStandardFlow', flowWrite(parseStandardFlow, (cmd) => parts.board.board.setStandardFlow(cmd)));
   // The settings page's engine half (E13-12): what the phone's Settings reads
   // and writes (`videos.*`, E12-3), behind the same guard (turning videos in
   // git on needs the confirmation).

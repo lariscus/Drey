@@ -1181,7 +1181,11 @@ not like it. The draft is written by the persona of the ticket's planning step
 (the first step whose persona hands over a plan), else the one that holds
 *Shape*, speaking with its own instructions; a chain with neither gets the
 answer *No persona is assigned to plan T-…* and nothing is drafted. Nothing is written until **Save flow**; *Reset to standard flow*
-puts the standard flow back behind the steps that have begun. The current step
+puts the standard flow back behind the steps that have begun. *Open flow editor*
+under **Default flow** in Settings → Tickets opens this tab on the standard flow
+itself (**Flow · Default**, no ticket, nothing locked, no reset): *Save flow*
+there changes the flow every **new** ticket is created with; tickets that exist
+keep their own. The current step
 and the ones before it cannot change, and the whole flow is read-only while a
 run is live on the ticket.
 
@@ -2492,10 +2496,14 @@ And the assistant can drive runs: ask it about the fleet — it sees
 
 Settings → Tickets starts with the things you decide about the crew:
 **Crew** shows the personas as chips; you are the human persona, called *You* until you type another name into **Your name** (it applies to every column you work, the flow editor, Crew and the phone); *Edit crew* opens the
-Crew tab. **Default flow** shows the standard flow, the columns an agent
-works with who does each; a flow is changed per ticket, so pick a ticket
-next to *Open flow editor* to open its Flow tab (the standard flow itself is
-set below, in the pipeline table). **Autopilot** is the state (*On*, *Paused*, *Off*) and *Resume paused autopilot at*;
+Crew tab. **Default flow** shows the standard flow a new ticket is created with, the
+personas in order (*Paul (shape) → Paul → Ben → Ralf → Tessa → You*);
+*Open flow editor* opens it in the Flow tab, where you edit and save it like a
+ticket's flow. **Propose a flow for every new plan** (off by default) lets the
+persona that writes the plan add a *Chain* chapter to every new plan — starting
+from the default flow, with the reason in the plan's *Decisions* — instead of
+only when a ticket's way should differ; you still approve the plan, and the
+chain is applied when the plan's run ends. **Autopilot** is the state (*On*, *Paused*, *Off*) and *Resume paused autopilot at*;
 **Models** is the capacity pool (see *Models, classes and the capacity pool*);
 **Budget and runners** shows the daily
 budgets of the personas added up with today's spending, and the sessions each

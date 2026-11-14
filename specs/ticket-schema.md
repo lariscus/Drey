@@ -778,7 +778,12 @@ it is **copied into a ticket at creation** (`chain:` plus `at: 1`, every
 creation path: capture, the chat's createTicket, a released plan part
 without a chain of its own), and is then the ticket's own — a later change
 of `flow:` never reshuffles existing tickets. A pipeline without `flow:`
-creates tickets without a chain.
+creates tickets without a chain. The settings page edits it in the flow editor
+itself: the editor's ticket id `standard` (`FlowScope` `standard`, tab key
+`flow://standard`) shows `flow:` with nothing locked, the same edits and Paul's
+draft apply, and "Save flow" rewrites the key in `pipeline.md` (a yaml document
+edit that keeps the other keys and the body; an empty list removes it) instead of
+a ticket header — checked by the same write guard; a part does not exist there.
 
 **The write guard** (`validateChain`, `core/chain-validate.ts`) runs where a
 write is decided — `setChain`, the flow editor, a part's chain, the plan's
@@ -1125,7 +1130,20 @@ the old phase stays in `x-legacy-phase`. `migrate-tickets --pipeline-out` writes
   (`flow: paul:shape; paul; ben; ralf; tessa; you`), or a YAML list. Copied
   into the ticket at creation and the ticket's own from then on; absent = new
   tickets carry no chain. An unreadable entry drops the whole key with a
-  warning. Read by `core/pipeline-flow.ts`.
+  warning. Read by `core/pipeline-flow.ts`; written by the settings page's
+  default flow (`BoardService.setStandardFlow`, one commit `tickets: default flow`).
+- `propose-flow`: optional (E10-5b) — `true` makes the plan persona propose a
+  flow for **every new plan**: a plan run's brief closes the plan format with
+  `prompts/fragments/flow-proposal.md`, which turns the optional `### Chain`
+  chapter into one every plan carries, starting from the chain the ticket
+  carries (the standard flow, copied at creation) and giving the reason in
+  `### Decisions`. The chapter is then applied like any plan chain
+  (`validateChain`, the green end of the run). Absent or `false` = off (`### Chain`
+  only when the way should differ); any other value reads as off with a
+  warning. Written by the settings page's switch (`setStandardFlow`, one commit
+  `tickets: propose flow on|off`; off removes the key). Read by
+  `core/pipeline-flow.ts` (`parseProposeFlow`) into `BoardSnapshot.proposeFlow`,
+  carried to the run as `RunCursor.proposeFlow`.
 - `token-budget`: optional (req-268) — the board's daily token budget once the
   pipeline holds only the lifecycle columns: step 3 of the board migration
   keeps the old working column's `token-budget` here (concept §5: it stays a

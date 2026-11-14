@@ -47,7 +47,7 @@ Open work only. Everything implemented lives in
 lives in [`decisions.md`](decisions.md). When an item ships, move it to the
 changelog and delete it here — no shipped history on this page.
 
-**Status (2026-11-14):** version 0.8.1, milestones 1–273 built (1–21 in `docs/milestones-done.md`; 109–111 recorded by the convergence audit backfill), plus the requirements the changelog records without a milestone number (req-95a, req-95b, req-96, req-97, req-98, req-99a, req-99b, req-101, req-102, req-104, req-110, req-126 among them). Milestones 1–83 are
+**Status (2026-11-14):** version 0.8.1, milestones 1–273 and 275 built (1–21 in `docs/milestones-done.md`; 109–111 recorded by the convergence audit backfill), plus the requirements the changelog records without a milestone number (req-95a, req-95b, req-96, req-97, req-98, req-99a, req-99b, req-101, req-102, req-104, req-110, req-126 among them). Milestones 1–83 are
 owner-verified (the round for 1–81 closed 2026-10-17; 82, the auto-update, and 83, the tickets foundation, on real use). From milestone 84 on, the changelog marks each entry that still awaits the owner's round — nearly all of them; that round is finish line step 6 below. Milestone and requirement ids are assigned when work starts; the next free ones follow from the top of `changelog.md`. Of the architectural cleanup, A1–A6 and A10–A12 shipped; A7–A9 remain.
 
 ### Finish line (owner, 2026-11-12)
@@ -151,7 +151,7 @@ Persona names follow D7 (Pia = Mission Control, Paul plans).
   spent" (running work finishes first) and a runners dialog behind *Manage*
   (board 7g) need a desk setting first (E12-3b); today *Daily budget* only
   adds up the personas' budgets and *Manage* scrolls to the Workers section.
-  The "default flow for new plans" (E10-5b) would also get its row here.
+  (The default flow for new plans shipped as E10-5b, milestone 275.)
 - **E13-11b — Flow tab, what is left.** The tab opens from the ticket
   strip and Settings; the plan block's "Change flow ›" link arrives with the
   Parts block (milestone 196, the tab can open `flow://<id>/<part>` already). The word
@@ -384,13 +384,6 @@ _Added by the owner on 2026-11-14 (crew management and the flow, before the merg
   Log), whether a checkpoint between the two (plan-review) is skipped
   on the way back, and how it interacts with W7's gates and routing
   (req-75). _(2026-11-14, owner: before the merge into `main`. On the persona board the key becomes a chain position: a red gate sends the ticket back to the persona at that position — the send-back of milestone 248 with the failure log as its reason — and returns to the position that went red; `max-red:` becomes the per-persona breaker of milestone 247.)_
-- **E10-5b — Flow editor follow-ups.** The switch that lets the plan
-  persona propose a flow for **every new plan** (concept §5.7 point 3: it
-  starts at the standard flow; today only the "Ask Paul" draft exists) and
-  the default flow under Settings → Tickets (E13-12 / E12-3; the standard
-  flow is `pipeline.md`'s `flow:`). The runner walks the chain since
-  milestone 247 and a persona's model follows its class (milestone 268), so the
-  delta's `move` / `assign` and a per-gate model pick are gone. _(2026-11-14, owner: before the merge into `main`.)_
 - **req-120 — Start a ticket's chain from the ticket card (board 9a; milestone 196)** (owner request, outside the list, 2026-11-07; found by wave 4.3 as a "feature not yet built" row). The card's primary button for a Prioritized ticket: the persona board's `start` move (milestone 254; today a drag or the card's context menu on the board), the button only in the states the board shows it, confirmation per the `tools` write policy. _(2026-11-14, owner: before the merge into `main`.)_
 - **req-148 — Queued and waiting runs in the fleet report (boards 10i, 5d; O11)** (owner request, outside the list, 2026-11-07; found by wave 4.7, milestone 202; built later). The Crew cards draw "queued" and "waits for a slot"; the fleet report knows live runs only. Needs the dispatcher's queue in the report and the clients drawing the state. _(2026-11-14, owner: before the merge into `main`.)_
 - **req-229 — Shape with Paul as a session record (follow-up of milestone 230, req-173; R9, concept open question 3).** `SessionKind` types `shape`, but Shape still runs over the chat bridge with read rounds (`chat-service.ts` shape turns), not as a session of a harness. Decide from the numbers whether Shape becomes a held session (kind `shape`, the ticket's repository read-only, Paul's harness, the plan as its working file) and build it on `HeldSessionStarter` with a `ShapeKind`. _(2026-11-14, owner: before the merge into `main`.)_

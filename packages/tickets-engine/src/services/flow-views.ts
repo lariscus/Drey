@@ -66,7 +66,8 @@ export function flowPersonasOf(personas: readonly Persona[]): FlowPersona[] {
 
 /** The text Paul reads before he drafts a flow: the standard flow, the flow now, the crew. */
 export function flowDraftText(input: {
-  readonly ticket: string;
+  /** The ticket; null = the standard flow itself (E10-5b). */
+  readonly ticket: string | null;
   readonly title: string;
   readonly plan: string;
   readonly standard: readonly string[];
@@ -79,7 +80,8 @@ export function flowDraftText(input: {
     .map((s) => `${s.position}. ${s.persona}${s.mode === null ? '' : `:${s.mode}`}${s.notify ? ' (tell me)' : ''}${s.state === 'current' ? ' (current, locked)' : ''}`)
     .join('\n');
   const standard = input.standard.length === 0 ? '(none)' : input.standard.join('; ');
-  return `Ticket ${input.ticket}: ${input.title}${input.plan}\n\nStandard flow: ${standard}\nThe chain now, from the current position:\n${now}\nSaved chain: ${input.saved.join('; ')}\n\nPersonas:\n${crew}`;
+  const head = input.ticket === null ? 'The default flow every new ticket is copied from — it changes no existing ticket.' : `Ticket ${input.ticket}: ${input.title}${input.plan}`;
+  return `${head}\n\nStandard flow: ${standard}\nThe chain now, from the current position:\n${now}\nSaved chain: ${input.saved.join('; ')}\n\nPersonas:\n${crew}`;
 }
 
 /** What the crew line says beside a persona that is not an agent. */

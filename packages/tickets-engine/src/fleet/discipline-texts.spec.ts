@@ -35,7 +35,7 @@ describe('the discipline files', () => {
       'writing.md',
     ]);
     const fragments = (await fsp.readdir(path.join(SHIPPED_PROMPTS_DIR, 'fragments'))).filter((n) => n.endsWith('.md')).sort();
-    expect(fragments).toEqual(['chain-grammar.md', 'plan-format.md']);
+    expect(fragments).toEqual(['chain-grammar.md', 'flow-proposal.md', 'plan-format.md']);
     for (const file of [...names.map((n) => path.join(dir, n)), ...fragments.map((n) => path.join(SHIPPED_PROMPTS_DIR, 'fragments', n))]) {
       const raw = await fsp.readFile(file, 'utf8');
       expect(raw.endsWith('\n'), file).toBe(true);

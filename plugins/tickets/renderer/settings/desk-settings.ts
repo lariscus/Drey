@@ -15,13 +15,14 @@ import type { SlotView } from '../../../../packages/tickets-engine/src/fleet/pro
 import type { PersonaView } from '../../shared/remote-protocol';
 import type { BoardSnapshot } from '../../shared/tickets';
 import { el, textButton } from '../settings-dom';
-import { budgetLineOf, maxMbOf, parseDeskVideos, standardFlowOf, type DeskVideos } from './desk-model';
+import { budgetLineOf, defaultFlowLine, maxMbOf, parseDeskVideos, type DeskVideos } from './desk-model';
+import { STANDARD_FLOW_ID } from '../../../../packages/tickets-engine/src/contracts/flow';
 import { slotSessionsLine } from './models-model';
 
 export interface DeskSettingsHooks {
   /** Opens the Team tab ("Edit crew"). */
   readonly openTeam: () => void;
-  /** Opens the Flow tab of a ticket. */
+  /** Opens the Flow tab of a ticket — or of the default flow, `standard` (E10-5b). */
   readonly openFlow: (ticketId: string) => void;
   /** Brings the page's runner settings into view ("Manage"). */
   readonly manageRunners: () => void;
@@ -104,17 +105,36 @@ export function createDeskSettings(api: DreyPluginApi, hooks: DeskSettingsHooks)
   // --- Flow --------------------------------------------------------------
   const flow = section('tset-flow-head', 'Flow', 'flow');
   const flowStrip = el('span');
-  flowStrip.setAttribute('aria-label', 'Standard flow');
-  const ticketPick = el('select');
-  ticketPick.setAttribute('aria-label', 'Ticket to edit the flow of');
+  flowStrip.setAttribute('aria-label', 'Default flow');
   const openFlow = textButton('Open flow editor');
-  openFlow.title = "Changes are per ticket: pick a ticket, edit its flow. The standard flow itself is the pipeline's columns below.";
-  openFlow.addEventListener('click', () => {
-    if (ticketPick.value !== '') {
-      hooks.openFlow(ticketPick.value);
-    }
+  openFlow.title = 'Edit the default flow. Tickets that already exist keep their own flow.';
+  openFlow.addEventListener('click', () => hooks.openFlow(STANDARD_FLOW_ID));
+  flow.list.append(setting('Default flow', 'Steps a new ticket runs through unless its plan says otherwise.', flowStrip, openFlow));
+  // E10-5b: the plan persona proposes a flow for every new plan (pipeline.md's `propose-flow:`).
+  const propose = el('input');
+  propose.type = 'checkbox';
+  propose.id = 'tset-propose-flow';
+  const proposeLabel = el('label', 'tset-set-check');
+  proposeLabel.htmlFor = propose.id;
+  proposeLabel.append(propose, el('span', undefined, 'The plan persona writes a flow into every new plan, starting from the default flow. You still approve the plan.'));
+  const proposeNote = el('span', 'field-hint');
+  const proposeSetting = el('div', 'tset-set');
+  proposeSetting.append(el('b', 'tset-set-name', 'Propose a flow for every new plan'), proposeLabel, proposeNote);
+  flow.list.append(proposeSetting);
+  propose.addEventListener('change', () => {
+    const on = propose.checked;
+    void (async () => {
+      try {
+        const reply = (await api.backend.invoke('setStandardFlow', { proposeFlow: on })) as { readonly ok?: boolean; readonly error?: string } | null;
+        proposeNote.textContent = reply?.ok === true ? '' : (reply?.error ?? 'The switch could not be saved.');
+      } catch (error) {
+        proposeNote.textContent = error instanceof Error ? error.message : String(error);
+      }
+      if (proposeNote.textContent !== '') {
+        propose.checked = snapshot?.proposeFlow === true;
+      }
+    })();
   });
-  flow.list.append(setting('Default flow', 'Steps a new ticket runs through unless its plan says otherwise.', flowStrip, ticketPick, openFlow));
 
   // --- Autopilot (req-95b, concept 6.1): the same three states the status item switches --
   const autopilot = section('tset-autopilot-head', 'Autopilot', 'autopilot');
@@ -209,24 +229,8 @@ export function createDeskSettings(api: DreyPluginApi, hooks: DeskSettingsHooks)
   };
 
   const paintFlow = (): void => {
-    const items = snapshot === null ? [] : standardFlowOf(snapshot.pipeline, personas);
-    flowStrip.textContent = items.length === 0 ? 'No column runs an agent' : items.map((item) => item.title).join(' → ');
-    const tickets =
-      snapshot === null
-        ? []
-        : snapshot.columns
-            .filter((column) => column.phase.id !== snapshot!.pipeline[0]?.id)
-            .flatMap((column) => column.tickets)
-            .filter((card) => card.meta.title !== '');
-    const previous = ticketPick.value;
-    ticketPick.replaceChildren(
-      ...tickets.map((card) => Object.assign(el('option', undefined, `${card.id} · ${card.meta.title}`), { value: card.id })),
-    );
-    if (tickets.some((card) => card.id === previous)) {
-      ticketPick.value = previous;
-    }
-    ticketPick.hidden = tickets.length === 0;
-    openFlow.disabled = tickets.length === 0;
+    flowStrip.textContent = defaultFlowLine(snapshot?.flow, personas);
+    propose.checked = snapshot?.proposeFlow === true;
   };
 
   // The Runners line is the slots' sessions (req-186): what the pool serves, not a pool size per runner.

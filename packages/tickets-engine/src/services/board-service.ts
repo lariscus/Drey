@@ -24,7 +24,8 @@ import { newTicketFileText, parseTicketFile, patchTicketFile, patchBlockedBy, pa
 import { withPlanSection } from '../core/plan-section';
 import { parsePlanChain } from '../core/plan-chain';
 import { applyFlowOp, type FlowOp } from '../core/flow-edit';
-import type { FlowReply, FlowSaveReply, FlowStepView, FlowTarget, FlowScope } from '../contracts/flow';
+import { STANDARD_FLOW_ID, type FlowReply, type FlowSaveReply, type FlowStepView, type FlowTarget, type FlowScope } from '../contracts/flow';
+import { patchPipelineFlow } from '../core/pipeline-flow-patch';
 import { allowedAfter, type PersonaAllowedPatch } from '../contracts/persona-allowed';
 import { BUILDING_STATE, DEFAULT_PIPELINE_TEXT, READY_STATE, STANDARD_FLOW_LINE } from '../core/pipeline-states';
 import { parseChainItems, renderChainEntries, unreadableEntryMessage } from '../core/chain-list';
@@ -176,8 +177,11 @@ function oneMemoryLine(text: string): string {
 /** The readable refusal every persona-scoped method shares. */
 /** The flow editor's frame (E10-5, req-266): the chain being edited and how much of it is locked. */
 interface FlowFrame {
-  readonly vault: EngineVault;
-  readonly card: TicketCard;
+  /** The id the reply names: the ticket's, or {@link STANDARD_FLOW_ID}. */
+  readonly ticketId: string;
+  /** Null for the standard flow (E10-5b): no ticket file behind it. */
+  readonly vault: EngineVault | null;
+  readonly card: TicketCard | null;
   readonly text: string;
   readonly title: string;
   readonly scope: FlowScope;
@@ -1682,6 +1686,9 @@ export class EngineBoardService {
    * `### Parts` (none = the standard flow), nothing locked.
    */
   private async flowFrame(target: FlowTarget): Promise<FlowFrame | { readonly error: string }> {
+    if (target.id === STANDARD_FLOW_ID) {
+      return this.standardFlowFrame(target);
+    }
     const found = await this.findCard(target.id);
     if (found === null) {
       return { error: `${target.id} is not on the board` };
@@ -1694,6 +1701,7 @@ export class EngineBoardService {
       const own = card.meta.chain ?? [];
       const saved = own.length > 0 ? own : standard;
       return {
+        ticketId: target.id,
         vault,
         card,
         text,
@@ -1714,6 +1722,7 @@ export class EngineBoardService {
     const released = lockedIndices(matchPartTickets(parts, this.childrenOf(snap, target.id))).has(target.part);
     const own = partChainEntries(part);
     return {
+      ticketId: target.id,
       vault,
       card,
       text,
@@ -1727,13 +1736,22 @@ export class EngineBoardService {
     };
   }
 
+  /** E10-5b: the standard flow as a frame — pipeline.md's `flow:`, nothing locked, no ticket file behind it. */
+  private async standardFlowFrame(target: FlowTarget): Promise<FlowFrame | { readonly error: string }> {
+    if (target.part !== null) {
+      return { error: 'the standard flow has no parts' };
+    }
+    const standard = (await this.snapshot()).flow ?? [];
+    return { ticketId: STANDARD_FLOW_ID, vault: null, card: null, text: '', title: 'Default flow', scope: { kind: 'standard' }, saved: standard, standard, locked: 0, part: null, readOnly: null };
+  }
+
   /** A flow frame's chain as the editor shows it: the positions from the current one on, with the crew. */
   private async flowReply(frame: FlowFrame, entries: readonly ChainEntry[]): Promise<FlowReply> {
     await this.ensureHumanPersona();
     const personas = await this.listPersonas();
     return {
       ok: true,
-      ticket: frame.card.id,
+      ticket: frame.ticketId,
       title: frame.title,
       scope: frame.scope,
       chain: renderChainEntries(entries),
@@ -1792,6 +1810,9 @@ export class EngineBoardService {
    * live run and a chain that does not hold refuse.
    */
   async saveFlow(input: FlowTarget & { chain: readonly string[]; actor?: string }): Promise<FlowSaveReply> {
+    if (input.id === STANDARD_FLOW_ID) {
+      return input.part === null ? this.setStandardFlow({ chain: input.chain }) : { ok: false, error: 'the standard flow has no parts' };
+    }
     if (input.part === null) {
       return this.setChain({ id: input.id, chain: input.chain, ...(input.actor === undefined ? {} : { actor: input.actor }) });
     }
@@ -1803,6 +1824,9 @@ export class EngineBoardService {
       }
       if (frame.readOnly !== null) {
         return { ok: false, error: frame.readOnly };
+      }
+      if (frame.vault === null || frame.card === null) {
+        return { ok: false, error: 'the standard flow has no parts' };
       }
       const entries = await this.flowEntriesOf(input.chain, frame);
       if ('error' in entries) {
@@ -1827,6 +1851,53 @@ export class EngineBoardService {
     });
   }
 
+  /**
+   * E10-5b: the standard flow and the proposal switch in `_meta/pipeline.md` (the settings page's
+   * default flow): `chain` replaces `flow:` (checked like every chain write; an empty list removes
+   * the key — a new ticket then carries no chain), `proposeFlow` sets `propose-flow:`. Existing tickets
+   * keep their own chains. One commit `tickets: default flow` / `tickets: propose flow on|off`.
+   */
+  setStandardFlow(input: { chain?: readonly string[]; proposeFlow?: boolean }): Promise<FlowSaveReply> {
+    return this.enqueue(async (): Promise<FlowSaveReply> => {
+      const vault = await this.detect();
+      const text = vault === null ? null : await this.readOptional(vault.id, PIPELINE_PATH);
+      if (vault === null || text === null) {
+        return { ok: false, error: 'tickets/_meta/pipeline.md is missing' };
+      }
+      let canonical: readonly string[] | undefined;
+      if (input.chain !== undefined) {
+        const parsed = parseChainItems(input.chain);
+        if (!parsed.ok) {
+          return { ok: false, error: unreadableEntryMessage(parsed.bad) };
+        }
+        const refusal = parsed.entries.length === 0 ? null : validateChain(parsed.entries, { ...(await this.chainGuardIds()), saved: [], locked: 0 });
+        if (refusal !== null) {
+          return { ok: false, error: refusal };
+        }
+        canonical = renderChainEntries(parsed.entries);
+      }
+      let patched: string;
+      try {
+        patched = patchPipelineFlow(text, { ...(canonical === undefined ? {} : { flow: canonical }), ...(input.proposeFlow === undefined ? {} : { proposeFlow: input.proposeFlow }) });
+      } catch (error) {
+        return { ok: false, error: messageOf(error) };
+      }
+      if (patched === text.replace(/\r\n/g, '\n')) {
+        return { ok: true };
+      }
+      try {
+        await this.host.write(vault.id, PIPELINE_PATH, patched);
+      } catch (error) {
+        return { ok: false, error: `write failed: ${messageOf(error)}` };
+      }
+      const what = canonical !== undefined ? 'default flow' : `propose flow ${input.proposeFlow === true ? 'on' : 'off'}`;
+      const warning = await this.commit(vault, [PIPELINE_PATH], `tickets: ${what}`);
+      this.host.announceChanges(vault.id, [PIPELINE_PATH]);
+      this.announceChanged();
+      return { ok: true, ...(warning === null ? {} : { warning }) };
+    });
+  }
+
   /** What Paul reads before he drafts a flow (E10-5): the standard flow, the chain now, the crew. */
   async flowDraftContext(target: FlowTarget): Promise<{ readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string }> {
     const frame = await this.flowFrame(target);
@@ -1839,6 +1910,9 @@ export class EngineBoardService {
     const reply = await this.flowReply(frame, frame.saved);
     if (!reply.ok) {
       return reply;
+    }
+    if (target.id === STANDARD_FLOW_ID) {
+      return { ok: true, text: flowDraftText({ ticket: null, title: frame.title, plan: '', standard: renderChainEntries(frame.standard), steps: reply.steps, saved: reply.saved, personas: reply.personas }) };
     }
     const plan = frame.part !== null ? `\nThis flow belongs to part "${frame.part.title}"${frame.part.reason === null ? '' : ` — ${frame.part.reason}`}.` : '';
     return {
@@ -2378,7 +2452,7 @@ export class EngineBoardService {
     if (placement === null || chain === undefined) {
       return null;
     }
-    const cursor = runCursorOf({ chain, at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.chainGuardIds() });
+    const cursor = runCursorOf({ chain, at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.chainGuardIds(), proposeFlow: snap.proposeFlow === true });
     const persona = placement.lookup(chain[cursor.at - 1]!.persona);
     return { persona: persona?.kind === 'agent' ? persona.id : null, cursor };
   }

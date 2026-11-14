@@ -12,9 +12,14 @@ import type { FlowOp } from '../core/flow-edit';
 
 export type { FlowOp };
 
-/** Which flow: the ticket's own chain, or one part of a split plan (the parent's `### Parts`). */
+/** The flow editor's ticket id for the standard flow (E10-5b): no ticket id matches it. */
+export const STANDARD_FLOW_ID = 'standard';
+
+/** Which flow: the ticket's own chain, one part of a split plan (the parent's `### Parts`), or the standard flow. */
 export type FlowScope =
   | { readonly kind: 'ticket' }
+  /** E10-5b: the standard flow itself — pipeline.md's `flow:`, what a new ticket's chain is copied from. */
+  | { readonly kind: 'standard' }
   | { readonly kind: 'part'; readonly index: number; readonly title: string };
 
 /** One position of the flow, from the ticket's current one on. */

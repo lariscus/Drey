@@ -522,7 +522,7 @@ Rule as everywhere: the scout writes only into its own ticket; the transition sc
 
 ### 5.7 The chain in the ticket — standard flow, delta, notify rules
 
-> Status: **built** (E9, milestone 110; flow editor E10-5, milestone 128; manual steps E10-6, milestone 132). **Planned:** the "propose a flow for every new plan" switch, per-gate model pick, the default flow under Settings → Tickets and the fleet executing `move` / `assign` (E10-5b); the desktop Flow tab (E13-11).
+> Status: **built** (E9, milestone 110; flow editor E10-5, milestone 128; manual steps E10-6, milestone 132). **Built since:** the "propose a flow for every new plan" switch and the default flow under Settings → Tickets (E10-5b, milestone 275: the switch makes `### Chain` a chapter every plan carries, the default flow is edited in the flow editor itself); the desktop Flow tab (E13-11). The per-gate model pick and the fleet executing `move` / `assign` are gone with the chain as a persona list (a position's model is its persona's).
 
 The gate sequence ("the chain") is where "runs through by default" and "this time I want it different" must meet. Design:
 
