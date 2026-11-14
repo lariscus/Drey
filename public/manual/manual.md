@@ -1234,6 +1234,15 @@ ends. At a step of **Pia**, Mission Control looks at the ticket once and
 proposes changes as cards in a chat of its own (*Pia — T-0123, position 2
 of 4*); the ticket waits in **Needs you** — confirm one of her cards and it
 moves on, or press **Accept** if she proposed nothing you want.
+**Follow-ups from a worker.** A worker that found work outside its step does
+not put it into its changes: it ends its last message with a short list. When
+the step is done, a chat named *Follow-ups from T-0123* appears in Mission
+Control with one card per proposal. **Confirm** creates that ticket in the
+first column, in the same repository and project as T-0123, with the worker's
+reason in its description; **Dismiss** leaves nothing. The worker creates no
+ticket itself, a step that failed its gate files nothing (it runs again), and
+a proposal you already saw on that ticket does not come back. Dialogs and
+scouts do not propose.
 How many tickets one persona runs at once is its **Parallel · max** (the
 Persona page's Work block); *min* lets it start one even when the pool is
 full. Three red gates in a row hold that persona until you play it again on

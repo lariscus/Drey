@@ -804,7 +804,7 @@ export class ChatService implements ChatServicePort {
           title: command.title,
           description: command.description,
           priority: command.priority,
-          repo: null,
+          repo: command.repo ?? null,
           ...(command.project === undefined ? {} : { project: command.project }),
           actor,
         });

@@ -197,9 +197,19 @@ export function composeInstruction(input: InstructionInput): ComposedInstruction
 function ruleParts(input: InstructionInput): string[] {
   const d = input.disciplines;
   if (isReadOnlyRun(input)) {
-    return [d.working, d.readOnly, d.language, d.precedence];
+    return [d.working, d.readOnly, ...followupsPart(input), d.language, d.precedence];
   }
-  return [d.working, d.writing, d.ticketFile, ...(input.interactive === undefined ? [d.handover] : []), d.language, d.precedence];
+  return [d.working, d.writing, d.ticketFile, ...(input.interactive === undefined ? [d.handover] : []), ...followupsPart(input), d.language, d.precedence];
+}
+
+/**
+ * req-299: the `FOLLOWUPS:` rule rides every dispatched run — writing or
+ * read-only, in a chain or a column — but not an interactive dialog (the
+ * conversation is the deliverable and the owner is in it). Scout runs
+ * compose their own brief and are not told it.
+ */
+function followupsPart(input: InstructionInput): string[] {
+  return input.interactive === undefined ? [input.disciplines.followups] : [];
 }
 
 /** The gate commands (when any), what ends the turn (the completion or the dialog discipline) and the signals. */

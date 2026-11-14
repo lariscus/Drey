@@ -68,6 +68,7 @@ export class RunningEngine implements Engine {
     board.presence.dispose();
     board.fleet.dispose();
     learning.stopSettling();
+    learning.stopFollowups();
     learning.improvements.dispose();
     verify.verify.dispose();
     board.board.dispose();

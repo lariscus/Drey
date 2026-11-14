@@ -16,6 +16,7 @@ import type { CapabilityClass, PoolGrantRecord, RunLedgerInput } from './protoco
 import type { RouteRecord } from './protocol-routing';
 import type { ModelNeeds } from '../contracts/ticket-pool-meta';
 import type { ShapedQuestion } from '../contracts/question-shape';
+import type { FollowupDraft } from '../core/followups';
 import type { TicketForm } from '../contracts/tickets';
 import type { SessionKind, SessionSpec } from './protocol-session';
 import type { ClosingRoundSpec } from './protocol-closing';
@@ -573,6 +574,13 @@ export interface RunInfo {
    * owner. Null/absent on every other end.
    */
   readonly blocked?: string | null;
+  /**
+   * The follow-up tickets the worker proposed at the end of its last message
+   * (`FOLLOWUPS:`, `core/followups.ts`, req-299). The engine files them as
+   * pending Mission Control cards once the run is done; nothing here touches
+   * the board. Absent when the worker proposed none.
+   */
+  readonly followups?: readonly FollowupDraft[];
   /** The worker's last error event (req-63: a rate limit shrinks the pool). */
   readonly lastError?: string | null;
   // --- token telemetry (T-0048); all optional so adopt() restores older

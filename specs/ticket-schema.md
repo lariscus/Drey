@@ -2218,7 +2218,9 @@ line is skipped, never guessed — the asymmetric-tolerance rule):
   typed `ChatCommand` (`createTicket` / `transition` / `setPriority` /
   `promote` / `setChain` — the union in
   `packages/tickets-engine/src/contracts/chat.ts`
-  is the entire write surface). Ids mint per session (`p-1`, `p-2`, …).
+  is the entire write surface; a `createTicket` may carry the ticket's
+  `project` (req-298) and `repo` (req-299, a `repos.md` name — a worker's
+  follow-up card names its source ticket's)). Ids mint per session (`p-1`, `p-2`, …).
 - `- '<UTC>' proposal p-<n> confirmed|dismissed — <summary>` — the
   owner's decision. The summary repeats the pending card's; a
   ` → <outcome>` tail (the moved path, a refusal) rides when the
@@ -2289,6 +2291,75 @@ reply and its proposal lines) commits once; a confirm/dismiss decision
 commits once. The reader (`packages/tickets-engine/src/core/chat-session.ts`)
 forgives: a file without a readable frontmatter fence reads as absent,
 a half-readable one yields what it can.
+
+### Worker follow-ups (req-299, owner 2026-11-14)
+
+A dispatched worker may propose work that is not part of its step. It
+writes nothing to the board: it ends its **last message** with a
+line-start `FOLLOWUPS:` marker and bullets, in the grammar of
+`packages/tickets-engine/src/core/followups.ts`:
+
+```markdown
+FOLLOWUPS:
+- Cache the heading tree per note
+  why: the outline rebuilds it on every keystroke
+  priority: low
+```
+
+A bullet (`-`, `*`, `1.`) is a title; the indented `why:` (alias
+`reason:`) and `priority:` lines belong to it, a wrapped detail line
+continues the reason. The **last** marker of the message counts, reading
+stops at the first unindented non-bullet line (closing prose), a marker in
+running prose and text on the marker's own line (`FOLLOWUPS: none`) read
+as nothing. Bounded: at most 5 proposals per run, titles distinct
+(case-insensitively), a title cut at 120 and a reason at 600 characters.
+
+**Who is told.** The rule is a run-brief discipline
+(`prompts/disciplines/followups.md`, `classifier-spec.md`): every
+dispatched run gets it — writing or read-only, in a chain or a column,
+any persona or position — **except** an interactive dialog (the owner is
+in the conversation), a scout (its report is its deliverable;
+req-302), a persona's 1:1, a free session and Pia's own turns. A run that
+was not told may still end with the marker; it is read all the same.
+
+**The record.** The runner keeps what it read as `followups`
+(`[{title, why, priority}]`) in the run's `run.json` info, from the
+`result` event of the turn (`fleet/orchestrate/event-fold.ts`); the key is
+absent on a run that never proposed, and a later result with none clears an
+earlier list (a steered run keeps no stale proposals).
+
+**The cards.** When the run is `done` — a red gate (`failed`, also the one
+that sends a ticket back, milestone 274), a stopped run and a run still
+going file nothing; the step runs again and proposes again — the engine's
+`FollowupService` (`services/followup-service.ts`, on the fleet's change
+notices, once per run per process) hands the list to the `FollowupFiler`
+(`services/followup-filer.ts`, pure half `core/followup-cards.ts`). It
+writes **one session per run**, titled `Follow-ups from T-0012`, no
+`ticket:` key (that marks a shape session): a mission line naming the run
+(`Run R-… of T-0012 (<title>) proposes 2 follow-up tickets. Nothing is
+created until you confirm a card.` — the idempotency key: a session of
+that title that already starts a line with `Run R-… of T-0012` is left
+alone) and one pending `createTicket` card per proposal, one commit
+`tickets: follow-ups of T-0012 proposed (R-…)` on the engine's one git
+queue. A title that any earlier follow-up session of the ticket already
+proposed (case-insensitively; confirmed, dismissed or pending) is not
+proposed again. The session is listed among the Mission Control sessions
+like any other; Pia is not asked.
+
+A card's command is the capture phase (the pipeline's first), a priority of
+the board's vocabulary (the worker's word when it is one, else the
+vocabulary's default), the source ticket's **`repo`** (the `createTicket`
+command's optional `repo` key: one line, at most 80 characters, junk reads as
+none; the confirm hands it to the board's create) and **`project`** (the
+source's `project:`, settled like any card's: kept when the board knows it,
+else the board's only project, else none; milestone 271 / req-298), and a
+description of the worker's `why` plus `Proposed by the worker of T-0012
+(run R-…).` The iron rule above holds unchanged: nothing exists until the
+owner's confirm (the ordinary decision path), a dismissed card leaves
+nothing, and the ticket gets no `parent:` — that means plan-part ownership
+(matching by title among the children, locking), not provenance. Runs that
+ended more than an hour before the engine started are not filed (an owner who
+deleted a session must not see its cards return).
 
 ## Validation (where it runs, what it checks)
 
