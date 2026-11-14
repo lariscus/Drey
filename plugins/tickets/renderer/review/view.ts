@@ -15,7 +15,7 @@ import type { RunInfo } from '../../../../packages/tickets-engine/src/fleet/prot
 import type { BoardSnapshot, MutationResult, TicketCard } from '../../shared/tickets';
 import { decisionLinkNode, pillNode } from '../ticket-document/dom';
 import { actionBarOf, assetUrl, offsetWords, proofOfText, titleCase, type ProofView } from '../ticket-document/model';
-import type { WorkRow } from '../work-groups';
+import type { WorkRow } from '../work/work-groups';
 import { REVIEW_ACCEPT, REVIEW_SEND_BACK, announceReviewComments, type ReviewAcceptDetail, type ReviewSendBackDetail } from './events';
 import {
   EMPTY_MARKS,

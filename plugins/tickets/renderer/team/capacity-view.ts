@@ -5,7 +5,7 @@
  * budget, Pause all and "Open Team". The same model as the Team tab
  * (`team-model.ts`); the band is the glance, the tab the detail.
  */
-import { h, textButton, type DeskDeps } from '../desk-deps';
+import { h, textButton, type DeskDeps } from '../board/desk-deps';
 import type { ChainStatus, RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { isLiveRun, teamModelOf, usd, usdBudget, type PersonaCardModel } from './team-model';
 import type { TeamStore } from './team-store';

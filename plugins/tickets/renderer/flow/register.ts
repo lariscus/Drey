@@ -5,7 +5,7 @@
  * restore, so a draft that was never saved is not kept.
  */
 import type { DreyPluginApi, Unsubscribe } from '../../../../shared/plugin-api/renderer';
-import type { DeskDeps } from '../desk-deps';
+import type { DeskDeps } from '../board/desk-deps';
 import { flowKeyOf, flowTargetOfKey, flowTitleOf, type FlowTarget } from './flow-model';
 import { mountFlow } from './flow-view';
 

@@ -41,22 +41,22 @@ import { personaModelFor } from '../../../packages/tickets-engine/src/core/perso
 import { planWorktreeRemoval } from '../../../packages/tickets-engine/src/core/worktree-removal';
 import { captureTidyMessages, parseCaptureTidy } from '../shared/capture-tidy';
 import type { AttachmentReply, RefineReply, TicketReply } from '../shared/remote-protocol';
-import { hostVaultIdMapper } from './host-vault-id';
-import { openTerminalAt } from './open-terminal';
-import { startWindowsDictation } from './dictation';
-import { createFleetMcpTools } from './mcp-tools';
-import { chainAutopilotOf } from './autopilot-ipc';
-import { createFleetSnapshotSender } from './fleet-snapshot';
-import { listWorkerModels } from './worker-models';
-import { EngineClient } from './engine-client';
-import { PathAnnouncer } from './path-announcer';
-import { ensureService, syncChatConfig, syncNotesVault, syncStoreConfig } from './service-lifecycle';
-import { SERVICE_AUTOSTART_KEY, SERVICE_ENABLED_KEY, createServiceQuitGuard, quitWordsOf, type QuitChoice } from './service-quit-guard';
-import { TicketDocuments, askToAddCheckout } from './ticket-documents';
-import { isStoreDocumentPath, storeDocumentHeader, storeDocumentHeaderEdit } from './store-document-header';
+import { hostVaultIdMapper } from './engine/host-vault-id';
+import { openTerminalAt } from './worker/open-terminal';
+import { startWindowsDictation } from './worker/dictation';
+import { createFleetMcpTools } from './ipc/mcp-tools';
+import { chainAutopilotOf } from './ipc/autopilot-ipc';
+import { createFleetSnapshotSender } from './engine/fleet-snapshot';
+import { listWorkerModels } from './worker/worker-models';
+import { EngineClient } from './engine/engine-client';
+import { PathAnnouncer } from './engine/path-announcer';
+import { ensureService, syncChatConfig, syncNotesVault, syncStoreConfig } from './service/service-lifecycle';
+import { SERVICE_AUTOSTART_KEY, SERVICE_ENABLED_KEY, createServiceQuitGuard, quitWordsOf, type QuitChoice } from './service/service-quit-guard';
+import { TicketDocuments, askToAddCheckout } from './documents/ticket-documents';
+import { isStoreDocumentPath, storeDocumentHeader, storeDocumentHeaderEdit } from './documents/store-document-header';
 import { checkoutOf, readStoreSettings } from '../../../packages/tickets-engine/src/store/store-settings';
-import { registerChatIpc } from './chat-ipc';
-import { MissionControlHost, createMissionControlView } from './mission-control';
+import { registerChatIpc } from './ipc/chat-ipc';
+import { MissionControlHost, createMissionControlView } from './service/mission-control';
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

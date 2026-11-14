@@ -5,7 +5,7 @@ import { i18n } from '../../../../shared/i18n';
 import type { PersonaView } from '../../shared/remote-protocol';
 import type { ChainStatus, RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { BoardSnapshot, TicketCard } from '../../shared/tickets';
-import type { DeskDeps } from '../desk-deps';
+import type { DeskDeps } from '../board/desk-deps';
 import { mountBoard } from '../board/board-view';
 import { bandHeaderStatusOf, bandShownFor, bandStatusOf, mountCapacity, personaLineOf } from './capacity-view';
 import { personaCardOf } from './team-model';

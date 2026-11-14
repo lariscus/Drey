@@ -47,7 +47,7 @@ Open work only. Everything implemented lives in
 lives in [`decisions.md`](decisions.md). When an item ships, move it to the
 changelog and delete it here — no shipped history on this page.
 
-**Status (2026-11-08):** version 0.8.1, milestones 1–151, 153–163, 165–169 and 171–213, plus req-176 (worker follow-up proposals), req-98, req-101, req-104 (the desktop frame matches board 9a), req-126 (the frame follow-ups of wave 4.2: no strip on a one-panel bottom dock, a view badge, a view's own tabs), req-110 (the fleet runner leaves when deactivated or when Drey quits idle), req-102 (the i18n catalog, ADR-0091), req-99a, req-95a, req-95b, req-97, req-96 and req-99b built (109–111 are recorded in the changelog by the convergence audit backfill) — 1–83
+**Status (2026-11-08):** version 0.8.1, milestones 1–151, 153–163, 165–169 and 171–213, plus req-176 (worker follow-up proposals), req-179 (the tickets plugin sorted into domain folders), req-98, req-101, req-104 (the desktop frame matches board 9a), req-126 (the frame follow-ups of wave 4.2: no strip on a one-panel bottom dock, a view badge, a view's own tabs), req-110 (the fleet runner leaves when deactivated or when Drey quits idle), req-102 (the i18n catalog, ADR-0091), req-99a, req-95a, req-95b, req-97, req-96 and req-99b built (109–111 are recorded in the changelog by the convergence audit backfill) — 1–83
 owner-verified (milestone 82, auto-update from GitHub Releases ADR-0074,
 end-to-end on a real install, the 0.7.0 → 0.7.1 update round included
 docs/07 checklist; milestone 83, the tickets foundation ADR-0075/0076,
@@ -393,7 +393,7 @@ owner confirms scope and order before any of it starts:
   Files tree, indexes and open ticket tabs stay fresh with the watcher off
   (G-08).
 - **X-1 — Documentation and code hygiene.** The schema's noise promise
-  versus the parser (G-20), delete `plugins/tickets/main/engine-host.ts` and
+  versus the parser (G-20), delete `plugins/tickets/main/engine/engine-host.ts` and
   reword the engine's package description (G-21), German code comments (G-22),
   undocumented commit subjects (G-33), the unaudited legacy parts of docs/05
   and docs/06 (G-34), a stray `apps/mission-control/node_modules` (G-35).

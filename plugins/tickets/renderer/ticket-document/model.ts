@@ -20,7 +20,7 @@ import type { I18n } from '../../../../shared/i18n/types';
 import type { VerificationReport } from '../../../../packages/tickets-engine/src/contracts/verify';
 import type { BoardSnapshot, PipelinePhase, TicketCard } from '../../shared/tickets';
 import { READY_STATE } from '../../shared/pipeline-states';
-import { ideaPhaseIds, isMachinePhase, needKindLabel, type WorkRow } from '../work-groups';
+import { ideaPhaseIds, isMachinePhase, needKindLabel, type WorkRow } from '../work/work-groups';
 
 /** The owner's shaping column of the one state list (req-99a). */
 export const SHAPING_STATE = 'shaping';

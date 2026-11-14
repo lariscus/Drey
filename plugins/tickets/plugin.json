@@ -7,6 +7,6 @@
   "author": "Drey",
   "main": "main/index.js",
   "renderer": "renderer/index.js",
-  "css": ["renderer/board.css", "renderer/settings.css", "renderer/ticket-header.css", "renderer/ticket-document.css", "renderer/desk.css", "renderer/review.css", "renderer/flow.css", "renderer/settings-desk.css", "renderer/autopilot/autopilot.css", "renderer/team/persona-page.css"],
+  "css": ["renderer/board/board.css", "renderer/settings/settings.css", "renderer/ticket-document/ticket-header.css", "renderer/ticket-document/ticket-document.css", "renderer/board/desk.css", "renderer/review/review.css", "renderer/flow/flow.css", "renderer/settings/desk.css", "renderer/autopilot/autopilot.css", "renderer/team/persona-page.css"],
   "permissions": ["documents", "vault", "settings", "main-process"]
 }

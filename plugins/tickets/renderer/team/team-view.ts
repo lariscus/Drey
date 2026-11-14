@@ -13,8 +13,8 @@
 import { autopilotSwitchViewOf, autopilotToneOf } from '../../../../shared/autopilot';
 import type { PersonaView } from '../../shared/remote-protocol';
 import type { PersonaMemoryReply, PersonaThreadReply } from '../../shared/remote-protocol';
-import { h, textButton, type DeskDeps } from '../desk-deps';
-import { NUDGE_TEXT } from '../workers-view';
+import { h, textButton, type DeskDeps } from '../board/desk-deps';
+import { NUDGE_TEXT } from '../run/workers-view';
 import {
   poolLabelOf,
   usdBudget,

@@ -123,7 +123,7 @@ its own token — FLEET.md) are unchanged.
 
 ## Lifecycle
 
-**Start.** The tickets plugin's main process (`plugins/tickets/main/service-lifecycle.ts`,
+**Start.** The tickets plugin's main process (`plugins/tickets/main/service/service-lifecycle.ts`,
 `ensureService`) reads `service.lock`. A live service of the same or a newer
 build is adopted. An **older** build is asked for the handover; if it
 refuses (a run in its gate) Drey keeps using it and the next Drey start asks
@@ -197,7 +197,7 @@ command.
 
 Code: `packages/tickets-engine/src/service/` (`service-host.ts`,
 `runner-component.ts`, `sleep.ts`, `service-lock.ts`, `legacy.ts`,
-`launch.ts`, `service-main.ts`); the client `plugins/tickets/main/service-lifecycle.ts`;
+`launch.ts`, `service-main.ts`); the client `plugins/tickets/main/service/service-lifecycle.ts`;
 the Drey-gone signal `packages/tickets-engine/src/server/drey-presence.ts`.
 Docs: ADR-0092, docs/05 §5.0, docs/06 "Drey Service: start, adopt, hand over",
 docs/07 (the packaged layout).

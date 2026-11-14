@@ -6,7 +6,7 @@
  * results render its Markdown (`markdown.ts`), the rest stays text.
  */
 import type { RunInfo, WaitQuestion } from '../../../packages/tickets-engine/src/fleet/protocol';
-import { formatWatch, parseStreamEvents, type WatchBlock } from '../renderer/watch-format';
+import { formatWatch, parseStreamEvents, type WatchBlock } from '../renderer/run/watch-format';
 import { ageOf } from '../shared/tickets';
 import type { ShapedQuestion } from '../shared/question-shape';
 import { answerText } from '../shared/question-shape';

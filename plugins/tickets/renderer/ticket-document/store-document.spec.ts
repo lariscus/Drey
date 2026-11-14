@@ -13,7 +13,7 @@ import { renderVerificationSection } from '../../../../packages/tickets-engine/s
 import { renderVerlaufLine } from '../../../../packages/tickets-engine/src/core/verlauf';
 import type { DreyPluginApi, EditorSurfaceContext, FrontmatterViewInput } from '../../../../shared/plugin-api/renderer';
 import type { BoardSnapshot } from '../../shared/tickets';
-import { createTicketHeader, ticketLogFold } from '../ticket-header';
+import { createTicketHeader, ticketLogFold } from './ticket-header';
 import { createTicketDocumentExtension } from './extension';
 import { createTicketStrip } from './strip';
 

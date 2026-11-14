@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '../../../../shared/i18n';
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
 import type { BoardSnapshot, TicketCard } from '../../shared/tickets';
-import type { WorkRow } from '../work-groups';
+import type { WorkRow } from '../work/work-groups';
 import { GO_TO_DECISION_CARD } from '../ticket-document/dom';
 import { ticketIdOfKey } from './register';
 import { REVIEW_COMMENTS, requestReviewAccept, requestReviewSendBack, type ReviewCommentsDetail } from './events';

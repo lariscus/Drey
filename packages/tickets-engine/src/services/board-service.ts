@@ -4,7 +4,7 @@
  * files and performs every mutation through the one single-writer queue.
  * All IO arrives injected: vault/config/log/announce through
  * {@link EngineHost}, the fleet runner through {@link FleetPort} — the
- * Drey plugin supplies both over its plugin context (main/engine-host.ts),
+ * Drey plugin supplies both over its plugin context (main/engine/engine-host.ts),
  * the standalone engine process (E2b) over plain fs.
  */
 import { randomBytes } from 'node:crypto';

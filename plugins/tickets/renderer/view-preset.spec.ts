@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DreyPluginApi, PluginDocKindContrib } from '../../../shared/plugin-api/renderer';
 import { registerFlowKind } from './flow/register';
 import { WORK_VIEW_ID, createWorkPreset, registerWorkView } from './view-preset';
-import type { DeskDeps } from './desk-deps';
+import type { DeskDeps } from './board/desk-deps';
 
 describe('the Work preset', () => {
   it('arranges Tickets left, the Assistant right and the Capacity band below', () => {

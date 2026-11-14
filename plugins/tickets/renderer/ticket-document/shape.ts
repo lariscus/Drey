@@ -10,8 +10,8 @@
  */
 import type { PlanMark } from '../../../../packages/tickets-engine/src/contracts/chat';
 import type { BoardSnapshot } from '../../shared/tickets';
-import { cardOfDocument, showsTicketDocument } from '../ticket-header';
-import { ideaPhaseIds } from '../work-groups';
+import { cardOfDocument, showsTicketDocument } from './ticket-header';
+import { ideaPhaseIds } from '../work/work-groups';
 
 export interface ShapeTarget {
   readonly id: string;

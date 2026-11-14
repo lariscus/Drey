@@ -22,7 +22,7 @@ describe('one Settings page width (E13-22)', () => {
   });
 
   it('the Tickets page sets no width of its own on its root', () => {
-    const tickets = css('plugins/tickets/renderer/settings.css');
+    const tickets = css('plugins/tickets/renderer/settings/settings.css');
     const root = /\n\.tset \{[^}]*\}/.exec(tickets)?.[0] ?? '';
     expect(root).not.toMatch(/(?:max-)?width/);
   });

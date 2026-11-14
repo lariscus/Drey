@@ -19,7 +19,7 @@ import type { PlanPartCard } from '../../../../packages/tickets-engine/src/contr
 import type { RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { BoardSnapshot, TicketCard } from '../../shared/tickets';
 import { isLiveRun, usd } from '../team/team-model';
-import { needKindLabel, workGroups } from '../work-groups';
+import { needKindLabel, workGroups } from '../work/work-groups';
 
 /** A part of a ticket: another ticket (`parent:`) or a plan part not released yet. */
 export interface BoardPartModel {

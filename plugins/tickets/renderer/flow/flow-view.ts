@@ -11,8 +11,8 @@
  * wording and the rules about what may move are in `flow-model.ts`.
  */
 import type { FlowOp } from '../../../../packages/tickets-engine/src/contracts/flow';
-import type { DeskDeps } from '../desk-deps';
-import { h, textButton } from '../desk-deps';
+import type { DeskDeps } from '../board/desk-deps';
+import { h, textButton } from '../board/desk-deps';
 import {
   addablePhasesOf,
   changedIndicesOf,

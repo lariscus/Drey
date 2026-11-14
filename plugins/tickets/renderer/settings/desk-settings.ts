@@ -15,8 +15,8 @@ import { WORKER_PROVIDERS } from '../../../../packages/tickets-engine/src/fleet/
 import { fleetSettingDefault } from '../../shared/fleet-defaults';
 import type { PersonaView } from '../../shared/remote-protocol';
 import type { BoardSnapshot } from '../../shared/tickets';
-import { RUNNER_LABEL } from '../settings-workers';
-import { el, textButton } from '../settings-dom';
+import { RUNNER_LABEL } from './workers';
+import { el, textButton } from './dom';
 import { budgetLineOf, maxMbOf, parseDeskVideos, runnersLineOf, standardFlowOf, type DeskVideos } from './desk-model';
 
 export interface DeskSettingsHooks {

@@ -14,14 +14,14 @@
 import type { DreyPluginApi, EditorSurfaceContext } from '../../../../shared/plugin-api/renderer';
 import type { BoardSnapshot, TicketCard } from '../../shared/tickets';
 import { maskFenceLines } from '../../../../shared/markdown/fences';
-import { ideaPhaseIds, type WorkRow } from '../work-groups';
+import { ideaPhaseIds, type WorkRow } from '../work/work-groups';
 import { costNode, proofNode, shapeMarksNode } from './dom';
 import { actionBarOf, chainOf, costTableOfText, pageShapeOf, proofOfText, sectionRange, type PageShape, type TextRange } from './model';
 import { partsNode, createPartsStore } from './parts';
 import { partsRange } from './parts-model';
 import { markGroupsOf, type ShapeMarks } from './shape';
 import { planHeadingEnd } from './shape';
-import { cardOfDocument, logSectionRange, ticketIdOfPath, ticketIdOfText } from '../ticket-header';
+import { cardOfDocument, logSectionRange, ticketIdOfPath, ticketIdOfText } from './ticket-header';
 
 export interface TicketDocumentActions {
   openThread(card: TicketCard): void;

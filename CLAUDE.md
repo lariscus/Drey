@@ -583,7 +583,7 @@ extraction, ADR-0088):
   program compiles it into `dist-electron/packages/tickets-engine/`, and
   `plugins/tickets/shared/` holds thin re-export shims for the renderer
   and phone client. The tickets plugin is Drey Service's client
-  (`main/service-lifecycle.ts`: adopt, hand over, or start; never stop).
+  (`main/service/service-lifecycle.ts`: adopt, hand over, or start; never stop).
 
 This map is a starting point, not a fixed contract — but any deviation
 should be called out explicitly (see Working Style below), not
