@@ -1,3 +1,4 @@
+import type { ChainEntry } from '../contracts/chain';
 import type { TicketCard } from '../contracts/tickets';
 import { atLastEntry, ownerSendBackTarget } from '../core/chain-cursor';
 import { renderChainEntry } from '../core/chain-list';
@@ -59,6 +60,16 @@ function activeChainOf(card: TicketCard, placement: HolderPlacement): { readonly
   return { at: Math.min(Math.max(card.meta.at ?? 1, 1), chain.length), length: chain.length };
 }
 
+/** req-305: Accept at an agent's `:shape` entry ends the shaping in place; null at any other entry. */
+function shapedAcceptOf(chain: readonly ChainEntry[], at: number, placement: HolderPlacement): OwnerAccept | null {
+  const current = chain[at - 1]!;
+  if (current.mode !== 'shape' || placement.lookup(current.persona)?.kind !== 'agent') {
+    return null;
+  }
+  const entries = chain.map((entry, index) => renderChainEntry(index === at - 1 ? { ...entry, mode: null } : entry));
+  return { kind: 'shaped', entries, at, line: `shaping done at position ${at} of ${chain.length} — ${current.persona} plans it now` };
+}
+
 /** What the owner's Accept does to a chain ticket. */
 export function ownerAcceptOf(card: TicketCard, placement: HolderPlacement): OwnerAccept {
   const active = activeChainOf(card, placement);
@@ -67,10 +78,9 @@ export function ownerAcceptOf(card: TicketCard, placement: HolderPlacement): Own
     return { kind: 'none' };
   }
   const { at, length } = active;
-  const current = chain[at - 1]!;
-  if (current.mode === 'shape' && placement.lookup(current.persona)?.kind === 'agent') {
-    const entries = chain.map((entry, index) => renderChainEntry(index === at - 1 ? { ...entry, mode: null } : entry));
-    return { kind: 'shaped', entries, at, line: `shaping done at position ${at} of ${length} — ${current.persona} plans it now` };
+  const shaped = shapedAcceptOf(chain, at, placement);
+  if (shaped !== null) {
+    return shaped;
   }
   const back = cursorAfterGreen(length, at, card.meta.returnTo);
   if (back.returned) {
