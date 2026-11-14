@@ -8,7 +8,6 @@ import { createReadStream, promises as fsp } from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
 import type { ChatChangePayload, RemoteChange } from '../contracts/remote-protocol';
-import { FALLBACK_FILES } from './fallback-client';
 import { isNotesPath, notesFailure } from './notes-routes';
 import { authorize, hostRefusal, route, type RemoteRequest, type RouterDeps } from './router';
 
@@ -344,12 +343,8 @@ export class RemoteGateway {
       content = await fsp.readFile(file).catch(() => null);
     }
     if (content === null) {
-      const fallback = FALLBACK_FILES[name];
-      if (fallback === undefined) {
-        send(res, 404, { ok: false, error: 'not found' });
-        return;
-      }
-      content = Buffer.from(fallback, 'utf8');
+      send(res, 404, { ok: false, error: 'not found' });
+      return;
     }
     res.writeHead(200, {
       ...SECURITY_HEADERS,
