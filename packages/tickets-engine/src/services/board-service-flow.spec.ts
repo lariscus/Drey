@@ -293,19 +293,6 @@ describe('flowOf / flowEdit / saveFlow (part scope)', () => {
   });
 });
 
-describe('flowDraftContext', () => {
-  it('hands Paul the standard flow, the chain now and the crew', async () => {
-    await writeParent();
-    const ctx = await serviceOf().flowDraftContext({ id: 'T-0130', part: 0 });
-    expect(ctx.ok).toBe(true);
-    if (ctx.ok) {
-      expect(ctx.text).toContain('Standard flow: paul:shape; paul; ben; ralf');
-      expect(ctx.text).toContain('part "Capture window"');
-      expect(ctx.text).toContain('- ralf (Ralf)');
-    }
-  });
-});
-
 describe('the plan\'s ### Chain and the chain at creation (req-266)', () => {
   it('copies the standard flow into a new ticket with the cursor at 1', async () => {
     const board = serviceOf();

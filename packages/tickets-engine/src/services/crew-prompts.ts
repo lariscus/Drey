@@ -15,19 +15,18 @@ import path from 'node:path';
 import { SHIPPED_PROMPTS_DIR } from '../core/default-prompts';
 import { expandFragments, loadPromptFragments, readPromptFile } from '../core/prompt-file';
 
-/** The four chat prompts: Mission Control's turns, shape, flow and the improvement aggregator. */
+/** The three chat prompts: Mission Control's turns, shape and the improvement aggregator. */
 export interface CrewPrompts {
   readonly mission: string;
   readonly shape: string;
-  readonly flow: string;
   readonly aggregator: string;
 }
 
-const CREW_FILES: readonly (keyof CrewPrompts)[] = ['mission', 'shape', 'flow', 'aggregator'];
+const CREW_FILES: readonly (keyof CrewPrompts)[] = ['mission', 'shape', 'aggregator'];
 
 /** Every crew prompt, from the shipped prompts dir by default, its fragments expanded. */
 export async function loadCrewPrompts(dir: string = SHIPPED_PROMPTS_DIR): Promise<CrewPrompts> {
-  const prompts: Record<keyof CrewPrompts, string> = { mission: '', shape: '', flow: '', aggregator: '' };
+  const prompts: Record<keyof CrewPrompts, string> = { mission: '', shape: '', aggregator: '' };
   for (const name of CREW_FILES) {
     prompts[name] = await readPromptFile(dir, path.join('crew', `${name}.md`), 'crew prompt');
   }

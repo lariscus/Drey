@@ -681,21 +681,6 @@ describe('ChatService start and send', () => {
     expect(text).not.toContain('nothing is listening');
   });
 
-  it('a flow draft without a model returns the failure message as its error (D-1)', async () => {
-    const failure = {
-      code: 'unsupported' as const,
-      provider: 'copilot-cli',
-      providerLabel: 'GitHub Copilot CLI',
-      baseUrl: null,
-      model: 'gpt',
-      reason: 'Mission Control cannot talk to this provider.',
-      message: 'GitHub Copilot CLI: Mission Control cannot talk to this provider.',
-    };
-    bridgeGate = () => Promise.resolve({ say: failure.message, thought: null, commands: [], failure });
-    service = boot();
-    expect(await service.draftFlow({ ticket: 'T-0001', context: 'flow', ask: null })).toEqual({ ok: false, error: failure.message });
-  });
-
   it('refuses an empty message and a missing file without touching the vault', async () => {
     service = boot();
     const started = await service.start({ title: 'Refusals', text: 'One' });

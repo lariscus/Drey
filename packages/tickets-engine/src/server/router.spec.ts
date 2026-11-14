@@ -37,7 +37,6 @@ function port(): TicketsRemotePort {
     flow: vi.fn(async () => ({ ok: false as const, error: 'unused' })),
     flowEdit: vi.fn(async () => ({ ok: false as const, error: 'unused' })),
     flowSave: vi.fn(async () => ({ ok: true as const })),
-    flowDraft: vi.fn(async () => ({ ok: false as const, error: 'unused' })),
     planStatus: vi.fn(async () => ({ ok: true as const, version: 2, modelAt: null, edits: 1, summary: '1 edit · +1 −0', marks: [] })),
     ticketFile: vi.fn(async (_id: string, path: string) =>
       path === 'src/a.ts' ? { ok: true as const, text: 'a\nb\n', truncated: false } : { ok: false as const, error: 'nope' },
@@ -352,18 +351,14 @@ describe('route', () => {
 
     await route(req({ method: 'POST', path: '/api/tickets/T-0052/flow-save', authorization: auth, body: { chain: ['ben', 'ralf(notify)'] } }), deps);
     expect(remote.flowSave).toHaveBeenLastCalledWith({ id: 'T-0052', part: null, chain: ['ben', 'ralf(notify)'] }, 'owner@ipad');
-    await route(req({ method: 'POST', path: '/api/tickets/T-0052/flow-draft', authorization: auth, body: { part: 0, ask: ' add a security pass ' } }), deps);
-    expect(remote.flowDraft).toHaveBeenLastCalledWith({ id: 'T-0052', part: 0, ask: 'add a security pass' });
-    await route(req({ method: 'POST', path: '/api/tickets/T-0052/flow-draft', authorization: auth, body: {} }), deps);
-    expect(remote.flowDraft).toHaveBeenLastCalledWith({ id: 'T-0052', part: null, ask: null });
   });
 
-  it('a read-only device may read a flow but not edit, save or ask for a draft', async () => {
+  it('a read-only device may read a flow but not edit or save', async () => {
     const { deps, devices } = setup();
     const { token } = await devices.add('iPad', true, new Date());
     const auth = `Bearer ${token}`;
     expect((await route(req({ path: '/api/tickets/T-0052/flow', authorization: auth }), deps)).status).toBe(200);
-    for (const what of ['flow-edit', 'flow-save', 'flow-draft']) {
+    for (const what of ['flow-edit', 'flow-save']) {
       expect((await route(req({ method: 'POST', path: `/api/tickets/T-0052/${what}`, authorization: auth, body: {} }), deps)).status).toBe(403);
     }
   });

@@ -27,19 +27,17 @@ import type { ChatShapeContext, ChatVoice } from '../contracts/chat';
 export interface ChatSystemTexts {
   readonly mission: string;
   readonly shape: string;
-  readonly flow: string;
 }
 
 /** What of the turn decides its system message. */
 export interface ChatSystemContext {
   readonly board: string;
   readonly shape?: Pick<ChatShapeContext, 'ticket' | 'ticketText'>;
-  readonly flow?: { readonly context: string };
   /** Mission Control's persona prompt; absent or blank = none (a mission turn only). */
   readonly persona?: string | null;
   /** req-257: Pia's entry in a ticket's chain — the ticket in the board digest's place. */
   readonly ticket?: { readonly id: string; readonly text: string };
-  /** req-272: who speaks in a shape turn or a flow draft; absent or without a prompt = the wrapper speaks alone. */
+  /** req-272: who speaks in a shape turn; absent or without a prompt = the wrapper speaks alone. */
   readonly voice?: ChatVoice;
 }
 
@@ -50,9 +48,6 @@ function voicedBy(voice: ChatVoice | undefined, wrapper: string): string {
 }
 
 export function chatSystemOf(texts: ChatSystemTexts, turn: ChatSystemContext): string {
-  if (turn.flow !== undefined) {
-    return `${voicedBy(turn.voice, texts.flow)}\n\n## Flow\n\n${turn.flow.context}`;
-  }
   if (turn.shape !== undefined) {
     const roster = turn.voice?.roster.trim() ?? '';
     // The crew sits before the ticket: the ticket changes every turn, the prefix before it does not.

@@ -72,7 +72,7 @@ import type { PromptPreviewCommand, PromptPreviewReply, SkillListReply, SkillRem
 import type { PlanPartsEdit, PlanPartsReply, PlanReleaseReply, PlanReleaseScope } from '../contracts/plan-approval';
 import type { PersonaRemoveCommand, PersonaRemovePort, PersonaRemoveReply } from '../contracts/persona-remove';
 import type { PersonaPictureRemove, PersonaPictureReply, PersonaPictureSet } from '../contracts/persona-picture';
-import type { FlowDraftReply, FlowOp, FlowReply, FlowSaveReply, FlowTarget } from '../contracts/flow';
+import type { FlowOp, FlowReply, FlowSaveReply, FlowTarget } from '../contracts/flow';
 import type { ReviewComment } from '../core/review-feedback';
 import type { TicketDiff, TicketFileReply, WorktreeFile } from '../core/worktree-changes';
 import type { ChatDecisionResult, ChatServicePort, ChatShapeResult, ChatSplitChoice, ChatSession, ChatSessionMeta, ChatTurnResult, PlanStatus } from '../contracts/chat';
@@ -115,7 +115,6 @@ export interface RemoteBoard {
   flowOf(target: FlowTarget): Promise<FlowReply>;
   flowEdit(input: FlowTarget & { chain: readonly string[]; edit: FlowOp }): Promise<FlowReply>;
   saveFlow(input: FlowTarget & { chain: readonly string[]; actor?: string }): Promise<FlowSaveReply>;
-  flowDraftContext(target: FlowTarget): Promise<{ readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string }>;
   editPlanParts(input: { id: string; edit: PlanPartsEdit; actor?: string }): Promise<MutationResult>;
   releasePlan(input: { id: string; scope: PlanReleaseScope; actor?: string }): Promise<PlanReleaseReply>;
   /** The proof card's file stat list (E5c). */
@@ -751,21 +750,6 @@ export class DreyTicketsPort implements TicketsRemotePort {
 
   flowSave(cmd: FlowTarget & { chain: readonly string[] }, actor: string): Promise<FlowSaveReply> {
     return this.boardService.saveFlow({ ...cmd, actor });
-  }
-
-  /** Paul's draft (E10-5): he reads the flow, proposes a delta; the draft is read back through the same guard as any edit. */
-  async flowDraft(cmd: FlowTarget & { ask: string | null }): Promise<FlowDraftReply> {
-    const target: FlowTarget = { id: cmd.id, part: cmd.part };
-    const context = await this.boardService.flowDraftContext(target);
-    if (!context.ok) {
-      return context;
-    }
-    const drafted = await this.chat().draftFlow({ ticket: cmd.id, context: context.text, ask: cmd.ask });
-    if (!drafted.ok) {
-      return drafted;
-    }
-    const view = await this.boardService.flowEdit({ ...target, chain: drafted.chain, edit: { op: 'view' } });
-    return view.ok ? { ...view, reason: drafted.reason } : { ok: false, error: `${drafted.author === undefined ? 'The' : `${drafted.author}'s`} draft does not hold: ${view.error}` };
   }
 
   chatSessions(): Promise<readonly ChatSessionMeta[]> {

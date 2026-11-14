@@ -10,7 +10,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { startFakeDesk } from './fixtures/mission-control-fake-desk';
 import { PAD_REVIEW_TEXT_121 } from './fixtures/mission-control-fake-boards';
-import { PAD_FLOW_130_DRAFT, PAD_SHAPE_QUESTION } from './fixtures/mission-control-fake-boards';
+import { PAD_FLOW_130_EDITED, PAD_SHAPE_QUESTION } from './fixtures/mission-control-fake-boards';
 
 let desk: Awaited<ReturnType<typeof startFakeDesk>>;
 const OUT = process.env['FID_OUT'] ?? 'test-results/fidelity';
@@ -110,16 +110,16 @@ test.describe('landscape', () => {
 
   test('5i flow', async ({ page }) => {
     await needsOf(page, (needs) => needs.map((need) => (need['ticketId'] === 'T-0130' ? { kind: 'checkpoint', phase: 'plan', ticketId: 'T-0130', title: 'Voice capture for tickets', summary: 'Plan to accept.' } : need)));
-    await page.route('**/api/tickets/T-0130/flow-draft', (route) => route.fulfill({ json: PAD_FLOW_130_DRAFT }));
+    await page.route('**/api/tickets/T-0130/flow-edit', (route) => route.fulfill({ json: PAD_FLOW_130_EDITED }));
     await open(page);
     await page.locator('mc-work .ph-trow', { hasText: 'Voice capture for tickets' }).first().click();
     await expect(page.locator('mc-plan-approve .pd-wide-bar')).toBeVisible();
     await page.locator('mc-plan-approve').getByRole('button', { name: /Change flow/ }).click();
     await expect(page.locator('mc-flow-editor .pd-flow')).toBeVisible();
     await expect(page.locator('mc-flow-editor .pd-fgate')).toHaveCount(4);
-    await page.locator('mc-flow-editor #pd-flow-ask').fill('Add a security pass for the command parser');
-    await page.locator('mc-flow-editor').getByRole('button', { name: 'Send' }).click();
-    await expect(page.locator('mc-flow-editor .pd-fpaul')).toBeVisible();
+    await page.locator('mc-flow-editor .pd-fins').nth(1).click();
+    await page.locator('mc-flow-editor .pd-fpick', { hasText: 'Ralf' }).click();
+    await expect(page.locator('mc-flow-editor .pd-fgate.draft').first()).toBeVisible();
     await page.locator('mc-flow-editor .pd-fgate.draft').first().click();
     await expect(page.locator('mc-flow-editor .pd-fcard')).toBeVisible();
     await shot(page, 'PadFlow');

@@ -3,7 +3,7 @@
  * design board "iPad: Flow editor" and its phone twin): the gates of one
  * ticket's or one part's flow, the inspector's facts and the wording of
  * the chip and the draft. The wire is `GET /api/tickets/<id>/flow[/<part>]`,
- * `POST …/flow-edit`, `…/flow-draft` and `…/flow-save`; nothing here
+ * `POST …/flow-edit` and `…/flow-save`; nothing here
  * imports engine code. Nothing is saved before "Save flow": the app
  * keeps a draft, and every edit is a round trip that returns the next
  * draft.
@@ -32,12 +32,6 @@ export interface McFlowState {
   readOnly(): boolean;
   /** One edit on the draft; the refusal comes back as text. */
   edit(op: McFlowOp): Promise<McFlowReply>;
-  /** Paul drafts a flow; `ask` is what the owner said, null = from the ticket alone. */
-  draft(ask: string | null): Promise<McFlowReply>;
-  /** Paul's reason while his draft is the working draft; null otherwise. */
-  paulReason(): string | null;
-  /** Throws Paul's draft away (back to the draft before it). */
-  undoDraft(): void;
   /** "Save flow": writes the draft; the editor closes on success. */
   save(): Promise<McFlowReply>;
   close(): void;

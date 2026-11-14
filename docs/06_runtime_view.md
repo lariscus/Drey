@@ -3945,9 +3945,7 @@ sequenceDiagram
 ```
 
 The chat reads the config per turn, so a change in Settings → Assistant
-applies to the next question without restarting the engine. A flow draft
-(`flow-draft`) that finds no model returns the failure's one-sentence
-text as its error.
+applies to the next question without restarting the engine.
 
 ## 6.80 A manual step: park, notify, Accept or Send back (E10-6)
 
@@ -6000,22 +5998,18 @@ sequenceDiagram
     participant P as the speaker's prompt.md
     participant CT as ChatTurn (bridge)
     participant M as chat model
-    Owner->>CS: a line in a shape session (or "Ask …" in the Flow tab)
-    CS->>V: shape(ticket) · flow(ticket)
+    Owner->>CS: a line in a shape session
+    CS->>V: shape(ticket)
     V->>B: snapshot (the ticket's chain, pipeline.md flow:) · listPersonas (crew.md order)
-    V->>V: shapeSpeakerOf: the :shape entry, else the standard flow's<br/>flowSpeakerOf: the plan entry (structural gate), else the shape persona
+    V->>V: shapeSpeakerOf: the :shape entry, else the standard flow's
     V->>P: the speaker's prompt.md (no cache; LF, version line dropped)
     V-->>CS: ChatVoice {speaker, prompt, roster}
-    alt a flow draft and nobody to ask
-        CS-->>Owner: "No persona is assigned to plan T-…" — no model call
-    else
-        CS->>CT: runTurn {…, shape | flow, voice}
-        CT->>M: system = prompt.md + shape.md | flow.md (wrapper + contract) + ## Crew (shape) + ## Ticket | ## Flow
-        M-->>CT: the JSON envelope
-    end
+    CS->>CT: runTurn {…, shape, voice}
+    CT->>M: system = prompt.md + shape.md (wrapper + contract) + ## Crew + ## Ticket
+    M-->>CT: the JSON envelope
 ```
 
-The persona's `prompt.md` opens the system message and the mode's wrapper (`prompts/crew/shape.md`, `flow.md`: the chat is not a run, the strict JSON contract wins over how a run ends, the plan format or the chain grammar) follows it — who speaks before what the mode asks (R11). The wrapper names no persona; a shape turn lists the crew in its own `## Crew` block (the agents with their one-line `summary:`, in `crew.md`'s order), a flow draft's context already lists it. Nothing is cached: a rename, an edit on the Persona page, a reorder or a deleted persona applies to the next message. Without a speaker or without a readable prompt the wrapper speaks alone — a shape turn never stops for it. The model stays the chat bridge's (the assistant's LLM settings), not the persona's.
+The persona's `prompt.md` opens the system message and the mode's wrapper (`prompts/crew/shape.md`: the chat is not a run, the strict JSON contract wins over how a run ends, the plan format) follows it — who speaks before what the mode asks (R11). The wrapper names no persona; a shape turn lists the crew in its own `## Crew` block (the agents with their one-line `summary:`, in `crew.md`'s order). Nothing is cached: a rename, an edit on the Persona page, a reorder or a deleted persona applies to the next message. Without a speaker or without a readable prompt the wrapper speaks alone — a shape turn never stops for it. The model stays the chat bridge's (the assistant's LLM settings), not the persona's.
 
 ## 6.127 The cursor moves → a `hold` line → the report's held, busy and waiting time (req-274, milestone 256)
 

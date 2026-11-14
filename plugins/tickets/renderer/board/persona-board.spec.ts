@@ -196,7 +196,7 @@ describe('the Board tab on persona columns', () => {
   });
 
   it('a card at a shaping entry offers Shaping done — the same Accept, the persona plans at that position (req-305)', async () => {
-    snap.columns[3]!.tickets.push(card('T-0127', 'active', { holder: 'paul', named: 'paul', position: 1, mode: 'shape' }));
+    (snap.columns[3]!.tickets as TicketCard[]).push(card('T-0127', 'active', { holder: 'paul', named: 'paul', position: 1, mode: 'shape' }));
     const host = mount();
     const shaping = host.querySelector('.pb-card[data-id="T-0127"]')!;
     expect(shaping.querySelector('.pb-status-text')!.textContent).toBe('shaping with you');

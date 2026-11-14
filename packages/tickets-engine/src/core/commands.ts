@@ -362,24 +362,6 @@ export function parseStandardFlow(payload: unknown): Parsed<StandardFlowCommand>
   return ok({ ...(chain === undefined ? {} : { chain }), ...(propose === undefined ? {} : { proposeFlow: propose }) });
 }
 
-export interface FlowDraftCommand {
-  readonly id: string;
-  readonly part: number | null;
-  /** What the owner asked Paul for; null = Paul proposes from the ticket alone. */
-  readonly ask: string | null;
-}
-
-/** Paul's flow draft (E10-5). */
-export function parseFlowDraft(payload: unknown): Parsed<FlowDraftCommand> {
-  const p = record(payload);
-  const target = flowTargetOf(p);
-  if (target === null) {
-    return refuse('bad flow payload');
-  }
-  const ask = typeof p['ask'] === 'string' && p['ask'].trim() !== '' ? p['ask'].trim().slice(0, 1000) : null;
-  return ok({ ...target, ask });
-}
-
 export interface StartRunCommand {
   /** Who asks (D-41); the board refuses a start without one. A device's is set by the router, not by its body. */
   readonly origin: string;

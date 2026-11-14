@@ -138,7 +138,7 @@ export type { RefineReply, TicketReply, AttachmentReply } from './replies';
 import type { RefineReply, TicketReply, AttachmentReply } from './replies';
 import type { EstimateKey, RunEstimate } from '../core/estimate';
 import type { PlanPartsEdit, PlanPartsReply, PlanReleaseReply, PlanReleaseScope } from './plan-approval';
-import type { FlowDraftReply, FlowOp, FlowReply, FlowSaveReply, FlowTarget } from './flow';
+import type { FlowOp, FlowReply, FlowSaveReply, FlowTarget } from './flow';
 import type { ReviewComment } from '../core/review-feedback';
 import type { TicketDiff, TicketFileReply, WorktreeFile } from '../core/worktree-changes';
 
@@ -278,8 +278,6 @@ export interface TicketsRemotePort extends SkillsPort, PersonaRemovePort {
   flowEdit(cmd: FlowTarget & { chain: readonly string[]; edit: FlowOp }): Promise<FlowReply>;
   /** "Save flow": the draft becomes the ticket's (or the part's) chain delta, one commit. */
   flowSave(cmd: FlowTarget & { chain: readonly string[] }, actor: string): Promise<FlowSaveReply>;
-  /** Paul's draft of the flow, with his reason; nothing is written. */
-  flowDraft(cmd: FlowTarget & { ask: string | null }): Promise<FlowDraftReply>;
 
   /** The Mission Control chat surface (E5a) — the service's port verbatim. */
   chatSessions(): Promise<readonly ChatSessionMeta[]>;

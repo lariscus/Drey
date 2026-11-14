@@ -54,7 +54,6 @@ const flow = (extra: Partial<McFlow> = {}): McFlow => ({
     { id: 'you', kind: 'human', title: 'You', color: '#38bdf8', model: '' },
   ],
   readOnly: null,
-  reason: null,
   ...extra,
 });
 
@@ -70,13 +69,11 @@ describe('parseFlow', () => {
       steps: [{ index: 2, position: 3, persona: 'tessa', title: 'Tessa', mode: 'shape', state: 'future', notify: true, missing: true }, { persona: 'broken' }],
       personas: [{ id: 'ben', title: 'Ben', color: '#fff', model: 'sonnet' }],
       readOnly: null,
-      reason: 'because',
     })!;
     expect(read.scope).toEqual({ kind: 'part', index: 1, title: 'Dictation' });
     expect(read.chain).toEqual(['ben', 'tessa(notify)']);
     expect(read.steps).toHaveLength(1);
     expect(read.steps[0]).toMatchObject({ index: 2, position: 3, persona: 'tessa', mode: 'shape', notify: true, missing: true, owner: false, locked: false });
-    expect(read.reason).toBe('because');
     expect(parseFlow({ ok: false, error: 'no' })).toBeNull();
     expect(parseFlow(null)).toBeNull();
   });
@@ -138,7 +135,7 @@ const text = (el: HTMLElement): string => (el.textContent ?? '').replace(/\s+/g,
 
 function mount(
   initial: McFlow | null,
-  options: { saved?: McFlow; readOnly?: boolean; reason?: string; edit?: (op: McFlowOp) => Promise<McFlowReply>; draft?: McFlowState['draft']; save?: McFlowState['save'] } = {},
+  options: { saved?: McFlow; readOnly?: boolean; edit?: (op: McFlowOp) => Promise<McFlowReply>; save?: McFlowState['save'] } = {},
 ): { el: HTMLElement; ops: McFlowOp[]; state: McFlowState; click: (selector: string, index?: number) => void; settle: () => Promise<void> } {
   const ops: McFlowOp[] = [];
   const state: McFlowState = {
@@ -152,9 +149,6 @@ function mount(
         ops.push(op);
         return { ok: true };
       }),
-    draft: options.draft ?? (async () => ({ ok: true })),
-    paulReason: () => options.reason ?? null,
-    undoDraft: vi.fn(),
     save: options.save ?? (async () => ({ ok: true })),
     close: vi.fn(),
   };
@@ -282,20 +276,10 @@ describe('FlowEditor', () => {
     expect(el.querySelector('.fe-error')?.textContent).toContain('only gates that have not begun can change');
   });
 
-  it('saves only a changed draft, and asks Paul with or without words', async () => {
-    const save = vi.fn(async (): Promise<McFlowReply> => ({ ok: true }));
-    const draft = vi.fn(async (): Promise<McFlowReply> => ({ ok: true }));
-    const clean = mount(flow(), { save, draft });
+  it('saves only a changed draft; it offers no way to ask for one', () => {
+    const clean = mount(flow());
     expect((clean.el.querySelector('.fe-btn.primary') as HTMLButtonElement).disabled).toBe(true);
-    const input = clean.el.querySelector('.fe-input') as HTMLInputElement;
-    input.value = ' add a security pass ';
-    input.dispatchEvent(new Event('input'));
-    clean.click('.fe-ask .fe-btn');
-    await clean.settle();
-    expect(draft).toHaveBeenLastCalledWith('add a security pass');
-    clean.click('.fe-ask .fe-btn');
-    await clean.settle();
-    expect(draft).toHaveBeenLastCalledWith(null);
+    expect(clean.el.querySelector('.fe-ask, .fe-input')).toBeNull();
   });
 
   it('saves a dirty draft; a read-only device can only look', async () => {
@@ -312,15 +296,10 @@ describe('FlowEditor', () => {
     const locked = mount(flow({ chain: ['ben', 'you'] }), { saved: flow(), readOnly: true });
     expect((locked.el.querySelector('.fe-btn.primary') as HTMLButtonElement).disabled).toBe(true);
     expect((locked.el.querySelector('.fe-plus') as HTMLButtonElement).disabled).toBe(true);
-    expect((locked.el.querySelector('.fe-input') as HTMLInputElement).disabled).toBe(true);
   });
 
-  it('shows Paul’s reason on his draft with an undo, and resets to the standard flow', async () => {
-    const { el, ops, state, click, settle } = mount(flow({ chain: ['ben', 'tessa', 'you'] }), { reason: 'A security pass fits an auth change.' });
-    expect(text(el)).toContain('Paul drafted this flow');
-    expect(text(el)).toContain('A security pass fits an auth change.');
-    click('.fe-paul .fe-link');
-    expect(state.undoDraft).toHaveBeenCalled();
+  it('resets to the standard flow', async () => {
+    const { ops, click, settle } = mount(flow({ chain: ['ben', 'tessa', 'you'] }));
     click('.fe-buttons .fe-link');
     await settle();
     expect(ops).toEqual([{ op: 'reset' }]);

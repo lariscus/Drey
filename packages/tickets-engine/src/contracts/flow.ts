@@ -61,7 +61,7 @@ export type FlowReply =
       readonly ticket: string;
       readonly title: string;
       readonly scope: FlowScope;
-      /** The chain shown: the saved one, an edit's result or Paul's draft; canonical entries. */
+      /** The chain shown: the saved one, or an edit's result; canonical entries. */
       readonly chain: readonly string[];
       /** The chain in the file now (a ticket without one: the standard flow it would get). */
       readonly saved: readonly string[];
@@ -75,11 +75,6 @@ export type FlowReply =
 
 /** The edit's answer: the new draft, or why the edit does not hold. */
 export type FlowEditReply = FlowReply;
-
-/** Paul's draft: the flow he proposes and why — nothing is written. */
-export type FlowDraftReply =
-  | (Extract<FlowReply, { ok: true }> & { readonly reason: string })
-  | { readonly ok: false; readonly error: string };
 
 export type FlowSaveReply =
   | { readonly ok: true; readonly warning?: string }

@@ -30,7 +30,7 @@ import { allowedAfter, type PersonaAllowedPatch } from '../contracts/persona-all
 import { BUILDING_STATE, DEFAULT_PIPELINE_TEXT, READY_STATE, STANDARD_FLOW_LINE } from '../core/pipeline-states';
 import { parseChainItems, renderChainEntries, unreadableEntryMessage } from '../core/chain-list';
 import { validateChain } from '../core/chain-validate';
-import { flowDraftText, flowPersonasOf, flowStepViews, lockedOfCard, partFlowSteps } from './flow-views';
+import { flowPersonasOf, flowStepViews, lockedOfCard, partFlowSteps } from './flow-views';
 import { deletePlanPart, movePlanPart, parsePlanParts, partChainEntries, withPlanParts, type PlanPart } from '../core/plan-parts';
 import { blockerOf, indicesToMint, lockedIndices, matchPartTickets, partStateOf, partTicketText, releaseLogText, startLineOf, type PartTicket } from '../core/plan-release';
 import type { PlanPartCard, PlanPartsEdit, PlanPartsReply, PlanReleaseReply, PlanReleaseScope } from '../contracts/plan-approval';
@@ -1909,29 +1909,6 @@ export class EngineBoardService {
       this.announceChanged();
       return { ok: true, ...(warning === null ? {} : { warning }) };
     });
-  }
-
-  /** What Paul reads before he drafts a flow (E10-5): the standard flow, the chain now, the crew. */
-  async flowDraftContext(target: FlowTarget): Promise<{ readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string }> {
-    const frame = await this.flowFrame(target);
-    if ('error' in frame) {
-      return { ok: false, error: frame.error };
-    }
-    if (frame.readOnly !== null) {
-      return { ok: false, error: frame.readOnly };
-    }
-    const reply = await this.flowReply(frame, frame.saved);
-    if (!reply.ok) {
-      return reply;
-    }
-    if (target.id === STANDARD_FLOW_ID) {
-      return { ok: true, text: flowDraftText({ ticket: null, title: frame.title, plan: '', standard: renderChainEntries(frame.standard), steps: reply.steps, saved: reply.saved, personas: reply.personas }) };
-    }
-    const plan = frame.part !== null ? `\nThis flow belongs to part "${frame.part.title}"${frame.part.reason === null ? '' : ` — ${frame.part.reason}`}.` : '';
-    return {
-      ok: true,
-      text: flowDraftText({ ticket: target.id, title: frame.title, plan, standard: renderChainEntries(frame.standard), steps: reply.steps, saved: reply.saved, personas: reply.personas }),
-    };
   }
 
   /**

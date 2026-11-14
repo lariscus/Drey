@@ -831,8 +831,7 @@ without a chain of its own), and is then the ticket's own — a later change
 of `flow:` never reshuffles existing tickets. A pipeline without `flow:`
 creates tickets without a chain. The settings page edits it in the flow editor
 itself: the editor's ticket id `standard` (`FlowScope` `standard`, tab key
-`flow://standard`) shows `flow:` with nothing locked, the same edits and Paul's
-draft apply, and "Save flow" rewrites the key in `pipeline.md` (a yaml document
+`flow://standard`) shows `flow:` with nothing locked, the same edits apply, and "Save flow" rewrites the key in `pipeline.md` (a yaml document
 edit that keeps the other keys and the body; an empty list removes it) instead of
 a ticket header — checked by the same write guard; a part does not exist there.
 

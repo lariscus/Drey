@@ -854,10 +854,6 @@ export class McState {
   /** The flow as the file holds it — what the dashed marks compare against. */
   readonly flowSaved = signal<McFlow | null>(null);
   readonly flowError = signal<string | null>(null);
-  /** Paul's reason while his draft is the working draft. */
-  readonly flowReason = signal<string | null>(null);
-  /** The draft before Paul's, for "Undo draft". */
-  private flowBeforePaul: McFlow | null = null;
 
   private flowPath(target: { ticket: string; part: number | null }): string {
     return `/api/tickets/${encodeURIComponent(target.ticket)}/flow`;
@@ -868,8 +864,6 @@ export class McState {
     this.flow.set(null);
     this.flowSaved.set(null);
     this.flowError.set(null);
-    this.flowReason.set(null);
-    this.flowBeforePaul = null;
     this.flowTarget.set({ ticket, part });
     const body = await this.client.raw(`${this.flowPath({ ticket, part })}${part === null ? '' : `/${part}`}`);
     const target = this.flowTarget();
@@ -891,8 +885,6 @@ export class McState {
     this.flow.set(null);
     this.flowSaved.set(null);
     this.flowError.set(null);
-    this.flowReason.set(null);
-    this.flowBeforePaul = null;
   }
 
   /** One edit on the draft: the desk answers the next draft; nothing is written. */
@@ -913,41 +905,7 @@ export class McState {
       return refusal(body, 'the desk did not take that change');
     }
     this.flow.set(next);
-    // A hand edit makes the working draft the owner's again.
-    this.flowReason.set(null);
-    this.flowBeforePaul = null;
     return { ok: true };
-  }
-
-  /** Paul drafts a flow; the draft becomes the working draft (dashed) and keeps the one before for undo. */
-  async draftFlow(ask: string | null): Promise<McFlowReply> {
-    const target = this.flowTarget();
-    const before = this.flow();
-    if (target === null || before === null) {
-      return { ok: false, error: 'no flow is open' };
-    }
-    const body = await this.client
-      .request<Record<string, unknown>>('POST', `${this.flowPath(target)}-draft`, { part: target.part, ask })
-      .catch(fail);
-    if (isFailure(body)) {
-      return body;
-    }
-    const drafted = parseFlow(body);
-    if (drafted === null) {
-      return refusal(body, 'Paul could not draft a flow');
-    }
-    this.flowBeforePaul = before;
-    this.flow.set(drafted);
-    this.flowReason.set(drafted.reason ?? 'Paul proposes this flow.');
-    return { ok: true };
-  }
-
-  undoFlowDraft(): void {
-    if (this.flowBeforePaul !== null) {
-      this.flow.set(this.flowBeforePaul);
-    }
-    this.flowBeforePaul = null;
-    this.flowReason.set(null);
   }
 
   /** "Save flow": the draft becomes the chain in the file; the editor closes and the screens under it refresh. */

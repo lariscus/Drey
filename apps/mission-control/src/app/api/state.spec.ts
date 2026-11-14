@@ -2257,30 +2257,6 @@ describe('McState shape mode (E10-3)', () => {
       expect(state.flow()?.chain).toEqual(['ben', 'ralf(notify)']);
     });
 
-    it('takes Paul’s draft as the working draft and undoes it; a hand edit makes it the owner’s', async () => {
-      const { desk } = makeDesk();
-      desk.on('GET', '/api/tickets/T-0130/flow', () => FLOW);
-      const state = makeState(desk);
-      await state.openFlow('T-0130', null);
-      desk.on('POST', '/api/tickets/T-0130/flow-draft', () => ({ ...FLOW, chain: ['ben', 'ralf(notify)'], reason: 'Auth change.' }));
-      expect(await state.draftFlow('add a security pass')).toEqual({ ok: true });
-      expect(desk.callsOf('POST', '/api/tickets/T-0130/flow-draft')[0]!.body).toEqual({ part: null, ask: 'add a security pass' });
-      expect(state.flow()?.chain).toEqual(['ben', 'ralf(notify)']);
-      expect(state.flowReason()).toBe('Auth change.');
-
-      state.undoFlowDraft();
-      expect(state.flow()?.chain).toEqual([]);
-      expect(state.flowReason()).toBeNull();
-
-      await state.draftFlow(null);
-      desk.on('POST', '/api/tickets/T-0130/flow-edit', () => ({ ...FLOW, chain: ['ben', 'ralf'] }));
-      await state.editFlow({ op: 'persona', step: 3, persona: 'tessa' });
-      expect(state.flowReason()).toBeNull();
-
-      desk.on('POST', '/api/tickets/T-0130/flow-draft', () => ({ ok: false, error: 'Mission Control is not set up yet.' }));
-      expect(await state.draftFlow(null)).toEqual({ ok: false, error: 'Mission Control is not set up yet.' });
-    });
-
     it('saves the draft, closes, toasts and refreshes what lies under it; a refusal keeps it open', async () => {
       const { desk } = makeDesk();
       desk.on('GET', '/api/tickets/T-0130/flow/0', () => ({ ...FLOW, scope: { kind: 'part', index: 0, title: 'A' }, chain: ['ben', 'ralf'] }));

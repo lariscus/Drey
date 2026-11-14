@@ -25,7 +25,6 @@ import { promises as fsp } from 'node:fs';
 import type {
   ChatBridge,
   ChatCommand,
-  ChatFlowDraft,
   ChatDecisionResult,
   ChatMessage,
   ChatProposal,
@@ -160,7 +159,7 @@ export interface ChatServiceDeps {
   readonly shadows?: PlanShadowStore;
   /** E10-3: the model a shape turn runs on (the chat model), shown in the context line. */
   readonly modelName?: () => Promise<string | undefined>;
-  /** req-272: who speaks in a shape turn and a flow draft — the assigned persona's prompt and the crew; absent = the wrappers speak alone. */
+  /** req-272: who speaks in a shape turn — the assigned persona's prompt and the crew; absent = the wrapper speaks alone. */
   readonly voices?: ChatVoiceSource;
   /** req-306: the `## Crew` block of a mission turn — every persona, the owner by name; absent = none. */
   readonly crewBlock?: MissionCrewSource;
@@ -660,37 +659,6 @@ export class ChatService implements ChatServicePort {
     }
     const reply = await reader.call(this.deps.board, ticket).catch(() => null);
     return reply !== null && reply.ok ? planSectionOf(reply.text) : null;
-  }
-
-  /**
-   * A persona drafts a flow (E10-5, req-272): one bridge turn under the flow
-   * wrapper, opened by the `prompt.md` of the persona of the ticket's plan
-   * entry (else the shape persona), the single setChain command read back as
-   * the proposed chain. Without any such persona nothing is asked of a
-   * model: the answer says which persona to name. No session file, no
-   * write — the draft lives on the owner's screen until "Save flow".
-   */
-  async draftFlow(input: { readonly ticket: string; readonly context: string; readonly ask: string | null }): Promise<ChatFlowDraft> {
-    const text = input.ask ?? 'Draft the flow for this ticket.';
-    const voice = this.deps.voices === undefined ? undefined : await this.deps.voices.flow(input.ticket);
-    if (voice === null) {
-      return { ok: false, error: `No persona is assigned to plan ${input.ticket}: give its chain an interactive entry (for example paul:shape) and ask again.` };
-    }
-    const who = voice?.speaker ?? 'The assigned persona';
-    let reply: Awaited<ReturnType<ChatBridge['runTurn']>>;
-    try {
-      reply = await this.deps.bridge.runTurn({ text, history: [], board: '', flow: { context: input.context }, ...(voice === undefined ? {} : { voice }), emit: () => undefined });
-    } catch (error) {
-      return { ok: false, error: `${who} could not be reached (${error instanceof Error ? error.message : String(error)}).` };
-    }
-    if (reply.failure !== undefined) {
-      return { ok: false, error: reply.failure.message };
-    }
-    const command = reply.commands.find((c) => c.kind === 'setChain');
-    if (command === undefined || command.kind !== 'setChain') {
-      return { ok: false, error: reply.say.trim() === '' ? `${who} did not propose a flow.` : reply.say.trim() };
-    }
-    return { ok: true, chain: command.chain, reason: reply.say.trim(), ...(voice?.speaker == null ? {} : { author: voice.speaker }) };
   }
 
   /**

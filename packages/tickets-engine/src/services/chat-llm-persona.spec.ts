@@ -41,7 +41,7 @@ function recording(systems: string[]): typeof fetch {
 const emit = (_event: ChatStreamEvent): void => undefined;
 
 describe('chatSystemOf (req-269)', () => {
-  const texts = { mission: 'MISSION', shape: 'SHAPE', flow: 'FLOW' };
+  const texts = { mission: 'MISSION', shape: 'SHAPE' };
 
   it('opens a mission turn with the persona prompt, then the mission prompt, then the board digest', () => {
     expect(chatSystemOf(texts, { board: BOARD, persona: `  ${PIA}\n\n` })).toBe(`${PIA}\n\nMISSION\n\n## Board digest\n\n${BOARD}`);
@@ -57,9 +57,8 @@ describe('chatSystemOf (req-269)', () => {
     expect(chatSystemOf(texts, { board: BOARD, persona: ' \n ' })).toBe(`MISSION\n\n## Board digest\n\n${BOARD}`);
   });
 
-  it('keeps shape and flow turns as they were, persona or not', () => {
+  it('keeps shape turns as they were, persona or not', () => {
     expect(chatSystemOf(texts, { board: BOARD, persona: PIA, shape: { ticket: 'T-0001', ticketText: 'Body.' } })).toBe('SHAPE\n\n## Ticket T-0001\n\nBody.');
-    expect(chatSystemOf(texts, { board: BOARD, persona: PIA, flow: { context: 'Ctx.' } })).toBe('FLOW\n\n## Flow\n\nCtx.');
   });
 });
 
@@ -88,17 +87,16 @@ describe('the bridge with Mission Control\'s persona (req-269)', () => {
     expect(systems[0]!.startsWith(CREW.mission)).toBe(true);
   });
 
-  it('never asks for the persona on a shape or flow turn, or on a bridge with its own system prompt', async () => {
+  it('never asks for the persona on a shape turn, or on a bridge with its own system prompt', async () => {
     const systems: string[] = [];
     let reads = 0;
     const missionPersona = async (): Promise<string | null> => (reads++, PIA);
     const shape: ChatShapeContext = { ticket: 'T-0001', ticketText: 'Body.', readFile: async () => ({ ok: false, error: 'none' }) };
     await createChatBridge({ crew: CREW, config: config(), fetch: recording(systems), missionPersona }).runTurn({ text: 'Hi', history: [], board: BOARD, shape, emit });
-    await createChatBridge({ crew: CREW, config: config(), fetch: recording(systems), missionPersona }).runTurn({ text: 'Hi', history: [], board: BOARD, flow: { context: 'Ctx.' }, emit });
     await createChatBridge({ crew: CREW, config: config(), fetch: recording(systems), missionPersona, systemPrompt: 'AGGREGATOR' }).runTurn({ text: 'Hi', history: [], board: BOARD, emit });
     expect(reads).toBe(0);
     expect(systems.every((system) => !system.includes('Who Pia is'))).toBe(true);
-    expect(systems[2]!.startsWith('AGGREGATOR\n\n## Board digest')).toBe(true);
+    expect(systems[1]!.startsWith('AGGREGATOR\n\n## Board digest')).toBe(true);
   });
 });
 
@@ -122,13 +120,12 @@ describe('the pinned model of Mission Control\'s persona (req-293)', () => {
     expect(seen).toEqual(['glm-4.7-flash', 'glm-5']);
   });
 
-  it('a shape or flow turn speaks as another persona: the assistant\'s model; a bridge with its own prompt takes the pin', async () => {
+  it('a shape turn speaks as another persona: the assistant\'s model; a bridge with its own prompt takes the pin', async () => {
     const seen: string[] = [];
     const model = async (): Promise<string> => 'glm-4.7-flash';
     const shape: ChatShapeContext = { ticket: 'T-0001', ticketText: 'Body.', readFile: async () => ({ ok: false, error: 'none' }) };
     await createChatBridge({ crew: CREW, config: config(), fetch: models(seen), model }).runTurn({ text: 'Hi', history: [], board: BOARD, shape, emit });
-    await createChatBridge({ crew: CREW, config: config(), fetch: models(seen), model }).runTurn({ text: 'Hi', history: [], board: BOARD, flow: { context: 'Ctx.' }, emit });
     await createChatBridge({ crew: CREW, config: config(), fetch: models(seen), model, systemPrompt: 'ONE ON ONE' }).runTurn({ text: 'Hi', history: [], board: BOARD, emit });
-    expect(seen).toEqual(['glm-5', 'glm-5', 'glm-4.7-flash']);
+    expect(seen).toEqual(['glm-5', 'glm-4.7-flash']);
   });
 });
