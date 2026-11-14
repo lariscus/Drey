@@ -907,10 +907,17 @@ it has; **+** adds one), the selected project on the right. Change its
 **Name**, pick a **Colour** (six presets or any colour from the picker),
 write its **Purpose** in the same Markdown editor as a persona's
 instructions (the figure beside the title is what it adds to every run),
-add **Repositories** — *Add repository* lists the other entries of
-`repos.md`, and *From folder…* registers a repository found in a folder
-and adds it in one step — plain **Folders** a worker may read, and set
-each **Vault** to None, Read or Write. A vault the project names that this
+add **Repositories** — *Add repository* takes a **Git URL** (https, ssh
+or `git@host:owner/repo.git`): Drey asks where to put it, clones it with
+the git you have installed (the progress shows; *Cancel* stops it) and
+lists the checkout in one step; or pick one of the other entries of
+`repos.md`, or *From folder…* to point at a checkout you already have —
+plain **Folders** a worker may read (*Add folder* opens the folder picker:
+a folder that is a git repository, or lies inside one, is listed as a
+repository by itself, any other folder is added as a read-only folder),
+and set each **Vault** to None, Read or Write. Drey never stores a
+password: sign in through git's credential manager or an ssh key, and
+leave user and password out of the URL. A vault the project names that this
 computer has not registered shows greyed, *not on this device*. Every
 change is saved and committed at once; *Project actions* (⋯) deletes a
 project after asking — its tickets keep the name and show as an unknown
