@@ -1,9 +1,10 @@
-import { BrowserWindow, dialog, shell } from 'electron';
+import { shell } from 'electron';
 import type {
   EngineHost,
   EngineVault,
   FleetPort,
 } from '../../../packages/tickets-engine/src/services/host';
+import { pickFolderDialog } from './folder-dialog';
 import { runInNewConsole } from './open-terminal';
 import type { FleetClient } from '../../../packages/tickets-engine/src/services/fleet-client';
 
@@ -82,12 +83,7 @@ export class DreyEngineHost implements EngineHost {
     return this.ctx.app.userRoot;
   }
 
-  pickFolder = async (title: string): Promise<string | null> => {
-    const win = BrowserWindow.getFocusedWindow();
-    const options = { title, properties: ['openDirectory', 'createDirectory'] as Array<'openDirectory' | 'createDirectory'> };
-    const outcome = win !== null ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
-    return outcome.canceled ? null : (outcome.filePaths[0] ?? null);
-  };
+  pickFolder = (title: string): Promise<string | null> => pickFolderDialog(title);
 
   revealPath = (absPath: string): Promise<string> => shell.openPath(absPath);
 

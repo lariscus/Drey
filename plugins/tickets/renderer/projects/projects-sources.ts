@@ -1,24 +1,18 @@
 // i18n: catalog
 /**
- * Repositories and Folders of a project (req-284, board 7m): the repository
- * chips (the first `primary`), *Add repository* opening the inline picker of
- * `repos.md`'s other entries plus *From folder…*; the plain folders, each
- * `Read`, *Add folder* through the folder picker.
+ * Repositories and Folders of a project (req-284, board 7m; req-304): the
+ * repository chips (the first `primary`), *Add repository* opening the inline
+ * picker (`projects-repo-picker.ts`: a Git URL to clone, `repos.md`'s other
+ * entries, *From folder…*); the plain folders, each `Read`, *Add folder*
+ * through the system folder picker — a folder that is a git repository is
+ * listed as one of the project's repositories instead, with no second choice.
  */
-import type { RepoCandidate, RepoRef } from '../../shared/tickets';
 import type { ProjectDraft } from '../../../../packages/tickets-engine/src/contracts/project-commands';
 import type { ProjectRecord } from '../../../../packages/tickets-engine/src/contracts/projects';
 import { h } from '../desk-deps';
 import { addButton, iconBtn, tag } from './projects-dom';
-import { repoChoices } from './projects-model';
+import { repoPicker } from './projects-repo-picker';
 import type { ProjectsContext } from './projects-context';
-
-const FROM_FOLDER = '\u0000from-folder';
-
-/** A picked folder's repositories as `repos.md` entries (a checkout without a remote names itself by its path). */
-function refOf(candidate: RepoCandidate): RepoRef {
-  return { name: candidate.name, url: candidate.url ?? candidate.path, branch: candidate.branch, policy: null, path: candidate.path, worker: null, worktrees: null, launch: null, instructions: null };
-}
 
 export function repositoriesBlock(ctx: ProjectsContext, project: ProjectRecord): HTMLElement {
   const { api, t } = ctx;
@@ -35,72 +29,11 @@ export function repositoriesBlock(ctx: ProjectsContext, project: ProjectRecord):
     chip.append(remove);
     chips.append(chip);
   });
-  const picker = h('div', 'prj-picker');
-  picker.hidden = true;
-  const add = addButton(api, t('projects.add_repository'), () => toggle(picker.hidden === true), true);
+  const add = addButton(api, t('projects.add_repository'), () => picker.toggle(!picker.isOpen), true);
   add.setAttribute('aria-expanded', 'false');
+  const picker = repoPicker(ctx, project, (open) => add.setAttribute('aria-expanded', String(open)));
   chips.append(add);
-
-  const select = h('select', 'prj-picker-list');
-  select.id = `prj-repo-${project.id}`;
-  select.size = 4;
-  const label = h('label', 'prj-sr', t('projects.repository'));
-  label.htmlFor = select.id;
-  let candidates: readonly RepoCandidate[] = [];
-  const fill = (): void => {
-    select.replaceChildren();
-    const names = candidates.length > 0 ? candidates.map((c) => c.name) : repoChoices(ctx.repoNames(), project.repos);
-    for (const name of names) {
-      select.append(new Option(name, name));
-    }
-    if (candidates.length === 0) {
-      select.append(new Option(t('projects.from_folder'), FROM_FOLDER));
-    }
-    select.selectedIndex = 0;
-  };
-  const toggle = (open: boolean): void => {
-    candidates = [];
-    picker.hidden = !open;
-    add.setAttribute('aria-expanded', String(open));
-    if (open) {
-      fill();
-      select.focus();
-    }
-  };
-  const confirm = async (): Promise<void> => {
-    const value = select.value;
-    if (value === FROM_FOLDER) {
-      const found = await ctx.scanFolder();
-      if (found.length === 1) {
-        await ctx.addRepo(project.id, refOf(found[0]!));
-        toggle(false);
-      } else if (found.length > 1) {
-        candidates = found;
-        fill();
-      }
-      return;
-    }
-    const candidate = candidates.find((c) => c.name === value);
-    if (candidate !== undefined) {
-      await ctx.addRepo(project.id, refOf(candidate));
-    } else if (value !== '') {
-      await ctx.save(project.id, { repos: [...ctx.latest(project.id).repos, value] });
-    }
-    toggle(false);
-  };
-  select.addEventListener('dblclick', () => void confirm());
-  select.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      void confirm();
-    } else if (event.key === 'Escape') {
-      toggle(false);
-    }
-  });
-  const actions = h('div', 'prj-picker-actions');
-  actions.append(iconBtn(api, 'check', t('projects.add_repository'), () => void confirm()), iconBtn(api, 'x', t('projects.cancel'), () => toggle(false)));
-  picker.append(label, select, actions);
-  block.append(chips, picker);
+  block.append(chips, picker.element);
   return block;
 }
 
@@ -120,11 +53,7 @@ export function foldersBlock(ctx: ProjectsContext, project: ProjectRecord): HTML
   const wrap = h('div');
   wrap.append(
     addButton(api, t('projects.add_folder'), () => {
-      void ctx.pickFolder().then((path) => {
-        if (path !== null && !ctx.latest(project.id).folders.includes(path)) {
-          write({ folders: [...ctx.latest(project.id).folders, path] });
-        }
-      });
+      void ctx.pickFolder(t('projects.pick_folder')).then((path) => (path === null ? undefined : ctx.addFolder(project.id, path, false)));
     }, false),
   );
   block.append(wrap);

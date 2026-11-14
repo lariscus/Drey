@@ -39,8 +39,8 @@ export const TEAM_METHODS = [
 // the whole payload where a string is expected).
 export const REMOTE_METHODS = ['status', 'configure', 'init', 'localClient', 'cancelPairing'] as const;
 
-// req-284: Settings → Projects' writes (ProjectService), one commit each.
-export const PROJECT_METHODS = ['projectSave', 'projectRemove', 'projectAddRepo'] as const;
+// req-284: Settings → Projects' writes (ProjectService), one commit each; req-304: a picked folder (repository or plain).
+export const PROJECT_METHODS = ['projectSave', 'projectRemove', 'projectAddFolder'] as const;
 
 // req-289: Settings → Skills library (SkillLibraryService): the listing, the GitHub sources, deleting a skill.
 export const SKILL_LIBRARY_METHODS = ['skillLibrary', 'skillSourceFetch', 'skillSourceUpdate', 'skillSourceRemove', 'skillDelete'] as const;

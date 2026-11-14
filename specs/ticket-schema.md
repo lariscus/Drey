@@ -1981,14 +1981,49 @@ worker. Settings → Projects (req-284) and the global project filter
 
 **Who writes it.** Besides the first project's migration, Settings →
 Projects (req-284) writes the records through the engine's `projectSave`,
-`projectRemove` and `projectAddRepo` (`ProjectService`): every change is
+`projectRemove` and `projectAddFolder` (`ProjectService`): every change is
 one commit of exactly the files it touched — `projects: <name> created`,
-`… changed`, `… removed`, `… — repository <repo> added (req-284)`. A new
-record's id is minted from its name (`-2`, `-3` when taken) and never
-changes afterwards, so a rename keeps every ticket's `project:` valid.
-*From folder…* registers the repository in `repos.md` (when no entry of
-that name exists) and lists it in the project in the same commit. A
-removed project's tickets keep its id; the board reports it as unknown.
+`… changed`, `… removed`, `… — repository <repo> added (req-304)`,
+`… — folder <path> added (req-304)`. A new record's id is minted from its
+name (`-2`, `-3` when taken) and never changes afterwards, so a rename
+keeps every ticket's `project:` valid. A removed project's tickets keep
+its id; the board reports it as unknown.
+
+**A picked folder** (req-304; *Add folder*, *From folder…*, a finished
+clone) is probed with the installed git (`git rev-parse --show-toplevel`,
+then the `origin` remote and the branch of that root). A git repository —
+the picked folder's root, or a folder inside one — is **registered in
+`repos.md`** and listed in the project, both files in one commit; a plain
+folder becomes one of the project's read-only `folders:` instead (and is
+refused where only a repository will do — *From folder…*, a clone). The
+`repos.md` entry written from a recognised checkout:
+
+```yaml
+repos:
+  <folder name>:                # the checkout root's name; `-2`, `-3` when another checkout holds it
+    url: <origin url>           # a checkout without a remote names itself by its path
+    branch: <current branch>    # omitted on a detached head
+    path: <checkout root>       # as git reports it, forward slashes
+```
+
+An existing entry **is** the checkout when its `path:` names the same
+folder (separators, a trailing slash and a drive letter's case ignored),
+or — an entry without a `path:` — when its `url` is the one found: that
+entry is listed and `repos.md` is not rewritten. The owner's prose under
+the frontmatter is kept, as with every `repos.md` write.
+
+**A clone** (req-304) starts from a Git URL: https, ssh, the scp-like
+`git@host:owner/repo.git` or a `file:` URL. A URL that carries a password
+— or any user in front of an https host, where it is a token — is refused:
+Drey never stores credentials; git's credential manager and the ssh agent
+answer for them (`GIT_TERMINAL_PROMPT=0`, so a missing login fails with
+git's own message instead of waiting on a prompt nobody sees). The
+checkout is `<picked folder>/<repository name>`; a folder that already
+holds something is refused before git runs. Drey's own process runs
+`git clone --progress` (no shell, no timeout, cancellable — the process
+tree is killed and the folder it began is removed), then asks the engine to
+register the checkout like any picked folder: one commit in the tickets
+vault, none for the clone itself.
 
 **Capture into a project** (req-285): a create (`create` on the invoke
 channel, `POST /api/tickets`) may carry `project: <id>`; the new ticket is
