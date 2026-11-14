@@ -20,7 +20,7 @@ import { actionBarOf, chainOf, costSummary, flowItemsOf, pageShapeOf, statusOf, 
 import { hasOpenParts } from './parts-model';
 import { cardStartOf } from './start-model';
 import { personaPictures } from '../team/persona-pictures';
-import { holdCardOf, titleOfSnapshot } from './hold-card';
+import { holdCardOf, titleOfSnapshot, type TitleOf } from './hold-card';
 
 export interface TicketStripDeps {
   /** The catalog (`api.i18n`): every word of the card comes through it. */
@@ -145,14 +145,15 @@ export function createTicketStrip(deps: TicketStripDeps): TicketStrip {
         const own = meta() ?? card.meta;
         const pinned = worker?.personaId === null ? undefined : personas?.find((p) => p.id === worker?.personaId);
         // A persona board (7a v2): the chain of personas and its holder instead of phases and a worker.
-        const held = holdCardOf(deps.i18n, snapshot, card, titleOfSnapshot(snapshot, personas ?? []));
+        const titleOf = titleOfSnapshot(snapshot, personas ?? []);
+        const held = holdCardOf(deps.i18n, snapshot, card, titleOf);
         const shaper = held?.holder?.shape === true ? held.holder.persona : null;
         const shaperColor =
           shaper === null ? '' : (snapshot.lanes?.find((lane) => lane.persona === shaper)?.color || personas?.find((p) => p.id === shaper)?.color) ?? '';
         const facts: CardFacts = {
           shape,
           id: own.id ?? card.id,
-          pill: { label: phaseTitleOrArchive(status.label, card.phase), tone: status.pill },
+          pill: heldPill(deps.i18n, card, status, held !== null ? titleOf : null, phaseTitle) ?? { label: phaseTitleOrArchive(status.label, card.phase), tone: status.pill },
           kind: status.kind,
           issues: issuesBadge(issues()),
           flow: held?.flow ?? flowItemsOf(deps.i18n, chain, card.phase, planToAccept),
@@ -207,6 +208,20 @@ export function createTicketStrip(deps: TicketStripDeps): TicketStrip {
       return { node: host, paint };
     },
   };
+}
+
+/**
+ * A persona board ticket a persona holds has no phase worth a title (its column is
+ * the stage `active`): the pill names the holder and the position, Mission
+ * Control's chip of board 10e v2 (`Ben · 2 of 4`). A status of its own (Needs you,
+ * Running, Blocked) keeps its word.
+ */
+function heldPill(i18n: I18n, card: TicketCard, status: { readonly label: string; readonly tone: string }, titleOf: TitleOf | null, phaseTitle: string): CardFacts['pill'] | null {
+  const hold = card.hold;
+  if (titleOf === null || hold === undefined || status.tone !== 'idle' || status.label !== phaseTitle) {
+    return null;
+  }
+  return { label: i18n.t('board.position', { name: titleOf(hold.holder), at: hold.position, of: hold.length }), tone: 'accent' };
 }
 
 /** An archived ticket has left the pipeline: its pill says so. */

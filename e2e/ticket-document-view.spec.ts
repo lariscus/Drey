@@ -146,6 +146,13 @@ test('an active ticket: the chain with its cursor, the holder, no Worker (board 
   await expect(chain).toContainText('You');
   const holder = card.locator('.tickets-card-label', { hasText: 'Holder' }).locator('xpath=following-sibling::*[1]');
   await expect(holder).toContainText('Ben');
+  // The pill names the holder and the position (Mission Control's chip, 10e v2), never the stage id.
+  await expect(card.locator('.tickets-head-phase')).toHaveText('Ben · 2 of 4');
+  // The Plan heading 7a v2 leaves out keeps one paragraph gap between the description and the plan.
+  const editor = page.locator('app-editor').first();
+  const planLine = editor.locator('.cm-line').filter({ hasText: 'Guard the open command' });
+  const shown = planLine.locator('xpath=preceding-sibling::*[not(contains(@class, "tickets-doc-collapsed"))][1]');
+  await expect(shown).toHaveClass(/tickets-doc-gap/);
 
   await checkBody(page);
   await page.locator('app-editor .cm-content').first().evaluate((el) => el.closest('.cm-scroller')?.scrollTo(0, 0));

@@ -302,6 +302,16 @@ export function createTicketDocumentExtension(deps: TicketDocumentDeps): TicketD
         return out;
       }));
       const logRange = logSectionRange(text);
+      // The Plan heading that 7b / 7c / 7a v2 leave out: the text around it keeps one paragraph gap.
+      const hiddenPlan =
+        planEnd !== null && planHasChapters && shape === 'flow' ? state.doc.lineAt(planEnd).number - 1 : -1;
+      const afterHiddenPlan = (index: number): string => {
+        let next = index + 1;
+        while (next < scan.length && (next === hiddenPlan || (scan[next] ?? '').trim() === '')) {
+          next++;
+        }
+        return (scan[next] ?? '').trim();
+      };
       let offset = 0;
       let inPlan = false;
       const lineClass = (from: number, cls: string): void => {
@@ -337,7 +347,7 @@ export function createTicketDocumentExtension(deps: TicketDocumentDeps): TicketD
           lineClass(from, 'tickets-doc-h3');
         } else if (line.trim() === '' && !caretLines.has(index + 1)) {
           const before = (scan[index - 1] ?? '').trim();
-          const after = (scan[index + 1] ?? '').trim();
+          const after = index + 1 === hiddenPlan && !caretLines.has(hiddenPlan + 1) ? afterHiddenPlan(index) : (scan[index + 1] ?? '').trim();
           const between = before !== '' && after !== '' && !before.startsWith('#') && !after.startsWith('#') && from > frontmatterEnd;
           lineClass(from, between ? 'tickets-doc-gap' : 'tickets-doc-collapsed');
         }
