@@ -193,10 +193,4 @@ describe('the standard flow and the proposal switch', () => {
     expect(snap.proposeFlow).toBeUndefined();
     expect(snap.issues.some((issue) => issue.message.includes('propose-flow'))).toBe(true);
   });
-
-  it('hands Paul the default flow as the thing to draft, not a ticket', async () => {
-    const context = await serviceOf().flowDraftContext({ id: 'standard', part: null });
-    expect(context.ok && context.text).toContain('default flow every new ticket is copied from');
-    expect(context.ok && context.text).toContain('Standard flow: paul:shape; paul; ben; ralf');
-  });
 });

@@ -63,28 +63,3 @@ export function flowPersonasOf(personas: readonly Persona[]): FlowPersona[] {
     model: modelOf(p) ?? '',
   }));
 }
-
-/** The text Paul reads before he drafts a flow: the standard flow, the flow now, the crew. */
-export function flowDraftText(input: {
-  /** The ticket; null = the standard flow itself (E10-5b). */
-  readonly ticket: string | null;
-  readonly title: string;
-  readonly plan: string;
-  readonly standard: readonly string[];
-  readonly steps: readonly FlowStepView[];
-  readonly saved: readonly string[];
-  readonly personas: readonly FlowPersona[];
-}): string {
-  const crew = input.personas.map((p) => `- ${p.id} (${p.title}${crewNote(p.kind)})`).join('\n');
-  const now = input.steps
-    .map((s) => `${s.position}. ${s.persona}${s.mode === null ? '' : `:${s.mode}`}${s.notify ? ' (tell me)' : ''}${s.state === 'current' ? ' (current, locked)' : ''}`)
-    .join('\n');
-  const standard = input.standard.length === 0 ? '(none)' : input.standard.join('; ');
-  const head = input.ticket === null ? 'The default flow every new ticket is copied from — it changes no existing ticket.' : `Ticket ${input.ticket}: ${input.title}${input.plan}`;
-  return `${head}\n\nStandard flow: ${standard}\nThe chain now, from the current position:\n${now}\nSaved chain: ${input.saved.join('; ')}\n\nPersonas:\n${crew}`;
-}
-
-/** What the crew line says beside a persona that is not an agent. */
-function crewNote(kind: FlowPersona['kind']): string {
-  return kind === 'human' ? ', the owner' : kind === 'mission' ? ', Mission Control: a turn of hers, no session' : '';
-}

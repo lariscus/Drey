@@ -77,7 +77,7 @@ export class ChatTurn {
 
   /** req-293: the pinned model of this turn — Mission Control's own turns (or every turn of a bridge with its own prompt); null = `chat.model`. */
   private async modelOverride(): Promise<string | null> {
-    const ownTurn = this.deps.systemPrompt !== undefined || (this.input.shape === undefined && this.input.flow === undefined);
+    const ownTurn = this.deps.systemPrompt !== undefined || this.input.shape === undefined;
     if (this.deps.model === undefined || !ownTurn) {
       return null;
     }
@@ -117,11 +117,10 @@ export class ChatTurn {
   private async openingMessages(): Promise<Message[]> {
     const { input } = this;
     const system = chatSystemOf(
-      { mission: this.deps.systemPrompt ?? this.deps.crew.mission, shape: this.deps.crew.shape, flow: this.deps.crew.flow },
+      { mission: this.deps.systemPrompt ?? this.deps.crew.mission, shape: this.deps.crew.shape },
       {
         board: input.board,
         ...(input.shape === undefined ? {} : { shape: input.shape }),
-        ...(input.flow === undefined ? {} : { flow: input.flow }),
         ...(input.voice === undefined ? {} : { voice: input.voice }),
         ...(input.missionTicket === undefined ? {} : { ticket: input.missionTicket }),
         persona: await this.missionPersona(),
@@ -138,10 +137,10 @@ export class ChatTurn {
    * req-269: Mission Control's persona prompt — a mission turn of the mission
    * bridge only (a bridge with its own
    * system prompt — the aggregator, a 1:1 — is not Mission Control). A shape
-   * or flow turn speaks as its own assigned persona (req-272, `input.voice`).
+   * turn speaks as its own assigned persona (req-272, `input.voice`).
    */
   private async missionPersona(): Promise<string | null> {
-    if (this.input.shape !== undefined || this.input.flow !== undefined || this.deps.systemPrompt !== undefined || this.deps.missionPersona === undefined) {
+    if (this.input.shape !== undefined ||this.deps.systemPrompt !== undefined || this.deps.missionPersona === undefined) {
       return null;
     }
     return this.deps.missionPersona().catch(() => null);

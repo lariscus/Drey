@@ -8,6 +8,7 @@ import { serviceModelTable } from '../services/compose-crew-sessions';
 import type { ServiceModelTable } from '../services/service-model-table';
 import { composePersonaSessions } from '../services/compose-persona-sessions';
 import { loadCrewPrompts } from '../services/crew-prompts';
+import { MissionCrewBlock } from '../services/mission-crew-block';
 import { MissionEntryTurns } from '../services/mission-entry-turns';
 import { MissionPersonaPrompt } from '../services/mission-persona-prompt';
 import { PersonaPinReader } from '../services/persona-pin-reader';
@@ -61,6 +62,12 @@ const messageOf = (error: unknown): string => (error instanceof Error ? error.me
  * Memory tab's journal (req-169), the skills (req-172) and the one-time
  * migrations those moved (the persona prose, req-171).
  */
+/** The git user of the tickets repository — the owner's name where the `you` persona holds none (req-306). */
+async function gitUserOf(board: BoardParts['board'], git: BoardParts['git']): Promise<string | null> {
+  const vault = await board.detect();
+  return vault === null ? null : (await git.run(vault.path, ['config', 'user.name'])).trim() || null;
+}
+
 export async function composeSessionParts(opts: EngineOptions, config: FileConfigStore, parts: BoardParts, log: Log): Promise<SessionParts> {
   const { board, host, git, fleet, hub } = parts;
   // req-279: the crew's chat prompts load here, once — the compose is the
@@ -77,6 +84,8 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
     // req-293/294/296: her memory and skills ride the prompt, her `model:` pins the model of her own turns.
     bridge: opts.chatBridge ?? createChatBridge({ config, crew, missionPersona: () => missionPrompt.text(), model: () => missionPrompt.model() }),
     sessions: parts.freeSessions, // req-173: Pia's startSession card
+    // req-306: the crew on her turn, the owner by name (the `you` persona's title, else the git user).
+    crewBlock: new MissionCrewBlock(() => board.listPersonas(), () => gitUserOf(board, git)),
     shadows: new FilePlanShadowStore(path.join(opts.home, 'plan-shadow.json')),
     modelName: () => config.get<string>('chat.model'),
     // req-272: Shape and Flow chat speak as the persona of the chain's entries, the crew read on every turn.

@@ -62,20 +62,6 @@
         <p class="pd-fexplain flow-sendback-rule">{{ 'flow.pad.send_back_rule' | t }}</p>
       </div>
 
-      @if (reason(); as why) {
-        <div class="pd-fpaul" role="status">
-          <span class="pd-fvia">
-            <mc-ph-avatar name="Paul" [color]="paulColor()" [size]="20" />
-            {{ 'flow.pad.paul_via' | t }}
-          </span>
-          <span class="pd-fp">{{ why }}</span>
-          @for (line of changeLines(); track line) {
-            <span class="pd-fp">{{ line }}</span>
-          }
-          <button type="button" class="pd-flink" (click)="undoDraft()">{{ 'flow.pad.undo_draft' | t }}</button>
-        </div>
-      }
-
       @if (inspector(); as ins) {
         <div class="pd-fcard" role="group" [attr.aria-label]="'flow.pad.gate' | t: { title: ins.step.title }">
           <div class="pd-fhead">
@@ -142,24 +128,6 @@
           </div>
         </div>
       }
-
-      <div class="pd-fask">
-        <label class="pd-fsr" for="pd-flow-ask">{{ 'flow.pad.ask_label' | t }}</label>
-        <textarea
-          id="pd-flow-ask"
-          class="pd-fin"
-          rows="1"
-          [value]="ask()"
-          [disabled]="readOnly() || busy()"
-          (input)="onAsk($event)"
-          (keydown.enter)="$event.preventDefault(); askPaul()"
-        ></textarea>
-        <button type="button" class="pd-fsend" [attr.aria-label]="'flow.pad.send' | t" [attr.title]="'flow.pad.send' | t" [disabled]="readOnly() || busy()" (click)="askPaul()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 19V5M5 12l7-7 7 7" />
-          </svg>
-        </button>
-      </div>
     } @else if (error(); as e) {
       <p class="pd-fnote" role="alert">{{ e }}</p>
     } @else {
@@ -209,14 +177,6 @@
 
         @if (readOnly()) {
           <p class="fe-note">{{ f.readOnly ?? 'This device is read-only.' }}</p>
-        }
-
-        @if (reason(); as why) {
-          <div class="fe-paul" role="status">
-            <span class="fe-paul-k">Paul drafted this flow</span>
-            <span class="fe-paul-t">{{ why }}</span>
-            <button type="button" class="fe-link" (click)="undoDraft()">Undo draft</button>
-          </div>
         }
 
         <ol class="fe-list" aria-label="Positions">
@@ -356,19 +316,6 @@
       @if (message(); as m) {
         <p class="fe-error" role="alert">{{ m }}</p>
       }
-      <div class="fe-ask">
-        <input
-          type="text"
-          class="fe-input"
-          aria-label="Ask Paul to change this flow"
-          placeholder="Ask Paul to change this flow"
-          [value]="ask()"
-          [disabled]="readOnly() || busy()"
-          (input)="onAsk($event)"
-          (keydown.enter)="askPaul()"
-        />
-        <button type="button" class="fe-btn" [disabled]="readOnly() || busy()" (click)="askPaul()">Ask Paul</button>
-      </div>
       <div class="fe-buttons">
         <button type="button" class="fe-link" [disabled]="readOnly() || busy()" (click)="reset()">Reset to standard flow</button>
         <span class="grow"></span>

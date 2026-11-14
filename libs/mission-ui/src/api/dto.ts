@@ -1022,6 +1022,11 @@ function chainEntryOf(raw: unknown): McChainEntry | null {
   return { persona, mode: entry['mode'] === 'shape' ? 'shape' : null, notify: entry['notify'] === true };
 }
 
+/** req-306: the board's standard flow (`flow` of the snapshot) as entry views; none when the board carries no flow. */
+export function standardFlowOf(board: unknown): readonly McChainEntry[] {
+  return chainEntriesOf(rec(board)?.['flow']);
+}
+
 /** The `chain:` list's wire JSON as entry views; junk entries drop out, never a throw. */
 export function chainEntriesOf(raw: unknown): readonly McChainEntry[] {
   return arr(raw)
@@ -2207,7 +2212,7 @@ export interface McFlow {
   readonly ticket: string;
   readonly title: string;
   readonly scope: McFlowScope;
-  /** The chain shown: the saved list, an edit's result or Paul's draft; canonical entries. */
+  /** The chain shown: the saved list or an edit's result; canonical entries. */
   readonly chain: readonly string[];
   /** The chain in the file now. */
   readonly saved: readonly string[];
@@ -2216,8 +2221,6 @@ export interface McFlow {
   readonly personas: readonly McFlowPersona[];
   /** Why nothing can be saved (a live run, a released part); null = editable. */
   readonly readOnly: string | null;
-  /** Paul's reason, present on a draft only. */
-  readonly reason: string | null;
 }
 
 /** Reads a flow answer tolerantly; null = the desk has no readable flow. */
@@ -2274,6 +2277,5 @@ export function parseFlow(json: unknown): McFlow | null {
     steps,
     personas,
     readOnly: strOrNull(body['readOnly']),
-    reason: strOrNull(body['reason']),
   };
 }

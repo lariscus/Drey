@@ -129,7 +129,6 @@ function boot(): ChatService {
         asked.push(ticket);
         return { speaker: 'Paula', prompt: '## Who Paula is', roster: '- ben (Ben): builds' };
       },
-      flow: async () => null,
     },
   });
 }

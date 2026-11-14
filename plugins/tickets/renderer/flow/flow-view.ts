@@ -2,7 +2,7 @@
  * The Flow tab (E13-11, design boards 5i "Shape the flow" and 7a–7c): one
  * ticket's chain (or one plan part's) as a list of gates with `+`
  * connectors, an inspector for the selected gate (who, model, tell me,
- * runs after, remove), and a foot with "Ask Paul", reset and "Save flow".
+ * runs after, remove), and a foot with reset and "Save flow".
  *
  * Nothing is written before "Save flow": the tab keeps a draft, and every
  * edit is a round trip to the engine (`flowEdit`) that returns the next
@@ -42,15 +42,13 @@ interface FlowState {
   message: string;
   notice: string;
   busy: boolean;
-  /** Paul's draft while it is the working draft: his reason and the draft before it. */
-  paul: { readonly reason: string; readonly before: FlowDraft } | null;
 }
 
 type EditReply = { readonly ok: true; readonly [key: string]: unknown } | { readonly ok: false; readonly error: string };
 
 /** Mounts the Flow tab for one target; returns the dispose. */
 export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget): () => void {
-  const state: FlowState = { draft: null, saved: null, error: '', selected: null, adding: null, message: '', notice: '', busy: false, paul: null };
+  const state: FlowState = { draft: null, saved: null, error: '', selected: null, adding: null, message: '', notice: '', busy: false };
   let disposed = false;
   const payload = { id: target.ticketId, part: target.part };
 
@@ -65,25 +63,12 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
   const foot = h('footer', 'flow-foot');
   const messageLine = h('p', 'flow-message');
   messageLine.setAttribute('role', 'alert');
-  const ask = h('input', 'flow-input');
-  ask.type = 'text';
-  ask.placeholder = 'Ask Paul to change this flow';
-  ask.setAttribute('aria-label', 'Ask Paul to change this flow');
-  const askButton = textButton('Ask Paul', 'desk-btn', 'Paul reads the ticket and drafts a flow; nothing is saved', () => void askPaul());
   const resetButton = textButton('Reset to standard flow', 'desk-btn desk-btn-link', 'Drop every change and run the standard flow', () => void run({ op: 'reset' }));
   resetButton.hidden = isStandardFlow(target);
   const saveButton = textButton('Save flow', 'desk-btn desk-btn-primary', isStandardFlow(target) ? 'Write this flow as the default for new tickets' : 'Write this flow to the ticket', () => void save());
-  ask.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      void askPaul();
-    }
-  });
-  const askRow = h('div', 'flow-ask');
-  askRow.append(ask, askButton);
   const buttons = h('div', 'flow-buttons');
   buttons.append(resetButton, h('span', 'flow-grow'), saveButton);
-  foot.append(messageLine, askRow, buttons);
+  foot.append(messageLine, buttons);
   root.append(head, main, foot);
   host.replaceChildren(root);
 
@@ -121,7 +106,6 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
       state.draft = flow;
       state.saved = flow;
       state.error = '';
-      state.paul = null;
     } else {
       state.error = reply.error;
     }
@@ -159,24 +143,6 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
       }
       state.message = reply.ok ? '' : reply.error;
       return false;
-    });
-  }
-
-  function askPaul(): Promise<boolean> {
-    return guarded(async () => {
-      const text = ask.value.trim();
-      const reply = await call('flowDraft', { ask: text === '' ? null : text });
-      if (disposed || !reply.ok || state.draft === null) {
-        state.message = reply.ok ? '' : reply.error;
-        return false;
-      }
-      const drafted = reply as unknown as FlowDraft & { reason?: string };
-      state.paul = { reason: drafted.reason ?? '', before: state.paul?.before ?? state.draft };
-      state.draft = drafted;
-      state.selected = null;
-      state.adding = null;
-      ask.value = '';
-      return true;
     });
   }
 
@@ -290,21 +256,6 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
     body.append(title);
     if (flow.readOnly != null) {
       body.append(h('p', 'flow-note', flow.readOnly));
-    }
-    if (state.paul !== null) {
-      const paul = h('div', 'flow-paul');
-      paul.setAttribute('role', 'status');
-      paul.append(
-        h('span', 'flow-paul-k', 'Paul drafted this flow'),
-        h('span', 'flow-paul-t', state.paul.reason),
-        textButton('Undo draft', 'desk-btn desk-btn-link', 'Back to the flow before his draft', () => {
-          state.draft = state.paul?.before ?? state.draft;
-          state.paul = null;
-          state.selected = null;
-          paint();
-        }),
-      );
-      body.append(paul);
     }
     const changed = changedIndicesOf(flow, state.saved);
     const list = h('ol', 'flow-list');
@@ -423,8 +374,6 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
     const flow = state.draft;
     foot.hidden = flow === null;
     const locked = readOnly() || state.busy;
-    ask.disabled = locked;
-    askButton.disabled = locked;
     resetButton.disabled = locked;
     saveButton.disabled = locked || !isDirty(flow, state.saved);
     messageLine.textContent = state.message !== '' ? state.message : state.notice;

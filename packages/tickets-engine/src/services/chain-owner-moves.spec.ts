@@ -59,6 +59,28 @@ describe("the owner's Accept on a chain ticket", () => {
   });
 });
 
+describe("the owner's Accept at a shaping entry (req-305)", () => {
+  const ONE = 'paul:shape; ben; ralf; tessa; you';
+
+  it('ends the shaping: the entry drops its mode, the cursor stays, the persona plans at the same position', () => {
+    expect(ownerAcceptOf(card('building', ONE, 1), PLACEMENT)).toEqual({
+      kind: 'shaped',
+      entries: ['paul', 'ben', 'ralf', 'tessa', 'you'],
+      at: 1,
+      line: 'shaping done at position 1 of 5 — paul plans it now',
+    });
+  });
+
+  it("keeps the entry's other options and every other position as written", () => {
+    const decision = ownerAcceptOf(card('building', 'paul:shape(notify); ben(on-red paul); you', 1), PLACEMENT);
+    expect(decision).toMatchObject({ kind: 'shaped', entries: ['paul(notify)', 'ben(on-red paul)', 'you'], at: 1 });
+  });
+
+  it('moves on as usual once the entry is an ordinary one', () => {
+    expect(ownerAcceptOf(card('building', 'paul; ben; you', 1), PLACEMENT)).toMatchObject({ kind: 'cursor', at: 2 });
+  });
+});
+
 describe("the owner's Send back on a chain ticket", () => {
   it('goes to the nearest earlier agent position, never using the one send-back', () => {
     expect(ownerSendBackOf(card('ready', STANDARD, 6), PLACEMENT)).toEqual({ kind: 'cursor', at: 5, persona: 'tessa' });

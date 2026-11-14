@@ -12,7 +12,7 @@ import { loadCrewPrompts } from './crew-prompts';
 import { personaLoader } from './persona-loader';
 
 /**
- * req-272: Shape and Flow chat speak as the assigned persona. The crew is
+ * req-272: the Shape chat speaks as the assigned persona. The crew is
  * real files in a temp vault — `personas/<id>/persona.md` + `prompt.md`,
  * `crew.md`'s `order:` — read through the same loader the board uses, so a
  * rename, an edit of `prompt.md` or a reorder reaches the very next turn.
@@ -143,25 +143,6 @@ describe('the voice of a shape turn', () => {
     expect(await voices().shape(TICKET)).toMatchObject({ speaker: 'Paul', prompt: null });
     const broken = new ChatVoices({ ...boardOnDisk(), snapshot: async () => Promise.reject(new Error('no board')) }, { read: async () => '' });
     expect(await broken.shape(TICKET)).toEqual({ speaker: null, prompt: null, roster: '' });
-    expect(await broken.flow(TICKET)).toBeNull();
-  });
-});
-
-describe('the voice of a flow draft', () => {
-  it("is the persona of the ticket's plan entry", async () => {
-    await seedCrew();
-    await persona('quill', 'title: Quill\nrole: custom\ngate: structural', '## Who Quill is\n\nQuill plans.\n');
-    chain = ['ralf:shape', 'quill', 'ben'];
-    expect(await voices().flow(TICKET)).toMatchObject({ speaker: 'Quill', prompt: '## Who Quill is\n\nQuill plans.' });
-  });
-
-  it('is the shape persona when the chain has no plan entry, and nobody when it has neither', async () => {
-    await seedCrew();
-    chain = ['ben:shape', 'ralf'];
-    expect((await voices().flow(TICKET))?.speaker).toBe('Ben');
-    chain = ['ben', 'ralf'];
-    standard = [];
-    expect(await voices().flow(TICKET)).toBeNull();
   });
 });
 
@@ -178,7 +159,7 @@ describe('the composed system message on the wire', () => {
     return new Response(body, { status: 200 });
   }
 
-  async function systemOf(turn: 'shape' | 'flow'): Promise<string> {
+  async function shapeSystem(): Promise<string> {
     const sent: { messages: { role: string; content: string }[] }[] = [];
     const bridge = createChatBridge({
       crew: CREW,
@@ -189,13 +170,13 @@ describe('the composed system message on the wire', () => {
       }) as typeof fetch,
     });
     const source = voices();
-    const voice = turn === 'shape' ? await source.shape(TICKET) : await source.flow(TICKET);
+    const voice = await source.shape(TICKET);
     await bridge.runTurn({
       text: 'Go.',
       history: [],
       board: 'BOARD',
-      ...(turn === 'shape' ? { shape: { ticket: TICKET, ticketText: 'TICKET TEXT', readFile: async () => ({ ok: false as const, error: 'none' }) } } : { flow: { context: 'FLOW CONTEXT' } }),
-      ...(voice === null ? {} : { voice }),
+      shape: { ticket: TICKET, ticketText: 'TICKET TEXT', readFile: async () => ({ ok: false as const, error: 'none' }) },
+      voice,
       emit: () => undefined,
     });
     return sent[0]!.messages[0]!.content;
@@ -206,7 +187,7 @@ describe('the composed system message on the wire', () => {
     standard = ['paula:shape', 'paula', 'ben'];
     await persona('paula', 'title: Paula\nrole: planner\nsummary: Plans.', '## Who Paula is\n\nPaula, who asks one question at a time.\n');
     await put(CREW_MD, '---\norder: [ben, paula]\n---\n');
-    const system = await systemOf('shape');
+    const system = await shapeSystem();
     const at = (text: string) => system.indexOf(text);
     expect(system.startsWith('## Who Paula is\n\nPaula, who asks one question at a time.\n\nThe owner shapes one new ticket with you')).toBe(true);
     expect(at('STRICT output contract')).toBeGreaterThan(at('Paula, who asks'));
@@ -219,17 +200,9 @@ describe('the composed system message on the wire', () => {
     expect(system).not.toContain('BOARD');
   });
 
-  it("opens a flow draft with the plan entry's prompt, then the wrapper and the flow", async () => {
-    await seedCrew();
-    const system = await systemOf('flow');
-    expect(system.startsWith('## Who Paul is\n\nPaul, the planner. He interviews first.\n\nThe owner asks you to draft the flow')).toBe(true);
-    expect(system).toContain('## Flow\n\nFLOW CONTEXT');
-    expect(system).not.toContain('You are Paul');
-  });
-
   it('speaks with the wrapper alone when no prompt can be read', async () => {
     await seedCrew();
     await fsp.rm(path.join(root, PERSONAS_DIR, 'paul', 'prompt.md'));
-    expect((await systemOf('shape')).startsWith('The owner shapes one new ticket with you')).toBe(true);
+    expect((await shapeSystem()).startsWith('The owner shapes one new ticket with you')).toBe(true);
   });
 });

@@ -111,6 +111,12 @@ export type ChatCommand =
    */
   | { readonly kind: 'setChain'; readonly id: string; readonly chain: readonly string[] }
   /**
+   * req-306: replace the board's standard flow (`flow:` in `_meta/pipeline.md`) with the given
+   * canonical entries — the chain every NEW ticket is copied from; existing tickets keep their own.
+   * Never empty (a flow names at least one persona); checked like every chain write at execution.
+   */
+  | { readonly kind: 'setStandardFlow'; readonly chain: readonly string[] }
+  /**
    * T-0050 (T0): replace the ticket's whole `blocked-by:` list with the
    * given ticket ids — the ticket waits until every one of them reaches
    * the pipeline's terminal phase. An empty list clears the blockers (the
@@ -181,20 +187,9 @@ export interface ChatServicePort {
    * to approve (E10-4). Either way the decision line lands in the file.
    */
   shapeDecide(input: { readonly file: string; readonly choice: ChatSplitChoice }): Promise<ChatShapeResult>;
-  /**
-   * Paul drafts a flow (E10-5): the model reads the ticket's flow and
-   * proposes the whole chain delta with a reason. Nothing is written; the
-   * caller checks the draft against the pipeline before showing it.
-   */
-  draftFlow(input: { readonly ticket: string; readonly context: string; readonly ask: string | null }): Promise<ChatFlowDraft>;
   confirm(input: { readonly file: string; readonly id: string }): Promise<ChatDecisionResult>;
   dismiss(input: { readonly file: string; readonly id: string }): Promise<ChatDecisionResult>;
 }
-
-/** The flow draft of the assigned persona (req-272, `author` = its title): the proposed chain and the reason, or why there is none. */
-export type ChatFlowDraft =
-  | { readonly ok: true; readonly chain: readonly string[]; readonly reason: string; readonly author?: string }
-  | { readonly ok: false; readonly error: string };
 
 /** One marked line of the shared plan. */
 export interface PlanMark {
@@ -237,7 +232,7 @@ export type ChatFailureCode = 'not-configured' | 'unsupported' | 'unreachable' |
 /**
  * Why a turn had no model (D-1) — the error card's content: provider,
  * endpoint and reason. `message` is the same in one sentence (the stream's
- * error event, the flow draft's error text).
+ * error event).
  */
 export interface ChatModelFailure {
   readonly code: ChatFailureCode;
@@ -318,9 +313,7 @@ export interface ChatBridge {
      * the read-only access to the ticket's repository.
      */
     readonly shape?: ChatShapeContext;
-    /** Present on a flow draft (E10-5): the flow the persona reads, replacing the board digest. */
-    readonly flow?: { readonly context: string };
-    /** req-272: the persona that speaks in a shape turn or a flow draft; absent = the wrapper alone. */
+    /** req-272: the persona that speaks in a shape turn; absent = the wrapper alone. */
     readonly voice?: ChatVoice;
     /** Receives the live stream: thought and text deltas — the turn's progress signal. */
     emit(event: ChatStreamEvent): void;
@@ -342,7 +335,7 @@ export interface ChatBridge {
 }
 
 /**
- * Who speaks in a shape turn or a flow draft (req-272): the assigned
+ * Who speaks in a shape turn (req-272): the assigned
  * persona's `prompt.md` opens the system message, ahead of the mode's
  * wrapper. Absent = no persona resolved; the wrapper speaks alone.
  */
@@ -351,7 +344,7 @@ export interface ChatVoice {
   readonly speaker: string | null;
   /** The speaking persona's `prompt.md` (LF, trimmed, version line dropped); null = none or empty. */
   readonly prompt: string | null;
-  /** The crew a shape turn may name for a plan part, one line each, in `crew.md`'s order; '' = none (a flow draft carries its own list). */
+  /** The crew a shape turn may name for a plan part, one line each, in `crew.md`'s order; '' = none. */
   readonly roster: string;
 }
 

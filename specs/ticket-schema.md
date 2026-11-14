@@ -670,13 +670,13 @@ The same persona may stand twice, so a **position** (1-based), never a
 persona id, is what the cursor and a send-back name.
 
 ```markdown
-chain: [paul:shape, paul, ben, ralf(notify), tessa, you]
+chain: [paul:shape, ben, ralf(notify), tessa, you]
 at: 3
-sent-back: 5>3
+sent-back: 4>2
 ```
 
 On a dricket store the three fields are `x-chain` (the entries joined by
-`;`: `x-chain: paul:shape;paul;ben;ralf(notify);tessa;you`), `x-at` and
+`;`: `x-chain: paul:shape;ben;ralf(notify);tessa;you`), `x-at` and
 `x-sent-back` — Drey extension fields like the others
 (`store/extension-keys.ts`).
 
@@ -689,9 +689,17 @@ The grammar, one entry per list item (`core/chain-list.ts`):
   `mission` persona's a **Mission Control turn** on the ticket (no session,
   no slot, no budget — R9; below), the human's parks the
   ticket for the owner, and an entry naming no readable persona is *missing*.
-- `<persona>:shape` — the run's **mode**: the interactive entry (the owner
-  shapes the ticket with that persona in the Shape chat). `shape` is the only
-  mode, and only an **agent's** entry takes one: `validateChain` refuses
+- `<persona>:shape` — the entry's **mode** (req-305): the owner **shapes the
+  ticket with that persona in the Shape chat first, and the persona's own run
+  follows at the same position** — shaping and planning are one entry, one
+  position, so the standard flow names Paul once. While the ticket waits at
+  the entry the Shape chat is open and no run starts; the owner's **Accept**
+  (the card's *Shaping done*) ends the shaping: the engine rewrites the entry
+  at the cursor without its mode (`paul:shape` → `paul`, the cursor stays,
+  one `put` with the status line `shaping done at position 1 of 5`), and the
+  persona's run is dispatched like any other. The mode is thereby consumed —
+  a send-back to the position runs the persona again without a new shaping.
+  `shape` is the only mode, and only an **agent's** entry takes one: `validateChain` refuses
   `you:shape` and a mission persona's (`pia:shape`) at any position after the
   cursor (req-269).
 - `<persona>(notify)` — the **notify rule**: a card lands in "Needs you"
@@ -723,7 +731,8 @@ lifecycle edge (`inbox`, `prioritized`, `done`, `cancelled`) has no holder;
 readable persona puts it at You with *no persona for position n*;
 otherwise the entry's persona holds it. The holder of an agent entry is the
 one who runs — no column persona, no ticket pin, no default (below); a
-`:shape` entry waits for the owner's Shape chat; a You entry waits for the
+`:shape` entry first waits for the owner's Shape chat (req-305: its run
+follows at the same position once the owner accepts the shaping); a You entry waits for the
 owner in Needs you; a Pia entry gets a Mission Control turn (below). A run's green end
 writes the next position into `x-at` inside its claim and releases once
 into `active` (`ClaimRelease.advance`); past the last entry the cursor
@@ -822,8 +831,7 @@ without a chain of its own), and is then the ticket's own — a later change
 of `flow:` never reshuffles existing tickets. A pipeline without `flow:`
 creates tickets without a chain. The settings page edits it in the flow editor
 itself: the editor's ticket id `standard` (`FlowScope` `standard`, tab key
-`flow://standard`) shows `flow:` with nothing locked, the same edits and Paul's
-draft apply, and "Save flow" rewrites the key in `pipeline.md` (a yaml document
+`flow://standard`) shows `flow:` with nothing locked, the same edits apply, and "Save flow" rewrites the key in `pipeline.md` (a yaml document
 edit that keeps the other keys and the body; an empty list removes it) instead of
 a ticket header — checked by the same write guard; a part does not exist there.
 
@@ -1098,7 +1106,7 @@ phases:
   - { id: building, title: Building, wip: 3, claim: true, handover: agent build-default, color: '#c96442' }
   - { id: ready, title: Ready to try, handover: manual, persona: you }
   - { id: done, title: Done, handover: none }
-flow: paul:shape; paul; ben; ralf; tessa; you
+flow: paul:shape; ben; ralf; tessa; you
 ---
 Prose for humans. The board follows this file on refresh.
 ```
@@ -1111,7 +1119,7 @@ stage: plan, build, review and test are phases of the chain inside it) · **Read
 (id `ready`, the owner's checkpoint, see "Agent lane rules") · **Done**. The manual columns
 carry `persona: you` (the human persona, whose name is configurable — `personas.humanName`,
 Settings → Tickets → Crew); the fleet takes nothing from them. The shipped `flow:` is the
-default crew's standard flow, `paul:shape; paul; ben; ralf; tessa; you` (req-266). Building is the first worker
+default crew's standard flow, `paul:shape; ben; ralf; tessa; you` (req-266, req-305: Paul once, shaping included). Building is the first worker
 column, so a run there on a ticket without acceptance criteria gates structurally.
 
 **Accept on Ready to try is the sign-off** and no plain move: it starts the human persona's
@@ -1171,7 +1179,7 @@ the old phase stays in `x-legacy-phase`. `migrate-tickets --pipeline-out` writes
   string is ignored with a noise badge.
 - `flow`: optional (req-266) — the **standard flow**, the chain a new ticket
   is created with: one line in the chain grammar, entries separated by `;`
-  (`flow: paul:shape; paul; ben; ralf; tessa; you`), or a YAML list. Copied
+  (`flow: paul:shape; ben; ralf; tessa; you`), or a YAML list. Copied
   into the ticket at creation and the ticket's own from then on; absent = new
   tickets carry no chain. An unreadable entry drops the whole key with a
   warning. Read by `core/pipeline-flow.ts`; written by the settings page's
@@ -2251,7 +2259,7 @@ line is skipped, never guessed — the asymmetric-tolerance rule):
   in an indented fenced block marked `json` — a **proposal card**:
   `<summary>` is the human sentence the card shows, the block is the
   typed `ChatCommand` (`createTicket` / `transition` / `setPriority` /
-  `promote` / `setChain` — the union in
+  `promote` / `setChain` / `setStandardFlow` (req-306: the board's `flow:`, no ticket id) — the union in
   `packages/tickets-engine/src/contracts/chat.ts`
   is the entire write surface; a `createTicket` may carry the ticket's
   `project` (req-298) and `repo` (req-299, a `repos.md` name — a worker's

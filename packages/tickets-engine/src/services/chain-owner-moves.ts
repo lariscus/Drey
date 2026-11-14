@@ -1,5 +1,7 @@
+import type { ChainEntry } from '../contracts/chain';
 import type { TicketCard } from '../contracts/tickets';
 import { atLastEntry, ownerSendBackTarget } from '../core/chain-cursor';
+import { renderChainEntry } from '../core/chain-list';
 import { chainFinished } from '../core/chain-placement';
 import { cursorAfterGreen } from '../core/chain-red-gate';
 import { EDGE_STAGES } from '../core/lifecycle-stages';
@@ -14,6 +16,8 @@ import type { HolderPlacement } from '../store/store-board';
  *
  * - Accept moves the cursor to the next position: the owner's step is done
  *   (a You entry), or the owner hands on whatever stands at the cursor.
+ *   At a `:shape` entry (req-305) it ends the shaping instead: the entry
+ *   drops its mode and the persona's run follows at the same position.
  * - At the chain's LAST entry: a You entry of a repository ticket is the
  *   sign-off — You's `commit` leaving action (milestone 245's machine run)
  *   first, then `done`; any other last entry goes straight to `done` (a
@@ -29,6 +33,11 @@ import type { HolderPlacement } from '../store/store-board';
  */
 export type OwnerAccept =
   | { readonly kind: 'none' }
+  /**
+   * req-305: the shaping at a `:shape` entry is over — the entry loses its mode, the cursor stays,
+   * and the persona's own run starts at the same position (one entry, one position).
+   */
+  | { readonly kind: 'shaped'; readonly entries: readonly string[]; readonly at: number; readonly line: string }
   | { readonly kind: 'commit' }
   | { readonly kind: 'done'; readonly line: string }
   /** `returned` (req-78): the cursor goes straight back to the position whose red gate sent the ticket here. */
@@ -51,6 +60,16 @@ function activeChainOf(card: TicketCard, placement: HolderPlacement): { readonly
   return { at: Math.min(Math.max(card.meta.at ?? 1, 1), chain.length), length: chain.length };
 }
 
+/** req-305: Accept at an agent's `:shape` entry ends the shaping in place; null at any other entry. */
+function shapedAcceptOf(chain: readonly ChainEntry[], at: number, placement: HolderPlacement): OwnerAccept | null {
+  const current = chain[at - 1]!;
+  if (current.mode !== 'shape' || placement.lookup(current.persona)?.kind !== 'agent') {
+    return null;
+  }
+  const entries = chain.map((entry, index) => renderChainEntry(index === at - 1 ? { ...entry, mode: null } : entry));
+  return { kind: 'shaped', entries, at, line: `shaping done at position ${at} of ${chain.length} — ${current.persona} plans it now` };
+}
+
 /** What the owner's Accept does to a chain ticket. */
 export function ownerAcceptOf(card: TicketCard, placement: HolderPlacement): OwnerAccept {
   const active = activeChainOf(card, placement);
@@ -59,6 +78,10 @@ export function ownerAcceptOf(card: TicketCard, placement: HolderPlacement): Own
     return { kind: 'none' };
   }
   const { at, length } = active;
+  const shaped = shapedAcceptOf(chain, at, placement);
+  if (shaped !== null) {
+    return shaped;
+  }
   const back = cursorAfterGreen(length, at, card.meta.returnTo);
   if (back.returned) {
     return { kind: 'cursor', at: back.at, line: `accepted at position ${at} of ${length} — back to position ${back.at}, whose red gate sent it here`, returned: true };

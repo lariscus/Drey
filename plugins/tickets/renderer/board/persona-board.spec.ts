@@ -195,6 +195,18 @@ describe('the Board tab on persona columns', () => {
     expect(invoked).toContainEqual(['sendBack', { id: 'T-0118', note: 'the export misses images', position: 3 }]);
   });
 
+  it('a card at a shaping entry offers Shaping done — the same Accept, the persona plans at that position (req-305)', async () => {
+    (snap.columns[3]!.tickets as TicketCard[]).push(card('T-0127', 'active', { holder: 'paul', named: 'paul', position: 1, mode: 'shape' }));
+    const host = mount();
+    const shaping = host.querySelector('.pb-card[data-id="T-0127"]')!;
+    expect(shaping.querySelector('.pb-status-text')!.textContent).toBe('shaping with you');
+    expect(shaping.querySelector('.pb-decide-back')).toBeNull();
+    shaping.querySelector<HTMLButtonElement>('.pb-shaping-done')!.click();
+    await Promise.resolve();
+    expect(invoked).toContainEqual(['acceptTicket', { id: 'T-0127' }]);
+    expect(host.querySelector('.pb-card[data-id="T-0122"] .pb-shaping-done')).toBeNull();
+  });
+
   it('sends a dropped card as one move: start, hand, park', async () => {
     const host = mount();
     const drop = async (id: string, column: string): Promise<void> => {

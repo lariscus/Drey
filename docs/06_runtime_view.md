@@ -3945,9 +3945,7 @@ sequenceDiagram
 ```
 
 The chat reads the config per turn, so a change in Settings → Assistant
-applies to the next question without restarting the engine. A flow draft
-(`flow-draft`) that finds no model returns the failure's one-sentence
-text as its error.
+applies to the next question without restarting the engine.
 
 ## 6.80 A manual step: park, notify, Accept or Send back (E10-6)
 
@@ -4257,9 +4255,6 @@ sequenceDiagram
     F->>M: flowEdit {id, chain: draft, edit}
     M->>E: applyFlowOp -> validateChain (personas, cursor) -> the next list
     E-->>F: the next draft (or a refusal, shown under the list)
-    O->>F: Ask Paul
-    F->>M: flowDraft {id, ask}
-    E-->>F: Paul's draft + reason (Undo draft restores the one before)
     O->>F: Save flow
     F->>M: flowSave {id, chain}
     M->>E: saveFlow -> `chain:` frontmatter, one commit
@@ -5761,8 +5756,8 @@ sequenceDiagram
     participant Shape as Shape chat (Paul)
     Owner->>Chat: capture an idea
     Chat->>BS: createTicket
-    BS->>Pipe: snapshot.flow (flow: paul:shape; paul; ben; ralf; tessa; you)
-    BS->>T: chain: [paul:shape, paul, ben, ralf, tessa, you] · at: 1 (x-chain / x-at on a store)
+    BS->>Pipe: snapshot.flow (flow: paul:shape; ben; ralf; tessa; you)
+    BS->>T: chain: [paul:shape, ben, ralf, tessa, you] · at: 1 (x-chain / x-at on a store)
     Owner->>Chat: "give T-0121 a second review by Tessa"
     Chat-->>Owner: setChain card (the whole list)
     Owner->>Chat: confirm
@@ -6003,22 +5998,18 @@ sequenceDiagram
     participant P as the speaker's prompt.md
     participant CT as ChatTurn (bridge)
     participant M as chat model
-    Owner->>CS: a line in a shape session (or "Ask …" in the Flow tab)
-    CS->>V: shape(ticket) · flow(ticket)
+    Owner->>CS: a line in a shape session
+    CS->>V: shape(ticket)
     V->>B: snapshot (the ticket's chain, pipeline.md flow:) · listPersonas (crew.md order)
-    V->>V: shapeSpeakerOf: the :shape entry, else the standard flow's<br/>flowSpeakerOf: the plan entry (structural gate), else the shape persona
+    V->>V: shapeSpeakerOf: the :shape entry, else the standard flow's
     V->>P: the speaker's prompt.md (no cache; LF, version line dropped)
     V-->>CS: ChatVoice {speaker, prompt, roster}
-    alt a flow draft and nobody to ask
-        CS-->>Owner: "No persona is assigned to plan T-…" — no model call
-    else
-        CS->>CT: runTurn {…, shape | flow, voice}
-        CT->>M: system = prompt.md + shape.md | flow.md (wrapper + contract) + ## Crew (shape) + ## Ticket | ## Flow
-        M-->>CT: the JSON envelope
-    end
+    CS->>CT: runTurn {…, shape, voice}
+    CT->>M: system = prompt.md + shape.md (wrapper + contract) + ## Crew + ## Ticket
+    M-->>CT: the JSON envelope
 ```
 
-The persona's `prompt.md` opens the system message and the mode's wrapper (`prompts/crew/shape.md`, `flow.md`: the chat is not a run, the strict JSON contract wins over how a run ends, the plan format or the chain grammar) follows it — who speaks before what the mode asks (R11). The wrapper names no persona; a shape turn lists the crew in its own `## Crew` block (the agents with their one-line `summary:`, in `crew.md`'s order), a flow draft's context already lists it. Nothing is cached: a rename, an edit on the Persona page, a reorder or a deleted persona applies to the next message. Without a speaker or without a readable prompt the wrapper speaks alone — a shape turn never stops for it. The model stays the chat bridge's (the assistant's LLM settings), not the persona's.
+The persona's `prompt.md` opens the system message and the mode's wrapper (`prompts/crew/shape.md`: the chat is not a run, the strict JSON contract wins over how a run ends, the plan format) follows it — who speaks before what the mode asks (R11). The wrapper names no persona; a shape turn lists the crew in its own `## Crew` block (the agents with their one-line `summary:`, in `crew.md`'s order). Nothing is cached: a rename, an edit on the Persona page, a reorder or a deleted persona applies to the next message. Without a speaker or without a readable prompt the wrapper speaks alone — a shape turn never stops for it. The model stays the chat bridge's (the assistant's LLM settings), not the persona's.
 
 ## 6.127 The cursor moves → a `hold` line → the report's held, busy and waiting time (req-274, milestone 256)
 
@@ -6660,7 +6651,7 @@ sequenceDiagram
     participant D as Dispatcher
     participant W as Plan worker
     S->>F: Open flow editor (the default flow)
-    F->>E: flow {id: standard} / flowEdit / flowDraft
+    F->>E: flow {id: standard} / flowEdit
     E-->>F: scope standard · the saved flow · nothing locked
     F->>E: flowSave {id: standard, chain}
     E->>E: validateChain (the crew, an entry per position)
@@ -6736,3 +6727,35 @@ means the host lists no vault, so every reader of the board (`detect`, `listProj
 service) finds none; the files are never deleted. With no key (no Drey ever named a registry) the vault is
 loaded. The `board` IPC awaits the registry push before it reads, so a fetch right after a removal cannot
 see the old list.
+## 6.146 One entry shapes and plans; the standard flow is set through Mission Control (req-305, req-306, milestone 280)
+
+A ticket whose chain begins `paul:shape; ben; …` waits at position 1 for the owner's Shape chat; the owner's **Accept** (the card's *Shaping done*) rewrites the entry without its mode and the same persona plans at the same position. Pia sets the board's standard flow with a card and knows the owner as the persona `you`.
+
+```mermaid
+sequenceDiagram
+    actor O as Owner
+    participant B as Board card (desktop)
+    participant E as Engine (BoardService)
+    participant S as Store (x-chain, x-at)
+    participant D as Dispatcher (HolderPass)
+    participant W as Paul's plan run
+    participant C as ChatService (Pia)
+    participant P as pipeline.md
+    Note over S: x-chain paul:shape;ben;you · x-at 1
+    D->>D: holder paul, mode shape — no run, the wait line names the Shape chat
+    O->>E: the Shape chat (a bridge call: Paul's prompt.md + the shape wrapper) writes the plan
+    O->>B: Shaping done
+    B->>E: acceptTicket
+    E->>E: ownerAcceptOf: shape entry of an agent → decision "shaped"
+    E->>S: put — x-chain paul;ben;you, x-at stays 1 (status line "shaping done at position 1 of 3")
+    D->>W: the holder's run starts at position 1, like any other
+    W-->>S: green end: x-at 2 (Ben)
+    O->>C: "make the standard flow Paul, Ben, then me" (Henrik, me, I = you)
+    C->>C: system message: Pia's prompt, mission.md, board digest, ## Crew (you = Henrik), sessions
+    C-->>O: card "Set the standard flow to paul:shape; ben; you" (before / after)
+    O->>C: confirm
+    C->>E: setStandardFlow {chain}
+    E->>E: parse (strict) → validateChain (the crew, nothing locked)
+    E->>P: flow: paul:shape; ben; you — one commit "tickets: default flow"
+    Note over E,S: existing tickets keep their own chains
+```

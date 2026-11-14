@@ -24,7 +24,7 @@ import {
  * and its phone twin): the gates of one ticket's or one part's flow as a
  * list with a + connector between them, an inspector for the tapped gate
  * (who, model, tell me, runs after, move earlier / later, add after,
- * remove), Paul's draft, "Reset to standard flow" and "Save flow". Every
+ * remove), "Reset to standard flow" and "Save flow". Every
  * change is a draft, drawn dashed, until Save flow; a running gate stays
  * as it is.
  */
@@ -44,7 +44,6 @@ export class FlowEditor {
   protected readonly flow = computed(() => this.state.flow());
   protected readonly error = computed(() => this.state.error());
   protected readonly readOnly = computed(() => this.state.readOnly() || (this.state.flow()?.readOnly ?? null) !== null);
-  protected readonly reason = computed(() => this.state.paulReason());
 
   /** The tapped gate (its merged-chain index); null = none. */
   protected readonly selected = signal<number | null>(null);
@@ -52,7 +51,6 @@ export class FlowEditor {
   protected readonly adding = signal<number | null>(null);
   protected readonly busy = signal(false);
   protected readonly message = signal<string | null>(null);
-  protected readonly ask = signal('');
 
   protected readonly chip = computed(() => {
     const flow = this.flow();
@@ -115,9 +113,6 @@ export class FlowEditor {
     });
   });
 
-  /** Paul's picture on his card: his persona's colour. */
-  protected readonly paulColor = computed(() => this.flow()?.personas.find((p) => p.id === 'paul')?.color || 'var(--text-2)');
-
   protected padRowOf(index: number): { readonly tint: string } | undefined {
     return this.padRows().find((row) => row.step.index === index);
   }
@@ -133,23 +128,6 @@ export class FlowEditor {
     const flow = this.flow();
     const gates = (flow?.steps ?? []).map((s) => this.i18n.t('flow.pad.gate_who', { title: s.title, who: whoOf(s, flow!) }));
     return gates.length === 0 ? this.i18n.t('flow.pad.explain_generic') : this.i18n.t('flow.pad.explain', { gates: gates.join(', ') });
-  });
-
-  /** One sentence per gate the draft added, after the gate it follows. */
-  protected readonly changeLines = computed(() => {
-    const flow = this.flow();
-    if (flow === null) {
-      return [];
-    }
-    const changed = this.changed();
-    const lines: string[] = [];
-    flow.steps.forEach((step, at) => {
-      const before = flow.steps[at - 1];
-      if (before !== undefined && changed.has(step.index)) {
-        lines.push(this.i18n.t(step.notify ? 'flow.pad.change_added_tell' : 'flow.pad.change_added', { title: step.title, who: whoOf(step, flow), after: before.title }));
-      }
-    });
-    return lines;
   });
 
   /** The footer's left side: the number of changes in the draft, and the part it belongs to. */
@@ -256,36 +234,6 @@ export class FlowEditor {
       this.selected.set(null);
       this.adding.set(null);
     }
-  }
-
-  protected async askPaul(): Promise<void> {
-    if (this.busy()) {
-      return;
-    }
-    this.busy.set(true);
-    this.message.set(null);
-    try {
-      const text = this.ask().trim();
-      const reply = await this.state.draft(text === '' ? null : text);
-      if (reply.ok) {
-        this.ask.set('');
-        this.selected.set(null);
-        this.adding.set(null);
-      } else {
-        this.message.set(reply.error);
-      }
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected onAsk(event: Event): void {
-    this.ask.set((event.target as HTMLInputElement | HTMLTextAreaElement).value);
-  }
-
-  protected undoDraft(): void {
-    this.state.undoDraft();
-    this.selected.set(null);
   }
 
   protected async save(): Promise<void> {

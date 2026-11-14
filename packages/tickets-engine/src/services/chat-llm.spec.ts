@@ -408,11 +408,11 @@ describe('createChatBridge', () => {
 
     const body = JSON.parse(String(calls[0]!.init.body)) as { messages: { role: string; content: string }[] };
     const system = body.messages[0]!.content;
-    expect(system).toContain('exactly seven intents');
+    expect(system).toContain('exactly eight intents');
     expect(system).toContain('- promote —');
     expect(system).toContain('scout');
     // req-280: every command is listed with its fields and an example.
-    for (const kind of ['createTicket', 'transition', 'setPriority', 'promote', 'setChain', 'setBlockedBy', 'startSession']) {
+    for (const kind of ['createTicket', 'transition', 'setPriority', 'promote', 'setChain', 'setStandardFlow', 'setBlockedBy', 'startSession']) {
       expect(system).toContain(`{"kind":"${kind}"`);
     }
   });

@@ -438,7 +438,7 @@ export const PAD_ESTIMATES: Record<string, unknown> = {
   'build/ben': estimate('build', 'ben', 'qwen3-coder', 1.45, 1.1, 1.8),
 };
 
-/** 5i: the flow of T-0130's third part as the desk answers it before Paul's draft (the board's sample says part 3 whichever part is opened). */
+/** 5i: the flow of T-0130's third part as the desk answers it before an edit (the board's sample says part 3 whichever part is opened). */
 const flowStep = (index: number, persona: string, title: string, extra: Record<string, unknown>) => ({
   index,
   position: index + 1,
@@ -475,11 +475,10 @@ export const PAD_FLOW_130 = {
     { id: 'you', kind: 'human', title: 'You', color: 'var(--text)', model: '' },
   ],
   readOnly: null,
-  reason: null,
 };
 
-/** 5i: Paul's draft (what `POST /api/tickets/T-0130/flow-draft` answers): a security pass by Ralf after the review, with a card for the owner. */
-export const PAD_FLOW_130_DRAFT = {
+/** 5i: the owner's edit (what `POST /api/tickets/T-0130/flow-edit` answers): a security pass by Ralf after the review. */
+export const PAD_FLOW_130_EDITED = {
   ...PAD_FLOW_130,
   chain: ['ben', 'ralf', 'ralf(notify)', 'tessa', 'you'],
   steps: [
@@ -489,7 +488,6 @@ export const PAD_FLOW_130_DRAFT = {
     { ...FLOW_BASE_STEPS[2], index: 3, position: 4 },
     { ...FLOW_BASE_STEPS[3], index: 4, position: 5 },
   ],
-  reason: 'Part 3 touches the command parser, so I added a security pass by Ralf after the review. You would be told when it is done.',
 };
 
 /** 5d: the iPad's crew list: Paul runs a two-entry pool (the local model first, Claude Code as overflow). */

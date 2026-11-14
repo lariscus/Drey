@@ -30,7 +30,7 @@ import { allowedAfter, type PersonaAllowedPatch } from '../contracts/persona-all
 import { BUILDING_STATE, DEFAULT_PIPELINE_TEXT, READY_STATE, STANDARD_FLOW_LINE } from '../core/pipeline-states';
 import { parseChainItems, renderChainEntries, unreadableEntryMessage } from '../core/chain-list';
 import { validateChain } from '../core/chain-validate';
-import { flowDraftText, flowPersonasOf, flowStepViews, lockedOfCard, partFlowSteps } from './flow-views';
+import { flowPersonasOf, flowStepViews, lockedOfCard, partFlowSteps } from './flow-views';
 import { deletePlanPart, movePlanPart, parsePlanParts, partChainEntries, withPlanParts, type PlanPart } from '../core/plan-parts';
 import { blockerOf, indicesToMint, lockedIndices, matchPartTickets, partStateOf, partTicketText, releaseLogText, startLineOf, type PartTicket } from '../core/plan-release';
 import type { PlanPartCard, PlanPartsEdit, PlanPartsReply, PlanReleaseReply, PlanReleaseScope } from '../contracts/plan-approval';
@@ -1911,29 +1911,6 @@ export class EngineBoardService {
     });
   }
 
-  /** What Paul reads before he drafts a flow (E10-5): the standard flow, the chain now, the crew. */
-  async flowDraftContext(target: FlowTarget): Promise<{ readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string }> {
-    const frame = await this.flowFrame(target);
-    if ('error' in frame) {
-      return { ok: false, error: frame.error };
-    }
-    if (frame.readOnly !== null) {
-      return { ok: false, error: frame.readOnly };
-    }
-    const reply = await this.flowReply(frame, frame.saved);
-    if (!reply.ok) {
-      return reply;
-    }
-    if (target.id === STANDARD_FLOW_ID) {
-      return { ok: true, text: flowDraftText({ ticket: null, title: frame.title, plan: '', standard: renderChainEntries(frame.standard), steps: reply.steps, saved: reply.saved, personas: reply.personas }) };
-    }
-    const plan = frame.part !== null ? `\nThis flow belongs to part "${frame.part.title}"${frame.part.reason === null ? '' : ` — ${frame.part.reason}`}.` : '';
-    return {
-      ok: true,
-      text: flowDraftText({ ticket: target.id, title: frame.title, plan, standard: renderChainEntries(frame.standard), steps: reply.steps, saved: reply.saved, personas: reply.personas }),
-    };
-  }
-
   /**
    * The approval (E10-4): every part of the plan that is not a ticket yet
    * — or only the first such part — becomes its own ticket in the build
@@ -2918,7 +2895,13 @@ export class EngineBoardService {
       return (await this.commitActionMissing(vault, card.id)) ?? this.startCommitStep(card.id);
     }
     const terminal = snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done';
-    const written = await this.writeChainCursor(card, decision.kind === 'done' ? { done: terminal } : { at: decision.at, returned: decision.returned }, { line: decision.line, actor });
+    const target =
+      decision.kind === 'done'
+        ? { done: terminal }
+        : decision.kind === 'shaped'
+          ? { at: decision.at, chain: decision.entries }
+          : { at: decision.at, returned: decision.returned };
+    const written = await this.writeChainCursor(card, target, { line: decision.line, actor });
     const warning = written.ok && decision.kind === 'done' ? await this.removeWorktreesOfDone(card) : null;
     return warning === null || !written.ok ? written : { ...written, warning };
   }
@@ -2927,7 +2910,7 @@ export class EngineBoardService {
    * req-257: one owner write of a chain ticket's cursor on the store — `x-at` moved (the stage stays
    * `active`), or the ticket to `done` — with the status line, one `put`.
    */
-  private async writeChainCursor(card: TicketCard, target: { readonly at: number; readonly returned?: boolean } | { readonly done: string }, why: { readonly line: string; readonly actor: string; readonly text?: string }): Promise<BoardMutationResult> {
+  private async writeChainCursor(card: TicketCard, target: { readonly at: number; readonly returned?: boolean; readonly chain?: readonly string[] } | { readonly done: string }, why: { readonly line: string; readonly actor: string; readonly text?: string }): Promise<BoardMutationResult> {
     const store = this.dricket;
     if (store === null) {
       return { ok: false, error: 'the cursor of a chain lives on a dricket store' };
@@ -2935,7 +2918,8 @@ export class EngineBoardService {
     try {
       const record = await this.storeBoard.record(store, card.id);
       const legacy = why.text ?? recordToBoardFile(record, card.phase).text;
-      const moved = 'at' in target ? (setDocumentField(legacy, 'at', String(target.at)) ?? legacy) : legacy;
+      const moved =
+        'at' in target ? (target.chain !== undefined ? withChainAndCursor(legacy, target.chain, target.at) : (setDocumentField(legacy, 'at', String(target.at)) ?? legacy)) : legacy;
       // req-78: every owner write of the cursor uses or drops a red gate's return; only a return keeps the loop's count.
       const loopKeys = 'at' in target && target.returned === true ? ['return-to'] : ['return-to', 'red-backs'];
       const settled = loopKeys.reduce((doc, key) => setDocumentField(doc, key, null) ?? doc, moved);

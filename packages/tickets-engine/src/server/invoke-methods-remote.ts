@@ -1,4 +1,4 @@
-import { parseFlowDraft, parseFlowEdit, parseFlowSave, parsePlanPartsEdit, parseStandardFlow, type Parsed } from '../core/commands';
+import { parseFlowEdit, parseFlowSave, parsePlanPartsEdit, parseStandardFlow, type Parsed } from '../core/commands';
 import { remoteActorOf } from '../contracts/remote-protocol';
 import type { EngineParts } from './engine-parts';
 import type { InvokeTable } from './invoke-table';
@@ -39,7 +39,6 @@ export function addRemoteMethods(table: InvokeTable, parts: EngineParts): void {
   // The Parts block in the ticket (E13-10): the list edit the phone makes, same parser.
   table.set('planPartsEdit', flowWrite(parsePlanPartsEdit, (cmd) => remotePort.planPartsEdit(cmd, remoteActorOf('Drey'))));
   table.set('flowEdit', flowWrite(parseFlowEdit, (cmd) => remotePort.flowEdit(cmd)));
-  table.set('flowDraft', flowWrite(parseFlowDraft, (cmd) => remotePort.flowDraft(cmd)));
   table.set('flowSave', flowWrite(parseFlowSave, (cmd) => remotePort.flowSave(cmd, remoteActorOf('Drey'))));
   // E10-5b: the settings page's default flow and the proposal switch (pipeline.md's `flow:` / `propose-flow:`).
   table.set('setStandardFlow', flowWrite(parseStandardFlow, (cmd) => parts.board.board.setStandardFlow(cmd)));

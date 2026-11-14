@@ -90,27 +90,6 @@
   color: var(--status-deleted);
 }
 
-.flow-paul {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 8px 12px;
-  background: var(--accent-surface);
-  border-radius: var(--radius-control);
-}
-
-.flow-paul-k {
-  font-weight: 600;
-  color: var(--text-primary, var(--text-2));
-}
-
-.flow-paul-t {
-  flex: 1;
-  min-width: 12ch;
-}
-
 .flow-list {
   max-width: 520px;
   margin: 0;
@@ -140,8 +119,7 @@
 .flow-gate:focus-visible,
 .flow-plus:focus-visible,
 .flow-chipbtn:focus-visible,
-.flow-switch:focus-visible,
-.flow-input:focus-visible {
+.flow-switch:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -315,7 +293,6 @@
 .flow-ins-head,
 .flow-actions,
 .flow-row,
-.flow-ask,
 .flow-buttons {
   display: flex;
   align-items: center;
@@ -400,19 +377,4 @@
 .flow-message {
   margin: 0;
   color: var(--text-3);
-}
-
-.flow-input {
-  flex: 1;
-  box-sizing: border-box;
-  padding: 4px 10px;
-  font: inherit;
-  color: var(--text-primary, var(--text-2));
-  background: var(--bg-input);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-control);
-}
-
-.flow-input::placeholder {
-  color: var(--placeholder);
 }

@@ -92,6 +92,16 @@ describe('validateChatCommand', () => {
     expect(validateChatCommand({ kind: 'setChain', id: 'T-1', chain: [] })).toBeNull();
   });
 
+  it('validates setStandardFlow (req-306) with a non-empty persona list and no ticket id', () => {
+    expect(validateChatCommand({ kind: 'setStandardFlow', chain: ['paul:shape', 'ben', 'you'] })).toEqual({
+      kind: 'setStandardFlow',
+      chain: ['paul:shape', 'ben', 'you'],
+    });
+    expect(validateChatCommand({ kind: 'setStandardFlow', chain: [] })).toBeNull();
+    expect(validateChatCommand({ kind: 'setStandardFlow' })).toBeNull();
+    expect(validateChatCommand({ kind: 'setStandardFlow', chain: ['ok', 4] })).toBeNull();
+  });
+
   it('validates setBlockedBy with a ticket-id list — an empty list clears', () => {
     expect(validateChatCommand({ kind: 'setBlockedBy', id: 'T-0002', blockedBy: ['T-0001', 'T-0003'] })).toEqual({
       kind: 'setBlockedBy',

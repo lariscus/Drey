@@ -115,26 +115,6 @@
   color: var(--text-2);
 }
 
-.fe-paul {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 14px;
-  background: var(--panel);
-  border: 1px dashed var(--accent);
-  border-radius: var(--radius-control);
-}
-
-.fe-paul-k {
-  font-size: calc(13px * var(--mc-text, 1));
-  color: var(--accent);
-}
-
-.fe-paul-t {
-  font-size: calc(15px * var(--mc-text, 1));
-  line-height: 1.35;
-}
-
 .fe-list {
   display: flex;
   flex-direction: column;
@@ -467,24 +447,10 @@
   border-top: 1px solid var(--line);
 }
 
-.fe-ask,
 .fe-buttons {
   display: flex;
   gap: 10px;
   align-items: center;
-}
-
-.fe-input {
-  flex: 1;
-  min-width: 0;
-  min-height: 44px;
-  padding: 0 12px;
-  font: inherit;
-  font-size: 16px;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-control);
 }
 
 .fe-error {

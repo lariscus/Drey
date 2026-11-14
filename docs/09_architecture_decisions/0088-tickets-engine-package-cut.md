@@ -397,10 +397,8 @@ plugin folder, no npm workspaces, and a renderer/remote bundling guard
     The draft lives in the app and each tap is a stateless round trip
     (`POST …/flow-edit`), so nothing is written before "Save flow"
     (`POST …/flow-save`, ticket header or the part's line in the parent's
-    plan) and no draft state exists on the desk. Paul's draft
-    (`POST …/flow-draft`) is one bridge turn under its own prompt that
-    answers a `setChain` command; the desk reads it back through the same
-    guard as a hand edit, and it is never written by the draft.
+    plan) and no draft state exists on the desk. (Paul's draft, `POST …/flow-draft`,
+    was removed by req-306: flow changes in words go through Mission Control.)
 - **E10-6 (milestone 132):** the owner is a crew member. A persona file may
   say `kind: human` (`personas/you`, created on first sight with the title
   from config `personas.humanName`, default "You"); a human persona is never
@@ -496,9 +494,9 @@ plugin folder, no npm workspaces, and a renderer/remote bundling guard
 
   - **The Flow tab (E13-11, milestone 145).** The desktop's flow editor is a
     plain-DOM tab in the tickets plugin over the engine's `flow`, `flowEdit`,
-    `flowDraft` and `flowSave` (invoke allowlist, parsed by the router's own
-    `parseFlow*`). It holds only a draft: the grammar (`core/flow-edit.ts`,
-    `chain-delta.ts`) stays in the engine, so Drey, the phone and Paul's draft
+    and `flowSave` (invoke allowlist, parsed by the router's own
+    `parseFlow*`; `flowDraft` was removed by req-306). It holds only a draft: the grammar (`core/flow-edit.ts`,
+    `chain-delta.ts`) stays in the engine, so Drey and the phone
     go through one guard. The word helpers it shares with the Angular editor
     in `libs/mission-ui` exist twice (the lib cannot be imported); the engine
     contract `contracts/flow.ts` is the single shape.

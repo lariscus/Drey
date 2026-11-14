@@ -62,6 +62,8 @@ export interface PersonaCardModel {
   readonly cost: number | null;
   /** Accept and Send back… on the card: You's own entry. */
   readonly decide: boolean;
+  /** req-305: the persona's entry is still in the Shape chat — the card offers "Shaping done" (Accept: the persona plans at the same position). */
+  readonly shaping: boolean;
   /** The personas that worked a done ticket (`Ralf · Ben · Tessa`). */
   readonly workedBy: readonly string[];
   /** req-285: the project chip under *All projects*; null = none. */
@@ -198,6 +200,7 @@ export function personaCardOf(card: TicketCard, snap: BoardSnapshot, live: Board
     emphasized: hold !== null && hold.holder !== YOU_LANE && (badge === 'sent-back-once' || status?.kind === 'shaping'),
     cost: costOf(card),
     decide: hold !== null && hold.holder === YOU_LANE && hold.why === 'entry',
+    shaping: hold !== null && hold.holder !== YOU_LANE && hold.why === 'entry' && hold.mode === 'shape' && !hold.claimed,
     workedBy: [...new Set(cells.filter((cell) => crew.kindOf(cell.persona) === 'agent').map((cell) => cell.name))],
     project: live.chip?.(card) ?? null,
   };

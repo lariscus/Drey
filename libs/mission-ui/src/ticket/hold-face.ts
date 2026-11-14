@@ -162,17 +162,15 @@ const plus = (a: number | null, b: number | null): number | null => (b === null 
 /**
  * The position a run settled at. The Verlauf line names its persona, not its
  * position, so the runs are walked in order: the next position of that persona
- * up to the cursor, else the nearest earlier one (a send-back's rerun). A
- * `:shape` entry is a chat and writes no line — it takes a run only when its
- * persona has no other position.
+ * up to the cursor, else the nearest earlier one (a send-back's rerun).
+ * (req-305: a `:shape` entry is one position of its persona's run, shaping
+ * first — the chat writes no line, the run after it does.)
  */
-export function positionOfRun(persona: string | null, chain: readonly string[], modes: readonly Mode[], last: number, cursor: number): number | null {
+export function positionOfRun(persona: string | null, chain: readonly string[], last: number, cursor: number): number | null {
   if (persona === null) {
     return null;
   }
-  const all = chain.map((id, index) => (id === persona ? index + 1 : 0)).filter((position) => position > 0);
-  const runs = all.filter((position) => modes[position - 1] !== 'shape');
-  const candidates = runs.length > 0 ? runs : all;
+  const candidates = chain.map((id, index) => (id === persona ? index + 1 : 0)).filter((position) => position > 0);
   const ahead = candidates.find((position) => position > last && position <= cursor);
   if (ahead !== undefined) {
     return ahead;
@@ -196,12 +194,12 @@ function addRun(into: PositionCost | undefined, position: number | null, entry: 
 }
 
 /** The settled runs summed per chain position, first position first; runs no position takes come last, per persona. */
-export function positionCostsOf(entries: readonly McVerlaufEntry[], hold: Pick<McHold, 'chain' | 'position'>, modes: readonly Mode[]): readonly PositionCost[] {
+export function positionCostsOf(entries: readonly McVerlaufEntry[], hold: Pick<McHold, 'chain' | 'position'>): readonly PositionCost[] {
   const placed = new Map<number, PositionCost>();
   const loose = new Map<string, PositionCost>();
   let last = 0;
   for (const entry of entries) {
-    const position = positionOfRun(entry.persona, hold.chain, modes, last, hold.position);
+    const position = positionOfRun(entry.persona, hold.chain, last, hold.position);
     if (position === null) {
       const key = entry.persona ?? '';
       loose.set(key, addRun(loose.get(key), null, entry));

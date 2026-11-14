@@ -56,7 +56,7 @@ be said at all. Four owner rulings (2026-11-10/11) changed the model:
   `active`, `done` (dricket's `cancelled` reserved), and `running`, the
   claim's own stage while a run holds the ticket. A stage never says who.
 - **Chain** — the ticket's whole way, an ordered list of personas
-  (`paul:shape; paul; ben; ralf(notify); tessa; you`). A position (1-based),
+  (`paul:shape; ben; ralf(notify); tessa; you`). A position (1-based),
   not a persona id, is what the cursor and a send-back name. No step
   catalogue, no `steps:` field.
 - **Cursor** — the position of the current entry (`at:` / `x-at`).
@@ -331,6 +331,49 @@ Control's iPad and phone Crew draw a persona's queued tickets as rows
 (*queued · waits for a slot*), a persona with only queued tickets as
 *waiting*, and the head line's *· 1 queued*. On the phase board only the
 pool's queue reaches it.
+
+## Later change — one Paul with shaping, the flow changed through Mission Control (milestone 280, req-305 and req-306, 2026-11-14)
+
+Two findings of the owner's first test of the persona board.
+
+**One entry shapes and plans (req-305).** The standard flow read
+`paul:shape; paul; ben; …` — Paul twice, once for the Shape chat and once for the
+plan run — and the owner asked why. The two entries were one step of the ticket's
+way: the shaping *is* the planning, done with the owner. Now `paul:shape` is **one
+entry, one position**: the Shape chat runs while the ticket waits at it, the
+persona's own run follows at the same position. The grammar did not change, only what
+`:shape` means (before: an entry with no run of its own, ended by Accept moving the
+cursor on). The open questions of the row, as decided:
+
+- *How the engine knows the shaping is over:* the owner's **Accept** at a `:shape`
+  entry (the board card's *Shaping done*) rewrites the entry at the cursor without its
+  mode — `paul:shape` → `paul` — keeps the cursor and writes the status line, one
+  `put`; the persona's run is then dispatched like any other. *Rejected:* a stored
+  `x-shaped` flag (a second truth beside the chain, a field every writer and reader of
+  the chain must carry — the chain already is the state, and a rewritten entry also
+  says on a card's flow row that the shaping is behind); deriving it from the plan's
+  text (a plan run writes one too).
+- *A send-back to the position* runs the persona again without a new shaping — the
+  mode is consumed; the owner who wants another dialogue has the 1:1.
+- *The Flow chat's speaker* (milestone 255) is gone with the Ask Paul line (below);
+  the Shape chat's speaker is still the persona of the `:shape` entry, else of the
+  standard flow's.
+- *No migration* of existing chains (owner: nothing released): an old
+  `paul:shape; paul; …` chain still reads — position 1 shapes and plans, position 2
+  runs Paul again — and the owner edits it by hand.
+
+**The flow is changed in words through Mission Control (req-306).** The flow editor's
+*Ask Paul* line asked the plan persona for a draft; it answered "Trimmed the flow to the
+bare line…" and changed nothing, and Mission Control could not change the standard flow
+at all (*"chains can only be set per ticket"*). The line, its draft path (`flowDraft`,
+`draftFlow`, the flow wrapper `crew/flow.md`, `flowSpeakerOf`) and the Flow chat voice
+are **removed**. Pia gains the card **`setStandardFlow`** — the whole new flow, never
+empty, written through `BoardService.setStandardFlow` into `pipeline.md`'s `flow:`
+(existing tickets keep their chains; one ticket's chain is still `setChain`) — and a
+`## Crew` block on her turn, so she knows the owner as the persona `you` by the owner's
+**name** and by "me", "I" and "my": the name is the `you` persona's title while the owner
+has set one, else the git user's, else none (nothing hard-coded). Prompt texts:
+[specs/classifier-spec.md](../../specs/classifier-spec.md).
 
 ## Consequences
 

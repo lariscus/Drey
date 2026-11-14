@@ -104,18 +104,6 @@ describe('Flow tab', () => {
     expect(host.querySelector('.flow-chip')?.textContent).toBe('2 steps');
   });
 
-  it("applies Paul's draft with his reason, and undo goes back", async () => {
-    const { host } = setup({ flow: base, flowDraft: { ...edited, reason: 'It touches auth.' } });
-    await settle();
-    (host.querySelector('.flow-input') as HTMLInputElement).value = 'add a security check';
-    buttonNamed(host, 'Ask Paul').click();
-    await settle();
-    expect(host.querySelector('.flow-paul-t')?.textContent).toBe('It touches auth.');
-    expect(host.querySelectorAll('.flow-gate').length).toBe(3);
-    buttonNamed(host, 'Undo draft').click();
-    expect(host.querySelectorAll('.flow-gate').length).toBe(2);
-  });
-
   it('reports a read-only flow and a failed load', async () => {
     const ro = setup({ flow: { ...base, readOnly: 'A run is live on this ticket' } });
     await settle();

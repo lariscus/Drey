@@ -290,39 +290,11 @@ create as a `raw capture:` Log line (ticket-schema).
   list). The plan format also has an optional `### Chain` chapter — one line,
   the ticket's whole persona list; when the shape turn's plan is saved
   (`setPlan`) it becomes the ticket's `chain:` if it holds (`validateChain`).
-- **`FLOW_SYSTEM_PROMPT`** (the file `packages/tickets-engine/prompts/crew/flow.md`,
-  loaded by `services/crew-prompts.ts`;
-  E10-5, re-cut by req-266; **a mode wrapper since req-272, prompt version 3**)
-  — the assigned persona drafts one ticket's or one plan part's chain. The
-  wrapper opens "The owner asks you to draft the flow" and says this is a
-  chat, not a run (no file is written). The system message is the speaker's
-  `prompt.md` (read on every draft, as above) and a blank line, then the
-  wrapper, then `## Flow` (`Standard flow:` —
-  pipeline.md's `flow:`; the chain now from the current position, one
-  `<position>. <persona>[:mode]` line each with `(tell me)` / `(current,
-  locked)`; `Saved chain:`; `Personas:` the crew as `- <id> (<title>)`, the
-  human persona marked `the owner`, Mission Control's persona (req-269)
-  `Mission Control: a turn of hers, no session`; `services/flow-views.ts` `flowDraftText`);
-  the user message is the owner's words or "Draft the flow for this
-  ticket.". The reply is the mission envelope with exactly one
-  `setChain` command (`{"kind":"setChain","id":…,"chain":[…]}`) — the whole
-  persona list in the chain grammar, an empty list = the standard flow — and
-  a `say` that is the speaker's reason. Prompt version 2: the hard-coded
-  roster line ("paul plans, ben builds …") gave way to "pick personas from
-  the crew listed below". The speaker is the persona of the ticket's **plan
-  entry** — the first ordinary entry of its chain (else of the standard flow)
-  whose persona hands over a plan rather than code, i.e. its gate is
-  structural (`personaGate`: the record's `gate:`, else the planner role's
-  default) — else the shape persona (`core/chat-speaker.ts` `flowSpeakerOf`).
-  **With neither no model is called**: the answer is "No persona is assigned
-  to plan T-…: give its chain an interactive entry (for example paul:shape)
-  and ask again." The draft's author (the persona's title) rides the result,
-  so a refusal reads "Paula's draft does not hold: …". The desk validates
-  it like any edit and shows it as a draft; nothing is written.
+- **`FLOW_SYSTEM_PROMPT` is gone (req-306).** The file `prompts/crew/flow.md`, the flow draft bridge call (`draftFlow`, `flowDraftText`), the plan-entry speaker (`flowSpeakerOf`) and the flow editor's *Ask Paul* line were removed: it answered "Trimmed the flow…" and changed nothing. A flow is changed in words through Mission Control's `setChain` / `setStandardFlow` cards (the mission entry below).
 - **`MISSION_SYSTEM_PROMPT` and its context** (the file `packages/tickets-engine/prompts/crew/mission.md`
   via `services/crew-prompts.ts`; the context `chat-service.ts`,
-  E5a; D-7a / milestone 165; req-173) — the seven intents (steer, create, promote, chain,
-  blocked, session, report) and the strict `{say, thought, commands}` envelope. The system
+  E5a; D-7a / milestone 165; req-173; **req-306, mission.md version 5**) — the eight intents (steer, create, promote, chain,
+  **flow**, blocked, session, report) and the strict `{say, thought, commands}` envelope. The system
   message is — **req-269** — the persona part of Mission Control's persona (the crew's first
   `kind: mission` persona, Pia as shipped; read from the vault on **every** turn by
   `services/mission-persona-prompt.ts`, so the owner's edit applies on the next message):
@@ -365,6 +337,27 @@ create as a `raw capture:` Log line (ticket-schema).
   persona's model decides); "brief" is the first line the persona gets, in the
   owner's words."* with the example
   `{"kind":"startSession","persona":"ben","directory":"E:/projects/drey","poolClass":null,"brief":"Find out why the build is slow and tell me."}`.
+  **req-306 — the `flow` intent and the crew.** The intent line *"flow — the owner wants the
+  board's standard flow changed (the chain every new ticket starts with; "standard flow" is
+  the digest's line of that name): answer with a setStandardFlow command carrying the whole
+  new flow, never a partial edit. Tickets that exist keep their own chains — changing one of
+  them is the chain intent."*, the command
+  `{"kind":"setStandardFlow","chain":["paul:shape","ben","ralf","tessa","you"]}` (the whole
+  list in the chain grammar, never empty; it replaces `flow:` in `_meta/pipeline.md`
+  through `BoardService.setStandardFlow`, one commit `tickets: default flow`; the card
+  reads `Set the standard flow to paul:shape; ben; …` and renders the board's flow before
+  and the proposed one after), and one rule *"Persona ids come only from the "Crew" block.
+  The owner is the persona listed there as "you": when the owner says their own name, "me",
+  "I" or "my" they mean that persona, so "Ben, then me" is the entries "ben", "you" — the
+  owner is a member of the crew, never an unknown person."* Between the digest and the
+  sessions block rides **`## Crew`** (`services/mission-crew-block.ts`, read on every
+  turn): every persona of the board, agents first with their `summary:` (else role), then
+  Mission Control's persona (`- pia (Pia): Mission Control — you, who answer here.`) and the
+  human persona as `- you (<name>): the owner, <name> — works a position by hand. "<name>",
+  "me", "I", "my" in the owner's words mean "you".` The owner's name is the `you`
+  persona's title while the owner has set one (Settings → Tickets → Crew, "Your name"),
+  else the git user's name (`git config user.name` of the tickets repository), else no
+  name (the block still maps "me" / "I" / "my" to `you`).
   Below the digest (same system message) rides `## Sessions you may propose`:
   `personas: <id> (<harness>), …` (agents with a harness; an `api` persona is
   left out) and `folders: <tickets vault> (the tickets repository); <path>
@@ -487,9 +480,9 @@ prompt is the instruction; the runner adds only what a run's mode needs:
   follows the persona's prompt after a blank line, so the interview-first
   protocol is not displaced (`fleet/request-instruction.ts` `runPrompt`); an
   ordinary run keeps the persona's prompt alone;
-- **the chat modes (req-272)** — the Shape chat and the flow draft are bridge
-  calls, not runs: the speaker's `prompt.md` followed by the mode's wrapper
-  (`prompts/crew/shape.md` / `flow.md`, see their entries below), composed
+- **the chat modes (req-272)** — the Shape chat is a bridge
+  call, not runs: the speaker's `prompt.md` followed by the mode's wrapper
+  (`prompts/crew/shape.md`, see its entry above), composed
   per turn from the chain's persona — the same order as the interactive
   wrapper above (who speaks, then what the mode asks);
 - **closing round** — unchanged: the ask after a run with friction resumes
@@ -546,13 +539,15 @@ commands in its brief: the runner judges its hand-over structurally.
   shape `acceptanceCommands` runs; Open questions), pulled in by
   `plan-default`, `plan-interactive-default`, `build-default` (for a ticket
   that reaches the build without a plan) and the crew's shape prompt;
-  `chain-grammar.md` (version 3, req-266; req-78 added `on-red`) — the chain as the ordered
+  `chain-grammar.md` (version 4: req-305 made `<persona>:shape` the one entry that shapes with
+  the owner and then runs at the same position, the persona no longer standing twice; version
+  3, req-266; req-78 added `on-red`) — the chain as the ordered
   persona list: `<persona>`, `<persona>:shape`, `<persona>(notify)`,
   `<persona>(on-red <earlier persona>)` (a red machine gate goes back to that
   persona's nearest earlier position, then straight back), the
   positions up to the current one (`at`) locked, the example
-  `["paul:shape", "paul", "ben", "ralf", "tessa(on-red paul)", "you"]` — for the
-  mission and flow prompts; `plan-format.md` (version 2) gained `### Chain`; `flow-proposal.md` (version 1, E10-5b)
+  `["paul:shape", "ben", "ralf", "tessa(on-red paul)", "you"]` — for the
+  mission prompt; `plan-format.md` (version 3, its `### Chain` example is the one-Paul flow; version 2) gained `### Chain`; `flow-proposal.md` (version 1, E10-5b)
   is what the board adds to the plan format while `pipeline.md` says `propose-flow: true`:
   the `### Chain` chapter is no longer optional — every plan carries one, starting from the
   chain the ticket carries, the reason in `### Decisions`. It is appended after the plan
@@ -579,7 +574,8 @@ commands in its brief: the runner judges its hand-over structurally.
   example (`createTicket` title, phase, priority, project? (req-298, mission.md version 4), description?;
   `transition` id, from, to; `setPriority` id, priority; `promote` id;
   `setChain` id, chain — the whole persona list, empty = the standard flow
-  (req-266, mission.md version 3); `setBlockedBy` id, blockedBy; `startSession`
+  (req-266, mission.md version 3); `setStandardFlow` chain — the board's whole standard
+  flow, never empty (req-306, version 5); `setBlockedBy` id, blockedBy; `startSession`
   persona, directory, poolClass, brief) and pulls the chain grammar; shape
   pulls the plan format and says a reply with `read` is only a request (its
   other fields are set aside, `chat-llm.ts`); the aggregator gets the

@@ -1,16 +1,15 @@
 /**
- * Who speaks in the Shape and the Flow chat (req-272, the persona board
+ * Who speaks in the Shape chat (req-272, the persona board
  * concept §7). A turn asks for its voice here: the speaking persona is
  * picked from the ticket's chain (`core/chat-speaker.ts`), its `prompt.md`
  * is read from the vault on every call — a rename, an edit on the Persona
  * page, a persona deleted applies on the next message — and the roster is
  * the crew as it stands now, in `crew.md`'s order. Never throws: what cannot
- * be read is a voice without a prompt (Shape) or no voice (Flow).
+ * be read is a voice without a prompt.
  */
 import type { ChatVoice } from '../contracts/chat';
-import type { ChainEntry } from '../contracts/chain';
 import type { BoardSnapshot } from '../contracts/tickets';
-import { flowSpeakerOf, shapeSpeakerOf } from '../core/chat-speaker';
+import { shapeSpeakerOf } from '../core/chat-speaker';
 import { stripPromptVersion } from '../core/default-prompts';
 import { PERSONAS_DIR, type Persona } from '../core/persona';
 import { crewRosterOf } from './crew-roster';
@@ -27,8 +26,6 @@ export interface ChatVoicesBoard {
 export interface ChatVoiceSource {
   /** The voice of a shape turn on `ticket`: always one — without a speaker its prompt is null. */
   shape(ticket: string): Promise<ChatVoice>;
-  /** The voice of a flow draft on `ticket`; null = no persona can be named, the caller asks the owner which one. */
-  flow(ticket: string): Promise<ChatVoice | null>;
 }
 
 interface Resolved {
@@ -44,23 +41,15 @@ export class ChatVoices implements ChatVoiceSource {
   ) {}
 
   async shape(ticket: string): Promise<ChatVoice> {
-    const found = await this.resolve(ticket, shapeSpeakerOf);
+    const found = await this.resolve(ticket);
     return found === null ? { speaker: null, prompt: null, roster: '' } : this.voiceOf(found);
   }
 
-  async flow(ticket: string): Promise<ChatVoice | null> {
-    const found = await this.resolve(ticket, flowSpeakerOf);
-    return found === null || found.speaker === null ? null : this.voiceOf(found);
-  }
-
-  private async resolve(
-    ticket: string,
-    pick: (chain: readonly ChainEntry[], standard: readonly ChainEntry[], personas: readonly Persona[]) => Persona | null,
-  ): Promise<Resolved | null> {
+  private async resolve(ticket: string): Promise<Resolved | null> {
     try {
       const [snap, personas, vault] = await Promise.all([this.board.snapshot(), this.board.listPersonas(), this.board.detect()]);
       const card = snap.columns.flatMap((column) => column.tickets).find((candidate) => candidate.id === ticket);
-      return { speaker: pick(card?.meta.chain ?? [], snap.flow ?? [], personas), personas, vault };
+      return { speaker: shapeSpeakerOf(card?.meta.chain ?? [], snap.flow ?? [], personas), personas, vault };
     } catch {
       return null;
     }

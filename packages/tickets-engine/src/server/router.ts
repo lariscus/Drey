@@ -16,7 +16,6 @@ import {
   parseClaim,
   parseCreate,
   parsePermission,
-  parseFlowDraft,
   parseFlowEdit,
   parseFlowSave,
   parsePlanPartsEdit,
@@ -563,7 +562,7 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
   if (req.path === '/api/attachments') {
     return write('attachment', parseAttachment(body), (cmd) => port.saveAttachment(cmd, actor));
   }
-  const ticket = /^\/api\/tickets\/([^/]+)\/(move|claim|archive|refine|save|accept|send-back|hand|answer|parts|release|flow-edit|flow-save|flow-draft)$/.exec(req.path);
+  const ticket = /^\/api\/tickets\/([^/]+)\/(move|claim|archive|refine|save|accept|send-back|hand|answer|parts|release|flow-edit|flow-save)$/.exec(req.path);
   if (ticket !== null) {
     const id = decodeURIComponent(ticket[1]!);
     if (!TICKET_ID_PATTERN.test(id)) {
@@ -599,8 +598,6 @@ async function dispatch(req: RemoteRequest, device: RemoteDevice, deps: RouterDe
         return write(`flow-edit ${id}`, parseFlowEdit(withId), (cmd) => port.flowEdit(cmd));
       case 'flow-save':
         return write(`flow-save ${id}`, parseFlowSave(withId), (cmd) => port.flowSave(cmd, actor));
-      case 'flow-draft':
-        return write(`flow-draft ${id}`, parseFlowDraft(withId), (cmd) => port.flowDraft(cmd));
       default:
         return write(`archive ${id}`, { ok: true, value: { id } }, (cmd) => port.archive(cmd, actor));
     }

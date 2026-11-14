@@ -24,7 +24,7 @@ export interface ChatLlmConfig {
 
 export interface ChatBridgeDeps {
   readonly config: ChatLlmConfig;
-  /** The crew's prompt files (`loadCrewPrompts`, req-279): the mission, shape and flow texts. */
+  /** The crew's prompt files (`loadCrewPrompts`, req-279): the mission and shape texts. */
   readonly crew: CrewPrompts;
   /** The transport; the global fetch by default (the specs inject a fake). */
   readonly fetch?: typeof fetch;
@@ -39,7 +39,7 @@ export interface ChatBridgeDeps {
   /**
    * req-293: a model on the assistant's connection in place of `chat.model`,
    * asked on every turn; null = the assistant's own. On the mission bridge it
-   * applies to Mission Control's own turns only (a shape or flow turn speaks
+   * applies to Mission Control's own turns only (a shape turn speaks
    * as another persona); a bridge with its own system prompt (Pia's 1:1)
    * applies it to every turn.
    */
