@@ -332,7 +332,7 @@ Control's iPad and phone Crew draw a persona's queued tickets as rows
 *waiting*, and the head line's *· 1 queued*. On the phase board only the
 pool's queue reaches it.
 
-## Later change — one Paul with shaping, the flow changed through Mission Control (milestones 278 and 279, req-305 and req-306, 2026-11-14)
+## Later change — one Paul with shaping, the flow changed through Mission Control (milestone 280, req-305 and req-306, 2026-11-14)
 
 Two findings of the owner's first test of the persona board.
 

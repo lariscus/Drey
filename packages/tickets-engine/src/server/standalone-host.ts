@@ -1,8 +1,10 @@
 import { spawn } from 'node:child_process';
 import { promises as fsp } from 'node:fs';
 import path from 'node:path';
+import { VAULTS_KEY } from '../contracts/vaults';
 import type { EngineHost, EngineVault } from '../services/host';
 import type { ChangeHub } from './drey-port';
+import { HostedVault } from './hosted-vault';
 
 /**
  * The standalone host (ADR-0088, E2b): one tickets vault on disk, no Drey.
@@ -15,6 +17,7 @@ import type { ChangeHub } from './drey-port';
  */
 export class FsEngineHost implements EngineHost {
   private readonly vault: EngineVault;
+  private readonly hosted: HostedVault;
 
   constructor(
     /** The tickets vault's absolute root (the folder containing `tickets/`). */
@@ -32,6 +35,7 @@ export class FsEngineHost implements EngineHost {
       exists: true,
       active: true,
     };
+    this.hosted = new HostedVault(vaultPath, config);
   }
 
   private resolve(rel: string): string | null {
@@ -43,7 +47,11 @@ export class FsEngineHost implements EngineHost {
     return abs;
   }
 
+  /** The hosted vault, unless Drey unloaded it (D-73): then this host has no vault and the board is empty. */
   async listVaults(): Promise<readonly EngineVault[]> {
+    if (!(await this.hosted.loaded())) {
+      return [];
+    }
     const exists = await fsp.stat(this.vault.path).then((s) => s.isDirectory()).catch(() => false);
     return [{ ...this.vault, exists }];
   }
@@ -112,7 +120,16 @@ export class FsEngineHost implements EngineHost {
   configGet = <T>(key: string): Promise<T | undefined> => this.config.get<T>(key);
 
   configSet = async (key: string, value: unknown): Promise<void> => {
+    if (key !== VAULTS_KEY) {
+      await this.config.set(key, value);
+      return;
+    }
+    // Drey's registry list: a change that loads or unloads the hosted vault is a board change for every client.
+    const before = await this.hosted.loaded();
     await this.config.set(key, value);
+    if ((await this.hosted.loaded()) !== before) {
+      this.hub.emit('board');
+    }
   };
 
   emitBoardChanged = (): void => {

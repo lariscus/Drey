@@ -144,6 +144,9 @@ vault is the active one.
   context menu (right-click), which also offers *Set active*, *Rename*,
   *Open in File Explorer*, *Refresh* and *Remove*. The **+** in the panel
   header (shown on hover) starts a new file in the active vault.
+  *Remove* only unloads a vault — the folder and its files stay on disk. A
+  tickets vault takes its board with it: the Tickets panel, Mission Control
+  and the phone show no tickets until you add the folder again.
 - The **active vault** is the default target for new daily notes, quick
   capture and chats. Every operation can still address another vault
   explicitly (search scopes, the tasks panel, drag & drop).
