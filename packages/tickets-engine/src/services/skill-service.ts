@@ -17,6 +17,10 @@ import { tokenizerFor } from '../core/token-count';
 import type { EngineVault } from './host';
 import { NodeSkillFileSystem, type SkillFileSystem } from './skill-file-system';
 import { buildSkillKit, type SkillKit, type SkillKitGit, type SkillKitHost } from './skill-kit';
+import type { SkillProvenance } from './skill-lister';
+import { sourceRefOf } from './skill-source-store';
+import type { SkillUpdateChecks } from './skill-update-checks';
+import { SkillWriteQueue } from './skill-write-queue';
 
 /** The board as the skills need it: the vault, the personas and the persona patch that holds the selection. */
 export interface SkillsBoard {
@@ -32,6 +36,10 @@ export interface SkillServiceDeps {
   readonly git: SkillKitGit;
   /** The disk of a vault; default the vault folder itself. */
   readonly fsFor?: (vault: EngineVault) => SkillFileSystem;
+  /** req-289: the engine's one queue of skill writes (the library's too); default one of its own. */
+  readonly queue?: SkillWriteQueue;
+  /** req-289: what the library's last look for newer refs found; absent = no `updateAvailable` is ever said. */
+  readonly checks?: SkillUpdateChecks;
 }
 
 const fail = (code: SkillErrorCode, error: string): SkillFailure => ({ ok: false, code, error });
@@ -48,10 +56,12 @@ type Ready = { readonly vault: EngineVault; readonly kit: SkillKit };
  * per vault runs the one-time flat-file migration.
  */
 export class SkillService implements SkillsPort {
-  private tail: Promise<unknown> = Promise.resolve();
+  private readonly queue: SkillWriteQueue;
   private readonly migrated = new Map<string, Promise<unknown>>();
 
-  constructor(private readonly deps: SkillServiceDeps) {}
+  constructor(private readonly deps: SkillServiceDeps) {
+    this.queue = deps.queue ?? new SkillWriteQueue();
+  }
 
   /** Startup: migrate the legacy flat skills of the detected vault. */
   async migrateAll(): Promise<void> {
@@ -125,8 +135,7 @@ export class SkillService implements SkillsPort {
       if (!outcome.ok) {
         return outcome;
       }
-      const where = persona === null ? 'the shared pool' : persona.id;
-      await ready.kit.committer.commit(ready.vault, outcome, `skills: ${outcome.name} ${outcome.replaced ? 'replaced' : 'added'} in ${where}`);
+      await this.commitUpload(ready, persona, outcome);
       return { ok: true, name: outcome.name, origin: cmd.scope, files: outcome.changed.length, replaced: outcome.replaced, list: await this.listData(ready, persona) };
     });
   }
@@ -145,12 +154,31 @@ export class SkillService implements SkillsPort {
 
   // --- plumbing ----------------------------------------------------------
 
+  private async commitUpload(ready: Ready, persona: Persona | null, outcome: { readonly name: string; readonly replaced: boolean; readonly changed: readonly string[]; readonly deleted: readonly string[] }): Promise<void> {
+    const where = persona === null ? 'the shared pool' : persona.id;
+    // req-289: an upload over a fetched skill makes it the owner's own upload: its source no longer lists it.
+    const record = persona === null ? await ready.kit.sources.dropSkill(outcome.name) : null;
+    const change = record === null ? outcome : { changed: [...outcome.changed, record], deleted: outcome.deleted };
+    await ready.kit.committer.commit(ready.vault, change, `skills: ${outcome.name} ${outcome.replaced ? 'replaced' : 'added'} in ${where}`);
+  }
+
   private async listData(ready: Ready, persona: Persona | null): Promise<SkillListData> {
+    const provenance = await this.provenanceOf(ready);
     if (persona === null) {
-      return ready.kit.lister.list(null, [], tokenizerFor('claude-code', null));
+      return ready.kit.lister.list(null, [], tokenizerFor('claude-code', null), provenance);
     }
     const entry = personaModelGuess(persona);
-    return ready.kit.lister.list(persona.id, persona.skills, tokenizerFor(entry?.provider ?? null, entry?.model ?? null));
+    return ready.kit.lister.list(persona.id, persona.skills, tokenizerFor(entry?.provider ?? null, entry?.model ?? null), provenance);
+  }
+
+  /** req-289: the shared skills' sources and what the library's last look found for them. */
+  private async provenanceOf(ready: Ready): Promise<SkillProvenance> {
+    const byName = await ready.kit.sources.provenance();
+    const checks = this.deps.checks;
+    return (name) => {
+      const record = byName.get(name);
+      return record === undefined ? null : { source: sourceRefOf(record), updateAvailable: checks?.lookOf(record).updateAvailable ?? null };
+    };
   }
 
   private async listFor(ready: Ready, persona: Persona): Promise<SkillListReply> {
@@ -207,8 +235,6 @@ export class SkillService implements SkillsPort {
   }
 
   private serial<T>(op: () => Promise<T>): Promise<T> {
-    const next = this.tail.catch(() => undefined).then(op);
-    this.tail = next;
-    return next;
+    return this.queue.run(op);
   }
 }

@@ -6384,4 +6384,41 @@ sequenceDiagram
     M->>S: POST /api/personas/<id>/avatar/remove
     S->>V: delete avatar.png; a shipped id joins seeded-pictures: in crew.md
     S->>G: commit "personas: <id> picture removed"
+
+## 6.137 Fetching skills from a GitHub source — one commit (req-289, milestone 269)
+
+Settings → Tickets → Skills library. The owner types a repository, a folder
+and a ref and presses Fetch; Drey Service reads the skill folders under that
+folder at that ref, checks each like an upload, writes them into the shared
+home and records the source — one commit. Update is the same flow at the
+newer ref, with the source's old folders replaced; GitHub is never asked on
+a timer.
+
+```mermaid
+sequenceDiagram
+    participant P as Skills library (plugin renderer)
+    participant M as Plugin main
+    participant L as SkillLibraryService (engine)
+    participant F as SkillSourceFetcher
+    participant H as GitHub (API + raw)
+    participant V as Tickets vault
+    participant G as git
+    P->>M: skillLibrary {check: true} (the page's first look)
+    M->>L: invoke (SKILL_LIBRARY_METHODS)
+    L->>H: per source not looked at in 5 min: tags (a version ref) or the ref's commit (a branch)
+    L-->>P: {library} — sources with updateAvailable, skills with Used by
+    P->>M: skillSourceFetch {repo, path, ref}
+    M->>L: invoke
+    L->>L: SkillWriteQueue (the one queue of skill writes)
+    L->>F: fetch(repo, path, ref)
+    F->>H: commits/<ref> → tree?recursive=1
+    F->>F: skillsInTree: the topmost folders with a SKILL.md under path
+    F->>H: raw/<commit>/<file> for each file of each folder
+    F->>F: validateSkillBundle per folder (a failing one is skipped)
+    F-->>L: {commit, skills, skipped}
+    L->>V: refuse a name the pool holds; else write _meta/skills/<name>/… and _meta/skill-sources.md
+    L->>G: one commit "skills: <source> fetched at <ref> (n skills)"
+    L->>H: the look for a newer ref of the new source
+    L-->>P: {library, source, skipped, warning}
+    Note over P: Update to <ref> → skillSourceUpdate: the same, old folders removed in the same commit
 ```

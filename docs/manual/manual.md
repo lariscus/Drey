@@ -1453,6 +1453,39 @@ skills you already use with Claude drop in unchanged.
   folders by themselves the first time the crew starts, in one commit of the
   tickets repository; nothing is lost.
 
+### The skills library {#skills-library}
+
+**Settings → Tickets → Skills library** shows every skill of the board in one
+list and is where skills come in from GitHub.
+
+- **Add from GitHub** opens a row: the **Repository** (`github.com/owner/repo`,
+  or just `owner/repo`), the **Path** — the folder in it that holds the skills,
+  empty for the whole repository — and the **Ref**, a tag such as `v1.4` or a
+  branch such as `main`. **Fetch** takes every skill folder under that path
+  (a folder with a `SKILL.md`) into the shared skills, as they are in the
+  repository, in one commit of the tickets repository. A folder that is not a
+  valid skill is skipped, and the page says which. If a skill of the same name
+  is already in the library, nothing is fetched — delete the old one first.
+- **Upload skill…** adds a `SKILL.md`, a zip or a skill folder to the shared
+  skills, as on the Persona page.
+- **Sources** lists each repository you fetched from: its ref, how many skills
+  it brought and when. When the repository has a newer tag (or the branch has
+  moved on), the row offers **Update to v1.5** (or *Update to main*): the
+  skills are fetched again at that ref — changed ones replaced, ones the
+  repository dropped removed — in one commit. The trash button removes the
+  source and its skills after asking in the row.
+- **Skills** lists every skill: where it comes from (*shared*, *own* — a
+  persona's own skill — or the repository), the personas that use it, and its
+  size in tokens. Search by name, description or source; **All**, **Shared**,
+  **GitHub** and **Own** narrow the list. The `⋯` menu deletes a skill after
+  the row says how many personas use it; those personas keep its name in their
+  list, shown as missing, until you switch it off there.
+- **Only when you ask.** Drey reaches GitHub only for Fetch, Update and, when
+  you open the page, to look whether your sources have something newer. It
+  sends no account or token: the repository must be public. (A private
+  repository would need your GitHub sign-in or a token kept encrypted like the
+  other keys; that is not built yet.)
+
 ### Memory and journal {#memory-journal}
 
 Each persona keeps two lists, shown apart on its **Memory** tab (the persona's

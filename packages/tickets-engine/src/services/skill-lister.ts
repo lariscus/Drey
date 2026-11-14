@@ -1,9 +1,14 @@
-import type { SkillListData, SkillView, TokenizerView } from '../contracts/skills';
+import type { SkillListData, SkillSourceRef, SkillView, TokenizerView } from '../contracts/skills';
 import { declaredNameOf, descriptionFromBody } from '../core/skill';
 import { estimateTokens } from '../core/token-count';
 import { skillsSection } from '../fleet/skills-section';
 import type { SkillFileSystem } from './skill-file-system';
 import type { SkillFolderReader, SkillRecord } from './skill-folder-reader';
+
+/** req-289: a shared skill's GitHub source and the newer ref the library last found; null for one no source brought. */
+export type SkillProvenance = (name: string) => { readonly source: SkillSourceRef; readonly updateAvailable: string | null } | null;
+
+const NO_PROVENANCE: SkillProvenance = () => null;
 
 /**
  * The listing the Skills tab and the phone show (req-172, req-137): every
@@ -19,12 +24,14 @@ export class SkillLister {
   ) {}
 
   /** `personaId` null lists the shared pool alone (every `on` false). */
-  async list(personaId: string | null, selected: readonly string[], tokenizer: TokenizerView): Promise<SkillListData> {
+  async list(personaId: string | null, selected: readonly string[], tokenizer: TokenizerView, provenance: SkillProvenance = NO_PROVENANCE): Promise<SkillListData> {
     const { records, overriding } = await this.reader.available(personaId);
     const on = new Set(selected);
     const skills: SkillView[] = [];
     for (const record of records) {
-      skills.push(await this.viewOf(record, on.has(record.name), overriding.has(record.name), tokenizer));
+      const view = await this.viewOf(record, on.has(record.name), overriding.has(record.name), tokenizer);
+      const from = record.origin === 'shared' ? provenance(record.name) : null;
+      skills.push(from === null ? view : { ...view, source: from.source, updateAvailable: from.updateAvailable });
     }
     const present = new Set(records.map((record) => record.name));
     const byName = new Map(records.map((record) => [record.name, record] as const));
@@ -40,7 +47,8 @@ export class SkillLister {
     };
   }
 
-  private async viewOf(record: SkillRecord, on: boolean, overridesShared: boolean, tokenizer: TokenizerView): Promise<SkillView> {
+  /** One record as a row; public for the library, which lists every home's records itself. */
+  async viewOf(record: SkillRecord, on: boolean, overridesShared: boolean, tokenizer: TokenizerView): Promise<SkillView> {
     const { parsed } = record;
     return {
       name: record.name,
@@ -55,6 +63,8 @@ export class SkillLister {
       allowedTools: parsed.allowedTools,
       license: parsed.license,
       declaredName: declaredNameOf(parsed, record.name),
+      source: null,
+      updateAvailable: null,
     };
   }
 }

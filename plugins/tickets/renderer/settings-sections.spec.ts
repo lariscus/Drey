@@ -36,8 +36,8 @@ describe('Settings -> Tickets, the board 7g sections and rows', () => {
 });
 
 describe('Settings -> Tickets, board 7l (req-186)', () => {
-  it('puts Models right after Autopilot, as the board 7l nav has it', () => {
-    expect(ticketsSections(i18n).map((s) => s.label).slice(0, 5)).toEqual(['Crew', 'Flow', 'Autopilot', 'Models', 'Budget and runners']);
+  it('puts Models right after Autopilot, as the board 7l nav has it, and the Skills library after Models (board 7o)', () => {
+    expect(ticketsSections(i18n).map((s) => s.label).slice(0, 6)).toEqual(['Crew', 'Flow', 'Autopilot', 'Models', 'Skills library', 'Budget and runners']);
   });
   it('points every entry at a section of the page, the Models ones included', () => {
     const ids = ticketsSections(i18n).map((s) => s.id);

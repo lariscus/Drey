@@ -240,7 +240,10 @@ toolchain is removable by deleting `.tools/`). Never assume a bare `node`,
   same as the removable `copilot-web` scraper (ADR-0040). The startup
   **update check** against GitHub Releases (ADR-0074) is the one
   automatic network call: on by default as a bounded exception — it
-  sends no user content, and download, install and restart always ask. No hardcoded
+  sends no user content, and download, install and restart always ask.
+  The skills library's GitHub sources (req-289, ADR-0074 later change) are
+  asked only on the owner's action — Fetch, Update, opening the page — with
+  no token, from Drey Service. No hardcoded
   model id — never assume a specific model is loaded, and never assume
   `/v1/models` is reachable (the model id must stay hand-enterable;
   CLI/web providers advertise no model listing at all). API keys (and

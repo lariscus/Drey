@@ -2,6 +2,7 @@ import type { ChatBridge } from '../contracts/chat';
 import type { ChatChangePayload } from '../contracts/remote-protocol';
 import type { VerifyHarness } from '../contracts/verify';
 import type { OneOnOneToolSeam } from '../fleet/one-on-one-toolset';
+import type { GithubClient } from '../services/github-client';
 import type { RunnerLocator } from '../services/fleet-client';
 import type { PathsChange } from './drey-port';
 import type { FileConfigStore } from './file-config';
@@ -59,6 +60,12 @@ export interface EngineOptions {
    * neither start-up commit.
    */
   readonly migrateProjects?: boolean;
+  /**
+   * The skills library's GitHub (req-289): absent = the public API over
+   * `fetch` (`DREY_GITHUB_API_URL` / `DREY_GITHUB_RAW_URL` move it); a spec
+   * hands a fake so no test reaches the network.
+   */
+  readonly github?: GithubClient;
 }
 
 export interface Engine {

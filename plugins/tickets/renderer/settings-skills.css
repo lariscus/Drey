@@ -1,0 +1,262 @@
+/*
+ * Settings → Tickets → Skills library (board 7o, req-289). Buttons, fields,
+ * chips, rows, menus and group heads are the Models page's `.mdl-*` parts
+ * (settings-models.css); this file holds the section and what board 7o
+ * adds. Measures are the board's markup (DeskSkillsLibrary.dc.html), colours
+ * are tokens: #b3b7bc --text-4, #3b3d42 --border, #747980 --field-border,
+ * #2c2d31 --bg-input, #18191b --bg-main, #f4f5f6 --text-primary.
+ */
+
+.skl {
+  margin-top: 34px;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.skl-note {
+  margin: 8px 0 0;
+}
+
+.skl-mono {
+  font-family: var(--font-mono);
+}
+
+.skl-titlerow {
+  padding-top: 0;
+}
+
+.skl-addbox {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 8px 0 0;
+  padding: 10px;
+  background: var(--bg-dock);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-control);
+}
+
+.skl-fld-repo {
+  width: 330px;
+}
+
+.skl-fld-path {
+  width: 170px;
+}
+
+.skl-fld-ref {
+  width: 110px;
+}
+
+.skl-list {
+  border-top: 1px solid var(--border);
+}
+
+.skl-empty {
+  min-height: 40px;
+}
+
+/* --- Sources ------------------------------------------------------------------- */
+
+.skl-source {
+  min-height: 44px;
+}
+
+.skl-source-icon {
+  display: flex;
+  color: var(--text-4);
+}
+
+.skl-source-name {
+  width: 260px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.skl-source-count {
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.skl-confirm {
+  min-height: 44px;
+}
+
+/* --- Skills -------------------------------------------------------------------- */
+
+.skl-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  width: 260px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  background: var(--bg-input);
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-chip);
+  color: var(--text-4);
+}
+
+.skl-search-input {
+  flex-grow: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.skl-seg {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-main);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.skl-seg button {
+  height: 24px;
+  padding: 0 10px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-chip);
+  color: var(--text-4);
+  font: inherit;
+  font-size: 13px;
+}
+
+.skl-seg button[aria-pressed='true'] {
+  background: var(--border);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.skl-th {
+  min-height: 30px;
+  font-size: 12px;
+  color: var(--text-4);
+}
+
+.skl-skill {
+  min-height: 42px;
+}
+
+.skl-col-name {
+  width: 230px;
+  flex-shrink: 0;
+}
+
+.skl-skill-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.skl-col-source {
+  width: 260px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.skl-skill-source {
+  font-size: 12px;
+}
+
+.skl-col-users {
+  width: 150px;
+  flex-shrink: 0;
+}
+
+.skl-users {
+  display: flex;
+  padding-left: 6px;
+  box-sizing: border-box;
+}
+
+.skl-nobody {
+  font-size: 12px;
+}
+
+.skl-col-size {
+  flex-grow: 1;
+  text-align: right;
+  padding-right: 8px;
+}
+
+.skl-col-menu {
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.skl-user {
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  margin-left: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 2px solid var(--bg-main);
+  border-radius: 50%;
+  background: var(--persona-color, var(--accent));
+  color: var(--accent-contrast);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.skl-user img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* The row and Upload menus: the Models menu's look under their own names (a Models e2e counts `.mdl-menu`). */
+.skl-menuwrap {
+  position: relative;
+}
+
+.skl-menu {
+  position: absolute;
+  right: 0;
+  top: 30px;
+  z-index: 3;
+  width: 160px;
+  padding: 4px;
+  box-sizing: border-box;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.skl-menuitem {
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-chip);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.skl-menuitem:hover {
+  background: var(--border);
+}

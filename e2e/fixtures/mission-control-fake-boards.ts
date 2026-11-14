@@ -522,7 +522,7 @@ export const PIA_INSTRUCTIONS = [
   '- She says what she cannot see or do instead of inventing a ticket, a persona or a state.',
   '',
 ].join('\n');
-const piaSkill = (name: string, origin: 'own' | 'shared', on: boolean, tokens: number) => ({ name, description: '', origin, on, overridesShared: false, legacy: false, size: tokens * 4, tokens, files: 0, allowedTools: [], license: null, declaredName: null });
+const piaSkill = (name: string, origin: 'own' | 'shared', on: boolean, tokens: number) => ({ name, description: '', origin, on, overridesShared: false, legacy: false, size: tokens * 4, tokens, files: 0, allowedTools: [], license: null, declaredName: null, source: null, updateAvailable: null });
 export const PIA_SKILLS = {
   ok: true,
   list: { persona: 'pia', skills: [piaSkill('board-triage', 'own', true, 280), piaSkill('release-notes', 'shared', false, 190)], missing: [], selectedTokens: 280, tokenizer: { id: 'openai-estimate', family: 'openai-compatible', exact: false, model: null } },

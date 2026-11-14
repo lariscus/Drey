@@ -13,6 +13,8 @@ const skill = (name: string, origin: 'own' | 'shared', on: boolean, tokens: numb
   allowedTools: [],
   license: null,
   declaredName: null,
+  source: null,
+  updateAvailable: null,
 });
 
 /** The skills of both folders as the mockup's Ben has them: two on from the shared pool, his own, and one shared skill off. */

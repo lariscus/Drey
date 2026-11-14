@@ -130,3 +130,19 @@ The positive answer of a manual check is no longer a dialog: an
 inline text — a six-second note in the status bar for a Help-menu
 check, the green status line in Settings → Updates for a check from
 there. The asks and the failure dialogs are unchanged.
+
+### Later change (req-289, milestone 269, 2026-11-13): skills from GitHub
+
+A second, narrower GitHub exception: the skills library (Settings →
+Tickets → Skills library) fetches Agent Skills folders from a **public**
+GitHub repository — the REST API for a ref's commit, its tree and the
+tags, `raw.githubusercontent.com` for the files — from Drey Service, not
+the window. Unlike the update check it is **never automatic**: GitHub is
+asked on Fetch, on Update, and when the owner opens the library page (the
+look for a newer tag or a moved branch of the sources he added, at most
+once in five minutes per source, the answer kept in memory). No token or
+account is sent or stored; the repository's content becomes ordinary
+files in the tickets vault, one commit per fetch, so what a run loads is
+always in git. A private repository (the owner's `gh` sign-in, or a token
+encrypted like the other secrets per ADR-0010's later change) is not
+built. `specs/ticket-schema.md`, "GitHub sources", has the format.

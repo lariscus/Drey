@@ -29,6 +29,12 @@ export const SKILL_ERROR_CODES = [
   'too_large',
   'not_own',
   'internal',
+  // req-289: the skills library's GitHub sources.
+  'bad_source',
+  'no_source',
+  'not_found',
+  'rate_limited',
+  'fetch_failed',
 ] as const;
 
 export type SkillErrorCode = (typeof SKILL_ERROR_CODES)[number];
@@ -56,6 +62,22 @@ export interface TokenizerView {
   readonly model: string | null;
 }
 
+/**
+ * Where a fetched skill came from (req-289): the GitHub source it was
+ * fetched with and the commit its files are. Recorded in
+ * `tickets/_meta/skill-sources.md`, never in the skill's folder.
+ */
+export interface SkillSourceRef {
+  /** `github.com/<owner>/<repo>`. */
+  readonly repo: string;
+  /** The folder in the repository the skills were taken from; '' = its root. */
+  readonly path: string;
+  /** The tag or branch the owner asked for. */
+  readonly ref: string;
+  /** The commit the ref pointed at when the files were fetched. */
+  readonly commit: string;
+}
+
 /** One skill as the listing shows it: the effective one of its name (an own skill hides the shared one it overrides). */
 export interface SkillView {
   readonly name: string;
@@ -77,6 +99,14 @@ export interface SkillView {
   readonly license: string | null;
   /** The frontmatter's own name when it differs from the folder (the folder wins); null otherwise. */
   readonly declaredName: string | null;
+  /** req-289: the GitHub source of a fetched shared skill; null for an uploaded or own one. */
+  readonly source: SkillSourceRef | null;
+  /**
+   * req-289: the newer ref of its source (a higher tag, or the branch name
+   * when the branch moved past the fetched commit), as the library's last
+   * look found it; null when none is known — never asked for by a listing.
+   */
+  readonly updateAvailable: string | null;
 }
 
 export interface SkillListData {

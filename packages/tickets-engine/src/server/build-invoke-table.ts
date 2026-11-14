@@ -1,6 +1,6 @@
 import type { EngineParts } from './engine-parts';
 import { FLEET_METHODS } from './fleet-methods';
-import { BOARD_METHODS, PROJECT_METHODS, REMOTE_METHODS, TEAM_METHODS } from './invoke-methods';
+import { BOARD_METHODS, PROJECT_METHODS, REMOTE_METHODS, SKILL_LIBRARY_METHODS, TEAM_METHODS } from './invoke-methods';
 import { addChatMethods } from './invoke-methods-chat';
 import { addRemoteMethods } from './invoke-methods-remote';
 import { InvokeTable } from './invoke-table';
@@ -24,6 +24,8 @@ export function buildInvokeTable(parts: EngineParts): InvokeTable {
   table.register(parts.sessions.projects, PROJECT_METHODS);
   // req-288: the model table from `service.json`, for the Persona page while no runner is awake.
   table.set('modelTable', () => parts.sessions.modelTable.table());
+  // req-289: Settings → Skills library.
+  table.register(parts.sessions.skillLibrary, SKILL_LIBRARY_METHODS);
   addRemoteMethods(table, parts);
   addChatMethods(table, parts);
   // The Review tab's reads (E13-7): the branch's diff and one file of it --
