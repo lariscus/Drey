@@ -10,6 +10,9 @@ import { YOU_LANE, holdOf, lanesOf, laneTitleOf } from './hold';
 import { personaDeskGroupsOf } from './holder-desk';
 import { holderGroupsOf } from './holder-rows';
 import { phoneGroupsFiltered, phoneGroupsOf, todayCostTextOf, type PhoneWorkGroup, type PhoneWorkRow } from './phone-rows';
+import { ProjectFilter } from './project-filter';
+import { scopedDoneOf, scopedPhoneGroupsOf, scopedWorkGroupsOf, ticketChipOf, workProjectChoicesOf, workProjectScopeOf } from './project-scope';
+import { filterShownOf, type McProjectChip, type McProjectFilter } from './projects';
 import { McI18n } from '../i18n/i18n.service';
 import {
   MC_WORK_STATE,
@@ -64,7 +67,7 @@ import {
   selector: 'mc-work',
   templateUrl: './work.html',
   styleUrls: ['../phone/kit.css', './work.css', './pad.css'],
-  imports: [AppBar, McI18nPipe, NgTemplateOutlet, PhoneAvatar, PhoneIcon],
+  imports: [AppBar, McI18nPipe, NgTemplateOutlet, PhoneAvatar, PhoneIcon, ProjectFilter],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Work {
@@ -79,16 +82,52 @@ export class Work {
   /** The clock the rows' ages read; one tick a minute. */
   private readonly now = signal(Date.now());
 
-  /** One row per ticket: a ticket asked about under Needs you is not listed again. */
+  /** One row per ticket: a ticket asked about under Needs you is not listed again. req-298: the project filter narrows the cards, the heads' loads count every project. */
   protected readonly groups = computed<WorkGroup[]>(() => {
     const state = this.state;
     if (state === null) {
       return [];
     }
+    const scope = this.projectScope();
     const all = groupsOf(state.needs, state.board, state.personas);
     const holders = this.holderGroups(all);
-    return holders === null ? withoutNeedCopies(all) : personaDeskGroupsOf(all, holders, laneTitleOf(lanesOf(state.board), YOU_LANE) || this.i18n.t('flow.pad.you'));
+    if (holders === null) {
+      return scopedWorkGroupsOf(withoutNeedCopies(all), scope);
+    }
+    return personaDeskGroupsOf(scopedWorkGroupsOf(all, scope), scopedPhoneGroupsOf(holders, scope), laneTitleOf(lanesOf(state.board), YOU_LANE) || this.i18n.t('flow.pad.you'));
   });
+
+  // --- req-298: this device's project filter ------------------------------------
+
+  /** The board's projects, this device's choice in effect and every ticket's project. */
+  protected readonly projectScope = computed(() => workProjectScopeOf(this.state?.board ?? null, this.state?.projectFilter ?? null));
+
+  /** True when the filter is drawn: a board with two projects or more, and a state that can keep the choice. */
+  protected readonly projectFilterShown = computed(() => this.state?.setProjectFilter !== undefined && filterShownOf(this.projectScope().projects));
+
+  protected readonly projectChoices = computed(() => workProjectChoicesOf(this.projectScope(), this.i18n.t('projects.filter.unassigned')));
+
+  protected pickProject(filter: McProjectFilter): void {
+    this.state?.setProjectFilter?.(filter);
+  }
+
+  /** The chip a ticket's row or card carries under *All projects*; null = none. */
+  protected projectChip(id: string | null | undefined): McProjectChip | null {
+    return ticketChipOf(this.projectScope(), id);
+  }
+
+  /** A holder group's head tooltip: its load, and under a project filter that it counts every project. */
+  protected loadTitleOf(load: string | undefined): string | null {
+    if (load === undefined) {
+      return null;
+    }
+    return this.projectScope().filter === null ? load : [load, this.i18n.t('board.load.every_project')].join('\n');
+  }
+
+  /** The desk's group head under a project filter: a holder's load counts every project. */
+  protected everyProjectNote(key: string): string | null {
+    return this.projectScope().filter !== null && key.startsWith('lane:') ? this.i18n.t('board.load.every_project') : null;
+  }
 
   /** req-273: a held ticket's row words without the id (`3/6 · merging main`), for the desk's cards. */
   private readonly holdMeta = computed<ReadonlyMap<string, string>>(() => {
@@ -135,7 +174,8 @@ export class Work {
     const all = groupsOf(state.needs, state.board, state.personas);
     // req-273: a persona board lists by holder (boards 10c v2, 10e v2).
     const groups = this.holderGroups(all) ?? phoneGroupsOf(all, withoutNeedCopies(all), this.doneThisWeek(), state.liveRuns ?? [], this.now(), (key, params) => this.i18n.t(key, params));
-    return phoneGroupsFiltered(groups, this.query());
+    // req-298: built for every project (the loads count them all), then narrowed to the filter.
+    return phoneGroupsFiltered(scopedPhoneGroupsOf(groups, this.projectScope()), this.query());
   });
 
   protected isGroupOpen(group: PhoneWorkGroup): boolean {
@@ -200,6 +240,9 @@ export class Work {
   protected readonly doneThisWeek = computed<readonly McDoneEntry[]>(
     () => (this.state?.board as McBoard | null | undefined)?.recentDone ?? [],
   );
+
+  /** req-298: Done this week under the project filter (the desk's group). */
+  protected readonly doneShown = computed(() => scopedDoneOf(this.doneThisWeek(), this.projectScope()));
 
   /** True when the state can list the whole archive (the "Show older" button shows). */
   protected readonly olderAvailable = computed(() => this.state?.loadArchive !== undefined);

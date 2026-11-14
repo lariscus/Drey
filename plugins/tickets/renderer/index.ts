@@ -3202,6 +3202,8 @@ const plugin: { activate(api: DreyPluginApi): void } = {
     api.conversations.registerTargets(
       createConversationProvider({
         invoke: (method, payload) => api.backend.invoke(method, payload),
+        // req-298: Pia's new tickets go to the title bar's project.
+        project: () => projectFilter?.captureProject(),
         personas: () => teamStore(api).personas(),
         subscribePersonas: (listener) => teamStore(api).subscribe(listener),
         // req-168: the 1:1's words, and the changes its answer arrives by (the file written, a turn's end).

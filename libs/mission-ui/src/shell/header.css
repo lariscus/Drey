@@ -106,3 +106,23 @@
 .autopilot-slot:empty {
   display: none;
 }
+
+/* req-298: the project filter beside the switch, outside the grid's flow so the switch stays centred. */
+.mid {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.scope-slot {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 6px);
+  display: flex;
+  align-items: center;
+  transform: translateY(-50%);
+}
+
+.scope-slot:empty {
+  display: none;
+}

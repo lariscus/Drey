@@ -438,6 +438,13 @@ describe('route', () => {
     ).toEqual({ ok: false, error: 'ticket must be a ticket id' });
     await route(req({ method: 'POST', path: `/api/chat/sessions/${file}/messages`, origin, authorization: auth, body: { text: 'Quiet', planEdits: false } }), deps);
     expect(remote.chatSend).toHaveBeenLastCalledWith({ file, text: 'Quiet', planEdits: false });
+    // req-298: Mission Control's project filter rides a turn; anything but a project id reads as all projects.
+    await route(req({ method: 'POST', path: '/api/chat/sessions', origin, authorization: auth, body: { text: 'Capture', project: 'home-lab' } }), deps);
+    expect(remote.chatStart).toHaveBeenLastCalledWith({ title: undefined, text: 'Capture', project: 'home-lab' });
+    await route(req({ method: 'POST', path: `/api/chat/sessions/${file}/messages`, origin, authorization: auth, body: { text: 'More', project: 'drey' } }), deps);
+    expect(remote.chatSend).toHaveBeenLastCalledWith({ file, text: 'More', project: 'drey' });
+    await route(req({ method: 'POST', path: `/api/chat/sessions/${file}/messages`, origin, authorization: auth, body: { text: 'Junk', project: '_unassigned' } }), deps);
+    expect(remote.chatSend).toHaveBeenLastCalledWith({ file, text: 'Junk' });
 
     await route(req({ method: 'POST', path: `/api/chat/sessions/${file}/proposals/p-1/confirm`, origin, authorization: auth }), deps);
     expect(remote.chatConfirm).toHaveBeenCalledWith({ file, id: 'p-1' });

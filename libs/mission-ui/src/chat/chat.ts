@@ -38,6 +38,7 @@ import {
   type McChatState,
 } from './chat.model';
 import { parseBoardCard, type ChatMessageView, type McChainEntry, type SessionMeta } from '../api/dto';
+import { DEFAULT_PROJECT_COLOR, projectsOf, type McProjectChip } from '../work/projects';
 import {
   chainStepsOf,
   parseChainEntryView,
@@ -71,6 +72,8 @@ export interface TimelineProposal {
    * before/after confirmation renders the proposed delta from it.
    */
   readonly chain?: { readonly id: string; readonly chain: readonly string[] };
+  /** req-298: the project a createTicket card names (Pia names it; the confirm creates the ticket there). */
+  readonly project?: string;
 }
 
 /** The session slice the merged timeline renders. */
@@ -1429,6 +1432,16 @@ export class Chat {
   /** The tickets directory a create card's diffbox names; null omits the line. */
   protected createDirOf(detail: ProposalDetail & { readonly kind: 'create' }): string | null {
     return phaseDirOf(this.state.board(), detail.phase);
+  }
+
+  /** req-298: the project chip of a createTicket card — the board's name and colour, the id itself for a project the board does not list. */
+  protected proposalProjectOf(proposal: TimelineProposal): McProjectChip | null {
+    const id = proposal.project;
+    if (id === undefined || id === '') {
+      return null;
+    }
+    const project = projectsOf(this.state.board() as { readonly projects?: unknown } | null).find((known) => known.id === id);
+    return { label: project?.name ?? id, color: project?.color ?? DEFAULT_PROJECT_COLOR };
   }
 
   /** The ticket's current priority — the "from" of a priority card's line. */

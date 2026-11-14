@@ -74,6 +74,7 @@ import {
 } from '@mission-ui/api/dto';
 import type { McApproveReply, McPartsEdit } from '@mission-ui/plan/approve.model';
 import type { McFlowOp, McFlowReply } from '@mission-ui/flow/flow.model';
+import { chatProjectOf, filterInEffectOf, storeProjectFilter, storedProjectFilter, type FilterStorage, type McProjectFilter } from '@mission-ui/work/projects';
 import { pictureUrlOf } from './persona-pictures';
 
 export type PairingPhase = 'needs-code' | 'pairing' | 'ready';
@@ -132,6 +133,15 @@ interface StreamTail {
   readonly file: string;
 }
 
+/** The device's storage for the project filter; null where there is none (a blocked browser). */
+function filterStorage(): FilterStorage | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export class McState {
   readonly connected = signal(false);
   readonly pairing = signal<PairingPhase>('needs-code');
@@ -155,7 +165,13 @@ export class McState {
   readonly settingsError = signal<string | null>(null);
   /** The pairing waiting for a device, started from Settings → Devices (D-2); null = none. */
   readonly pairingView = signal<McPairingView | null>(null);
-  readonly work = signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG });
+  readonly work = signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG, projects: [] });
+  /**
+   * req-298: this device's project filter — a project id, `_unassigned`, or
+   * null for all projects. Device-local (localStorage), never the desktop
+   * view's: the Work list follows it, and Pia's new tickets go to its project.
+   */
+  readonly projectFilter = signal<McProjectFilter>(storedProjectFilter(filterStorage()));
   readonly needs = signal<readonly NeedView[]>([]);
   readonly team = signal<TeamView>({ personas: [], runs: [] });
   readonly chat = signal<ChatStateView>({ sessions: [], active: null });
@@ -556,11 +572,23 @@ export class McState {
     }
   }
 
+  /** req-298: picks the project filter on this device. */
+  setProjectFilter(filter: McProjectFilter): void {
+    this.projectFilter.set(filter);
+    storeProjectFilter(filterStorage(), filter);
+  }
+
+  /** req-298: the project Pia's new tickets go to — the filter's project on this board; none under all (she asks). */
+  private chatProject(): { project?: string } {
+    const project = chatProjectOf(filterInEffectOf(this.projectFilter(), this.work().projects));
+    return project === undefined ? {} : { project };
+  }
+
   /** Starts a session with the first owner message and opens it; `ticket` makes it a shape session. */
   async newSession(text: string, ticket?: string): Promise<McReply> {
     this.chatFailure.set(null);
     const body = await this.client
-      .request<Record<string, unknown>>('POST', '/api/chat/sessions', { text, ...(ticket === undefined ? {} : { ticket }) })
+      .request<Record<string, unknown>>('POST', '/api/chat/sessions', { text, ...(ticket === undefined ? {} : { ticket }), ...this.chatProject() })
       .catch(fail);
     // A turn the model never answered comes back as { ok: false, failure, file }:
     // read that before the generic refusal.
@@ -974,7 +1002,7 @@ export class McState {
       .request<Record<string, unknown>>(
         'POST',
         `/api/chat/sessions/${encodeURIComponent(file)}/messages`,
-        { text, ...(shaped !== null && !withEdits ? { planEdits: false } : {}) },
+        { text, ...(shaped !== null && !withEdits ? { planEdits: false } : {}), ...this.chatProject() },
       )
       .catch(fail);
     this.shapeBusy.set(false);

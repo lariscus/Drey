@@ -773,3 +773,49 @@ button:focus-visible {
   display: flex;
   flex-shrink: 0;
 }
+
+/* req-298: the cost strip carries the project filter at its end; under All projects a row names its project. */
+.ph-today-cost {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ph-today-filter {
+  margin-left: auto;
+}
+.ph-tproj {
+  display: inline-flex;
+  flex: none;
+  gap: 5px;
+  align-items: center;
+  max-width: 40%;
+  overflow: hidden;
+  color: var(--text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ph-tproj i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.projchip {
+  display: inline-flex;
+  flex: none;
+  gap: 6px;
+  align-items: center;
+  max-width: 40vw;
+  overflow: hidden;
+  font-size: calc(13px * var(--mc-text, 1));
+  color: var(--text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.projchip i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}

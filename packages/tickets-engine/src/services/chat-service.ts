@@ -42,6 +42,7 @@ import type {
 } from '../contracts/chat';
 import { titleFromDescription, type BoardSnapshot, type TicketCard, type TicketForm, type TicketPriority } from '../contracts/tickets';
 import { renderChainLine } from '../core/chain-list';
+import { withCommandProject, withProjectsBlock } from '../core/chat-projects';
 import { parsePlanParts } from '../core/plan-parts';
 import { ticketRefsOf } from '../core/chat-ticket-refs';
 import { changedLinesOf, editsSummary, planDelta, planDeltaForModel, planSectionOf } from '../core/plan-delta';
@@ -96,6 +97,8 @@ export interface ChatBoardPort {
     readonly priority: TicketPriority;
     readonly repo: string | null;
     readonly description: string;
+    /** req-298: the card's project; absent = none named. */
+    readonly project?: string;
   }): Promise<ChatMutationResult>;
   transition(input: { readonly id: string; readonly actor?: string; readonly from: string; readonly to: string }): Promise<ChatMutationResult>;
   setPriority(input: { readonly id: string; readonly priority: TicketPriority; readonly actor?: string }): Promise<ChatMutationResult>;
@@ -241,6 +244,14 @@ function boardDigest(snap: BoardSnapshot): string {
   return dropped === 0 ? out : `${out}\n… ${dropped} more line(s) did not fit`;
 }
 
+/** One turn's options: the plan delta switch, the Vault chip's reference, the client's project filter, the cancel. */
+interface TurnOptions {
+  readonly planEdits: boolean;
+  readonly reference?: string | undefined;
+  readonly project?: string | undefined;
+  readonly signal?: AbortSignal | undefined;
+}
+
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -304,7 +315,8 @@ export class ChatService implements ChatServicePort {
     return model === undefined || model === '' ? session : { ...session, model };
   }
 
-  async send(input: { readonly file: string; readonly text: string; readonly planEdits?: boolean; readonly context?: string; readonly signal?: AbortSignal }): Promise<ChatTurnResult> {
+  /** `project` (req-298): the project filter the owner's client stands on; absent = all projects. */
+  async send(input: { readonly file: string; readonly text: string; readonly planEdits?: boolean; readonly context?: string; readonly project?: string; readonly signal?: AbortSignal }): Promise<ChatTurnResult> {
     if (input.text.trim() === '') {
       return { ok: false, error: 'the message is empty' };
     }
@@ -313,13 +325,13 @@ export class ChatService implements ChatServicePort {
     }
     this.inFlight.add(input.file);
     try {
-      return await this.turn(input.file, input.text, input.planEdits !== false, input.context, input.signal);
+      return await this.turn(input.file, input.text, { planEdits: input.planEdits !== false, reference: input.context, project: input.project, signal: input.signal });
     } finally {
       this.inFlight.delete(input.file);
     }
   }
 
-  async start(input: { readonly title?: string; readonly text: string; readonly ticket?: string; readonly context?: string; readonly signal?: AbortSignal }): Promise<ChatTurnResult> {
+  async start(input: { readonly title?: string; readonly text: string; readonly ticket?: string; readonly context?: string; readonly project?: string; readonly signal?: AbortSignal }): Promise<ChatTurnResult> {
     if (input.text.trim() === '') {
       return { ok: false, error: 'the message is empty' };
     }
@@ -336,7 +348,7 @@ export class ChatService implements ChatServicePort {
     await this.deps.host.write(vault.id, file, newSessionText(title, stamp, input.ticket));
     await this.commit(vault, [file], `tickets: chat started ${file}`);
     this.deps.host.announceChanges(vault.id, [file]);
-    return this.turn(file, input.text, true, input.context, input.signal);
+    return this.turn(file, input.text, { planEdits: true, reference: input.context, project: input.project, signal: input.signal });
   }
 
   async confirm(input: { readonly file: string; readonly id: string }): Promise<ChatDecisionResult> {
@@ -356,7 +368,8 @@ export class ChatService implements ChatServicePort {
    * as one write and one commit. A crashed bridge leaves the owner line
    * as the honest record and reports the error through the stream.
    */
-  private async turn(file: string, text: string, planEdits = true, reference?: string, signal?: AbortSignal): Promise<ChatTurnResult> {
+  private async turn(file: string, text: string, opts: TurnOptions): Promise<ChatTurnResult> {
+    const { planEdits, reference, project, signal } = opts;
     const found = await this.boardAndVault();
     if (found === null) {
       return { ok: false, error: 'no tickets vault detected', file };
@@ -412,7 +425,7 @@ export class ChatService implements ChatServicePort {
       const reply = await this.deps.bridge.runTurn({
         text,
         history,
-        board: await this.withSessions(boardDigest(snap)),
+        board: await this.withSessions(withProjectsBlock(boardDigest(snap), snap.projects ?? [], project)),
         priorities: snap.priorities,
         ...(named === null ? {} : { named }),
         ...(delta === null ? {} : { planDelta: planDeltaForModel(delta) }),
@@ -453,7 +466,9 @@ export class ChatService implements ChatServicePort {
         }
       }
       proposals = [];
-      for (const command of reply.commands) {
+      for (const proposed of reply.commands) {
+        // req-298: a create names a project the board knows — the filter's, the only one, or none.
+        const command = withCommandProject(proposed, snap.projects ?? [], project);
         const summary = summaryOf(command);
         const appended = appendProposal(block, stamp, summary, command);
         block = appended.text;
@@ -790,6 +805,7 @@ export class ChatService implements ChatServicePort {
           description: command.description,
           priority: command.priority,
           repo: null,
+          ...(command.project === undefined ? {} : { project: command.project }),
           actor,
         });
         if (!result.ok) {

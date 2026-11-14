@@ -1831,5 +1831,6 @@
   "projects.filter.manage": "Manage projects…",
   "projects.filter.unassigned": "Unassigned",
   "board.load.every_project": "Counts every project",
+  "mc.project_filter.aria": "Project filter: {name}",
   "board.project_chip": "Project: {name}"
 }

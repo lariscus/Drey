@@ -505,6 +505,7 @@ describe('Chat setChain before/after card (E9)', () => {
       { id: 'done', title: 'Done', cards: [] },
     ],
     priorities: DEFAULT_PRIORITY_CONFIG,
+    projects: [],
   };
 
   function fakeState(board: unknown, work: WorkView): ChainFakeState {
@@ -580,6 +581,36 @@ describe('Chat setChain before/after card (E9)', () => {
   });
 });
 
+// -- req-298: the project a createTicket card names ----------------------------------
+
+describe('the project of a createTicket card (req-298)', () => {
+  function setup(board: unknown): { proposalProjectOf(proposal: TimelineProposal): { label: string; color: string } | null } {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: MC_CHAT_STATE,
+          useValue: {
+            chatPrefill: signal(null),
+            chat: signal<ChatStateView>({ sessions: [], active: null }),
+            board: signal(board),
+            work: signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG, projects: [] }),
+          } as unknown as McChatState,
+        },
+      ],
+    });
+    return TestBed.runInInjectionContext(() => new Chat()) as unknown as { proposalProjectOf(proposal: TimelineProposal): { label: string; color: string } | null };
+  }
+
+  it("draws the board's name and colour; a project the board does not list shows its id; no project, no chip", () => {
+    const vm = setup({ projects: [{ id: 'home-lab', name: 'Home lab', color: '#bfe3cd' }] });
+    const create = proposal('p-1', 'pending', undefined, { summary: 'Create ticket "CSV" in inbox' });
+    expect(vm.proposalProjectOf({ ...create, project: 'home-lab' })).toEqual({ label: 'Home lab', color: '#bfe3cd' });
+    expect(vm.proposalProjectOf({ ...create, project: 'gone' })).toEqual({ label: 'gone', color: '#8ecbef' });
+    expect(vm.proposalProjectOf(create)).toBeNull();
+  });
+});
+
 // -- the cards' kickers (the mono .ck labels) ---------------------------------------
 
 describe('Chat card kickers', () => {
@@ -593,7 +624,7 @@ describe('Chat card kickers', () => {
             chatPrefill: signal(null),
             chat: signal<ChatStateView>(chatView),
             board: signal(null),
-            work: signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG }),
+            work: signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG, projects: [] }),
           } as unknown as McChatState,
         },
       ],
@@ -680,7 +711,7 @@ describe('Chat card decisions (toasts)', () => {
       chatPrefill: signal(null),
       chat: signal<ChatStateView>({ sessions: [], active }),
       board: signal(null),
-      work: signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG }),
+      work: signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG, projects: [] }),
       toast: (message, kind) => toasts.push([message, kind]),
       openSession: (file) => {
         state.chat.update((chat) => ({ ...chat, active: activeOf(file, []) }));
@@ -826,7 +857,7 @@ describe('Chat sessions sheet (read-only views)', () => {
       chatPrefill: signal(null),
       chat: signal<ChatStateView>({ sessions: metas, active: null }),
       board: signal(null),
-      work: signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG }),
+      work: signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG, projects: [] }),
       toast: (message, kind) => toasts.push([message, kind]),
       openSession: (file) => {
         const meta = metas.find((m) => m.file === file);
@@ -995,7 +1026,7 @@ describe('Chat attach sheet (composer uploads)', () => {
       chatPrefill: signal(null),
       chat: signal<ChatStateView>({ sessions: metas, active: null }),
       board: signal(null),
-      work: signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG }),
+      work: signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG, projects: [] }),
       toast: (message, kind) => toasts.push([message, kind]),
       ...(upload === undefined ? {} : { uploadAttachment: (files: File[]) => upload(files) }),
       openSession: (file) => {
@@ -1485,7 +1516,7 @@ describe('Chat menu request (E12-2)', () => {
             ...(menu === undefined ? {} : { chatMenu: menu }),
             chat: signal<ChatStateView>({ sessions: [], active: null }),
             board: signal(null),
-            work: signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG }),
+            work: signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG, projects: [] }),
             toast: () => undefined,
           } as unknown as McChatState,
         },

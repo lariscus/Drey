@@ -205,6 +205,10 @@ export const appConfig: ApplicationConfig = {
           get pausedPersonas() {
             return state.team().pausedPersonas ?? [];
           },
+          get projectFilter() {
+            return state.projectFilter();
+          },
+          setProjectFilter: (filter) => state.setProjectFilter(filter),
           get openTicketId() {
             return state.ticketOpen()?.id ?? state.approvalTicket();
           },

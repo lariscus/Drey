@@ -14,6 +14,13 @@ import {
 } from '../contracts/tickets';
 import type { ChatCommand, ChatQuestionOption } from '../contracts/chat';
 import { classNameOf } from '../contracts/capability-class';
+import { PROJECT_ID_PATTERN } from '../contracts/projects';
+
+/** req-298: a createTicket's project — a project id, or null for none (junk reads as none, never a refusal). */
+function projectIdOf(value: unknown): string | null {
+  const id = typeof value === 'string' ? value.trim() : '';
+  return PROJECT_ID_PATTERN.test(id) ? id : null;
+}
 
 /** The parsed envelope — what a mission turn amounted to. */
 export interface ChatEnvelope {
@@ -159,12 +166,14 @@ export function validateChatCommand(
     if (title === null || phase === null || priority === null) {
       return null;
     }
+    const project = projectIdOf(obj['project']);
     return {
       kind: 'createTicket',
       title,
       description: textOf(obj['description']) ?? '',
       priority,
       phase,
+      ...(project === null ? {} : { project }),
     };
   }
   if (kind === 'transition') {

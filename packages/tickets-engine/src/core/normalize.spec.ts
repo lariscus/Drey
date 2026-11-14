@@ -280,6 +280,14 @@ describe('recentDoneOf (req-75 W1b)', () => {
     ]);
   });
 
+  it("carries the ticket's own project (req-298) and leaves it out when the ticket names none", () => {
+    const own: DriftFile = { path: 'tickets/archive/T-0009.md', text: ['---', 'id: T-0009', 'title: "Mine"', 'project: home-lab', '---', '## Log', '', "- '2026-10-30T00:00:00Z' owner@desk — archived", ''].join('\n') };
+    expect(recentDoneOf([own, archived('T-0010', '2026-10-29T00:00:00Z')], NOW)).toEqual([
+      { id: 'T-0009', title: 'Mine', at: '2026-10-30T00:00:00Z', project: 'home-lab' },
+      { id: 'T-0010', title: 'Ticket T-0010', at: '2026-10-29T00:00:00Z' },
+    ]);
+  });
+
   it('takes the NEWEST archived stamp, so a revived ticket counts from its re-archival', () => {
     const revived: DriftFile = {
       path: 'tickets/archive/T-0005.md',

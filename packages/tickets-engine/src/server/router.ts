@@ -36,6 +36,7 @@ import { parsePersonaPatch } from './persona-patch-body';
 import { parsePersonaPicture, parsePersonaRemove } from './persona-remove-body';
 import { parseSkillRemove, parseSkillToggle, parseSkillUpload } from './skill-bodies';
 import { TICKET_ID_PATTERN } from '../contracts/tickets';
+import { PROJECT_ID_PATTERN } from '../contracts/projects';
 import { parsePersonaBoardMove } from '../contracts/persona-board';
 import { parseCrewOrder } from './session-payloads';
 import { parseRevoke, parseSettingsPatch, type SettingsAccess } from './settings';
@@ -130,7 +131,13 @@ function asObject(body: unknown): Record<string, unknown> | null {
   return typeof body === 'object' && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>) : null;
 }
 
-function parseChatStart(body: unknown): Parsed<{ title?: string; text: string; ticket?: string }> {
+/** req-298: the client's project filter on a chat turn — a project id; anything else (absent, '', junk) = all projects. */
+function chatProjectOf(obj: Record<string, unknown>): { project?: string } {
+  const project = typeof obj['project'] === 'string' ? obj['project'].trim() : '';
+  return PROJECT_ID_PATTERN.test(project) ? { project } : {};
+}
+
+function parseChatStart(body: unknown): Parsed<{ title?: string; text: string; ticket?: string; project?: string }> {
   const obj = asObject(body);
   const text = typeof obj?.['text'] === 'string' ? obj['text'].trim() : '';
   const title = obj?.['title'];
@@ -145,10 +152,10 @@ function parseChatStart(body: unknown): Parsed<{ title?: string; text: string; t
   if (ticket !== undefined && !(typeof ticket === 'string' && TICKET_ID_PATTERN.test(ticket))) {
     return { ok: false, error: 'ticket must be a ticket id' };
   }
-  return { ok: true, value: { title: name === '' ? undefined : name, text, ...(ticket === undefined ? {} : { ticket: ticket as string }) } };
+  return { ok: true, value: { title: name === '' ? undefined : name, text, ...(ticket === undefined ? {} : { ticket: ticket as string }), ...chatProjectOf(obj) } };
 }
 
-function parseChatSend(file: string, body: unknown): Parsed<{ file: string; text: string; planEdits?: boolean }> {
+function parseChatSend(file: string, body: unknown): Parsed<{ file: string; text: string; planEdits?: boolean; project?: string }> {
   const obj = asObject(body);
   const text = typeof obj?.['text'] === 'string' ? obj['text'].trim() : '';
   if (obj === null) {
@@ -161,7 +168,7 @@ function parseChatSend(file: string, body: unknown): Parsed<{ file: string; text
   if (planEdits !== undefined && typeof planEdits !== 'boolean') {
     return { ok: false, error: 'planEdits is true or false' };
   }
-  return { ok: true, value: { file, text, ...(planEdits === undefined ? {} : { planEdits }) } };
+  return { ok: true, value: { file, text, ...(planEdits === undefined ? {} : { planEdits }), ...chatProjectOf(obj) } };
 }
 
 /** The phone edit mode's raw save: the text must be a whole ticket file (E5c). */

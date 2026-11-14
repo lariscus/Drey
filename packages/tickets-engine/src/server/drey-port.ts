@@ -776,11 +776,11 @@ export class DreyTicketsPort implements TicketsRemotePort {
     return this.chat().open(file);
   }
 
-  chatSend(input: { readonly file: string; readonly text: string; readonly planEdits?: boolean }): Promise<ChatTurnResult> {
+  chatSend(input: { readonly file: string; readonly text: string; readonly planEdits?: boolean; readonly project?: string }): Promise<ChatTurnResult> {
     return this.chat().send(input);
   }
 
-  chatStart(input: { readonly title?: string; readonly text: string; readonly ticket?: string }): Promise<ChatTurnResult> {
+  chatStart(input: { readonly title?: string; readonly text: string; readonly ticket?: string; readonly project?: string }): Promise<ChatTurnResult> {
     return this.chat().start(input);
   }
 

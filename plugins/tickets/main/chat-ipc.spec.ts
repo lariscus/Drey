@@ -45,6 +45,18 @@ describe('registerChatIpc', () => {
     expect(calls[1]?.payload).toBe(FILE);
   });
 
+  it("forwards the title bar's project filter on a start and a send; anything but a project id is left out (req-298)", async () => {
+    const { call, calls } = setup();
+    await call('mcStart', { text: 'Capture', project: 'home-lab' });
+    await call('mcSend', { file: FILE, text: 'More', project: 'drey' });
+    await call('mcSend', { file: FILE, text: 'Junk', project: '../x' });
+    expect(calls.map((c) => c.payload)).toEqual([
+      { text: 'Capture', project: 'home-lab' },
+      { file: FILE, text: 'More', project: 'drey' },
+      { file: FILE, text: 'Junk' },
+    ]);
+  });
+
   it('refuses a session file outside the chat folder, a bad card id and an unknown decision', () => {
     const { call, calls } = setup();
     expect(call('mcOpen', { file: 'tickets/evil.md' })).toEqual({ ok: false, error: 'bad session payload' });

@@ -1,0 +1,191 @@
+/*
+ * The project filter (req-298), board 7n's control in each frame's own dress:
+ * the iPad's is a group like the area switch beside it (44 px controls), the
+ * desk's a group beside the top nav's tabs, the phone's the cost strip's end.
+ */
+:host {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.pf-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+:host(.face-pad) .pf-group,
+:host(.face-desk) .pf-group {
+  padding: 2px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+}
+
+:host(.face-desk) .pf-group {
+  background: var(--bg);
+}
+
+.pf-btn {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 0 6px 0 8px;
+  font: inherit;
+  color: var(--text-2);
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+}
+
+:host(.face-phone) .pf-btn {
+  height: 33px;
+  padding: 0 0 0 8px;
+  font-size: var(--ph-15);
+}
+
+:host(.face-pad) .pf-btn {
+  height: 44px;
+  padding: 0 10px 0 14px;
+  font-size: var(--ph-16);
+  color: var(--text);
+}
+
+:host(.face-desk) .pf-btn {
+  height: 30px;
+  font-size: calc(15px * var(--mc-text, 1));
+  color: var(--text);
+}
+
+@media (hover: hover) {
+  :host(.face-pad) .pf-btn:hover,
+  :host(.face-desk) .pf-btn:hover {
+    background: var(--panel-2);
+  }
+}
+
+:host(.face-pad) .pf-btn.open,
+:host(.face-desk) .pf-btn.open {
+  background: var(--panel-2);
+}
+
+.pf-btn:focus-visible,
+.pf-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.pf-label {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pf-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.pf-dot-10 {
+  width: 10px;
+  height: 10px;
+}
+
+.pf-dot.none {
+  box-sizing: border-box;
+  background: transparent;
+  border: 1.5px dashed var(--control-border);
+}
+
+.pf-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+
+.pf-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 31;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 224px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+:host(.face-phone) .pf-menu {
+  top: calc(100% + 2px);
+  right: 0;
+  left: auto;
+}
+
+.pf-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 44px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: var(--ph-16, 16px);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-chip);
+}
+
+:host(.face-desk) .pf-item {
+  height: 34px;
+  font-size: calc(15px * var(--mc-text, 1));
+}
+
+@media (hover: hover) {
+  .pf-item:hover {
+    background: var(--panel-2);
+  }
+}
+
+.pf-check {
+  display: flex;
+  flex-shrink: 0;
+  width: 16px;
+}
+
+.pf-name {
+  flex-grow: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pf-count {
+  font-size: var(--ph-15, 15px);
+  color: var(--text-3);
+}
+
+/* The iPad upright (board MPadPortrait's header): the room between the switch and the Autopilot chip is short. */
+@media (max-width: 900px) {
+  :host(.face-pad) .pf-btn {
+    padding: 0 8px 0 12px;
+  }
+
+  :host(.face-pad) .pf-label {
+    max-width: 44px;
+  }
+}
