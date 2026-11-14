@@ -5,17 +5,17 @@
  * project*), the selected project right (`projects-detail.ts`). It reads the
  * board snapshot's `projects`, `repos.md` and this device's vault registry,
  * writes through the engine's `projectSave` / `projectRemove` /
- * `projectAddRepo` (one commit each, applied as made — no Save) and follows
+ * `projectAddFolder` (one commit each, applied as made — no Save) and follows
  * the board's change events, so it never shows a copy that drifted from disk.
  */
 import type { DreyPluginApi, PluginSettingsPageContrib } from '../../../../shared/plugin-api/renderer';
-import type { BoardSnapshot, RepoCandidate, RepoRef, ReposListing } from '../../shared/tickets';
-import type { ProjectDraft, ProjectReply } from '../../../../packages/tickets-engine/src/contracts/project-commands';
+import type { BoardSnapshot, ReposListing } from '../../shared/tickets';
+import type { ProjectDraft, ProjectFolderReply, ProjectReply } from '../../../../packages/tickets-engine/src/contracts/project-commands';
 import type { ProjectRecord } from '../../../../packages/tickets-engine/src/contracts/projects';
 import { h } from '../desk-deps';
 import { dot, iconBtn } from './projects-dom';
 import { colorOf, draftOf, freshColor, newProjectName, ticketCounts } from './projects-model';
-import type { ProjectsContext } from './projects-context';
+import type { CloneProgressEvent, FolderOutcome, ProjectsContext } from './projects-context';
 import { projectDetail, type ProjectDetail } from './projects-detail';
 
 interface PageState {
@@ -29,6 +29,37 @@ interface PageState {
 function failureOf(reply: unknown): string | null {
   const r = reply as ProjectReply | null;
   return r?.ok === true ? null : (r?.error ?? '');
+}
+
+/** The words for a refused folder or clone: the catalog's line for the code, the engine's or git's own text where there is no better one. */
+export function failureText(t: ProjectsContext['t'], code: string | undefined, error: string | undefined): string {
+  const detail = error ?? '';
+  switch (code) {
+    case 'not_a_repository':
+      return t('projects.no_repository');
+    case 'not_a_folder':
+      return t('projects.not_a_folder');
+    case 'bad_url':
+      return t('projects.clone_error.bad_url');
+    case 'credentials':
+      return t('projects.clone_error.credentials');
+    case 'auth':
+      return t('projects.clone_error.auth');
+    case 'offline':
+      return t('projects.clone_error.offline');
+    case 'not_found':
+      return t('projects.clone_error.not_found');
+    case 'no_git':
+      return t('projects.clone_error.no_git');
+    case 'busy':
+      return t('projects.clone_error.busy');
+    case 'exists':
+      return t('projects.clone_error.exists', { path: detail });
+    case 'git':
+      return t('projects.clone_error.git', { detail });
+    default:
+      return detail;
+  }
 }
 
 export function createProjectsSettingsPage(api: DreyPluginApi): PluginSettingsPageContrib {
@@ -83,6 +114,21 @@ function mountProjectsPage(api: DreyPluginApi, body: HTMLElement): () => void {
   const put = (record: ProjectRecord): void => {
     state.projects = state.projects.some((p) => p.id === record.id) ? state.projects.map((p) => (p.id === record.id ? record : p)) : [...state.projects, record];
   };
+  /** A reply of `projectAddFolder` / `projectCloneRepo` as the page shows it; after a write the page reloads, so `latest` follows. */
+  const outcomeOf = async (reply: unknown): Promise<FolderOutcome> => {
+    const r = (reply ?? {}) as Partial<ProjectFolderReply> & { code?: string; error?: string };
+    if (r.ok === true && (r.kind === 'repository' || r.kind === 'folder') && typeof r.name === 'string') {
+      report(null);
+      await load().catch(() => undefined);
+      return { ok: true, kind: r.kind, name: r.name };
+    }
+    if (r.code === 'cancelled') {
+      return { ok: false, message: '', cancelled: true };
+    }
+    const message = failureText(t, r.code, r.error);
+    report(message);
+    return { ok: false, message };
+  };
   const ctx: ProjectsContext = {
     api,
     t,
@@ -95,7 +141,6 @@ function mountProjectsPage(api: DreyPluginApi, body: HTMLElement): () => void {
       const reply = await api.backend.invoke('projectSave', { id, project: draftOf(next) });
       return report(failureOf(reply));
     },
-    addRepo: async (id, repo: RepoRef) => report(failureOf(await api.backend.invoke('projectAddRepo', { id, repo }))),
     remove: async (id) => {
       const ok = report(failureOf(await api.backend.invoke('projectRemove', { id })));
       if (ok) {
@@ -104,25 +149,20 @@ function mountProjectsPage(api: DreyPluginApi, body: HTMLElement): () => void {
       }
       return ok;
     },
-    pickFolder: async () => {
-      const picked = (await api.backend.invoke('pickFolder')) as { path?: string } | null;
+    pickFolder: async (title) => {
+      const picked = (await api.backend.invoke('pickFolder', { title })) as { path?: string } | null;
       return typeof picked?.path === 'string' ? picked.path : null;
     },
-    scanFolder: async (): Promise<readonly RepoCandidate[]> => {
-      const folder = await ctx.pickFolder();
-      if (folder === null) {
-        return [];
+    addFolder: async (id, folder, repoOnly) => outcomeOf(await api.backend.invoke('projectAddFolder', { id, folder, repoOnly })),
+    cloneRepo: async (id, url, parent, onProgress) => {
+      const off = api.backend.on('repo-clone-progress', (data) => onProgress(data as CloneProgressEvent));
+      try {
+        return await outcomeOf(await api.backend.invoke('projectCloneRepo', { id, url, parent }));
+      } finally {
+        off();
       }
-      const found = (await api.backend.invoke('scanRepos', { folder })) as { ok?: boolean; candidates?: readonly RepoCandidate[]; error?: string };
-      if (found.ok !== true) {
-        report(found.error ?? t('projects.no_repository'));
-        return [];
-      }
-      if ((found.candidates ?? []).length === 0) {
-        report(t('projects.no_repository'));
-      }
-      return found.candidates ?? [];
     },
+    cancelClone: () => void api.backend.invoke('projectCloneCancel').catch(() => undefined),
   };
 
   const create = async (): Promise<void> => {

@@ -1,3 +1,4 @@
+import { stat } from 'node:fs/promises';
 import * as path from 'node:path';
 import { hostname } from 'node:os';
 import { createChatBridge } from '../services/chat-llm';
@@ -14,6 +15,7 @@ import { PersonaModelMigrator } from '../services/persona-model-migrator';
 import { PersonaProseMigrator } from '../services/persona-prose-migrator';
 import { ProjectMigrator } from '../services/project-migrator';
 import { PersonaRemoveService } from '../services/persona-remove-service';
+import { FolderProbe } from '../services/folder-probe';
 import { ProjectService } from '../services/project-service';
 import { PersonaRecords } from '../services/persona-records';
 import { PersonaRunRecords } from '../services/persona-run-records';
@@ -110,7 +112,8 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
   const personaRunRecords = new PersonaRunRecords({ board, host, git });
   const { skills, library: skillLibrary } = composeSkills({ board, host, git, env: process.env, ...(opts.github === undefined ? {} : { github: opts.github }) });
   const personaRemoval = new PersonaRemoveService({ board, fleet, host, git, pins: new PersonaPinReader(host, parts.crew.crewFiles) });
-  const projects = new ProjectService({ board, host, git, changed: () => board.announceChanged() });
+  const probe = new FolderProbe({ git: (cwd, args) => git.run(cwd, args), isDirectory: (folder) => stat(folder).then((s) => s.isDirectory(), () => false) });
+  const projects = new ProjectService({ board, host, git, probe, changed: () => board.announceChanged() });
   const startupWork = migrateOnce(log, {
     personaRecords,
     skills,
