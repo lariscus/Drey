@@ -536,7 +536,14 @@ commands in its brief: the runner judges its hand-over structurally.
   persona list: `<persona>`, `<persona>:shape`, `<persona>(notify)`, the
   positions up to the current one (`at`) locked, the example
   `["paul:shape", "paul", "ben", "ralf", "tessa", "you"]` — for the
-  mission and flow prompts; `plan-format.md` (version 2) gained `### Chain`. A placeholder expands
+  mission and flow prompts; `plan-format.md` (version 2) gained `### Chain`; `flow-proposal.md` (version 1, E10-5b)
+  is what the board adds to the plan format while `pipeline.md` says `propose-flow: true`:
+  the `### Chain` chapter is no longer optional — every plan carries one, starting from the
+  chain the ticket carries, the reason in `### Decisions`. It is appended after the plan
+  format by `expandFragments(text, fragments, { proposeFlow })` (the run composer passes
+  `RunCursor.proposeFlow`) — only a run's brief; the crew's chat prompts, a 1:1 and a free
+  session never get it — and a prompt may place it by hand with `{{flow-proposal}}` (empty
+  while the switch is off). A placeholder expands
   whatever the prompt's source (column template, vault copy, persona
   prompt — also in a 1:1 and a free session's brief); vault copies keep it.
 - **Versions:** every discipline, fragment and crew prompt carries a

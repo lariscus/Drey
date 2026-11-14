@@ -6,7 +6,7 @@
  */
 import type { DreyPluginApi, Unsubscribe } from '../../../../shared/plugin-api/renderer';
 import type { DeskDeps } from '../desk-deps';
-import { flowKeyOf, flowTargetOfKey, flowTitleOf, type FlowTarget } from './flow-model';
+import { flowKeyOf, flowTargetOfKey, flowTitleOf, isStandardFlow, type FlowTarget } from './flow-model';
 import { mountFlow } from './flow-view';
 
 export const FLOW_KIND = 'tickets-flow';
@@ -39,6 +39,9 @@ export function registerFlowKind(api: DreyPluginApi, deps: DeskDeps): Unsubscrib
       }
       return mountFlow(deps, host, target);
     },
-    statusText: (path) => flowTargetOfKey(path)?.ticketId ?? null,
+    statusText: (path) => {
+      const target = flowTargetOfKey(path);
+      return target === null ? null : isStandardFlow(target) ? 'Default flow' : target.ticketId;
+    },
   });
 }

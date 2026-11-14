@@ -6534,3 +6534,30 @@ sequenceDiagram
 
 Pia's memory and a 1:1's accepted memory proposal were already the engine's writes (board service, one commit each);
 nothing outside the runner wrote a persona file uncommitted.
+
+## 6.143 The default flow and the plan persona's flow proposal (E10-5b, milestone 275)
+
+Settings → Tickets edits the flow every new ticket is created with, and decides whether each new plan carries a proposed flow. Both are keys of `tickets/_meta/pipeline.md`; nothing is stored anywhere else.
+
+```mermaid
+sequenceDiagram
+    participant S as Settings → Tickets
+    participant F as Flow tab (flow://standard)
+    participant E as Engine (BoardService)
+    participant P as pipeline.md
+    participant D as Dispatcher
+    participant W as Plan worker
+    S->>F: Open flow editor (the default flow)
+    F->>E: flow {id: standard} / flowEdit / flowDraft
+    E-->>F: scope standard · the saved flow · nothing locked
+    F->>E: flowSave {id: standard, chain}
+    E->>E: validateChain (the crew, an entry per position)
+    E->>P: flow: ben; ralf; paul; you — one commit "tickets: default flow"
+    Note over E: existing tickets keep their own chain
+    S->>E: setStandardFlow {proposeFlow: true}
+    E->>P: propose-flow: true — one commit "tickets: propose flow on"
+    D->>E: snapshot → proposeFlow
+    D->>W: a plan run: RunCursor.proposeFlow → the brief closes the plan format with flow-proposal.md
+    W-->>E: the plan with a ### Chain chapter (and its reason under Decisions)
+    E->>E: the chain is applied at the run's green end (validateChain, the cursor stays locked)
+```

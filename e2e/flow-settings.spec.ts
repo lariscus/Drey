@@ -121,7 +121,7 @@ test.describe('Flow tab and Settings → Tickets (E13-11, E13-12)', () => {
     const settings = page.locator('.tset-desk');
     await expect(settings).toBeVisible({ timeout: 15_000 });
     await expect(settings.locator('.tset-set-controls').first()).toContainText('Paul, Ben, Ralf');
-    await expect(settings.locator('[aria-label="Standard flow"]')).toHaveText('Plan → Build → Review');
+    await expect(settings.locator('[aria-label="Default flow"]')).toHaveText('Ben → Ralf → You');
     await expect(settings).toContainText('$12 across 3 personas');
     const videos = page.locator('[data-settings-section="videos"]');
     await expect(videos.locator('#tset-videos-limit')).not.toHaveValue('');
@@ -130,8 +130,28 @@ test.describe('Flow tab and Settings → Tickets (E13-11, E13-12)', () => {
     await videos.locator('#tset-videos-limit').scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath('settings-tickets-videos.png') });
 
-    // The flow editor opens from Settings on the picked ticket (the overlay stays over it).
+    // E10-5b: the proposal switch writes pipeline.md's propose-flow key through the engine.
+    const propose = settings.locator('#tset-propose-flow');
+    await expect(propose).not.toBeChecked();
+    await propose.check();
+    await expect.poll(() => fs.readFileSync(path.join(vaultDir, 'tickets', '_meta', 'pipeline.md'), 'utf8'), { timeout: 15_000 }).toMatch(/^propose-flow: true$/m);
+    await expect(propose).toBeChecked();
+
+    // E10-5b: the default flow opens in the flow editor itself and saves into pipeline.md; the ticket keeps its own chain.
     await settings.getByRole('button', { name: 'Open flow editor' }).click();
+    const standard = page.locator('.flow-tab').filter({ visible: true });
+    await expect(standard.locator('.flow-h')).toHaveText('Default flow', { timeout: 15_000 });
+    await expect(standard.locator('.flow-gate-title')).toHaveText(['Ben', 'Ralf', 'You']);
+    await expect(standard.getByRole('button', { name: 'Reset to standard flow' })).toBeHidden();
+    await standard.locator('.flow-plus[aria-label="Add a persona after Ralf"]').click();
+    await standard.locator('.flow-add').getByRole('button', { name: 'Paul' }).click();
+    await standard.getByRole('button', { name: 'Save flow' }).click();
+    await expect(standard.locator('.flow-message')).toContainText('Saved', { timeout: 15_000 });
+    const pipeline = fs.readFileSync(path.join(vaultDir, 'tickets', '_meta', 'pipeline.md'), 'utf8');
+    expect(pipeline).toMatch(/^flow: ben; ralf; paul; you$/m);
+    expect(pipeline).toMatch(/^propose-flow: true$/m);
+    expect(fs.readFileSync(path.join(vaultDir, 'tickets', '40-build', 'T-0121.md'), 'utf8')).not.toMatch(/^flow:/m);
+    await page.screenshot({ path: testInfo.outputPath('flow-default.png') });
     stopEngine();
   });
 });
