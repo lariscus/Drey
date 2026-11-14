@@ -815,6 +815,7 @@ export function createTicketsWidget(api: DreyPluginApi): PluginWidgetContrib {
     defaultDock: 'left',
     defaultOpen: false,
     defaultFlex: 340,
+    order: 70,
     flush: true,
     status: () => {
       if (snapshot === null || snapshot.vaultId === null) {

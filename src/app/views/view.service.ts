@@ -234,15 +234,22 @@ export class ViewService {
       return;
     }
     const held = new Set(this.panes.tabsOfView(id));
-    for (const tab of tabs) {
-      if (held.has(tab.path)) {
-        continue;
+    // The view's own tabs land in this view, whatever home view their kind
+    // names (the Crew tab's kind names Work): no routing while they open.
+    const release = this.homeViews.suspend();
+    try {
+      for (const tab of tabs) {
+        if (held.has(tab.path)) {
+          continue;
+        }
+        try {
+          entry.opener(tab.kind, tab.path);
+        } catch (error) {
+          this.log.record('warn', `view "${id}": opening ${tab.kind} ${tab.path} failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
       }
-      try {
-        entry.opener(tab.kind, tab.path);
-      } catch (error) {
-        this.log.record('warn', `view "${id}": opening ${tab.kind} ${tab.path} failed: ${error instanceof Error ? error.message : String(error)}`);
-      }
+    } finally {
+      release();
     }
   }
 
@@ -258,8 +265,10 @@ export class ViewService {
     this.dock.switchView(id);
     this.panes.switchView(id);
     this._activeId.set(id);
-    this.adoptBaseline(id);
+    // The preset's own tabs first: they are part of the layout a first
+    // showing adopts as saved, so a view never opens "modified" (req-297).
     this.openPresetTabs(id);
+    this.adoptBaseline(id);
   }
 
   /** `Ctrl+1`…`Ctrl+9`: the view at 0-based `index`; a missing one does nothing. */
@@ -278,6 +287,22 @@ export class ViewService {
     }
     const at = views.findIndex((v) => v.id === this._activeId());
     this.switchTo(views[(at + 1) % views.length].id);
+  }
+
+  /**
+   * View -> "Reset layout" (`layout.reset`, req-297): the active view back
+   * to its own default -- a preset view to its preset layout, re-seeded,
+   * its own tabs opened; Notes and user views to the base defaults. Docked
+   * editor panes go back to the centre. Like any other change it alters the
+   * working layout only: "Save layout" keeps it, "Reset to saved layout"
+   * still returns to the saved one (D-6). No tab is closed.
+   */
+  resetActive(): void {
+    const id = this._activeId();
+    const preset = this.presets().find((p) => p.id === id)?.preset;
+    this.dock.reset(preset?.layout);
+    this.panes.resetRegions();
+    this.openPresetTabs(id);
   }
 
   // --- saved layouts (D-6) ---------------------------------------------------
@@ -517,12 +542,22 @@ export class ViewService {
 function fingerprint(layout: SavedLayout): string {
   const { root, panes, dock } = layout.panes;
   // A baseline saved before panels could fold has no `collapsed`: same as none folded.
-  const { collapsed, ...dockRest } = layout.dock;
+  const { collapsed, flexes, open, foldedSides, ...dockRest } = layout.dock;
   return JSON.stringify({
     dock: dockRest,
+    // Records and the folded sides by content, not by the order their keys
+    // were added in -- a reset builds them in default order, a running app
+    // in plugin-registration order (req-297).
+    flexes: sortedEntries(flexes),
+    open: sortedEntries(open),
+    foldedSides: [...(foldedSides ?? [])].sort(),
     collapsed: Object.keys(collapsed ?? {}).sort(),
     root,
     tabs: Object.fromEntries(Object.entries(panes).map(([id, pane]) => [id, pane.tabs])),
     docked: dock ?? null,
   });
+}
+
+function sortedEntries<T>(record: Readonly<Record<string, T>> | undefined): [string, T][] {
+  return Object.entries(record ?? {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 }

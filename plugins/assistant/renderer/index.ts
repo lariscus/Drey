@@ -373,6 +373,7 @@ const plugin: PluginRendererModule = {
       defaultDock: 'right',
       defaultOpen: true,
       defaultFlex: 100,
+      order: 10,
       flush: true,
       // Deliberately NO `status()` (frame-header value): the chat title it
       // showed recomputed only on shell change detection — stale and wrong

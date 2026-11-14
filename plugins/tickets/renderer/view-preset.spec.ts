@@ -1,19 +1,41 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DreyPluginApi, PluginDocKindContrib } from '../../../shared/plugin-api/renderer';
 import { registerFlowKind } from './flow/register';
-import { WORK_VIEW_ID, createWorkPreset, registerWorkView } from './view-preset';
+import { MISSION_CONTROL_TARGET } from './conversation/targets';
+import { BOARD_KEY, BOARD_KIND, CREW_VIEW_ID, TEAM_KEY, TEAM_KIND, WORK_VIEW_ID, createCrewPreset, createWorkPreset, registerWorkView } from './view-preset';
 import type { DeskDeps } from './desk-deps';
 
-describe('the Work preset', () => {
-  it("arranges Tickets left, the Assistant right and nothing below (the Capacity band is the Board's pool chip, req-271)", () => {
+describe('the Work preset (board 7q DeskViewWorkMC, req-297)', () => {
+  it('opens the Board, Mission Control open in the right dock, Tickets in the folded left dock, nothing below', () => {
     const preset = createWorkPreset();
     expect(preset.id).toBe(WORK_VIEW_ID);
     expect(preset.label).toBe('Work');
-    expect(preset.layout).toEqual({ left: ['tickets'], right: ['assistant'], bottom: [] });
+    expect(preset.assistantTarget).toBe(MISSION_CONTROL_TARGET);
+    expect(preset.layout).toEqual({
+      left: ['tickets', 'outline', 'backlinks'],
+      right: ['assistant'],
+      bottom: [],
+      open: ['tickets', 'assistant'],
+      folded: ['left'],
+      openTabs: [{ kind: BOARD_KIND, path: BOARD_KEY }],
+    });
   });
+});
 
-  it('names no Assistant target until E13-5 gives it one', () => {
-    expect(createWorkPreset().assistantTarget).toBeUndefined();
+describe('the Crew preset (board 7r DeskViewCrew, req-297)', () => {
+  it('opens the Crew tab with both side docks folded, the Assistant on Mission Control, nothing below', () => {
+    const preset = createCrewPreset();
+    expect(preset.id).toBe(CREW_VIEW_ID);
+    expect(preset.label).toBe('Crew');
+    expect(preset.assistantTarget).toBe(MISSION_CONTROL_TARGET);
+    expect(preset.layout).toEqual({
+      left: ['tickets', 'outline', 'backlinks'],
+      right: ['assistant'],
+      bottom: [],
+      open: ['tickets', 'assistant'],
+      folded: ['left', 'right'],
+      openTabs: [{ kind: TEAM_KIND, path: TEAM_KEY }],
+    });
   });
 });
 

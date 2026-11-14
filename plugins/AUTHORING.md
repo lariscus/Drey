@@ -138,6 +138,12 @@ leaves the app on the previous build. Verify with
   is refused, logged); the base keeps the choice per view (ADR-0089 later change). Every plugin reads it with
   `ui.workspaceScope()` and `ui.onWorkspaceScopeChange`. `FindQuery.scope` gains `'project'` (a find mode restricts itself
   to the choice's vaults).
+  1.60 (req-297, default layouts per view) adds `PluginWidgetContrib.order`: the panel's place in its default dock on a
+  fresh layout and after `View → Reset layout` (lower first; the built-ins use steps of ten — Calendar 10, Files 20, Open
+  windows 50; Find 30, Templates 40, Source control 60, Tickets 70 on the left, Assistant 10, Outline 20, Backlinks 30 on the
+  right). Absent, the panel follows the ordered ones in registration order. It never reorders a layout the user already
+  has. `View → Reset layout` now returns a preset view to its own `layout` (re-seeded, `openTabs` opened) instead of the
+  base defaults, and a preset's `openTabs` open in the preset even when their doc kind names another `homeView`.
   1.58 (req-284, Settings → Projects) adds `PluginSettingsPageContrib.bare`: the host draws no title and no
   description for the page and lets its body take the detail pane's full width instead of the one Settings page
   width — for a page that draws its own head and layout, such as a master-detail list (board 7m).
@@ -460,6 +466,7 @@ pure-field case.
   The value shows in the panel header while open and in the strip icon's
   tooltip while closed — keep it short.
 - `defaultOpen: false` means the panel starts as an icon only.
+- `order` (SDK 1.60) places it among the icons of its default dock on a fresh layout; lower first.
   `api.ui.revealWidget(id)` opens it.
 
 ## SDK 1.20 — a header for your Settings page

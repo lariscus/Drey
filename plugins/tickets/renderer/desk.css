@@ -1126,9 +1126,14 @@
   flex: 0 0 140px;
 }
 
+/*
+ * A persona column shares the room left over (7e v2) but never gets
+ * narrower than 158 px: beside Mission Control (7q `DeskViewWorkMC`,
+ * req-297) the columns keep that width and the board scrolls sideways.
+ */
 .pb-col-lane {
-  flex: 1 1 0;
-  min-width: 150px;
+  flex: 1 0 158px;
+  min-width: 158px;
 }
 
 .pb-col-done {

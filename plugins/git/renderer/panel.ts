@@ -418,6 +418,7 @@ export function createSourceControlWidget(
     defaultDock: 'left',
     defaultOpen: false,
     defaultFlex: 260,
+    order: 60,
     flush: true,
     status: () => {
       const vault = session.currentOk();

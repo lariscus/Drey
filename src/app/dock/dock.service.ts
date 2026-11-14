@@ -70,8 +70,8 @@ export interface DockState {
 
 const WIDTH = { min: 180, max: 560 } as const;
 const HEIGHT = { min: 100, max: 680 } as const;
-const DEFAULT_LEFT_W = 248;
-const DEFAULT_RIGHT_W = 340;
+const DEFAULT_LEFT_W = 300;
+const DEFAULT_RIGHT_W = 380;
 const DEFAULT_BOTTOM_H = 280;
 
 function clampBottomHeight(px: number): number {
@@ -591,7 +591,12 @@ export class DockService {
     if (this.hasView(id)) {
       return;
     }
-    const base = this.defaultState();
+    this.slots = { ...this.slots, [id]: this.presetState(layout) };
+    this.persist();
+  }
+
+  /** The dock state a preset's layout describes, on top of the defaults (`seedView`, `reset`). */
+  private presetState(layout: ViewPresetLayout): DockState {
     const named = new Set<string>([
       ...(layout.left ?? []),
       ...(layout.right ?? []),
@@ -602,7 +607,7 @@ export class DockService {
     for (const widgetId of this.registry.allWidgetIds()) {
       open[widgetId] = named.has(widgetId) && shown.has(widgetId);
     }
-    const seed = this.merge(base, {
+    return this.merge(this.defaultState(), {
       dock: {
         left: [...(layout.left ?? [])],
         right: [...(layout.right ?? [])],
@@ -612,8 +617,6 @@ export class DockService {
       foldedSides: [...(layout.folded ?? [])],
       ...(layout.bottomH !== undefined ? { bottomH: clampBottomHeight(layout.bottomH) } : {}),
     });
-    this.slots = { ...this.slots, [id]: seed };
-    this.persist();
   }
 
   /** Forgets a deleted view's dock layout. */
@@ -623,11 +626,17 @@ export class DockService {
     this.persist();
   }
 
-  /** View -> "Reset layout": the ACTIVE view's dock back to the defaults. */
-  reset(): void {
+  /**
+   * View -> "Reset layout": the ACTIVE view's dock back to its default
+   * (req-297, ADR-0089 later change) -- a preset view's own layout, given
+   * as `preset`, re-seeded; the base defaults otherwise (Notes, user
+   * views). A panel disabled in Settings stays out.
+   */
+  reset(preset?: ViewPresetLayout): void {
     this.storedActive = null;
-    this.state.set(this.defaultState());
+    this.state.set(preset === undefined ? this.defaultState() : this.presetState(preset));
     this.persist();
+    this.reconcileEnabled(this.settings.widgetsDisabled());
   }
 
   /**

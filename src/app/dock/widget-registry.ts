@@ -46,6 +46,12 @@ export interface WidgetDescriptor {
   defaultDock: DockSide;
   /** Open (`true`) or closed to its strip icon (`false`) by default. */
   defaultOpen: boolean;
+  /**
+   * Its place in the default dock on a fresh layout / after Reset layout
+   * (SDK 1.60): lower first; absent = after the ordered ones, in
+   * registration order.
+   */
+  order?: number;
   /** `flex-grow` weight when expanded (ignored for a content-height widget). */
   defaultFlex: number;
   /** Sizes to its content instead of a flex share; draws no splitter (was `CONTENT_HEIGHT_PANELS`). */
@@ -92,6 +98,7 @@ export const CORE_WIDGETS: readonly WidgetDescriptor[] = [
     component: CalendarPanel,
     defaultDock: 'left',
     defaultOpen: true,
+    order: 10,
     defaultFlex: 250,
     contentHeight: true,
     headerReplacesTitle: true,
@@ -105,6 +112,7 @@ export const CORE_WIDGETS: readonly WidgetDescriptor[] = [
     component: FilesPanel,
     defaultDock: 'left',
     defaultOpen: true,
+    order: 20,
     defaultFlex: 340,
     removable: true,
     capabilities: ['file-tree', 'active-document'],
@@ -119,7 +127,9 @@ export const CORE_WIDGETS: readonly WidgetDescriptor[] = [
     icon: 'window',
     component: WindowsPanel,
     defaultDock: 'left',
-    defaultOpen: true,
+    // Board 7p (req-297): a strip icon on a fresh layout, between Templates and Source control.
+    defaultOpen: false,
+    order: 50,
     defaultFlex: 150,
     removable: true,
     capabilities: ['active-document'],

@@ -33,11 +33,15 @@ export class WidgetRegistryService {
     this.statusTick.update((v) => v + 1);
   }
 
-  /** All registerable widgets, core first, then plugin contributions in registration order. */
-  readonly widgets: Signal<readonly WidgetDescriptor[]> = computed(() => [
-    ...this.coreWidgets,
-    ...this.pluginWidgets(),
-  ]);
+  /**
+   * All registerable widgets in default order (SDK 1.60 `order`, lower
+   * first): the ordered ones by their number, then the rest -- core first,
+   * then plugin contributions in registration order. The per-dock default
+   * order of a fresh layout is this list filtered by `defaultDock`.
+   */
+  readonly widgets: Signal<readonly WidgetDescriptor[]> = computed(() =>
+    byDefaultOrder([...this.coreWidgets, ...this.pluginWidgets()]),
+  );
   readonly widgetMap: Signal<ReadonlyMap<WidgetId, WidgetDescriptor>> = computed(
     () => new Map(this.widgets().map((w) => [w.id, w])),
   );
@@ -136,6 +140,7 @@ export class WidgetRegistryService {
         defaultDock: contrib.defaultDock,
         defaultOpen: contrib.defaultOpen,
         defaultFlex: contrib.defaultFlex,
+        ...(typeof contrib.order === 'number' && Number.isFinite(contrib.order) ? { order: contrib.order } : {}),
         ...(contrib.contentHeight !== undefined ? { contentHeight: contrib.contentHeight } : {}),
         ...(contrib.flush !== undefined ? { flush: contrib.flush } : {}),
         removable: true,
@@ -158,4 +163,13 @@ export class WidgetRegistryService {
       this.pluginWidgets.update((list) => list.filter((w) => w.id !== contrib.id));
     };
   }
+}
+
+/** Stable sort by `order`; a widget without one goes after every ordered widget. */
+export function byDefaultOrder(widgets: readonly WidgetDescriptor[]): WidgetDescriptor[] {
+  const rank = (w: WidgetDescriptor): number => w.order ?? Number.POSITIVE_INFINITY;
+  return widgets
+    .map((w, at) => ({ w, at }))
+    .sort((a, b) => rank(a.w) - rank(b.w) || a.at - b.at)
+    .map(({ w }) => w);
 }

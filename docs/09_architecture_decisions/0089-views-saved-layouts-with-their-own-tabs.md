@@ -316,3 +316,54 @@ panel lists the choice's `sources` (vaults by name, plain folders read-only).
 - Alternatives weighed in the concept (`project-handling-draft.md` §4): a filter
   in every panel (S2) was declined by the owner; Mission Control on a phone or
   iPad keeps its own, device-local filter (roadmap req-298).
+
+## Later change — default layouts per view, and Reset layout per view (milestone 270, req-297, SDK 1.60)
+
+The owner's default-layout boards (7p `DeskViewNotes`, 7q `DeskViewWorkMC`,
+7r `DeskViewCrew`, accepted 2026-11-13) fix what each view opens with on its
+first showing and after `View → Reset layout`.
+
+- **Notes is the base defaults.** Docks 300 / 380 (`DockService`, was
+  248 / 340). Left: Calendar and Files open; Find, Templates, Open windows,
+  Source control and Tickets as strip icons. Right: the Assistant open (on
+  Model, Notes names no target); Outline and Backlinks as strip icons — their
+  `defaultDock` moved right ("about this note" beside the note), Open
+  windows' `defaultOpen` became false. No bottom band; today's daily note as
+  before (`daily.openOnStartup`).
+- **The strip order is declared, not discovered (SDK 1.60).** A dock panel
+  may name an `order` (lower first; the built-ins use steps of ten). The
+  registry lists panels by it, and a fresh layout or a reset lays each dock
+  out in that order; panels without one follow in registration order.
+  Without it the order came from plugin activation, which is folder-name
+  order — Backlinks before Outline, Source control before Find — and no
+  board's strip. It only places a panel in a *new* layout: a layout the user
+  already has is never reordered.
+- **Work and Crew are the tickets plugin's presets**, unchanged as a
+  mechanism. Work opens the Board (`openTabs`) with the Assistant open on
+  Mission Control (`assistantTarget`) in the right dock and the left dock
+  folded. Crew opens the Crew tab with both side docks folded. Both keep the
+  right dock to the Assistant alone, as the boards draw its strip: Tickets,
+  Outline and Backlinks wait as icons in the folded left dock. The full-width
+  Board alternative (`DeskViewWork`) was declined (`specs/decisions.md`); the
+  Board's persona columns keep 158 px beside the dock and the board scrolls
+  sideways.
+- **Reset layout returns the active view to its own default.**
+  `ViewService.resetActive()` — the command `layout.reset` and the View menu
+  row — gives a preset view its preset layout, re-seeded, and opens its
+  `openTabs`; Notes and user views get the base defaults (a user view is a
+  copy, it has no default of its own). Docked editor panes go back to the
+  centre as before. It is a change like any other (D-6): it alters the
+  working layout only, *Save layout* keeps it, *Reset to saved layout* still
+  returns to the saved one. Until now the reset gave every view the Notes
+  arrangement.
+- **No migration.** A changed default never rewrites a saved layout or a view
+  already shown; an existing install gets the new arrangement view by view
+  through *Reset layout*.
+- **Two fixes the defaults surfaced.** A preset now opens its own tabs
+  *before* its first showing adopts the layout as saved, so a view never
+  opens "modified". And the modified check compares panel records by
+  content, not by key order — a reset builds them in default order, a
+  running app in registration order, and the two used to differ for the same
+  layout. A preset's own tabs also open in the preset whatever home view
+  their doc kind names (the Crew tab's kind names Work): the home-view router
+  is suspended while they open.

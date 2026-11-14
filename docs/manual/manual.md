@@ -117,8 +117,8 @@ Stepping back to a closed note reopens it.
 ![The View menu](img/titlebar-view-menu.png)
 
 The **View** menu toggles every panel, the docks, zen mode (`Ctrl+Alt+Z`),
-full screen (`F11`) and *Reset layout*, which restores the default dock
-arrangement and undocks docked editor panes.
+full screen (`F11`) and *Reset layout*, which returns the view you are in
+to the arrangement it opens with and undocks docked editor panes.
 
 ### Zen mode
 
@@ -2752,13 +2752,25 @@ automatically.
   tabs *In this view* above those *In other views*, each with *Show here*.
   Closing a tab only takes it out of the current
   view while another view still shows it; it closes for good (asking
-  about unsaved changes) with the last one. *Reset layout* resets the
-  current view only. A plugin can offer views of its own: they appear in
+  about unsaved changes) with the last one. *View → Reset layout* returns
+  the current view — only that one — to the arrangement it opens with
+  (below); like any other change it is not saved until you choose *Save
+  layout*, and *Reset to saved layout* still brings back the one you saved. A plugin can offer views of its own: they appear in
   the switcher after *Notes* and cannot be deleted, and opening a
   document that belongs to such a view (a tab the plugin names for it)
-  switches there first. The tickets plugin offers **Work** (`Ctrl+2`):
-  the Tickets panel on the left, the Assistant on the right and nothing
-  below. Opening a ticket — from the Tickets panel, the Files panel, a
+  switches there first. The tickets plugin offers **Work** (`Ctrl+2`) and
+  **Crew** (`Ctrl+3`).
+- **What each view opens with.** *Notes*: Calendar and Files open on the
+  left (Find, Templates, Open windows, Source control and Tickets as icons
+  in the strip), the Assistant open on the right (Outline and Backlinks as
+  icons), today's daily note, nothing below. *Work*: the Board, Mission
+  Control open in the Assistant on the right, the left dock folded away
+  with the Tickets panel in it (`Ctrl+B` brings it back); beside the
+  Assistant the board keeps its column width and scrolls sideways. *Crew*:
+  the Crew tab alone, both side docks folded; a card opens the persona's
+  page as a tab. Work's Board and Crew's Crew tab come back each time you
+  switch to the view. An arrangement you already have is never replaced by
+  these: *Reset layout* applies them, one view at a time. Opening a ticket — from the Tickets panel, the Files panel, a
   `[[T-0121]]` link or the quick switcher — never changes the view: the
   ticket opens as a tab in the view you are in. Opening the Board or
   Crew tab switches to Work; Notes is `Ctrl+1`.

@@ -16,7 +16,7 @@ describe('DockService views (ADR-0089)', () => {
     dock.switchView('work');
     expect(dock.activeViewId()).toBe('work');
     expect(dock.sideFolded('left')).toBe(false); // a view without a layout starts at the defaults
-    expect(dock.dockWidth('left')).toBe(248);
+    expect(dock.dockWidth('left')).toBe(300);
     dock.setDockWidth('left', 400);
 
     dock.switchView('notes');
@@ -63,7 +63,7 @@ describe('DockService views (ADR-0089)', () => {
     dock.switchView('notes');
     dock.dropView('mine');
     dock.switchView('mine'); // gone: back to the defaults
-    expect(dock.dockWidth('right')).toBe(340);
+    expect(dock.dockWidth('right')).toBe(380);
   });
 
   it('persists every view and the active one, and reads them back', () => {
@@ -99,7 +99,7 @@ describe('DockService views (ADR-0089)', () => {
     dock.switchView('work');
     dock.setDockWidth('left', 410);
     dock.reset();
-    expect(dock.dockWidth('left')).toBe(248);
+    expect(dock.dockWidth('left')).toBe(300);
     dock.switchView('notes');
     expect(dock.dockWidth('left')).toBe(300);
   });

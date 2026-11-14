@@ -847,7 +847,8 @@ Splitters (`startSplit`, keeps the summed height of the two open
 neighbours constant, min 40px each) and the dock-edge resizers
 (`startDockResize`, clamp 180–560px) use pointer capture instead and
 write the same `drey.dock` blob. `View → Reset layout` is
-`DockService.reset()`.
+`ViewService.resetActive()` -- `DockService.reset()` with the active view's
+preset layout, or the base defaults (§6.138).
 
 ### View menu → hide / show a whole widget (ADR-0034)
 
@@ -6421,4 +6422,37 @@ sequenceDiagram
     L->>H: the look for a newer ref of the new source
     L-->>P: {library, source, skipped, warning}
     Note over P: Update to <ref> → skillSourceUpdate: the same, old folders removed in the same commit
+
+## 6.138 View → Reset layout: the active view back to its own default (req-297, milestone 270)
+
+Each view opens with its board — 7p `DeskViewNotes`, 7q `DeskViewWorkMC`,
+7r `DeskViewCrew` — on its first showing (a preset is seeded, ADR-0089) and
+after `View → Reset layout`. The reset acts on the active view only and,
+like every other change, on its working layout (D-6): the saved layout stays
+until *Save layout*, *Reset to saved layout* returns to it.
+
+```mermaid
+sequenceDiagram
+    participant U as Owner
+    participant M as View menu / layout.reset
+    participant V as ViewService
+    participant D as DockService
+    participant P as PaneService
+    participant R as HomeViewRouter
+    participant K as preset's doc kind (tickets)
+    U->>M: Reset layout
+    M->>V: resetActive()
+    alt active view is a preset (Work, Crew)
+        V->>D: reset(preset.layout) -- presetState: named panels, open, folded
+    else Notes or a user view
+        V->>D: reset() -- base defaults: 300 / 380, panels by order
+    end
+    D->>D: reconcileEnabled (panels disabled in Settings stay out)
+    V->>P: resetRegions() -- docked editors back to the centre
+    V->>R: suspend()
+    loop each openTabs entry the view does not hold
+        V->>K: restore(path) -- the Board / the Crew tab, in this view
+    end
+    V->>R: release
+    Note over V: modified() = working layout vs saved, by content
 ```

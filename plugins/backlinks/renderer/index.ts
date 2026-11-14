@@ -106,9 +106,10 @@ const plugin: PluginRendererModule = {
       id: 'backlinks',
       title: 'Backlinks',
       icon: 'link',
-      defaultDock: 'left',
+      defaultDock: 'right',
       defaultOpen: false,
       defaultFlex: 200,
+      order: 30,
       flush: true,
       status: () => (state.rows.length > 0 ? `${state.rows.length}` : null),
       mount: (body) => {

@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import type { DreyApi } from '../../../shared/ipc-api';
-import { DockService } from '../dock';
+import { DockService, WidgetRegistryService } from '../dock';
 import { PaneService } from '../panes';
 import { EditorService } from '../services/editor.service';
 import { FileOpenerRegistry } from '../services/file-opener-registry.service';
@@ -486,5 +486,174 @@ describe('ViewService saved layouts (D-6: a view saves only by "Save view")', ()
     dock.setDockWidth('left', 321);
     views.saveCurrentAs('Second');
     expect(views.modified()).toBe(false);
+  });
+});
+
+describe('ViewService "Reset layout": the active view back to its own default (req-297)', () => {
+  let views: ViewService;
+  let dock: DockService;
+  let panes: PaneService;
+  let editor: EditorService;
+  const opened: string[] = [];
+  const PRESET = {
+    id: 'acme.work',
+    label: 'Work',
+    layout: {
+      left: ['files'],
+      right: ['windows', 'calendar'],
+      bottom: [],
+      open: ['windows'],
+      folded: ['left' as const],
+      openTabs: [{ kind: 'acme-board', path: 'board://all' }],
+    },
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    opened.length = 0;
+    window.dreyApi = {
+      readVaultFile: (p: string) => Promise.resolve({ content: `body of ${p}`, modifiedMs: 1 }),
+    } as unknown as DreyApi;
+    views = TestBed.inject(ViewService);
+    dock = TestBed.inject(DockService);
+    panes = TestBed.inject(PaneService);
+    editor = TestBed.inject(EditorService);
+    views.registerPreset('acme', PRESET, (kind, path) => {
+      opened.push(`${views.activeId()} ${kind} ${path}`);
+      editor.addPluginDoc(kind, path, 'Board');
+    });
+    views.adoptBaselines();
+  });
+
+  afterEach(() => {
+    delete (window as { dreyApi?: unknown }).dreyApi;
+    localStorage.clear();
+  });
+
+  it('a preset view goes back to its preset layout, re-seeded, and its own tabs come back', async () => {
+    views.switchTo('acme.work');
+    dock.toggleSide('left');
+    dock.toggle('calendar');
+    dock.setDockWidth('right', 500);
+    dock.move('files', 'right', 0);
+    await editor.closeTab('board://all');
+    expect(panes.tabsOfView('acme.work')).not.toContain('board://all');
+
+    views.resetActive();
+
+    expect(dock.sideFolded('left')).toBe(true);
+    expect(dock.leftIds()[0]).toBe('files');
+    expect(dock.rightIds().slice(0, 2)).toEqual(['windows', 'calendar']);
+    expect(dock.closed('windows')).toBe(false);
+    expect(dock.closed('calendar')).toBe(true);
+    expect(dock.dockWidth('right')).toBe(380);
+    expect(panes.tabsOfView('acme.work')).toContain('board://all');
+    expect(opened.at(-1)).toBe('acme.work acme-board board://all');
+  });
+
+  it('Notes goes back to the base defaults, not to a preset (board 7p)', () => {
+    dock.toggleSide('left');
+    dock.toggle('windows');
+    dock.setDockWidth('left', 200);
+    dock.setDockWidth('right', 200);
+    dock.toggle('calendar');
+
+    views.resetActive();
+
+    expect(views.activeId()).toBe('notes');
+    expect(dock.sideFolded('left')).toBe(false);
+    expect(dock.leftIds()).toEqual(['calendar', 'files', 'windows']);
+    expect(dock.closed('calendar')).toBe(false);
+    expect(dock.closed('files')).toBe(false);
+    expect(dock.closed('windows')).toBe(true);
+    expect(dock.dockWidth('left')).toBe(300);
+    expect(dock.dockWidth('right')).toBe(380);
+    expect(dock.hasBottom()).toBe(false);
+    expect(opened).toEqual([]);
+  });
+
+  it('a user view copied from a preset goes back to the base defaults, not the preset it was copied from', () => {
+    views.switchTo('acme.work');
+    const mine = views.saveCurrentAs('Mine');
+    expect(dock.sideFolded('left')).toBe(true);
+
+    views.resetActive();
+
+    expect(views.activeId()).toBe(mine);
+    expect(dock.sideFolded('left')).toBe(false);
+    expect(dock.leftIds()).toEqual(['calendar', 'files', 'windows']);
+    expect(dock.closed('windows')).toBe(true);
+  });
+
+  it('alters the working layout only: the saved layout stays and "Reset to saved layout" brings it back (D-6)', async () => {
+    views.switchTo('acme.work');
+    dock.toggleSide('left');
+    dock.setDockWidth('right', 450);
+    views.saveActive();
+    const saved = JSON.parse(localStorage.getItem('drey.views.saved')!).views['acme.work'] as unknown;
+
+    views.resetActive();
+
+    expect(views.modified()).toBe(true);
+    expect(JSON.parse(localStorage.getItem('drey.views.saved')!).views['acme.work']).toEqual(saved);
+    await views.revertActive();
+    expect(dock.sideFolded('left')).toBe(false);
+    expect(dock.dockWidth('right')).toBe(450);
+    expect(views.modified()).toBe(false);
+  });
+
+  it('resets the active view only: another view keeps its arrangement', () => {
+    dock.setDockWidth('left', 222);
+    views.switchTo('acme.work');
+    views.resetActive();
+    views.switchTo('notes');
+    expect(dock.dockWidth('left')).toBe(222);
+  });
+
+  it('a preset view opens unmodified: its own tabs are part of the layout its first showing adopts', () => {
+    views.switchTo('acme.work');
+    expect(panes.tabsOfView('acme.work')).toContain('board://all');
+    expect(views.modified()).toBe(false);
+  });
+
+  it('a reset to the layout the view already had is no change, whatever order the panels registered in', () => {
+    // A plugin panel that registers after the dock exists, ordered before Files: the running
+    // layout lists it last, a reset lists it in default order -- the same layout.
+    TestBed.inject(WidgetRegistryService).registerPluginWidget({
+      id: 'acme.panel',
+      title: 'Acme',
+      defaultDock: 'left',
+      defaultOpen: false,
+      defaultFlex: 100,
+      order: 15,
+      mount: () => () => undefined,
+    });
+    TestBed.tick();
+    views.saveActive();
+    views.resetActive();
+    expect(dock.leftIds()).toEqual(['calendar', 'acme.panel', 'files', 'windows']);
+    expect(views.modified()).toBe(false);
+  });
+
+  it('after a reset of a disturbed preset view, the view equals its first showing again', async () => {
+    views.switchTo('acme.work');
+    dock.toggleSide('left');
+    dock.toggleSide('right');
+    await editor.closeTab('board://all');
+    expect(views.modified()).toBe(true);
+    views.resetActive();
+    expect(views.modified()).toBe(false);
+  });
+
+  it("a preset's own tab opens in the preset even when its kind names another home view", () => {
+    const off = views.registerPreset('acme', { id: 'acme.crew', label: 'Crew', layout: { openTabs: [{ kind: 'acme-team', path: 'team://all' }] } }, (kind, path) => {
+      // The Crew tab's kind names Work as its home view (tickets plugin): routing must not pull the view away.
+      TestBed.inject(HomeViewRouter).enter('acme.work');
+      editor.addPluginDoc(kind, path, 'Crew');
+    });
+    views.switchTo('acme.crew');
+    expect(views.activeId()).toBe('acme.crew');
+    expect(panes.tabsOfView('acme.crew')).toContain('team://all');
+    off();
   });
 });

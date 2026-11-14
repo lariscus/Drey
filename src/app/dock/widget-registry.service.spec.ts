@@ -32,6 +32,26 @@ describe('WidgetRegistryService', () => {
     expect(registry.widgets().map((w) => w.id)).toEqual(CORE_WIDGETS.map((w) => w.id));
   });
 
+  it('orders the widgets by their default order (SDK 1.60); the unordered ones follow in registration order', () => {
+    const registry = TestBed.inject(WidgetRegistryService);
+    const widget = (id: string, order?: number) => ({
+      id,
+      title: id,
+      defaultDock: 'left' as const,
+      defaultOpen: false,
+      defaultFlex: 100,
+      ...(order !== undefined ? { order } : {}),
+      mount: () => () => undefined,
+    });
+    registry.registerPluginWidget(widget('late'));
+    registry.registerPluginWidget(widget('tickets', 70));
+    registry.registerPluginWidget(widget('find', 30));
+    registry.registerPluginWidget(widget('templates', 40));
+    registry.registerPluginWidget(widget('junk', Number.NaN));
+    // Board 7p: Calendar, Files, Find, Templates, Open windows, ..., Tickets.
+    expect(registry.widgets().map((w) => w.id)).toEqual(['calendar', 'files', 'find', 'templates', 'windows', 'tickets', 'late', 'junk']);
+  });
+
   it('Open windows reads "N here · M elsewhere" once other views hold tabs', () => {
     const registry = TestBed.inject(WidgetRegistryService);
     const panes = TestBed.inject(PaneService);

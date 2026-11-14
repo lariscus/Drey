@@ -25,9 +25,47 @@ describe('DockService', () => {
     for (const w of CORE_WIDGETS) {
       expect(dock.closed(w.id)).toBe(!w.defaultOpen);
     }
-    expect(dock.dockWidth('left')).toBe(248);
-    expect(dock.dockWidth('right')).toBe(340);
+    expect(dock.dockWidth('left')).toBe(300);
+    expect(dock.dockWidth('right')).toBe(380);
     expect(dock.dockHeight()).toBe(280);
+  });
+
+  it('lays out plugin panels by their default order, on a fresh layout and after a reset (board 7p, SDK 1.60)', () => {
+    const registry = TestBed.inject(WidgetRegistryService);
+    const widget = (id: string, defaultDock: 'left' | 'right', order: number) => ({
+      id,
+      title: id,
+      defaultDock,
+      defaultOpen: id === 'assistant',
+      defaultFlex: 100,
+      order,
+      mount: () => () => undefined,
+    });
+    // Registered in plugin-folder order (alphabetical), as the host activates them.
+    for (const w of [
+      widget('assistant', 'right', 10),
+      widget('backlinks', 'right', 30),
+      widget('git', 'left', 60),
+      widget('outline', 'right', 20),
+      widget('find', 'left', 30),
+      widget('templates', 'left', 40),
+      widget('tickets', 'left', 70),
+    ]) {
+      registry.registerPluginWidget(w);
+    }
+    const dock = make();
+    const left = ['calendar', 'files', 'find', 'templates', 'windows', 'git', 'tickets'];
+    const right = ['assistant', 'outline', 'backlinks'];
+    expect(dock.leftIds()).toEqual(left);
+    expect(dock.rightIds()).toEqual(right);
+    expect(left.filter((id) => !dock.closed(id))).toEqual(['calendar', 'files']);
+    expect(right.filter((id) => !dock.closed(id))).toEqual(['assistant']);
+
+    dock.move('tickets', 'right', 0);
+    dock.move('calendar', 'left', 7);
+    dock.reset();
+    expect(dock.leftIds()).toEqual(left);
+    expect(dock.rightIds()).toEqual(right);
   });
 
   describe('folding a side dock (the titlebar toggles)', () => {
@@ -274,6 +312,7 @@ describe('DockService', () => {
 
     it('a splitter skips a folded panel', () => {
       const dock = make();
+      dock.toggle('windows'); // a strip icon by default (board 7p)
       expect(dock.nextOpenId('calendar')).toBe('files');
       dock.toggleCollapsed('files');
       expect(dock.nextOpenId('calendar')).toBe('windows');
@@ -388,16 +427,15 @@ describe('DockService', () => {
     it('closing the last open panel of a side dock folds the dock away', () => {
       const dock = make();
       dock.toggle('calendar');
-      dock.toggle('files');
       expect(dock.sideFolded('left')).toBe(false);
-      dock.toggle('windows');
+      dock.toggle('files'); // Open windows is closed by default (board 7p)
       expect(dock.noneOpen('left')).toBe(true);
       expect(dock.sideFolded('left')).toBe(true);
     });
 
     it('opening a panel unfolds its dock', () => {
       const dock = make();
-      for (const id of ['calendar', 'files', 'windows']) {
+      for (const id of ['calendar', 'files']) {
         dock.toggle(id);
       }
       dock.toggle('files');
@@ -410,7 +448,7 @@ describe('DockService', () => {
       const panes = TestBed.inject(PaneService);
       panes.open('a.md');
       panes.detachToDock('p1', 'left');
-      for (const id of ['calendar', 'files', 'windows']) {
+      for (const id of ['calendar', 'files']) {
         dock.toggle(id);
       }
       expect(dock.sideFolded('left')).toBe(false);
@@ -421,15 +459,14 @@ describe('DockService', () => {
       // Two panels: a lone bottom panel has no strip and never closes (board 7e).
       dock.move('windows', 'bottom', 0);
       dock.move('calendar', 'bottom', 1);
-      dock.toggle('windows');
-      dock.toggle('calendar');
+      dock.toggle('calendar'); // Open windows starts closed (board 7p)
       expect(dock.noneOpen('bottom')).toBe(true);
       expect(dock.sideFolded('bottom')).toBe(false);
     });
 
     it('a closed panel can be moved to another dock and stays closed', () => {
       const dock = make();
-      dock.toggle('windows');
+      expect(dock.closed('windows')).toBe(true); // board 7p
       dock.move('windows', 'right', 0);
       expect(dock.rightIds()).toEqual(['windows']);
       expect(dock.closed('windows')).toBe(true);
@@ -497,6 +534,7 @@ describe('DockService', () => {
 
   it('nextOpenId skips closed neighbours and stops at the end', () => {
     const dock = make();
+    dock.toggle('windows'); // a strip icon by default (board 7p)
     // left: [calendar, files, windows]
     expect(dock.nextOpenId('calendar')).toBe('files');
     expect(dock.nextOpenId('files')).toBe('windows');
@@ -535,8 +573,7 @@ describe('DockService', () => {
     const dock = make();
     dock.move('windows', 'bottom', 0);
     dock.move('calendar', 'bottom', 1); // a lone bottom panel could not be closed (board 7e)
-    dock.toggle('windows');
-    expect(dock.closed('windows')).toBe(true);
+    expect(dock.closed('windows')).toBe(true); // closed by default (board 7p)
     dock.openAndExpand('windows');
     expect(dock.closed('windows')).toBe(false);
     expect(dock.sideOf('windows')).toBe('bottom');
@@ -554,7 +591,8 @@ describe('DockService', () => {
       'windows',
     ]);
     expect(dock.closed('files')).toBe(false);
-    expect(dock.dockWidth('left')).toBe(248);
+    expect(dock.closed('windows')).toBe(true);
+    expect(dock.dockWidth('left')).toBe(300);
   });
 
   it('persists across instances and folds a partial blob onto the defaults', () => {
