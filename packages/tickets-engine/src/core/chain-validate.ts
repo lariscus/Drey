@@ -10,6 +10,7 @@
  */
 import { MAX_CHAIN_ENTRIES, type ChainEntry } from '../contracts/chain';
 import { renderChainEntry } from './chain-list';
+import { redTargetPosition } from './chain-red-gate';
 import { HUMAN_PERSONA_ID } from './persona';
 
 export interface ChainGuard {
@@ -43,6 +44,14 @@ function entryRefusal(entry: ChainEntry, index: number, guard: ChainGuard): stri
   return null;
 }
 
+/** req-78: an entry's `on-red` must name an earlier position of the same chain (a position, or a persona that stands before it). */
+function onRedRefusal(entries: readonly ChainEntry[], entry: ChainEntry, index: number): string | null {
+  if (entry.onRed === undefined || redTargetPosition(entries, index + 1, entry.onRed) !== null) {
+    return null;
+  }
+  return `position ${index + 1}: on-red ${entry.onRed} names no earlier position of this chain — ${renderChainEntry(entry)}`;
+}
+
 /** The refusal line, or null when the chain may be written. */
 export function validateChain(entries: readonly ChainEntry[], guard: ChainGuard): string | null {
   if (entries.length === 0) {
@@ -52,7 +61,7 @@ export function validateChain(entries: readonly ChainEntry[], guard: ChainGuard)
     return `a chain holds at most ${MAX_CHAIN_ENTRIES} entries`;
   }
   for (const [index, entry] of entries.entries()) {
-    const refusal = entryRefusal(entry, index, guard);
+    const refusal = entryRefusal(entry, index, guard) ?? onRedRefusal(entries, entry, index);
     if (refusal !== null) {
       return refusal;
     }
@@ -69,7 +78,7 @@ function lockedRefusal(entries: readonly ChainEntry[], guard: ChainGuard): strin
       break;
     }
     const isCurrent = index === guard.locked - 1;
-    if (now === undefined || !sameStep(was, now) || (!isCurrent && was.notify !== now.notify)) {
+    if (now === undefined || !sameStep(was, now) || (!isCurrent && (was.notify !== now.notify || was.onRed !== now.onRed))) {
       return `position ${index + 1} (${renderChainEntry(was)}) is ${isCurrent ? 'the current step' : 'done'} — only the positions after it can change`;
     }
   }

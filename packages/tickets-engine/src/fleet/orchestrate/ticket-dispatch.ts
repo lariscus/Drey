@@ -13,6 +13,7 @@ import { composeRunRequest } from '../request';
 import type { DisciplineTexts } from '../discipline-texts';
 import { worktreePathFor } from '../worktree-home';
 import type { BoardPersonas, TicketPersona } from './board-personas';
+import { DEFAULT_MAX_RED } from './breaker';
 import type { ChainBoard } from './chain-board';
 import type { DispatchPrompt, PromptSource } from './prompt-source';
 import type { FleetLedger } from './settled-runs';
@@ -93,6 +94,11 @@ function moveTargetOf(snap: BoardSnapshot, card: TicketCard, workingPhaseId: str
 /** req-257: a run on a lifecycle store of a ticket with a chain works a chain entry (its cursor); false on the phase board. */
 function chained(config: ChainConfig, card: TicketCard): boolean {
   return config.store?.lifecycle === true && (card.meta.chain?.length ?? 0) > 0;
+}
+
+/** Whose gate failure a retry reads: a chain run its own position's (req-78), a column run its column's. */
+function retryOf(cursor: RunCursor | null, workingPhaseId: string): { readonly column: string } | { readonly position: number } {
+  return cursor !== null ? { position: cursor.at } : { column: workingPhaseId };
 }
 
 /** What the repo side of a dispatch resolved to. */
@@ -202,10 +208,10 @@ export class TicketDispatch {
     const { card, workingPhaseId } = planned;
     const { target, parkFor } = got;
     // req-257: a chain run hands on by its cursor (the column follows the holder), never by a move.
-    const cursor = chained(config, card) ? await this.cursorOf(config, card) : null;
+    const cursor = chained(config, card) ? await this.cursorOf(config, card, target.phase) : null;
     // E10-6: a manual step after this gate parks the ticket on a green gate — it moves only as far as the working column.
     const nextPhaseId = cursor !== null ? null : moveTargetOf(snap, card, workingPhaseId, parkFor);
-    const context = await this.context(config, card, target.repo, workingPhaseId);
+    const context = await this.context(config, card, target.repo, retryOf(cursor, workingPhaseId));
     return {
       disciplines: await this.disciplines(),
       card,
@@ -240,16 +246,25 @@ export class TicketDispatch {
     };
   }
 
-  /** req-257: the chain entry the run works — position, the entries, the send-back used, the crew a plan run's `### Chain` may name. */
-  private async cursorOf(config: ChainConfig, card: TicketCard): Promise<RunCursor> {
-    return runCursorOf({ chain: card.meta.chain ?? [], at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.deps.personas.crewGuard(config) });
+  /**
+   * req-257: the chain entry the run works — position, the entries, the send-back used, the crew a plan run's `### Chain` may name;
+   * req-78: the red-gate loop — where a green end returns, the loop's count and bound, and the red gate that sent the ticket here.
+   */
+  private async cursorOf(config: ChainConfig, card: TicketCard, phase: PipelinePhase): Promise<RunCursor> {
+    const chain = card.meta.chain ?? [];
+    const { returnTo, redBacks } = card.meta;
+    const from = returnTo !== undefined && returnTo > (card.meta.at ?? 1) ? returnTo : null;
+    const redBack = from === null ? undefined : { from, persona: chain[from - 1]?.persona ?? '?', failure: this.deps.directory.lastGateFailureAt(card.id, from) };
+    const redLoop = { ...(returnTo !== undefined ? { returnTo } : {}), ...(redBacks !== undefined ? { redBacks } : {}), maxRed: phase.maxRed ?? DEFAULT_MAX_RED, ...(redBack !== undefined ? { redBack } : {}) };
+    return runCursorOf({ chain, at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.deps.personas.crewGuard(config), redLoop });
   }
 
-  /** The context pack (T-0048): the repo's instructions, the worktree's diff stat and a retry's gate failure; a scout run has neither worktree nor gate. */
-  private async context(config: ChainConfig, card: TicketCard, repo: RepoRef | null, workingPhaseId: string): Promise<{ repoInstructions: string | null; diffStat: string | null; gateFailure: string | null }> {
+  /** The context pack (T-0048): the repo's instructions, the worktree's diff stat and a retry's gate failure (its column's, a chain run's own position's — req-78); a scout run has neither worktree nor gate. */
+  private async context(config: ChainConfig, card: TicketCard, repo: RepoRef | null, retry: { readonly column: string } | { readonly position: number }): Promise<{ repoInstructions: string | null; diffStat: string | null; gateFailure: string | null }> {
     const scout = (card.meta.form ?? 'ship') === 'scout';
     const repoInstructions = repo !== null && repo.path !== null ? await readRepoInstructions(repo.path, repo.instructions) : null;
-    const gateFailure = scout ? null : this.deps.directory.lastGateFailure(card.id, workingPhaseId);
+    const directory = this.deps.directory;
+    const gateFailure = scout ? null : 'position' in retry ? directory.lastGateFailureAt(card.id, retry.position) : directory.lastGateFailure(card.id, retry.column);
     const diffStat =
       scout || repo === null || repo.path === null ? null : await worktreeDiffStat(new TicketsGit(() => config.git), worktreePathFor(config.ticketsVaultPath, repo, card.id), repo.branch);
     if (!scout && gateFailure !== null && diffStat === null) {

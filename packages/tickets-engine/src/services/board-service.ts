@@ -59,6 +59,7 @@ import { runCursorOf } from '../fleet/run-cursor';
 import { MISSION_ENTRY_KEY, type MissionEntry } from './mission-entry-turns';
 import { ownerAcceptOf, ownerSendBackOf } from './chain-owner-moves';
 import { chainFinished } from '../core/chain-placement';
+import { cursorAfterGreen } from '../core/chain-red-gate';
 import { setDocumentField } from '../store/document-fields';
 import { ACTIVE_STAGE, EDGE_STAGES } from '../core/lifecycle-stages';
 import { cursorForPin, placementColumnsOf } from '../core/chain-placement';
@@ -2371,7 +2372,8 @@ export class EngineBoardService {
     if (placement === null || chain === undefined) {
       return null;
     }
-    const cursor = runCursorOf({ chain, at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.chainGuardIds() });
+    const loop = { ...(card.meta.returnTo !== undefined ? { returnTo: card.meta.returnTo } : {}), ...(card.meta.redBacks !== undefined ? { redBacks: card.meta.redBacks } : {}) }; // req-78
+    const cursor = runCursorOf({ chain, at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.chainGuardIds(), redLoop: loop });
     const persona = placement.lookup(chain[cursor.at - 1]!.persona);
     return { persona: persona?.kind === 'agent' ? persona.id : null, cursor };
   }
@@ -2823,14 +2825,14 @@ export class EngineBoardService {
       return (await this.commitActionMissing(vault, card.id)) ?? this.startCommitStep(card.id);
     }
     const terminal = snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done';
-    return this.writeChainCursor(card, decision.kind === 'done' ? { done: terminal } : { at: decision.at }, { line: decision.line, actor });
+    return this.writeChainCursor(card, decision.kind === 'done' ? { done: terminal } : { at: decision.at, returned: decision.returned }, { line: decision.line, actor });
   }
 
   /**
    * req-257: one owner write of a chain ticket's cursor on the store — `x-at` moved (the stage stays
    * `active`), or the ticket to `done` — with the status line, one `put`.
    */
-  private async writeChainCursor(card: TicketCard, target: { readonly at: number } | { readonly done: string }, why: { readonly line: string; readonly actor: string; readonly text?: string }): Promise<BoardMutationResult> {
+  private async writeChainCursor(card: TicketCard, target: { readonly at: number; readonly returned?: boolean } | { readonly done: string }, why: { readonly line: string; readonly actor: string; readonly text?: string }): Promise<BoardMutationResult> {
     const store = this.dricket;
     if (store === null) {
       return { ok: false, error: 'the cursor of a chain lives on a dricket store' };
@@ -2839,7 +2841,10 @@ export class EngineBoardService {
       const record = await this.storeBoard.record(store, card.id);
       const legacy = why.text ?? recordToBoardFile(record, card.phase).text;
       const moved = 'at' in target ? (setDocumentField(legacy, 'at', String(target.at)) ?? legacy) : legacy;
-      const text = setDocumentField(moved, 'awaiting', null) ?? moved; // the owner decided: no longer waiting for You
+      // req-78: every owner write of the cursor uses or drops a red gate's return; only a return keeps the loop's count.
+      const loopKeys = 'at' in target && target.returned === true ? ['return-to'] : ['return-to', 'red-backs'];
+      const settled = loopKeys.reduce((doc, key) => setDocumentField(doc, key, null) ?? doc, moved);
+      const text = setDocumentField(settled, 'awaiting', null) ?? settled; // the owner decided: no longer waiting for You
       await this.putRecord(store, record, text, 'at' in target ? { keepStage: true } : { phase: target.done });
     } catch (error) {
       return { ok: false, error: error instanceof TicketChangedError ? `${card.id} changed meanwhile — look again and retry` : messageOf(error) };
@@ -2913,8 +2918,9 @@ export class EngineBoardService {
         return { ok: true }; // the ticket stands elsewhere now: nothing to finish
       }
       const terminal = snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done';
-      const last = input.position >= chain.length;
-      const written = await this.writeChainCursor(card, last ? { done: terminal } : { at: input.position + 1 }, { line: `Mission Control's entry at position ${input.position} of ${chain.length} is done — her card was confirmed`, actor: this.owner });
+      const back = cursorAfterGreen(chain.length, input.position, card.meta.returnTo); // req-78: her entry may be a red gate's target
+      const last = !back.returned && input.position >= chain.length;
+      const written = await this.writeChainCursor(card, last ? { done: terminal } : { at: back.at, returned: back.returned }, { line: `Mission Control's entry at position ${input.position} of ${chain.length} is done — her card was confirmed`, actor: this.owner });
       if (written.ok) {
         await this.noteStatus(card, 'resolved', { key: MISSION_ENTRY_KEY }, this.owner);
       }

@@ -48,6 +48,8 @@ export interface McHold {
   readonly claimed: boolean;
   readonly sentBack: McSentBack | null;
   readonly questions: number;
+  /** req-78: a red gate sent the ticket here from this later position; absent = none. */
+  readonly returnTo?: number;
 }
 
 // --- tolerant reads ------------------------------------------------------------
@@ -107,7 +109,14 @@ export function holdOf(ticket: { readonly hold?: unknown } | null | undefined): 
     claimed: hold['claimed'] === true,
     sentBack: sentBackOf(hold['sentBack']),
     questions: Math.max(0, whole(hold['questions']) ?? 0),
+    ...returnToOf(hold['returnTo'], position),
   };
+}
+
+/** req-78: the later position a red gate sent the ticket back from; nothing when absent or junk. */
+function returnToOf(raw: unknown, position: number): { readonly returnTo?: number } {
+  const value = whole(raw);
+  return value !== null && value > position ? { returnTo: value } : {};
 }
 
 /** A persona id's display name off the lanes; the id itself when no lane names it. */
@@ -276,7 +285,13 @@ function runStatusOf(hold: McHold, live: HoldLive, human: boolean): HoldStatus {
   if ((live.activity ?? '').startsWith(MERGING_MAIN)) {
     return { kind: 'merging-main' };
   }
-  const from = hold.sentBack !== null && hold.position === hold.sentBack.to ? (hold.chain[hold.sentBack.from - 1] ?? null) : null;
+  // req-78: a red gate's target names the position that went red, else the persona send-back's sender.
+  const from =
+    hold.returnTo !== undefined
+      ? (hold.chain[hold.returnTo - 1] ?? null)
+      : hold.sentBack !== null && hold.position === hold.sentBack.to
+        ? (hold.chain[hold.sentBack.from - 1] ?? null)
+        : null;
   return { kind: 'running', minutes: live.minutes, from };
 }
 

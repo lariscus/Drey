@@ -3,7 +3,7 @@
 ## Status
 
 Accepted — built (owner-approved concept 2026-11-11; milestones 237, 239,
-243 – 248, 254 – 256, 260, 261; the documentation row req-275 is milestone
+243 – 248, 254 – 256, 260, 261, 272; the documentation row req-275 is milestone
 262). Later change of three ADRs, each of which carries a pointer back to
 this one:
 
@@ -266,6 +266,71 @@ The concept was approved with open readings; the code decided them.
   §17: `class:` and a pinned `model:` instead of `worker:` and `models:`,
   `allowed: write-notes`) are other rows (req-282 – req-291), not this
   ADR's.
+
+## Later change — a red gate sends back, Start on the card, the queue in the report (milestone 272, 2026-11-14)
+
+Three rows the owner added to finish line step 5 before the merge into
+`main` (req-78, req-120, req-148).
+
+**A red gate sends the ticket back (req-78).** The row was written for the
+phase board (`on-red: <phase>` in `pipeline.md`); on the persona board the
+key is a chain option, so the standard `flow:` and every ticket can carry it:
+`tessa(on-red paul)` — the persona of the nearest earlier position that names
+it — or `tessa(on-red 2)`. A red machine gate there is milestone 248's
+send-back with the gate's failure as its reason: inside the claim the cursor
+goes to the target, `x-return-to` records the red position, `x-red-backs`
+counts the loop, one release into `active` with the red-gate line. The
+target's brief carries the failure and tells it to ask (`QUESTION:` →
+`awaiting: you`, milestone 248) when it needs the owner's decisions; its
+green end — or the owner's Accept at You, or the card that ends Pia's entry —
+moves the cursor straight back to `x-return-to`. The open questions of the
+row, as decided:
+
+- *Where the return is recorded:* a store field, `x-return-to`, written
+  inside the same claim as the cursor. *Rejected:* deriving it from the Log
+  (a reader would parse prose; a hand edit of the Log would move the cursor).
+- *Checkpoints on the way back:* the return skips **every** position
+  between, a You entry included — the owner's words were "straight back into
+  the phase whose gate went red, not through the queue again". Who wants the
+  build to run again points `on-red` at the builder instead.
+- *The bound:* `x-red-backs` against the persona breaker's threshold (the
+  column's `max-red`, else 3): the red gate that would reach it stays with its
+  persona as before, and the per-persona breaker of milestone 247 takes it.
+  The breaker alone does not bound the loop — any green run of that persona
+  on another ticket resets its streak.
+- *The one send-back:* a red gate does not use it — the target is configured
+  and the loop has its own bound; a persona's `SEND-BACK:` and every owner
+  write of the cursor drop a pending return.
+- *W7's gates and routing (req-75):* nothing to add — the target runs as any
+  run of its persona, its class from the persona.
+
+The red run settles failed (the breaker counts it) but the ticket backs off
+nowhere (`RunInfo.redBackTo`): it moved on to another persona. A chain run's
+retry now reads the last failure **at its own position**
+(`lastGateFailureAt`), since two personas share one `active` column. Not
+built: `on-red` on the phase board (files backend, unmigrated store), where a
+red gate keeps backing off; a card badge for a ticket on a red gate's way (the
+running line names the position that went red: *running · from Tessa*).
+
+**Start on the card (req-120).** Board 9a's primary button on a Prioritized
+ticket of a persona board is the `start` move with the persona of the entry
+at the cursor — the drop on that column, no other call. It shows only where
+the board would accept that drop (a chain whose entry names a persona of the
+crew, no claim). The row asked for confirmation "per the `tools` write
+policy"; no write policy covers ticket moves (the `tools` slice governs the
+assistant's tools), so the button always asks in place
+(`Start T-0017 with Paul?` · Cancel · Start).
+
+**The queue in the fleet report (req-148).** The chain status's `queued` is
+the dispatcher's queue of the last pass in dispatch order: the capacity
+pool's queue (`slot`) and, on a persona board, the holders the plan found no
+place for (`slot` — the big pool full; `persona` — the persona at its
+`parallel:`); a ticket that waited before for the same reason keeps its
+`since`; empty unless the Autopilot is On. The desktop Crew tab, Mission
+Control's iPad and phone Crew draw a persona's queued tickets as rows
+(*queued · waits for a slot*), a persona with only queued tickets as
+*waiting*, and the head line's *· 1 queued*. On the phase board only the
+pool's queue reaches it.
 
 ## Consequences
 

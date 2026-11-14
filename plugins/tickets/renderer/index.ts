@@ -3373,6 +3373,8 @@ const plugin: { activate(api: DreyPluginApi): void } = {
         onReview: (card) => openReviewTab(api, card),
         openFlow: (card) => openFlowTab(api, card.id),
         icon: (name, size) => api.ui.icon(name, size),
+        // req-120: the card's Start is the persona board's start move, the drop's call
+        onStart: (card, persona) => void runMutation(api.i18n.t('board.busy.move', { id: card.id }), () => invokeBoard('personaBoardMove', { kind: 'start', id: card.id, persona })),
       }),
       api,
       snapshot: () => snapshot,

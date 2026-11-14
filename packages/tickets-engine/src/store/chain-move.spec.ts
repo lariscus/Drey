@@ -3,6 +3,7 @@ import { crewLookupOf } from '../core/chain-holder';
 import { placementColumnsOf } from '../core/chain-placement';
 import { pipelinePhaseOf } from '../core/pipeline-phase';
 import type { TicketDetail } from '../ports/ticket-store';
+import { parse } from 'yaml';
 import { withChainAndCursor, withCursorForMove } from './chain-move';
 import { documentField } from './document-fields';
 import type { HolderPlacement } from './store-board';
@@ -42,6 +43,12 @@ describe('the chain and cursor of a persona board move (req-270)', () => {
   it('replaces the whole chain and the cursor and keeps every other key and the body', () => {
     const out = withChainAndCursor(LEGACY, ['paul:shape', 'paul', 'bob', 'you'], 3);
     expect(out).toBe('---\nid: T-1\ntitle: x\nchain: [paul:shape, paul, bob, you]\nat: 3\n---\nbody\n');
+  });
+
+  it('req-78: an entry with options keeps its commas inside the flow list and reads back whole', () => {
+    const out = withChainAndCursor(LEGACY, ['paul', 'ben', 'tessa(notify, on-red paul)', 'you'], 2);
+    const header = parse(out.split('---\n')[1]!) as { chain: string[] };
+    expect(header.chain).toEqual(['paul', 'ben', 'tessa(notify, on-red paul)', 'you']);
   });
 
   it('adds the keys a chainless ticket lacks', () => {

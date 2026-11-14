@@ -7,6 +7,7 @@
  * `persona-page.ts`), which holds state, cost, Pause, Instructions, Memory
  * and 1:1. Plain DOM over the model in `team-model.ts`.
  */
+import type { I18n } from '../../../../shared/i18n/types';
 import { autopilotSwitchViewOf, autopilotToneOf } from '../../../../shared/autopilot';
 import { h, textButton, type DeskDeps } from '../desk-deps';
 import { NUDGE_TEXT } from '../workers-view';
@@ -80,8 +81,11 @@ function iconButton(label: string, title: string, icon: SVGElement, extra: strin
   return button;
 }
 
+/** Stands in for the ticket id while a catalog sentence is split around it. */
+const TICKET_MARK = '@@ticket@@';
+
 /** What the card says first: what the persona waits on, is stuck on, or does; the ticket id stays in one piece. */
-function headlineNode(card: PersonaCardModel): HTMLElement {
+function headlineNode(card: PersonaCardModel, t: I18n['t']): HTMLElement {
   const node = h('div', 'desk-persona-headline');
   const say = (before: string, ticket: string, after = ''): void => {
     node.append(before);
@@ -95,7 +99,13 @@ function headlineNode(card: PersonaCardModel): HTMLElement {
     return node;
   }
   const run = card.runs.find((entry) => entry.stuck) ?? card.runs.find((entry) => entry.waiting) ?? card.runs[0];
-  if (run === undefined) {
+  if (run === undefined && card.queued.length > 0) {
+    // req-148, board DeskTeamV2: `Review of T-0121 queued` — the ticket stays in one piece.
+    const first = card.queued[0]!;
+    const key = card.phases.includes('review') ? 'tickets.team.headline.queued_review' : 'tickets.team.headline.queued';
+    const [before = '', after = ''] = t(key, { ticket: TICKET_MARK }).split(TICKET_MARK);
+    say(before, first.ticketId, `${after}${card.queued.length > 1 ? ` +${card.queued.length - 1}` : ''}`);
+  } else if (run === undefined) {
     node.textContent = card.stateWord;
   } else if (run.stuck) {
     if (run.quietMinutes === null) {
@@ -162,7 +172,7 @@ function personaCardNode(
   const title = h('span', 'desk-persona-title');
   title.append(personaPictureNode(card.color, card.title, 20, card.id), card.title);
   top.append(title, h('span', 'desk-head-spacer'), h('span', 'desk-persona-dot'), h('span', 'desk-persona-state', card.stateWord));
-  node.append(top, headlineNode(card), h('div', 'desk-persona-role', subLineOf(card)));
+  node.append(top, headlineNode(card, deps.api.i18n.t), h('div', 'desk-persona-role', subLineOf(card)));
   const stuck = card.runs.find((run) => run.stuck);
   if (stuck !== undefined) {
     const controls = h('div', 'desk-persona-controls');
@@ -253,7 +263,7 @@ export function mountTeam(deps: DeskDeps, store: TeamStore, host: HTMLElement): 
     frame = 0;
     const model = teamModelOf(store.personas(), deps.runs(), deps.chain(), deps.titleOf, Date.now());
     const head = h('header', 'desk-head');
-    head.append(h('h2', 'desk-h', 'Crew'), h('span', 'desk-head-sub', store.loaded() ? teamHeadOf(model) : 'Loading…'), h('span', 'desk-head-spacer'));
+    head.append(h('h2', 'desk-h', 'Crew'), h('span', 'desk-head-sub', store.loaded() ? teamHeadOf(model, deps.api.i18n) : 'Loading…'), h('span', 'desk-head-spacer'));
     const budget = budgetNode(model);
     if (budget !== null) {
       head.append(budget);

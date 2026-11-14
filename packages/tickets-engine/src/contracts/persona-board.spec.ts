@@ -52,6 +52,8 @@ describe("a card's status", () => {
     expect(holdStatusOf(hold(), { ...IDLE, running: true, activity: 'merging main' }, kindOf)).toEqual({ kind: 'merging-main' });
     expect(holdStatusOf(hold({ sentBack: { from: 5, to: 3 } }), { ...IDLE, running: true, minutes: 3 }, kindOf)).toEqual({ kind: 'running', minutes: 3, from: 'tessa' });
     expect(holdStatusOf(hold(), { ...IDLE, running: true, minutes: 6 }, kindOf)).toEqual({ kind: 'running', minutes: 6, from: null });
+    // req-78: a red gate's target runs "from" the position that went red
+    expect(holdStatusOf(hold({ position: 2, holder: 'paul', returnTo: 5 }), { ...IDLE, running: true, minutes: 1 }, kindOf)).toEqual({ kind: 'running', minutes: 1, from: 'tessa' });
     expect(holdStatusOf(hold({ holder: 'you', named: 'you', position: 6 }), { ...IDLE, running: true }, kindOf)).toEqual({ kind: 'committing' });
   });
 

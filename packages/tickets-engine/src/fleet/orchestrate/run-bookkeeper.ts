@@ -5,7 +5,7 @@ import type { RunRequest } from '../protocol';
 import type { TerminalRunState } from '../run/run-state';
 import { usageSummary } from '../run/run-summary';
 import type { ChainCardPatch } from '../store-chain-board';
-import type { ClaimRelease, SendBackWrite, WriteResult } from './claim-release';
+import type { ClaimRelease, RedBackWrite, SendBackWrite, WriteResult } from './claim-release';
 import type { LiveRun } from './live-run';
 import type { RunStreams } from './run-streams';
 import type { TicketCopy } from './ticket-copy';
@@ -73,6 +73,14 @@ export class RunBookkeeper {
       return this.predatesStore(run, 'moved');
     }
     return this.parts.release.sendBack(run, back);
+  }
+
+  /** req-78: a red gate's send-back — the cursor to the entry's `on-red` target, the return recorded, inside the claim, one release. */
+  async redBack(run: LiveRun, back: RedBackWrite): Promise<WriteResult> {
+    if (run.request.dk === undefined) {
+      return this.predatesStore(run, 'moved');
+    }
+    return this.parts.release.redBack(run, back);
   }
 
   /** E10-6: a manual step follows the green gate — the ticket waits where it is, parked for the human persona. */

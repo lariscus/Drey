@@ -123,7 +123,13 @@ export interface InstructionInput {
    * length and the entries — so the brief lists the positions and the
    * `SEND-BACK:` marker. Absent = a column run, no section.
    */
-  readonly chain?: { readonly at: number; readonly length: number; readonly entries: readonly string[] };
+  readonly chain?: {
+    readonly at: number;
+    readonly length: number;
+    readonly entries: readonly string[];
+    /** req-78: the red gate that sent the ticket to this position — the brief's "Sent back by a red gate" part. */
+    readonly redBack?: { readonly from: number; readonly persona: string; readonly failure: string | null };
+  };
 }
 
 /**

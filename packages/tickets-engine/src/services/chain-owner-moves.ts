@@ -1,6 +1,7 @@
 import type { TicketCard } from '../contracts/tickets';
 import { atLastEntry, ownerSendBackTarget } from '../core/chain-cursor';
 import { chainFinished } from '../core/chain-placement';
+import { cursorAfterGreen } from '../core/chain-red-gate';
 import { EDGE_STAGES } from '../core/lifecycle-stages';
 import type { HolderPlacement } from '../store/store-board';
 
@@ -22,12 +23,16 @@ import type { HolderPlacement } from '../store/store-board';
  *   target picker: any earlier position), else to the nearest earlier agent
  *   position; the owner's send-back never uses the one send-back a ticket
  *   has (reading 6).
+ * - req-78: while a red gate's return is pending (`return-to` after the
+ *   cursor), Accept sends the ticket straight back to the position that went
+ *   red; the owner's Send back and every other cursor write drop the return.
  */
 export type OwnerAccept =
   | { readonly kind: 'none' }
   | { readonly kind: 'commit' }
   | { readonly kind: 'done'; readonly line: string }
-  | { readonly kind: 'cursor'; readonly at: number; readonly line: string };
+  /** `returned` (req-78): the cursor goes straight back to the position whose red gate sent the ticket here. */
+  | { readonly kind: 'cursor'; readonly at: number; readonly line: string; readonly returned: boolean };
 
 export type OwnerSendBack =
   | { readonly kind: 'none' }
@@ -54,8 +59,12 @@ export function ownerAcceptOf(card: TicketCard, placement: HolderPlacement): Own
     return { kind: 'none' };
   }
   const { at, length } = active;
+  const back = cursorAfterGreen(length, at, card.meta.returnTo);
+  if (back.returned) {
+    return { kind: 'cursor', at: back.at, line: `accepted at position ${at} of ${length} — back to position ${back.at}, whose red gate sent it here`, returned: true };
+  }
   if (!atLastEntry(chain, at)) {
-    return { kind: 'cursor', at: at + 1, line: `accepted at position ${at} of ${length} — position ${at + 1} next` };
+    return { kind: 'cursor', at: at + 1, line: `accepted at position ${at} of ${length} — position ${at + 1} next`, returned: false };
   }
   const signOff = placement.lookup(chain[at - 1]!.persona)?.kind === 'human';
   if (signOff && card.meta.repo !== null && (card.meta.form ?? 'ship') !== 'scout') {

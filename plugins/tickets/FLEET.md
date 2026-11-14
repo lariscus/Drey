@@ -522,7 +522,11 @@ gates in a row per persona, its one-minute breather, the trip's
 `{reason, at}` while the persona holds; playing it clears the trip and the
 streak; the chain status also answers `personaWaits`, never persisted —
 req-271: ticket → persona, the tickets the last pass left waiting because
-their persona runs its maximum, the Board card's `waits for Ben`) · `ledgerCards`
+their persona runs its maximum, the Board card's `waits for Ben` — and
+`queued`, never persisted either — req-148: the dispatcher's queue of the
+last pass, `{ticket, persona, why: slot | persona, position, since}` in
+dispatch order, the pool's queue and the holders left without a place, empty
+unless the Autopilot is On; the Crew cards' queued rows) · `ledgerCards`
 (per ticket the keys of the ledger cards the pool raised and has not
 resolved yet — req-170) · `tranche` (the current tranche's counters:
 `index`, `day`, `startedAt`, `started`, `pending`, `facts`, `anomalyFrom`,
@@ -1268,6 +1272,22 @@ keep the column dispatch (and its ring run) as before.
   `QUESTION:` writes `x-awaiting: you` before the claim is given up and the
   answer's reclaim removes it. A plan's `### Chain` becomes `x-chain` at the
   green end when the guard holds (else the hand-on comment says why).
+- **A red gate that sends back** (req-78, milestone 272). An entry with
+  `on-red <persona|position>` (`tessa(on-red paul)`) turns its red machine gate
+  into a send-back: inside the claim `x-at` goes to the target, `x-return-to`
+  records the red position and `x-red-backs` counts the loop; one release
+  into `active` with `red gate at position 5 (tessa) — sent back to 2 (paul)
+  (red 1 of 2); returns to position 5 when position 2 is through: …`. The
+  run is `failed` with `redBackTo` on its record (the persona breaker counts
+  it, the ticket backs off nowhere); the one `x-sent-back` stays unused. The
+  target's brief gets *Sent back by a red gate* with the failure (the record
+  of the red position's last failed run, `lastGateFailureAt`); a chain run's
+  ordinary retry now reads its own position's failure the same way. The
+  target's green end writes `x-at` = `x-return-to` (`back to position 5 of 6,
+  whose red gate sent it here`), skipping the positions between. The red gate
+  that would bring `x-red-backs` to the breaker's threshold stays with its
+  persona (`on-red not followed — the red-gate loop reached its bound`); so
+  does one whose target no longer resolves.
 - **Pia's entry** (milestone 248) never reaches the runner: the engine runs
   one Mission Control turn per entry (a chat session `Pia — T-0123, position
   2 of 4`), then parks the ticket for the owner (`x-awaiting: you`,

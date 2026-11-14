@@ -76,6 +76,11 @@ export interface TicketHold {
   readonly sentBack: ChainSendBack | null;
   /** Open questions the owner has not answered (`why: question`); 0 otherwise. */
   readonly questions: number;
+  /**
+   * req-78: a red gate sent the ticket here from this later position (its
+   * entry's `on-red`); a green end goes straight back there. Absent = none.
+   */
+  readonly returnTo?: number;
 }
 
 /** The card's persona board field (`TicketCard` extends it). */
@@ -237,8 +242,15 @@ function runStatusOf(hold: TicketHold, live: HoldLive, human: boolean): HoldStat
   if ((live.activity ?? '').startsWith(MERGING_MAIN)) {
     return { kind: 'merging-main' };
   }
-  const from = hold.sentBack !== null && hold.position === hold.sentBack.to ? (hold.chain[hold.sentBack.from - 1] ?? null) : null;
-  return { kind: 'running', minutes: live.minutes, from };
+  return { kind: 'running', minutes: live.minutes, from: sentFromOf(hold) };
+}
+
+/** Whose position sent the ticket to the cursor: a red gate's (req-78), else the persona send-back's; null = none. */
+function sentFromOf(hold: TicketHold): string | null {
+  if (hold.returnTo !== undefined) {
+    return hold.chain[hold.returnTo - 1] ?? null;
+  }
+  return hold.sentBack !== null && hold.position === hold.sentBack.to ? (hold.chain[hold.sentBack.from - 1] ?? null) : null;
 }
 
 /** An agent entry without a run: the Shape chat, a held persona, its own pool, the big pool. */

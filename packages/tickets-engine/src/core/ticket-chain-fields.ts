@@ -16,6 +16,24 @@ function cursorOf(raw: unknown): number | null {
   return Number.isInteger(value) && value >= 1 ? value : null;
 }
 
+/** req-78: the red-gate loop's two fields, `return-to:` (a position) and `red-backs:` (a count); junk is a warning and absent. */
+function redLoopOf(header: Readonly<Record<string, unknown>>, issues: TicketIssue[]): { returnTo?: number; redBacks?: number } {
+  const out: { returnTo?: number; redBacks?: number } = {};
+  for (const [key, field] of [['return-to', 'returnTo'], ['red-backs', 'redBacks']] as const) {
+    const raw = header[key];
+    if (raw === undefined || raw === null) {
+      continue;
+    }
+    const value = cursorOf(raw);
+    if (value === null) {
+      issues.push({ level: 'warning', message: `${key} must be a whole number from 1 — ignored` });
+    } else {
+      out[field] = value;
+    }
+  }
+  return out;
+}
+
 /** The chain fields of a parsed frontmatter object; findings go to `issues`. */
 export function parseTicketChainFields(header: Readonly<Record<string, unknown>>, issues: TicketIssue[], done: boolean): TicketChainFields {
   const items = chainItemsOf(header['chain']);
@@ -29,7 +47,7 @@ export function parseTicketChainFields(header: Readonly<Record<string, unknown>>
   if (parsed.entries.length === 0) {
     return {};
   }
-  const out: { chain: readonly ChainEntry[]; at?: number; sentBack?: ChainSendBack } = { chain: parsed.entries };
+  const out: { chain: readonly ChainEntry[]; at?: number; sentBack?: ChainSendBack; returnTo?: number; redBacks?: number } = { chain: parsed.entries, ...redLoopOf(header, issues) };
   const rawAt = header['at'];
   if (rawAt !== undefined && rawAt !== null) {
     const at = cursorOf(rawAt);

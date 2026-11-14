@@ -36,7 +36,12 @@ const STANDARD = 'paul:shape; paul; ben; ralf; tessa; you';
 
 describe("the owner's Accept on a chain ticket", () => {
   it('moves the cursor on at a middle position', () => {
-    expect(ownerAcceptOf(card('ready', 'ben; you; ralf; you', 2), PLACEMENT)).toEqual({ kind: 'cursor', at: 3, line: 'accepted at position 2 of 4 — position 3 next' });
+    expect(ownerAcceptOf(card('ready', 'ben; you; ralf; you', 2), PLACEMENT)).toEqual({ kind: 'cursor', at: 3, line: 'accepted at position 2 of 4 — position 3 next', returned: false });
+  });
+
+  it('req-78: sends the ticket straight back to the position whose red gate sent it to You', () => {
+    const returning = { ...card('ready', 'paul; you; ben; tessa(on-red you); you', 2), meta: { ...card('ready', 'paul; you; ben; tessa(on-red you); you', 2).meta, returnTo: 4 } } as unknown as TicketCard;
+    expect(ownerAcceptOf(returning, PLACEMENT)).toEqual({ kind: 'cursor', at: 4, line: 'accepted at position 2 of 5 — back to position 4, whose red gate sent it here', returned: true });
   });
 
   it("is the sign-off at the chain's last You entry of a repository ticket: the commit", () => {

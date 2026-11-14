@@ -511,7 +511,20 @@ commands in its brief: the runner judges its hand-over structurally.
   second goes to the owner, a position that is no earlier one is a red gate
   (`fleet/harness/event-text.ts` `sendBackOf`: the last line-start marker,
   the number then the rest of the line; a marker without a number reads as
-  position 0). Status-log lines, Handover
+  position 0). A red gate at an entry with `on-red` (req-78) sends the
+  ticket back without any marker; the target's brief then carries, among
+  the parts that change between runs and before the retry's gate failure
+  (`fleet/instruction-sections.ts` `redBackPart`): `Sent back by a red gate:
+  the machine gate of position <n> (<persona>) went red, and that position
+  sends the ticket back to you. Revise your work with the failure as
+  feedback, and say in your handover what failed and what you changed. If it
+  needs the owner's decision, ask with QUESTION: (in backticks) — the ticket waits at You
+  until it is answered. When you end green, the ticket goes straight back to
+  position <n>; the positions between are not run again.` then `The failure's
+  tail:` and the failure capped like the gate failure (`caps.gateFailure*`),
+  or `The failure is in the ticket's status log.` when the red run's record is
+  gone. A chain run's retry reads its own position's last failure (no longer
+  the column's). Status-log lines, Handover
   states and Log lines are for people — the runner writes every persisted
   status verb itself (store comments), so no prompt asks an agent for a
   status line any more.
@@ -531,10 +544,12 @@ commands in its brief: the runner judges its hand-over structurally.
   shape `acceptanceCommands` runs; Open questions), pulled in by
   `plan-default`, `plan-interactive-default`, `build-default` (for a ticket
   that reaches the build without a plan) and the crew's shape prompt;
-  `chain-grammar.md` (version 2, req-266) — the chain as the ordered
-  persona list: `<persona>`, `<persona>:shape`, `<persona>(notify)`, the
+  `chain-grammar.md` (version 3, req-266; req-78 added `on-red`) — the chain as the ordered
+  persona list: `<persona>`, `<persona>:shape`, `<persona>(notify)`,
+  `<persona>(on-red <earlier persona>)` (a red machine gate goes back to that
+  persona's nearest earlier position, then straight back), the
   positions up to the current one (`at`) locked, the example
-  `["paul:shape", "paul", "ben", "ralf", "tessa", "you"]` — for the
+  `["paul:shape", "paul", "ben", "ralf", "tessa(on-red paul)", "you"]` — for the
   mission and flow prompts; `plan-format.md` (version 2) gained `### Chain`. A placeholder expands
   whatever the prompt's source (column template, vault copy, persona
   prompt — also in a 1:1 and a free session's brief); vault copies keep it.

@@ -47,7 +47,7 @@ Open work only. Everything implemented lives in
 lives in [`decisions.md`](decisions.md). When an item ships, move it to the
 changelog and delete it here — no shipped history on this page.
 
-**Status (2026-11-14):** version 0.8.1, milestones 1–271 built (1–21 in `docs/milestones-done.md`; 109–111 recorded by the convergence audit backfill), plus the requirements the changelog records without a milestone number (req-95a, req-95b, req-96, req-97, req-98, req-99a, req-99b, req-101, req-102, req-104, req-110, req-126 among them). Milestones 1–83 are
+**Status (2026-11-14):** version 0.8.1, milestones 1–272 built (1–21 in `docs/milestones-done.md`; 109–111 recorded by the convergence audit backfill), plus the requirements the changelog records without a milestone number (req-95a, req-95b, req-96, req-97, req-98, req-99a, req-99b, req-101, req-102, req-104, req-110, req-126 among them). Milestones 1–83 are
 owner-verified (the round for 1–81 closed 2026-10-17; 82, the auto-update, and 83, the tickets foundation, on real use). From milestone 84 on, the changelog marks each entry that still awaits the owner's round — nearly all of them; that round is finish line step 6 below. Milestone and requirement ids are assigned when work starts; the next free ones follow from the top of `changelog.md`. Of the architectural cleanup, A1–A6 and A10–A12 shipped; A7–A9 remain.
 
 ### Finish line (owner, 2026-11-12)
@@ -364,26 +364,6 @@ No open row: every row of step 5 shipped (milestones 263–271, the last req-298
 
 _Added by the owner on 2026-11-14 (crew management and the flow, before the merge into `main`):_
 
-- **req-78 — A red gate sends the ticket back** (owner request,
-  2026-10-31). An optional `on-red: <phase>` key per phase in
-  `pipeline.md`: a red gate moves the ticket back to that phase with
-  the gate's failure log in the ticket (Log line + the next run's
-  brief), instead of only backing off. The target is configured, so
-  the back-move may cross a manual checkpoint — the checkpoint only
-  stops the machine because nothing told it otherwise (owner,
-  2026-10-31). Flow the owner expects (e.g. `test` red, `on-red:
-  plan`): the plan worker revises the plan with the failure as
-  feedback and tells the owner what failed; when that needs decisions,
-  the ticket waits in Needs you until the owner has made them; then it
-  goes straight back into the phase whose gate went red (the phase it
-  had started), not through the queue again. The loop is bounded by
-  the phase's `max-red:` — past it the circuit breaker parks as today.
-  The pipeline stays linear apart from this one rule; a visual workflow
-  designer (branches, parallel paths) is not planned. Open: where the
-  "return to" phase is recorded (a frontmatter key vs. derived from the
-  Log), whether a checkpoint between the two (plan-review) is skipped
-  on the way back, and how it interacts with W7's gates and routing
-  (req-75). _(2026-11-14, owner: before the merge into `main`. On the persona board the key becomes a chain position: a red gate sends the ticket back to the persona at that position — the send-back of milestone 248 with the failure log as its reason — and returns to the position that went red; `max-red:` becomes the per-persona breaker of milestone 247.)_
 - **E10-5b — Flow editor follow-ups.** The switch that lets the plan
   persona propose a flow for **every new plan** (concept §5.7 point 3: it
   starts at the standard flow; today only the "Ask Paul" draft exists) and
@@ -391,8 +371,6 @@ _Added by the owner on 2026-11-14 (crew management and the flow, before the merg
   flow is `pipeline.md`'s `flow:`). The runner walks the chain since
   milestone 247 and a persona's model follows its class (milestone 268), so the
   delta's `move` / `assign` and a per-gate model pick are gone. _(2026-11-14, owner: before the merge into `main`.)_
-- **req-120 — Start a ticket's chain from the ticket card (board 9a; milestone 196)** (owner request, outside the list, 2026-11-07; found by wave 4.3 as a "feature not yet built" row). The card's primary button for a Prioritized ticket: the persona board's `start` move (milestone 254; today a drag or the card's context menu on the board), the button only in the states the board shows it, confirmation per the `tools` write policy. _(2026-11-14, owner: before the merge into `main`.)_
-- **req-148 — Queued and waiting runs in the fleet report (boards 10i, 5d; O11)** (owner request, outside the list, 2026-11-07; found by wave 4.7, milestone 202; built later). The Crew cards draw "queued" and "waits for a slot"; the fleet report knows live runs only. Needs the dispatcher's queue in the report and the clients drawing the state. _(2026-11-14, owner: before the merge into `main`.)_
 - **req-229 — Shape with Paul as a session record (follow-up of milestone 230, req-173; R9, concept open question 3).** `SessionKind` types `shape`, but Shape still runs over the chat bridge with read rounds (`chat-service.ts` shape turns), not as a session of a harness. Decide from the numbers whether Shape becomes a held session (kind `shape`, the ticket's repository read-only, Paul's harness, the plan as its working file) and build it on `HeldSessionStarter` with a `ShapeKind`. _(2026-11-14, owner: before the merge into `main`.)_
 - **req-142 — Persona permissions: the runner enforcing them ("Allowed to", board 7k)** (owner request, outside the list, 2026-11-07; found by wave 4.9 against board 7k; built later, not in wave 4). The record and the page are done: milestone 227 (req-167) built `allowed: write-vaults`, enforced per call by Drey Service's vault MCP; milestone 217 (req-170) `spend-above-allowance`; milestone 231 (req-171) the page block (read vaults fixed, write vaults per vault, run commands, network, spend above the allowance) and the two new record fields `allowed: run-commands: accept-edits | bypass` and `allowed: network: true`. **Still open:** the runner reading those two per run — it starts every harness with the crew's `permissionMode` today, so the choice is recorded and changes nothing — and a network switch that means something (it needs the harness sandbox of req-185, Spike 1). _(2026-11-13: the vault part moves to the project — req-282/283; `write-vaults` becomes `write-notes`.)_ _(2026-11-14, owner: before the merge into `main`.)_
 - **req-185 — Worker sandbox and trust boundary (Spike 1)** (concept 2026-11-08: security before routing and Lead). What a worker may reach beyond its worktree (file system, network), per harness; the finding becomes an ADR-0075 later change or a new ADR; until then the worktree plus the permission mode is the boundary and the concept says so. _(2026-11-14, owner: before the merge into `main`, and above all **where a worker may create its worktrees** — "aktuell wird immer meine Platte zugemüllt": a machine-wide worktree root in Settings (machine scope, `service.json`), the per-repo `worktrees:` override of `repos.md` kept, the default no longer under the tickets repository; and a finished ticket's worktree removed after its merge (branch kept), so they do not pile up.)_

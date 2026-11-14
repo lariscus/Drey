@@ -11,20 +11,45 @@
  *   human persona).
  * - `:<mode>` — the run's mode, `shape` (the interactive entry) only.
  * - `(notify)` — the Bescheid rule on that position.
+ * - `(on-red <position | persona>)` — req-78: where a red gate of that
+ *   position sends the ticket (`tessa(on-red paul)`); options are
+ *   comma-separated inside one pair of parentheses (`(notify, on-red 2)`).
  *
  * On a dricket store the entries are joined by `;` in `x-chain`; in a
  * ticket file they are the `chain:` list. The same text is the plan's
  * `### Chain` line and a plan part's `chain:` detail line.
  */
-import { CHAIN_MODES, type ChainEntry, type ChainMode, type ChainSendBack, type ChainStep } from '../contracts/chain';
+import { CHAIN_MODES, type ChainEntry, type ChainMode, type ChainRedTarget, type ChainSendBack, type ChainStep } from '../contracts/chain';
 
-const ENTRY_RE = /^([a-z][a-z0-9-]*)(?::([a-z][a-z0-9-]*))?(?:\s*\(\s*(notify)\s*\))?$/;
+const ENTRY_RE = /^([a-z][a-z0-9-]*)(?::([a-z][a-z0-9-]*))?(?:\s*\(([^()]*)\))?$/;
+/** req-78: `on-red <position | persona>` — also read with a colon (`on-red: paul`), written without one. */
+const ON_RED_RE = /^on-red\s*(?::\s*|\s+)([1-9]\d*|[a-z][a-z0-9-]*)$/;
 
 /** A persona id's grammar — the persona directory names under `_meta/personas/`. */
 export const PERSONA_ID_RE = /^[a-z][a-z0-9-]*$/;
 
 function isMode(value: string): value is ChainMode {
   return (CHAIN_MODES as readonly string[]).includes(value);
+}
+
+/** The entry's options inside `( … )`, comma-separated: `notify` and `on-red <target>`, each once; null when one is not the grammar. */
+function parseOptions(raw: string | undefined): { readonly notify: boolean; readonly onRed?: ChainRedTarget } | null {
+  if (raw === undefined) {
+    return { notify: false };
+  }
+  let notify = false;
+  let onRed: ChainRedTarget | undefined;
+  for (const option of raw.split(',').map((part) => part.trim())) {
+    const red = ON_RED_RE.exec(option);
+    if (option === 'notify' && !notify) {
+      notify = true;
+    } else if (red !== null && onRed === undefined) {
+      onRed = /^\d+$/.test(red[1]!) ? Number(red[1]) : red[1]!;
+    } else {
+      return null;
+    }
+  }
+  return onRed === undefined ? { notify } : { notify, onRed };
 }
 
 /** Parses one entry; null when the text is not the grammar. */
@@ -34,15 +59,17 @@ export function parseChainEntry(text: string): ChainEntry | null {
     return null;
   }
   const mode = match[2];
-  if (mode !== undefined && !isMode(mode)) {
+  const options = parseOptions(match[3]);
+  if ((mode !== undefined && !isMode(mode)) || options === null) {
     return null;
   }
-  return { persona: match[1]!, mode: mode ?? null, notify: match[3] !== undefined };
+  return { persona: match[1]!, mode: mode ?? null, ...options };
 }
 
 /** Renders one entry canonically — the round trip with {@link parseChainEntry}. */
 export function renderChainEntry(entry: ChainEntry): string {
-  return `${entry.persona}${entry.mode === null ? '' : `:${entry.mode}`}${entry.notify ? '(notify)' : ''}`;
+  const options = [...(entry.notify ? ['notify'] : []), ...(entry.onRed !== undefined ? [`on-red ${entry.onRed}`] : [])];
+  return `${entry.persona}${entry.mode === null ? '' : `:${entry.mode}`}${options.length > 0 ? `(${options.join(', ')})` : ''}`;
 }
 
 /** The whole chain as canonical strings — what the `chain:` list holds. */

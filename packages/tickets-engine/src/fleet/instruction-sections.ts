@@ -7,6 +7,7 @@
 import type { InstructionInput } from './instruction';
 import { capHead, capTail } from './capping';
 import { memoryOf, optional, trimmed, type Truncation } from './instruction-parts';
+import { QUESTION_MARKER } from './protocol';
 import { isReadOnlyRun } from './review-run';
 
 /** The most of an earlier handover the brief carries. */
@@ -100,8 +101,35 @@ export function changingParts(input: InstructionInput, truncations: Truncation[]
     ...optional(memoryOf(input.memorySection)),
     ...optional(handoverPart(input.handover)),
     ...optional(diffStatPart(input, truncations)),
+    ...optional(redBackPart(input, truncations)),
     ...optional(gateFailurePart(input, truncations)),
   ];
+}
+
+/**
+ * req-78: the run a red gate sent the ticket to (`on-red`): what went red where, the failure as
+ * feedback, the question for the owner's decisions, and the return — the ticket goes straight
+ * back to the position that went red. The text is in specs/classifier-spec.md.
+ */
+function redBackPart(input: InstructionInput, truncations: Truncation[]): string | null {
+  const redBack = input.chain?.redBack;
+  if (redBack === undefined) {
+    return null;
+  }
+  const head =
+    `Sent back by a red gate: the machine gate of position ${redBack.from} (${redBack.persona}) went red, and that position sends the ticket back to you. ` +
+    `Revise your work with the failure as feedback, and say in your handover what failed and what you changed. ` +
+    `If it needs the owner's decision, ask with \`${QUESTION_MARKER}\` — the ticket waits at You until it is answered. ` +
+    `When you end green, the ticket goes straight back to position ${redBack.from}; the positions between are not run again.`;
+  const raw = redBack.failure ?? '';
+  if (raw.trim() === '') {
+    return `${head} The failure is in the ticket's status log.`;
+  }
+  const capped = capTail(raw, { lines: input.caps.gateFailureLines, bytes: input.caps.gateFailureBytes });
+  if (capped.truncated) {
+    truncations.push({ section: 'gateFailure', originalSize: capped.originalSize });
+  }
+  return `${head} The failure's tail:\n\n${capped.text}`;
 }
 
 function handoverPart(raw: string | undefined): string | null {

@@ -30,8 +30,11 @@ export class PersonaBreaker {
     if (isQuotaError(info.lastError)) {
       return this.env.persist(); // a spent quota is the pool's pause, not the persona's fault
     }
-    const count = (this.state.ticketFailures[info.ticketId]?.count ?? 0) + 1;
-    this.state.ticketFailures[info.ticketId] = { count, until: new Date(this.env.clock.now().getTime() + failureBackoffMs(count)).toISOString() };
+    if (info.redBackTo === undefined) {
+      // req-78: a red gate that sent the ticket back moved it on to another persona — nothing for the ticket to back off from.
+      const count = (this.state.ticketFailures[info.ticketId]?.count ?? 0) + 1;
+      this.state.ticketFailures[info.ticketId] = { count, until: new Date(this.env.clock.now().getTime() + failureBackoffMs(count)).toISOString() };
+    }
     if (info.gateFailure === null) {
       return this.env.persist(); // no gate verdict: the ticket backs off, the persona is not to blame
     }

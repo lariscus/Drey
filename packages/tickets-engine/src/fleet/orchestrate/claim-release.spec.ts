@@ -119,6 +119,70 @@ describe('ClaimRelease — release is the one door', () => {
       expect(t.store.text).not.toMatch(/^x-sent-back:/m);
     });
 
+    describe("req-78: a red gate whose entry names on-red sends the ticket back, and the target's green end returns", () => {
+      const ENTRIES = ['paul', 'ben', 'ralf', 'tessa(on-red paul)', 'you'];
+      const redSetup = (): Harness => {
+        const t = lifecycleSetup();
+        return { ...t, ...harness(dirs.fleet, { execShell: async () => Promise.reject(new Error('exit 1\nTests failed: 2')) }, t.store) };
+      };
+
+      it('the red gate at position 4 moves the cursor to Paul, records the return and the count, in one release — the one send-back stays unused', async () => {
+        const t = redSetup();
+        const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK, nextPhase: null, nextPhaseDir: null, cursor: { at: 4, length: 5, entries: ENTRIES, maxRed: 3 } }));
+        endTurn(t.adapter.handles[0]!);
+        await settled(t.sup, id, 'failed');
+        expect(t.store.of('release').map((c) => c.stage)).toEqual(['active']);
+        expect(t.store.text).toMatch(/^x-at: 1$/m);
+        expect(t.store.text).toMatch(/^x-return-to: 4$/m);
+        expect(t.store.text).toMatch(/^x-red-backs: 1$/m);
+        expect(t.store.text).not.toMatch(/^x-sent-back:/m);
+        expect(t.store.of('comment')[0]?.text).toContain('red gate at position 4 (tessa) — sent back to 1 (paul) (red 1 of 2); returns to position 4 when position 1 is through');
+        expect(t.sup.get(id)?.redBackTo).toBe(1);
+      });
+
+      it('past the bound the red gate stays with its persona, as before', async () => {
+        const t = redSetup();
+        const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK, nextPhase: null, nextPhaseDir: null, cursor: { at: 4, length: 5, entries: ENTRIES, redBacks: 2, maxRed: 3 } }));
+        endTurn(t.adapter.handles[0]!);
+        await settled(t.sup, id, 'failed');
+        expect(t.store.text).not.toMatch(/^x-at:/m);
+        expect(t.store.of('comment')[0]?.text).toMatch(/^failed: /);
+        expect(t.sup.get(id)?.redBackTo).toBeUndefined();
+      });
+
+      it("the target's green end goes straight back to the position that went red, keeping the count", async () => {
+        const t = lifecycleSetup();
+        t.store.text = t.store.text.replace('x-phase: build', 'x-at: 1\nx-return-to: 4\nx-red-backs: 1');
+        const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK, nextPhase: null, nextPhaseDir: null, cursor: { at: 1, length: 5, entries: ENTRIES, returnTo: 4, redBacks: 1 } }));
+        endTurn(t.adapter.handles[0]!);
+        await settled(t.sup, id, 'done');
+        expect(t.store.text).toMatch(/^x-at: 4$/m);
+        expect(t.store.text).not.toMatch(/^x-return-to:/m);
+        expect(t.store.text).toMatch(/^x-red-backs: 1$/m);
+        expect(t.store.of('comment')[0]?.text).toContain('back to position 4 of 5, whose red gate sent it here');
+      });
+
+      it('a green end that is no return ends the loop and its count', async () => {
+        const t = lifecycleSetup();
+        t.store.text = t.store.text.replace('x-phase: build', 'x-at: 4\nx-red-backs: 1');
+        const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK, nextPhase: null, nextPhaseDir: null, cursor: { at: 4, length: 5, entries: ENTRIES, redBacks: 1 } }));
+        endTurn(t.adapter.handles[0]!);
+        await settled(t.sup, id, 'done');
+        expect(t.store.text).toMatch(/^x-at: 5$/m);
+        expect(t.store.text).not.toMatch(/^x-red-backs:/m);
+      });
+
+      it("a persona send-back drops a pending return — it invalidates everything from its target on", async () => {
+        const t = lifecycleSetup();
+        t.store.text = t.store.text.replace('x-phase: build', 'x-at: 2\nx-return-to: 4');
+        const id = await startRun(t.sup, request({ dk: LIFECYCLE_DK, nextPhase: null, nextPhaseDir: null, cursor: { at: 2, length: 5, entries: ENTRIES, returnTo: 4 } }));
+        endTurnSaying(t.adapter.handles[0]!, 'SEND-BACK: 1 the plan is wrong');
+        await settled(t.sup, id, 'done');
+        expect(t.store.text).toMatch(/^x-at: 1$/m);
+        expect(t.store.text).not.toMatch(/^x-return-to:/m);
+      });
+    });
+
     it("req-257: a plan run's ### Chain becomes the ticket's chain at its green end, when the guard holds", async () => {
       const t = lifecycleSetup();
       t.store.text = t.store.text.replace('## Log', '## Plan\n\n### Chain\n\npaul:shape; paul; ben; ralf; you\n\n## Log');

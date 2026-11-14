@@ -158,6 +158,34 @@
   border-color: var(--border);
 }
 
+/* req-120: board 9a's primary button — filled with the accent. */
+.tickets-doc-btn.is-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.tickets-doc-btn.is-primary:hover,
+.tickets-doc-btn.is-primary:focus-visible {
+  background: var(--accent);
+  filter: brightness(1.08);
+}
+
+.tickets-doc-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tickets-doc-start-ask {
+  font-size: 13px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .tickets-card-grid {
   display: grid;
   gap: 4px 12px;

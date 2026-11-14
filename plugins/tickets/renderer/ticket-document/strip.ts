@@ -18,6 +18,7 @@ import type { I18n } from '../../../../shared/i18n/types';
 import { cardOfDocument } from '../ticket-header';
 import { actionBarOf, chainOf, costSummary, flowItemsOf, pageShapeOf, statusOf, titleCase, workerOf, type PersonaName } from './model';
 import { hasOpenParts } from './parts-model';
+import { cardStartOf } from './start-model';
 import { personaPictures } from '../team/persona-pictures';
 
 export interface TicketStripDeps {
@@ -31,6 +32,8 @@ export interface TicketStripDeps {
   /** Opens the ticket's Flow tab (E13-11); absent = no link. */
   readonly openFlow?: (card: TicketCard) => void;
   readonly icon?: (name: string, size?: number) => SVGElement;
+  /** req-120: the card's Start — the persona board's `start` move with this persona; absent = no button. */
+  readonly onStart?: (card: TicketCard, persona: string) => void;
 }
 
 export interface TicketStripInput {
@@ -160,6 +163,7 @@ export function createTicketStrip(deps: TicketStripDeps): TicketStrip {
           gate: need !== null && need.text.trim() !== '' ? deps.i18n.t('ticket.waits_for_you', { text: need.text.trim() }) : '',
           decide: actionBarOf(row, snapshot).decide,
           canReview: chain.some((step) => step.state !== 'future'),
+          start: cardStartOf(snapshot, card),
         };
         host.replaceChildren(
           cardNode(
@@ -169,6 +173,7 @@ export function createTicketStrip(deps: TicketStripDeps): TicketStrip {
               onReview: () => deps.onReview(card),
               ...(deps.openFlow === undefined ? {} : { onFlow: () => deps.openFlow?.(card) }),
               ...(deps.icon === undefined ? {} : { icon: deps.icon, onRaw: expandRaw }),
+              ...(deps.onStart === undefined ? {} : { onStart: (persona: string) => deps.onStart?.(card, persona) }),
             },
             facts,
           ),

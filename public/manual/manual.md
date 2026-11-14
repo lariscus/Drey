@@ -1014,7 +1014,10 @@ persona — and at its right end the ticket's cost in grey (hover it: *So
 far*). The open ticket's row is marked with an accent bar. Click a row to open the ticket: its **document**, whatever the run is
 doing, and a click never touches a saved view. The ticket's card has
 **Thread** — the worker's page — and, once the ticket has passed a step,
-**Open Review**. The thread's header shows the run's light and who is working,
+**Open Review**. On the persona board a Prioritized ticket's card also carries
+**Start with Paul** — the persona at the ticket's current step: it asks once
+(*Start T-0017 with Paul?*, **Cancel** or **Start**) and then starts the chain,
+the same as dragging the card onto Paul's column. The thread's header shows the run's light and who is working,
 and above its composer sits the **decision bar** (Accept, or Accept → next
 phase on a board with other checkpoints). The thread follows whichever ticket you
 click last — one tab, not one per ticket — and opens where your focus is,
@@ -1346,6 +1349,19 @@ be sent back **once** by its personas — the second send-back does not move it:
 it comes to you with both reasons, and you accept or send it back yourself.
 Your own send-back never counts. A persona that asks a question moves the card
 to you; your answer returns it to the same persona.
+
+**A red gate that sends back.** A step may say where its red check goes:
+`tessa(on-red paul)` in the chain (or in the standard flow) sends a ticket whose
+check fails at Tessa back to Paul — the persona's nearest earlier step — with
+the failure as his task; `tessa(on-red 2)` names the step by its number. Paul
+revises his work and says what failed; when he needs your decision he asks, and
+the ticket waits at You until you answer. When Paul's step is through, the
+ticket goes **straight back to Tessa** — the steps between do not run again
+(point `on-red` at the builder if they should). The card reads *running · from
+Tessa* while Paul works, and the ticket's log says why it went back. This does
+not use the one send-back. The loop is bounded: the red check that would be
+the third in a row stays with Tessa as before, and three red checks in a row
+hold her until you play her on the Crew tab.
 
 **Leaving actions** are machine work that runs when a ticket leaves a persona,
 inside its claim and without a model: Ben's `sync-main` (merge `main` into the
@@ -1733,7 +1749,11 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   one. *Done this week* is the last column.
 - **Crew** (an editor tab) — a card per persona: its picture, its state (*idle*,
   *running*, *waiting*, *stuck*, *paused*), the day's cost against its
-  budget, and one row per live run. The shipped crew — Pia, Paul, Ben, Ralf,
+  budget, and one row per live run. A ticket that waits to be its next run
+  shows too: the card says *waiting* (*Review of T-0121 queued*) and the head
+  counts it (`4 personas · 2 running · 1 stuck · 1 queued`); in Mission
+  Control it is a row of its own, *queued* with *waits for a slot* (no place in
+  the pool) or *waits for Ben* (the persona runs its maximum). The shipped crew — Pia, Paul, Ben, Ralf,
   Tessa and you — come with their pictures (the Drey crew's squirrels); a
   board set up before them gets them the next time the engine starts, and a
   picture already in a persona's folder stays. The picture is the file

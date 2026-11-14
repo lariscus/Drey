@@ -579,6 +579,31 @@ describe('parseTeam — live runs and capacity (E12-4)', () => {
   });
 });
 
+describe('parseTeam: the queued tickets (req-148)', () => {
+  const personas = [{ id: 'ben', title: 'Ben' }, { id: 'ralf', title: 'Ralf' }];
+  const chain = (queued: unknown): unknown => ({ runs: [], chain: { master: 'run', queued } });
+
+  it('hands each persona its queued tickets in queue order with the reason', () => {
+    const team = parseTeam(personas, chain([
+      { ticket: 'T-0122', persona: 'ben', why: 'persona', position: 2, since: '2026-11-04T11:00:00Z' },
+      { ticket: 'T-0121', persona: 'ralf', why: 'slot', position: 1, since: '2026-11-04T11:00:00Z' },
+      { ticket: 'T-0123', persona: 'ben', why: 'slot', position: 3, since: '2026-11-04T11:00:00Z' },
+    ]));
+    expect(team.personas.find((p) => p.id === 'ben')?.queuedRuns).toEqual([{ ticketId: 'T-0122', why: 'persona' }, { ticketId: 'T-0123', why: 'slot' }]);
+    expect(team.personas.find((p) => p.id === 'ralf')?.queuedRuns).toEqual([{ ticketId: 'T-0121', why: 'slot' }]);
+  });
+
+  it('drops junk, entries without a persona, unknown reasons and repeats; never guesses', () => {
+    const team = parseTeam(personas, chain([
+      null, 7, { ticket: 'T-1', persona: null, why: 'slot', position: 1 }, { ticket: '', persona: 'ben', why: 'slot', position: 2 },
+      { ticket: 'T-2', persona: 'ben', why: 'later', position: 3 }, { ticket: 'T-3', persona: 'ben', why: 'slot', position: 4 }, { ticket: 'T-3', persona: 'ben', why: 'persona', position: 5 },
+    ]));
+    expect(team.personas.find((p) => p.id === 'ben')?.queuedRuns).toEqual([{ ticketId: 'T-3', why: 'slot' }]);
+    expect(parseTeam(personas, chain('nope')).personas.every((p) => p.queuedRuns === undefined)).toBe(true);
+    expect(parseTeam(personas, { runs: [], chain: { master: 'run' } }).personas.every((p) => p.queuedRuns === undefined)).toBe(true);
+  });
+});
+
 describe('parseTeam: the one line (req-144)', () => {
   it('keeps a persona summary and leaves the key out when there is none', () => {
     const team = parseTeam(

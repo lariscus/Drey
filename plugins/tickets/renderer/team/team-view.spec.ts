@@ -132,6 +132,19 @@ describe('the Crew tab', () => {
     expect(host.querySelector('[data-persona="tessa"] .desk-persona-role')!.textContent).toBe('Tester · $0.36 today');
   });
 
+  it('draws a persona with only queued tickets as waiting with the board headline, and counts queued tickets in the head (req-148)', () => {
+    runs = [];
+    chain = { master: 'run', queued: [{ ticket: 'T-0121', persona: 'ralf', why: 'slot', position: 1, since: '2026-11-04T11:00:00Z' }, { ticket: 'T-0122', persona: 'ben', why: 'persona', position: 2, since: '2026-11-04T11:00:00Z' }, { ticket: 'T-0123', persona: 'ben', why: 'persona', position: 3, since: '2026-11-04T11:00:00Z' }] } as unknown as ChainStatus;
+    const host = document.body.appendChild(document.createElement('div'));
+    mountTeam(deps(), store([persona({ id: 'ralf', title: 'Ralf', role: 'Reviewer', phases: ['review'], dailyCost: 0.46, budget: null }), persona({})]), host);
+    expect(host.querySelector('.desk-head-sub')!.textContent).toBe('2 personas · 3 queued');
+    const ralf = host.querySelector('[data-persona="ralf"]')!;
+    expect(ralf.querySelector('.desk-persona-state')!.textContent).toBe('waiting');
+    expect(ralf.querySelector('.desk-persona-headline')!.textContent).toBe('Review of T-0121 queued');
+    expect(ralf.querySelector('.desk-persona-headline .desk-nowrap')!.textContent).toBe('T-0121');
+    expect(host.querySelector('[data-persona="ben"] .desk-persona-headline')!.textContent).toBe('T-0122 queued +1');
+  });
+
   it('draws the Autopilot chip between the budget and Pause all, and a click opens the popover (board 7f)', () => {
     const host = document.body.appendChild(document.createElement('div'));
     mountTeam(deps(), store(personas), host);

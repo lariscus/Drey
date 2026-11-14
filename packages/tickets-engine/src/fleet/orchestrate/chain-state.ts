@@ -1,6 +1,6 @@
 import { AUTOPILOT_OFF, masterOf } from '../autopilot';
 import type { PipelinePhase } from '../../contracts/tickets';
-import type { AutopilotRecord, ChainConfig, ChainMaster, ChainStatus, ChainTrip, ColumnMode } from '../protocol';
+import type { AutopilotRecord, ChainConfig, ChainMaster, ChainStatus, ChainTrip, ColumnMode, QueuedTicket } from '../protocol';
 import type { TrancheRecord } from './tranche/tranche-record';
 
 /** Per ticket: consecutive failed runs and the instant the next attempt may start. */
@@ -109,6 +109,8 @@ export class ChainState {
   readonly personaTripped: Record<string, ChainTrip> = {};
   /** req-271: the tickets the last pass left waiting for their persona's own pool (ticket -> persona); never persisted. */
   readonly personaWaits: Record<string, string> = {};
+  /** req-148: the dispatcher's queue of the last pass (`fleet/dispatch-queue.ts`); never persisted. */
+  queued: readonly QueuedTicket[] = [];
   /** req-170: per ticket, the open ledger cards' keys (`ledger-ticket`, `ledger-persona-ben`). */
   readonly ledgerCards: Record<string, string[]> = {};
   /** req-274: per held ticket, the last recorded hold (see {@link ChainFile}). */
@@ -157,6 +159,7 @@ export class ChainState {
       personaRedStreak: { ...this.personaRedStreak },
       personaTripped: { ...this.personaTripped },
       personaWaits: { ...this.personaWaits },
+      queued: [...this.queued],
       poolSize: pools.poolSize,
     };
   }
@@ -173,6 +176,7 @@ export class ChainState {
       }
     }
     this.pausedPersonas.clear();
+    this.queued = [];
     this.tranche = null;
   }
 

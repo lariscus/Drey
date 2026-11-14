@@ -29,7 +29,17 @@ export interface ChainEntry {
   readonly mode: ChainMode | null;
   /** The Bescheid rule: a card lands in Needs you when this position is done. */
   readonly notify: boolean;
+  /**
+   * req-78: where a red machine gate of this position sends the ticket —
+   * an earlier position (a number) or the persona of the nearest earlier
+   * position that names it (an id); `(on-red paul)`. Absent = a red gate
+   * leaves the ticket with this position, as before.
+   */
+  readonly onRed?: ChainRedTarget;
 }
+
+/** req-78: an entry's `on-red` target — a position (1-based) or a persona id. */
+export type ChainRedTarget = number | string;
 
 /** One position of a ticket's chain as the surfaces render it. */
 export interface ChainStep extends ChainEntry {
@@ -53,6 +63,14 @@ export interface TicketChainFields {
   readonly chain?: readonly ChainEntry[];
   readonly at?: number;
   readonly sentBack?: ChainSendBack;
+  /**
+   * req-78: `return-to:` / `x-return-to` — the position whose red gate sent
+   * the ticket back; when the entry at the cursor ends green the cursor goes
+   * straight back there. Absent = none.
+   */
+  readonly returnTo?: number;
+  /** req-78: `red-backs:` / `x-red-backs` — the red-gate send-backs of the current loop (the bound counts them). */
+  readonly redBacks?: number;
 }
 
 /** At most this many entries — `x-chain` is one size-capped line on the store. */

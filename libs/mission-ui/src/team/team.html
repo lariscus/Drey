@@ -92,6 +92,15 @@
                   }
                 </div>
               }
+              @for (row of queuedRowsOf(persona); track row.ticketId) {
+                <div class="pd-run pd-queued">
+                  <div class="pd-run-top">
+                    <button type="button" class="pd-run-title" (click)="openQueued(row)">{{ row.title }}</button>
+                    <span class="pd-age">{{ 'work.phone.queued' | t }}</span>
+                  </div>
+                  <span class="pd-run-line">{{ row.line }}</span>
+                </div>
+              }
             </article>
           }
           @if (poolEmpty()) {
@@ -190,6 +199,15 @@
                     </div>
                   }
                 }
+              </div>
+            }
+            @for (row of queuedRowsOf(persona); track row.ticketId) {
+              <div class="ph-run ph-queued">
+                <div class="ph-run-top">
+                  <button type="button" class="ph-run-title ph-ellipsis" (click)="openQueued(row)">{{ row.title }}</button>
+                  <span class="ph-age">{{ 'work.phone.queued' | t }}</span>
+                </div>
+                <span class="ph-run-line ph-ellipsis">{{ row.line }}</span>
               </div>
             }
           </article>

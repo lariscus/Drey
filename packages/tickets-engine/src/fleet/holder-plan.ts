@@ -71,6 +71,8 @@ export interface HolderPlan {
   readonly plan: readonly PlannedHolderDispatch[];
   /** Candidates left without a place, by ticket id. */
   readonly waits: ReadonlyMap<string, { readonly persona: string; readonly why: HolderWait }>;
+  /** req-148: every candidate's ticket id in dispatch order — the order the dispatcher's queue is reported in. */
+  readonly order: readonly string[];
 }
 
 interface Candidate {
@@ -82,7 +84,7 @@ interface Candidate {
 /** What to start right now, in dispatch order (see the module comment). */
 export function planHolderDispatch(input: HolderPlanInput): HolderPlan {
   if (input.master !== 'run') {
-    return { plan: [], waits: new Map() };
+    return { plan: [], waits: new Map(), order: [] };
   }
   return assignPlaces(input, sortedCandidates(input));
 }
@@ -127,7 +129,7 @@ function assignPlaces(input: HolderPlanInput, candidates: readonly Candidate[]):
     running[held.persona] = (running[held.persona] ?? 0) + 1;
     plan.push({ card, workingPhase: column, fromPhase: card.phase, pool, persona: held.persona, position: held.position, overrun: place.overrun });
   }
-  return { plan, waits };
+  return { plan, waits, order: candidates.map((candidate) => candidate.card.id) };
 }
 
 /** One candidate's place: its persona's pool first, then the big pool, the persona's min overrunning a full one. */

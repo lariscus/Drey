@@ -253,6 +253,12 @@ export interface CapacityView {
   readonly size: number;
 }
 
+/** req-148: one ticket the dispatcher holds back — `slot` = no free place in the pool, `persona` = its persona runs its maximum. */
+export interface QueuedRunView {
+  readonly ticketId: string;
+  readonly why: 'slot' | 'persona';
+}
+
 /** One team card: the persona directory slice plus what it is running now. */
 export interface PersonaView {
   readonly id: string;
@@ -278,6 +284,8 @@ export interface PersonaView {
   readonly currentRun: PersonaRun | null;
   /** Every live run of this persona (a builder may carry several); absent = none known. */
   readonly liveRuns?: readonly LiveRunView[];
+  /** req-148: the tickets the dispatcher holds back for this persona (the chain block's `queued`), in queue order; absent = none. */
+  readonly queuedRuns?: readonly QueuedRunView[];
   /** Every live session of this persona that is not a ticket run (req-173); absent = none. */
   readonly liveSessions?: readonly LiveSessionView[];
   /**
@@ -1339,6 +1347,7 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
   const pausedPersonas = strArray(fleet['pausedPersonas']);
   const capacity = capacityOf(chain, runs);
   const waits = chainWaitsOf(chain);
+  const queuedAll = queuedOf(chain);
   const personas: PersonaView[] = [];
   for (const raw of arr(personasJson)) {
     const persona = personaOf(raw);
@@ -1362,9 +1371,11 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
       }
       return [liveRunOf(r, runState)];
     });
+    const queuedRuns = queuedAll.filter((entry) => entry.persona === persona.id).map(({ ticketId, why }): QueuedRunView => ({ ticketId, why }));
     personas.push({
       ...persona,
       ...(liveRuns.length > 0 ? { liveRuns } : {}),
+      ...(queuedRuns.length > 0 ? { queuedRuns } : {}),
       ...(liveSessions.length > 0 ? { liveSessions } : {}),
       currentRun:
         liveRun === null || liveRun === undefined || state === null
@@ -1391,6 +1402,25 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
     ...(pausedPersonas.length > 0 ? { pausedPersonas } : {}),
     ...(capacity.length > 0 ? { capacity } : {}),
   };
+}
+
+/** req-148: the chain block's `queued` entries in queue order; an entry without a ticket id, a persona or a known reason is dropped, never guessed. */
+function queuedOf(chain: Record<string, unknown> | null): readonly { readonly ticketId: string; readonly persona: string; readonly why: 'slot' | 'persona' }[] {
+  const seen = new Set<string>();
+  const entries: { ticketId: string; persona: string; why: 'slot' | 'persona'; position: number }[] = [];
+  for (const raw of arr(chain?.['queued'])) {
+    const entry = rec(raw);
+    const ticketId = str(entry?.['ticket']);
+    const persona = str(entry?.['persona']);
+    const why = entry?.['why'];
+    if (ticketId === '' || persona === '' || (why !== 'slot' && why !== 'persona') || seen.has(ticketId)) {
+      continue;
+    }
+    seen.add(ticketId);
+    const position = entry?.['position'];
+    entries.push({ ticketId, persona, why, position: typeof position === 'number' && Number.isFinite(position) ? position : Number.MAX_SAFE_INTEGER });
+  }
+  return entries.sort((a, b) => a.position - b.position);
 }
 
 /**

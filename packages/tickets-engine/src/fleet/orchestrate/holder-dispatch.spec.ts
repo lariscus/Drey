@@ -80,6 +80,26 @@ describe('the holder dispatch on a lifecycle store (req-257)', () => {
     await orch.setMaster('run');
 
     expect(fleet.records.map((r) => r.request.ticketId)).toEqual(['T-0321']);
+    // req-148: the one left without a slot is the dispatcher's queue in the chain status
+    expect(orch.status().queued).toEqual([{ ticket: 'T-0320', persona: 'paul', why: 'slot', position: 1, since: expect.any(String) as unknown }]);
+  });
+
+  it('req-148: the queue is empty while the Autopilot is off', async () => {
+    h.io.seed('T-0322', 'active', { chain: STANDARD, extensions: { at: '3' } });
+    const { orch } = h.build();
+    await orch.configure(h.config({ store: LIFECYCLE, pools: ONE }));
+    expect(orch.status().queued).toEqual([]);
+  });
+
+  it("req-78: a red gate's target runs with the loop on its cursor and the failure in its brief", async () => {
+    h.io.seed('T-0323', 'active', { chain: ['paul', 'ben', 'tessa(on-red paul)', 'you'], extensions: { at: '1', 'return-to': '3', 'red-backs': '1' } });
+    const { orch, fleet } = h.build();
+    await orch.configure(h.config({ store: LIFECYCLE }));
+    await orch.setMaster('run');
+
+    const request = fleet.records[0]!.request;
+    expect(request.cursor).toMatchObject({ at: 1, returnTo: 3, redBacks: 1, maxRed: 3, redBack: { from: 3, persona: 'tessa', failure: null } });
+    expect(request.instruction).toContain('Sent back by a red gate: the machine gate of position 3 (tessa) went red');
   });
 
   it('a held persona starts nothing — the owner paused it', async () => {

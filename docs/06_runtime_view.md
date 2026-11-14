@@ -6487,3 +6487,35 @@ sequenceDiagram
     G->>C: confirm → execute
     C->>B: createTicket({…, project: 'drey'}) → project: / x-project
 ```
+
+## 6.140 A red gate sends the ticket back and returns; Start on the card; the queue in the report (req-78, req-120, req-148, milestone 272)
+
+Chain `paul; ben; tessa(on-red paul); you`. Tessa's gate goes red at position 3: the ticket goes to Paul with the failure, Paul asks the owner, and his green end sends it straight back to Tessa — Ben's position is not run again. The loop's third red gate (the persona breaker's threshold) would stay with Tessa as before.
+
+```mermaid
+sequenceDiagram
+    participant R as Runner (RunCompletion)
+    participant C as ClaimRelease
+    participant S as dricket store
+    participant D as Dispatcher / TicketDispatch
+    participant O as Owner
+    R->>R: Tessa's run ends, machine gate red
+    R->>R: decideRedGate(chain, at 3, red-backs 0, max-red 3) = back to 1
+    R->>C: redBack(decision, failure line)
+    C->>S: put in claim: x-at 1, x-return-to 3, x-red-backs 1
+    C->>S: release --stage active, "red gate at position 3 (tessa) — sent back to 1 (paul) (red 1 of 2) …"
+    R->>R: settle failed (redBackTo 1): the persona breaker counts Tessa, no ticket back-off
+    D->>D: next pass: holder Paul; cursor carries returnTo 3, redBack {from 3, tessa, failure}
+    D->>R: Paul's run, brief "Sent back by a red gate …" + the failure
+    R->>S: QUESTION: → x-awaiting you (milestone 248)
+    O->>S: answers in Needs you; the reclaim clears x-awaiting
+    R->>C: Paul's gate green → advance
+    C->>S: put in claim: x-at 3 (x-return-to removed, x-red-backs kept); release active
+    D->>R: Tessa's run again (her retry reads her last failure at position 3)
+```
+
+The owner's Accept at You and the card that ends Pia's entry return the same way (`cursorAfterGreen`); a persona's `SEND-BACK:`, the owner's Send back and a column move drop `x-return-to`.
+
+**Start on the card (req-120).** A Prioritized chain ticket's document on a persona board shows `Start with Paul` (`cardStartOf`); the click asks in place, `Start` sends `personaBoardMove {kind: start, id, persona}` — the drop's call — and BoardService puts the ticket `active` with the entry at the cursor.
+
+**The queue in the report (req-148).** After every pass the dispatcher folds the capacity pool's queue and the holder plan's waits in dispatch order into `ChainState.queued` (`dispatchQueueOf`, a known wait keeps its `since`); `GET /chain` answers it, the desk forwards the chain block to Mission Control, and the Crew tab, iPad and phone draw the queued rows and *· 1 queued*.

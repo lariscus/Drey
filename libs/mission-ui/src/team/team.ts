@@ -17,7 +17,7 @@ import {
   signal,
   type Signal,
 } from '@angular/core';
-import type { CapacityView, LiveRunView } from '../api/dto';
+import type { CapacityView, LiveRunView, QueuedRunView } from '../api/dto';
 
 /**
  * The wire DTO of `GET /api/personas` — duplicated from the engine's
@@ -73,6 +73,8 @@ export interface McTeamPersona extends McPersonaView {
   readonly currentRun: McPersonaRun | null;
   /** Every live run the persona carries (E12-4); absent = none known. */
   readonly liveRuns?: readonly LiveRunView[];
+  /** req-148: the tickets the dispatcher holds back for the persona, in queue order; absent = none. */
+  readonly queuedRuns?: readonly QueuedRunView[];
 }
 
 /**
@@ -365,12 +367,28 @@ export function runRowOf(run: LiveRunView, title: string | null, nowMs: number):
   };
 }
 
-/** The card's state words: `2 running`, `paused`, `idle`. */
-export function stateWordsOf(liveRuns: number, paused: boolean): string {
+/** The card's state words: `2 running`, `paused`, `waiting` (queued tickets and no live run, req-148), `idle`. */
+export function stateWordsOf(liveRuns: number, paused: boolean, queued = 0): string {
   if (paused) {
     return 'paused';
   }
-  return liveRuns === 0 ? 'idle' : liveRuns === 1 ? 'running' : `${liveRuns} running`;
+  if (liveRuns === 0) {
+    return queued > 0 ? 'waiting' : 'idle';
+  }
+  return liveRuns === 1 ? 'running' : `${liveRuns} running`;
+}
+
+/** req-148: a queued ticket under a persona's card — the title the client knows (else the id), `queued` right, and why it waits. */
+export interface QueuedRowVm {
+  readonly ticketId: string;
+  readonly title: string;
+  /** The reason in words: `waits for a slot`, or `waits for <persona>` for a persona at its maximum. */
+  readonly line: string;
+}
+
+/** The crew's queued tickets in total (the header's `1 queued`). */
+export function queuedCountOf(personas: readonly Pick<McTeamPersona, 'queuedRuns'>[] | null): number {
+  return (personas ?? []).reduce((sum, persona) => sum + (persona.queuedRuns?.length ?? 0), 0);
 }
 
 /** The share of the day's budget spent, 0 – 100 (capped); null without both figures. */
@@ -660,6 +678,7 @@ export class Team {
       t.t('crew.phone.n_personas', { n: list.filter((persona) => persona.kind !== 'human' && persona.kind !== 'mission').length }),
       t.t('crew.phone.n_running', { n: runs.filter((run) => !run.stuck).length }),
       t.t('crew.phone.n_stuck', { n: runs.filter((run) => run.stuck).length }),
+      ...(queuedCountOf(list) > 0 ? [t.t('crew.phone.n_queued', { n: queuedCountOf(list) })] : []),
     ].join(' · ');
   });
 
@@ -762,6 +781,21 @@ export class Team {
     );
   }
 
+  /** req-148: the persona's queued tickets as rows under its live runs. */
+  protected queuedRowsOf(persona: McTeamPersona): readonly QueuedRowVm[] {
+    if (this.isMission(persona)) {
+      return [];
+    }
+    return (persona.queuedRuns ?? []).map((entry) => ({
+      ticketId: entry.ticketId,
+      title: this.state.ticketTitleOf?.(entry.ticketId) ?? entry.ticketId,
+      line:
+        entry.why === 'slot'
+          ? this.teamI18n.t('tickets.queue.waits_slot')
+          : this.teamI18n.t('board.status.waits_for', { name: persona.title }),
+    }));
+  }
+
   protected liveCountOf(persona: McTeamPersona): number {
     return persona.liveRuns?.length ?? (persona.currentRun === null ? 0 : 1);
   }
@@ -770,7 +804,7 @@ export class Team {
     if (persona.kind === 'human') {
       return 'Manual steps';
     }
-    return stateWordsOf(this.liveCountOf(persona), this.isPaused(persona));
+    return stateWordsOf(this.liveCountOf(persona), this.isPaused(persona), persona.queuedRuns?.length ?? 0);
   }
 
   protected dotClass(persona: McTeamPersona): string {
@@ -781,6 +815,10 @@ export class Team {
       return 'run-dim';
     }
     return persona.currentRun === null ? 'run-dim' : runStateClass(persona.currentRun.state);
+  }
+
+  protected openQueued(row: QueuedRowVm): void {
+    this.state.openTicket?.(row.ticketId);
   }
 
   protected openRow(row: RunRowVm): void {
