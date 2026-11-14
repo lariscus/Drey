@@ -364,7 +364,6 @@ No open row: every row of step 5 shipped (milestones 263–271, the last req-298
 
 _Added by the owner on 2026-11-14 (crew management and the flow, before the merge into `main`):_
 
-- **req-229 — Shape with Paul as a session record (follow-up of milestone 230, req-173; R9, concept open question 3).** `SessionKind` types `shape`, but Shape still runs over the chat bridge with read rounds (`chat-service.ts` shape turns), not as a session of a harness. Decide from the numbers whether Shape becomes a held session (kind `shape`, the ticket's repository read-only, Paul's harness, the plan as its working file) and build it on `HeldSessionStarter` with a `ShapeKind`. _(2026-11-14, owner: before the merge into `main`.)_
 
 ### Next
 
