@@ -4257,9 +4257,6 @@ sequenceDiagram
     F->>M: flowEdit {id, chain: draft, edit}
     M->>E: applyFlowOp -> validateChain (personas, cursor) -> the next list
     E-->>F: the next draft (or a refusal, shown under the list)
-    O->>F: Ask Paul
-    F->>M: flowDraft {id, ask}
-    E-->>F: Paul's draft + reason (Undo draft restores the one before)
     O->>F: Save flow
     F->>M: flowSave {id, chain}
     M->>E: saveFlow -> `chain:` frontmatter, one commit
@@ -5761,8 +5758,8 @@ sequenceDiagram
     participant Shape as Shape chat (Paul)
     Owner->>Chat: capture an idea
     Chat->>BS: createTicket
-    BS->>Pipe: snapshot.flow (flow: paul:shape; paul; ben; ralf; tessa; you)
-    BS->>T: chain: [paul:shape, paul, ben, ralf, tessa, you] · at: 1 (x-chain / x-at on a store)
+    BS->>Pipe: snapshot.flow (flow: paul:shape; ben; ralf; tessa; you)
+    BS->>T: chain: [paul:shape, ben, ralf, tessa, you] · at: 1 (x-chain / x-at on a store)
     Owner->>Chat: "give T-0121 a second review by Tessa"
     Chat-->>Owner: setChain card (the whole list)
     Owner->>Chat: confirm
@@ -6619,7 +6616,7 @@ sequenceDiagram
     participant D as Dispatcher
     participant W as Plan worker
     S->>F: Open flow editor (the default flow)
-    F->>E: flow {id: standard} / flowEdit / flowDraft
+    F->>E: flow {id: standard} / flowEdit
     E-->>F: scope standard · the saved flow · nothing locked
     F->>E: flowSave {id: standard, chain}
     E->>E: validateChain (the crew, an entry per position)
@@ -6665,3 +6662,36 @@ sends the ticket back (milestone 274) leaves the run `failed`, so the position t
 again — and the filer writes on the same `TicketsGit` queue as the closing round's persona commits
 (milestone 272), so the two never meet at `index.lock`. A ticket exists only after the owner's confirm,
 through the chat's one decision path.
+
+## 6.145 One entry shapes and plans; the standard flow is set through Mission Control (req-305, req-306, milestone 278)
+
+A ticket whose chain begins `paul:shape; ben; …` waits at position 1 for the owner's Shape chat; the owner's **Accept** (the card's *Shaping done*) rewrites the entry without its mode and the same persona plans at the same position. Pia sets the board's standard flow with a card and knows the owner as the persona `you`.
+
+```mermaid
+sequenceDiagram
+    actor O as Owner
+    participant B as Board card (desktop)
+    participant E as Engine (BoardService)
+    participant S as Store (x-chain, x-at)
+    participant D as Dispatcher (HolderPass)
+    participant W as Paul's plan run
+    participant C as ChatService (Pia)
+    participant P as pipeline.md
+    Note over S: x-chain paul:shape;ben;you · x-at 1
+    D->>D: holder paul, mode shape — no run, the wait line names the Shape chat
+    O->>E: the Shape chat (a bridge call: Paul's prompt.md + the shape wrapper) writes the plan
+    O->>B: Shaping done
+    B->>E: acceptTicket
+    E->>E: ownerAcceptOf: shape entry of an agent → decision "shaped"
+    E->>S: put — x-chain paul;ben;you, x-at stays 1 (status line "shaping done at position 1 of 3")
+    D->>W: the holder's run starts at position 1, like any other
+    W-->>S: green end: x-at 2 (Ben)
+    O->>C: "make the standard flow Paul, Ben, then me" (Henrik, me, I = you)
+    C->>C: system message: Pia's prompt, mission.md, board digest, ## Crew (you = Henrik), sessions
+    C-->>O: card "Set the standard flow to paul:shape; ben; you" (before / after)
+    O->>C: confirm
+    C->>E: setStandardFlow {chain}
+    E->>E: parse (strict) → validateChain (the crew, nothing locked)
+    E->>P: flow: paul:shape; ben; you — one commit "tickets: default flow"
+    Note over E,S: existing tickets keep their own chains
+```

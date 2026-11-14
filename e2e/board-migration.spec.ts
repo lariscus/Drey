@@ -151,7 +151,7 @@ test('the board migration steps 3 to 5, each on the owner’s confirmation (req-
   await line.getByRole('button', { name: 'Review…' }).click();
   await expect(line.locator('li')).toHaveText([
     'Removes the columns Shaping, Building, Ready to try.',
-    'Writes the standard flow: paul:shape; paul; ben; ralf; tessa; you.',
+    'Writes the standard flow: paul:shape; ben; ralf; tessa; you.',
     'Moves min-class, max-turns onto ben.',
     'Keeps the token budget 40,000,000 as a board key.',
     'One commit in the tickets repository.',
@@ -161,6 +161,7 @@ test('the board migration steps 3 to 5, each on the owner’s confirmation (req-
   await line.getByRole('button', { name: 'Migrate' }).click();
   await expect.poll(() => read('pipeline.md'), { timeout: 30_000 }).not.toContain('building');
   expect(read('pipeline.md')).toContain('token-budget: 40000000');
+  expect(read('pipeline.md')).toMatch(/^flow: paul:shape; ben; ralf; tessa; you$/m); // req-305: Paul once, shaping included
   expect(read('personas/ben/persona.md')).toContain('class: standard'); // req-288: the floor raised the class
   expect(read('personas/ben/persona.md')).not.toContain('min-class');
 

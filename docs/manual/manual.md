@@ -1187,18 +1187,18 @@ either: while the ticket waits at one of your checkpoints its head has the link
 
 **The Flow tab.** *Change* in the ticket's card or *Change flow* in its Parts
 block opens **Flow · T-0121**: the ticket's **chain** — the personas it goes
-through, in order (*Paul, Paul, Ben, Ralf, Tessa, You*), each with its model.
+through, in order (*Paul, Ben, Ralf, Tessa, You*), each with its model.
 The same persona may stand twice; the entry where you shape the ticket with
-Paul carries the mark *Shape*. Click a step to open its settings on the right:
+Paul carries the mark *Shape*: Paul first shapes it with you in the Shape chat
+and then plans it, one entry, one step (*Shaping done* on its card on the
+Board ends the shaping and Paul plans at once). Click a step to open its settings on the right:
 who takes it (any persona of the crew), *Tell me when it is done*, *Earlier* /
 *Later*, *Add a persona after* and *Remove gate*. The round **+** between two
 steps adds a persona there. A step drawn with a dashed outline is a change you
-have not saved. Type into *Ask Paul to change this flow* (or leave it empty)
-and press *Ask Paul* to get a draft with the reason, *Undo draft* if you do
-not like it. The draft is written by the persona of the ticket's planning step
-(the first step whose persona hands over a plan), else the one that holds
-*Shape*, speaking with its own instructions; a chain with neither gets the
-answer *No persona is assigned to plan T-…* and nothing is drafted. Nothing is written until **Save flow**; *Reset to standard flow*
+have not saved. To have the flow changed in words, ask Mission Control: *"Change
+the standard flow to Paul, Ben, then me"* — she answers with a card that sets the
+standard flow, and she knows you by your name (Settings → Tickets → Crew, *Your
+name*) and by *me* and *I* as the persona *You*. Nothing is written until **Save flow**; *Reset to standard flow*
 puts the standard flow back behind the steps that have begun. *Open flow editor*
 under **Default flow** in Settings → Tickets opens this tab on the standard flow
 itself (**Flow · Default**, no ticket, nothing locked, no reset): *Save flow*
@@ -1209,7 +1209,7 @@ run is live on the ticket.
 
 **Where a chain comes from.** A new ticket gets the board's **standard flow**
 (the `flow:` line in `_meta/pipeline.md`; a new board ships
-`paul:shape; paul; ben; ralf; tessa; you`), and from then on the chain is the
+`paul:shape; ben; ralf; tessa; you`), and from then on the chain is the
 ticket's own — changing the standard flow later leaves existing tickets alone.
 Paul may write a chain into the plan (`### Chain`); when the shaped plan is
 saved it becomes the ticket's chain. A plan's parts carry their own; a part
