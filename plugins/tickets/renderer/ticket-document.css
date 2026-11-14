@@ -6,7 +6,8 @@
    them (see ticket-header.css). */
 
 /* --- the page, per state (owner ruling, wave 4.3): 9a for Inbox and Prioritized,
-   row 7 for Shaping and later. The user's editor zoom still scales the type. --- */
+   row 7 for Shaping and later. The user's editor zoom scales the type and the
+   column alike, so a zoomed page keeps the board's measure. --- */
 
 .cm-editor.tickets-doc-editor .cm-gutters {
   /* The fold gutter takes no room: the column centres in the whole pane. */
@@ -34,7 +35,7 @@
 }
 
 .cm-editor.tickets-doc-editor.is-flow .cm-content {
-  max-width: 720px;
+  max-width: calc(720px * var(--drey-editor-scale, 1));
   padding: 20px 0 24px;
 }
 
@@ -44,8 +45,8 @@
 }
 
 .cm-editor.tickets-doc-editor.is-early .cm-content {
-  max-width: 660px;
-  padding: 24px 32px 40px;
+  max-width: calc(660px * var(--drey-editor-scale, 1));
+  padding: 24px calc(32px * var(--drey-editor-scale, 1)) 40px;
 }
 
 .cm-editor.tickets-doc-editor .tickets-doc-h1,
@@ -100,6 +101,24 @@
 .cm-editor.tickets-doc-editor.is-early .tickets-doc-h2 {
   padding-top: 24px;
   padding-bottom: 8px;
+}
+
+/* A heading below the plan's chapters: the body's size, set apart from the text above. */
+.cm-editor.tickets-doc-editor .tickets-doc-h3,
+.cm-editor.tickets-doc-editor .tickets-doc-h3 span {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.cm-editor.tickets-doc-editor .tickets-doc-h3 {
+  padding-top: 16px;
+  padding-bottom: 4px;
+}
+
+/* A Log entry's time: quiet, the entry's words stay the line. */
+.cm-editor.tickets-doc-editor .tickets-doc-log-time {
+  color: var(--text-4);
+  font-variant-numeric: tabular-nums;
 }
 
 /* A blank line around a heading is the heading's own spacing; between two

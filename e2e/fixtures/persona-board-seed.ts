@@ -25,6 +25,8 @@ export interface Seed {
   readonly cost?: number;
   /** Text appended to the ticket's body (a `## Verlauf` with its runs). */
   readonly body?: string;
+  /** The body replaces dk's template sections (`## Description` … `## Log`) instead of following them. */
+  readonly replaceBody?: boolean;
 }
 
 /** Board 10e v2's runs of T-0118 as the runner records them, one line per settled run. */
@@ -110,6 +112,9 @@ export function seedStore(dirs: StoreDirs, seeds: readonly Seed[] = SEEDS): void
     let header = text.replace(/^repos:.*\n/m, '').replace(/^stage: .*$/m, `${repo}stage: ${seed.stage}\n${fields.join('\n')}`);
     if (seed.priority !== undefined) {
       header = /^priority: .*$/m.test(header) ? header.replace(/^priority: .*$/m, `priority: ${seed.priority}`) : header.replace(/^stage: /m, `priority: ${seed.priority}\nstage: `);
+    }
+    if (seed.replaceBody === true) {
+      header = header.replace(/^## [\s\S]*$/m, '');
     }
     const file = path.join(dirs.root, `${id}.md`);
     fs.writeFileSync(file, `${header.replace(/\s*$/, '\n')}${seed.body === undefined ? '' : `\n${seed.body}`}`);
