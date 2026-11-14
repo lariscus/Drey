@@ -26,7 +26,9 @@ export function withCursorForMove(legacyText: string, record: TicketDetail, targ
   if (cursor === null || cursor === (fields.at ?? 1)) {
     return legacyText;
   }
-  return setDocumentField(legacyText, 'at', String(cursor)) ?? legacyText;
+  // req-78: the owner moved the cursor himself — a red gate's pending return and its loop end here.
+  const moved = setDocumentField(legacyText, 'at', String(cursor)) ?? legacyText;
+  return ['return-to', 'red-backs'].reduce((text, key) => setDocumentField(text, key, null) ?? text, moved);
 }
 
 /**

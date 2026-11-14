@@ -14,6 +14,7 @@ import {
   initialsOf,
   isPersonaPaused,
   phasesFootOf,
+  queuedCountOf,
   runRowOf,
   runStateClass,
   stateWordsOf,
@@ -428,6 +429,14 @@ describe('state words and budget share', () => {
     expect(stateWordsOf(1, false)).toBe('running');
     expect(stateWordsOf(2, false)).toBe('2 running');
     expect(stateWordsOf(2, true)).toBe('paused');
+  });
+
+  it('reads waiting for queued tickets without a live run (req-148), paused and running first', () => {
+    expect(stateWordsOf(0, false, 1)).toBe('waiting');
+    expect(stateWordsOf(0, true, 1)).toBe('paused');
+    expect(stateWordsOf(1, false, 2)).toBe('running');
+    expect(queuedCountOf([{ queuedRuns: [{ ticketId: 'T-1', why: 'slot' }] }, {}, { queuedRuns: [{ ticketId: 'T-2', why: 'persona' }, { ticketId: 'T-3', why: 'slot' }] }])).toBe(3);
+    expect(queuedCountOf(null)).toBe(0);
   });
 
   it('shares the budget, capped, null without both figures', () => {

@@ -128,6 +128,7 @@ describe('cardNode', () => {
     gate: '',
     decide: true,
     canReview: true,
+    start: null,
     ...over,
   });
   const actions = () => ({ i18n, onThread: vi.fn(), onReview: vi.fn(), onFlow: vi.fn() });
@@ -178,5 +179,26 @@ describe('cardNode', () => {
     const full = cardNode(actions(), facts({ issues: { count: 2, worst: 'error', title: 'x' }, gate: 'Waits for you: which one?' }));
     expect(full.querySelector('.tickets-issues-error')?.textContent).toBe('2');
     expect(full.querySelector('.tickets-doc-gate')?.textContent).toBe('Waits for you: which one?');
+  });
+  it("req-120: 9a's primary Start asks in place, then sends the start with the persona of the entry", () => {
+    const onStart = vi.fn();
+    const node = cardNode({ ...actions(), onStart }, facts({ shape: 'early', canReview: false, decide: false, start: { persona: 'paul', title: 'Paul' } }));
+    expect(labels(node)).toEqual(['Thread', 'Start with Paul']);
+    const start = Array.from(node.querySelectorAll<HTMLButtonElement>('.tickets-card-top button')).at(-1)!;
+    expect(start.classList.contains('is-primary')).toBe(true);
+    start.click();
+    expect(node.querySelector('.tickets-doc-start-ask')?.textContent).toBe('Start T-0118 with Paul?');
+    expect(labels(node)).toEqual(['Thread', 'Cancel', 'Start']);
+    expect(onStart).not.toHaveBeenCalled();
+    Array.from(node.querySelectorAll<HTMLButtonElement>('.tickets-card-top button')).at(-1)!.click();
+    expect(onStart).toHaveBeenCalledWith('paul');
+  });
+
+  it('req-120: Cancel takes the ask back; no start, no button', () => {
+    const node = cardNode({ ...actions(), onStart: vi.fn() }, facts({ start: { persona: 'paul', title: 'Paul' } }));
+    Array.from(node.querySelectorAll<HTMLButtonElement>('.tickets-card-top button')).at(-1)!.click();
+    Array.from(node.querySelectorAll<HTMLButtonElement>('.tickets-card-top button')).find((b) => b.textContent === 'Cancel')!.click();
+    expect(labels(node)).toContain('Start with Paul');
+    expect(labels(cardNode({ ...actions(), onStart: vi.fn() }, facts()))).not.toContain('Start with Paul');
   });
 });

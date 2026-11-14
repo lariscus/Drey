@@ -15,6 +15,7 @@ import type { LedgerCards } from './ledger-cards';
 import { messageOf } from './live-run';
 import { PassPools } from './pass-pools';
 import type { PoolCapacity } from './pool-capacity';
+import { reportQueue } from './queue-report';
 import type { StartHold } from './start-hold';
 import type { SupervisorDirectory } from './supervisor-directory';
 import type { DispatchOutcome, PoolGrantFor, TicketDispatch } from './ticket-dispatch';
@@ -156,6 +157,7 @@ export class Dispatcher {
     const held = running && (this.deps.hold?.current() ?? null) !== null; // req-181: asked once per pass, before any start
     const refusedByColumn = await this.dispatchPlan(config, snap, { plan, personas, pools, held });
     this.noteWaits(snap, pools, { busy: occupied.busy, dispatched: new Set(plan.map((item) => item.card.id)), refusedByColumn });
+    reportQueue(state, this.deps, { order: [], waits: new Map() }); // req-148: the pool's queue
     this.deps.notes.endPass();
   }
 
@@ -188,6 +190,7 @@ export class Dispatcher {
       this.deps.pool?.queue.clear();
       holders.clearWaits();
     }
+    reportQueue(state, this.deps, { order: planned.order, waits: running ? planned.waits : new Map() }); // req-148
     this.deps.notes.endPass();
   }
 

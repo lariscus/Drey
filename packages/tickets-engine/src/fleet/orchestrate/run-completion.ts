@@ -1,4 +1,6 @@
 import { decideSendBack } from '../../core/chain-cursor';
+import { decideRedGate } from '../../core/chain-red-gate';
+import { DEFAULT_MAX_RED } from './breaker';
 import { hasScoutReport } from '../../core/scout';
 import { capTail, SANITY_CAP } from '../capping';
 import type { RunRequest } from '../protocol';
@@ -147,6 +149,7 @@ export class RunCompletion {
       run.info = { ...run.info, gateFailure: failure, gateResult: 'red' };
       await this.deps.bookkeeper.note(run, `machine gate failed — ${shortGateLine(failure)}`);
       await this.deps.closing?.afterGate(run);
+      await this.redBack(run, failure);
       return this.deps.settler.finish(run, 'failed');
     }
     run.info = { ...run.info, gateResult: 'green' };
@@ -167,6 +170,33 @@ export class RunCompletion {
     }
     await this.deps.bookkeeper.note(run, `run finished (${exitWord(code)})`);
     await this.deps.settler.finish(run, 'done');
+  }
+
+  /**
+   * req-78: a chain run's red gate whose entry names an `on-red` target sends the ticket back
+   * there (`core/chain-red-gate.ts`) — milestone 248's send-back with the gate's failure as its
+   * reason, the return recorded, inside the claim. The run stays failed (the persona breaker counts
+   * it); past the loop's bound, or with no target, the ticket stays with the persona as before.
+   */
+  private async redBack(run: LiveRun, failure: string): Promise<void> {
+    const cursor = run.request.cursor;
+    if (cursor === undefined) {
+      return;
+    }
+    const chain = cursorChain(cursor);
+    const decision = decideRedGate({ chain, at: cursor.at, redBacks: cursor.redBacks ?? 0, maxRed: cursor.maxRed ?? DEFAULT_MAX_RED });
+    if (decision.kind === 'unresolved' || decision.kind === 'bound') {
+      const why = decision.kind === 'bound' ? `the red-gate loop reached its bound (${decision.redBacks} of ${decision.maxRed - 1} sent back)` : decision.reason;
+      await this.deps.bookkeeper.note(run, `on-red not followed — ${why}; the ticket stays with ${run.info.persona ?? 'the persona'}`);
+    }
+    if (decision.kind !== 'back') {
+      return;
+    }
+    const written = await this.deps.bookkeeper.redBack(run, { decision, chain, gate: shortGateLine(failure) });
+    if (written.ok) {
+      run.info = { ...run.info, redBackTo: decision.to };
+    }
+    await this.deps.bookkeeper.note(run, written.ok ? `red gate — sent back to position ${decision.to}, returns to ${decision.from}` : `red gate — sending back failed — ${written.error}`);
   }
 
   /**

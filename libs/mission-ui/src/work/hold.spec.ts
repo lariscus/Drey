@@ -17,6 +17,7 @@ const HOLDS: readonly McHold[] = [
   { ...base, holder: 'you', position: 2 },
   { ...base, holder: 'paul', position: 1, mode: 'shape' },
   { ...base, holder: 'pia', position: 1 },
+  { ...base, holder: 'paul', position: 2, returnTo: 5 },
 ];
 const LIVES: readonly HoldLive[] = [live(), live({ running: true, minutes: 4 }), live({ running: true, activity: 'merging main · 2 files' }), live({ queued: 'waits for a B slot' }), live({ waitsFor: 'ben' }), live({ held: true })];
 const kindOf = (persona: string): McLane['kind'] | null => (persona === 'you' ? 'human' : persona === 'pia' ? 'mission' : persona === 'ghost' ? null : 'agent');
@@ -42,6 +43,14 @@ describe('the lib copy of the persona board helpers', () => {
 });
 
 describe('tolerant reads', () => {
+  it("req-78: reads a red gate's return only when it stands after the cursor", () => {
+    const wire = { holder: 'paul', why: 'entry', position: 2, length: 6, chain: base.chain };
+    expect(holdOf({ hold: { ...wire, returnTo: 5 } })?.returnTo).toBe(5);
+    expect(holdOf({ hold: { ...wire, returnTo: 2 } })?.returnTo).toBeUndefined();
+    expect(holdOf({ hold: { ...wire, returnTo: 'x' } })?.returnTo).toBeUndefined();
+    expect(holdStatusOf(holdOf({ hold: { ...wire, returnTo: 5 } })!, live({ running: true, minutes: 2 }), kindOf)).toEqual({ kind: 'running', minutes: 2, from: 'tessa' });
+  });
+
   it('reads lanes and holds, junk drops out', () => {
     expect(lanesOf({})).toBeNull();
     expect(lanesOf({ lanes: [{ persona: 'ben', title: 'Ben', kind: 'agent', color: '#fff', parallel: 2, min: 1 }, { title: 'no id' }] })).toEqual([{ persona: 'ben', title: 'Ben', kind: 'agent', color: '#fff', parallel: 2, min: 1 }]);

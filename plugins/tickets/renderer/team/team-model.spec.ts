@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports -- the spec stands in for the host, which owns the catalog at runtime
+import { i18n } from '../../../../shared/i18n';
 import type { PersonaView } from '../../shared/remote-protocol';
 import type { ChainStatus, RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import {
@@ -199,14 +201,54 @@ describe('the team model', () => {
     expect(model.slots).toBe(5);
     expect(model.liveRuns).toBe(2);
     expect(slotsLineOf(model)).toBe('2 of 5 slots busy');
-    expect(teamHeadOf(model)).toBe('3 personas · 1 running · 1 stuck');
+    expect(teamHeadOf(model, i18n)).toBe('3 personas · 1 running · 1 stuck');
   });
 
   it('knows no cost, budget or slots when nothing reports them', () => {
     const model = teamModelOf([persona({ budget: null })], [], null, titles, NOW);
     expect(model).toMatchObject({ todayCost: null, todayBudget: null, slots: 0, halted: false, summary: 'All idle' });
     expect(slotsLineOf(model)).toBe('');
-    expect(teamHeadOf(model)).toBe('1 persona');
+    expect(teamHeadOf(model, i18n)).toBe('1 persona');
+  });
+
+  describe('queued tickets (req-148, boards 5d, 10i, DeskTeamV2)', () => {
+    const queuedChain = (queued: unknown[]): ChainStatus => ({ master: 'run', queued }) as unknown as ChainStatus;
+    const entry = (ticket: string, who: string | null, position: number, why: 'slot' | 'persona' = 'slot') => ({ ticket, persona: who, why, position, since: '2026-11-04T11:00:00Z' });
+    const ralf = persona({ id: 'ralf', title: 'Ralf', role: 'Reviewer', phases: ['review'], dailyCost: 0.46, budget: null });
+
+    it('gives a persona its own queued tickets in queue order and reads waiting without a live run', () => {
+      const chain = queuedChain([entry('T-0122', 'ben', 2), entry('T-0121', 'ralf', 1), entry('T-0140', null, 3), entry('T-0123', 'ben', 1, 'persona')]);
+      const model = teamModelOf([ralf, persona()], [run()], chain, titles, NOW);
+      const [r, b] = model.personas;
+      expect(r!.queued).toEqual([{ ticketId: 'T-0121', title: '', why: 'slot' }]);
+      expect(r!.state).toBe('waiting');
+      expect(r!.stateWord).toBe('waiting');
+      expect(b!.queued.map((q) => q.ticketId)).toEqual(['T-0123', 'T-0122']);
+      expect(b!.state).toBe('running');
+    });
+
+    it('counts queued tickets after the states, and does not count a queued-only persona as waiting twice', () => {
+      const chain = queuedChain([entry('T-0121', 'ralf', 1), entry('T-0122', 'ben', 2)]);
+      const model = teamModelOf([ralf, persona()], [run()], chain, titles, NOW);
+      expect(model.queuedTickets).toBe(2);
+      expect(model.summary).toBe('1 running');
+      expect(teamHeadOf(model, i18n)).toBe('2 personas · 1 running · 2 queued');
+    });
+
+    it('says the queue alone when every persona is idle, and nothing without a queued field', () => {
+      const only = teamModelOf([ralf], [], queuedChain([entry('T-0121', 'ralf', 1)]), titles, NOW);
+      expect(teamHeadOf(only, i18n)).toBe('1 persona · 1 queued');
+      const none = teamModelOf([ralf], [], { master: 'run' } as unknown as ChainStatus, titles, NOW);
+      expect(none.queuedTickets).toBe(0);
+      expect(none.personas[0]!.state).toBe('idle');
+    });
+
+    it('keeps paused above waiting and drops entries the wire cannot vouch for', () => {
+      const chain = queuedChain([entry('T-0121', 'ralf', 1), { ticket: '', persona: 'ralf', why: 'slot', position: 2 }, { ticket: 'T-0150', persona: 'ralf', why: 'nope', position: 3 }]);
+      const card = personaCardOf(ralf, [], ['ralf'], titles, NOW, chain);
+      expect(card.state).toBe('paused');
+      expect(card.queued.map((q) => q.ticketId)).toEqual(['T-0121']);
+    });
   });
 
   it('reads the chain pause list', () => {

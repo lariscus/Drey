@@ -364,9 +364,11 @@ of the Plan and removes it for fewer than two parts.
 | `priority` | one id of the board's configured vocabulary | Required. The vocabulary is the vault's own — `_meta/pipeline.md`'s `priorities:` list (default `urgent \| high \| normal \| low`); the list's order IS the weight, first = highest. An omitted or unknown id reads as the vocabulary's default (its middle entry) with a warning badge; machine writers always write a vocabulary word. See [Priorities](#priorities-priorities-in-pipelinemd). |
 | `track` | `auto \| shape` | Optional (req-75 W1b, ADR-0087 decision 2). The ticket's triage track: `auto` runs on its own, `shape` goes through the plan-mode dialog with the owner. Absent (or any other value — a warning) reads as not triaged; set from the Work panel's row menu (Track ›) until W5c/W6 fill it from triage. |
 | `form` | `ship \| scout` | Optional (concept §5.6, E8). The ticket's form: `ship` (the default — an absent key reads as ship) is the known way, plan → worktree → gate → move. `scout` is exploration only: a scout run reads repo/history/data and writes the ticket's `## Report` section — no worktree, no diff, no gate, no move; the report surfaces as a card in "Needs you" and the owner promotes the ticket to ship from there. Any other value warns (`form must be ship or scout — read as ship`) and reads as ship. See [The scout form](#the-scout-form-e8-concept-56). |
-| `chain` | list of strings | Optional (req-266, the persona board). The ticket's **chain: the ordered list of the personas it goes through**, one entry per position in the strict grammar `<persona>[:shape][(notify)]` (`chain: [paul:shape, paul, ben, ralf(notify), tessa, you]`; on a store `x-chain`, entries joined by `;`). Copied from `_meta/pipeline.md`'s `flow:` at creation, then the ticket's own. One entry outside the grammar — the old E9 delta included — reads the chain as absent, with a warning (silently on a done ticket). See [The chain](#the-chain-req-266-was-the-chain-delta-of-e9). |
+| `chain` | list of strings | Optional (req-266, the persona board). The ticket's **chain: the ordered list of the personas it goes through**, one entry per position in the strict grammar `<persona>[:shape][(notify, on-red <persona|position>)]` (req-78 added `on-red`) (`chain: [paul:shape, paul, ben, ralf(notify), tessa, you]`; on a store `x-chain`, entries joined by `;`). Copied from `_meta/pipeline.md`'s `flow:` at creation, then the ticket's own. One entry outside the grammar — the old E9 delta included — reads the chain as absent, with a warning (silently on a done ticket). See [The chain](#the-chain-req-266-was-the-chain-delta-of-e9). |
 | `at` | position | Optional (req-266). The chain's **cursor**, 1-based (`x-at` on a store); absent = 1. Written as `1` with the chain; nothing advances it before req-257. A value that is no position warns and reads as 1. |
 | `sent-back` | `<from>><to>` | Optional (req-266). The one send-back the ticket used (`sent-back: 5>3`, `x-sent-back` on a store); written by req-257's runner. A value that does not read warns and is ignored. |
+| `return-to` | position | Optional (req-78). The later position whose red gate sent the ticket back (`x-return-to` on a store); a green end of the entry at the cursor returns there. Machine-written; any owner write of the cursor drops it. A value that is no position warns and is ignored. See [The chain](#the-chain-req-266-was-the-chain-delta-of-e9). |
+| `red-backs` | count | Optional (req-78). The red-gate send-backs of the current loop (`x-red-backs`); the loop's bound reads it. Machine-written; a green end that is no return removes it. |
 | `parent` | ticket id | Optional (E10, concept v2 §5.9). Set on a ticket that is one **part** of a split plan: `parent: T-0130` names the ticket whose `### Parts` list produced it. The parent keeps the plan; the part carries its own description, builder persona and `chain:` (a per-part scope — the parent's `chain:` never leaks into a part). A value that is no ticket id, or the ticket's own id, warns and reads as no parent; whether the parent still exists is not checked (a finished parent is archived). |
 | `class` | a class name | Optional class pin (req-170): the run asks the capacity pool for exactly this class, whatever the size, the floor or the persona's default say. A name of the owner's class list in Settings → Models (req-287: shipped `super heavy`, `heavy`, `standard`, `light`; lower case, single spaces); the old letters `A`, `B`, `C` read as `heavy`, `standard`, `light` and are never written again. A value that is no name warns and reads as no pin; a name the list does not hold waits with the pool's reason. The Work row's menu (**Class ›**, req-186) writes it — one header patch, a Log line `class standard` / `class none`, one commit `tickets: <id> class <value>`; a live run refuses. Dricket: `x-class`. |
 | `model` | string | Optional model pin (req-170): the run asks the pool for this model of the model table (its row's class); it beats `class:` and every class rule. Dricket: `x-model`. |
@@ -696,6 +698,16 @@ The grammar, one entry per list item (`core/chain-list.ts`):
   when that position is done — while the cursor stands on the next position
   (`server/needs.ts` `notifyNeedsOf`, req-257; a notify on the last entry
   never fires).
+- `<persona>(on-red <persona | position>)` — req-78 (milestone 274): where a
+  **red machine gate** of that position sends the ticket — the persona of the
+  nearest earlier position that names it (`tessa(on-red paul)`), or that
+  earlier position (`tessa(on-red 2)`). Options share one pair of
+  parentheses, comma-separated: `tessa(notify, on-red paul)`; the reader also
+  takes `on-red: paul`, the writer drops the colon (a `: ` inside a header
+  value would break the front matter). `validateChain` refuses an `on-red`
+  that names no earlier position and a change of a past entry's `on-red`;
+  the current entry may change it. `flow:` takes the same grammar, so the
+  standard flow can carry it into every new ticket.
 
 `at:` is the **cursor**, the position of the current entry (absent = 1). It
 means something while the ticket is worked; a ticket in Inbox, Prioritized
@@ -752,6 +764,36 @@ green end (in the same in-claim write as the cursor), when the write guard
 holds (personas of the crew, nothing changed at or before the cursor);
 otherwise the ticket keeps its chain and the hand-on says why. The owner's
 Accept or Send back clears `awaiting`.
+
+**A red gate that sends the ticket back** (req-78, milestone 274;
+`core/chain-red-gate.ts`). Two fields carry the loop: `return-to: <position>`
+(`x-return-to`) — the position whose red gate sent the ticket back — and
+`red-backs: <n>` (`x-red-backs`) — the red-gate send-backs of the current
+loop. When a run's machine gate goes **red** at an entry with `on-red`, the
+runner writes, inside the claim, `at:` = the target, `return-to:` = the red
+position and `red-backs:` + 1, and releases once into `active` with the line
+`red gate at position 5 (tessa) — sent back to 2 (paul) (red 1 of 2);
+returns to position 5 when position 2 is through: <the gate's line>`. It is
+milestone 248's send-back with the gate's failure as its reason, but it does
+**not** use the ticket's one send-back (`sent-back:` stays as it is): the
+target is configured, the loop has its own bound. The run still settles
+failed — the persona breaker counts it — but the ticket backs off nowhere
+(`RunInfo.redBackTo`). The target's brief carries "Sent back by a red gate"
+with the failure; when it needs the owner's decisions it asks (`QUESTION:`)
+and the ticket waits at You (`awaiting: you`) until they are answered. **The
+return:** when the entry at the cursor ends green while `return-to:` stands
+after it — a run's green end, the owner's Accept at You, the confirmation
+that ends Pia's entry — the cursor goes straight back to `return-to:`; the
+positions between are not walked again, a You entry among them included, and
+`return-to:` goes. A plan's `### Chain` that changes the persona at
+`return-to:` drops the return (the hand-on says so). **The bound:** the red
+gate that would bring `red-backs:` to the persona breaker's threshold
+(`max-red` of the column the run stands in, else 3) stays with its persona as
+before — the next run of that persona gets the failure, and the breaker of
+milestone 247 trips after its streak. A green end that is no return ends the
+loop: `red-backs:` goes. A persona's `SEND-BACK:` and every owner write of
+the cursor (Send back, a column move) drop `return-to:`; only a return keeps
+`red-backs:`.
 
 **Pia's entry** (req-257, milestone 248; owner 2026-11-12). When the cursor
 reaches an entry of Mission Control's persona, the engine runs one
@@ -927,7 +969,9 @@ vocabulary in `pipeline.md` beyond the lifecycle edges (below).
 | start / hand / park | the owner (drag, menu) | "The owner's moves" above |
 | a run ends green | the runner | leaving actions first, then `x-at` + 1 and one release into `active` (a plan run's `### Chain` in the same write) |
 | the last entry ends | the runner / the owner | the engine's `put --claim` into `done`; at a You entry of a repository ticket only after the `commit` leaving action |
-| a persona's `SEND-BACK:` | the runner | the first: `x-at` back, `x-sent-back: from>to`, the invalidation line; the second: `x-awaiting: you`, `needs-decision [second-send-back]` |
+| a persona's `SEND-BACK:` | the runner | the first: `x-at` back, `x-sent-back: from>to`, the invalidation line; the second: `x-awaiting: you`, `needs-decision [second-send-back]`; a pending `x-return-to` goes |
+| a red gate at an entry with `on-red` | the runner | `x-at` = the target, `x-return-to` = the red position, `x-red-backs` + 1, the red-gate line, one release into `active` (req-78); past the bound nothing moves |
+| the target's entry ends green | the runner / the owner (Accept) / Pia (card) | `x-at` = `x-return-to` (straight back), `x-return-to` removed, `x-red-backs` kept |
 | a question in a run | the worker | `x-awaiting: you` before the claim is given up; the answer's reclaim clears it |
 | Accept / Send back at You | the owner, Pia (card) | the cursor on / back to the picked position; `x-awaiting` cleared |
 | claim | the runner only | `dk claim` (`active -> running`); humans' edits are `put --claim` |
@@ -2355,6 +2399,7 @@ its changed chapters back inside the claim (D-30, [FLEET.md](../plugins/tickets/
 | `x-interactive` | `interactive` | only `true` |
 | `x-chain` | `chain` | the persona list, entries separated by `;` (req-266) |
 | `x-at`, `x-sent-back` | `at`, `sent-back` | the chain's cursor and its one send-back (req-266) |
+| `x-return-to`, `x-red-backs` | `return-to`, `red-backs` | a red gate's return and the loop's count (req-78) |
 | `x-references` | `references` | separated by `,` |
 | `x-entered-<phase>` | `entered-<phase>` | |
 

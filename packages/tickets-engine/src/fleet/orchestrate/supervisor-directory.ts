@@ -90,6 +90,20 @@ export class SupervisorDirectory {
     return latest !== undefined && latest.info.state === 'failed' ? (latest.info.gateFailure ?? null) : null;
   }
 
+  /**
+   * req-78: the ticket's most recent failed run's gate failure at this chain
+   * position, or null — a chain run's retry reads its own position's failure
+   * (two personas share one `active` column), and a red gate's target reads
+   * the failure of the position that sent it back. A later success there
+   * clears the slate.
+   */
+  lastGateFailureAt(ticketId: string, position: number): string | null {
+    const latest = this.all()
+      .filter((r) => r.info.ticketId === ticketId && r.info.chainPosition?.at === position && (r.info.state === 'failed' || r.info.state === 'done'))
+      .sort((a, b) => b.info.startedAt.localeCompare(a.info.startedAt))[0];
+    return latest !== undefined && latest.info.state === 'failed' ? (latest.info.gateFailure ?? null) : null;
+  }
+
   private inColumn(ticketId: string, column: string): readonly SupervisorRecord[] {
     return this.all()
       .filter((r) => r.info.ticketId === ticketId && (r.request.column ?? null) === column)

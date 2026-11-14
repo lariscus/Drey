@@ -7,6 +7,7 @@
  * chips). DOM-free, so the tab, the band and the spec share it.
  */
 import type { PersonaView } from '../../shared/remote-protocol';
+import type { I18n } from '../../../../shared/i18n/types';
 import type { ChainStatus, RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
 
 /** The run states that count as live (the fleet's own list). */
@@ -79,6 +80,15 @@ export interface RunRowModel {
   readonly provider: string;
 }
 
+/** req-148: one ticket the dispatcher holds back for a persona (the chain block's `queued`). */
+export interface QueuedRowModel {
+  readonly ticketId: string;
+  /** The ticket's title; '' = unknown (the id stands alone). */
+  readonly title: string;
+  /** `slot` = no free place in the pool, `persona` = the persona runs its maximum. */
+  readonly why: 'slot' | 'persona';
+}
+
 /** One team card. */
 export interface PersonaCardModel {
   readonly id: string;
@@ -107,6 +117,8 @@ export interface PersonaCardModel {
   /** Mission Control's persona (req-269): her card opens her Persona page — she has no 1:1, runs or setup. */
   readonly mission: boolean;
   readonly runs: readonly RunRowModel[];
+  /** req-148: the persona's queued tickets in queue order; a persona with these and no live run reads `waiting`. */
+  readonly queued: readonly QueuedRowModel[];
 }
 
 /** One provider pool's load. */
@@ -122,6 +134,8 @@ export interface TeamModel {
   readonly capacity: readonly CapacityChip[];
   /** `1 running · 2 waiting · 1 stuck`, or `All idle`. */
   readonly summary: string;
+  /** Queued TICKETS over every card (req-148); the head says `1 queued` after the states. */
+  readonly queuedTickets: number;
   /** Today's cost across the personas; null = none known. */
   readonly todayCost: number | null;
   /** The summed daily budgets; null = no persona has one. */
@@ -211,16 +225,27 @@ export function budgetPctOf(dailyCost: number | null, budget: number | null): nu
   return Math.min(100, Math.round((dailyCost / budget) * 100));
 }
 
+/** The persona's queued tickets off the chain block, in queue order; an entry the wire cannot vouch for is dropped. */
+function queuedOf(chain: ChainStatus | null, persona: string, titleOf: (ticketId: string) => string | null): readonly QueuedRowModel[] {
+  return (chain?.queued ?? [])
+    .filter((entry) => entry.persona === persona && entry.ticket !== '' && (entry.why === 'slot' || entry.why === 'persona'))
+    .slice()
+    .sort((a, b) => a.position - b.position)
+    .map((entry) => ({ ticketId: entry.ticket, title: titleOf(entry.ticket) ?? '', why: entry.why }));
+}
+
 export function personaCardOf(
   persona: PersonaView,
   runs: readonly RunInfo[],
   pausedIds: readonly string[],
   titleOf: (ticketId: string) => string | null,
   nowMs: number,
+  chain: ChainStatus | null = null,
 ): PersonaCardModel {
   // req-168/173: a 1:1 or a free session is a session, not work on a ticket — the persona's card does not read "running" for it.
   const live = runs.filter((run) => isLiveRun(run) && run.persona === persona.id && (run.kind ?? 'run') === 'run');
   const rows = live.map((run) => runRowOf(run, titleOf, nowMs));
+  const queued = queuedOf(chain, persona.id, titleOf);
   const paused = persona.paused === true || pausedIds.includes(persona.id);
   const state: PersonaState = paused
     ? 'paused'
@@ -230,7 +255,9 @@ export function personaCardOf(
         ? 'waiting'
         : rows.length > 0
           ? 'running'
-          : 'idle';
+          : queued.length > 0
+            ? 'waiting'
+            : 'idle';
   const dailyCost = typeof persona.dailyCost === 'number' && Number.isFinite(persona.dailyCost) ? persona.dailyCost : null;
   const budget = typeof persona.budget === 'number' && Number.isFinite(persona.budget) ? persona.budget : null;
   return {
@@ -252,6 +279,7 @@ export function personaCardOf(
     human: persona.kind === 'human',
     mission: persona.kind === 'mission',
     runs: rows,
+    queued,
   };
 }
 
@@ -280,9 +308,11 @@ export function capacityOf(chain: ChainStatus | null, runs: readonly RunInfo[]):
 /** `1 running · 2 waiting · 1 stuck`; the idle and paused personas stay out. */
 export function summaryOf(cards: readonly PersonaCardModel[]): string {
   const count = (state: PersonaState): number => cards.filter((card) => card.state === state).length;
+  // A persona that only has queued tickets is counted by `queuedTickets`, not twice.
+  const waiting = cards.filter((card) => card.state === 'waiting' && card.runs.length > 0).length;
   const parts = [
     ...(count('running') > 0 ? [`${count('running')} running`] : []),
-    ...(count('waiting') > 0 ? [`${count('waiting')} waiting`] : []),
+    ...(waiting > 0 ? [`${waiting} waiting`] : []),
     ...(count('stuck') > 0 ? [`${count('stuck')} stuck`] : []),
   ];
   return parts.length === 0 ? 'All idle' : parts.join(' · ');
@@ -297,7 +327,7 @@ export function teamModelOf(
 ): TeamModel {
   const paused = chain?.pausedPersonas ?? [];
   // The boards (7e, 7f) show the agents; the owner's own persona has no card and no slots.
-  const cards = personas.filter((persona) => persona.kind !== 'human').map((persona) => personaCardOf(persona, runs, paused, titleOf, nowMs));
+  const cards = personas.filter((persona) => persona.kind !== 'human').map((persona) => personaCardOf(persona, runs, paused, titleOf, nowMs, chain));
   const costs = cards.map((card) => card.dailyCost).filter((cost): cost is number => cost !== null);
   const budgets = cards.map((card) => card.budget).filter((budget): budget is number => budget !== null);
   const capacity = capacityOf(chain, runs);
@@ -305,6 +335,7 @@ export function teamModelOf(
     personas: cards,
     capacity,
     summary: summaryOf(cards),
+    queuedTickets: cards.reduce((sum, card) => sum + card.queued.length, 0),
     todayCost: costs.length === 0 ? null : costs.reduce((sum, cost) => sum + cost, 0),
     todayBudget: budgets.length === 0 ? null : budgets.reduce((sum, budget) => sum + budget, 0),
     liveRuns: runs.filter(isLiveRun).length,
@@ -314,10 +345,11 @@ export function teamModelOf(
 }
 
 /** The Crew tab's header line (board 7f): `5 personas · 1 running · 1 stuck`; idle says nothing. The day's cost has its own block. Mission Control's persona is not counted (req-269, as in Mission Control). */
-export function teamHeadOf(model: TeamModel): string {
+export function teamHeadOf(model: TeamModel, i18n: I18n): string {
   const agents = model.personas.filter((card) => !card.mission).length;
   const count = `${agents} ${agents === 1 ? 'persona' : 'personas'}`;
-  return [count, ...(model.summary === 'All idle' ? [] : [model.summary])].join(' · ');
+  const states = model.summary === 'All idle' ? [] : [model.summary];
+  return [count, ...states, ...(model.queuedTickets > 0 ? [i18n.t('crew.phone.n_queued', { n: model.queuedTickets })] : [])].join(' · ');
 }
 
 /** The capacity band's head: `2 of 5 slots busy`; '' without pool sizes. */

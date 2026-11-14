@@ -60,6 +60,7 @@ import { runCursorOf } from '../fleet/run-cursor';
 import { MISSION_ENTRY_KEY, type MissionEntry } from './mission-entry-turns';
 import { ownerAcceptOf, ownerSendBackOf } from './chain-owner-moves';
 import { chainFinished } from '../core/chain-placement';
+import { cursorAfterGreen } from '../core/chain-red-gate';
 import { setDocumentField } from '../store/document-fields';
 import { ACTIVE_STAGE, EDGE_STAGES } from '../core/lifecycle-stages';
 import { cursorForPin, placementColumnsOf } from '../core/chain-placement';
@@ -506,7 +507,7 @@ export class EngineBoardService {
     // points the runner at this vault (M85). Cheap and idempotent —
     // the runner re-reads the vault on every dispatch pass anyway.
     await this.refreshHandover(snapshot);
-    await this.syncChainConfig(vault, snapshot.pipeline);
+    await this.syncChainConfig(vault, snapshot.pipeline, snapshot.lanes !== undefined);
     return snapshot;
   }
 
@@ -819,10 +820,16 @@ export class EngineBoardService {
     };
   }
 
-  /** Keeps the runner's chain config in step with the pipeline (never spawns). */
+  /**
+   * Keeps the runner's chain config in step with the pipeline (never spawns). A persona board
+   * (`personaBoard`, a lifecycle store) is configured whatever its pipeline holds: after the board
+   * migration the pipeline is Inbox, Prioritized and Done only, no agent column, and the chain
+   * walks by the holders (req-78 found it: a restarted runner was never pointed at the vault).
+   */
   private async syncChainConfig(
     vault: { readonly path: string } | null,
     pipeline: readonly PipelinePhase[],
+    personaBoard = false,
   ): Promise<ChainConfig | null> {
     const dricket = this.dricket;
     if (dricket !== null && (dricket.dkStore === '' || checkoutOf(dricket) === null)) {
@@ -830,7 +837,7 @@ export class EngineBoardService {
     }
     const defaultPersona = await this.defaultPersonaOf();
     const chain: ChainConfig | null =
-      vault !== null && pipeline.some((phase) => isAutoPhase(phase))
+      vault !== null && (personaBoard || pipeline.some((phase) => isAutoPhase(phase)))
         ? {
             ticketsVaultPath: vault.path,
             ...(dricket !== null ? { store: await this.chainStoreOf(dricket) } : {}),
@@ -850,7 +857,13 @@ export class EngineBoardService {
     }
     this.lastChainConfig = json;
     if (chain !== null) {
-      void this.fleet.configureChain(chain);
+      // No runner reachable (the Autopilot's first switch-on starts it later): forget the sent state, so the
+      // next snapshot sends the config again — it is the same text, and would otherwise never be re-sent.
+      void this.fleet.configureChain(chain).then((sent) => {
+        if (sent === false && this.lastChainConfig === json) {
+          this.lastChainConfig = null;
+        }
+      });
     }
     return chain;
   }
@@ -2452,7 +2465,8 @@ export class EngineBoardService {
     if (placement === null || chain === undefined) {
       return null;
     }
-    const cursor = runCursorOf({ chain, at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.chainGuardIds(), proposeFlow: snap.proposeFlow === true });
+    const loop = { ...(card.meta.returnTo !== undefined ? { returnTo: card.meta.returnTo } : {}), ...(card.meta.redBacks !== undefined ? { redBacks: card.meta.redBacks } : {}) }; // req-78
+    const cursor = runCursorOf({ chain, at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.chainGuardIds(), redLoop: loop, proposeFlow: snap.proposeFlow === true });
     const persona = placement.lookup(chain[cursor.at - 1]!.persona);
     return { persona: persona?.kind === 'agent' ? persona.id : null, cursor };
   }
@@ -2904,7 +2918,7 @@ export class EngineBoardService {
       return (await this.commitActionMissing(vault, card.id)) ?? this.startCommitStep(card.id);
     }
     const terminal = snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done';
-    const written = await this.writeChainCursor(card, decision.kind === 'done' ? { done: terminal } : { at: decision.at }, { line: decision.line, actor });
+    const written = await this.writeChainCursor(card, decision.kind === 'done' ? { done: terminal } : { at: decision.at, returned: decision.returned }, { line: decision.line, actor });
     const warning = written.ok && decision.kind === 'done' ? await this.removeWorktreesOfDone(card) : null;
     return warning === null || !written.ok ? written : { ...written, warning };
   }
@@ -2913,7 +2927,7 @@ export class EngineBoardService {
    * req-257: one owner write of a chain ticket's cursor on the store — `x-at` moved (the stage stays
    * `active`), or the ticket to `done` — with the status line, one `put`.
    */
-  private async writeChainCursor(card: TicketCard, target: { readonly at: number } | { readonly done: string }, why: { readonly line: string; readonly actor: string; readonly text?: string }): Promise<BoardMutationResult> {
+  private async writeChainCursor(card: TicketCard, target: { readonly at: number; readonly returned?: boolean } | { readonly done: string }, why: { readonly line: string; readonly actor: string; readonly text?: string }): Promise<BoardMutationResult> {
     const store = this.dricket;
     if (store === null) {
       return { ok: false, error: 'the cursor of a chain lives on a dricket store' };
@@ -2922,7 +2936,10 @@ export class EngineBoardService {
       const record = await this.storeBoard.record(store, card.id);
       const legacy = why.text ?? recordToBoardFile(record, card.phase).text;
       const moved = 'at' in target ? (setDocumentField(legacy, 'at', String(target.at)) ?? legacy) : legacy;
-      const text = setDocumentField(moved, 'awaiting', null) ?? moved; // the owner decided: no longer waiting for You
+      // req-78: every owner write of the cursor uses or drops a red gate's return; only a return keeps the loop's count.
+      const loopKeys = 'at' in target && target.returned === true ? ['return-to'] : ['return-to', 'red-backs'];
+      const settled = loopKeys.reduce((doc, key) => setDocumentField(doc, key, null) ?? doc, moved);
+      const text = setDocumentField(settled, 'awaiting', null) ?? settled; // the owner decided: no longer waiting for You
       await this.putRecord(store, record, text, 'at' in target ? { keepStage: true } : { phase: target.done });
     } catch (error) {
       return { ok: false, error: error instanceof TicketChangedError ? `${card.id} changed meanwhile — look again and retry` : messageOf(error) };
@@ -2996,8 +3013,9 @@ export class EngineBoardService {
         return { ok: true }; // the ticket stands elsewhere now: nothing to finish
       }
       const terminal = snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done';
-      const last = input.position >= chain.length;
-      const written = await this.writeChainCursor(card, last ? { done: terminal } : { at: input.position + 1 }, { line: `Mission Control's entry at position ${input.position} of ${chain.length} is done — her card was confirmed`, actor: this.owner });
+      const back = cursorAfterGreen(chain.length, input.position, card.meta.returnTo); // req-78: her entry may be a red gate's target
+      const last = !back.returned && input.position >= chain.length;
+      const written = await this.writeChainCursor(card, last ? { done: terminal } : { at: back.at, returned: back.returned }, { line: `Mission Control's entry at position ${input.position} of ${chain.length} is done — her card was confirmed`, actor: this.owner });
       if (written.ok) {
         await this.noteStatus(card, 'resolved', { key: MISSION_ENTRY_KEY }, this.owner);
         if (last) {

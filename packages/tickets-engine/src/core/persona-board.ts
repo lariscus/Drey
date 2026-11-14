@@ -64,6 +64,7 @@ export function holdOf(card: TicketCard, lookup: PersonaLookup, decisions: reado
     claimed: card.meta.claimedBy !== null,
     sentBack: card.meta.sentBack ?? null,
     questions: why === 'question' ? questionsOf(decisions) : 0,
+    ...(card.meta.returnTo !== undefined && card.meta.returnTo > entry.position ? { returnTo: card.meta.returnTo } : {}), // req-78
   };
 }
 

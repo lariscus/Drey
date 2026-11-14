@@ -38,6 +38,13 @@ describe('the persona breaker (concept §9)', () => {
     expect(state.ticketFailures['T-2']?.count).toBe(1);
   });
 
+  it('req-78: a red gate that sent the ticket back counts against the persona but backs the ticket off nowhere', async () => {
+    const { state, breaker } = setup();
+    await breaker.failed({ ...red('T-1'), redBackTo: 2 } as RunInfo, 'tessa', 3);
+    expect(state.personaRedStreak['tessa']).toBe(1);
+    expect(state.ticketFailures['T-1']).toBeUndefined();
+  });
+
   it('the trip is in the chain status and survives the file', () => {
     const { state } = setup();
     state.pausedPersonas.add('ben');

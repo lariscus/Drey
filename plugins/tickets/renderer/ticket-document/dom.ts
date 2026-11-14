@@ -262,6 +262,8 @@ export interface CardFacts {
   readonly decide: boolean;
   /** The Review tab's button: only when the ticket has changes to review. */
   readonly canReview: boolean;
+  /** req-120: the primary button that starts the chain (`Start with Paul`); null = the board shows none. */
+  readonly start: { readonly persona: string; readonly title: string } | null;
 }
 
 export interface CardActions {
@@ -272,6 +274,37 @@ export interface CardActions {
   /** The escape to the raw YAML, under the pointer only; absent = no button. */
   readonly onRaw?: () => void;
   readonly icon?: (name: string, size?: number) => SVGElement;
+  /** req-120: the confirmed start of the chain with `persona`; absent = no start button. */
+  readonly onStart?: (persona: string) => void;
+}
+
+/**
+ * req-120: the primary `Start with Paul` and its confirmation in place — the click
+ * asks (`Start T-0017 with Paul?` · Cancel · Start), the second click sends the move.
+ */
+function startNode(actions: CardActions, facts: CardFacts, start: NonNullable<CardFacts['start']>): HTMLElement {
+  const { i18n } = actions;
+  const host = el('span', 'tickets-doc-start');
+  const ask = (): void => {
+    const cancel = el('button', 'tickets-doc-btn', i18n.t('ticket.card.start_cancel'));
+    cancel.type = 'button';
+    const confirm = el('button', 'tickets-doc-btn is-primary', i18n.t('ticket.card.start_confirm'));
+    confirm.type = 'button';
+    cancel.addEventListener('click', idle);
+    confirm.addEventListener('click', () => {
+      confirm.disabled = true;
+      actions.onStart?.(start.persona);
+    });
+    host.replaceChildren(el('span', 'tickets-doc-start-ask', i18n.t('ticket.card.start_ask', { id: facts.id, name: start.title })), cancel, confirm);
+    confirm.focus();
+  };
+  function idle(): void {
+    const button = buttonNode(i18n.t('board.menu.start', { name: start.title }), null, ask);
+    button.classList.add('is-primary');
+    host.replaceChildren(button);
+  }
+  idle();
+  return host;
 }
 
 /** The pill of a ticket's state (boards 9a, 7b, 7c, 7j, 7d). */
@@ -364,6 +397,9 @@ export function cardNode(actions: CardActions, facts: CardFacts): HTMLElement {
     top.append(buttonNode(i18n.t('ticket.card.open_review'), i18n.t('ticket.card.open_review_hint'), actions.onReview));
   }
   top.append(buttonNode(i18n.t('ticket.card.thread'), i18n.t('ticket.card.thread_hint'), actions.onThread));
+  if (facts.start !== null && actions.onStart !== undefined) {
+    top.append(startNode(actions, facts, facts.start));
+  }
   root.append(top);
 
   const grid = el('div', 'tickets-card-grid');

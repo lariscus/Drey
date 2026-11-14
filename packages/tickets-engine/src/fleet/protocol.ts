@@ -34,7 +34,7 @@ export { DEFAULT_ROUTING, INPUT_MODALITIES } from './protocol-routing';
 export type { BurnRateBasis, BurnRateReading, BurnRateSlotReading, CapabilityImportReport, FilteredSlot, InputModality, ModelCapabilities, RouteRecord, RouteStepUp, RoutingSettings } from './protocol-routing';
 export type { ModelNeeds } from '../contracts/ticket-pool-meta';
 export type { QuotaKind, QuotaReliability, QuotaWindow, SlotBilling, SlotStateName, SlotSummary, SlotView } from './protocol-slots';
-export type { AutopilotRecord, AutopilotReason, AutopilotRefusal, AutopilotState, BurnRateHold, ChainConfig, ChainHold, ChainMaster, ChainStatus, ChainStoreConfig, ChainTrip, ColumnMode } from './protocol-chain';
+export type { AutopilotRecord, AutopilotReason, AutopilotRefusal, AutopilotState, BurnRateHold, ChainConfig, ChainHold, ChainMaster, ChainStatus, ChainStoreConfig, ChainTrip, ColumnMode, QueuedTicket, QueuedWhy } from './protocol-chain';
 export { DEFAULT_EARLY_STOP, DEFAULT_TRANCHE, normalizeTranche, tranchesOff, tranchesPerDay } from './protocol-tranche';
 export type { AnomalyRule, CheckpointReport, EarlyStop, EarlyStopConfig, RedTicket, TrancheConfig, TrancheEnd, TrancheStatus } from './protocol-tranche';
 export { DEFAULT_DEV_PORTS, DEFAULT_GOVERNOR_SETTINGS } from './protocol-governor';
@@ -114,6 +114,14 @@ export interface RunCursor {
   readonly sentBack?: { readonly from: number; readonly to: number };
   /** Who a plan run's `### Chain` may name (the crew, `you` included) and who takes no mode; absent = the plan's chain is not applied. */
   readonly crew?: { readonly personas: readonly string[]; readonly modeless: readonly string[] };
+  /** req-78: the position a red gate sent the ticket back from (`x-return-to`) — a green end returns there; absent = none. */
+  readonly returnTo?: number;
+  /** req-78: the red-gate send-backs of the current loop (`x-red-backs`); absent = 0. */
+  readonly redBacks?: number;
+  /** req-78: the persona breaker's threshold for this run — the loop's bound; absent = 3. */
+  readonly maxRed?: number;
+  /** req-78: the red gate this entry was reached by — its position, persona and failure, for the brief; absent = none. */
+  readonly redBack?: { readonly from: number; readonly persona: string; readonly failure: string | null };
   /** E10-5b: the board proposes a flow for every new plan (pipeline.md `propose-flow:`) — a plan run's brief makes `### Chain` a chapter every plan carries. */
   readonly proposeFlow?: boolean;
 }
@@ -579,6 +587,13 @@ export interface RunInfo {
    * written before it. The report's per-position busy time reads it.
    */
   readonly chainPosition?: { readonly at: number; readonly length: number };
+  /**
+   * req-78: the run's red gate sent the ticket back to this earlier position
+   * (its entry's `on-red`): the run failed, the persona breaker counts it, but
+   * the ticket does not back off — it moved on to another persona. Absent on
+   * every other end.
+   */
+  readonly redBackTo?: number;
   /** Usage summed over the run's model calls; a null counter was never reported. */
   readonly usage?: RunUsage;
   /**

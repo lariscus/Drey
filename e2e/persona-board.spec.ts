@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test, expect, type ElectronApplication, type Page } from './fixtures/drey';
+import { showTicketsPanel } from './fixtures/crew-run';
 import { SEEDS, byTitle, dkIdOf, fieldOf, idOf, liveRun, seedStore, seedVaultOf } from './fixtures/persona-board-seed';
 
 /**
@@ -170,7 +171,8 @@ test('the persona board: columns by holder, the pool chip, drag and Accept (req-
   const tabs = page.locator('[role="tablist"][aria-label="Views"] [role="tab"]');
   await expect(tabs).toHaveText(['Notes', 'Work', 'Crew'], { timeout: 30_000 });
   await tabs.filter({ hasText: 'Work' }).click();
-  const panel = page.locator('.tickets-panel').filter({ visible: true });
+  // Since milestone 270 the Work view opens on the Board with the left dock folded: show the panel first.
+  const panel = await showTicketsPanel(page);
   await expect(panel.locator(`.work-row[data-id="${byTitle('Palette opens twice on slow CI')}"]`)).toBeVisible({ timeout: 60_000 });
   await pushFleet(electronApp);
 

@@ -16,21 +16,27 @@ export function cursorChain(cursor: RunCursor): ChainEntry[] {
   return Array.from({ length: cursor.length }, () => ({ persona: '?', mode: null, notify: false }));
 }
 
-/** The request's cursor of a chain ticket: position, length, the entries, the send-back used, and the crew a plan may name. */
+/** The request's cursor of a chain ticket: position, length, the entries, the send-back used, the crew a plan may name, and the red-gate loop (req-78). */
 export function runCursorOf(input: {
   readonly chain: readonly ChainEntry[];
   readonly at: number | undefined;
   readonly sentBack?: { readonly from: number; readonly to: number } | undefined;
   readonly crew?: RunCursor['crew'];
+  readonly redLoop?: Pick<RunCursor, 'returnTo' | 'redBacks' | 'maxRed' | 'redBack'>;
   readonly proposeFlow?: boolean;
 }): RunCursor {
   const length = input.chain.length;
+  const loop = input.redLoop ?? {};
   return {
     at: Math.min(Math.max(input.at ?? 1, 1), length),
     length,
     entries: renderChainEntries(input.chain),
     ...(input.sentBack !== undefined ? { sentBack: input.sentBack } : {}),
     ...(input.crew !== undefined ? { crew: input.crew } : {}),
+    ...(loop.returnTo !== undefined ? { returnTo: loop.returnTo } : {}),
+    ...(loop.redBacks !== undefined && loop.redBacks > 0 ? { redBacks: loop.redBacks } : {}),
+    ...(loop.maxRed !== undefined ? { maxRed: loop.maxRed } : {}),
+    ...(loop.redBack !== undefined ? { redBack: loop.redBack } : {}),
     ...(input.proposeFlow === true ? { proposeFlow: true } : {}),
   };
 }

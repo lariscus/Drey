@@ -109,6 +109,8 @@ export function normalizeChainStore(value: unknown): ChainStoreConfig | null {
     dkDataDir: text('dkDataDir', 'dataDir'),
     dkCheckout: text('dkCheckout', 'checkout'),
     trailers: v['trailers'] === true,
+    // req-78 found it: dropped here, a lifecycle store reached the runner as a phase-stage store and nothing dispatched by holder.
+    ...(v['lifecycle'] === true ? { lifecycle: true } : {}),
   };
 }
 
@@ -147,6 +149,15 @@ export interface ChainStatus {
   /** req-271: the tickets the last pass left waiting because their persona runs its maximum (`parallel:`) — ticket id -> persona; the card's `waits for Ben`. Absent on older runners. */
   readonly personaWaits?: Readonly<Record<string, string>>;
   /**
+   * req-148: the dispatcher's queue — every ticket the last pass wanted to
+   * start and left waiting, in the order it would serve them: the pool's
+   * queue (a class without room) and, on a persona board, the holders the
+   * plan found no place for (the big pool full, or the persona at its
+   * `parallel:`). The Crew cards' queued rows and their `1 queued`. Empty
+   * while the Autopilot is not On. Absent on older runners.
+   */
+  readonly queued?: readonly QueuedTicket[];
+  /**
    * Per provider: the effective parallel runs its pool carries right now
    * (configured size, capped by a probe, minus a rate-limit shrink) — the
    * Team tab's capacity line reads it against the live runs. Absent on
@@ -178,6 +189,25 @@ export interface BurnRateHold {
   readonly resumesAt: string;
   readonly basis: BurnRateBasis;
   /** When the hold rose (ISO): the card's time. */
+  readonly since: string;
+}
+
+/**
+ * req-148: why a queued ticket waits — `slot`: no free place in the pool
+ * (the provider's slots, or the capacity pool's class); `persona`: its
+ * persona runs its maximum of parallel runs.
+ */
+export type QueuedWhy = 'slot' | 'persona';
+
+/** req-148: one ticket the dispatcher left waiting (see {@link ChainStatus.queued}). */
+export interface QueuedTicket {
+  readonly ticket: string;
+  /** The persona whose run it waits to be; null when the pool's queue names none. */
+  readonly persona: string | null;
+  readonly why: QueuedWhy;
+  /** 1 = served first when room frees. */
+  readonly position: number;
+  /** ISO: the pass that first left it waiting for this reason. */
   readonly since: string;
 }
 

@@ -63,7 +63,8 @@ export interface EngineHost {
 export interface FleetPort {
   runs(): Promise<readonly RunInfo[]>;
   start(request: RunRequest): Promise<{ ok: true; run: RunInfo } | { ok: false; error: string }>;
-  configureChain(config: ChainConfig): Promise<void>;
+  /** Points the runner at the vault; `false` = no runner was reachable and nothing was sent (the board sends it again with its next snapshot). */
+  configureChain(config: ChainConfig): Promise<boolean | void>;
   /** E14-5b: the runner releases the agent claims of this host that no live run holds. */
   releaseLeftoverClaims?(
     store: ChainStoreConfig,
