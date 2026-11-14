@@ -36,12 +36,12 @@ const base: FlowDraft = {
 };
 const edited: FlowDraft = { ...base, chain: ['ben', 'ralf', 'you'], steps: [...base.steps, step(2, 'you', { owner: true })] };
 
-function setup(replies: Record<string, unknown>): { host: HTMLElement; invoke: ReturnType<typeof vi.fn>; dispose: () => void } {
+function setup(replies: Record<string, unknown>, ticketId = 'T-0130'): { host: HTMLElement; invoke: ReturnType<typeof vi.fn>; dispose: () => void } {
   const invoke = vi.fn((method: string) => Promise.resolve(replies[method]));
   const deps: FlowDeps = { invoke, subscribe: () => () => undefined, titleOf: () => null };
   const host = document.createElement('div');
   document.body.append(host);
-  const dispose = mountFlow(deps, host, { ticketId: 'T-0130', part: null });
+  const dispose = mountFlow(deps, host, { ticketId, part: null });
   return { host, invoke, dispose };
 }
 
@@ -53,6 +53,20 @@ const settle = async (): Promise<void> => {
     await Promise.resolve();
   }
 };
+
+describe('Flow tab on the default flow (E10-5b)', () => {
+  const standard: FlowDraft = { ...base, ticket: 'standard', title: 'Default flow', scope: { kind: 'standard' }, steps: [step(0, 'ben'), step(1, 'ralf')] };
+
+  it('asks the engine for the standard flow, names it and offers no reset to itself', async () => {
+    const { host, invoke } = setup({ flow: standard, flowSave: { ok: true } }, 'standard');
+    await settle();
+    expect(invoke).toHaveBeenCalledWith('flow', { id: 'standard', part: null });
+    expect(host.querySelector('.flow-id')?.textContent).toBe('Default flow');
+    expect(host.querySelector('.flow-h')?.textContent).toBe('Default flow');
+    expect(buttonNamed(host, 'Reset to standard flow').hidden).toBe(true);
+    expect(buttonNamed(host, 'Save flow').title).toBe('Write this flow as the default for new tickets');
+  });
+});
 
 describe('Flow tab', () => {
   it('lists the positions the engine answers, with the step-count chip', async () => {

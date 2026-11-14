@@ -19,6 +19,7 @@ import {
   changesLabelOf,
   eyebrowOf,
   isDirty,
+  isStandardFlow,
   marksOf,
   moveRoomOf,
   personasFor,
@@ -70,7 +71,8 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
   ask.setAttribute('aria-label', 'Ask Paul to change this flow');
   const askButton = textButton('Ask Paul', 'desk-btn', 'Paul reads the ticket and drafts a flow; nothing is saved', () => void askPaul());
   const resetButton = textButton('Reset to standard flow', 'desk-btn desk-btn-link', 'Drop every change and run the standard flow', () => void run({ op: 'reset' }));
-  const saveButton = textButton('Save flow', 'desk-btn desk-btn-primary', 'Write this flow to the ticket', () => void save());
+  resetButton.hidden = isStandardFlow(target);
+  const saveButton = textButton('Save flow', 'desk-btn desk-btn-primary', isStandardFlow(target) ? 'Write this flow as the default for new tickets' : 'Write this flow to the ticket', () => void save());
   ask.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -200,8 +202,8 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
   function paintHead(): void {
     const flow = state.draft;
     head.replaceChildren();
-    head.append(h('span', 'flow-id', target.ticketId));
-    const title = deps.titleOf(target.ticketId);
+    head.append(h('span', 'flow-id', isStandardFlow(target) ? 'Default flow' : target.ticketId));
+    const title = isStandardFlow(target) ? null : deps.titleOf(target.ticketId);
     if (title !== null && flow === null) {
       head.append(h('span', 'flow-head-title', title));
     }

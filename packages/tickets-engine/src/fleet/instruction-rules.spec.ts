@@ -88,6 +88,15 @@ describe('composeInstruction — the shared rules by run kind (req-280)', () => 
     expect(text).toContain(D.fragments.planFormat);
   });
 
+  it('closes the plan format with the flow proposal only while the board proposes a flow (E10-5b)', () => {
+    const chain = { at: 2, length: 4, entries: ['paul:shape', 'paul', 'ben', 'you'] };
+    const off = composeInstruction(input({ prompt: 'Write the plan.\n\n{{plan-format}}', chain })).text;
+    expect(off).not.toContain(D.fragments.flowProposal);
+    const on = composeInstruction(input({ prompt: 'Write the plan.\n\n{{plan-format}}', chain: { ...chain, proposeFlow: true } })).text;
+    expect(on).toContain(`${D.fragments.planFormat}\n\n${D.fragments.flowProposal}`);
+    expect(on).not.toContain('{{flow-proposal}}');
+  });
+
   it('the protocol markers reach the brief substituted, never as placeholders', () => {
     const text = composeInstruction(input()).text;
     expect(text).not.toContain('{{blocked}}');

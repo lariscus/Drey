@@ -5,7 +5,7 @@
  * this file only reads the engine's `FlowReply`, the same shape the phone's
  * editor renders (`libs/mission-ui/src/flow/flow.model.ts` is its twin).
  */
-import type { FlowPersona, FlowReply, FlowStepView } from '../../../../packages/tickets-engine/src/contracts/flow';
+import { STANDARD_FLOW_ID, type FlowPersona, type FlowReply, type FlowStepView } from '../../../../packages/tickets-engine/src/contracts/flow';
 
 /** An answer the desk gave for a flow, minus the failure case. */
 export type FlowDraft = Extract<FlowReply, { readonly ok: true }>;
@@ -133,10 +133,13 @@ export const flowKeyOf = (target: FlowTarget): string =>
   `${FLOW_SCHEME}${target.ticketId}${target.part === null ? '' : `/${target.part}`}`;
 
 export const flowTitleOf = (target: FlowTarget): string =>
-  target.part === null ? `Flow · ${target.ticketId}` : `Flow · ${target.ticketId} · Part ${target.part + 1}`;
+  isStandardFlow(target) ? 'Flow · Default' : target.part === null ? `Flow · ${target.ticketId}` : `Flow · ${target.ticketId} · Part ${target.part + 1}`;
+
+/** The target is the default flow itself (E10-5b), not a ticket's. */
+export const isStandardFlow = (target: FlowTarget): boolean => target.ticketId === STANDARD_FLOW_ID;
 
 /** The target a flow key names; null for any other key. */
 export function flowTargetOfKey(key: string): FlowTarget | null {
-  const match = /^flow:\/\/(T-\d{4,})(?:\/(\d{1,3}))?$/.exec(key);
+  const match = /^flow:\/\/(T-\d{4,}|standard)(?:\/(\d{1,3}))?$/.exec(key);
   return match === null ? null : { ticketId: match[1]!, part: match[2] === undefined ? null : Number(match[2]) };
 }
