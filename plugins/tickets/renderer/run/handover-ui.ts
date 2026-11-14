@@ -13,7 +13,7 @@
  * resolution stays the final word — falling back fresh there is visible
  * as a stream note, not a silent switch.
  */
-import { COMPACT_CAPABILITY, resolveHandover, type HandoverCandidate } from '../../../../packages/tickets-engine/src/fleet/handover';
+import { COMPACT_CAPABILITY, resolveHandover, type HandoverCandidate } from '../../../../packages/tickets-engine/src/fleet/runner/handover';
 import type { FleetHandoverConfig, HandoverMode } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { formatTokens } from './worker-status';
 

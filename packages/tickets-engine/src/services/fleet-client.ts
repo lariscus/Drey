@@ -15,7 +15,7 @@ import { execFile } from 'node:child_process';
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
-import { recordedWorkerPids, workerGone, type ExecFn } from '../fleet/procs';
+import { recordedWorkerPids, workerGone, type ExecFn } from '../fleet/runner/procs';
 import type {
   AutopilotRecord,
   AutopilotRefusal,

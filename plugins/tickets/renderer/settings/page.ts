@@ -1,7 +1,7 @@
 import type { DreyPluginApi, PluginSettingsPageContrib } from '../../../../shared/plugin-api/renderer';
 import { parseHandover, type BoardSnapshot, type FolderStatus, type PromptListing, type ReposListing } from '../../shared/tickets';
 import { createColumnsSection, effectivePrompt } from './columns';
-import { parseWorkerValue } from '../../../../packages/tickets-engine/src/fleet/assignment';
+import { parseWorkerValue } from '../../../../packages/tickets-engine/src/fleet/runner/assignment';
 import { el, iconButton, kv, mutate, numberConfig, selectConfig, textConfig } from './dom';
 import { createPromptsSection } from './prompts';
 import { createRemoteSection } from './remote';

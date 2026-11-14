@@ -6,8 +6,8 @@
  * owner picks Nudge, Hand over or Stop.
  */
 import type { RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
-import type { NormalizedEvent } from '../../../../packages/tickets-engine/src/fleet/providers';
-import { READ_TOOLS, WRITE_TOOLS } from '../../../../packages/tickets-engine/src/fleet/telemetry';
+import type { NormalizedEvent } from '../../../../packages/tickets-engine/src/fleet/providers/providers';
+import { READ_TOOLS, WRITE_TOOLS } from '../../../../packages/tickets-engine/src/fleet/telemetry/telemetry';
 import { RESULT_PREFIX, THINK_PREFIX, YOU_PREFIX } from '../run/watch-format';
 
 /** No write/edit tool call for this many minutes means stuck. */

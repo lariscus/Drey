@@ -150,7 +150,7 @@ stays.
 
 **Sleep, in two levels (the service on).**
 
-1. *The Crew runner* sleeps on req-110's verdict (`fleet/runner-lifecycle.ts`):
+1. *The Crew runner* sleeps on req-110's verdict (`fleet/runner/runner-lifecycle.ts`):
    a live run or an On/Paused Autopilot keeps it; otherwise it goes when the
    Autopilot is switched Off, when Drey has gone (`/retire-if-idle`, sent once
    the last Drey's event stream has been closed for 5 s), or after 15 min

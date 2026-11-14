@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
 import { mountWorkers, NUDGE_TEXT, workerCards, workersNode, type WorkersViewDeps } from './workers-view';
 import type { RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
-import type { NormalizedEvent } from '../../../../packages/tickets-engine/src/fleet/providers';
+import type { NormalizedEvent } from '../../../../packages/tickets-engine/src/fleet/providers/providers';
 
 // --- the Work panel's Workers section (milestone 95) --------------------------
 

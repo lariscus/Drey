@@ -15,7 +15,7 @@
  * part) replaces, and `tool` events mark a call running before its input
  * is known.
  */
-import type { NormalizedEvent } from '../../../../packages/tickets-engine/src/fleet/providers';
+import type { NormalizedEvent } from '../../../../packages/tickets-engine/src/fleet/providers/providers';
 
 /** The owner's own prompts ride the stream as notes with this lead-in. */
 export const YOU_PREFIX = 'you › ';

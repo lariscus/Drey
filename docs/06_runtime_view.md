@@ -3297,7 +3297,7 @@ first fleet snapshot.
 ### When the runner leaves (req-110)
 
 The runner outlives Drey so that runs do — not so that it stands around.
-Three exits, one verdict (`fleet/runner-lifecycle.ts`: nothing live and
+Three exits, one verdict (`fleet/runner/runner-lifecycle.ts`: nothing live and
 no On/Paused Autopilot; a live run always keeps the runner, and a
 running or paused chain is what drains the board with Drey closed):
 

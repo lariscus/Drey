@@ -1,3 +1,14 @@
+### Milestone 216 — req-181: the engine's `fleet/` sorted into domain folders
+
+**Not yet manually verified by the owner.** Owner request, outside the list, 2026-11-14 (step 3 of the restructure of req-179/req-180). Entered the roadmap as req-181 and leaves it with this entry. A pure move: no behaviour, no export name changed.
+
+- **`packages/tickets-engine/src/fleet/`** (57 files, flat before): `protocol.ts` stays at the root (the wire contract the plugin and Mission Control import); `runner/` (the runner entry, the run supervisor `runs`, runner lifecycle, build stamp, process plumbing, event writer, request builder, assignment, handover, `run-spec-support`), `chain/` (chain planning, the orchestrator, Autopilot rules, the store chain board), `lease/` (the run lease with its fake, the dk target), `providers/` (worker providers, `kimi`, `kimi-usage`), `worktrees/` (preparation, cleanup, home), `telemetry/` (token fold, report, output caps, context pack). Specs moved with their source; the seven specs without a same-named source went by what they import (`orchestrator-*`, `chain-store-dk`, `blocked-dispatch` → `chain/`; `run-lease-dk` → `lease/`; `runs-dk` → `runner/`; `context-window` → `providers/`).
+- **Made by script** as in milestones 214/215: 197 relative specifiers in 74 files. By hand: `runner/runner.ts` reads `prompts/<ref>.md` by `__dirname`, one folder deeper now (checked against a fresh build). **The script had one blind spot, caught by the specs:** it also rewrote relative paths that sit inside *strings* — the fixture of `build-stamp.spec.ts` (hand-written `require("../ticket-files")` source text) and a doc comment in `build-stamp.ts`. Both restored; a search of all three moves for the same pattern found nothing else, and the earlier two steps' results did not change.
+- **Docs:** `docs/05` (the fleet folder map and the rows that name fleet files), `docs/06`, `docs/testing-flakes.md`, `specs/classifier-spec.md`, `specs/roadmap.md`, `plugins/tickets/FLEET.md` and `SERVICE.md` name the new paths; this changelog, the ADRs and the dated design notes keep the paths of their day.
+- **Verified:** `npm run typecheck` clean; `check-cycles.mjs` clean; ESLint clean on `packages/` and `plugins/tickets`; `build-plugins.mjs` builds and `dist-electron/packages/tickets-engine/prompts` resolves from the built `runner/runner.js`. `packages`, `plugins/tickets`, `shared`, `electron/ipc` specs: the same 13 failures as on the parent commit (listed in milestone 215).
+- **Left open:** `services/` (41), `store/` (39), `server/` (36) and the 3,400-line `renderer/index.ts`.
+- **Not verified by the owner.** To check: a worker run end to end (start, live thread, finish), the chain running a column, a Kimi run if one is configured.
+
 ### Milestone 215 — req-180: the engine's `core/` sorted into domain folders
 
 **Not yet manually verified by the owner.** Owner request, outside the list, 2026-11-14 (step 2 of the restructure that started with req-179: "yes" to continuing with the engine, `core/` first). Entered the roadmap as req-180 and leaves it with this entry. A pure move: no behaviour, no export name changed.
@@ -7,7 +18,7 @@
 - **Made by script** as in milestone 214 (`git mv`, 292 relative specifiers in 136 files rewritten, including the e2e specs and the plugin). By hand: `config/default-prompts.ts` builds `SHIPPED_PROMPTS_DIR` from `__dirname`, one folder deeper now — checked against a fresh build (`dist-electron/packages/tickets-engine/prompts`, 7 files).
 - **Docs:** `docs/05` (the core folder map, the feature index and component rows), `specs/ticket-schema.md`, `specs/classifier-spec.md`, `specs/roadmap.md` name the new paths; this changelog, the ADRs and the dated design notes keep the paths of their day.
 - **Verified:** `npm run typecheck` clean; `check-cycles.mjs` clean; ESLint clean on `packages/` and `plugins/tickets`; `build-plugins.mjs` builds. `packages`, `plugins/tickets`, `shared`, `electron/ipc` specs: the same 13 failures before and after (compared on the parent commit — real-git, worktree-junction and Windows-path specs under `fleet/`, `services/fleet-client` and two plugin specs; they fail on Linux regardless of this change).
-- **Left open:** `fleet/` (57 files), `services/` (41), `store/` (39), `server/` (36), and the 3,400-line `renderer/index.ts`.
+- **Left open:** `fleet/` followed in milestone 216; `services/` (41), `store/` (39), `server/` (36) and the 3,400-line `renderer/index.ts`.
 - **Not verified by the owner.** To check: a build run end to end (the shipped prompts still load), the Review/Plan chapters and the ticket's history of a store ticket in the thread.
 
 ### Milestone 214 — req-179: the tickets plugin's `renderer/` and `main/` sorted into domain folders

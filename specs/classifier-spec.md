@@ -284,7 +284,7 @@ create as a `raw capture:` Log line (ticket-schema).
   cancelled."* (code `cancelled`); the stream's `text` / `thought` events
   are the progress. The Cancel control is req-157.
 - **The fleet's step prompts and the run brief's persona line**
-  (`packages/tickets-engine/prompts/*.md`, `fleet/assignment.ts`; milestone
+  (`packages/tickets-engine/prompts/*.md`, `fleet/runner/assignment.ts`; milestone
   212, D-60 / D-61). The shipped step prompts (`build-default` v6,
   `qa-default` v2, `review-default` v3, `scout-default` v2) ask the worker,
   in their "How to work" list, to append one friction line to
@@ -359,7 +359,7 @@ a different path and keep their own rendering.
 ## The worker's follow-up proposals (req-176)
 
 A dispatched (non-interactive) build run's brief carries this rule
-(`FOLLOWUPS_DISCIPLINE` in `packages/tickets-engine/src/fleet/assignment.ts`,
+(`FOLLOWUPS_DISCIPLINE` in `packages/tickets-engine/src/fleet/runner/assignment.ts`,
 after the handover rule, before the asking rule; verbatim):
 
 > Follow-ups: work you found that is not part of this step (a defect

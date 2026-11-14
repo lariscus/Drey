@@ -11,7 +11,7 @@ import {
   composeInstruction,
   parseWorkerValue,
   resolveAssignment,
-} from '../../../packages/tickets-engine/src/fleet/assignment';
+} from '../../../packages/tickets-engine/src/fleet/runner/assignment';
 import { DEFAULT_FLEET_CAPS } from '../../../packages/tickets-engine/src/fleet/protocol';
 
 /**

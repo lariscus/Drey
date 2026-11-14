@@ -1,4 +1,4 @@
-import { parseWorkerValue } from '../fleet/assignment';
+import { parseWorkerValue } from '../fleet/runner/assignment';
 import { normalizeFleetHandover, WORKER_PROVIDERS, type FleetHandoverConfig } from '../fleet/protocol';
 import type { BoardSnapshot } from '../contracts/tickets';
 

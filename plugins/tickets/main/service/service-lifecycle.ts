@@ -2,7 +2,7 @@ import { promises as fsp } from 'node:fs';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
 import { NOTES_VAULT_KEY } from '../../../../packages/tickets-engine/src/contracts/notes';
-import { fleetBuildStamp, isStaleDaemon } from '../../../../packages/tickets-engine/src/fleet/build-stamp';
+import { fleetBuildStamp, isStaleDaemon } from '../../../../packages/tickets-engine/src/fleet/runner/build-stamp';
 import { WORKER_PROVIDERS } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { FileConfigStore } from '../../../../packages/tickets-engine/src/server/file-config';
 import { SERVICE_ENTRY_NAME, serviceLaunchCommand, spawnService } from '../../../../packages/tickets-engine/src/service/launch';

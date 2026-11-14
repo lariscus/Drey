@@ -18,7 +18,7 @@
 import { closeSync, openSync, promises as fsp, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
-import { fleetBuildStamp } from '../fleet/build-stamp';
+import { fleetBuildStamp } from '../fleet/runner/build-stamp';
 import { clientDirOf } from '../server/client-dir';
 import { FileConfigStore } from '../server/file-config';
 import { autostartEntry, setAutostart } from './launch';

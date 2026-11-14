@@ -27,7 +27,7 @@ import {
   type TicketPriority,
   type TicketUsage,
 } from '../../contracts/tickets';
-import { checkpointPhaseIds } from '../../fleet/chain';
+import { checkpointPhaseIds } from '../../fleet/chain/chain';
 import { withTerminalTickets } from '../pipeline/normalize';
 import { READY_STATE } from '../pipeline/pipeline-states';
 import { runDependencyPass } from './blocked';

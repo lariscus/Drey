@@ -59,7 +59,7 @@ is one invocation, failed when at least one test failed.
    files after the spec had passed its last assertion (`ENOTEMPTY …\tickets\plan`
    in "a soft pause waits…"). Fix: the supervisor tracks that work and offers
    `idle()`; the specs drain every supervisor they built before removing the
-   temp dirs (`fleet/run-spec-support.ts`, shared by `runs.spec` and
+   temp dirs (`fleet/runner/run-spec-support.ts`, shared by `runs.spec` and
    `runs-dk.spec`).
 5. **`settled()` polled a clock.** It waited for the `onRunSettled` event by
    polling with `vi.waitFor`'s 1 s default (`expected 'not settled yet'`). Now it

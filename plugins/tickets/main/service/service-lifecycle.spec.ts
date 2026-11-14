@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { formatStamp } from '../../../../packages/tickets-engine/src/fleet/build-stamp';
+import { formatStamp } from '../../../../packages/tickets-engine/src/fleet/runner/build-stamp';
 import { ServiceHost } from '../../../../packages/tickets-engine/src/service/service-host';
 import { writeServiceLock, type ServiceLock } from '../../../../packages/tickets-engine/src/service/service-lock';
 import { EngineClient } from '../engine/engine-client';

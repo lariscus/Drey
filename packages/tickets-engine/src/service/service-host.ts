@@ -32,7 +32,7 @@ import * as http from 'node:http';
 import * as path from 'node:path';
 import { createEngine, type Engine, type EngineOptions } from '../server/engine';
 import { FileConfigStore } from '../server/file-config';
-import type { Args, RunnerDeps, RunnerHandle } from '../fleet/runner';
+import type { Args, RunnerDeps, RunnerHandle } from '../fleet/runner/runner';
 import { hasHandedOverRuns, retireLegacyEngine, retireLegacyRunner, type LegacyDeps } from './legacy';
 import { RunnerComponent } from './runner-component';
 import {

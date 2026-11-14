@@ -5,7 +5,7 @@
  * `POST /chain/autopilot` behind `FleetClient.setAutopilot` — and get the
  * same reply shape: the new chain status, or a refusal with its code.
  */
-import { parseAutopilotSet } from '../../../../packages/tickets-engine/src/fleet/autopilot';
+import { parseAutopilotSet } from '../../../../packages/tickets-engine/src/fleet/chain/autopilot';
 import type { AutopilotRecord, AutopilotRefusal, ChainStatus } from '../../../../packages/tickets-engine/src/fleet/protocol';
 
 export type ChainAutopilotReply = { readonly ok: true; readonly status: ChainStatus } | AutopilotRefusal;

@@ -1,0 +1,2580 @@
+import { promises as fsp } from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AttachInfo, ProviderAdapter, ProviderStart, WorkerHandle } from '../providers/providers';
+import { execShell, HANDBACK_CONTINUE, HANDOVER_CONTINUE, limitExceeded, probeExec, RunSupervisor, STUCK_FAIL_MS, STUCK_FLAG_MS, usageSummary, type RunSupervisorDeps } from './runs';
+import { processAlive } from './procs';
+import type { RunInfo, RunRequest, RunState } from '../protocol';
+import { drainSupervisors, hasSettled, markSettled, settled, trackSupervisor, waitFor } from './run-spec-support';
+import { newTicketFileText, patchTicketFile, parseTicketFile } from '../../core/ticket/ticket-files';
+import { TicketsGit, type GitExecFn } from '../../core/git/tickets-git';
+
+/**
+ * The run supervisor against seams: a scripted adapter, a recorded git
+ * seam, a no-op worktree. The ticket files are REAL (temp dir) — the
+ * stamps and the success move are file semantics, and that is exactly
+ * what must not drift from the board's.
+ */
+
+function fakeAdapter() {
+  const handles: Array<
+    WorkerHandle & { fail: (code: number | null) => void; onEvent: (text: string) => void; result: (blocked?: string | null) => void }
+  > = [];
+  const attachInfos: AttachInfo[] = [];
+  const starts: ProviderStart[] = [];
+  const adapter: ProviderAdapter = {
+    id: 'opencode',
+    label: 'OpenCode',
+    liveInject: true,
+    spawn: (start) => make(start),
+    attach: (start, info) => {
+      attachInfos.push(info);
+      return make(start);
+    },
+  };
+  const make = (start: ProviderStart) => {
+      starts.push(start);
+      let exitResolve: ((code: number | null) => void) | null = null;
+      const handle: WorkerHandle & {
+        fail: (code: number | null) => void;
+        onEvent: (text: string) => void;
+        result: (blocked?: string | null) => void;
+      } = {
+        pid: 4242,
+        exited: new Promise<number | null>((resolve) => {
+          exitResolve = resolve;
+        }),
+        steer: vi.fn(async () => 'inject' as const),
+        setHold: vi.fn(),
+        interrupt: vi.fn(async () => true),
+        answerPermission: vi.fn(async () => true),
+        answerQuestion: vi.fn(async () => true),
+        stop: vi.fn(async () => {
+          exitResolve?.(null);
+        }),
+        fail: (code) => exitResolve?.(code),
+        onEvent: (text) => start.onEvent({ ts: '2026-10-17T12:00:00Z', kind: 'note', text }),
+        result: (blocked?: string | null) =>
+          start.onEvent({
+            ts: '2026-10-17T12:00:00Z',
+            kind: 'result',
+            text: 'done',
+            ...(blocked !== undefined ? { blocked } : {}),
+          }),
+      };
+      handles.push(handle);
+      return handle;
+  };
+  return { adapter, handles, attachInfos, starts };
+}
+
+function gitRecorder() {
+  const calls: Array<{ args: readonly string[]; cwd: string }> = [];
+  let worktreeList = '';
+  const exec: GitExecFn = async (_exe, args, cwd) => {
+    calls.push({ args, cwd });
+    if (args[0] === 'rev-parse') {
+      return `${path.sep}root${path.sep}tk\n`;
+    }
+    // The default prepareWorktree: an existing registration at the same
+    // path throws ("already exists") — the reuse rule answers with the list.
+    if (args[0] === 'worktree' && args[1] === 'add') {
+      throw new Error(`fatal: '${args[2] ?? ''}' already exists`);
+    }
+    if (args[0] === 'worktree' && args[1] === 'list') {
+      return worktreeList;
+    }
+    return '';
+  };
+  const ticketsGit = new TicketsGit(() => 'git', exec);
+  return {
+    ticketsGit,
+    calls,
+    set worktreeList(value: string) {
+      worktreeList = value;
+    },
+  };
+}
+
+let vaultDir = '';
+let fleetRoot = '';
+
+const ticketText = (): string =>
+  newTicketFileText({
+    id: 'T-0001',
+    title: 'Add the thing',
+    repo: 'kt',
+    priority: 'normal',
+    rank: 5000,
+    firstPhase: 'plan',
+    now: new Date('2026-10-17T10:00:00Z'),
+    actor: 'owner@box',
+    description: 'It should work.',
+  });
+
+async function writeTicket(): Promise<string> {
+  const rel = 'tickets/plan/T-0001.md';
+  await fsp.mkdir(path.dirname(path.join(vaultDir, rel)), { recursive: true });
+  await fsp.writeFile(path.join(vaultDir, rel), ticketText(), 'utf8');
+  return rel;
+}
+
+function request(overrides: Partial<RunRequest> = {}): RunRequest {
+  return {
+    origin: 'spec',
+    ticketId: 'T-0001',
+    ticketsVaultPath: vaultDir,
+    ticketRelPath: 'tickets/plan/T-0001.md',
+    phase: 'plan',
+    repoPath: 'W:/kt',
+    worktreePath: 'W:/fleet-worktrees/T-0001',
+    branch: 't/T-0001',
+    baseRef: null,
+    provider: 'opencode',
+    model: null,
+    permissionMode: 'accept-edits',
+    instruction: 'Do the ticket.',
+    acceptance: ['npm run verify:unit'],
+    gate: 'commands',
+    git: 'git',
+    nextPhase: 'build',
+    nextPhaseDir: 'build',
+    pushRemote: null,
+    claimIdentity: null,
+    ...overrides,
+  };
+}
+
+function supervisor(overrides: Partial<RunSupervisorDeps> = {}): {
+  sup: RunSupervisor;
+  adapter: ReturnType<typeof fakeAdapter>;
+  git: ReturnType<typeof gitRecorder>;
+  gate: string[][];
+} {
+  const adapter = fakeAdapter();
+  const git = gitRecorder();
+  const gate: string[][] = [];
+  const sup = new RunSupervisor({
+    root: fleetRoot,
+    adapter: adapter.adapter,
+    git: 'git',
+    log: () => undefined,
+    now: () => new Date('2026-10-17T12:00:00Z'),
+    prepareWorktree: async () => ({ outcome: 'created', sessionInvalidated: false, movedTo: null }),
+    execShell: async (command) => {
+      gate.push([command]);
+    },
+    ticketsGit: git.ticketsGit,
+    ...overrides,
+    onRunSettled: (info) => {
+      markSettled(sup, info.id);
+      overrides.onRunSettled?.(info);
+    },
+  });
+  trackSupervisor(sup);
+  return { sup, adapter, git, gate };
+}
+
+describe('RunSupervisor', () => {
+  beforeEach(async () => {
+    vaultDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-vault-'));
+    fleetRoot = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-fleet-'));
+  });
+
+  afterEach(async () => {
+    await drainSupervisors();
+    await fsp.rm(vaultDir, { recursive: true, force: true });
+    await fsp.rm(fleetRoot, { recursive: true, force: true });
+  });
+
+  // --- the session handover (T-0049) --------------------------------
+
+  /** A settled record the next start may resume — seeded as a runner
+   *  boot would adopt it (the supervisor's `now` is fixed at 12:00). */
+  async function seedRun(
+    id: string,
+    over: {
+      ticket?: string;
+      model?: string | null;
+      phase?: string;
+      state?: RunState;
+      sessionRef?: string | null;
+      endedAt?: string | null;
+      startedAt?: string;
+      lastTurnContext?: number | null;
+    } = {},
+  ): Promise<void> {
+    const ticket = over.ticket ?? 'T-0001';
+    const started = over.startedAt ?? '2026-10-17T10:00:00Z';
+    const info: RunInfo = {
+      id,
+      ticketId: ticket,
+      provider: 'opencode',
+      state: over.state ?? 'failed',
+      pid: null,
+      startedAt: started,
+      endedAt: over.endedAt ?? '2026-10-17T11:57:00Z',
+      sessionRef: over.sessionRef ?? `ses_${id}`,
+      tokensIn: 0,
+      tokensOut: 0,
+      costUsd: null,
+      lastActivity: started,
+      steerCount: 0,
+      lastSteerRung: null,
+      worktreePath: 'W:/gone',
+      branch: `t/${ticket}`,
+      ...(over.model !== undefined ? { model: over.model } : {}),
+      ...(over.phase !== undefined ? { phase: over.phase } : {}),
+      ...(over.lastTurnContext !== undefined ? { lastTurnContext: over.lastTurnContext } : {}),
+      gateFailure: null,
+    };
+    const dir = path.join(fleetRoot, 'runs', id);
+    await fsp.mkdir(dir, { recursive: true });
+    await fsp.writeFile(
+      path.join(dir, 'run.json'),
+      JSON.stringify({
+        request: request({
+          ...(ticket !== 'T-0001' ? { ticketId: ticket, branch: `t/${ticket}`, ticketRelPath: `tickets/plan/${ticket}.md` } : {}),
+          ...(over.model !== undefined ? { model: over.model } : {}),
+          ...(over.phase !== undefined ? { phase: over.phase, ticketRelPath: `tickets/${over.phase}/T-0001.md` } : {}),
+        }),
+        info,
+      }),
+      'utf8',
+    );
+  }
+
+  it('the watchdog flags a silent worker, then fails it so the ticket backs off (M1b)', async () => {
+    const rel = await writeTicket();
+    let current = new Date('2026-10-17T12:00:00Z');
+    const alive = async (_cmd: string, args: readonly string[]): Promise<string> => `"${args.join(' ').match(/\d+/)?.[0] ?? ''}"`;
+    const { sup } = supervisor({ now: () => current, exec: alive });
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+
+    current = new Date(current.getTime() + STUCK_FLAG_MS + 60_000);
+    await sup.reap();
+    expect(sup.get(id)!.stuck).toBe(true);
+    expect(sup.get(id)!.state).toBe('running');
+
+    current = new Date(current.getTime() + STUCK_FAIL_MS);
+    await sup.reap();
+    expect(sup.get(id)!.state).toBe('failed');
+    expect(sup.get(id)!.lastError).toContain('hung');
+  });
+
+  it('a reaped run settles once, although stopping its worker also fires the exit handler (D-4)', async () => {
+    const rel = await writeTicket();
+    let current = new Date('2026-10-17T12:00:00Z');
+    const alive = async (_cmd: string, args: readonly string[]): Promise<string> => `"${args.join(' ').match(/d+/)?.[0] ?? ''}"`;
+    const settles: string[] = [];
+    const { sup, git } = supervisor({ now: () => current, exec: alive, onRunSettled: (info) => void settles.push(info.id) });
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+
+    current = new Date(current.getTime() + STUCK_FLAG_MS + STUCK_FAIL_MS + 60_000);
+    await sup.reap();
+    await settled(sup, id, 'failed');
+    // Let a second (exit-handler) settle, if one were running, finish too.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(settles).toEqual([id]);
+    expect(git.calls.filter((c) => c.args[0] === 'commit' && c.args.includes('-m')).length).toBeGreaterThan(0);
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    expect(parseTicketFile(text, rel).meta.run).toBeNull();
+  });
+
+  it('the reaper stops a run past its turn limit', async () => {
+    const rel = await writeTicket();
+    const { sup } = supervisor({ limits: { maxTurns: 5 } });
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+    const live = (sup as unknown as { runs: Map<string, { info: RunInfo }> }).runs.get(id)!;
+    live.info = { ...live.info, turns: 6 };
+    await sup.reap();
+    expect(sup.get(id)!.state).toBe('failed');
+    expect(sup.get(id)!.lastError).toContain('run limit');
+  });
+
+  /** A run of `provider` whose context is past the cap, reaped once. */
+  async function reapPastCap(provider: 'claude-code' | 'opencode'): Promise<RunInfo> {
+    const rel = await writeTicket();
+    const fake = fakeAdapter();
+    const alive = async (_cmd: string, args: readonly string[]): Promise<string> =>
+      `"${args.join(' ').match(/\d+/)?.[0] ?? ''}"`;
+    const { sup } = supervisor({ adapter: { ...fake.adapter, id: provider }, exec: alive });
+    const started = await sup.start(request({ ticketRelPath: rel, provider }));
+    const id = (started as { run: { id: string } }).run.id;
+    const live = (sup as unknown as { runs: Map<string, { info: RunInfo }> }).runs.get(id)!;
+    live.info = { ...live.info, lastTurnContext: 170_000 };
+    await sup.reap();
+    return sup.get(id)!;
+  }
+
+  it('the reaper ends a claude-code run past the context cap', async () => {
+    const info = await reapPastCap('claude-code');
+    expect(info.state).toBe('failed');
+    expect(info.lastError).toContain('context cap: 170000 tokens');
+  });
+
+  it('an OpenCode run past the cap is left alone — it compacts its own session', async () => {
+    const info = await reapPastCap('opencode');
+    expect(info.state).toBe('running');
+  });
+
+  it('a soft pause waits for the end of the current action, then interrupts', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    const handle = adapter.handles[0]!;
+
+    expect((await sup.pauseAfterAction(runId)).ok).toBe(true);
+    expect(handle.interrupt).not.toHaveBeenCalled(); // asked, not yet done
+    handle.onEvent('bash npm test'); // a call starting is not the end of an action
+    expect(handle.interrupt).not.toHaveBeenCalled();
+    handle.onEvent('result › 41 passed');
+    await waitFor(() => expect(handle.interrupt).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(sup.get(runId)!.paused).toBe(true));
+  });
+
+  it("the column's own max-turns beats the runner default", async () => {
+    const rel = await writeTicket();
+    const { sup } = supervisor();
+    const started = await sup.start(request({ ticketRelPath: rel, limits: { maxTurns: 3 } }));
+    const id = (started as { run: { id: string } }).run.id;
+    const live = (sup as unknown as { runs: Map<string, { info: RunInfo }> }).runs.get(id)!;
+    live.info = { ...live.info, turns: 4 }; // far under the default 250, over the column's 3
+    await sup.reap();
+    expect(sup.get(id)!.state).toBe('failed');
+    expect(sup.get(id)!.lastError).toContain('4 turns, over the limit of 3');
+  });
+
+  it('an auto handover resumes a warm same-phase retry and stamps mode and lineage (T-0049)', async () => {
+    const rel = await writeTicket();
+    await seedRun('R-old', { endedAt: '2026-10-17T11:57:00Z' }); // 3 min before the fixed now
+    const { sup, adapter } = supervisor();
+    await sup.adopt();
+
+    const started = await sup.start(request({ ticketRelPath: rel, handover: 'auto' }));
+    const id = (started as { run: { id: string } }).run.id;
+    expect(adapter.starts[0]!.resumeRef).toBe('ses_R-old');
+    expect(adapter.starts[0]!.compactFirst).not.toBe(true);
+
+    const info = sup.get(id)!;
+    expect(info.handoverMode).toBe('resume');
+    expect(info.resumedFrom).toBe('ses_R-old');
+    expect(info.sessionRef).toBe('ses_R-old');
+    // The stamps are durable and the decision is on the record's trail.
+    const stored = JSON.parse(await fsp.readFile(path.join(fleetRoot, 'runs', id, 'run.json'), 'utf8')) as {
+      info: { handoverMode?: string; resumedFrom?: string | null };
+    };
+    expect(stored.info.handoverMode).toBe('resume');
+    expect(stored.info.resumedFrom).toBe('ses_R-old');
+    const stream = await fsp.readFile(path.join(fleetRoot, 'runs', id, 'stream.jsonl'), 'utf8');
+    expect(stream).toContain('handover: resume');
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    expect(text).toContain('handover resume');
+  });
+
+  it('a resume is prompted with the continuation while the brief is unchanged — the full brief otherwise (req-80)', async () => {
+    const rel = await writeTicket();
+    await seedRun('R-old', { endedAt: '2026-10-17T11:57:00Z' });
+    const file = path.join(fleetRoot, 'runs', 'R-old', 'run.json');
+    const seeded = JSON.parse(await fsp.readFile(file, 'utf8')) as { request: Record<string, unknown> };
+    seeded.request['briefDigest'] = 'd1';
+    await fsp.writeFile(file, JSON.stringify(seeded), 'utf8');
+
+    const same = supervisor();
+    await same.sup.adopt();
+    const started = await same.sup.start(
+      request({ ticketRelPath: rel, handover: 'auto', briefDigest: 'd1', continuationInstruction: 'Only what changed.' }),
+    );
+    expect(same.adapter.starts[0]!.resumeRef).toBe('ses_R-old');
+    expect(same.adapter.starts[0]!.instruction).toBe('Only what changed.');
+    const id = (started as { run: { id: string } }).run.id;
+    expect(await fsp.readFile(path.join(fleetRoot, 'runs', id, 'stream.jsonl'), 'utf8')).toContain('brief: continuation');
+
+    await same.sup.stop(id, null);
+    await settled(same.sup, id, 'stopped');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await fsp.rm(path.join(fleetRoot, 'runs', id), { recursive: true, force: true });
+    const changed = supervisor();
+    await changed.sup.adopt();
+    await changed.sup.start(
+      request({ ticketRelPath: rel, handover: 'auto', briefDigest: 'd2', continuationInstruction: 'Only what changed.' }),
+    );
+    expect(changed.adapter.starts[0]!.resumeRef).toBe('ses_R-old');
+    expect(changed.adapter.starts[0]!.instruction).not.toBe('Only what changed.');
+  });
+
+  it('the resolution picks the newest terminal run of the same ticket and model — other tickets and models never', async () => {
+    const rel = await writeTicket();
+    await seedRun('R-match', { startedAt: '2026-10-17T10:00:00Z', endedAt: '2026-10-17T11:57:00Z' });
+    await seedRun('R-newer-match', { startedAt: '2026-10-17T10:30:00Z', endedAt: '2026-10-17T11:58:00Z' });
+    await seedRun('R-other-ticket', { ticket: 'T-0002', startedAt: '2026-10-17T11:00:00Z' });
+    await seedRun('R-other-model', { model: 'glm-x', startedAt: '2026-10-17T11:30:00Z' });
+    const { sup, adapter } = supervisor();
+    await sup.adopt();
+
+    await sup.start(request({ ticketRelPath: rel, handover: 'auto' }));
+    expect(adapter.starts[0]!.resumeRef).toBe('ses_R-newer-match');
+  });
+
+  it('a candidate of another phase (build after plan) resolves fresh (T-0049)', async () => {
+    await fsp.mkdir(path.join(vaultDir, 'tickets', 'build'), { recursive: true });
+    await fsp.writeFile(path.join(vaultDir, 'tickets', 'build', 'T-0001.md'), ticketText(), 'utf8');
+    await seedRun('R-plan', { phase: 'plan', endedAt: '2026-10-17T11:57:00Z' });
+    const { sup, adapter } = supervisor();
+    await sup.adopt();
+
+    const started = await sup.start(
+      request({ ticketRelPath: 'tickets/build/T-0001.md', phase: 'build', nextPhase: 'review', handover: 'auto' }),
+    );
+    expect((started as { run: { handoverMode?: string } }).run.handoverMode).toBe('fresh');
+    expect(adapter.starts[0]!.resumeRef).toBeNull();
+    const stream = await fsp.readFile(
+      path.join(fleetRoot, 'runs', (started as { run: { id: string } }).run.id, 'stream.jsonl'),
+      'utf8',
+    );
+    expect(stream).toContain('worked the plan phase');
+  });
+
+  it('a recreated or moved-aside worktree resolves fresh — the session is stale (T-0049)', async () => {
+    await seedRun('R-stale', { endedAt: '2026-10-17T11:57:00Z' });
+    const { sup, adapter } = supervisor({
+      prepareWorktree: async () => ({ outcome: 'recreated', sessionInvalidated: true, movedTo: null }),
+    });
+    await sup.adopt();
+    const rel = await writeTicket();
+
+    const started = await sup.start(request({ ticketRelPath: rel, handover: 'auto' }));
+    expect((started as { run: { handoverMode?: string } }).run.handoverMode).toBe('fresh');
+    expect(adapter.starts[0]!.resumeRef).toBeNull();
+    const stream = await fsp.readFile(
+      path.join(fleetRoot, 'runs', (started as { run: { id: string } }).run.id, 'stream.jsonl'),
+      'utf8',
+    );
+    expect(stream).toContain('stale');
+  });
+
+  it('a session another non-terminal run holds resolves fresh — never double-resumed (T-0049)', async () => {
+    // The ticket's candidate session…
+    await seedRun('R-held', { endedAt: '2026-10-17T11:57:00Z', sessionRef: 'ses_busy' });
+    // …is held by another ticket's live worker (adopted as running).
+    await seedRun('R-live2', {
+      ticket: 'T-0002',
+      state: 'running',
+      endedAt: null,
+      sessionRef: 'ses_busy',
+      startedAt: '2026-10-17T11:00:00Z',
+    });
+    const { sup, adapter } = supervisor();
+    await sup.adopt();
+    const rel = await writeTicket();
+
+    const started = await sup.start(request({ ticketRelPath: rel, handover: 'auto' }));
+    expect((started as { run: { handoverMode?: string } }).run.handoverMode).toBe('fresh');
+    expect(adapter.starts[0]!.resumeRef).toBeNull();
+    const stream = await fsp.readFile(
+      path.join(fleetRoot, 'runs', (started as { run: { id: string } }).run.id, 'stream.jsonl'),
+      'utf8',
+    );
+    expect(stream).toContain('twice');
+  });
+
+  it('a cold pause above the configured threshold resumes with a native compact first (T-0049)', async () => {
+    const rel = await writeTicket();
+    await seedRun('R-big', {
+      endedAt: '2026-10-17T10:00:00Z', // two hours before the fixed now: cold
+      sessionRef: 'ses_big',
+      lastTurnContext: 30_000,
+    });
+    const { sup, adapter } = supervisor();
+    await sup.adopt();
+    sup.setHandoverConfig({ compactAboveTokens: 20_000, resumePauseTtlMin: 15, contextCapTokens: 160_000 });
+    const started = await sup.start(request({ ticketRelPath: rel, handover: 'auto' }));
+    expect(adapter.starts[0]!.compactFirst).toBe(true);
+    expect((started as { run: { handoverMode?: string } }).run.handoverMode).toBe('resume-compact');
+
+    // The same record with the default threshold is below the bar: a plain resume.
+    const plain = supervisor();
+    await plain.sup.adopt();
+    await plain.sup.start(request({ ticketRelPath: rel, handover: 'auto' }));
+    expect(plain.adapter.starts[0]!.compactFirst).not.toBe(true);
+  });
+
+  it('a resume the adapter cannot establish respawns fresh under the same run id (T-0049)', async () => {
+    const rel = await writeTicket();
+    await seedRun('R-gone', { sessionRef: 'ses_gone', endedAt: '2026-10-17T11:57:00Z' });
+    const { sup, adapter } = supervisor();
+    await sup.adopt();
+
+    const started = await sup.start(request({ ticketRelPath: rel, handover: 'resume' }));
+    const id = (started as { run: { id: string } }).run.id;
+    expect(adapter.starts[0]!.resumeRef).toBe('ses_gone');
+
+    adapter.starts[0]!.onResumeFailed!('the session answered HTTP 404');
+    await waitFor(() => expect(adapter.starts.length).toBe(2));
+    expect(adapter.handles[0]!.stop).toHaveBeenCalled();
+    expect(adapter.starts[1]!.resumeRef).toBeNull();
+    expect(adapter.starts[1]!.instruction).toBe('Do the ticket.');
+
+    // One run id, fresh stamps, the note on the stream — and the run is alive.
+    const info = sup.get(id)!;
+    expect(sup.list().filter((r) => !['done', 'stopped', 'failed'].includes(r.state))).toHaveLength(1);
+    expect(info.handoverMode).toBe('fresh');
+    expect(info.resumedFrom).toBeNull();
+    const stream = await fsp.readFile(path.join(fleetRoot, 'runs', id, 'stream.jsonl'), 'utf8');
+    expect(stream).toContain('the run starts fresh');
+
+    // The replacement worker's turn decides the run as usual.
+    adapter.handles[1]!.result();
+    adapter.handles[1]!.fail(0);
+    await settled(sup, id, 'done');
+  });
+
+  it('resume strips the stored handover ask from the copied request (T-0049)', async () => {
+    const rel = await writeTicket();
+    const dir = path.join(fleetRoot, 'runs', 'R-det');
+    await fsp.mkdir(dir, { recursive: true });
+    const info = {
+      id: 'R-det',
+      ticketId: 'T-0001',
+      provider: 'opencode',
+      state: 'detached',
+      pid: null,
+      startedAt: '2026-10-17T11:00:00Z',
+      endedAt: null,
+      sessionRef: 'ses_det',
+      tokensIn: 0,
+      tokensOut: 0,
+      costUsd: null,
+      lastActivity: '2026-10-17T11:00:00Z',
+      steerCount: 0,
+      lastSteerRung: null,
+      worktreePath: 'x',
+      branch: 't/T-0001',
+      gateFailure: null,
+    };
+    await fsp.writeFile(
+      path.join(dir, 'run.json'),
+      JSON.stringify({ request: request({ ticketRelPath: rel, handover: 'auto' }), info }),
+      'utf8',
+    );
+    const { sup } = supervisor();
+    await sup.adopt();
+
+    const outcome = await sup.resume('R-det');
+    expect(outcome.ok).toBe(true);
+    const id = (outcome as { run: { id: string } }).run.id;
+    const stored = JSON.parse(await fsp.readFile(path.join(fleetRoot, 'runs', id, 'run.json'), 'utf8')) as {
+      request: { handover?: string };
+    };
+    expect(stored.request.handover).toBeUndefined();
+  });
+
+  it('refuses a second live run for the ticket', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    await sup.start(request({ ticketRelPath: rel }));
+    const second = await sup.start(request({ ticketRelPath: rel }));
+    expect(second.ok).toBe(false);
+    expect((second as { error: string }).error).toContain('already has a live run');
+    expect(adapter.handles).toHaveLength(1);
+  });
+
+  it('takeover holds the run, an interrupt takes over by itself, release hands it back', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    const handle = adapter.handles[0]!;
+
+    expect((await sup.takeover(runId)).ok).toBe(true);
+    expect(handle.setHold).toHaveBeenLastCalledWith(true);
+    expect(sup.get(runId)?.held).toBe(true);
+
+    expect((await sup.interrupt(runId)).ok).toBe(true);
+    expect(handle.interrupt).toHaveBeenCalledTimes(1);
+
+    expect((await sup.release(runId)).ok).toBe(true);
+    expect(handle.setHold).toHaveBeenLastCalledWith(false);
+    expect(sup.get(runId)?.held).toBe(false);
+  });
+
+  it('handing back a paused worker continues the step instead of ending it for the gate', async () => {
+    const { sup, adapter, gate } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    const handle = adapter.handles[0]!;
+
+    expect((await sup.interrupt(runId)).ok).toBe(true);
+    handle.result(); // the interrupted turn's own result — not a completion
+    expect((await sup.release(runId)).ok).toBe(true);
+    expect(handle.steer).toHaveBeenCalledWith(HANDBACK_CONTINUE);
+    expect(sup.get(runId)?.state).toBe('running');
+
+    // The worker exits without a result of its own after the hand-back:
+    // no agent-done was ever declared, so the step fails instead of gating.
+    handle.fail(0);
+    await settled(sup, runId, 'failed');
+    expect(gate).toEqual([]);
+  });
+
+  it('a plain release without a pause does not prompt the worker', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    const handle = adapter.handles[0]!;
+    expect((await sup.takeover(runId)).ok).toBe(true);
+    expect((await sup.release(runId)).ok).toBe(true);
+    expect(handle.steer).not.toHaveBeenCalled();
+  });
+
+  it('the first prompt takes the run over by itself; opening and watching never do', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    expect(sup.get(runId)?.held).not.toBe(true);
+
+    expect((await sup.send(runId, 'look at the spec')).ok).toBe(true);
+    expect(adapter.handles[0]!.setHold).toHaveBeenLastCalledWith(true);
+    expect(sup.get(runId)?.held).toBe(true);
+  });
+
+  it('a waiting worker is recorded with its question and logged; the answer is no takeover (req-64)', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    adapter.starts[0]!.onEvent({ ts: '2026-10-20T10:05:00Z', kind: 'usage', waiting: { kind: 'question', text: 'Which API?' } });
+    await waitFor(async () => {
+      expect(sup.get(runId)?.waiting).toEqual({ kind: 'question', text: 'Which API?', since: '2026-10-20T10:05:00Z' });
+      expect(await fsp.readFile(path.join(vaultDir, rel), 'utf8')).toContain('asks the owner — Which API?');
+    });
+
+    expect((await sup.send(runId, 'v2')).ok).toBe(true);
+    expect(adapter.handles[0]!.setHold).not.toHaveBeenCalled();
+    expect(sup.get(runId)?.held).not.toBe(true);
+    expect(await fsp.readFile(path.join(vaultDir, rel), 'utf8')).toContain('answered by the owner: v2');
+
+    adapter.starts[0]!.onEvent({ ts: '2026-10-20T10:06:00Z', kind: 'usage', waiting: null });
+    await waitFor(() => expect(sup.get(runId)?.waiting).toBeNull());
+  });
+
+  it('passes the owner\'s approval to the worker, and refuses when nothing waits for one (req-64)', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    expect((await sup.answerPermission(runId, 'once')).ok).toBe(false);
+
+    adapter.starts[0]!.onEvent({
+      ts: '2026-10-20T10:05:00Z',
+      kind: 'usage',
+      waiting: { kind: 'permission', text: 'bash rm -rf dist', requestId: 'per_1' },
+    });
+    await waitFor(() => expect(sup.get(runId)?.waiting?.kind).toBe('permission'));
+    expect((await sup.answerPermission(runId, 'reject')).ok).toBe(true);
+    expect(adapter.handles[0]!.answerPermission).toHaveBeenCalledWith('per_1', 'reject');
+    expect(await fsp.readFile(path.join(vaultDir, rel), 'utf8')).toContain('rejected by the owner — bash rm -rf dist');
+  });
+
+  it("answers a question form with the owner's choices or typed words — no takeover, no prompt", async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    expect((await sup.answerQuestion(runId, { q0: 'Rebase' })).ok).toBe(false);
+
+    const questions = [{ key: 'q0', header: 'Merge', question: 'How should I merge?', options: [{ label: 'Rebase' }, { label: 'Merge' }], multiple: false }];
+    adapter.starts[0]!.onEvent({
+      ts: '2026-10-20T10:05:00Z',
+      kind: 'usage',
+      waiting: { kind: 'question', text: 'How should I merge?', requestId: 'frm_1', questions },
+    });
+    await waitFor(() => expect(sup.get(runId)?.waiting?.requestId).toBe('frm_1'));
+    expect((await sup.answerQuestion(runId, { q0: 'Rebase' })).ok).toBe(true);
+    expect(adapter.handles[0]!.answerQuestion).toHaveBeenLastCalledWith('frm_1', { q0: 'Rebase' });
+
+    expect((await sup.send(runId, '2')).ok).toBe(true);
+    expect(adapter.handles[0]!.answerQuestion).toHaveBeenLastCalledWith('frm_1', { q0: 'Merge' });
+    expect(adapter.handles[0]!.steer).not.toHaveBeenCalled();
+    expect(adapter.handles[0]!.setHold).not.toHaveBeenCalled();
+    expect(await fsp.readFile(path.join(vaultDir, rel), 'utf8')).toContain('answered by the owner: Merge');
+  });
+
+  it('an interrupt of a run nobody holds takes it over first', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    expect((await sup.interrupt(runId)).ok).toBe(true);
+    expect(adapter.handles[0]!.setHold).toHaveBeenCalledWith(true);
+    expect(sup.get(runId)?.held).toBe(true);
+  });
+
+  it('a reported context window survives later events without it (T-0052)', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    const fire = adapter.starts[0]!.onEvent;
+    fire({ ts: '2026-10-17T12:00:00Z', kind: 'usage', contextWindow: 1_000_000 });
+    await waitFor(() => expect(sup.get(runId)?.contextWindow).toBe(1_000_000));
+    // A later event without the field must not erase the once-set value.
+    fire({ ts: '2026-10-17T12:00:01Z', kind: 'note', text: 'working' });
+    await waitFor(() => expect(sup.get(runId)?.lastActivity).toBe('2026-10-17T12:00:01Z'));
+    expect(sup.get(runId)?.contextWindow).toBe(1_000_000);
+  });
+
+  // --- the elapsed clock's busy spans (req-67) -----------------------
+
+  it('the clock presumes working from the start and closes its span when a wait begins', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    const fire = adapter.starts[0]!.onEvent;
+    fire({ ts: '2026-10-17T12:05:00Z', kind: 'usage', turn: 'busy' });
+    await waitFor(() => expect(sup.get(runId)?.execSince).toBe('2026-10-17T12:00:00.000Z'));
+
+    fire({ ts: '2026-10-17T12:10:00Z', kind: 'usage', waiting: { kind: 'question', text: 'Which API?' } });
+    await waitFor(() => expect(sup.get(runId)).toMatchObject({ execMs: 10 * 60_000, execSince: null }));
+
+    fire({ ts: '2026-10-17T12:15:00Z', kind: 'usage', turn: 'busy', waiting: null });
+    await waitFor(() => expect(sup.get(runId)?.execSince).toBe('2026-10-17T12:15:00Z'));
+    expect(sup.get(runId)?.execMs).toBe(10 * 60_000);
+  });
+
+  it('a standing held worker pauses the clock the same way, and startup counts', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    const fire = adapter.starts[0]!.onEvent;
+    fire({ ts: '2026-10-17T12:10:00Z', kind: 'usage', turn: 'idle' });
+    await waitFor(() => expect(sup.get(runId)).toMatchObject({ execMs: 10 * 60_000, execSince: null }));
+
+    fire({ ts: '2026-10-17T12:12:00Z', kind: 'usage', turn: 'busy' });
+    await waitFor(() => expect(sup.get(runId)?.execSince).toBe('2026-10-17T12:12:00Z'));
+    expect(sup.get(runId)?.execMs).toBe(10 * 60_000);
+  });
+
+  it('the clock freezes when the run ends, on the record as well', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    const fire = adapter.starts[0]!.onEvent;
+    // Rapid-fire on purpose: two events, no settling between them — the
+    // fold must serialize them in arrival order (the req-67 clock-freeze
+    // flake used to let the older idle event land last).
+    fire({ ts: '2026-10-17T12:10:00Z', kind: 'usage', turn: 'idle' });
+    fire({ ts: '2026-10-17T12:12:00Z', kind: 'usage', turn: 'busy' });
+    await waitFor(() => expect(sup.get(runId)?.execSince).toBe('2026-10-17T12:12:00Z'));
+
+    await sup.stop(runId, 'enough');
+    await waitFor(async () => {
+      expect(sup.get(runId)?.state).toBe('stopped');
+      const stored = JSON.parse(await fsp.readFile(path.join(fleetRoot, 'runs', runId, 'run.json'), 'utf8')) as {
+        info: RunInfo;
+      };
+      expect(stored.info).toMatchObject({ execMs: 10 * 60_000, execSince: null });
+    });
+  });
+
+  it('an adopted run detached mid-busy is frozen at its last stamp', async () => {
+    const rel = await writeTicket();
+    const dir = path.join(fleetRoot, 'runs', 'R-ex');
+    await fsp.mkdir(dir, { recursive: true });
+    const info: RunInfo = {
+      id: 'R-ex',
+      ticketId: 'T-0001',
+      provider: 'opencode',
+      state: 'running',
+      pid: null,
+      startedAt: '2026-10-17T10:00:00Z',
+      endedAt: null,
+      sessionRef: 'ses_ex',
+      tokensIn: 0,
+      tokensOut: 0,
+      costUsd: null,
+      lastActivity: '2026-10-17T11:30:00Z',
+      steerCount: 0,
+      lastSteerRung: null,
+      worktreePath: 'x',
+      branch: 't/T-0001',
+      turn: 'busy',
+      execMs: 30 * 60_000,
+      execSince: '2026-10-17T11:00:00Z',
+      gateFailure: null,
+    };
+    await fsp.writeFile(path.join(dir, 'run.json'), JSON.stringify({ request: request({ ticketRelPath: rel }), info }), 'utf8');
+    const { sup } = supervisor();
+    await sup.adopt();
+    expect(sup.get('R-ex')).toMatchObject({ execMs: 60 * 60_000, execSince: null });
+  });
+
+  it('a re-attached busy run resumes its clock at the next busy report, without the unwatched gap', async () => {
+    const rel = await writeTicket();
+    const dir = path.join(fleetRoot, 'runs', 'R-busy');
+    await fsp.mkdir(dir, { recursive: true });
+    const info: RunInfo = {
+      id: 'R-busy',
+      ticketId: 'T-0001',
+      provider: 'opencode',
+      state: 'running',
+      pid: process.pid,
+      startedAt: '2026-10-17T11:00:00Z',
+      endedAt: null,
+      sessionRef: 'ses_busy',
+      tokensIn: 0,
+      tokensOut: 0,
+      costUsd: null,
+      lastActivity: '2026-10-17T11:30:00Z',
+      steerCount: 0,
+      lastSteerRung: null,
+      worktreePath: 'x',
+      branch: 't/T-0001',
+      turn: 'busy',
+      execMs: 20 * 60_000,
+      execSince: '2026-10-17T11:10:00Z',
+      gateFailure: null,
+    };
+    await fsp.writeFile(path.join(dir, 'run.json'), JSON.stringify({ request: request({ ticketRelPath: rel }), info }), 'utf8');
+    await fsp.writeFile(
+      path.join(dir, 'attach.json'),
+      JSON.stringify({ address: 'http://127.0.0.1:50003', password: 'pw', pid: process.pid, pidStartedMs: null }),
+      'utf8',
+    );
+    const { sup, adapter } = supervisor({ exec: probeExec(os.tmpdir()) });
+    await sup.adopt();
+    // The unwatched gap closed the span at the record's last stamp.
+    expect(sup.get('R-busy')).toMatchObject({ execMs: 40 * 60_000, execSince: null });
+
+    adapter.starts[0]!.onEvent({ ts: '2026-10-17T12:05:00Z', kind: 'usage', turn: 'busy' });
+    await waitFor(() => expect(sup.get('R-busy')?.execSince).toBe('2026-10-17T12:05:00Z'));
+    expect(sup.get('R-busy')?.execMs).toBe(40 * 60_000);
+  });
+
+  it('resume ends a detached run and resumes its session in a new run', async () => {
+    const rel = await writeTicket();
+    const dir = path.join(fleetRoot, 'runs', 'R-gone');
+    await fsp.mkdir(dir, { recursive: true });
+    const info = { id: 'R-gone', ticketId: 'T-0001', provider: 'opencode', state: 'detached', pid: null, startedAt: '2026-10-17T11:00:00Z', endedAt: null, sessionRef: 'ses_gone', tokensIn: 0, tokensOut: 0, costUsd: null, lastActivity: '2026-10-17T11:00:00Z', steerCount: 0, lastSteerRung: null, worktreePath: 'x', branch: 't/T-0001', gateFailure: null };
+    await fsp.writeFile(path.join(dir, 'run.json'), JSON.stringify({ request: request({ ticketRelPath: rel }), info }), 'utf8');
+    const { sup, adapter } = supervisor();
+    await sup.adopt();
+
+    const outcome = await sup.resume('R-gone');
+    expect(outcome.ok).toBe(true);
+    expect(sup.get('R-gone')?.state).toBe('stopped');
+    expect(adapter.starts).toHaveLength(1);
+    expect(adapter.starts[0]!.resumeRef).toBe('ses_gone');
+    expect(adapter.starts[0]!.instruction).toContain('session was resumed');
+  });
+
+  it('resume refuses a run that is not detached or never reported a session', async () => {
+    const { sup } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    expect((await sup.resume(runId)).ok).toBe(false);
+    expect((await sup.resume('R-nope')).ok).toBe(false);
+  });
+
+  it('refuses a takeover for a worker that cannot be held, and for an unknown run', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+    (adapter.handles[0] as { setHold?: unknown }).setHold = undefined;
+    const refused = await sup.takeover(runId);
+    expect(refused.ok).toBe(false);
+    expect((refused as { error: string }).error).toContain('cannot be taken over');
+    expect((await sup.takeover('R-nope')).ok).toBe(false);
+  });
+
+  it('stop kills the worker first and the ticket Log line comes with the run\'s end', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const runId = (started as { run: { id: string } }).run.id;
+
+    const outcome = await sup.stop(runId, 'because');
+    expect(outcome.ok).toBe(true);
+    expect(adapter.handles[0]!.stop).toHaveBeenCalledTimes(1);
+    await waitFor(async () => {
+      expect(sup.get(runId)?.state).toBe('stopped');
+      expect(await fsp.readFile(path.join(vaultDir, rel), 'utf8')).toContain('stopped by the owner — because');
+    });
+  });
+
+  it('re-attaches a live worker of a restarted runner, a held run stays held', async () => {
+    const rel = await writeTicket();
+    const dir = path.join(fleetRoot, 'runs', 'R-live');
+    await fsp.mkdir(dir, { recursive: true });
+    const info = {
+      id: 'R-live',
+      ticketId: 'T-0001',
+      provider: 'opencode',
+      state: 'running',
+      held: true,
+      pid: process.pid,
+      startedAt: '2026-10-17T11:00:00Z',
+      endedAt: null,
+      sessionRef: 'ses_live',
+      tokensIn: 5,
+      tokensOut: 1,
+      costUsd: null,
+      lastActivity: '2026-10-17T11:30:00Z',
+      steerCount: 0,
+      lastSteerRung: null,
+      worktreePath: 'x',
+      branch: 't/T-0001',
+      gateFailure: null,
+    };
+    await fsp.writeFile(path.join(dir, 'run.json'), JSON.stringify({ request: request({ ticketRelPath: rel }), info }), 'utf8');
+    // the worker is "alive": the recorded process is this very test process
+    await fsp.writeFile(
+      path.join(dir, 'attach.json'),
+      JSON.stringify({ address: 'http://127.0.0.1:50001', password: 'pw', pid: process.pid, pidStartedMs: null }),
+      'utf8',
+    );
+
+    const { sup, adapter } = supervisor({ exec: probeExec(os.tmpdir()) });
+    await sup.adopt();
+
+    expect(sup.get('R-live')?.state).toBe('running');
+    expect(adapter.attachInfos).toHaveLength(1);
+    expect(adapter.attachInfos[0]).toMatchObject({ address: 'http://127.0.0.1:50001', password: 'pw', sessionRef: 'ses_live', pid: process.pid });
+    expect(adapter.handles[0]!.setHold).toHaveBeenCalledWith(true);
+    // the credential never rides in the run record the board reads
+    expect(await fsp.readFile(path.join(dir, 'run.json'), 'utf8')).not.toContain('pw"');
+  });
+
+  it('does not re-attach when the recorded process is gone or no attach file exists', async () => {
+    const rel = await writeTicket();
+    for (const [id, attach] of [
+      ['R-nofile', null],
+      ['R-dead', { address: 'http://127.0.0.1:50002', password: 'pw', pid: 2_147_483_000, pidStartedMs: null }],
+    ] as const) {
+      const dir = path.join(fleetRoot, 'runs', id);
+      await fsp.mkdir(dir, { recursive: true });
+      const info = { id, ticketId: 'T-0001', provider: 'opencode', state: 'running', pid: null, startedAt: '2026-10-17T11:00:00Z', endedAt: null, sessionRef: 'ses_x', tokensIn: 0, tokensOut: 0, costUsd: null, lastActivity: '2026-10-17T11:00:00Z', steerCount: 0, lastSteerRung: null, worktreePath: 'x', branch: 't/T-0001', gateFailure: null };
+      await fsp.writeFile(path.join(dir, 'run.json'), JSON.stringify({ request: request({ ticketRelPath: rel }), info }), 'utf8');
+      if (attach !== null) {
+        await fsp.writeFile(path.join(dir, 'attach.json'), JSON.stringify(attach), 'utf8');
+      }
+    }
+    const { sup, adapter } = supervisor({ exec: probeExec(os.tmpdir()) });
+    await sup.adopt();
+    expect(adapter.attachInfos).toHaveLength(0);
+    expect(sup.get('R-nofile')?.state).toBe('detached');
+    expect(sup.get('R-dead')?.state).toBe('detached');
+  });
+
+  it('adopts a live leftover as detached once, and stop ends a detached run (frees the ticket)', async () => {
+    const rel = await writeTicket();
+    const dir = path.join(fleetRoot, 'runs', 'R-old');
+    await fsp.mkdir(dir, { recursive: true });
+    const info = {
+      id: 'R-old',
+      ticketId: 'T-0001',
+      provider: 'opencode',
+      state: 'running',
+      pid: null,
+      startedAt: '2026-10-17T11:00:00Z',
+      endedAt: null,
+      sessionRef: null,
+      tokensIn: 0,
+      tokensOut: 0,
+      costUsd: null,
+      lastActivity: '2026-10-17T11:00:00Z',
+      steerCount: 0,
+      lastSteerRung: null,
+      worktreePath: 'x',
+      branch: 't/T-0001',
+      gateFailure: null,
+    };
+    await fsp.writeFile(path.join(dir, 'run.json'), JSON.stringify({ request: request({ ticketRelPath: rel }), info }), 'utf8');
+
+    const first = supervisor();
+    await first.sup.adopt();
+    expect(first.sup.get('R-old')?.state).toBe('detached');
+
+    // A second boot leaves the detached record alone (no re-detach, no new stamp).
+    const before = await fsp.readFile(path.join(dir, 'run.json'), 'utf8');
+    const second = supervisor();
+    await second.sup.adopt();
+    expect(await fsp.readFile(path.join(dir, 'run.json'), 'utf8')).toBe(before);
+
+    const stopped = await second.sup.stop('R-old', 'owner');
+    expect(stopped.ok).toBe(true);
+    expect(second.sup.get('R-old')?.state).toBe('stopped');
+  });
+
+  describe('a detached run whose worker is gone (D-34)', () => {
+    /** Answers the liveness probes: only the pids named are running, started at the given instant. */
+    const running = (pids: Readonly<Record<number, string>>) => async (cmd: string, args: readonly string[]): Promise<string> => {
+      const pid = Number(args.join(' ').match(/\d+/)?.[0] ?? '0');
+      if (cmd === 'powershell.exe') {
+        const started = pids[pid];
+        if (started === undefined) {
+          throw new Error('gone');
+        }
+        return String(Date.parse(started));
+      }
+      if (pids[pid] === undefined) {
+        if (cmd === 'tasklist') {
+          return 'INFO: No tasks';
+        }
+        throw new Error('gone');
+      }
+      return cmd === 'ps' ? new Date(pids[pid]!).toUTCString() : `"${pid}"`;
+    };
+
+    async function seedDetached(rel: string, pid: number): Promise<void> {
+      const dir = path.join(fleetRoot, 'runs', 'R-old');
+      await fsp.mkdir(dir, { recursive: true });
+      const info: RunInfo = {
+        id: 'R-old',
+        ticketId: 'T-0001',
+        provider: 'opencode',
+        state: 'detached',
+        pid,
+        startedAt: '2026-10-17T11:00:00Z',
+        endedAt: '2026-10-17T11:30:00Z',
+        sessionRef: 'ses_old',
+        tokensIn: 0,
+        tokensOut: 0,
+        costUsd: null,
+        lastActivity: '2026-10-17T11:20:00Z',
+        steerCount: 0,
+        lastSteerRung: null,
+        worktreePath: 'x',
+        branch: 't/T-0001',
+        gateFailure: 'the runner restarted while the worker lived on; watch or resume it manually',
+      };
+      await fsp.writeFile(path.join(dir, 'run.json'), JSON.stringify({ request: request({ ticketRelPath: rel }), info }), 'utf8');
+    }
+
+    it('settles at the reaper: the fleet stops counting it', async () => {
+      const rel = await writeTicket();
+      await seedDetached(rel, 70832);
+      const { sup } = supervisor({ exec: running({}) });
+      await sup.adopt();
+      expect(sup.get('R-old')?.state).toBe('detached');
+      await sup.reap();
+      await settled(sup, 'R-old', 'failed');
+      expect(sup.get('R-old')?.pid).toBeNull();
+      expect(JSON.parse(await fsp.readFile(path.join(fleetRoot, 'runs', 'R-old', 'run.json'), 'utf8')).info.state).toBe('failed');
+    });
+
+    it('a reused pid (a process started after the run last showed life) is not the worker', async () => {
+      const rel = await writeTicket();
+      await seedDetached(rel, 49864);
+      const { sup } = supervisor({ exec: running({ 49864: '2026-10-18T18:15:00Z' }) });
+      await sup.adopt();
+      await sup.reap();
+      await settled(sup, 'R-old', 'failed');
+    });
+
+    it('a worker still alive keeps its run detached: it may yet be working', async () => {
+      const rel = await writeTicket();
+      await seedDetached(rel, 4242);
+      const { sup } = supervisor({ exec: running({ 4242: '2026-10-17T11:00:00Z' }) });
+      await sup.adopt();
+      await sup.reap();
+      expect(sup.get('R-old')?.state).toBe('detached');
+    });
+  });
+
+  describe('a record from before the cut-over, on a board that moved to a store (D-42)', () => {
+    async function seedLive(rel: string): Promise<void> {
+      const dir = path.join(fleetRoot, 'runs', 'R-frozen');
+      await fsp.mkdir(dir, { recursive: true });
+      const info: RunInfo = {
+        id: 'R-frozen',
+        ticketId: 'T-0001',
+        provider: 'opencode',
+        state: 'running',
+        pid: 70832,
+        startedAt: '2026-10-17T11:00:00Z',
+        endedAt: null,
+        sessionRef: 'ses_frozen',
+        tokensIn: 0,
+        tokensOut: 0,
+        costUsd: null,
+        lastActivity: '2026-10-17T11:20:00Z',
+        steerCount: 0,
+        lastSteerRung: null,
+        worktreePath: 'x',
+        branch: 't/T-0001',
+        gateFailure: null,
+      };
+      await fsp.writeFile(path.join(dir, 'run.json'), JSON.stringify({ request: request({ ticketRelPath: rel }), info }), 'utf8');
+    }
+
+    it('the boot writes nothing to the legacy tree and commits nothing', async () => {
+      const rel = await writeTicket();
+      await seedLive(rel);
+      const before = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+      const { sup, git } = supervisor({ storeBacked: () => true, exec: async () => 'INFO: No tasks' });
+      await sup.adopt();
+      expect(sup.get('R-frozen')?.state).toBe('detached');
+      await sup.reap();
+      await settled(sup, 'R-frozen', 'failed');
+      expect(await fsp.readFile(path.join(vaultDir, rel), 'utf8')).toBe(before);
+      expect(git.calls.filter((c) => c.args[0] === 'commit')).toEqual([]);
+    });
+
+    it('on a file board the boot still clears the stamp', async () => {
+      const rel = await writeTicket();
+      await seedLive(rel);
+      const before = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+      const { sup } = supervisor({ exec: async () => 'INFO: No tasks' });
+      await sup.adopt();
+      expect(await fsp.readFile(path.join(vaultDir, rel), 'utf8')).not.toBe(before);
+    });
+  });
+
+  describe('every start says who asks (D-41)', () => {
+    it('a start with no origin is refused, and nothing spawns', async () => {
+      const rel = await writeTicket();
+      const { sup, adapter } = supervisor();
+      const { origin: _none, ...nameless } = request({ ticketRelPath: rel });
+      const outcome = await sup.start(nameless);
+      expect(outcome).toMatchObject({ ok: false, error: expect.stringContaining('names no origin') });
+      expect(adapter.starts).toHaveLength(0);
+    });
+
+    it('the origin lands in the runner log and on the record', async () => {
+      const rel = await writeTicket();
+      const logs: string[] = [];
+      const { sup } = supervisor({ log: (line) => logs.push(line) });
+      const started = await sup.start(request({ ticketRelPath: rel, origin: 'drey:run-dialog' }));
+      const id = (started as { run: { id: string } }).run.id;
+      expect(logs).toContain(`run ${id} (T-0001): asked by drey:run-dialog`);
+      expect(sup.get(id)?.origin).toBe('drey:run-dialog');
+    });
+  });
+
+  it('validates the deterministic branch and the machine gate before spawning', async () => {
+    const { sup } = supervisor();
+    await writeTicket();
+    const wrongBranch = await sup.start(request({ branch: 'feature/x' }));
+    expect(wrongBranch.ok).toBe(false);
+    const noGate = await sup.start(request({ acceptance: [] }));
+    expect(noGate.ok).toBe(false);
+    expect((noGate as { error: string }).error).toContain('carries no gate commands');
+    const wrongPath = await sup.start(request({ ticketRelPath: 'tickets/build/T-0001.md' }));
+    expect(wrongPath.ok).toBe(false);
+    expect((wrongPath as { error: string }).error).toContain('does not match id and phase');
+    // The first worker column may take the ticket anyway: its run gates
+    // structurally (the plan writes the criteria).
+    const structural = await sup.start(request({ acceptance: [], gate: 'structural' }));
+    expect(structural.ok).toBe(true);
+  });
+
+  it('a structural run fails red when no acceptance criteria came into existence', async () => {
+    const { sup, adapter, gate } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ acceptance: [], gate: 'structural' }));
+    const id = (started as { run: { id: string } }).run.id;
+
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'failed');
+
+    expect(gate).toEqual([]); // no commands to run — the gate reads instead
+    expect(sup.get(id)?.gateFailure).toContain('no executable acceptance criteria');
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    expect(parseTicketFile(text, rel).meta.run).toBeNull();
+  });
+
+  it('a structural run passes when the plan produced acceptance criteria', async () => {
+    const { sup, adapter, gate } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ acceptance: [], gate: 'structural' }));
+    const id = (started as { run: { id: string } }).run.id;
+
+    // The plan's deliverable: acceptance criteria appear in the ticket…
+    const live = path.join(vaultDir, rel);
+    await fsp.writeFile(
+      live,
+      (await fsp.readFile(live, 'utf8')).replace(
+        '### Acceptance criteria',
+        '### Acceptance criteria\n\n- [ ] `node -e "process.exit(0)"` — exits 0',
+      ),
+      'utf8',
+    );
+
+    // …and the gate reads them as green (no commands to run).
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+    expect(gate).toEqual([]);
+    await expect(fsp.access(path.join(vaultDir, 'tickets', 'build', 'T-0001.md'))).resolves.toBeUndefined();
+  });
+
+  it('accepts a numbered phase directory in the ticket path (T-0041)', async () => {
+    const { sup } = supervisor();
+    const rel = 'tickets/30-plan/T-0001.md';
+    await fsp.mkdir(path.join(vaultDir, 'tickets', '30-plan'), { recursive: true });
+    await fsp.writeFile(path.join(vaultDir, rel), ticketText(), 'utf8');
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    expect(started.ok).toBe(true);
+  });
+
+  it('a green worker passes the gate and moves the ticket on (one commit)', async () => {
+    const { sup, adapter, git, gate } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    expect(started.ok).toBe(true);
+
+    const info = (started as { run: { id: string; state: string } }).run;
+    expect(info.state).toBe('running');
+    // The ticket carries the live run now.
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    expect(parseTicketFile(text, rel).meta.run?.stream).toBe(info.id);
+
+    adapter.handles[0]!.onEvent('working…');
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, info.id, 'done');
+
+    // The gate ran exactly the ticket's commands, in the worktree.
+    expect(gate[0]).toEqual(['npm run verify:unit']);
+    // The ticket moved to the next phase; the run map is gone.
+    const movedRel = 'tickets/build/T-0001.md';
+    const moved = await fsp.readFile(path.join(vaultDir, movedRel), 'utf8');
+    expect(parseTicketFile(moved, movedRel).meta.run).toBeNull();
+    expect(parseTicketFile(moved, movedRel).meta.entered['build']).toBeDefined();
+    // Exactly the moved pair was committed for the transition.
+    const commit = git.calls.find((c) => c.args[0] === 'commit');
+    expect(commit?.args).toContain('--');
+    expect(git.calls.some((c) => c.args[0] === 'add')).toBe(true);
+    await expect(fsp.access(path.join(vaultDir, rel))).rejects.toBeDefined();
+  });
+
+  it('a run is `done` in memory before its settle has written the ticket — only onRunSettled marks the end (D-4)', async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let holding = 0;
+    let runId = '';
+    let sup: RunSupervisor | null = null;
+    const exec: GitExecFn = async (_exe, args) => {
+      if (args[0] === 'rev-parse') {
+        return `${path.sep}root${path.sep}tk
+`;
+      }
+      // Every commit from the moment the run is `done` belongs to the settle.
+      if (args[0] === 'commit' && sup?.get(runId)?.state === 'done') {
+        holding++;
+        await held;
+      }
+      return '';
+    };
+    const built = supervisor({ ticketsGit: new TicketsGit(() => 'git', exec) });
+    sup = built.sup;
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    runId = (started as { run: { id: string } }).run.id;
+    built.adapter.handles[0]!.result();
+    built.adapter.handles[0]!.fail(0);
+    await waitFor(() => expect(holding).toBe(1));
+    // The settle is inside its commit: `state` is terminal, the run is not settled.
+    expect(sup.get(runId)?.state).toBe('done');
+    expect(hasSettled(sup, runId)).toBe(false);
+    release();
+    await settled(sup, runId, 'done');
+    const movedRel = 'tickets/build/T-0001.md';
+    const moved = await fsp.readFile(path.join(vaultDir, movedRel), 'utf8');
+    expect(parseTicketFile(moved, movedRel).meta.run).toBeNull();
+  });
+
+  it('an interactive dialog starts held, lays the run stamp and the reservation, and ends without gate or move (req-65)', async () => {
+    const { sup, adapter, gate } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(
+      request({
+        ticketRelPath: rel,
+        acceptance: [],
+        gate: 'structural',
+        nextPhase: null,
+        nextPhaseDir: null,
+        interactive: 'plan',
+      }),
+    );
+    expect(started.ok).toBe(true);
+    const info = (started as { run: { id: string; state: string; held?: boolean; interactive?: string } }).run;
+    // Held from turn one — before the worker says anything.
+    expect(adapter.handles[0]!.setHold).toHaveBeenCalledWith(true);
+    expect(info.held).toBe(true);
+    expect(info.interactive).toBe('plan');
+    expect(info.state).toBe('running');
+
+    // The ticket carries the live run AND the dialog reservation.
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    const meta = parseTicketFile(text, rel).meta;
+    expect(meta.run?.stream).toBe(info.id);
+    expect(meta.interactive).toBe(true);
+
+    // The worker ends its turn without a result — a dialog turn, not a
+    // claim: the run still ends done, and nothing gates or moves.
+    adapter.handles[0]!.fail(0);
+    await settled(sup, info.id, 'done');
+    expect(gate).toEqual([]);
+    const kept = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    const keptMeta = parseTicketFile(kept, rel).meta;
+    expect(keptMeta.run).toBeNull(); // the stamp cleared with the run
+    expect(keptMeta.interactive).toBe(true); // the reservation stands until a move
+    await fsp.access(path.join(vaultDir, rel)); // the ticket never moved
+  });
+
+  it('an interactive dialog spawns quiet — no brief delivered, the worker stands held (req-75)', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(
+      request({
+        ticketRelPath: rel,
+        acceptance: [],
+        gate: 'structural',
+        nextPhase: null,
+        nextPhaseDir: null,
+        interactive: 'plan',
+      }),
+    );
+    expect(started.ok).toBe(true);
+    const info = (started as { run: { id: string } }).run;
+    // Nothing runs until the owner asks: the adapter delivers no first
+    // prompt, and the record says the brief still rides ahead.
+    expect(adapter.starts[0]!.holdAtSpawn).toBe(true);
+    expect(adapter.handles[0]!.setHold).toHaveBeenCalledWith(true);
+    expect(sup.get(info.id)?.quietStart).toBe(true);
+    expect(sup.get(info.id)?.held).toBe(true);
+  });
+
+  it("the owner's first message wraps the quiet brief once; every later send goes bare (req-75)", async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(
+      request({
+        ticketRelPath: rel,
+        acceptance: [],
+        gate: 'structural',
+        nextPhase: null,
+        nextPhaseDir: null,
+        interactive: 'plan',
+      }),
+    );
+    const id = (started as { run: { id: string } }).run.id;
+
+    expect((await sup.send(id, 'Where does the parser live?')).ok).toBe(true);
+    expect(adapter.handles[0]!.steer).toHaveBeenCalledWith(
+      'Do the ticket.\n\n---\n\nThe owner starts the dialog:\nWhere does the parser live?',
+    );
+    // Once, and persisted: quietStart is cleared with the send.
+    expect(sup.get(id)?.quietStart).toBeUndefined();
+    await waitFor(async () =>
+      expect(JSON.parse(await fsp.readFile(path.join(fleetRoot, 'runs', id, 'run.json'), 'utf8')).info.quietStart).toBeUndefined(),
+    );
+
+    expect((await sup.send(id, 'Start with the lexer')).ok).toBe(true);
+    expect(adapter.handles[0]!.steer).toHaveBeenLastCalledWith('Start with the lexer');
+  });
+
+  it('a fleet move into a non-claim phase releases a stale claim', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+
+    // A claim left over from an earlier round rides on the live ticket…
+    const live = path.join(vaultDir, rel);
+    await fsp.writeFile(
+      live,
+      patchTicketFile(await fsp.readFile(live, 'utf8'), {
+        to: 'plan',
+        from: null,
+        now: new Date('2026-10-17T12:00:01Z'),
+        actor: 'owner@desk',
+        claimBy: 'owner@desk',
+      }),
+      'utf8',
+    );
+
+    // …but the fleet's own move never carries it into the next column.
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+
+    const movedRel = 'tickets/build/T-0001.md';
+    const moved = await fsp.readFile(path.join(vaultDir, movedRel), 'utf8');
+    expect(parseTicketFile(moved, movedRel).meta.claimedBy).toBeNull();
+  });
+
+  it('moves the ticket into the resolved numbered directory (T-0041)', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(
+      request({ ticketRelPath: rel, nextPhase: 'qa', nextPhaseDir: '35-qa' }),
+    );
+    expect(started.ok).toBe(true);
+    const id = (started as { run: { id: string } }).run.id;
+
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+
+    const movedRel = 'tickets/35-qa/T-0001.md';
+    const moved = await fsp.readFile(path.join(vaultDir, movedRel), 'utf8');
+    expect(parseTicketFile(moved, movedRel).meta.entered['qa']).toBeDefined();
+    expect(moved).toContain('moving to qa');
+    await expect(fsp.access(path.join(vaultDir, rel))).rejects.toBeDefined();
+  });
+
+  it('a manual step after the gate parks the ticket in place: awaiting set, no move (E10-6)', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel, nextPhase: null, nextPhaseDir: null, parkFor: 'you' }));
+    expect(started.ok).toBe(true);
+    const id = (started as { run: { id: string } }).run.id;
+
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    const meta = parseTicketFile(text, rel).meta;
+    expect(meta.awaiting).toBe('you');
+    expect(text).toContain('parked for you (manual step)');
+  });
+
+  it('a pulled ticket moves into the working column and parks there (E10-6)', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel, nextPhase: 'qa', nextPhaseDir: 'qa', parkFor: 'you' }));
+    const id = (started as { run: { id: string } }).run.id;
+
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+
+    const movedRel = 'tickets/qa/T-0001.md';
+    const moved = await fsp.readFile(path.join(vaultDir, movedRel), 'utf8');
+    expect(parseTicketFile(moved, movedRel).meta.awaiting).toBe('you');
+    expect(parseTicketFile(moved, movedRel).meta.entered['qa']).toBeDefined();
+  });
+
+  it('pushes the transition commit when the request names a remote, never otherwise (T-0041)', async () => {
+    const withPush = supervisor();
+    const rel = await writeTicket();
+    const started = await withPush.sup.start(request({ ticketRelPath: rel, pushRemote: 'origin' }));
+    expect(started.ok).toBe(true);
+    const id = (started as { run: { id: string } }).run.id;
+
+    withPush.adapter.handles[0]!.result();
+    withPush.adapter.handles[0]!.fail(0);
+    await settled(withPush.sup, id, 'done');
+
+    const push = withPush.git.calls.find((c) => c.args[0] === 'push');
+    expect(push?.args).toEqual(['push', 'origin', 'HEAD']);
+    expect(push?.cwd).toBe(`${path.sep}root${path.sep}tk`);
+
+    const noPush = supervisor();
+    const rel2 = await writeTicket();
+    const started2 = await noPush.sup.start(request({ ticketRelPath: rel2 }));
+    const id2 = (started2 as { run: { id: string } }).run.id;
+    noPush.adapter.handles[0]!.result();
+    noPush.adapter.handles[0]!.fail(0);
+    await settled(noPush.sup, id2, 'done');
+    expect(noPush.git.calls.some((c) => c.args[0] === 'push')).toBe(false);
+  });
+
+  it('a red gate fails the run and the ticket stays put', async () => {
+    const { sup, adapter } = supervisor({
+      execShell: async () => Promise.reject(new Error('exit 1\nTests failed')),
+    });
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    expect(started.ok).toBe(true);
+    const id = (started as { run: { id: string } }).run.id;
+
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'failed');
+    expect(sup.get(id)?.gateFailure).toContain('exit 1');
+
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    const meta = parseTicketFile(text, rel).meta;
+    expect(meta.run).toBeNull(); // the slot is free again
+    expect(text).toContain('machine gate failed');
+  });
+
+  it('a red gate records its verdict, a bounded multi-line failure and a one-line Log entry', async () => {
+    const { sup, adapter } = supervisor({
+      execShell: async () => {
+        const err = new Error('command failed');
+        // What promisify(exec) rejects with: stdout and stderr ride the error.
+        Object.assign(err, { stdout: 'running tests…', stderr: `${'detail\n'.repeat(600)}FAIL src/a.spec.ts` });
+        throw err;
+      },
+    });
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'failed');
+    const info = sup.get(id)!;
+    expect(info.gateResult).toBe('red');
+    expect(info.gateFailure).toContain('\n'); // multi-line: the command line, then the output
+    expect(info.gateFailure).toContain('FAIL src/a.spec.ts');
+    expect(info.gateFailure!.split('\n').length).toBeLessThanOrEqual(400 + 2); // SANITY_CAP + the two heading lines
+
+    // The ticket Log keeps the single-line discipline: the failure's first line only.
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    const gateLines = text.split('\n').filter((line) => line.includes('machine gate failed'));
+    expect(gateLines).toHaveLength(1);
+    expect(gateLines[0]).toContain('machine gate failed — `npm run verify:unit` failed');
+    expect(gateLines[0]).not.toContain('detail');
+  });
+
+  it('a green gate records its verdict (gateResult on the record)', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+    expect(sup.get(id)?.gateResult).toBe('green');
+  });
+
+  it('a result that ends BLOCKED: runs no gate and moves nothing — the ticket waits (the refusal half of ADR-0077)', async () => {
+    const { sup, adapter, gate } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    expect(started.ok).toBe(true);
+    const id = (started as { run: { id: string } }).run.id;
+
+    adapter.handles[0]!.result('merge conflict in specs/changelog.md — not resolvable');
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+    // No gate ran — a green one over the branch would say nothing about the step's own report.
+    expect(gate).toHaveLength(0);
+    expect(sup.get(id)?.gateResult).toBeNull();
+    expect(sup.get(id)?.blocked).toBe('merge conflict in specs/changelog.md — not resolvable');
+    // The ticket file still sits in its phase folder; no move was performed.
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    expect(text).not.toContain('moving to build');
+    await expect(fsp.access(path.join(vaultDir, 'tickets/build/T-0001.md'))).rejects.toBeDefined();
+    // The record is durable: run.json carries the reason.
+    const stored = JSON.parse(await fsp.readFile(path.join(fleetRoot, 'runs', id, 'run.json'), 'utf8')) as {
+      info: { blocked?: string | null };
+    };
+    expect(stored.info.blocked).toBe('merge conflict in specs/changelog.md — not resolvable');
+  });
+
+  it('keeps the follow-ups a result proposes on the record, and drops them when a later result proposes none', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+    const onEvent = adapter.starts[0]!.onEvent;
+
+    onEvent({ ts: '2026-10-17T12:00:01Z', kind: 'note', text: 'working' });
+    await vi.waitFor(() => expect(sup.get(id)?.lastActivity).toBe('2026-10-17T12:00:01Z'));
+    expect(sup.get(id)).not.toHaveProperty('followups');
+
+    onEvent({
+      ts: '2026-10-17T12:00:02Z',
+      kind: 'result',
+      text: 'Done.\nFOLLOWUPS:\n- Cache the heading tree\n  why: slow\n  priority: low',
+    });
+    await vi.waitFor(() => expect(sup.get(id)?.followups).toEqual([{ title: 'Cache the heading tree', why: 'slow', priority: 'low' }]));
+    const stored = JSON.parse(await fsp.readFile(path.join(fleetRoot, 'runs', id, 'run.json'), 'utf8')) as {
+      info: { followups?: unknown };
+    };
+    expect(stored.info.followups).toEqual([{ title: 'Cache the heading tree', why: 'slow', priority: 'low' }]);
+
+    onEvent({ ts: '2026-10-17T12:00:03Z', kind: 'result', text: 'Done, nothing more to propose.' });
+    await vi.waitFor(() => expect(sup.get(id)?.followups).toEqual([]));
+  });
+
+  it('folds the run telemetry into the record as events arrive', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel, model: 'zai/glm-5.3' }));
+    const id = (started as { run: { id: string } }).run.id;
+    const onEvent = adapter.starts[0]!.onEvent;
+    onEvent({ ts: '2026-10-17T12:00:01Z', kind: 'note', text: 'read src/a.ts', tool: 'read' });
+    onEvent({ ts: '2026-10-17T12:00:02Z', kind: 'usage', turnUsage: { input: 900, cacheRead: 20_000, cacheCreation: 4_000, output: 210 } });
+    onEvent({ ts: '2026-10-17T12:00:03Z', kind: 'note', text: 'edit src/a.ts', tool: 'edit' });
+    onEvent({ ts: '2026-10-17T12:00:04Z', kind: 'usage', turnUsage: { input: 1_100, cacheRead: 30_000, cacheCreation: null, output: 300 } });
+    await waitFor(() => expect(sup.get(id)?.turns).toBe(2));
+
+    const info = sup.get(id)!;
+    expect(info.handoverMode).toBe('fresh');
+    expect(info.model).toBe('zai/glm-5.3');
+    expect(info.phase).toBe('plan');
+    expect(info.turns).toBe(2);
+    expect(info.usage).toEqual({ input: 2_000, cacheRead: 50_000, cacheCreation: 4_000, output: 510 });
+    expect(info.lastTurnContext).toBe(31_100);
+    expect(info.readCalls).toBe(1);
+    expect(info.tokensBeforeFirstWrite).toBe(24_900);
+    // The record is durable: run.json carries the fields. The write is
+    // queued behind the events and truncates before it fills — a read can
+    // land on an empty or older file, so it is retried (D-4).
+    await waitFor(async () => {
+      const stored = JSON.parse(await fsp.readFile(path.join(fleetRoot, 'runs', id, 'run.json'), 'utf8')) as {
+        info: { turns?: number; usage?: unknown };
+      };
+      expect(stored.info.turns).toBe(2);
+      expect(stored.info.usage).toBeDefined();
+    });
+  });
+
+  it('stop kills the worker and frees the run slot', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+
+    const stopped = await sup.stop(id, 'wrong direction');
+    expect(stopped.ok).toBe(true);
+    expect(adapter.handles[0]!.stop).toHaveBeenCalled();
+    await waitFor(async () => {
+      const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+      expect(parseTicketFile(text, rel).meta.run).toBeNull();
+    });
+    await expect(sup.get(id)?.state).toBe('stopped');
+
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    expect(text).toContain('stopped by the owner — wrong direction');
+  });
+
+  it('a prompt to an ended run reopens its session with the prompt as the first message', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+    adapter.handles[0]!.onEvent('session');
+    await sup.stop(id, 'pause');
+    await settled(sup, id, 'stopped');
+    // The fake worker reported no session; give the record one.
+    (sup as unknown as { runs: Map<string, { info: RunInfo }> }).runs.get(id)!.info = {
+      ...sup.get(id)!,
+      sessionRef: 'ses_1',
+    };
+
+    expect((await sup.send(id, '   ')).ok).toBe(false);
+    const sent = await sup.send(id, 'Also fix the header');
+    expect(sent.ok).toBe(true);
+    expect(sent.rung).toBe('resume');
+    expect(sent.runId).toBeDefined();
+    expect(sent.runId).not.toBe(id);
+    expect(adapter.starts[1]!.resumeRef).toBe('ses_1');
+    expect(adapter.starts[1]!.instruction).toBe('Also fix the header');
+    expect(sup.get(sent.runId!)?.held).toBe(true);
+    const stream = await fsp.readFile(path.join(fleetRoot, 'runs', sent.runId!, 'stream.jsonl'), 'utf8');
+    expect(stream).toContain('you › Also fix the header');
+  });
+
+  it('follows a ticket the owner moved during the run: the stamp is cleared, no second move', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+
+    // The owner moves the card on by hand (two columns on) while the worker runs.
+    const movedRel = 'tickets/commit/T-0001.md';
+    await fsp.mkdir(path.dirname(path.join(vaultDir, movedRel)), { recursive: true });
+    await fsp.rename(path.join(vaultDir, rel), path.join(vaultDir, movedRel));
+
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+
+    const text = await fsp.readFile(path.join(vaultDir, movedRel), 'utf8');
+    expect(parseTicketFile(text, movedRel).meta.run).toBeNull();
+    await expect(fsp.access(path.join(vaultDir, 'tickets/build/T-0001.md'))).rejects.toBeDefined();
+  });
+
+  it('steer reaches the worker and lands in the ticket Log', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+    // A dispatched run posts its brief at spawn, as before (req-75).
+    expect(adapter.starts[0]!.holdAtSpawn).not.toBe(true);
+
+    const sent = await sup.send(id, 'Focus on the parser first');
+    expect(sent.ok).toBe(true);
+    expect((sent as { rung: string }).rung).toBe('inject');
+    expect(adapter.handles[0]!.steer).toHaveBeenCalledWith('Focus on the parser first');
+
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    expect(text).toContain('steer (inject): Focus on the parser first');
+  });
+
+  it('a runner restart marks live runs detached and frees the ticket', async () => {
+    const { sup: first, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await first.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+    // The first supervisor "crashes" without the worker ever exiting.
+
+    const second = supervisor();
+    await second.sup.adopt();
+    const adopted = second.sup.get(id);
+    expect(adopted?.state).toBe('detached');
+
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    expect(parseTicketFile(text, rel).meta.run).toBeNull();
+    void adapter;
+  });
+
+  it('the start patch records the dialog\'s worker choice on the ticket', async () => {
+    const { sup } = supervisor();
+    const rel = await writeTicket();
+    await sup.start(request({ ticketRelPath: rel, recordWorker: 'claude-code/sonnet' }));
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    expect(parseTicketFile(text, rel).meta.worker).toBe('claude-code/sonnet');
+  });
+
+  it('a second opinion re-runs the step before it moves — once', async () => {
+    let opinions = 0;
+    const { sup, adapter } = supervisor({
+      secondOpinion: async () => {
+        opinions += 1;
+        return 'You are the sampling auditor — review the step.';
+      },
+    });
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+
+    // The first worker's green gate hands the step to the auditor.
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await waitFor(() => expect(adapter.handles.length).toBe(2));
+    // The ticket has not moved yet — the audit round runs first.
+    await expect(fsp.access(path.join(vaultDir, 'tickets', 'plan', 'T-0001.md'))).resolves.toBeUndefined();
+
+    // The auditor's green gate moves the ticket, and no third round starts.
+    adapter.handles[1]!.result();
+    adapter.handles[1]!.fail(0);
+    await settled(sup, id, 'done');
+    await expect(fsp.access(path.join(vaultDir, 'tickets', 'build', 'T-0001.md'))).resolves.toBeUndefined();
+    expect(opinions).toBe(1);
+    expect(adapter.handles).toHaveLength(2);
+    const stream = await fsp.readFile(path.join(fleetRoot, 'runs', id, 'stream.jsonl'), 'utf8');
+    expect(stream).toContain('second opinion');
+  });
+
+  it('a red gate in the audit round parks the ticket', async () => {
+    let gateCalls = 0;
+    const gateGreenRounds = 1;
+    const { sup, adapter } = supervisor({
+      secondOpinion: async () => 'audit brief',
+      execShell: async (command) => {
+        // The first gate is green, the auditor's gate runs the same
+        // commands — fail from the second round on via the call count.
+        gateCalls += 1;
+        if (gateCalls > gateGreenRounds) {
+          throw new Error('exit 1\naudit gate red');
+        }
+        void command;
+      },
+    });
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await waitFor(() => expect(adapter.handles.length).toBe(2));
+    adapter.handles[1]!.result();
+    adapter.handles[1]!.fail(0);
+    await settled(sup, id, 'failed');
+    await expect(fsp.access(path.join(vaultDir, 'tickets', 'plan', 'T-0001.md'))).resolves.toBeUndefined();
+    expect(sup.get(id)?.gateFailure).toContain('exit 1');
+    expect(sup.get(id)?.gateResult).toBe('red');
+  });
+
+  it('a worker that ends without a result fails red — the gate never runs', async () => {
+    const { sup, adapter, gate } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+
+    // A crash (or a spawn that never came up): the turn never finished,
+    // so there is no agent-done for the gate to judge.
+    adapter.handles[0]!.fail(-1);
+    await settled(sup, id, 'failed');
+
+    expect(gate).toEqual([]); // the safety net judges claimed-done work only
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    expect(parseTicketFile(text, rel).meta.run).toBeNull(); // the slot is free again
+    expect(text).toContain('no agent-done, the step fails');
+    // The ticket did not move.
+    await expect(fsp.access(path.join(vaultDir, 'tickets', 'plan', 'T-0001.md'))).resolves.toBeUndefined();
+  });
+
+  it('reuses an existing registered worktree for a re-run', async () => {
+    const { sup, git } = supervisor({ prepareWorktree: undefined });
+    // The path comes from the request (T-0044) — the runner never derives one.
+    const wt = request().worktreePath.replace(/\\/g, '/');
+    git.worktreeList = [
+      `worktree ${wt}`,
+      'branch refs/heads/t/T-0001',
+      '',
+      `worktree ${path.join(fleetRoot, 'worktrees', 'kt-other')}`,
+      'branch refs/heads/other',
+      '',
+    ].join('\n');
+    const rel = await writeTicket();
+
+    // `git worktree add` throws on the existing path; the registration
+    // for the same branch makes the start succeed anyway.
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    expect(started.ok).toBe(true);
+  });
+
+  it('refuses a start whose worktree path is registered for another branch', async () => {
+    const { sup, git } = supervisor({ prepareWorktree: undefined });
+    const wt = request().worktreePath.replace(/\\/g, '/');
+    git.worktreeList = [
+      `worktree ${wt}`,
+      'branch refs/heads/other',
+      '',
+    ].join('\n');
+    const rel = await writeTicket();
+
+    const refused = await sup.start(request({ ticketRelPath: rel }));
+    expect(refused.ok).toBe(false);
+    expect((refused as { error: string }).error).toContain('worktree failed');
+  });
+});
+
+describe('usageSummary — what the ticket Log says a run used', () => {
+  it('names tokens and leaves a zero cost out (flat plans report 0)', () => {
+    expect(usageSummary({ tokensIn: 331_122, tokensOut: 1_511, costUsd: 0 })).toBe(' — 331k in / 2k out');
+    expect(usageSummary({ tokensIn: 3_400_000, tokensOut: 800, costUsd: null })).toBe(' — 3.4M in / 800 out');
+  });
+
+  it('adds a real cost and stays silent when nothing was used', () => {
+    expect(usageSummary({ tokensIn: 1_000, tokensOut: 10, costUsd: 0.124 })).toBe(' — 1k in / 10 out · $0.12');
+    expect(usageSummary({ tokensIn: 0, tokensOut: 0, costUsd: null })).toBe('');
+  });
+
+  it('names the cached part of the input when the provider reported one (req-53)', () => {
+    expect(usageSummary({ tokensIn: 6_565_245, tokensOut: 12_779, cacheReadTokens: 6_200_000, costUsd: 0 })).toBe(
+      ' — 6.6M in (6.2M cached) / 13k out',
+    );
+    expect(usageSummary({ tokensIn: 1_000, tokensOut: 10, cacheReadTokens: 0, costUsd: null })).toBe(' — 1k in / 10 out');
+  });
+});
+
+describe('probeExec — the process probes keep their arguments apart', () => {
+  it('hands an argument with spaces over as one argument (no shell re-parsing)', async () => {
+    const out = await probeExec(os.tmpdir())(process.execPath, ['-e', 'process.stdout.write(process.argv[1])', 'PID eq 42']);
+    expect(out).toBe('PID eq 42');
+  });
+
+  it('sees a live pid as alive and an impossible one as gone', async () => {
+    const exec = probeExec(os.tmpdir());
+    expect(await processAlive(process.pid, exec)).toBe(true);
+    expect(await processAlive(2_147_483_000, exec)).toBe(false);
+  });
+});
+
+/**
+ * The runner handover (req-51): a runner retired for a newer build leaves
+ * its live runs to the successor instead of stopping them. The probe exec
+ * answers nothing, so no real process is ever probed or killed here.
+ */
+describe('RunSupervisor handover', () => {
+  const noProbe = async (): Promise<string> => '';
+
+  beforeEach(async () => {
+    vaultDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-vault-'));
+    fleetRoot = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-fleet-'));
+  });
+
+  afterEach(async () => {
+    await drainSupervisors();
+    await fsp.rm(vaultDir, { recursive: true, force: true });
+    await fsp.rm(fleetRoot, { recursive: true, force: true });
+  });
+
+  /** A Claude-Code-like fake: same scripted handles, no attach. */
+  function claudeSupervisor(): ReturnType<typeof supervisor> {
+    const fake = fakeAdapter();
+    const adapter: ProviderAdapter = { ...fake.adapter, id: 'claude-code', attach: undefined };
+    const built = supervisor({ adapter, exec: noProbe });
+    return { ...built, adapter: fake };
+  }
+
+  async function startedClaudeRun(sup: RunSupervisor, adapter: ReturnType<typeof fakeAdapter>): Promise<string> {
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel, provider: 'claude-code' }));
+    expect(started.ok).toBe(true);
+    adapter.starts[0]!.onSessionRef('ses_claude');
+    const id = (started as { run: { id: string } }).run.id;
+    // the session ref is persisted fire-and-forget: wait for that write to land
+    await waitFor(async () =>
+      expect(await fsp.readFile(path.join(fleetRoot, 'runs', id, 'run.json'), 'utf8').catch(() => '')).toContain('ses_claude'),
+    );
+    return id;
+  }
+
+  const storedOf = async (id: string): Promise<{ info: { state: string }; handover?: { mode: string } }> =>
+    JSON.parse(await fsp.readFile(path.join(fleetRoot, 'runs', id, 'run.json'), 'utf8')) as {
+      info: { state: string };
+      handover?: { mode: string };
+    };
+
+  it('stops a worker it cannot leave running, keeps the run live on disk and the ticket stamped', async () => {
+    const { sup, adapter } = claudeSupervisor();
+    const id = await startedClaudeRun(sup, adapter);
+
+    expect(sup.handoverBlocker()).toBeNull();
+    expect(await sup.handOver()).toBe(1);
+
+    expect(adapter.handles[0]!.stop).toHaveBeenCalled();
+    // the worker's exit decides nothing in the retiring runner
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(sup.get(id)?.state).toBe('running');
+    const stored = await storedOf(id);
+    expect(stored.info.state).toBe('running');
+    expect(stored.handover?.mode).toBe('resume');
+    const text = await fsp.readFile(path.join(vaultDir, 'tickets/plan/T-0001.md'), 'utf8');
+    expect(parseTicketFile(text, 'tickets/plan/T-0001.md').meta.run).not.toBeNull();
+
+    // nothing new starts, and a stop would be undone by the successor's resume
+    expect((await sup.start(request())).ok).toBe(false);
+    expect((await sup.stop(id, null)).ok).toBe(false);
+  });
+
+  it('leaves a worker with an attach file running for the successor to re-attach', async () => {
+    const { sup, adapter } = supervisor({ exec: noProbe });
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+    await fsp.writeFile(path.join(fleetRoot, 'runs', id, 'attach.json'), '{}', 'utf8');
+
+    await sup.handOver();
+    expect(adapter.handles[0]!.stop).not.toHaveBeenCalled();
+    expect((await storedOf(id)).handover?.mode).toBe('reattach');
+  });
+
+  it('records the server listening on the address as the attach pid, not the shell around it', async () => {
+    const exec = async (cmd: string, args: readonly string[]): Promise<string> => {
+      const line = [cmd, ...args].join(' ');
+      if (line.includes('Get-NetTCPConnection')) {
+        return '777';
+      }
+      return line.includes('StartTime') ? '1700000000000' : '';
+    };
+    const { sup, adapter } = supervisor({ exec });
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+    adapter.starts[0]!.onAttachInfo?.({ address: 'http://127.0.0.1:50918', password: 'pw', pid: 4242 });
+    const attachPath = path.join(fleetRoot, 'runs', id, 'attach.json');
+    await waitFor(async () => expect(await fsp.readFile(attachPath, 'utf8').catch(() => '')).toContain('pidStartedMs'));
+    const attach = JSON.parse(await fsp.readFile(attachPath, 'utf8')) as { pid: number; pidStartedMs: number };
+    expect(attach.pid).toBe(process.platform === 'win32' ? 777 : 4242);
+    expect(attach.pidStartedMs).toBe(1700000000000);
+  });
+
+  it('a resume in place ends the server the attach file records before the fresh worker starts', async () => {
+    const probed: string[] = [];
+    const exec = async (cmd: string, args: readonly string[]): Promise<string> => {
+      probed.push([cmd, ...args].join(' '));
+      return '';
+    };
+    const first = claudeSupervisor();
+    const id = await startedClaudeRun(first.sup, first.adapter);
+    await first.sup.handOver();
+    // a server pid nothing runs under: the guarded kill only probes it
+    await fsp.writeFile(
+      path.join(fleetRoot, 'runs', id, 'attach.json'),
+      JSON.stringify({ address: 'http://127.0.0.1:50919', password: 'pw', pid: 2_147_483_000, pidStartedMs: 1700000000000 }),
+      'utf8',
+    );
+
+    const fake = fakeAdapter();
+    const second = supervisor({ adapter: { ...fake.adapter, id: 'claude-code', attach: undefined }, exec });
+    await second.sup.adopt();
+    expect(second.sup.get(id)?.state).toBe('running');
+    expect(probed.some((line) => line.includes('2147483000'))).toBe(true);
+  });
+
+  it('defers while a run is in its machine gate', async () => {
+    // The gate's promise exists before the run does: the blocker turns true
+    // when the run enters the gate state, which can be before `execShell` is
+    // called — a release wired inside `execShell` then fired into the void.
+    let releaseGate: () => void = () => undefined;
+    const gateReleased = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    const { sup, adapter } = supervisor({
+      exec: noProbe,
+      execShell: () => gateReleased,
+    });
+    const rel = await writeTicket();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    const id = (started as { run: { id: string } }).run.id;
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await waitFor(() => expect(sup.handoverBlocker()).toContain('machine gate'));
+    releaseGate();
+    await settled(sup, id, 'done');
+    expect(sup.handoverBlocker()).toBeNull();
+  });
+
+  it('the successor resumes a handed-over session in place — same run id, a fresh worker', async () => {
+    const first = claudeSupervisor();
+    const id = await startedClaudeRun(first.sup, first.adapter);
+    await first.sup.handOver();
+
+    const second = claudeSupervisor();
+    await second.sup.adopt();
+
+    const run = second.sup.get(id);
+    expect(run?.state).toBe('running');
+    expect(run?.pid).toBe(4242);
+    expect(second.adapter.starts).toHaveLength(1);
+    expect(second.adapter.starts[0]!.resumeRef).toBe('ses_claude');
+    expect(second.adapter.starts[0]!.instruction).toBe(HANDOVER_CONTINUE);
+    // the record is an ordinary live run again
+    expect((await storedOf(id)).handover).toBeUndefined();
+    const text = await fsp.readFile(path.join(vaultDir, 'tickets/plan/T-0001.md'), 'utf8');
+    expect(text).toContain(`run ${id} resumed after a runner handover`);
+
+    // and it ends like any run: agent done, gate green, the ticket moves
+    second.adapter.handles[0]!.result();
+    second.adapter.handles[0]!.fail(0);
+    await settled(second.sup, id, 'done');
+  });
+
+  it("keeps a resumed session's usage base across the handover, so the run's counts go on from its own (req-53)", async () => {
+    const first = claudeSupervisor();
+    const id = await startedClaudeRun(first.sup, first.adapter);
+    const base = { tokensIn: 10_000, tokensOut: 50, cacheReadTokens: 9_000, costUsd: null };
+    first.adapter.starts[0]!.onUsageBase!(base);
+    await waitFor(async () => expect(await fsp.readFile(path.join(fleetRoot, 'runs', id, 'run.json'), 'utf8')).toContain('usageBase'));
+    await first.sup.handOver();
+
+    const second = claudeSupervisor();
+    await second.sup.adopt();
+    expect(second.adapter.starts[0]!.usageBase).toEqual(base);
+  });
+
+  it('a run without a recorded base resumes from zero — its own session is counted whole', async () => {
+    const first = claudeSupervisor();
+    const id = await startedClaudeRun(first.sup, first.adapter);
+    await first.sup.handOver();
+    const second = claudeSupervisor();
+    await second.sup.adopt();
+    expect(second.sup.get(id)?.state).toBe('running');
+    expect(second.adapter.starts[0]!.usageBase).toEqual({ tokensIn: 0, tokensOut: 0, cacheReadTokens: 0, costUsd: null });
+  });
+
+  it('a held run comes back held and fully silent — no resume prompt at all', async () => {
+    const first = claudeSupervisor();
+    const id = await startedClaudeRun(first.sup, first.adapter);
+    expect((await first.sup.takeover(id)).ok).toBe(true);
+    await first.sup.handOver();
+
+    const second = claudeSupervisor();
+    await second.sup.adopt();
+    expect(second.sup.get(id)?.held).toBe(true);
+    // The resume prompt itself caused the "I'm back" no-op turns
+    // (R-20261030T20203-wpsd): a held resume delivers nothing — the
+    // worker stands, held, until the owner sends.
+    expect(second.adapter.starts[0]!.instruction).toBe(HANDOVER_CONTINUE);
+    expect(second.adapter.starts[0]!.holdAtSpawn).toBe(true);
+    expect(second.adapter.handles[0]!.setHold).toHaveBeenCalledWith(true);
+  });
+
+  it('a held worker that stood idle is resumed fully silent, like any held run (req-80 idle case via req-75 holdAtSpawn)', async () => {
+    const promptless = (): ReturnType<typeof supervisor> => {
+      const fake = fakeAdapter();
+      const adapter: ProviderAdapter = { ...fake.adapter, id: 'claude-code', attach: undefined, promptless: true };
+      return { ...supervisor({ adapter, exec: noProbe }), adapter: fake };
+    };
+    const first = promptless();
+    const id = await startedClaudeRun(first.sup, first.adapter);
+    expect((await first.sup.takeover(id)).ok).toBe(true);
+    first.adapter.starts[0]!.onEvent({ ts: '2026-10-17T12:00:00Z', kind: 'usage', turn: 'idle' });
+    await waitFor(() => expect(first.sup.get(id)?.turn).toBe('idle'));
+    await first.sup.handOver();
+
+    const second = promptless();
+    await second.sup.adopt();
+    expect(second.sup.get(id)?.held).toBe(true);
+    // req-75 subsumes req-80's empty-prompt case: nothing is delivered at
+    // all, not even an empty instruction.
+    expect(second.adapter.starts[0]!.instruction).toBe(HANDOVER_CONTINUE);
+    expect(second.adapter.starts[0]!.holdAtSpawn).toBe(true);
+
+    // a busy one goes silent the same way — HANDOVER_HELD is gone (req-75)
+    const third = promptless();
+    const busy = await startedClaudeRun(third.sup, third.adapter);
+    expect((await third.sup.takeover(busy)).ok).toBe(true);
+    third.adapter.starts[0]!.onEvent({ ts: '2026-10-17T12:00:00Z', kind: 'usage', turn: 'busy' });
+    await waitFor(() => expect(third.sup.get(busy)?.turn).toBe('busy'));
+    await third.sup.handOver();
+    const fourth = promptless();
+    await fourth.sup.adopt();
+    expect(fourth.adapter.starts.map((s) => s.instruction)).toContain(HANDOVER_CONTINUE);
+    expect(fourth.adapter.starts.every((s) => s.holdAtSpawn === true)).toBe(true);
+  });
+
+  it('a handed-over run without a session detaches as before', async () => {
+    const first = claudeSupervisor();
+    const rel = await writeTicket();
+    const started = await first.sup.start(request({ ticketRelPath: rel, provider: 'claude-code' }));
+    const id = (started as { run: { id: string } }).run.id;
+    await first.sup.handOver();
+
+    const second = claudeSupervisor();
+    await second.sup.adopt();
+    expect(second.sup.get(id)?.state).toBe('detached');
+    expect(second.adapter.starts).toHaveLength(0);
+  });
+
+  it('a supervisor adopts only its own provider\'s runs', async () => {
+    const first = claudeSupervisor();
+    const id = await startedClaudeRun(first.sup, first.adapter);
+    const before = await fsp.readFile(path.join(fleetRoot, 'runs', id, 'run.json'), 'utf8');
+
+    const opencode = supervisor({ exec: noProbe });
+    await opencode.sup.adopt();
+    expect(opencode.sup.get(id)).toBeNull();
+    expect(await fsp.readFile(path.join(fleetRoot, 'runs', id, 'run.json'), 'utf8')).toBe(before);
+  });
+});
+
+describe('RunSupervisor persona stamping and memory (E3, ADR-0088)', () => {
+  beforeEach(async () => {
+    vaultDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-vault-'));
+    fleetRoot = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-fleet-'));
+  });
+
+  afterEach(async () => {
+    await drainSupervisors();
+    await fsp.rm(vaultDir, { recursive: true, force: true });
+    await fsp.rm(fleetRoot, { recursive: true, force: true });
+  });
+
+  const memoryFile = (): string => path.join(vaultDir, 'tickets', '_meta', 'personas', 'pia', 'memory.md');
+
+  it('a dispatched persona stamps RunInfo.persona at start', async () => {
+    const rel = await writeTicket();
+    const { sup } = supervisor();
+    const started = await sup.start(request({ ticketRelPath: rel }), { persona: 'pia' });
+    expect(started.ok).toBe(true);
+    expect((started as { run: RunInfo }).run.persona).toBe('pia');
+    // nothing settled yet — no memory file appears
+    await expect(fsp.access(memoryFile())).rejects.toBeDefined();
+  });
+
+  it('a ring run carries persona null and touches no personas dir', async () => {
+    const rel = await writeTicket();
+    const { sup } = supervisor();
+    const started = await sup.start(request({ ticketRelPath: rel }));
+    expect(started.ok).toBe(true);
+    expect((started as { run: RunInfo }).run.persona).toBeNull();
+    await expect(fsp.access(path.join(vaultDir, 'tickets', '_meta', 'personas'))).rejects.toBeDefined();
+  });
+
+  it('a green persona run appends its one-line lesson (handed-over, token sum)', async () => {
+    const rel = await writeTicket();
+    const { sup, adapter } = supervisor();
+    const started = await sup.start(request({ ticketRelPath: rel }), { persona: 'pia' });
+    const id = (started as { run: RunInfo }).run.id;
+    adapter.starts[0]!.onEvent({ ts: '2026-10-17T12:00:10Z', kind: 'usage', tokensIn: 12_000, tokensOut: 300 });
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+    // The settle's tail (persist, the ticket stamp, the memory append)
+    // still runs when the state flips — poll the file, don't read it once.
+    await waitFor(async () => {
+      const memory = await fsp.readFile(memoryFile(), 'utf8');
+      expect(memory.startsWith('# Memory')).toBe(true);
+      expect(memory).toContain('- 2026-10-17 · T-0001 · handed-over · 12300 tokens');
+    });
+  });
+
+  it('a red gate appends a failed lesson; an owner stop appends a stopped one', async () => {
+    const rel = await writeTicket();
+    const { sup, adapter } = supervisor({
+      execShell: async () => {
+        throw new Error('exit 1');
+      },
+    });
+    const started = await sup.start(request({ ticketRelPath: rel }), { persona: 'pia' });
+    const id = (started as { run: RunInfo }).run.id;
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(1);
+    await settled(sup, id, 'failed');
+    await waitFor(async () => {
+      expect(await fsp.readFile(memoryFile(), 'utf8')).toContain('· failed ·');
+    });
+
+    const second = await sup.start(request({ ticketRelPath: rel }), { persona: 'pia' });
+    const id2 = (second as { run: RunInfo }).run.id;
+    await sup.stop(id2, 'test');
+    await settled(sup, id2, 'stopped');
+    await waitFor(async () => {
+      const memory = await fsp.readFile(memoryFile(), 'utf8');
+      expect(memory).toContain('· stopped ·');
+      expect(memory.split('\n').filter((line) => line.startsWith('- '))).toHaveLength(2);
+    });
+  });
+
+  it('the memory file caps at 200 lines — the oldest lessons drop first, the header stays', async () => {
+    const rel = await writeTicket();
+    const dir = path.join(vaultDir, 'tickets', '_meta', 'personas', 'pia');
+    await fsp.mkdir(dir, { recursive: true });
+    const lines = ['# Memory', ''];
+    for (let i = 1; i <= 198; i++) {
+      lines.push(`- 2026-10-01 · T-0${String(i).padStart(3, '0')} · handed-over · ${i} tokens`);
+    }
+    await fsp.writeFile(path.join(dir, 'memory.md'), `${lines.join('\n')}\n`, 'utf8');
+
+    const { sup, adapter } = supervisor();
+    const started = await sup.start(request({ ticketRelPath: rel }), { persona: 'pia' });
+    const id = (started as { run: RunInfo }).run.id;
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+    await waitFor(async () => {
+      const memory = await fsp.readFile(memoryFile(), 'utf8');
+      expect(memory).toContain('- 2026-10-17 · T-0001 · handed-over · 0 tokens'); // the new entry landed
+    });
+
+    const memory = await fsp.readFile(memoryFile(), 'utf8');
+    const nonEmpty = memory.split('\n').filter((line) => line !== '');
+    expect(nonEmpty).toHaveLength(199); // the header + 198 entries — the file's 200 lines with the blank
+    expect(nonEmpty[0]).toBe('# Memory');
+    expect(memory).toContain('- 2026-10-01 · T-0002 · handed-over · 2 tokens'); // shifted up, kept
+    expect(memory).not.toContain('- 2026-10-01 · T-0001 · handed-over · 1 tokens'); // the oldest, dropped
+  });
+
+  it('a memory write failure never fails the settle', async () => {
+    const rel = await writeTicket();
+    // A file where the personas directory belongs: the mkdir of the
+    // persona folder fails, the append must not.
+    await fsp.mkdir(path.join(vaultDir, 'tickets', '_meta'), { recursive: true });
+    await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'personas'), 'not a directory', 'utf8');
+    const logs: string[] = [];
+    const { sup, adapter } = supervisor({ log: (message) => logs.push(message) });
+    const started = await sup.start(request({ ticketRelPath: rel }), { persona: 'pia' });
+    const id = (started as { run: RunInfo }).run.id;
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+    await waitFor(() => {
+      expect(logs.some((line) => line.includes('persona memory append failed'))).toBe(true);
+    });
+  });
+
+  // --- scout runs (E8, concept §5.6) --------------------------------
+
+  const scoutRequest = (over: Partial<RunRequest> = {}): RunRequest =>
+    request({
+      form: 'scout',
+      acceptance: [],
+      gate: 'none',
+      nextPhase: null,
+      nextPhaseDir: null,
+      worktreePath: 'W:/kt', // the read ground — the repo checkout itself
+      instruction: 'Scout it.',
+      ...over,
+    });
+
+  it('a scout run starts without a worktree: no preparation, the record and the stamp say scout', async () => {
+    const prepare = vi.fn(async () => ({ outcome: 'created' as const, sessionInvalidated: false, movedTo: null }));
+    const { sup, adapter } = supervisor({ prepareWorktree: prepare });
+    const rel = await writeTicket();
+    const started = await sup.start(scoutRequest({ ticketRelPath: rel }));
+    expect(started.ok).toBe(true);
+    const info = (started as { run: RunInfo }).run;
+    expect(prepare).not.toHaveBeenCalled(); // exploration only — no worktree
+    expect(info.form).toBe('scout');
+    expect(info.worktree).toBeUndefined();
+    expect(info.worktreePath).toBe('W:/kt'); // the read ground
+    expect(adapter.starts[0]!.cwd).toBe('W:/kt'); // the worker spawns there
+    // The ticket carries the live run; the Log line names the read ground.
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    expect(parseTicketFile(text, rel).meta.run?.stream).toBe(info.id);
+    expect(text).toContain('scout run, read ground W:/kt');
+    // The stream's opening note frames the run.
+    const stream = await fsp.readFile(path.join(fleetRoot, 'runs', info.id, 'stream.jsonl'), 'utf8');
+    expect(stream).toContain('scout run, read ground W:/kt (no worktree, no gate, no move)');
+  });
+
+  it('a finished scout run ends done: no gate runs, nothing moves, the report line names the card', async () => {
+    const { sup, adapter, gate } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(scoutRequest({ ticketRelPath: rel }));
+    const id = (started as { run: RunInfo }).run.id;
+
+    // The worker wrote its report into its own ticket file.
+    const live = path.join(vaultDir, rel);
+    await fsp.writeFile(
+      live,
+      (await fsp.readFile(live, 'utf8')).replace(
+        '## Log',
+        '## Report\n\nWritten on 2026-10-17T12:00:00Z by pia.\n\n### Summary\n\nOnly SQLite is wired in.\n\n### Decisions\n\n- [ ] D1: Which storage should back the index? — Recommendation: SQLite\n\n## Log',
+      ),
+      'utf8',
+    );
+
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+
+    expect(gate).toEqual([]); // the machine gate never ran
+    await expect(fsp.access(path.join(vaultDir, 'tickets', 'build', 'T-0001.md'))).rejects.toBeDefined(); // no move
+    const text = await fsp.readFile(live, 'utf8');
+    expect(text).toContain('the ## Report chapter waits for the owner in Needs you');
+    expect(parseTicketFile(text, rel).meta.run).toBeNull(); // the stamp is cleared
+    // The report chapter itself survived the run's bookkeeping.
+    expect(text).toContain('## Report');
+    expect(text).toContain('Only SQLite is wired in.');
+  });
+
+  it('a scout run that ends without a report is still done — the Log line says nothing waits', async () => {
+    const { sup, adapter, gate } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(scoutRequest({ ticketRelPath: rel }));
+    const id = (started as { run: RunInfo }).run.id;
+
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+
+    expect(gate).toEqual([]);
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    expect(text).toContain('scout run finished (exit 0) without a ## Report chapter');
+  });
+
+  it('a scout worker that ends without its turn fails like any run', async () => {
+    const { sup, adapter, gate } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(scoutRequest({ ticketRelPath: rel }));
+    const id = (started as { run: RunInfo }).run.id;
+
+    adapter.handles[0]!.fail(1); // no result — the worker died mid-exploration
+    await settled(sup, id, 'failed');
+
+    expect(gate).toEqual([]); // still no gate
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    expect(text).toContain('worker ended without finishing its turn');
+  });
+
+  it('a blocked scout end stays put: done with the blocked reason, no report bookkeeping', async () => {
+    const { sup, adapter } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(scoutRequest({ ticketRelPath: rel }));
+    const id = (started as { run: RunInfo }).run.id;
+
+    adapter.handles[0]!.result('the index API needs an owner decision');
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+
+    expect(sup.get(id)?.blocked).toBe('the index API needs an owner decision');
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    expect(text).toContain('blocked — the index API needs an owner decision');
+    expect(text).not.toContain('## Report chapter waits');
+  });
+
+  it('a scout run stores owner attachments in its run dir — the read ground is never written', async () => {
+    const { sup, git } = supervisor();
+    const rel = await writeTicket();
+    const started = await sup.start(scoutRequest({ ticketRelPath: rel }));
+    const id = (started as { run: RunInfo }).run.id;
+
+    const attached = await sup.attachFile(id, 'log.txt', Buffer.from('evidence').toString('base64'));
+    expect(attached.ok).toBe(true);
+    if (attached.ok) {
+      expect(attached.path.startsWith(path.join(fleetRoot, 'runs', id))).toBe(true);
+    }
+    // No worktree exclude dance — nothing in the read ground may be touched.
+    expect(git.calls.some((c) => c.args.includes('--git-path'))).toBe(false);
+  });
+});
+
+describe('RunSupervisor settled cost and the Verlauf chapter (costtracking, concept §4.3/§5.4)', () => {
+  beforeEach(async () => {
+    vaultDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-vault-'));
+    fleetRoot = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-fleet-'));
+  });
+
+  afterEach(async () => {
+    await drainSupervisors();
+    await fsp.rm(vaultDir, { recursive: true, force: true });
+    await fsp.rm(fleetRoot, { recursive: true, force: true });
+  });
+
+  /** An interactive dialog run: no gate, no move — the settle keeps the
+   *  ticket where it is, which is what these file assertions need. */
+  const dialogRequest = (overrides: Partial<RunRequest> = {}): RunRequest =>
+    request({
+      ticketRelPath: 'tickets/plan/T-0001.md',
+      acceptance: [],
+      gate: 'structural',
+      nextPhase: null,
+      nextPhaseDir: null,
+      interactive: 'plan',
+      ...overrides,
+    });
+
+  /** The settle's record write completed — the test only ends once the
+   *  run.json on disk says done, so no queued write outlives the tmp dir. */
+  const settleDurably = async (id: string): Promise<void> => {
+    await waitFor(async () => {
+      const stored = JSON.parse(await fsp.readFile(path.join(fleetRoot, 'runs', id, 'run.json'), 'utf8')) as {
+        info: { state?: string };
+      };
+      expect(stored.info.state).toBe('done');
+    });
+  };
+
+  const verlaufLineOf = async (rel: string): Promise<string | null> => {
+    const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+    const at = text.indexOf('- { phase:');
+    return at === -1 ? null : text.slice(at, text.indexOf('\n', at));
+  };
+
+  it('a settled run with usage appends its one-line Verlauf entry — the chapter is created, the entry rides the settle', async () => {
+    const rel = await writeTicket();
+    const { sup, adapter } = supervisor();
+    const started = await sup.start(dialogRequest({ model: 'opus' }), { persona: 'pia' });
+    const id = (started as { run: RunInfo }).run.id;
+    adapter.starts[0]!.onEvent({ ts: '2026-10-17T12:00:10Z', kind: 'usage', tokensIn: 48_000, tokensOut: 6_000, costUsd: 1.17 });
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+
+    await waitFor(async () => {
+      // The fixture's clock is fixed at 12:00, so the run's dauer is 0m.
+      expect(await verlaufLineOf(rel)).toBe(
+        '- { phase: plan, persona: pia, model: opus, tokens: 54k, cost: 1.17, dauer: 0m, ausgang: handed-over }',
+      );
+    });
+    // A second run appends BELOW the first — existing entries stay.
+    const second = await sup.start(dialogRequest({ model: 'opus' }), { persona: 'pia' });
+    const id2 = (second as { run: RunInfo }).run.id;
+    adapter.starts[1]!.onEvent({ ts: '2026-10-17T12:00:10Z', kind: 'usage', tokensIn: 10_000, tokensOut: 500 });
+    adapter.handles[1]!.result();
+    adapter.handles[1]!.fail(0);
+    await settled(sup, id2, 'done');
+    await waitFor(async () => {
+      const text = await fsp.readFile(path.join(vaultDir, rel), 'utf8');
+      const at = text.lastIndexOf('- { phase:');
+      expect(text.slice(at, text.indexOf('\n', at))).toBe(
+        '- { phase: plan, persona: pia, model: opus, tokens: 11k, cost: 0.1875, dauer: 0m, ausgang: handed-over }',
+      );
+    });
+    await settleDurably(id);
+    await settleDurably(id2);
+  });
+
+  it('a zero-usage run writes no Verlauf entry and creates no chapter', async () => {
+    const rel = await writeTicket();
+    const { sup, adapter } = supervisor();
+    const started = await sup.start(dialogRequest());
+    const id = (started as { run: RunInfo }).run.id;
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+    await expect(fsp.readFile(path.join(vaultDir, rel), 'utf8')).resolves.not.toContain('## Verlauf');
+    await settleDurably(id);
+  });
+
+  it('the settled cost falls back to the price table when the provider reports none — unknown models stay null', async () => {
+    const rel = await writeTicket();
+    const { sup, adapter } = supervisor();
+    const started = await sup.start(dialogRequest({ model: 'opus' }));
+    const id = (started as { run: RunInfo }).run.id;
+    // 48k opus in + 6k out → 0.72 + 0.45 = 1.17 from the table.
+    adapter.starts[0]!.onEvent({ ts: '2026-10-17T12:00:10Z', kind: 'usage', tokensIn: 48_000, tokensOut: 6_000 });
+    adapter.handles[0]!.result();
+    adapter.handles[0]!.fail(0);
+    await settled(sup, id, 'done');
+    await waitFor(() => expect(sup.get(id)?.costUsd).toBe(1.17));
+    await settleDurably(id);
+
+    // A provider-reported cost is never overwritten by the table.
+    const withCost = await sup.start(dialogRequest({ model: 'opus' }));
+    const id2 = (withCost as { run: RunInfo }).run.id;
+    adapter.starts[1]!.onEvent({ ts: '2026-10-17T12:00:10Z', kind: 'usage', tokensIn: 48_000, tokensOut: 6_000, costUsd: 0.5 });
+    adapter.handles[1]!.result();
+    adapter.handles[1]!.fail(0);
+    await settled(sup, id2, 'done');
+    expect(sup.get(id2)?.costUsd).toBe(0.5);
+    await settleDurably(id2);
+
+    // An unknown model and no provider cost: no cost is never a 0 fake.
+    const unknown = await sup.start(dialogRequest({ model: 'mystery-model' }));
+    const id3 = (unknown as { run: RunInfo }).run.id;
+    adapter.starts[2]!.onEvent({ ts: '2026-10-17T12:00:10Z', kind: 'usage', tokensIn: 48_000, tokensOut: 6_000 });
+    adapter.handles[2]!.result();
+    adapter.handles[2]!.fail(0);
+    await settled(sup, id3, 'done');
+    expect(sup.get(id3)?.costUsd).toBeNull();
+    await settleDurably(id3);
+  });
+});
+
+describe('limitExceeded — the per-run ceilings', () => {
+  const info = (over: Partial<RunInfo>): RunInfo => ({ ...({} as RunInfo), ...over });
+  const limits = { maxTurns: 100, maxWorkMs: 60 * 60_000 };
+
+  it('lets a run inside both ceilings go on', () => {
+    expect(limitExceeded(info({ turns: 40, execMs: 10 * 60_000 }), limits, Date.now())).toBeNull();
+  });
+
+  it('stops a run past its turn ceiling', () => {
+    expect(limitExceeded(info({ turns: 101 }), limits, Date.now())).toContain('101 turns');
+  });
+
+  it('counts closed busy spans plus the open one, not the waits', () => {
+    const now = Date.parse('2026-10-31T12:00:00Z');
+    const open = info({ execMs: 50 * 60_000, execSince: '2026-10-31T11:45:00Z' });
+    expect(limitExceeded(open, limits, now)).toContain('65 min');
+    const idle = info({ execMs: 50 * 60_000, execSince: null });
+    expect(limitExceeded(idle, limits, now)).toBeNull();
+  });
+
+  it('0 means unlimited', () => {
+    expect(limitExceeded(info({ turns: 9999, execMs: 9e9 }), { maxTurns: 0, maxWorkMs: 0 }, Date.now())).toBeNull();
+  });
+});
+
+describe('execShell — the gate shell', () => {
+  it('resolves on exit 0 and rejects with the output on a failure', async () => {
+    await expect(execShell('exit 0', os.tmpdir())).resolves.toBeUndefined();
+    await expect(execShell('echo boom && exit 3', os.tmpdir())).rejects.toMatchObject({
+      stdout: expect.stringContaining('boom'),
+    });
+  });
+});

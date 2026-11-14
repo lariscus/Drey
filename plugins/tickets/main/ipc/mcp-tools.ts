@@ -6,7 +6,7 @@
  * work repo in its own worktree); the tool descriptions say so.
  */
 import type { PluginMcpTool, PluginMcpToolProvider } from '../../../../shared/plugin-api';
-import { autopilotOf } from '../../../../packages/tickets-engine/src/fleet/autopilot';
+import { autopilotOf } from '../../../../packages/tickets-engine/src/fleet/chain/autopilot';
 import type { ChainStatus } from '../../../../packages/tickets-engine/src/fleet/protocol';
 
 export interface FleetMcpDeps {

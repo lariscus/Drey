@@ -29,7 +29,7 @@ import {
   type Parsed,
 } from '../core/ticket/commands';
 import { remoteActorOf, type ImprovementDecision, type TicketsRemotePort } from '../contracts/remote-protocol';
-import { parseAutopilotSet } from '../fleet/autopilot';
+import { parseAutopilotSet } from '../fleet/chain/autopilot';
 import type { AutopilotRefusal } from '../fleet/protocol';
 import { parseReviewComments, sendBackNoteOf, type ReviewComment } from '../core/review/review-feedback';
 import type { PersonaRouter } from '../core/persona/persona';

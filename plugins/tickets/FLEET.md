@@ -294,7 +294,7 @@ resumed run appends `resumed`).
 How a run's context reaches its worker. `RunRequest.handover` rides the
 start: the dialog sends the owner's explicit choice, the dispatcher
 sends `auto`, an older sender's absence means `fresh`. One resolver —
-`packages/tickets-engine/src/fleet/handover.ts`, pure — decides:
+`packages/tickets-engine/src/fleet/runner/handover.ts`, pure — decides:
 
 - The **review phase always resolves fresh** (an independent worker
   judges the step).
@@ -571,8 +571,8 @@ by themselves** (On), only finish what runs (Paused), or wait for the owner
 
 - Code: `packages/tickets-engine/src/service/runner-component.ts` (the runner
   as a service component, req-164), `packages/tickets-engine/src/fleet/`
-  (`runner.ts`, `runner-lifecycle.ts` — when the runner may sleep, req-110; `runs.ts`, `chain.ts`,
-  `orchestrator.ts`, `providers.ts`, `protocol.ts`), client side
+  (`runner/runner.ts`, `runner/runner-lifecycle.ts` — when the runner may sleep, req-110; `runner/runs.ts`, `chain/chain.ts`,
+  `chain/orchestrator.ts`, `providers/providers.ts`, `protocol.ts`), client side
   `packages/tickets-engine/src/services/fleet-client.ts`; the Drey-gone
   signal `packages/tickets-engine/src/server/drey-presence.ts`
 - Specs: `specs/ticket-schema.md` (tickets, gates, agent lane rules),
@@ -592,4 +592,4 @@ prompt changes in substance.
 
 ## Kimi Code (E10-8)
 
-`kimi` is the third adapter (`packages/tickets-engine/src/fleet/kimi.ts`): `kimi acp` over stdio, approvals and questions held for the owner, `/compact` native, resume by `session/load`. Tokens come from Kimi's wire log, cost from the price table. See `docs/design/kimi-worker.md`.
+`kimi` is the third adapter (`packages/tickets-engine/src/fleet/providers/kimi.ts`): `kimi acp` over stdio, approvals and questions held for the owner, `/compact` native, resume by `session/load`. Tokens come from Kimi's wire log, cost from the price table. See `docs/design/kimi-worker.md`.

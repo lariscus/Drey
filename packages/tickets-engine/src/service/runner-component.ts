@@ -12,7 +12,7 @@
  * unchanged; `service.lock` records them.
  */
 import type { RunnerDescriptor } from '../fleet/protocol';
-import { startRunner, type Args, type RunnerDeps, type RunnerHandle } from '../fleet/runner';
+import { startRunner, type Args, type RunnerDeps, type RunnerHandle } from '../fleet/runner/runner';
 import type { RunnerLocator } from '../services/fleet-client';
 import type { ComponentRecord } from './service-lock';
 

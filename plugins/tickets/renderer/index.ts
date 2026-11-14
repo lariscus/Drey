@@ -60,11 +60,11 @@ import { openReviewTab, registerReviewKind } from './review/register';
 import type { WorkRow } from './work/work-groups';
 import { boardIssuesChip, boardIssuesList, type BoardIssuesDeps } from './board/board-issues';
 import type { ChainStatus, FleetHandoverConfig, RunInfo } from '../../../packages/tickets-engine/src/fleet/protocol';
-import type { NormalizedEvent } from '../../../packages/tickets-engine/src/fleet/providers';
+import type { NormalizedEvent } from '../../../packages/tickets-engine/src/fleet/providers/providers';
 import { DEFAULT_FLEET_HANDOVER, normalizeFleetHandover } from '../../../packages/tickets-engine/src/fleet/protocol';
 import { handoverDialogState } from './run/handover-ui';
-import type { HandoverCandidate } from '../../../packages/tickets-engine/src/fleet/handover';
-import { parseWorkerValue } from '../../../packages/tickets-engine/src/fleet/assignment';
+import type { HandoverCandidate } from '../../../packages/tickets-engine/src/fleet/runner/handover';
+import { parseWorkerValue } from '../../../packages/tickets-engine/src/fleet/runner/assignment';
 import {
   contextFill,
   contextLabel,

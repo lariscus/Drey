@@ -16,7 +16,7 @@
  */
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
 import type { RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
-import type { NormalizedEvent } from '../../../../packages/tickets-engine/src/fleet/providers';
+import type { NormalizedEvent } from '../../../../packages/tickets-engine/src/fleet/providers/providers';
 import { durationWords, headerControls, liveStateWord } from '../thread/thread-steps';
 import { contextFill, contextLabel, execClockMs, formatTokens, workerStatus, type Light } from './worker-status';
 import { parseStreamEvents } from './watch-format';
