@@ -97,6 +97,19 @@ describe('ProcessSupervisor and the vault (req-167)', () => {
     expect(h.requests[0]!.tools).toBeUndefined();
   });
 
+  it("a ticket run's persona may write its own memory line and journal note; a 1:1, a free session and a run without a persona may not (req-226)", () => {
+    const recordsOf = (request: Record<string, unknown>, persona: string | null = 'ben'): VaultGrantRequest['records'] => {
+      const h = harness(true, request);
+      const run = { ...h.run, info: { ...h.run.info, persona, provider: 'claude-code', model: 'sonnet' } } as LiveRun;
+      h.supervisor.spawn(run, { instruction: 'x', resumeRef: null });
+      return h.requests[0]!.records;
+    };
+    expect(recordsOf({ permissionMode: 'accept-edits' })).toEqual({ harness: 'claude-code', model: 'sonnet' });
+    expect(recordsOf({ ticketId: '1:1', session: { kind: '1:1', persona: 'ben', workingDirectory: 'W:/kt', chatFile: 'c.md' } })).toBeUndefined();
+    expect(recordsOf({ ticketId: 'free', session: { kind: 'free', persona: 'ben', workingDirectory: 'W:/x' } })).toBeUndefined();
+    expect(recordsOf({}, null)).toBeUndefined();
+  });
+
   it('a ticket run is offered every vault tool', () => {
     const h = harness(true, { permissionMode: 'accept-edits' });
     h.supervisor.spawn(h.run, { instruction: 'x', resumeRef: null });

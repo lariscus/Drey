@@ -15,6 +15,16 @@ import type { NormalizedEvent, WorkerMcpLaunch, WorkerMcpServer } from '../harne
  */
 export type VaultScope = { readonly kind: 'project'; readonly project: string | null } | { readonly kind: 'every-project' };
 
+/**
+ * A ticket run's persona writes into its own records during the run
+ * (req-226): `memory_write` and `journal_write`, once each — the harness and
+ * model name the author of the line.
+ */
+export interface PersonaRecordsGrant {
+  readonly harness: string;
+  readonly model: string;
+}
+
 /** Whose access is opened, and where its calls are logged. */
 export interface VaultGrantRequest {
   readonly runId: string;
@@ -27,6 +37,8 @@ export interface VaultGrantRequest {
   readonly scope: VaultScope;
   /** The vault tools offered (a 1:1: the read cut, req-217); absent = all the service serves workers. */
   readonly tools?: readonly string[];
+  /** req-226: present = the run's persona may write its memory line and journal note (a ticket run with a persona). */
+  readonly records?: PersonaRecordsGrant;
   /** The run's own folder: a harness's config file lands here, never in the worktree. */
   readonly runDir: string;
   /** The harness's name, for the one stream line when it takes no MCP. */

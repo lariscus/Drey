@@ -1,5 +1,5 @@
 import { parseFriction, type FrictionLine } from './improvements';
-import { JOURNAL_ENTRY_CAP, JOURNAL_HEADER, parseJournalBlock, renderJournalEntry, type JournalEntry } from './persona-journal';
+import { JOURNAL_ENTRY_CAP, JOURNAL_HEADER, parseJournalBlock, renderJournalEntry, RUN_JOURNAL_NOTE, type JournalEntry } from './persona-journal';
 
 /**
  * The journal file as blocks (req-169): every entry is a block that starts
@@ -57,6 +57,35 @@ export function withJournalEntries(existing: string | null, entries: readonly Jo
   const added = entries.map((entry) => renderJournalEntry(entry));
   const blocks = at === 'end' ? [...file.blocks, ...added] : [...added, ...file.blocks];
   return render({ header: file.header, blocks: blocks.slice(Math.max(0, blocks.length - JOURNAL_ENTRY_CAP)) });
+}
+
+/** The block index of the run's own `journal_write` entry: same persona and ticket, stamped at or after `since`; -1 when none. */
+function runEntryIndex(blocks: readonly string[][], entry: JournalEntry, since: string): number {
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const held = parseJournalBlock(blocks[i]!);
+    if (held !== null && held.note === RUN_JOURNAL_NOTE && held.persona === entry.persona && held.ticket === entry.ticket && held.at >= since) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The file with a closing round's entry (req-226): when the run wrote its
+ * own note through `journal_write` (same persona and ticket, at or after the
+ * run's start `since`), the round's entry takes that entry's place and keeps
+ * its note as the `friction:` when the round brought none — one entry per
+ * run, as the report counts them. Otherwise the entry is appended.
+ */
+export function withRoundEntry(existing: string | null, entry: JournalEntry, since: string): string {
+  const file = blocksOf(existing ?? '');
+  const at = runEntryIndex(file.blocks, entry, since);
+  if (at === -1) {
+    return withJournalEntries(existing, [entry]);
+  }
+  const held = parseJournalBlock(file.blocks[at]!)!;
+  const merged: JournalEntry = { ...entry, friction: entry.friction ?? held.friction };
+  return render({ header: file.header, blocks: file.blocks.map((block, i) => (i === at ? renderJournalEntry(merged) : block)) });
 }
 
 /**

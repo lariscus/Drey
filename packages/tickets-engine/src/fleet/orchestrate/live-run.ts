@@ -30,6 +30,8 @@ export interface LiveRun {
   sendBack?: { readonly position: number; readonly reason: string } | null;
   /** The friction the worker reported in its final message (`FRICTION:`, req-169); set with `agentDone`. */
   friction?: string | null;
+  /** The worker saved its one memory lesson through `memory_write` (req-226): its closing round writes none. */
+  lessonWritten?: boolean;
   /** The owner interrupted the turn: the `result` that follows is the interrupt's, not a completion. */
   paused?: boolean;
   /** The owner asked for a pause after the current action (`pauseAfterAction`). */

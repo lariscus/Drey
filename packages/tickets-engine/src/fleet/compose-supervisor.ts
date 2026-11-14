@@ -35,6 +35,9 @@ import { HandoverSettings } from './orchestrate/handover-settings';
 import { LeftoverClaims } from './orchestrate/leftover-claims';
 import { OwnerAnswers } from './orchestrate/owner-answers';
 import { ClosingRound } from './orchestrate/closing-round';
+import type { ClosingRoundRecords } from './orchestrate/closing-round-records';
+import { DiskRoundRecords } from './orchestrate/disk-round-records';
+import { EngineRoundRecords, type PersonaRecordsChannel } from './orchestrate/engine-round-records';
 import { ClosingSignalRule } from './orchestrate/closing-signal-rule';
 import { PersonaJournalWriter } from './orchestrate/persona-journal-writer';
 import { PersonaMemory } from './orchestrate/persona-memory';
@@ -123,6 +126,8 @@ export interface RunSupervisorDeps {
   readonly execShell?: GateShell;
   readonly prepareWorktree?: PrepareWorktree;
   readonly ticketsGit?: TicketsGitSeam;
+  /** req-225: the engine's writer of the closing round's records (one commit per round); absent = plain writes. */
+  readonly personaRecords?: PersonaRecordsChannel;
   /** `dk validate --trailers` (the gate's trailer check): null = passes. */
   readonly validateTrailers?: TrailerCheck;
   readonly leaseTimers?: LeaseTimers;
@@ -187,26 +192,31 @@ function runtimeOf(deps: RunSupervisorDeps): Runtime {
   const stopper: RunStopper = new RunStopper(machine, repo, processes, { settler, bookkeeper, log });
   const gate = new GateRunner({ bookkeeper, shell: deps.execShell ?? execShell, trailers: deps.validateTrailers ?? validateTrailers, repo, review, ...(deps.seats !== undefined ? { seats: deps.seats } : {}) });
   const opinion = deps.secondOpinion !== undefined ? { secondOpinion: deps.secondOpinion } : {};
-  const closing = closingRoundOf({ shared, repo, processes, log });
+  const closing = closingRoundOf({ shared, repo, processes, log, channel: deps.personaRecords });
   const leaving = runLeavingOf({ git, bookkeeper, repo, claims, seats: deps.seats });
   const completion: RunCompletion = new RunCompletion({ machine, repo, gate, bookkeeper, settler, processes, closing, leaving, ...opinion });
   return { ...shared, deps, table, machine, background, repo, settings, claims, settler, processes, stopper, takeover, completion, git, review };
 }
 
 /** req-169: the closing round over the run's own session, its writers and the runner's records as the cost history. */
-function closingRoundOf(parts: { shared: RunnerShared; repo: RunRepository; processes: ProcessSupervisor; log: (message: string) => void }): ClosingRound {
+function closingRoundOf(parts: { shared: RunnerShared; repo: RunRepository; processes: ProcessSupervisor; log: (message: string) => void; channel: PersonaRecordsChannel | undefined }): ClosingRound {
   const { shared, repo, processes, log } = parts;
-  const { clock, fs, streams, bookkeeper } = shared;
+  const { clock, streams, bookkeeper } = shared;
   return new ClosingRound({
     rule: new ClosingSignalRule(new RecordedRunCosts(() => repo.list())),
     asker: new ResumeRoundAsker({ spawner: processes, stream: (run, event) => void streams.append(run, event).catch(() => undefined), delay: unrefDelay }),
-    journal: new PersonaJournalWriter(fs, log),
-    memory: new PersonaMemory(clock, fs, log),
-    proposals: new RoundProposalWriter(clock, fs, log),
+    records: roundRecordsOf(shared, log, parts.channel),
     clock,
     note: (run, what) => bookkeeper.note(run, what),
     log,
   });
+}
+
+/** req-225: the round's records go to the engine (one commit) when Drey Service hands its channel in, plainly otherwise. */
+function roundRecordsOf(shared: RunnerShared, log: (message: string) => void, channel: PersonaRecordsChannel | undefined): ClosingRoundRecords {
+  const { clock, fs } = shared;
+  const disk = new DiskRoundRecords({ journal: new PersonaJournalWriter(fs, log), memory: new PersonaMemory(clock, fs, log), proposals: new RoundProposalWriter(clock, fs, log) });
+  return channel === undefined ? disk : new EngineRoundRecords({ channel, fallback: disk, clock, log });
 }
 
 /** A wait that never keeps the process alive by itself. */

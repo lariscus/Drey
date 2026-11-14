@@ -147,7 +147,9 @@ gate, retry, an owner steer, cost far above the typical run, friction the
 persona reported in the run; the list is configurable; a smooth run costs no
 round. **Write path: a closing round** of the session after the gate verdict
 (structured answer, output capped); a `memory_write` / `journal_write` tool
-during the run is a later item if lessons turn out to get lost.
+during the run is a later item if lessons turn out to get lost — built
+2026-11-14 (req-226), with the round's writes as one commit of the
+engine's (req-225).
 
 ### R5 — Vault rights of a run: read all, write none by default (2026-11-07)
 

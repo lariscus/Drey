@@ -5435,8 +5435,9 @@ sequenceDiagram
 ```
 
 The round's events land in the run's stream (the service window's Sessions area shows them) but its exit decides
-nothing; a 1:1, a dialog, a blocked, scout or no-result run never reaches it. The runner's writes into the persona
-folder are plain file writes (req-225); the owner's removals and the migration are the engine's, one commit each.
+nothing; a 1:1, a dialog, a blocked, scout or no-result run never reaches it. In Drey Service the round's three
+writes are the engine's, one commit per round (req-225, §6.140); a standalone runner writes them plainly. The owner's
+removals and the migration are the engine's, one commit each.
 
 ## 6.114 A free session — "New session…" or Pia's card → pool → record → directory → idle release; the layers at a run's start (req-173, milestone 230, ADR-0092 / ADR-0077 later changes)
 
@@ -6487,3 +6488,49 @@ sequenceDiagram
     G->>C: confirm → execute
     C->>B: createTicket({…, project: 'drey'}) → project: / x-project
 ```
+
+## 6.140 A run writes its persona records as commits: `memory_write` during the run, the closing round as one commit (req-225, req-226)
+
+A ticket run's worker with a persona may save its one lesson (and one journal note) while it works; the closing round
+after the gate then writes no second lesson. Every write goes to the engine's one writer of the tickets repository —
+the runner and the vault MCP never run git there — so each lands as a commit on the engine's git queue.
+
+```mermaid
+sequenceDiagram
+    participant W as Worker (Ben's harness)
+    participant M as Vault MCP (Drey Service)
+    participant F as EventFold (the run)
+    participant K as ClosingRound
+    participant X as EngineRoundRecords
+    participant E as PersonaRunRecords (engine)
+    participant G as TicketsGit (the engine's one queue)
+    Note over M: the token carries records {harness, model}: a ticket run with a persona
+    W->>M: memory_write {lesson} (once per run)
+    M->>E: invoke personaRunMemory {persona, ticket, harness, model, lesson}
+    E->>E: personaLessonLine · already held? → refused, the turn given back
+    E->>G: memory.md — commit "personas: ben memory +1 (T-0001)"
+    E-->>M: the stored line
+    M-->>F: audit: mcp__drey__memory_write · allowed → run.lessonWritten
+    M-->>W: Saved to your memory: …
+    opt journal_write {note}
+        W->>M: journal_write {note}
+        M->>E: invoke personaRunJournal → reviews.md entry (gate none, note: written during the run)
+        E->>G: commit "personas: ben journal +1 (T-0001)"
+    end
+    W-->>F: result · exit → the gate → a signal
+    K->>W: closing round (prompt: lesson null — you already saved it)
+    W-->>K: {"finding":…, "lesson":…}
+    K->>X: write {entry, lesson: null (the run saved it), proposal}
+    X->>E: invoke personaClosingRound {vaultPath, persona, ticket, runStartedAt, journal, lesson, proposal}
+    alt the engine holds the run's vault
+        E->>E: reviews.md (the run's own journal_write entry replaced) · memory.md unless held · improvements.md
+        E->>G: one commit "personas: ben closing round T-0001"
+        E-->>X: {ok, lesson, proposal}
+    else engine down, or another vault (foreign)
+        X->>X: DiskRoundRecords — the same files, plain writes (uncommitted)
+    end
+    K-->>K: runner note "closing round done — journal entry written, the run saved its lesson itself (one commit)"
+```
+
+Pia's memory and a 1:1's accepted memory proposal were already the engine's writes (board service, one commit each);
+nothing outside the runner wrote a persona file uncommitted.

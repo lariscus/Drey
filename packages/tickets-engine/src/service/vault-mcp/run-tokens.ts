@@ -8,7 +8,8 @@
  * attaches since req-182), so nothing needs to survive a restart.
  */
 import type { NormalizedEvent } from '../../fleet/harness/contract';
-import type { VaultScope } from '../../fleet/orchestrate/worker-vault';
+import type { PersonaRecordsGrant, VaultScope } from '../../fleet/orchestrate/worker-vault';
+import { RecordQuota } from './record-quota';
 import { StaleWriteGuard } from './stale-writes';
 
 /** Random token and its hash: crypto is an adapter ({@link NodeTokenCrypto}). */
@@ -31,6 +32,8 @@ export interface VaultGrant {
    * line behind `readOnly`, which already refuses every change.
    */
   readonly tools?: readonly string[];
+  /** req-226: present = the persona may write its memory line and journal note, once each. */
+  readonly records?: PersonaRecordsGrant;
   /** The run's stream: every call is audited there. */
   readonly emit: (event: NormalizedEvent) => void;
 }
@@ -39,6 +42,8 @@ export interface VaultGrant {
 export interface TokenSession {
   readonly grant: VaultGrant;
   readonly reads: StaleWriteGuard;
+  /** req-226: the persona writes this worker has left. */
+  readonly quota: RecordQuota;
 }
 
 export class RunTokens {
@@ -48,7 +53,7 @@ export class RunTokens {
 
   mint(grant: VaultGrant): string {
     const token = this.crypto.token();
-    this.sessions.set(this.crypto.hash(token), { grant, reads: new StaleWriteGuard() });
+    this.sessions.set(this.crypto.hash(token), { grant, reads: new StaleWriteGuard(), quota: new RecordQuota() });
     return token;
   }
 

@@ -39,3 +39,11 @@ export interface ServiceHostOptions {
   readonly withDreyGraceMs?: number;
   readonly firstDreyWaitMs?: number;
 }
+
+/** The two spans of the with-Drey mode a spec may shorten (`ServiceStay`). */
+export function staySpans(opts: ServiceHostOptions): { withDreyGraceMs?: number; firstDreyWaitMs?: number } {
+  return {
+    ...(opts.withDreyGraceMs === undefined ? {} : { withDreyGraceMs: opts.withDreyGraceMs }),
+    ...(opts.firstDreyWaitMs === undefined ? {} : { firstDreyWaitMs: opts.firstDreyWaitMs }),
+  };
+}

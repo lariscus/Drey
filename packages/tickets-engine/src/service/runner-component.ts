@@ -13,6 +13,7 @@
  */
 import type { GovernorSettings, RunnerDescriptor } from '../fleet/protocol';
 import { startRunner, type Args, type RunnerDeps, type RunnerHandle } from '../fleet/runner';
+import type { PersonaRecordsChannel } from '../fleet/orchestrate/engine-round-records';
 import type { WorkerVaultGate } from '../fleet/orchestrate/worker-vault';
 import type { RunnerLocator } from '../services/fleet-client';
 import type { ComponentRecord } from './service-lock';
@@ -32,6 +33,8 @@ export interface RunnerComponentOptions {
   readonly governorSettings?: () => GovernorSettings;
   /** req-167: the vault MCP gate every worker's spawn opens. */
   readonly vault?: WorkerVaultGate;
+  /** req-225: the engine's writer of the closing round's records. */
+  readonly personaRecords?: PersonaRecordsChannel;
   /** Test seam: the in-process start. */
   readonly start?: (args: Args, deps: RunnerDeps) => Promise<RunnerHandle | null>;
 }
@@ -97,6 +100,7 @@ export class RunnerComponent implements RunnerLocator {
           signals: false,
           ...(this.opts.governorSettings === undefined ? {} : { governorSettings: this.opts.governorSettings }),
           ...(this.opts.vault === undefined ? {} : { vault: this.opts.vault }),
+          ...(this.opts.personaRecords === undefined ? {} : { personaRecords: this.opts.personaRecords }),
         },
       );
       if (handle === null) {

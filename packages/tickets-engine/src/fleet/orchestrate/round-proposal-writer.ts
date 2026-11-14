@@ -1,6 +1,5 @@
-import { MAX_IMPROVEMENT_CONTENT, nextImprovementId, parseImprovements, renderImprovements } from '../../core/improvements';
 import { PERSONAS_DIR } from '../../core/persona';
-import { applyPromptEdits } from '../../core/prompt-edits';
+import { withRoundProposal } from '../../core/round-proposal';
 import type { ClosingProposal } from '../closing-round-prompt';
 import type { Clock } from '../ports/clock';
 import type { FileSystem } from '../ports/file-system';
@@ -11,9 +10,10 @@ import { messageOf } from './live-run';
  * worker suggests lands as an OPEN proposal in the persona's
  * `improvements.md` — the card the owner accepts or dismisses in the 1:1.
  * The round proposes, it never adopts. A prompt.md proposal's edits
- * (req-280) are applied to the persona's current prompt.md here, and the
- * proposal stores the resulting text; edits that do not apply write
- * nothing. A failure is a log line.
+ * (req-280) are applied to the persona's current prompt.md
+ * (`withRoundProposal`); edits that do not apply write nothing. The
+ * standalone runner's plain write — in Drey Service the engine writes and
+ * commits it (req-225). A failure is a log line.
  */
 export class RoundProposalWriter {
   constructor(
@@ -25,46 +25,20 @@ export class RoundProposalWriter {
   /** The minted proposal id; null when nothing was written. */
   async add(vaultPath: string, persona: string, proposal: ClosingProposal, evidence: string): Promise<string | null> {
     try {
-      const content = await this.contentOf(vaultPath, persona, proposal);
-      if (content === null) {
+      const folder = this.fs.join(vaultPath, PERSONAS_DIR, persona);
+      const abs = this.fs.join(folder, 'improvements.md');
+      const prompt = proposal.target === 'prompt.md' ? await this.fs.readTextOrNull(this.fs.join(folder, 'prompt.md')) : null;
+      const written = withRoundProposal(await this.fs.readTextOrNull(abs), prompt, { persona, ...proposal, evidence, at: this.clock.now().toISOString() });
+      if (!written.ok) {
+        this.log(`persona ${persona}: closing-round proposal dropped — ${written.error}`);
         return null;
       }
-      const abs = this.fs.join(vaultPath, PERSONAS_DIR, persona, 'improvements.md');
-      const existing = (await this.fs.readTextOrNull(abs)) ?? '';
-      const file = parseImprovements(existing);
-      const id = nextImprovementId(existing);
-      const proposals = [
-        ...file.proposals,
-        { id, state: 'open' as const, target: proposal.target, title: proposal.title, evidence: [evidence], content, lesson: null, at: this.clock.now().toISOString(), decidedAt: null },
-      ];
-      await this.fs.mkdirp(this.fs.dirname(abs));
-      await this.fs.writeText(abs, renderImprovements(persona, { lastAggregation: file.lastAggregation, proposals }));
-      return id;
+      await this.fs.mkdirp(folder);
+      await this.fs.writeText(abs, written.text);
+      return written.id;
     } catch (error) {
       this.log(`persona ${persona}: closing-round proposal failed — ${messageOf(error)}`);
       return null;
     }
-  }
-
-  /** The proposal's stored text: the model id, or prompt.md with the edits applied; null (logged) when the edits do not apply. */
-  private async contentOf(vaultPath: string, persona: string, proposal: ClosingProposal): Promise<string | null> {
-    if (proposal.target !== 'prompt.md') {
-      return proposal.content;
-    }
-    const current = await this.fs.readTextOrNull(this.fs.join(vaultPath, PERSONAS_DIR, persona, 'prompt.md'));
-    if (current === null || current.trim() === '' || proposal.edits === undefined) {
-      this.log(`persona ${persona}: closing-round prompt proposal dropped — the persona has no prompt.md to edit`);
-      return null;
-    }
-    const applied = applyPromptEdits(current, proposal.edits);
-    if (!applied.ok) {
-      this.log(`persona ${persona}: closing-round prompt proposal dropped — ${applied.error}`);
-      return null;
-    }
-    if (applied.text.length > MAX_IMPROVEMENT_CONTENT) {
-      this.log(`persona ${persona}: closing-round prompt proposal dropped — the edited prompt.md exceeds ${MAX_IMPROVEMENT_CONTENT} characters`);
-      return null;
-    }
-    return applied.text;
   }
 }

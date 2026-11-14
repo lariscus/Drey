@@ -5,8 +5,10 @@
  * personas' `write-notes`, req-283). Called
  * once by the service host; a spec builds the parts over fakes instead.
  */
+import { PERSONA_RUN_METHODS, type RunRecordReply } from '../../contracts/persona-run-records';
 import type { ProjectRecord } from '../../contracts/projects';
 import type { Persona } from '../../core/persona';
+import { PersonaRecordTools, type PersonaRecordsPort } from './persona-record-tools';
 import { ProjectRights, type RightsSource } from './project-rights';
 import { RegisteredVaults, type VaultsConfig } from './registered-vaults';
 import { RunTokens } from './run-tokens';
@@ -23,7 +25,7 @@ export interface VaultMcpWiring {
   /** The engine's config, once the engine is up (the service's own file before). */
   readonly config: VaultsConfig;
   /** The engine's invoke channel; null before the engine is up. */
-  readonly invoke: () => ((method: string) => Promise<unknown>) | null;
+  readonly invoke: () => ((method: string, payload?: unknown) => Promise<unknown>) | null;
   /** The vault the service was started for. */
   readonly hostedVault: string;
   readonly build: string;
@@ -31,6 +33,18 @@ export interface VaultMcpWiring {
   readonly onChange: () => void;
   /** A worker's call changed files (req-213): the engine's paths channel hears it. */
   readonly changed?: (change: VaultPathsChange) => void;
+}
+
+/** req-226: the worker's own persona writes go to the engine's one writer of the tickets repository. */
+function recordsPort(invoke: VaultMcpWiring['invoke']): PersonaRecordsPort {
+  const call = async (method: string, payload: unknown): Promise<RunRecordReply> => {
+    const channel = invoke();
+    return channel === null ? { ok: false, error: 'the engine is not up' } : ((await channel(method, payload)) as RunRecordReply);
+  };
+  return {
+    memoryWrite: (write) => call(PERSONA_RUN_METHODS.memory, write),
+    journalWrite: (write) => call(PERSONA_RUN_METHODS.journal, write),
+  };
 }
 
 /** req-283: the board's project records and a persona's `allowed: write-notes`, read through the engine at every call. */
@@ -53,6 +67,7 @@ export function composeVaultMcp(wiring: VaultMcpWiring): VaultMcpComponent {
     disk,
     rights: new ProjectRights(rightsSource(wiring.invoke), disk),
     auditor: new VaultCallAuditor({ now, log: wiring.log }),
+    records: new PersonaRecordTools(recordsPort(wiring.invoke)),
     ...(wiring.changed === undefined ? {} : { changed: wiring.changed }),
   });
   return new VaultMcpComponent({
