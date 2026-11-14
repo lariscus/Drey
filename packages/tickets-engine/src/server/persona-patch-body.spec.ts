@@ -14,7 +14,11 @@ describe('parsePersonaPatch (req-171: summary, budget, allowed)', () => {
     expect(parsePersonaPatch({ summary: 5 })).toEqual({ ok: false, error: 'summary is a string' });
     expect(parsePersonaPatch({ budget: '5' })).toEqual({ ok: false, error: 'budget is a number of dollars or null' });
     expect(parsePersonaPatch({ allowed: [] })).toEqual({ ok: false, error: 'allowed is an object' });
-    expect(parsePersonaPatch({ pool: 'sonnet' })).toEqual({ ok: false, error: 'pool is a list of names' });
+    expect(parsePersonaPatch({ class: 5 })).toEqual({ ok: false, error: 'class is a string' });
+    expect(parsePersonaPatch({ model: 5 })).toEqual({ ok: false, error: 'model is a model id or null (the next free model of the class)' });
+    // req-288: worker and pool are no writable keys any more
+    expect(parsePersonaPatch({ worker: 'kimi', pool: ['k2'] })).toMatchObject({ ok: false });
+    expect(parsePersonaPatch({ model: null })).toEqual({ ok: true, value: { model: null } });
   });
 
   it('trims the names of a list and refuses a body with none of the writable keys', () => {

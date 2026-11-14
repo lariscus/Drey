@@ -43,6 +43,18 @@ const countOf = (reply: unknown): number | null => {
   return (reply as { ok?: boolean } | null)?.ok === true && Array.isArray(entries) ? entries.length : null;
 };
 
+/**
+ * req-288: the model table as `service.json` holds it, when no runner is awake to answer `poolModels`
+ * (it never wakes one): the classes and the rows, no live load — nothing runs while the runner sleeps.
+ */
+async function fileTableOf(deps: DeskDeps): Promise<ModelsReply | null> {
+  const reply = (await deps.invoke('modelTable')) as { ok?: unknown; classes?: unknown; models?: unknown } | null;
+  if (reply === null || reply.ok !== true || !Array.isArray(reply.classes) || !Array.isArray(reply.models)) {
+    return null;
+  }
+  return { ok: true, classes: reply.classes, models: reply.models, now: { used: 0, global: null, slots: [], classes: [] } } as unknown as ModelsReply;
+}
+
 export interface PersonaReads {
   readonly extras: PageExtras;
   readonly memory: number | null;
@@ -51,7 +63,7 @@ export interface PersonaReads {
 
 export async function readBeside(deps: DeskDeps, id: string, mission = false): Promise<PersonaReads> {
   const [table, slotReply, memory, journal, chatModels] = await Promise.all([
-    quiet(async () => (await deps.invoke('poolModels')) as ModelsReply | null),
+    quiet(async () => ((await deps.invoke('poolModels')) as ModelsReply | null) ?? (await fileTableOf(deps))),
     quiet(async () => (await deps.invoke('slots')) as { readonly slots?: readonly SlotView[] } | null),
     quiet(() => deps.invoke('personaMemory', { persona: id })),
     quiet(() => deps.invoke('personaJournal', { persona: id })),

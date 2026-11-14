@@ -346,14 +346,10 @@ describe('personas (ADR-0088, E3)', () => {
       PIA_PERSONA.replace('title: Pia', 'title: Ben').replace('worker: claude-code', 'worker: opencode'),
       'utf8',
     );
-    const personas = (await engine.invoke('listPersonas')) as {
-      id: string;
-      title: string;
-      worker: string;
-      models: { default: string; pool: readonly string[] };
-    }[];
+    const personas = (await engine.invoke('listPersonas')) as { id: string; title: string; class: string | null; legacy?: { worker: string } }[];
     expect(personas.map((p) => p.id)).toEqual(['ben', 'pia']); // sorted
-    expect(personas[1]).toMatchObject({ title: 'Pia', worker: 'claude-code', models: { default: 'opus', pool: ['opus', 'sonnet'] } });
+    // req-288: a v2 record reads with its old keys as `legacy` until the start's migration moves it
+    expect(personas[1]).toMatchObject({ title: 'Pia', class: null, legacy: { worker: 'claude-code', models: { default: 'opus', pool: ['opus', 'sonnet'] } } });
   });
 
   it('serves the team reads of the remote port on the invoke channel (E13-8)', async () => {
@@ -361,9 +357,9 @@ describe('personas (ADR-0088, E3)', () => {
     expect(((await engine.invoke('personas')) as { id: string; kind?: string }[]).map((p) => [p.id, p.kind])).toEqual([['you', 'human']]);
     await fsp.mkdir(path.join(vault, 'tickets/_meta/personas/pia'), { recursive: true });
     await fsp.writeFile(path.join(vault, 'tickets/_meta/personas/pia/persona.md'), PIA_PERSONA, 'utf8');
-    const personas = (await engine.invoke('personas')) as { id: string; title: string; pool: readonly string[] }[];
+    const personas = (await engine.invoke('personas')) as { id: string; title: string; model: string }[];
     expect(personas.map((p) => p.id)).toEqual(['pia', 'you']);
-    expect(personas[0]).toMatchObject({ title: 'Pia', pool: ['opus', 'sonnet'] });
+    expect(personas[0]).toMatchObject({ title: 'Pia', model: '' });
     const thread = (await engine.invoke('personaThread', 'pia')) as { ok: boolean; messages?: unknown[] };
     expect(thread.ok).toBe(true);
     const memory = (await engine.invoke('personaMemory', 'pia')) as { ok: boolean };

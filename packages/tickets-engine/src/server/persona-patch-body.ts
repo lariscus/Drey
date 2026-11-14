@@ -4,9 +4,9 @@ import type { Parsed } from '../core/commands';
 
 /**
  * The persona setup's PATCH body (U4, concept §4.5): only the listed keys
- * are writable, each checked for its shape. The router policies of §4.6
- * were removed with req-170 — a persona's pool is ordered strongest first
- * and the capacity pool picks by class.
+ * are writable, each checked for its shape. Persona v3 (req-288): `class`
+ * names the persona's capability class, `model` its pinned model (null =
+ * the next free model of the class); `worker` and `pool` left with it.
  */
 function asObject(body: unknown): Record<string, unknown> | null {
   return typeof body === 'object' && body !== null && !Array.isArray(body) ? (body as Record<string, unknown>) : null;
@@ -15,9 +15,10 @@ function asObject(body: unknown): Record<string, unknown> | null {
 export interface PersonaPatchInput {
   title?: string;
   role?: string;
-  worker?: string;
-  model?: string;
-  pool?: string[];
+  /** req-288: the capability class. */
+  class?: string;
+  /** req-288: the pinned model (`<provider>/<model>`); null = the next free model of the class. */
+  model?: string | null;
   color?: string;
   skills?: string[];
   prompt?: string;
@@ -32,9 +33,8 @@ export interface PersonaPatchInput {
 const PERSONA_PATCH_KEYS: readonly (keyof PersonaPatchInput)[] = [
   'title',
   'role',
-  'worker',
+  'class',
   'model',
-  'pool',
   'color',
   'skills',
   'prompt',
@@ -48,6 +48,7 @@ const PERSONA_PATCH_KEYS: readonly (keyof PersonaPatchInput)[] = [
 /** The keys that may also be null (to clear them): the type their value has otherwise, and the refusal. */
 const NULLABLE: Partial<Record<keyof PersonaPatchInput, readonly ['number' | 'string', string]>> = {
   budget: ['number', 'budget is a number of dollars or null'],
+  model: ['string', 'model is a model id or null (the next free model of the class)'],
   chatModel: ['string', 'chatModel is a model id or null'],
 };
 
@@ -58,7 +59,6 @@ function valueOf(key: keyof PersonaPatchInput, value: unknown): Parsed<unknown> 
     return value === null || typeof value === nullable[0] ? { ok: true, value } : { ok: false, error: nullable[1] };
   }
   switch (key) {
-    case 'pool':
     case 'skills':
       return Array.isArray(value) && value.every((v) => typeof v === 'string')
         ? { ok: true, value: value.map((v) => (v as string).trim()) }

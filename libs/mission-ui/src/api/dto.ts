@@ -255,10 +255,14 @@ export interface PersonaView {
   readonly kind?: 'agent' | 'human' | 'mission';
   readonly title: string;
   readonly role: string;
+  /** Retired with Persona v3 (req-288): '' from a desk that sends `class`. */
   readonly worker: string;
+  /** req-288: the pinned model (`<provider>/<model>`); '' = the next free model of its class. */
   readonly model: string;
-  /** The persona's model pool (the assignment ring); `[]` when the desk omits it. */
+  /** Retired with Persona v3 (req-288): `[]` from a desk that sends `class`. */
   readonly pool: readonly string[];
+  /** req-288: the capability class; absent for the owner, Mission Control's persona and an older desk. */
+  readonly class?: string;
   /** `#rrggbb`; the avatar ring's colour. */
   readonly color: string;
   /** req-292: the picture's version (`personas/<id>/avatar.png`); absent = no picture, the circle draws the silhouette and asks for nothing. */
@@ -447,9 +451,10 @@ export interface PersonaJournalView {
 export interface PersonaPatch {
   readonly title?: string;
   readonly role?: string;
-  readonly worker?: string;
-  readonly model?: string;
-  readonly pool?: readonly string[];
+  /** req-288: the capability class. */
+  readonly class?: string;
+  /** req-288: the pinned model; null = the next free model of the class. */
+  readonly model?: string | null;
   readonly color?: string;
   readonly skills?: readonly string[];
   readonly prompt?: string;
@@ -1283,6 +1288,7 @@ function personaOf(raw: unknown): PersonaView | null {
     worker: str(persona['worker']),
     model: str(persona['model']),
     pool: strArray(persona['pool']),
+    ...(str(persona['class']) !== '' ? { class: str(persona['class']) } : {}),
     color: str(persona['color'], '#7aa2f7'),
     ...(avatarVersion !== '' ? { avatarVersion } : {}),
     ...(summary !== '' ? { summary } : {}),

@@ -22,6 +22,8 @@ export function buildInvokeTable(parts: EngineParts): InvokeTable {
   table.register(parts.remote.remotePort, TEAM_METHODS);
   // req-284: Settings → Projects.
   table.register(parts.sessions.projects, PROJECT_METHODS);
+  // req-288: the model table from `service.json`, for the Persona page while no runner is awake.
+  table.set('modelTable', () => parts.sessions.modelTable.table());
   addRemoteMethods(table, parts);
   addChatMethods(table, parts);
   // The Review tab's reads (E13-7): the branch's diff and one file of it --

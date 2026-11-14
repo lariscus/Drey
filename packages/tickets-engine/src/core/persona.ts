@@ -1,5 +1,7 @@
 import { parseDocument } from 'yaml';
 import { splitFrontmatter } from '../../../../shared/frontmatter';
+import { classNameOf, type ClassName } from '../contracts/capability-class';
+import { splitPoolEntry } from './pool-entry';
 import { EMPTY_PERSONA_SETTINGS, personaSettingsLines, personaSettingsOf, type PersonaSettings } from './persona-settings';
 
 /**
@@ -9,7 +11,7 @@ import { EMPTY_PERSONA_SETTINGS, personaSettingsLines, personaSettingsOf, type P
  *
  *   tickets/_meta/personas/
  *     paul/
- *       persona.md   # frontmatter: title, role, worker, models, color, skills, budget
+ *       persona.md   # frontmatter: title, role, class, model, color, skills, budget
  *       prompt.md    # the persona prompt (longform, editable, versioned)
  *       memory.md    # curated memory (the write/read paths are E3)
  *       avatar.png   # optional
@@ -21,25 +23,34 @@ import { EMPTY_PERSONA_SETTINGS, personaSettingsLines, personaSettingsOf, type P
  *     → Phasen-Persona (`persona:` in pipeline.md)
  *       → Default-Persona (engine config `personas.default`)
  *
- * A persona's `models.default` + `models.pool` replace the separate
- * `worker:`/`model:`/`prompt:` keys — the model is configuration, not
- * identity (concept §4.6). The old column keys stay readable while the
- * migration rewrites them onto personas, then they are deprecated.
+ * Since Persona v3 (req-288) a persona names a capability **class** and may
+ * pin one **model** of it; the harness follows from the model's row in the
+ * model table. The v2 keys `worker:`, `models:` (default + pool) and
+ * `min-class:` are read as {@link PersonaLegacyModels} only, for the one-time
+ * migration (`PersonaModelMigrator`), and never written again.
  */
 
 export type PersonaRole = 'planner' | 'builder' | 'reviewer' | 'tester' | 'custom';
 
 export const PERSONA_ROLES: readonly PersonaRole[] = ['planner', 'builder', 'reviewer', 'tester', 'custom'];
 
+/** The v2 `models:` block (req-170): the default model and the pool, strongest first. Read for the migration only (req-288). */
 export interface PersonaModels {
-  /** What runs when the model table cannot decide (an estimate, a machine without a table). */
   readonly default: string;
-  /**
-   * The models the persona may run, strongest first (req-170): the pool
-   * grants the first one of the requested class with room. Every entry
-   * must be a row of the model table (Settings → Models).
-   */
   readonly pool: readonly string[];
+}
+
+/**
+ * The v2 model keys of an unmigrated record (req-288): `worker:`, `models:`
+ * and the class floor `min-class:`. Present only while a record names no
+ * `class:`; a write of such a record keeps them, so nothing is lost before
+ * the migration runs, and the migration replaces them with `class:` and an
+ * optional `model:`.
+ */
+export interface PersonaLegacyModels {
+  readonly worker: string;
+  readonly models: PersonaModels;
+  readonly minClass: ClassName | null;
 }
 
 /** The harness permission mode a persona's runs may take (`allowed: run-commands:`, req-171); absent = the crew setting decides. */
@@ -103,9 +114,21 @@ export interface Persona {
   readonly kind: PersonaKind;
   readonly title: string;
   readonly role: PersonaRole;
-  /** The CLI harness (`claude-code` | `opencode` | `kimi` | `api`). */
-  readonly worker: string;
-  readonly models: PersonaModels;
+  /**
+   * `class:` (req-288) — the capability class its runs ask the pool for (a
+   * name of the owner's list in Settings → Models); a ticket's `class:` or
+   * size may raise a run above it, never below. null = the record names
+   * none (the human, Mission Control's persona, an unmigrated v2 record).
+   */
+  readonly class: ClassName | null;
+  /**
+   * `model:` of an agent (req-288) — the one model of its class it is pinned
+   * to, as a pool entry (`<provider>/<model>`; the harness from the prefix,
+   * else from the model's table row); null = the next free model of the class.
+   */
+  readonly model: string | null;
+  /** The v2 keys of a record not migrated yet (req-288); absent once it names a `class:`. */
+  readonly legacy?: PersonaLegacyModels;
   /** UI color (`#rrggbb`), chips and avatars. */
   readonly color: string;
   /** `summary:` — the one line for the crew list (req-144, R11); '' = none (the cards then draw the role). */
@@ -119,7 +142,7 @@ export interface Persona {
   readonly budget: number | null;
   /** `allowed:` — what it may do beyond its runs; absent in the file = nothing beyond. */
   readonly allowed: PersonaAllowed;
-  /** The run settings (req-258): class floor, needs, ceilings, gate, own pool, leaving actions, read-only. */
+  /** The run settings (req-258): needs, ceilings, gate, own pool, leaving actions, read-only (the class floor folded into `class`, req-288). */
   readonly settings: PersonaSettings;
   /**
    * req-293: `model:` of Mission Control's persona — the model of her chat
@@ -174,6 +197,24 @@ function modelsOf(raw: unknown): PersonaModels {
   return { default: defaultModel, pool: pool.length > 0 ? pool : [defaultModel] };
 }
 
+/** The v2 keys of an agent record that names no `class:` but still carries one of them; null otherwise. */
+function legacyOf(get: (key: string) => unknown): PersonaLegacyModels | null {
+  if (get('worker') === undefined && get('models') === undefined && get('min-class') === undefined) {
+    return null;
+  }
+  return { worker: asString(get('worker')) ?? 'opencode', models: modelsOf(get('models')), minClass: classNameOf(get('min-class')) };
+}
+
+/** An agent's `class:` and `model:` (req-288), or the v2 keys it still carries. */
+function agentModelOf(get: (key: string) => unknown): Pick<Persona, 'class' | 'model' | 'legacy'> {
+  const named = classNameOf(get('class'));
+  if (named !== null) {
+    return { class: named, model: asString(get('model')) };
+  }
+  const legacy = legacyOf(get);
+  return { class: null, model: null, ...(legacy !== null ? { legacy } : {}) };
+}
+
 /** `budget:` is USD per day; tolerant — absent, non-numeric or negative reads as null. */
 function budgetOf(raw: unknown): number | null {
   const amount = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw.trim()) : Number.NaN;
@@ -205,9 +246,28 @@ function allowedLines(allowed: PersonaAllowed): string[] {
   return lines.length > 0 ? ['allowed:', ...lines] : [];
 }
 
-/** `worker:` and `models:` — a mission persona has neither (she speaks over the chat bridge, req-269). */
+/**
+ * An agent's `class:` and pinned `model:` (req-288; the model a double-quoted
+ * scalar, an id may hold a colon); a record that names no class keeps its v2
+ * keys until the migration replaces them. The human and Mission Control's
+ * persona carry no class.
+ */
 function modelLines(persona: Persona): string[] {
-  return [`worker: ${persona.worker}`, 'models:', `  default: ${persona.models.default}`, `  pool: [${persona.models.pool.join(', ')}]`];
+  if (persona.class !== null) {
+    const pinned = (persona.model ?? '').trim();
+    return [`class: ${persona.class}`, ...(pinned !== '' ? [`model: ${JSON.stringify(pinned)}`] : [])];
+  }
+  const legacy = persona.legacy;
+  if (legacy === undefined) {
+    return [];
+  }
+  return [
+    `worker: ${legacy.worker}`,
+    'models:',
+    `  default: ${legacy.models.default}`,
+    `  pool: [${legacy.models.pool.join(', ')}]`,
+    ...(legacy.minClass !== null ? [`min-class: ${legacy.minClass}`] : []),
+  ];
 }
 
 /** req-293: Mission Control's persona's `model:` — a double-quoted scalar (a model id may hold a colon); none = the assistant's model. */
@@ -231,21 +291,38 @@ export function parsePersonaFile(id: string, text: string): Persona {
   const js = hadFence && yamlText !== null ? (parseDocument(yamlText).toJS() as Record<string, unknown> | null) : null;
   const get = (key: string): unknown => (js === null || typeof js !== 'object' ? undefined : js[key]);
   const roleRaw = asString(get('role')) ?? 'custom';
+  const kind = kindOf(get('kind'));
   return {
     id,
-    kind: kindOf(get('kind')),
+    kind,
     title: asString(get('title')) ?? id,
     role: (PERSONA_ROLES as readonly string[]).includes(roleRaw) ? (roleRaw as PersonaRole) : 'custom',
-    worker: asString(get('worker')) ?? 'opencode',
-    models: modelsOf(get('models')),
+    ...(kind === 'agent' ? agentModelOf(get) : { class: null, model: null }),
     color: asString(get('color')) ?? '#a78bfa',
     summary: (asString(get('summary')) ?? '').replace(/\s+/g, ' '),
     skills: asStringList(get('skills')),
     budget: budgetOf(get('budget')),
     allowed: allowedOf(get('allowed')),
     settings: personaSettingsOf(get),
-    ...(kindOf(get('kind')) === 'mission' ? { chatModel: asString(get('model')) ?? null } : {}),
+    ...(kind === 'mission' ? { chatModel: asString(get('model')) ?? null } : {}),
   };
+}
+
+/**
+ * The model a persona's figures read before the pool decides (a token count,
+ * an estimate, a start outside the chain): its pinned model, else an
+ * unmigrated record's old default on its worker; null = its class decides at
+ * dispatch (req-288).
+ */
+export function personaModelGuess(persona: Pick<Persona, 'model' | 'legacy'>): { readonly provider: string | null; readonly model: string } | null {
+  if (persona.model !== null && persona.model.trim() !== '') {
+    return splitPoolEntry(persona.model);
+  }
+  if (persona.legacy === undefined) {
+    return null;
+  }
+  const entry = splitPoolEntry(persona.legacy.models.default);
+  return { provider: entry.provider ?? persona.legacy.worker, model: entry.model };
 }
 
 /** True for the owner's own persona (E10-6) — no run, no model, no budget. */
@@ -273,8 +350,8 @@ export function humanPersona(title: string, id: string = HUMAN_PERSONA_ID): Pers
     kind: 'human',
     title,
     role: 'custom',
-    worker: 'opencode',
-    models: { default: 'opus', pool: ['opus'] },
+    class: null,
+    model: null,
     color: '#38bdf8',
     summary: '',
     skills: [],

@@ -3,8 +3,9 @@
  * The Proposals block (R11; the Friction card, renamed): the persona's open
  * improvement proposal — raised from the journal's findings and the 1:1 —
  * with Show diff / Dismiss / Apply over the existing improvements routes
- * (`personaImprovementDecide`), and under it the links to the Crew detail's
- * Memory and 1:1 tabs, which are the page's own tabs.
+ * (`personaImprovementDecide`). Board 7k v3 (req-288) draws it in the left
+ * column and without the links to Memory and the 1:1 — those are the page's
+ * own tabs; with no open proposal there is no block.
  */
 import type { ImprovementProposal } from '../../../../packages/tickets-engine/src/core/improvements';
 import { h } from '../desk-deps';
@@ -57,25 +58,12 @@ function card(ctx: BlockContext, view: ProposalsView, open: ImprovementProposal)
   return node;
 }
 
-function links(ctx: BlockContext, view: ProposalsView): HTMLElement {
-  const { t } = ctx;
-  const row = h('div', 'persona-links');
-  const link = (text: string, run: () => void): void => {
-    row.append(outlineButton(text, 'persona-link', run));
-  };
-  link(view.memory === null ? t('persona.links.memory') : t('persona.links.memory_count', { count: view.memory }), () => view.openTab('memory'));
-  link(view.journal === null ? t('persona.links.journal') : t('persona.links.journal_count', { count: view.journal }), () => view.openTab('memory'));
-  link(t('persona.links.talk', { name: ctx.draft().title }), () => view.openTab('talk'));
-  return row;
-}
-
-export function proposalsBlock(ctx: BlockContext, view: ProposalsView): HTMLElement {
+export function proposalsBlock(ctx: BlockContext, view: ProposalsView): HTMLElement | null {
+  if (view.proposal === null) {
+    return null;
+  }
   const block = h('section', 'persona-block');
   block.setAttribute('aria-label', ctx.t('persona.proposals.title'));
-  block.append(blockHead(ctx.t('persona.proposals.title')));
-  if (view.proposal !== null) {
-    block.append(card(ctx, view, view.proposal));
-  }
-  block.append(links(ctx, view));
+  block.append(blockHead(ctx.t('persona.proposals.title')), card(ctx, view, view.proposal));
   return block;
 }

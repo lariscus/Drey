@@ -88,7 +88,7 @@ import { splitFrontmatter } from '../../../../shared/frontmatter';
 import { composeRunRequest, type PersonaDispatch } from '../fleet/request';
 import { loadDisciplineTexts, type DisciplineTexts } from '../fleet/discipline-texts';
 import { deriveWorkerModel, personaLoader, resolvePersonaForTicket } from './persona-loader';
-import { personaPatchError } from './persona-patch';
+import { personaPatchError, withModelPatch } from './persona-patch';
 import { columnPromptRef, isAutoPhase, nextPhaseIdOf } from '../fleet/chain';
 import { readRepoInstructions, worktreeDiffStat } from '../fleet/context-pack';
 import { cleanWorktrees, listOrphans, removeWorktree, type CleanupReport } from '../fleet/worktree-clean';
@@ -107,6 +107,7 @@ import { EMPTY_PERSONA_SETTINGS, HUMAN_PERSONA_ID, humanPersona, isAgentPersona,
 import { crewOrderOf, inCrewOrder, withCrewOrder } from '../core/crew-order';
 import { personaRunSettingsOf } from '../core/persona-settings';
 import { settingsAfter, type PersonaSettingsPatch } from '../contracts/persona-settings-patch';
+import { raisedToFloor } from '../core/persona-model-migration';
 import { CREW_FILE } from '../contracts/crew-config';
 import { scanRepoFolder } from './repos-scan';
 
@@ -568,7 +569,7 @@ export class EngineBoardService {
     const touched = [PIPELINE_PATH];
     const builder = crew.find((persona) => persona.id === step.builder);
     if (builder !== undefined && step.plan.moved !== null) {
-      touched.push(await this.writePersonaSettings(vault, builder, step.patch));
+      touched.push(await this.writePersonaSettings(vault, raisedToFloor(builder, step.floor), step.patch));
     }
     return touched;
   }
@@ -4409,9 +4410,8 @@ export class EngineBoardService {
     id: string;
     title?: string;
     role?: string;
-    worker?: string;
-    model?: string;
-    pool?: readonly string[];
+    class?: string;
+    model?: string | null;
     color?: string;
     skills?: readonly string[];
     prompt?: string;
@@ -4441,7 +4441,7 @@ export class EngineBoardService {
       }
       const sent = (key: string): boolean =>
         input[key as keyof typeof input] !== undefined;
-      if (!['title', 'role', 'worker', 'model', 'pool', 'color', 'skills', 'prompt', 'summary', 'budget', 'allowed', 'settings', 'chatModel'].some(sent)) {
+      if (!['title', 'role', 'class', 'model', 'color', 'skills', 'prompt', 'summary', 'budget', 'allowed', 'settings', 'chatModel'].some(sent)) {
         return { ok: true }; // nothing to change
       }
       const personaPath = `${PERSONAS_DIR}/${id}/persona.md`;
@@ -4449,18 +4449,9 @@ export class EngineBoardService {
       const { body, hadFence } = splitFrontmatter(current);
       const persona = parsePersonaFile(id, current);
       const next: Persona = {
-        ...persona,
+        ...withModelPatch(persona, input),
         ...(input.title !== undefined ? { title: input.title.trim() } : {}),
         ...(input.role !== undefined ? { role: input.role as Persona['role'] } : {}),
-        ...(input.worker !== undefined ? { worker: input.worker.trim() } : {}),
-        ...(input.model !== undefined || input.pool !== undefined
-          ? {
-              models: {
-                default: input.model !== undefined ? input.model.trim() : persona.models.default,
-                pool: input.pool !== undefined ? input.pool.map((m) => m.trim()) : persona.models.pool,
-              },
-            }
-          : {}),
         ...(input.color !== undefined ? { color: input.color.trim() } : {}),
         ...(input.skills !== undefined ? { skills: input.skills.map((s) => s.trim()) } : {}),
         ...(input.summary !== undefined ? { summary: input.summary.replace(/\s+/g, ' ').trim() } : {}),

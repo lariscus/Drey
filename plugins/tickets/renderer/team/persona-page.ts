@@ -168,7 +168,7 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
     } else {
       drafts.delete(id);
     }
-    if (next.pool !== undefined) {
+    if (next.pinnedModel !== undefined) {
       void loaded.ctx.preview.ensure();
     }
     syncState();
@@ -216,7 +216,7 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
       const base = draftOf(persona, prompt.ok ? prompt.text : '');
       const draft = drafts.get(id) ?? base;
       const skills = new PersonaSkillsState(seams.skills ?? engineSkillsSeam(invoke), id);
-      const preview = new PersonaPreviewState(seams.preview ?? enginePromptPreviewSeam(invoke), id, () => previewRequestOf(session.loaded?.view.phases ?? persona.phases, (session.loaded?.draft ?? draft).pool));
+      const preview = new PersonaPreviewState(seams.preview ?? enginePromptPreviewSeam(invoke), id, () => previewRequestOf(session.loaded?.view.phases ?? persona.phases, (session.loaded?.draft ?? draft).pinnedModel));
       const [reads] = await Promise.all([readBeside(deps, id, persona.kind === 'mission'), skills.load(), preview.ensure()]);
       if (disposed) {
         return;
@@ -227,7 +227,7 @@ export function mountPersonaPage(deps: DeskDeps, store: TeamStore, mountHost: HT
           void preview.ensure(true);
         }
       });
-      const ctx = blockContextOf({ deps, t, view: persona, reads, base, paths, skills, preview, session, edit, repaint: render });
+      const ctx = blockContextOf({ deps, t, view: persona, reads, base, paths, skills, preview, session, edit, repaint: render, refreshPersonas: () => store.refresh() });
       session.loaded?.instructions.dispose();
       session.loaded?.skills.dispose();
       const instructions = createInstructionsBlock(ctx, draft.prompt, prompt.ok);

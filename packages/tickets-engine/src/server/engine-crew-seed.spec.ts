@@ -52,7 +52,7 @@ describe('the engine seeds the default crew at its start (req-256)', () => {
   it('gives an existing board without the crew Pia, Paul, Ben, Ralf and Tessa in one commit, and the Crew tab lists them', async () => {
     const engine = await start();
     for (const [id, role] of [['paul', 'planner'], ['ben', 'builder'], ['ralf', 'reviewer'], ['tessa', 'tester']] as const) {
-      expect(parsePersonaFile(id, (await read(`${PERSONAS}/${id}/persona.md`))!)).toMatchObject({ role, worker: 'opencode' });
+      expect(parsePersonaFile(id, (await read(`${PERSONAS}/${id}/persona.md`))!)).toMatchObject({ role, class: 'heavy', model: null });
     }
     expect(parsePersonaFile('pia', (await read(`${PERSONAS}/pia/persona.md`))!)).toMatchObject({ kind: 'mission', title: 'Pia' });
     expect(seededCrewOf(await read('tickets/_meta/crew.md'))).toEqual(['pia', 'paul', 'ben', 'ralf', 'tessa']);
@@ -72,14 +72,18 @@ describe('the engine seeds the default crew at its start (req-256)', () => {
     expect((await git(['log', '--format=%s'])).trim().split('\n')).toEqual(['owner removes ralf', 'projects: the first project "vault" from repos.md and the registered vaults (req-282)', 'personas: the default crew (req-256)', 'seed']);
   });
 
-  it('leaves the owner\'s own personas and pipeline as they are', async () => {
+  it('leaves the owner\'s own personas and pipeline as they are — but moves a v2 record onto class and model once (req-288)', async () => {
     await fsp.mkdir(path.join(vault, PERSONAS, 'build-default'), { recursive: true });
     const own = "---\ntitle: Build default\nrole: builder\nworker: kimi\nmodels:\n  default: owner-model\n  pool: [owner-model]\ncolor: '#123456'\nskills: []\n---\n";
     await fsp.writeFile(path.join(vault, PERSONAS, 'build-default/persona.md'), own, 'utf8');
     await git(['add', '-A']);
     await git(['commit', '-m', 'owner persona']);
-    await start();
-    expect(await read(`${PERSONAS}/build-default/persona.md`)).toBe(own);
+    const engine = await start();
+    await engine.ready;
+    const migrated = (await read(`${PERSONAS}/build-default/persona.md`))!;
+    expect(parsePersonaFile('build-default', migrated)).toMatchObject({ title: 'Build default', class: 'heavy', model: 'kimi/owner-model', color: '#123456' });
+    expect(migrated).not.toMatch(/^(worker|models):/m);
+    expect((await git(['log', '--format=%s'])).trim().split('\n')).toContain('personas: class and model replace worker and models (req-288)');
     expect(await read('tickets/_meta/pipeline.md')).toBe(PIPELINE);
   });
 });

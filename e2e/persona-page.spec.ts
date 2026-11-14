@@ -49,6 +49,19 @@ test.beforeEach(({ vaultDir }) => {
   fs.mkdirSync(path.join(vaultDir, 'tickets', '_meta', 'personas', 'ralf', 'prompt.md'), { recursive: true });
 });
 
+/** req-288: the engine's start moves the v2 records onto class and model; the page is opened once that commit is in. */
+async function migrated(vaultDir: string): Promise<void> {
+  await expect
+    .poll(() => {
+      try {
+        return execFileSync('git', ['log', '--format=%s'], { cwd: vaultDir, encoding: 'utf8', windowsHide: true });
+      } catch {
+        return '';
+      }
+    }, { timeout: 30_000 })
+    .toContain('personas: class and model replace worker and models (req-288)');
+}
+
 async function openPersona(page: Page, id: string): Promise<void> {
   await expect(page.locator('app-titlebar [role="tab"]', { hasText: 'Work' })).toBeVisible({ timeout: 30_000 });
   await page.keyboard.press('Control+2');
@@ -61,6 +74,8 @@ async function openPersona(page: Page, id: string): Promise<void> {
 
 test('edit, discard and save a persona as one commit', async ({ page, vaultDir }) => {
   test.setTimeout(120_000);
+  await expect(page.locator('app-titlebar [role="tab"]', { hasText: 'Work' })).toBeVisible({ timeout: 30_000 });
+  await migrated(vaultDir);
   await openPersona(page, 'ben');
   const dir = path.join(vaultDir, 'tickets', '_meta', 'personas', 'ben');
   const body = page.locator('.persona-page').filter({ visible: true });
@@ -74,13 +89,22 @@ test('edit, discard and save a persona as one commit', async ({ page, vaultDir }
   await expect(body.locator('[data-field="summary"]')).toHaveValue('Builds one part, test first.');
   // req-258: no step chips; the run settings, the builder's read-only off by its role.
   await expect(body.locator('.persona-step')).toHaveCount(0);
-  await expect(body.locator('[data-field="min-class"]')).toHaveValue('');
   await expect(body.locator('[data-field="readonly"]')).toHaveAttribute('aria-checked', 'false');
   await expect(state).toContainText('Saved');
+  // req-288: the start moved the v2 record onto class and model, once — the pool held one model, so it is pinned.
+  await expect.poll(() => fs.readFileSync(path.join(dir, 'persona.md'), 'utf8'), { timeout: 15_000 }).toContain('class: heavy');
+  expect(fs.readFileSync(path.join(dir, 'persona.md'), 'utf8')).toContain('model: "opencode/qwen3-coder"');
+  expect(fs.readFileSync(path.join(dir, 'persona.md'), 'utf8')).not.toMatch(/^(worker|models):/m);
+  expect(execFileSync('git', ['log', '--format=%s'], { cwd: vaultDir, encoding: 'utf8', windowsHide: true })).toContain('personas: class and model replace worker and models (req-288)');
+  await expect(body.locator('.persona-seg-btn[aria-checked="true"]')).toHaveText('heavy');
+  await expect(body.locator('[data-field="pinned-model"]')).toContainText('qwen3-coder');
+  for (const gone of ['[data-field="worker"]', '[data-field="min-class"]', '.persona-pool-row']) {
+    await expect(body.locator(gone)).toHaveCount(0);
+  }
   // The prose of persona.md moved into prompt.md when the engine started: one logged commit, once.
   expect(fs.readFileSync(path.join(dir, 'prompt.md'), 'utf8')).toContain('## Who Ben is');
   expect(fs.readFileSync(path.join(dir, 'persona.md'), 'utf8')).not.toContain('Who Ben is');
-  for (const absent of ['Open as Markdown', 'Tell me when', 'Upload picture', 'Plain Markdown']) {
+  for (const absent of ['Open as Markdown', 'Tell me when', 'Plain Markdown', 'Harness', 'Class floor']) {
     await expect(body).not.toContainText(absent);
   }
 
@@ -109,14 +133,15 @@ test('edit, discard and save a persona as one commit', async ({ page, vaultDir }
   expect(execFileSync('git', ['show', '--name-only', '--format=', 'HEAD'], { cwd: vaultDir, encoding: 'utf8', windowsHide: true })).toContain('prompt.md');
   expect(Number(execFileSync('git', ['rev-list', '--count', '--all'], { cwd: vaultDir, encoding: 'utf8', windowsHide: true }).trim())).toBe(before + 1);
 
-  // Allowed to: a choice is part of the same Save.
-  await body.locator('.persona-allow-row select').nth(1).selectOption('on');
+  // Allowed to: a switch is part of the same Save.
+  await body.locator('[data-field="network"]').click();
   await body.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(state).toContainText('Saved', { timeout: 15_000 });
   expect(fs.readFileSync(path.join(dir, 'persona.md'), 'utf8')).toContain('allowed:\n  network: true');
 
-  // req-258: the run settings ride the same Save into persona.md.
-  await body.locator('[data-field="min-class"]').selectOption('A');
+  // req-258/288: the class and the run settings ride the same Save into persona.md; a class change drops a pin outside the class.
+  await body.locator('.persona-seg-btn[data-value="standard"]').click();
+  await expect(body.locator('[data-field="pinned-model"]')).toHaveText('Next free in class');
   await body.locator('[data-field="readonly"]').click();
   await body.locator('[data-field="parallel"]').fill('2');
   await body.getByRole('button', { name: 'Add action…', exact: true }).click();
@@ -124,9 +149,10 @@ test('edit, discard and save a persona as one commit', async ({ page, vaultDir }
   await body.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(state).toContainText('Saved', { timeout: 15_000 });
   const settings = fs.readFileSync(path.join(dir, 'persona.md'), 'utf8');
-  for (const line of ['min-class: A', 'parallel: 2', 'leaving: [sync-main]', 'readonly: true']) {
+  for (const line of ['class: standard', 'parallel: 2', 'leaving: [sync-main]', 'readonly: true']) {
     expect(settings).toContain(line);
   }
+  expect(settings).not.toMatch(/^(model|min-class):/m);
 
   // The Proposals card: Dismiss is written to the proposals file.
   await expect(body.locator('[data-proposal]')).toContainText('Add a line about the ADR index');
@@ -146,4 +172,49 @@ test('a prompt that cannot be read leaves the editor and Save disabled', async (
   await expect(body.locator('.persona-ed-view .cm-content')).toHaveAttribute('contenteditable', 'false');
   await expect(body.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
   await expect(body.locator('.persona-head .persona-state')).toContainText('Could not read the instructions');
+});
+
+/** A 2 × 1 PNG: wider than tall, so the page crops it to a square before it sends it. */
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADklEQVR4nGP4z8AAQv8BD/kD/YURmXYAAAAASUVORK5CYII=', 'base64');
+
+test('req-288: the picture is uploaded and removed from the Profile block, one commit each', async ({ page, vaultDir }) => {
+  test.setTimeout(120_000);
+  await openPersona(page, 'ben');
+  const body = page.locator('.persona-page').filter({ visible: true });
+  const avatar = path.join(vaultDir, 'tickets', '_meta', 'personas', 'ben', 'avatar.png');
+  const subjects = (): string => execFileSync('git', ['log', '--format=%s'], { cwd: vaultDir, encoding: 'utf8', windowsHide: true });
+  await body.getByRole('button', { name: 'Change picture', exact: true }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await body.getByRole('menuitem', { name: 'Upload picture…' }).click();
+  await (await chooser).setFiles({ name: 'ben.png', mimeType: 'image/png', buffer: PNG });
+  await expect.poll(subjects, { timeout: 15_000 }).toContain('personas: ben picture');
+  const written = fs.readFileSync(avatar);
+  expect(written.subarray(1, 4).toString('ascii')).toBe('PNG');
+  expect(written.readUInt32BE(16)).toBe(256); // the page drew a 256 × 256 square
+  expect(written.readUInt32BE(20)).toBe(256);
+  await expect(body.locator('.persona-avatar-profile img.persona-picture')).toBeVisible({ timeout: 15_000 });
+
+  await body.getByRole('button', { name: 'Change picture', exact: true }).click();
+  await body.getByRole('menuitem', { name: 'Remove picture' }).click();
+  await expect.poll(subjects, { timeout: 15_000 }).toContain('personas: ben picture removed');
+  expect(fs.existsSync(avatar)).toBe(false);
+  // Ben's picture is a shipped one: its id is in seeded-pictures, so the engine's backfill leaves it removed.
+  expect(fs.readFileSync(path.join(vaultDir, 'tickets', '_meta', 'crew.md'), 'utf8')).toMatch(/seeded-pictures:.*\bben\b/);
+  await expect(body.locator('.persona-avatar-profile img.persona-picture')).toHaveCount(0, { timeout: 15_000 });
+});
+
+test('req-288: a pinned model is saved as the record\'s model; Next free in class clears it', async ({ page, vaultDir }) => {
+  test.setTimeout(120_000);
+  await expect(page.locator('app-titlebar [role="tab"]', { hasText: 'Work' })).toBeVisible({ timeout: 30_000 });
+  await migrated(vaultDir);
+  await openPersona(page, 'ben');
+  const body = page.locator('.persona-page').filter({ visible: true });
+  const file = path.join(vaultDir, 'tickets', '_meta', 'personas', 'ben', 'persona.md');
+  await expect.poll(() => fs.readFileSync(file, 'utf8'), { timeout: 15_000 }).toContain('model: "opencode/qwen3-coder"');
+  await body.locator('[data-field="pinned-model"]').click();
+  await body.locator('.persona-listbox [role="option"]', { hasText: 'Next free in class' }).click();
+  await body.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(body.locator('.persona-head .persona-state')).toContainText('Saved', { timeout: 15_000 });
+  await expect.poll(() => fs.readFileSync(file, 'utf8'), { timeout: 15_000 }).not.toContain('model:');
+  expect(fs.readFileSync(file, 'utf8')).toContain('class: heavy');
 });

@@ -1,11 +1,11 @@
-import { classNameOf, type ClassName } from '../contracts/capability-class';
+import type { ClassName } from '../contracts/capability-class';
 import type { ModelNeeds } from '../contracts/ticket-pool-meta';
 import { needsText, parseNeeds } from './model-needs';
 
 /**
  * The run settings of a persona record (req-258, the persona board concept
  * §5 and §9): what sat on the board's columns moves to `persona.md` —
- * the class floor, the model needs, the run ceilings, the hand-over gate —
+ * the model needs (the class floor folded into `class:` with req-288), the run ceilings, the hand-over gate —
  * plus the persona's own pool (`parallel:`, `min:`), its leaving actions and
  * whether its runs are instructed read-only. Every key is optional; an
  * absent one keeps today's behaviour (the column's value, or the role's
@@ -26,8 +26,6 @@ export const PERSONA_LEAVING_ACTIONS: readonly PersonaLeavingAction[] = ['sync-m
 export type PersonaClass = ClassName;
 
 export interface PersonaSettings {
-  /** `min-class:` — no run of the persona asks the pool for a lighter class; null = the column's floor. */
-  readonly minClass: PersonaClass | null;
   /** `needs:` — what its runs need of the model (the req-178 grammar); null = the column's. */
   readonly needs: ModelNeeds | null;
   /** `max-turns:` — the run ceiling in turns; null = the column's. */
@@ -51,7 +49,6 @@ export interface PersonaSettings {
 }
 
 export const EMPTY_PERSONA_SETTINGS: PersonaSettings = {
-  minClass: null,
   needs: null,
   maxTurns: null,
   maxWorkMin: null,
@@ -100,7 +97,6 @@ function minOf(raw: unknown): number {
 export function personaSettingsOf(get: (key: string) => unknown): PersonaSettings {
   const readOnly = get('readonly');
   return {
-    minClass: classNameOf(get('min-class')),
     needs: parseNeeds(get('needs')).needs,
     maxTurns: positiveInt(get('max-turns')),
     maxWorkMin: positiveInt(get('max-work')),
@@ -116,7 +112,6 @@ export function personaSettingsOf(get: (key: string) => unknown): PersonaSetting
 export function personaSettingsLines(settings: PersonaSettings): string[] {
   const needs = needsText(settings.needs);
   return [
-    ...(settings.minClass !== null ? [`min-class: ${settings.minClass}`] : []),
     ...(needs !== '' ? [`needs: [${needs}]`] : []),
     ...(settings.maxTurns !== null ? [`max-turns: ${settings.maxTurns}`] : []),
     ...(settings.maxWorkMin !== null ? [`max-work: ${settings.maxWorkMin}`] : []),

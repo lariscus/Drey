@@ -1,5 +1,5 @@
 import type { PromptPartTokens, TokenizerView } from '../contracts/skills';
-import { PERSONAS_DIR, splitPoolEntry, type Persona } from '../core/persona';
+import { PERSONAS_DIR, personaModelGuess, splitPoolEntry, type Persona } from '../core/persona';
 import { loadPersonaSkills } from '../core/skill-load';
 import { estimateTokens, tokenizerFor } from '../core/token-count';
 import { personaMemorySection } from '../fleet/context-pack';
@@ -21,6 +21,14 @@ export interface PromptPreviewData {
   readonly skills: readonly PromptPartTokens[];
   /** Lines for the log: skills that did not load, names the folder overrode. */
   readonly warnings: readonly string[];
+}
+
+/** The model the preview counts with: the asked one, else the persona's pin (req-288); '' and a neutral tokenizer when neither names one. */
+function previewModelOf(persona: Persona, asked: string | null): { readonly worker: string; readonly model: string; readonly tokenizer: ReturnType<typeof tokenizerFor> } {
+  const entry = asked !== null ? splitPoolEntry(asked) : personaModelGuess(persona);
+  const worker = entry?.provider ?? '';
+  const model = entry?.model ?? '';
+  return { worker, model, tokenizer: tokenizerFor(worker === '' ? null : worker, model === '' ? null : model) };
 }
 
 /**
@@ -97,11 +105,10 @@ export class PromptPreview {
       this.fs.readText(`${dir}/memory.md`),
       loadPersonaSkills((rel) => this.fs.readText(rel), persona.id, persona.skills),
     ]);
-    const entry = splitPoolEntry(options.model ?? persona.models.default);
-    const tokenizer = tokenizerFor(entry.provider ?? persona.worker, entry.model);
+    const { worker, model, tokenizer } = previewModelOf(persona, options.model);
     const composed = composeInstruction(
       previewInstructionInput(
-        { id: persona.id, role: persona.role, worker: entry.provider ?? persona.worker, model: entry.model, prompt, memory: memory ?? '', skills: loaded.skills, run: personaRunSettingsOf(persona) },
+        { id: persona.id, role: persona.role, worker, model, prompt, memory: memory ?? '', skills: loaded.skills, run: personaRunSettingsOf(persona) },
         options.step,
         await this.disciplines(),
       ),

@@ -39,6 +39,7 @@ import {
 import { parseTicketFile, patchHeaderFields, type HeaderPatch } from '../../../packages/tickets-engine/src/core/ticket-files';
 import { parseReviewComments, sendBackNoteOf } from '../../../packages/tickets-engine/src/core/review-feedback';
 import { planWorktreeRemoval } from '../../../packages/tickets-engine/src/core/worktree-removal';
+import { personaModelGuess } from '../../../packages/tickets-engine/src/core/persona';
 import { captureTidyMessages, parseCaptureTidy } from '../shared/capture-tidy';
 import type { AttachmentReply, RefineReply, TicketReply } from '../shared/remote-protocol';
 import { hostVaultIdMapper } from './host-vault-id';
@@ -622,7 +623,7 @@ const plugin: MainPluginModule = {
       if (persona === undefined) {
         return { estimate: null };
       }
-      const model = persona.models.default;
+      const model = personaModelGuess(persona)?.model ?? '';
       return { estimate: await board.estimateOf({ gate: p['gate'], persona: persona.id, model }) };
     });
 
@@ -885,8 +886,20 @@ const plugin: MainPluginModule = {
       const persona = str(payload, 'persona');
       return persona === null ? { ok: false, error: 'bad persona payload' } : client.invoke('personaAvatar', persona);
     });
+    // req-288: the owner's picture for a persona (a PNG data URL the page drew) and its removal; one commit each.
+    ctx.ipc.handle('personaAvatarSet', (payload) => {
+      const persona = str(payload, 'persona');
+      const dataUrl = str(payload, 'dataUrl');
+      return persona === null || dataUrl === null ? { ok: false, error: 'bad persona picture payload' } : client.invoke('personaAvatarSet', { persona, dataUrl });
+    });
+    ctx.ipc.handle('personaAvatarRemove', (payload) => {
+      const persona = str(payload, 'persona');
+      return persona === null ? { ok: false, error: 'bad persona payload' } : client.invoke('personaAvatarRemove', { persona });
+    });
     // req-293: the assistant's connection and its models — Mission Control's persona's Model choice on her page.
     ctx.ipc.handle('chatModels', () => client.invoke('chatModels'));
+    // req-288: the model table from `service.json` — the Persona page's Model block while no runner answers `poolModels`.
+    ctx.ipc.handle('modelTable', () => client.invoke('modelTable'));
     ctx.ipc.handle('personaJournalRemove', (payload) => {
       const persona = str(payload, 'persona');
       const at = str(payload, 'at');

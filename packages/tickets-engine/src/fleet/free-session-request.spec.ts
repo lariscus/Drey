@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import type { Persona } from '../core/persona';
+import type { ModelRow } from './protocol';
 import { composeFreeSessionBrief } from './free-session-brief';
 import { FreeSessionRequestBuilder } from './free-session-request';
 import { FREE_SESSION_TICKET } from './protocol-session';
 
-const BEN = { id: 'ben', kind: 'agent', title: 'Ben', role: 'build', worker: 'claude-code', models: { default: 'claude-code/sonnet', pool: ['claude-code/opus'] }, color: '#fff', skills: [], budget: 4, allowed: {} } as unknown as Persona;
-const base = { persona: BEN, ticketsVaultPath: 'E:\\T', directory: 'E:\\work', instruction: 'brief', origin: 'drey:crew', crew: { permissionMode: 'accept-edits' as const }, overrides: {} };
+const row = (provider: ModelRow['provider'], model: string, cls: string, enabled = true): ModelRow => ({ provider, model, class: cls, slot: null, category: '', cost: 1, enabled });
+const ROWS: readonly ModelRow[] = [row('claude-code', 'opus', 'heavy'), row('claude-code', 'sonnet', 'standard'), row('opencode', 'glm-5.3', 'standard'), row('kimi', 'k2', 'light', false)];
+const BEN = { id: 'ben', kind: 'agent', title: 'Ben', role: 'build', class: 'standard', model: null, color: '#fff', skills: [], budget: 4, allowed: {} } as unknown as Persona;
+const base = { persona: BEN, ticketsVaultPath: 'E:\\T', directory: 'E:\\work', instruction: 'brief', origin: 'drey:crew', crew: { permissionMode: 'accept-edits' as const }, overrides: {}, rows: ROWS };
 const builder = new FreeSessionRequestBuilder();
 
 describe('FreeSessionRequestBuilder (req-173)', () => {
-  it('builds a free session: the persona harness, the named directory, the vault permission, no ticket allowance', () => {
-    const built = builder.build({ ...base, classOf: (provider, model) => (provider === 'claude-code' && model === 'sonnet' ? 'B' : null) });
+  it("builds a free session: the first model of the persona's class (req-288), the named directory, the vault permission, no ticket allowance", () => {
+    const built = builder.build(base);
     expect(built.ok).toBe(true);
     const request = built.ok ? built.request : null;
     expect(request).toMatchObject({
@@ -21,7 +24,7 @@ describe('FreeSessionRequestBuilder (req-173)', () => {
       worktreePath: 'E:\\work',
       repoPath: 'E:\\work',
       gate: 'none',
-      poolClass: 'B',
+      poolClass: 'standard',
       ledger: { allowance: null, personaBudget: 4, noTicket: true },
       session: { kind: 'free', persona: 'ben', workingDirectory: 'E:\\work' },
     });
@@ -35,12 +38,13 @@ describe('FreeSessionRequestBuilder (req-173)', () => {
   });
 
   it('the session record wins: permission, model pin and class over the vault and the persona', () => {
-    const built = builder.build({ ...base, overrides: { permissionMode: 'read-only', model: 'opus', poolClass: 'A' }, classOf: () => 'C' });
-    expect(built.ok && built.request).toMatchObject({ permissionMode: 'read-only', model: 'opus', poolClass: 'A' });
+    const built = builder.build({ ...base, overrides: { permissionMode: 'read-only', model: 'opus', poolClass: 'heavy' } });
+    expect(built.ok && built.request).toMatchObject({ permissionMode: 'read-only', model: 'opus', poolClass: 'heavy' });
   });
 
-  it('refuses a persona without a harness', () => {
-    expect(builder.build({ ...base, persona: { ...BEN, worker: 'api' } as Persona })).toMatchObject({ ok: false });
+  it('req-288: a pinned model runs on its harness; a persona with no model of its class has no session', () => {
+    expect(builder.build({ ...base, persona: { ...BEN, model: 'opencode/glm-5.3' } as Persona })).toMatchObject({ ok: true, request: { provider: 'opencode', model: 'glm-5.3', poolClass: 'standard' } });
+    expect(builder.build({ ...base, persona: { ...BEN, class: 'light' } as Persona })).toMatchObject({ ok: false, error: expect.stringContaining('no light model') });
   });
 
   it('the brief names the directory, what the permission allows, and the tickets vault rule', () => {

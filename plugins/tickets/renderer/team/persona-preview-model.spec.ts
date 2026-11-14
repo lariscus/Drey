@@ -49,8 +49,8 @@ describe('the preview’s parts and request', () => {
   });
 
   it('asks for the first step and the strongest model, and names only what exists', () => {
-    expect(previewRequestOf(['plan', 'review'], ['opus', 'sonnet'])).toEqual({ step: 'plan', model: 'opus' });
-    expect(previewRequestOf([], [])).toEqual({});
-    expect(previewRequestOf(undefined, ['opus'])).toEqual({ model: 'opus' });
+    expect(previewRequestOf(['plan', 'review'], 'claude-code/opus')).toEqual({ step: 'plan', model: 'claude-code/opus' });
+    expect(previewRequestOf([], '')).toEqual({});
+    expect(previewRequestOf(undefined, ' opus ')).toEqual({ model: 'opus' });
   });
 });

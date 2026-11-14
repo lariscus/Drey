@@ -2,16 +2,13 @@ import { CREW_FILE } from '../contracts/crew-config';
 import { seededPersonaText, seededPromptText, type ShippedPersona } from '../core/default-crew';
 import { SEEDED_PICTURES_KEY, seededCrewOf, seededListOf, withSeededCrew, withSeededList } from '../core/crew-seed-marker';
 import { crewOrderOf, withCrewOrder } from '../core/crew-order';
-import { HUMAN_PERSONA_ID, PERSONAS_DIR, type PersonaModels } from '../core/persona';
+import { HUMAN_PERSONA_ID, PERSONAS_DIR } from '../core/persona';
 import type { CrewWrite } from '../core/crew-file-write';
 import type { TicketsGit } from '../core/tickets-git';
-import type { ModelRow } from '../fleet/protocol-pool';
 import type { CrewConfigFiles } from './crew-config-files';
-import type { CrewSeedModels } from './crew-seed-models';
 import type { EngineHost, EngineVault } from './host';
 import type { PersonaAvatarWriter } from './persona-avatars';
 import type { PersonaFolderPort } from './persona-folders';
-import type { ModelTablePort } from './service-model-table';
 import type { ShippedCrew, ShippedCrewSource } from './shipped-crew-files';
 
 /** The commit message of the one commit a seeding makes. */
@@ -31,23 +28,17 @@ export interface CrewSeederDeps {
   readonly folders: PersonaFolderPort;
   /** req-292: the shipped picture of each seeded persona, copied beside its files. */
   readonly avatars: PersonaAvatarWriter;
-  /** The vault's crew settings: the default worker, and the file the marker lives in. */
+  /** The vault's crew settings: the file the marker lives in. */
   readonly crew: {
-    effective(vault: EngineVault): Promise<{ readonly defaultWorker: string }>;
     readonly crewFiles: Pick<CrewConfigFiles, 'read' | 'put' | 'serial'>;
   };
-  /** The machine's model table, read from `service.json` (no runner needed). */
-  readonly table: ModelTablePort;
-  readonly models: CrewSeedModels;
   readonly log: (message: string, level?: 'info' | 'warn') => void;
 }
 
-/** What one seeding works with: the vault, the shipped crew, the worker, the model table's rows. */
+/** What one seeding works with: the vault and the shipped crew. */
 interface Seeding {
   readonly vault: EngineVault;
   readonly shipped: ShippedCrew;
-  readonly worker: string;
-  readonly rows: readonly ModelRow[] | null;
 }
 
 /**
@@ -56,9 +47,9 @@ interface Seeding {
  * once at the engine's start for a board that lacks them. **Idempotent by
  * id**: the `seeded-crew:` key of `_meta/crew.md` lists the ids already
  * offered, so a persona the owner later deletes stays deleted; an id whose
- * folder exists is never touched (only marked). The worker is the vault's
- * default worker, the models the worker's rows of the model table
- * ({@link CrewSeedModels}); the pipeline and the crew's default persona are
+ * folder exists is never touched (only marked). Each persona keeps the
+ * `class:` its shipped record names and pins no model (req-288: the next free
+ * model of its class runs); the pipeline and the crew's default persona are
  * not changed. One commit of the persona files and `crew.md`.
  */
 /**
@@ -100,10 +91,7 @@ export class CrewSeeder {
       if (shipped.personas.length === 0) {
         return { kind: 'nothing' };
       }
-      // `effective` runs the crew.md migration, which takes the file's queue: ask before entering it.
-      const worker = (await this.deps.crew.effective(vault)).defaultWorker;
-      const rows = await this.deps.table.rows().catch(() => null);
-      return await this.deps.crew.crewFiles.serial(() => this.seedLocked({ vault, shipped, worker, rows }));
+      return await this.deps.crew.crewFiles.serial(() => this.seedLocked({ vault, shipped }));
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       this.deps.log(`crew: seeding the default crew failed — ${reason}`, 'warn');
@@ -135,19 +123,18 @@ export class CrewSeeder {
       this.deps.log(`crew: ${marker.error}`, 'warn');
       return { kind: 'refused', reason: marker.error };
     }
-    const models = this.deps.models.pick(run.worker, run.rows);
-    const written = await this.writePersonas(run, missing, models);
+    const written = await this.writePersonas(run, missing);
     const pictured = withPictures(marker, written.pictured);
     await files.put(vault, pictured.ok ? pictured.text : marker.text);
     const paths = [...written.paths, CREW_FILE];
     await this.commit(vault, paths);
     this.deps.host.announceChanges(vault.id, paths);
-    this.report(run, { seeded: missing, models, kept: offered.length - missing.length });
+    this.report({ seeded: missing, kept: offered.length - missing.length });
     return missing.length === 0 ? { kind: 'nothing' } : { kind: 'seeded', ids: missing.map((persona) => persona.id) };
   }
 
-  private async writePersonas(run: Seeding, personas: readonly ShippedPersona[], models: PersonaModels | null): Promise<{ readonly paths: string[]; readonly pictured: string[] }> {
-    const { vault, worker } = run;
+  private async writePersonas(run: Seeding, personas: readonly ShippedPersona[]): Promise<{ readonly paths: string[]; readonly pictured: string[] }> {
+    const { vault } = run;
     const written: string[] = [];
     const pictured: string[] = [];
     for (const persona of personas) {
@@ -158,7 +145,7 @@ export class CrewSeeder {
       const promptPath = `${PERSONAS_DIR}/${persona.id}/prompt.md`;
       const personaPath = `${PERSONAS_DIR}/${persona.id}/persona.md`;
       await this.deps.host.write(vault.id, promptPath, prompt.text);
-      await this.deps.host.write(vault.id, personaPath, seededPersonaText(persona, worker, models));
+      await this.deps.host.write(vault.id, personaPath, seededPersonaText(persona));
       written.push(personaPath, promptPath);
       const avatarPath = await this.deps.avatars.copyShipped(vault, persona.id);
       if (avatarPath !== null) {
@@ -183,18 +170,14 @@ export class CrewSeeder {
     }
   }
 
-  private report(run: Seeding, done: { readonly seeded: readonly ShippedPersona[]; readonly models: PersonaModels | null; readonly kept: number }): void {
-    const { seeded, models, kept } = done;
-    const { worker, shipped } = run;
-    const ids = seeded.map((persona) => persona.id).join(', ');
+  private report(done: { readonly seeded: readonly ShippedPersona[]; readonly kept: number }): void {
+    const { seeded, kept } = done;
     const keptNote = kept > 0 ? `; ${kept} already had a folder and stayed as it is` : '';
     if (seeded.length === 0) {
       this.deps.log(`crew: the default crew is marked as offered${keptNote}`);
-    } else if (models === null) {
-      const fallback = shipped.personas.find((persona) => persona.persona.kind === 'agent')?.persona.models.default ?? '';
-      this.deps.log(`crew: seeded the default crew (${ids}) with worker ${worker}; the model table names no model for it, so the persona default (${fallback}) stands${keptNote} — set it on the Persona page`);
-    } else {
-      this.deps.log(`crew: seeded the default crew (${ids}) with worker ${worker}, models ${models.default} (pool ${models.pool.join(', ')})${keptNote}`);
+      return;
     }
+    const classes = seeded.map((persona) => (persona.persona.class === null ? persona.id : `${persona.id} ${persona.persona.class}`)).join(', ');
+    this.deps.log(`crew: seeded the default crew (${classes}), each on the next free model of its class${keptNote}`);
   }
 }

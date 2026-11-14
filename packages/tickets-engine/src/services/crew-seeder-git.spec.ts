@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { TicketsGit } from '../core/tickets-git';
 import { CREW_SEED_COMMIT } from './crew-seeder';
-import { CrewSeederRig, modelRow } from './crew-seeder-rig.fake';
+import { CrewSeederRig } from './crew-seeder-rig.fake';
 
 /** req-256 against a real repository: the vault is a folder inside it, and the seeding is exactly one commit. */
 
@@ -32,7 +32,7 @@ describe('CrewSeeder over a real git repository', () => {
   });
 
   async function seed(): Promise<string[]> {
-    rig = CrewSeederRig.createAt(path.join(repo, 'vault'), { rows: [modelRow('glm-big', 'opencode', 'A')], git: new TicketsGit(() => 'git') });
+    rig = CrewSeederRig.createAt(path.join(repo, 'vault'), { git: new TicketsGit(() => 'git') });
     expect(await rig.seeder.seed(rig.vault)).toMatchObject({ kind: 'seeded' });
     return git('show', '--name-only', '--format=%s', 'HEAD').split('\n').filter((line) => line !== '');
   }

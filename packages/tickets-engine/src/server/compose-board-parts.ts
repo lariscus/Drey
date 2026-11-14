@@ -60,7 +60,7 @@ export function composeBoardParts(opts: EngineOptions, config: FileConfigStore, 
   // req-173 (R13): the vault layer of the configuration, `_meta/crew.md` — the board resolves its crew
   // keys from it; the first read of a vault moves the old keys of config.json and chain.json in once.
   const crew = composeCrewConfig({ host, git, config, fleetRoot, log });
-  const crewSeeder = opts.seedDefaultCrew === false ? null : composeCrewSeeder({ host, git, crew, home: opts.home, log });
+  const crewSeeder = opts.seedDefaultCrew === false ? null : composeCrewSeeder({ host, git, crew, log });
   const avatars = new PersonaAvatars(host);
   const crewPictures = opts.seedDefaultCrew === false ? null : composeCrewPictures({ host, git, crew, avatars, log });
   const board = new EngineBoardService(
@@ -78,7 +78,7 @@ export function composeBoardParts(opts: EngineOptions, config: FileConfigStore, 
     { events, crew, dkHealth: new DkHealthProbe(execProbe), avatars, ...(crewSeeder === null ? {} : { crewSeeder }) },
   );
   // req-173 (R12): the free sessions the owner opens (service window, Crew tab) or accepts from Pia's card.
-  const freeSessions = composeFreeSessions({ board, fleet, crew, host, log });
+  const freeSessions = composeFreeSessions({ board, fleet, crew, host, home: opts.home, log });
   board.onChanged(() => hub.emit('board'));
   return { hub, host, git, fleet, presence, events, crew, crewSeeder, crewPictures, avatars, board, freeSessions };
 }

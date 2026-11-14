@@ -1,25 +1,14 @@
 import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import type { ModelRow } from '../fleet/protocol-pool';
 import { CrewConfigFiles } from './crew-config-files';
 import { CrewSeeder } from './crew-seeder';
-import { CrewSeedModels } from './crew-seed-models';
 import type { EngineHost, EngineVault } from './host';
 import { PersonaAvatars } from './persona-avatars';
 import { PersonaFolders } from './persona-folders';
 import { ShippedCrewFiles } from './shipped-crew-files';
 
-/** One row of a model table, the way `service.json` would parse it. */
-export function modelRow(model: string, provider: ModelRow['provider'], cls: ModelRow['class']): ModelRow {
-  return { model, slot: null, provider, category: 'everyday', class: cls, cost: 1, enabled: true };
-}
-
 export interface CrewSeederRigOptions {
-  /** The crew.md default worker. */
-  readonly worker?: string;
-  /** The model table's rows; null = no table. */
-  readonly rows?: readonly ModelRow[] | null;
   /** The git port: absent = a recording fake that "commits" nothing. */
   readonly git?: ConstructorParameters<typeof CrewSeeder>[0]['git'];
 }
@@ -51,9 +40,7 @@ export class CrewSeederRig {
       git,
       folders: new PersonaFolders(host),
       avatars: new PersonaAvatars(host),
-      crew: { effective: async () => ({ defaultWorker: options.worker ?? 'opencode' }), crewFiles: new CrewConfigFiles(host, git) },
-      table: { rows: async () => options.rows ?? null },
-      models: new CrewSeedModels(),
+      crew: { crewFiles: new CrewConfigFiles(host, git) },
       log: (message) => void this.logs.push(message),
     });
   }

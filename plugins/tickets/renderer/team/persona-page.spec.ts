@@ -15,23 +15,27 @@ describe('the Persona page v2 (R11, board 7k)', () => {
     expect(q<HTMLSelectElement>('[data-field="role"]').value).toBe('Builder');
     expect(q<HTMLInputElement>('[data-field="summary"]').value).toBe('Builds one part of a ticket, test first.');
     expect(fx.host.querySelector('.persona-step')).toBeNull(); // req-258: the persona board has no steps
-    expect(q<HTMLSelectElement>('[data-field="min-class"]').value).toBe('standard');
+    expect(fx.host.querySelector('[data-field="min-class"]')).toBeNull(); // req-288: the floor folded into the class
     expect(q('[data-field="readonly"]').getAttribute('aria-checked')).toBe('false');
     expect(q<HTMLInputElement>('[data-field="parallel"]').value).toBe('2');
     expect(q<HTMLInputElement>('[data-field="min"]').value).toBe('0');
     expect([...fx.host.querySelectorAll('.persona-action')].map((node) => node.textContent)).toEqual(['sync-main']);
-    expect(q<HTMLSelectElement>('[data-field="worker"]').value).toBe('claude-code');
-    expect([...fx.host.querySelectorAll('.persona-pool-row')].map((node) => [node.querySelector('.persona-pool-n')?.textContent, node.querySelector('.persona-pool-name')?.textContent, node.querySelector('.persona-tag')?.textContent])).toEqual([
-      ['1', 'opusClaude Code · class heavy · factor 3', '0 / 3 busy'],
-      ['2', 'sonnetClaude Code · class standard · factor 1', '0 / 3 busy'],
-    ]);
+    // req-288: the Model block — the owner's classes, Next free in class, the counts; no harness, no pool
+    expect(fx.host.querySelector('[data-field="worker"]')).toBeNull();
+    expect(fx.host.querySelector('.persona-pool-row')).toBeNull();
+    expect([...fx.host.querySelectorAll('.persona-seg-btn')].map((node) => [node.textContent, node.getAttribute('aria-checked')])).toEqual([['heavy', 'true'], ['standard', 'false'], ['light', 'false']]);
+    expect(q('[data-field="pinned-model"]').textContent).toBe('Next free in class');
+    expect(q('.persona-model-counts').textContent).toBe('1 heavy model · 1 free now');
     expect(q<HTMLInputElement>('[data-field="budget"]').value).toBe('$5');
-    expect([...fx.host.querySelectorAll('.persona-allow-row')].map((row) => row.firstElementChild?.textContent)).toEqual(['Change notes where the project allows', 'Run commands in the worktree', 'Reach the network', 'Spend above the ticket allowance']);
-    expect(q<HTMLSelectElement>('select[aria-label="Change notes where the project allows"]').value).toBe('on');
-    expect(q('.persona-skill').textContent).toContain('personas/ben/skills/tdd/SKILL.md');
-    expect(q('.persona-skill').textContent).toContain('own · 240 tokens');
+    expect([...fx.host.querySelectorAll('.persona-allow-row')].map((row) => row.firstElementChild?.textContent)).toEqual(['Run commands', 'Reach the network', 'Change notes where the project allows', 'Spend above allowance']);
+    expect(q('[data-field="write-notes"]').getAttribute('aria-checked')).toBe('true');
+    expect(buttonOf('Vaults are set per project')).toBeDefined();
+    expect(q('.persona-skill').textContent).toContain('own · tdd');
+    expect(q('.persona-skill').textContent).toContain('240 tokens');
+    expect(q('.persona-left').contains(q('[data-proposal]'))).toBe(true); // board 7k v3: Skills and Proposals in the left column
+    expect(q('.persona-right').querySelectorAll('.persona-block').length).toBe(1); // the Instructions editor alone fills the right
     expect(q('[data-proposal]').textContent).toContain('Add a line');
-    expect(q('.persona-links').textContent).toBe('Memory · 3 →Journal · 2 →Talk to Ben 1:1 →');
+    expect(fx.host.querySelector('.persona-links')).toBeNull(); // board 7k v3: Memory and the 1:1 are the page's tabs
     expect(stateText()).toBe('Saved');
     expect(fx.retitled).toEqual(['Ben']);
     expect(personaWordCountOf('ben')).toBe(5);
@@ -63,14 +67,13 @@ describe('the Persona page v2 (R11, board 7k)', () => {
     type(q('[data-field="title"]'), 'Benno');
     type(q('[data-field="summary"]'), 'Builds one part.');
     choose(q('[data-field="role"]'), 'Reviewer');
-    choose(q('[data-field="worker"]'), 'opencode');
+    q<HTMLButtonElement>('.persona-seg-btn[data-value="standard"]').click();
     type(q('[data-field="budget"]'), '$7.50');
     typeInEditor('New instructions');
-    const selects = [...fx.host.querySelectorAll<HTMLSelectElement>('.persona-allow-row select')];
-    choose(selects[0]!, 'off');
-    choose(selects[1]!, 'bypass');
-    choose(selects[2]!, 'on');
-    choose(selects[3]!, 'allow');
+    q('[data-field="write-notes"]').click();
+    choose(q<HTMLSelectElement>('.persona-allow-row select'), 'bypass');
+    q('[data-field="network"]').click();
+    q('[data-field="spend"]').click();
     expect(stateText()).toBe('Changed · not saved');
     buttonOf('Save').click();
     await settle();
@@ -80,7 +83,7 @@ describe('the Persona page v2 (R11, board 7k)', () => {
         title: 'Benno',
         role: 'reviewer',
         summary: 'Builds one part.',
-        worker: 'opencode',
+        class: 'standard',
         budget: 7.5,
         prompt: 'New instructions',
         allowed: { writeNotes: false, runCommands: 'bypass', network: true, spendAboveAllowance: true },
@@ -94,7 +97,8 @@ describe('the Persona page v2 (R11, board 7k)', () => {
   it('req-283: Change notes where the project allows saves write-notes — the vaults are the project\'s', async () => {
     await mount();
     expect(fx.host.querySelector('.persona-vault-pick')).toBeNull();
-    choose(q<HTMLSelectElement>('select[aria-label="Change notes where the project allows"]'), 'off');
+    q('[data-field="write-notes"]').click();
+    expect(q('[data-field="write-notes"]').getAttribute('aria-checked')).toBe('false');
     buttonOf('Save').click();
     await settle();
     expect(patches()).toEqual([{ persona: 'ben', allowed: { writeNotes: false } }]);
@@ -102,7 +106,6 @@ describe('the Persona page v2 (R11, board 7k)', () => {
 
   it('req-258: the run settings save as one settings patch of what changed', async () => {
     await mount();
-    choose(q<HTMLSelectElement>('[data-field="min-class"]'), 'heavy');
     q('[data-field="readonly"]').click();
     expect(q('[data-field="readonly"]').getAttribute('aria-checked')).toBe('true');
     type(q<HTMLInputElement>('[data-field="parallel"]'), '');
@@ -114,31 +117,39 @@ describe('the Persona page v2 (R11, board 7k)', () => {
     expect([...fx.host.querySelectorAll('.persona-action')].map((node) => node.textContent)).toEqual(['commit']);
     buttonOf('Save').click();
     await settle();
-    expect(patches()).toEqual([{ persona: 'ben', settings: { minClass: 'heavy', readOnly: true, parallel: null, min: 1, leaving: ['commit'] } }]);
+    expect(patches()).toEqual([{ persona: 'ben', settings: { readOnly: true, parallel: null, min: 1, leaving: ['commit'] } }]);
   });
 
-  it('the models come from the table; a row moves, goes, and a new one is picked from the table', async () => {
+  it('req-288: the model listbox offers Next free in class and the models of the class with their harness; a pin saves as model', async () => {
     await mount();
-    q<HTMLElement>('[data-model="opus"] .persona-icon-btn').click();
-    [...q('[data-model="opus"]').querySelectorAll('button')].find((button) => button.textContent === 'Move down')!.click();
-    expect([...fx.host.querySelectorAll('.persona-pool-row')].map((row) => (row as HTMLElement).dataset['model'])).toEqual(['sonnet', 'opus']);
-    buttonOf('Add a model…').click();
-    choose(q<HTMLSelectElement>('.persona-add select'), 'haiku');
-    expect([...fx.host.querySelectorAll('.persona-pool-row')].map((row) => (row as HTMLElement).dataset['model'])).toEqual(['sonnet', 'opus', 'haiku']);
+    q<HTMLButtonElement>('[data-field="pinned-model"]').click();
+    expect([...fx.host.querySelectorAll('.persona-listbox [role="option"]')].map((option) => [option.textContent, option.getAttribute('aria-selected')])).toEqual([
+      ['Next free in class', 'true'],
+      ['opus · Claude Code', 'false'],
+    ]);
+    q<HTMLElement>('.persona-listbox [data-value="claude-code/opus"]').click();
+    expect(fx.host.querySelector('.persona-listbox')).toBeNull();
+    expect(q('[data-field="pinned-model"]').textContent).toBe('opus · Claude Code');
     buttonOf('Save').click();
     await settle();
-    expect(patches()).toEqual([{ persona: 'ben', pool: ['sonnet', 'opus', 'haiku'] }]);
+    expect(patches()).toEqual([{ persona: 'ben', model: 'claude-code/opus' }]);
   });
 
-  it('without a model table the model name is typed, and an unlisted model says so', async () => {
+  it('req-288: a class change drops a pin that is no model of the new class; without a table the shipped classes show', async () => {
+    fx.view = { model: 'claude-code/opus' };
+    await mount();
+    expect(q('[data-field="pinned-model"]').textContent).toBe('opus · Claude Code');
+    q<HTMLButtonElement>('.persona-seg-btn[data-value="light"]').click();
+    expect(q('[data-field="pinned-model"]').textContent).toBe('Next free in class');
+    buttonOf('Save').click();
+    await settle();
+    expect(patches()).toEqual([{ persona: 'ben', class: 'light', model: null }]);
+    cleanFixture();
+    resetFixture();
     fx.table = null;
     await mount();
-    expect(q('[data-model="opus"]').textContent).toContain('not in the model table');
-    buttonOf('Add a model…').click();
-    const input = q<HTMLInputElement>('.persona-add input');
-    type(input, 'glm-5.3');
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-    expect(fx.host.querySelector('[data-model="glm-5.3"]')).not.toBeNull();
+    expect([...fx.host.querySelectorAll('.persona-seg-btn')].map((node) => node.textContent)).toEqual(['super heavy', 'heavy', 'standard', 'light']);
+    expect(q('.persona-model-counts').textContent).toBe('0 heavy models · 0 free now');
   });
 
   it('Discard puts the form and the editor back as they were read', async () => {
@@ -155,12 +166,12 @@ describe('the Persona page v2 (R11, board 7k)', () => {
   });
 
   it('req-269 (v4): Mission Control\'s persona has no work, rights, proposals or Delete; her model and skills are covered in persona-page-tabs.spec.ts', async () => {
-    fx.view = { kind: 'mission', role: 'custom', worker: '', model: '', pool: [], phases: [], budget: null };
+    fx.view = { kind: 'mission', role: 'custom', model: '', phases: [], budget: null };
     fx.prompt = { text: '## Who Pia is\n\nMission Control.' };
     await mount();
     expect(q<HTMLInputElement>('[data-field="title"]').value).toBe('Ben');
     expect(editor().text).toBe('## Who Pia is\n\nMission Control.');
-    for (const selector of ['[data-field="worker"]', '[data-field="min-class"]', '[data-field="budget"]', '.persona-allow-row', '[data-proposal]', '.persona-delete-open']) {
+    for (const selector of ['[data-field="pinned-model"]', '[data-field="budget"]', '.persona-allow-row', '[data-proposal]', '.persona-delete-open']) {
       expect(fx.host.querySelector(selector), selector).toBeNull();
     }
     // req-296 / req-293: her skills ride her prompt, so the page counts it and previews it like any persona's.

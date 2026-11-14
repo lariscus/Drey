@@ -12,6 +12,8 @@ export interface ClassPool {
   classOf(entry: PoolEntry): CapabilityClass | null;
   /** req-287: the rank of a class in the owner's list. */
   rankOf(name: CapabilityClass): number;
+  /** req-288: every model the router may use, strongest class first. */
+  entries(): readonly PoolEntry[];
 }
 
 export interface WaitQueue {

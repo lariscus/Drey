@@ -32,7 +32,8 @@ describe('step 3: the pipeline keeps the lifecycle columns', () => {
       tokenBudget: 40000000,
       dropped: ['audit: on'],
     });
-    expect(out.patch).toEqual({ minClass: 'standard', maxTurns: 80 });
+    expect(out.patch).toEqual({ maxTurns: 80 });
+    expect(out.floor).toBe('standard'); // req-288: the column's floor raises the builder's class
     const parsed = parsePipeline(out.text);
     expect(parsed.phases.map((p) => [p.id, p.persona])).toEqual([['inbox', null], ['prioritized', null], ['done', null]]);
     expect(parsed.flow?.map((e) => e.persona)).toEqual(['paul', 'paul', 'ben', 'ralf', 'tessa', 'you']);
@@ -42,7 +43,7 @@ describe('step 3: the pipeline keeps the lifecycle columns', () => {
   });
 
   it("replaces only the shipped phase-board prose, and leaves a builder's own setting alone", () => {
-    const out = pipelineMigrationOf(DEFAULT_PIPELINE_TEXT, [persona('ben', 'min-class: A\n'), persona('paul')])!;
+    const out = pipelineMigrationOf(DEFAULT_PIPELINE_TEXT, [persona('ben', 'class: heavy\n'), persona('paul')])!;
     expect(out.text.endsWith(`---\n${LIFECYCLE_PIPELINE_PROSE}`)).toBe(true);
     expect(out.plan.flow).toBeNull(); // the shipped pipeline has a flow already
     expect(out.plan.moved).toBeNull();

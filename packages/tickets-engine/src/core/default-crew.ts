@@ -1,5 +1,5 @@
 import { stripPromptVersion } from './default-prompts';
-import { parsePersonaFile, personaFileText, type Persona, type PersonaModels, type PersonaRole } from './persona';
+import { parsePersonaFile, personaFileText, type Persona, type PersonaRole } from './persona';
 
 /**
  * The default crew (req-256, decision D7): planner Paul, builder Ben,
@@ -7,8 +7,8 @@ import { parsePersonaFile, personaFileText, type Persona, type PersonaModels, ty
  * own persona (`kind: mission`) — shipped as files under
  * `packages/tickets-engine/personas/<id>/{persona,prompt}.md` and seeded
  * into a board's `tickets/_meta/personas/` ({@link CrewSeeder}). The
- * shipped `persona.md` has no `worker:` and no `models:` key: those are
- * the vault's, filled at seeding (never for Pia, who runs no session). The
+ * shipped `persona.md` of an agent names its `class:` and pins no model
+ * (req-288: the next free model of the class runs; Pia runs no session). The
  * shipped `prompt.md` is the persona's "who it is" part (R11, the prompt is
  * the persona); the seeded one of an agent adds the step text of its role
  * below it, because a persona's prompt replaces the step prompt as the
@@ -30,7 +30,7 @@ export const CREW_STEPS: Readonly<Partial<Record<PersonaRole, { readonly ref: st
 /** One shipped persona as read from the package: its parsed record and the "who it is" prose. */
 export interface ShippedPersona {
   readonly id: string;
-  /** `persona.md` parsed — `worker` and `models` here are the parser's defaults, never what is seeded. */
+  /** `persona.md` parsed. */
   readonly persona: Persona;
   /** `prompt.md`, newline-terminated, opening with `## Who <title> is`. */
   readonly who: string;
@@ -54,14 +54,9 @@ export function shippedPersonaOf(id: string, personaText: string, promptText: st
   return { id, persona, who: who.endsWith('\n') ? who : `${who}\n` };
 }
 
-/**
- * The `persona.md` a vault gets: the shipped record with the vault's
- * worker and, when the model table names one for it, the models; without
- * models the parser's default stays (the file then names it, like any
- * persona the writer saves). A mission persona's file carries neither.
- */
-export function seededPersonaText(shipped: ShippedPersona, worker: string, models: PersonaModels | null): string {
-  return personaFileText({ ...shipped.persona, worker, ...(models === null ? {} : { models }) });
+/** The `persona.md` a vault gets: the shipped record as the writer writes it (its class, no pinned model, req-288). */
+export function seededPersonaText(shipped: ShippedPersona): string {
+  return personaFileText(shipped.persona);
 }
 
 /**

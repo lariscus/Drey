@@ -280,6 +280,7 @@ export const appConfig: ApplicationConfig = {
               worker?: string;
               model?: string;
               pool?: readonly string[];
+              class?: string;
               skills?: readonly string[];
               kind?: 'agent' | 'human' | 'mission';
               summary?: string;

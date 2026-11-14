@@ -1712,26 +1712,33 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   journal](#memory-journal); the tab carries the count) and **1:1** (a
   conversation with the persona, [The 1:1](#one-on-one); Ctrl+Enter sends).
   The tab stays where you left it while the page is open. On the left,
-  **Profile** (the persona's picture — or its initials —, the name, the role and **the one
+  **Profile** (the persona's picture — or its initials — with a camera
+  button: **Upload picture…** takes any image, centred and cropped to a
+  square, and **Remove picture** takes it away again — a removed picture of
+  the shipped crew stays removed; the name, the role and **the one
   line for the crew list** — the line under the name on the crew cards, in
-  Mission Control too), **Work** (the harness; the models,
-  strongest first, each with its class, its factor and how many of its
-  sessions are busy (`1 / 3 busy`: the running runs and 1:1s on that model
-  against what its accounts allow); **Add a model…** picks from the model table and the **⋮** menu moves or
-  removes a row; the **Class floor** — the lowest model class a run of the
-  persona may use, over the step's own; **Read-only** — the persona's runs
+  Mission Control too), **Model** (the persona's **class** — a segmented
+  control of the classes in your list under *Settings → Models*, such as
+  *super heavy · heavy · standard · light*; and **Model**: *Next free in class*,
+  the default, or one model of that class, each with its harness. The line
+  under it, `3 heavy models · 2 free now`, says how many enabled models serve the
+  class and how many have a free session. A ticket's class, a plan part's
+  size and the step's class floor can only raise the class a run asks for,
+  never lower it; a pinned model runs alone until one of them does. The harness
+  follows from the model — the persona has none of its own and no model list),
+  **Work** (**Read-only** — the persona's runs
   are told to change no file (an instruction in their brief, not a lock: the
   reviewer and the tester are read-only unless you switch it off);
   **Parallel · max** and **Parallel · min** — the most runs of the persona at
   once, and how many it may start when the big pool is full (both are
   enforced: a run needs room in the persona's pool and in the big one); **Leaving actions** — machine work when a
   ticket leaves the persona, `sync-main` or `commit` (see *Leaving actions*
-  below); the daily budget) and **Allowed to** (**Change notes where the
-  project allows** — the project names the vaults, see *The crew's vault* —,
-  whether its runs ask before running commands, whether it may
-  reach the network, whether it may spend past a ticket's allowance — hover a
-  row for what it means; the notes and allowance choices apply to runs now,
-  the commands and network choices are recorded for the runner). On the right,
+  below); the daily budget) and **Allowed to** (**Run commands** in the worktree,
+  **Reach the network**, **Change notes where the project allows** — the project
+  names the vaults, so the link *Vaults are set per project* opens *Settings →
+  Projects*; see *The crew's vault* — and **Spend above allowance**, past a
+  ticket's allowance — hover a row for what it means; the notes and allowance
+  choices apply to runs now, the commands and network choices are recorded for the runner). On the right,
   **Instructions** is the persona's `prompt.md` in the same editor your notes
   use — Live Preview or **Source**, with the formatting buttons above it — and
   the line above it counts what a run of this persona starts with (`≈ 2,490

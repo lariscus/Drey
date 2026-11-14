@@ -39,4 +39,6 @@ export interface BlockContext {
   edit(next: Partial<PersonaDraft>): void;
   /** Changes the draft and rebuilds the blocks (a switch, a row added or moved). */
   change(next: Partial<PersonaDraft>): void;
+  /** req-288: reads the persona list again — a picture change lands in its `avatarVersion`, and the page redraws from it. */
+  refreshPersonas(): Promise<void>;
 }

@@ -92,25 +92,30 @@ describe('Pia, Mission Control\'s persona (req-269)', () => {
     expect(text).not.toContain('drey-prompt-version');
   });
 
-  it('is seeded as shipped: no step below her prompt, no worker and no models in her record', async () => {
+  it('is seeded as shipped: no step below her prompt, no class and no model in her record', async () => {
     const pia = shippedPersonaOf('pia', await file('pia', 'persona.md'), await file('pia', 'prompt.md')) as Shipped;
     expect(seededPromptText(pia, await loadShippedPrompts())).toEqual({ text: pia.who, stepMissing: false });
-    const record = seededPersonaText(pia, 'claude-code', { default: 'm1', pool: ['m1'] });
+    const record = seededPersonaText(pia);
     expect(record).toContain('kind: mission');
-    expect(record).not.toMatch(/^worker:/m);
-    expect(record).not.toMatch(/^models:/m);
+    expect(record).not.toMatch(/^(worker|models|class|model):/m);
     expect(parsePersonaFile('pia', record)).toMatchObject({ kind: 'mission', title: 'Pia', summary: pia.persona.summary, color: pia.persona.color });
   });
 });
 
 describe('what is seeded from them', () => {
-  it('writes persona.md with the vault worker and the models it is given, the shipped record otherwise unchanged', async () => {
+  it('req-288: writes persona.md as shipped — its class, no pinned model, no worker or models', async () => {
     const ben = shippedPersonaOf('ben', await file('ben', 'persona.md'), await file('ben', 'prompt.md')) as Exclude<ReturnType<typeof shippedPersonaOf>, string>;
-    const text = seededPersonaText(ben, 'claude-code', { default: 'm1', pool: ['m1', 'm2'] });
-    expect(text).toContain('worker: claude-code');
-    expect(text).toContain('  default: m1\n  pool: [m1, m2]');
-    expect(parsePersonaFile('ben', text)).toMatchObject({ title: 'Ben', role: 'builder', summary: ben.persona.summary, color: ben.persona.color, skills: [] });
-    expect(seededPersonaText(ben, 'opencode', null)).toContain(`  default: ${ben.persona.models.default}`);
+    const text = seededPersonaText(ben);
+    expect(text).toContain('class: heavy\n');
+    expect(text).not.toMatch(/^(worker|models|model):/m);
+    expect(parsePersonaFile('ben', text)).toMatchObject({ title: 'Ben', role: 'builder', class: 'heavy', model: null, summary: ben.persona.summary, color: ben.persona.color, skills: [] });
+  });
+
+  it('req-288: every shipped agent names a class', async () => {
+    for (const id of AGENT_IDS) {
+      const shipped = shippedPersonaOf(id, await file(id, 'persona.md'), await file(id, 'prompt.md')) as Exclude<ReturnType<typeof shippedPersonaOf>, string>;
+      expect(shipped.persona.class).toBe('heavy');
+    }
   });
 
   it('puts the role\'s shipped step under the character, one prompt that works as the run\'s instruction base', async () => {

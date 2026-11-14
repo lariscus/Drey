@@ -74,6 +74,22 @@ export class PoolGrant {
     return this.deps.settings.order().rank(name);
   }
 
+  /** req-288: every model the router may use, strongest class first (the table's order within a class), each provider and model once. */
+  entries(): readonly PoolEntry[] {
+    const order = this.deps.settings.order();
+    const rows = this.deps.settings.table().rows.filter((row) => row.enabled);
+    const ranked = rows.map((row, at) => ({ row, at })).sort((x, y) => order.rank(x.row.class) - order.rank(y.row.class) || x.at - y.at);
+    const seen = new Set<string>();
+    return ranked.flatMap(({ row }) => {
+      const key = `${row.provider}/${row.model}`;
+      if (seen.has(key)) {
+        return [];
+      }
+      seen.add(key);
+      return [{ provider: row.provider, model: row.model }];
+    });
+  }
+
   /** The class the model table gives a pool entry (its first row); null when the table does not hold it. */
   classOf(entry: PoolEntry): CapabilityClass | null {
     return entry.model === null ? null : (this.deps.settings.table().rowsOf(entry.model, entry.provider)[0]?.class ?? null);

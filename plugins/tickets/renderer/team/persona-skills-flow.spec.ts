@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readSkillZip } from '../../../../packages/tickets-engine/src/services/skill-zip';
-import type { RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { buttonOf, choose, cleanFixture, fx, mount, patches, q, resetFixture, settle, stateText, typeInEditor } from './persona-page.harness';
 
 beforeEach(resetFixture);
@@ -13,53 +12,71 @@ afterEach(() => {
 const rows = (): string[] => [...fx.host.querySelectorAll<HTMLElement>('[data-skill]')].map((row) => row.dataset['skill']!);
 const calls = (method: string): Record<string, unknown>[] => fx.invoked.filter(([name]) => name === method).map(([, payload]) => payload as Record<string, unknown>);
 const switchOf = (name: string): HTMLButtonElement => q<HTMLButtonElement>(`[data-skill="${name}"] .persona-switch`);
-/** A button of the inline removal ask: the page has other Cancel and Remove buttons (the model menu). */
-const inAsk = (name: string): HTMLButtonElement => [...q('[role="alertdialog"]').querySelectorAll('button')].find((button) => button.textContent === name)!;
 const problem = (): string => q('.persona-skill-problem').textContent ?? '';
 
-describe('the Skills block over the engine routes (req-237)', () => {
-  it('lists the skills of both folders — the own folder and the shared pool — with off rows, origin, tokens and counts', async () => {
+const library = (): string[] => [...fx.host.querySelectorAll<HTMLElement>('.persona-library [role="option"]')].map((option) => option.dataset['value']!);
+const openLibrary = (): void => buttonOf('Add from library').click();
+
+describe('the Skills block over the engine routes (req-237; board 7k v3, req-288)', () => {
+  it('lists the skills the persona carries and its own — switch, source line and tokens; the library lists every skill with its source', async () => {
     await mount();
-    expect(rows()).toEqual(['tdd', 'go-conventions', 'diff-review']);
-    expect(q('[data-skill="tdd"]').textContent).toContain('personas/ben/skills/tdd/SKILL.md');
-    expect(q('[data-skill="tdd"]').textContent).toContain('own · 240 tokens');
-    expect(q('[data-skill="tdd"] .persona-grow').getAttribute('title')).toBe('tdd skill');
-    expect(q('[data-skill="go-conventions"]').textContent).toContain('_meta/skills/go-conventions/SKILL.md');
-    expect(q('[data-skill="go-conventions"]').textContent).toContain('shared · 310 tokens');
+    expect(rows()).toEqual(['tdd', 'go-conventions']);
+    expect(q('[data-skill="tdd"]').textContent).toContain('own · tdd');
+    expect(q('[data-skill="tdd"]').textContent).toContain('240 tokens');
+    expect(q('[data-skill="tdd"] .persona-skill-name').getAttribute('title')).toBe('tdd skill');
+    expect(q('[data-skill="go-conventions"]').textContent).toContain('shared · go-conventions');
     expect(switchOf('tdd').getAttribute('aria-checked')).toBe('true');
-    expect(switchOf('diff-review').getAttribute('aria-checked')).toBe('false');
-    expect(q('.persona-skill-counts').textContent).toBe('2 of 3 on · ≈ 550 tokens');
+    expect(fx.host.querySelector('.persona-library')?.hasAttribute('hidden')).toBe(true);
+    openLibrary();
+    expect(library()).toEqual(['diff-review', 'go-conventions', 'tdd']);
+    expect([...fx.host.querySelectorAll('.persona-library [role="option"]')].map((option) => option.getAttribute('aria-selected'))).toEqual(['false', 'true', 'true']);
+    expect(q('.persona-library [data-value="diff-review"]').textContent).toContain('shared');
     expect(calls('personaSkills')).toEqual([{ persona: 'ben' }]);
   });
 
-  it('a switch goes to the engine at once and the row shows what the engine answered; it is no change of the form', async () => {
+  it('a library pick switches the skill on at once — no change of the form; the search narrows the list', async () => {
     await mount();
-    switchOf('diff-review').click();
+    openLibrary();
+    q<HTMLElement>('.persona-library [data-value="diff-review"]').click();
     await settle();
     expect(calls('personaSkillToggle')).toEqual([{ persona: 'ben', skill: 'diff-review', on: true }]);
-    expect(switchOf('diff-review').getAttribute('aria-checked')).toBe('true');
-    expect(q('.persona-skill-counts').textContent).toBe('3 of 3 on · ≈ 950 tokens');
+    expect(rows()).toEqual(['tdd', 'go-conventions', 'diff-review']);
     expect(stateText()).toBe('Saved');
     expect(patches()).toEqual([]);
-    switchOf('tdd').click();
+    const search = q<HTMLInputElement>('.persona-library-search');
+    search.value = 'go';
+    search.dispatchEvent(new Event('input'));
+    expect(library()).toEqual(['go-conventions']);
+  });
+
+  it('a switch goes to the engine at once; remove takes a library skill off the persona', async () => {
+    await mount();
+    switchOf('go-conventions').click();
     await settle();
-    expect(calls('personaSkillToggle')[1]).toEqual({ persona: 'ben', skill: 'tdd', on: false });
-    expect(switchOf('tdd').getAttribute('aria-checked')).toBe('false');
+    expect(calls('personaSkillToggle')).toEqual([{ persona: 'ben', skill: 'go-conventions', on: false }]);
+    expect(rows()).toEqual(['tdd']);
+    openLibrary();
+    q<HTMLElement>('.persona-library [data-value="go-conventions"]').click();
+    await settle();
+    q<HTMLButtonElement>('[data-skill="go-conventions"] .persona-icon-btn').click();
+    await settle();
+    expect(calls('personaSkillToggle')[2]).toEqual({ persona: 'ben', skill: 'go-conventions', on: false });
+    expect(calls('personaSkillRemove')).toEqual([]);
   });
 
   it('shows an engine refusal through its catalog text and leaves the rows as they were', async () => {
     await mount();
-    fx.skillFail = { code: 'no_skill', error: 'no skill named diff-review is available to ben' };
-    switchOf('diff-review').click();
+    fx.skillFail = { code: 'no_skill', error: 'no skill named go-conventions is available to ben' };
+    switchOf('go-conventions').click();
     await settle();
     expect(problem()).toBe('That skill is not available.');
-    expect(switchOf('diff-review').getAttribute('aria-checked')).toBe('false');
+    expect(switchOf('go-conventions').getAttribute('aria-checked')).toBe('true');
     fx.skillFail = { code: 'something_new', error: 'The engine says this.' };
-    switchOf('diff-review').click();
+    switchOf('go-conventions').click();
     await settle();
     expect(problem()).toBe('The engine says this.');
     fx.skillFail = null;
-    switchOf('diff-review').click();
+    switchOf('tdd').click();
     await settle();
     expect(q('.persona-skill-problem').hidden).toBe(true);
   });
@@ -67,30 +84,22 @@ describe('the Skills block over the engine routes (req-237)', () => {
   it('a name the record holds that no folder does is a row to switch off', async () => {
     fx.missing = ['ghost'];
     await mount();
-    expect(rows()).toEqual(['tdd', 'go-conventions', 'ghost', 'diff-review']); // on first, the off row last
+    expect(rows()).toEqual(['tdd', 'go-conventions', 'ghost']);
     expect(q('[data-skill="ghost"]').textContent).toContain('not found');
-    expect(q('.persona-skill-counts').textContent).toContain('3 of 4 on');
     switchOf('ghost').click();
     await settle();
     expect(calls('personaSkillToggle')).toEqual([{ persona: 'ben', skill: 'ghost', on: false }]);
   });
 
-  it('the row menu is on an own skill only; Remove asks once in the row, Cancel keeps the skill, Remove deletes it', async () => {
+  it('an own skill is taken off like any other: it stays in the persona\'s folder and in the library as own', async () => {
     await mount();
-    expect(fx.host.querySelector('[data-skill="go-conventions"] .persona-icon-btn')).toBeNull();
     q<HTMLElement>('[data-skill="tdd"] .persona-icon-btn').click();
-    buttonOf('Remove skill').click();
-    expect(q('[data-skill="tdd"] [role="alertdialog"]').textContent).toContain('Remove Tdd?');
-    expect(calls('personaSkillRemove')).toEqual([]);
-    inAsk('Cancel').click();
-    expect(rows()).toContain('tdd');
-    expect(fx.host.querySelector('[role="alertdialog"]')).toBeNull();
-    q<HTMLElement>('[data-skill="tdd"] .persona-icon-btn').click();
-    buttonOf('Remove skill').click();
-    inAsk('Remove').click();
     await settle();
-    expect(calls('personaSkillRemove')).toEqual([{ persona: 'ben', name: 'tdd' }]);
-    expect(rows()).toEqual(['go-conventions', 'diff-review']);
+    expect(calls('personaSkillToggle')).toEqual([{ persona: 'ben', skill: 'tdd', on: false }]);
+    expect(calls('personaSkillRemove')).toEqual([]);
+    expect(rows()).toEqual(['go-conventions']);
+    openLibrary();
+    expect(q('.persona-library [data-value="tdd"]').textContent).toContain('own');
   });
 });
 
@@ -108,10 +117,11 @@ const inFolder = (name: string, path: string, data: string): File => {
   return file;
 };
 
-describe('Add skill… (req-237): a file, a zip or a folder, up into the persona’s own folder', () => {
+describe('Upload own skill… (req-237; the library popup\'s last row since req-288): a file, a zip or a folder, up into the persona’s own folder', () => {
   it('offers a skill file or zip and a skill folder; the hidden inputs are what the browser picks with', async () => {
     await mount();
-    buttonOf('Add skill…').click();
+    openLibrary();
+    buttonOf('Upload own skill…').click();
     expect([...fx.host.querySelectorAll('.persona-skill-add [role="menuitem"]')].map((item) => item.textContent)).toEqual(['Skill file or zip…', 'Skill folder…']);
     expect(q<HTMLInputElement>('input[data-pick="file"]').accept).toBe('.md,.markdown,.zip');
     expect(q('input[data-pick="folder"]').hasAttribute('webkitdirectory')).toBe(true);
@@ -123,8 +133,9 @@ describe('Add skill… (req-237): a file, a zip or a folder, up into the persona
     expect(fx.uploads[0]).toEqual({ scope: 'own', persona: 'ben', format: 'markdown', text: '---\nname: review\ndescription: d\n---\nBody' });
     await pick('file', [new File(['Flat text'], 'lint-rules.md')]);
     expect(fx.uploads[1]).toEqual({ scope: 'own', persona: 'ben', format: 'markdown', text: 'Flat text', name: 'lint-rules' });
-    expect(rows()).toContain('uploaded');
-    expect(q('[data-skill="uploaded"] .persona-switch').getAttribute('aria-checked')).toBe('false');
+    expect(rows()).not.toContain('uploaded'); // off until switched on: it waits in the library as own
+    openLibrary();
+    expect(library()).toContain('uploaded');
   });
 
   it('a zip goes up as base64 for the route to read', async () => {
@@ -174,13 +185,13 @@ describe('the start-of-run figure and Preview full prompt (req-238)', () => {
     expect(q('.persona-tokens').textContent).toBe('≈ 2,584 tokens at start'); // 2,490 - 6 (saved text) + 100 (350 characters at 3.5 per token)
   });
 
-  it('asks for the persona’s first step and strongest model, and again when the strongest model changes', async () => {
+  it('asks for the persona’s first step and its pinned model, and again when the pin changes (req-288)', async () => {
     await mount();
-    expect(calls('personaPromptPreview')).toEqual([{ persona: 'ben', step: 'build', model: 'opus' }]);
-    q<HTMLElement>('[data-model="opus"] .persona-icon-btn').click();
-    [...q('[data-model="opus"]').querySelectorAll('button')].find((button) => button.textContent === 'Move down')!.click();
+    expect(calls('personaPromptPreview')).toEqual([{ persona: 'ben', step: 'build' }]);
+    q<HTMLButtonElement>('[data-field="pinned-model"]').click();
+    q<HTMLElement>('.persona-listbox [data-value="claude-code/opus"]').click();
     await settle();
-    expect(calls('personaPromptPreview')[1]).toEqual({ persona: 'ben', step: 'build', model: 'sonnet' });
+    expect(calls('personaPromptPreview')[1]).toEqual({ persona: 'ben', step: 'build', model: 'claude-code/opus' });
   });
 
   it('opens the brief read-only in the host’s Markdown view with the parts marked, and closes again', async () => {
@@ -204,7 +215,8 @@ describe('the start-of-run figure and Preview full prompt (req-238)', () => {
     buttonOf('Preview full prompt').click();
     await settle();
     const before = calls('personaPromptPreview').length;
-    switchOf('diff-review').click();
+    openLibrary();
+    q<HTMLElement>('.persona-library [data-value="diff-review"]').click();
     await settle();
     expect(calls('personaPromptPreview').length).toBeGreaterThan(before);
     expect([...fx.host.querySelectorAll('.persona-part-skill')].map((part) => part.textContent)).toEqual(['Tdd · 240', 'Go conventions · 310', 'Diff review · 400']);
@@ -221,7 +233,7 @@ describe('the start-of-run figure and Preview full prompt (req-238)', () => {
   });
 });
 
-describe('the head’s commit age and the models’ busy count (req-239)', () => {
+describe('the head’s commit age (req-239) and the Model block’s free count (req-288)', () => {
   it('reads Saved · committed with the relative time of the folder’s last commit; Changed while the form is dirty', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-09T10:00:00+01:00'));
@@ -237,13 +249,8 @@ describe('the head’s commit age and the models’ busy count (req-239)', () =>
     expect(stateText()).toBe('Saved');
   });
 
-  const run = (over: Partial<RunInfo>): RunInfo => ({ id: 'r', ticketId: 'T-1', provider: 'claude-code', state: 'running', model: 'opus', kind: 'run', ...over }) as unknown as RunInfo;
-  const busy = (model: string): string => q(`[data-model="${model}"] .persona-tag`).textContent ?? '';
-
-  it('counts the live runs and sessions on a model against the sessions its slots allow', async () => {
-    fx.runs = [run({ id: 'a' }), run({ id: 'b', model: 'claude-code/opus', kind: '1:1' }), run({ id: 'c', state: 'done' }), run({ id: 'd', model: null, grant: { model: 'sonnet' } as RunInfo['grant'] }), run({ id: 'e', provider: 'kimi' })];
+  it('counts the models of the class and those a slot could serve now', async () => {
     await mount();
-    expect(busy('opus')).toBe('2 / 3 busy'); // a and b; the finished run and the Kimi run are not on it
-    expect(busy('sonnet')).toBe('1 / 3 busy'); // d, by the model the pool granted
+    expect(q('.persona-model-counts').textContent).toBe('1 heavy model · 1 free now');
   });
 });

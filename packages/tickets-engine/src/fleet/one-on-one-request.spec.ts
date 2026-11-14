@@ -1,18 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import type { Persona } from '../core/persona';
+import type { ModelRow } from './protocol';
 import { composeOneOnOneBrief, type OneOnOneBriefInput } from './one-on-one-brief';
 import { OneOnOneRequestBuilder } from './one-on-one-request';
 import { cutToOneOnOne, NO_TOOLS, ONE_ON_ONE_TOOLS, ONE_ON_ONE_VAULT_TOOLS } from './one-on-one-toolset';
 
 import { EMPTY_PERSONA_SETTINGS } from '../core/persona-settings';
+const row = (provider: ModelRow['provider'], model: string, cls: string, enabled = true): ModelRow => ({ provider, model, class: cls, slot: null, category: '', cost: 1, enabled });
+const ROWS: readonly ModelRow[] = [row('claude-code', 'opus', 'heavy'), row('claude-code', 'sonnet', 'standard'), row('opencode', 'glm-5.3', 'standard'), row('kimi', 'k2', 'light', false)];
 function persona(over: Partial<Persona> = {}): Persona {
   return {
     id: 'ben',
     kind: 'agent',
     title: 'Ben',
     role: 'builder',
-    worker: 'claude-code',
-    models: { default: 'opus', pool: ['opus', 'opencode/glm-5.3'] },
+    class: 'heavy',
+    model: null,
     color: '#888888',
     summary: '',
     skills: [],
@@ -29,12 +32,13 @@ const input = (over: Partial<Parameters<OneOnOneRequestBuilder['build']>[0]> = {
   chatFile: 'tickets/_meta/chat/20261109-100000-1-1-ben.md',
   instruction: 'brief',
   origin: 'drey:1:1',
+  rows: ROWS,
   ...over,
 });
 
 describe('OneOnOneRequestBuilder — the 1:1 asks the pool like any session (req-168)', () => {
-  it("runs the persona's own harness and model, read-only in the tickets repository, with no ticket, gate or move", () => {
-    const built = new OneOnOneRequestBuilder().build(input({ classOf: (provider, model) => (provider === 'claude-code' && model === 'opus' ? 'A' : null) }));
+  it("runs the first model of the persona's class (req-288), read-only in the tickets repository, with no ticket, gate or move", () => {
+    const built = new OneOnOneRequestBuilder().build(input());
     expect(built.ok).toBe(true);
     const request = built.ok ? built.request : null;
     expect(request).toMatchObject({
@@ -47,22 +51,26 @@ describe('OneOnOneRequestBuilder — the 1:1 asks the pool like any session (req
       acceptance: [],
       nextPhase: null,
       column: null,
-      poolClass: 'A',
+      poolClass: 'heavy',
       ledger: { allowance: null, personaBudget: 4, spendAboveAllowance: false, noTicket: true },
       session: { kind: '1:1', persona: 'ben', workingDirectory: 'E:/tickets', chatFile: 'tickets/_meta/chat/20261109-100000-1-1-ben.md' },
     });
     expect(request?.dk).toBeUndefined();
   });
 
-  it("takes the pool's first model of the persona's harness when the default names another one", () => {
-    const built = new OneOnOneRequestBuilder().build(input({ persona: persona({ worker: 'opencode', models: { default: 'claude-code/opus', pool: ['opencode/glm-5.3'] } }) }));
-    expect(built.ok && built.request).toMatchObject({ provider: 'opencode', model: 'glm-5.3' });
-    expect(built.ok && built.request.poolClass).toBeUndefined();
+  it('req-288: a pinned model runs on its own harness, its class from its row', () => {
+    const built = new OneOnOneRequestBuilder().build(input({ persona: persona({ model: 'glm-5.3' }) }));
+    expect(built.ok && built.request).toMatchObject({ provider: 'opencode', model: 'glm-5.3', poolClass: 'standard' });
   });
 
-  it('refuses an api persona: its 1:1 goes over the chat bridge', () => {
-    const built = new OneOnOneRequestBuilder().build(input({ persona: persona({ worker: 'api' }) }));
-    expect(built).toMatchObject({ ok: false, error: expect.stringContaining('chat bridge') });
+  it('req-288: an unmigrated record runs by the migration rule — the class of its old default', () => {
+    const v2 = persona({ class: null, legacy: { worker: 'claude-code', models: { default: 'sonnet', pool: ['sonnet', 'opus'] }, minClass: null } });
+    expect(new OneOnOneRequestBuilder().build(input({ persona: v2 }))).toMatchObject({ ok: true, request: { provider: 'claude-code', model: 'sonnet', poolClass: 'standard' } });
+  });
+
+  it('refuses a persona whose class holds no model the router may use', () => {
+    const built = new OneOnOneRequestBuilder().build(input({ persona: persona({ class: 'light' }) }));
+    expect(built).toMatchObject({ ok: false, error: expect.stringContaining('no light model') });
   });
 });
 

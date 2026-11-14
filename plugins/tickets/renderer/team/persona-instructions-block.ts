@@ -13,6 +13,8 @@ import type { MarkdownFormatAction, MarkdownViewHandle } from '../../../../share
 import { h } from '../desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { iconButton, outlineButton } from './persona-dom';
+import { splitPoolEntry } from '../../../../packages/tickets-engine/src/core/pool-entry';
+import { classModelsOf } from './persona-class-model';
 import { createEditorGrip } from './persona-ed-grip';
 import { createPreviewPanel, type PreviewPanel } from './persona-preview-panel';
 import { atStartTokensOf } from './persona-preview-model';
@@ -39,6 +41,14 @@ export interface InstructionsBlock {
   dispose(): void;
 }
 
+/** The tokenizer of the model a run would take: the pin, else the class's first model of the table (req-288). */
+function tokenizerOfDraft(ctx: BlockContext): ReturnType<typeof tokenizerFor> {
+  const { pinnedModel, modelClass } = ctx.draft();
+  const entry = pinnedModel !== '' ? pinnedModel : (classModelsOf(ctx.extras.table, modelClass)[0]?.entry ?? '');
+  const { provider, model } = splitPoolEntry(entry);
+  return tokenizerFor(provider, entry === '' ? null : model);
+}
+
 export function createInstructionsBlock(ctx: BlockContext, initial: string, editable: boolean): InstructionsBlock {
   const { t, api } = ctx;
   const block = h('section', 'persona-block persona-block-fill');
@@ -50,7 +60,7 @@ export function createInstructionsBlock(ctx: BlockContext, initial: string, edit
     current = text;
     const preview = ctx.preview.preview;
     const own = ctx.draft();
-    tokens.textContent = preview === null ? t('persona.page.tokens', { count: estimateTokens(text.trim(), tokenizerFor(own.worker, own.pool[0] ?? null)) }) : t('persona.page.tokens_at_start', { count: atStartTokensOf(preview, text) });
+    tokens.textContent = preview === null ? t('persona.page.tokens', { count: estimateTokens(text.trim(), tokenizerOfDraft(ctx)) }) : t('persona.page.tokens_at_start', { count: atStartTokensOf(preview, text) });
   };
   countTokens(initial);
   const offPreview = ctx.preview.subscribe(() => countTokens(current));

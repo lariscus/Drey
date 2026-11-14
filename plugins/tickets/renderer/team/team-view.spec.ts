@@ -17,9 +17,8 @@ const persona = (patch: Partial<PersonaView>): PersonaView => ({
   id: 'ben',
   title: 'Ben',
   role: 'Builder',
-  worker: 'opencode',
-  model: 'qwen3-coder',
-  pool: ['qwen3-coder'],
+  class: 'heavy',
+  model: '',
   color: '#3366cc',
   budget: 5,
   dailyCost: 2.67,
@@ -208,7 +207,7 @@ describe('the Crew tab', () => {
   it('a click or Enter on any card opens that persona\'s page, Mission Control\'s persona included; she is not counted', () => {
     const host = document.body.appendChild(document.createElement('div'));
     const opens: string[] = [];
-    const pia = persona({ id: 'pia', title: 'Pia', kind: 'mission', role: 'custom', worker: '', model: '', pool: [], budget: null, dailyCost: undefined, phases: [], summary: 'Mission Control' });
+    const pia = persona({ id: 'pia', title: 'Pia', kind: 'mission', role: 'custom', model: '', budget: null, dailyCost: undefined, phases: [], summary: 'Mission Control' });
     mountTeam({ ...deps(), openPersona: (id: string) => opens.push(id) } as DeskDeps, store([pia, ...personas]), host);
     expect([...host.querySelectorAll<HTMLElement>('.desk-persona')].map((card) => card.dataset['persona'])).toEqual(['pia', 'ben', 'tessa']);
     expect(host.querySelector('[data-persona="pia"] .desk-persona-state')!.textContent).toBe('idle');

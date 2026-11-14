@@ -114,6 +114,7 @@ export type { PersonaMessage, PersonaProposal, PersonaProposalCommand, PersonaPr
  * defined in `persona-records.ts`.
  */
 import type { PersonaJournalRemove, PersonaJournalReply, PersonaMemoryRemove, PersonaMemoryReply } from './persona-records';
+import type { PersonaPictureRemove, PersonaPictureReply, PersonaPictureSet } from './persona-picture';
 export type { JournalEntry, PersonaJournalRemove, PersonaJournalReply, PersonaMemoryEntry, PersonaMemoryRemove, PersonaMemoryReply } from './persona-records';
 
 /** The chain's persona pause (U4): applied, with the state echoed back. */
@@ -187,6 +188,10 @@ export interface TicketsRemotePort extends SkillsPort, PersonaRemovePort {
   personas(): Promise<readonly PersonaView[]>;
   /** req-292: the persona's picture (`personas/<id>/avatar.png`) as a `data:image/png` URL; refused when it has none. */
   personaAvatar(personaId: string): Promise<PersonaAvatarReply>;
+  /** req-288: the owner's picture for a persona (a PNG data URL) — `personas/<id>/avatar.png`, one commit. */
+  personaAvatarSet(cmd: PersonaPictureSet): Promise<PersonaPictureReply>;
+  /** req-288: removes the persona's picture; a shipped one's id joins `seeded-pictures:` in the same commit. */
+  personaAvatarRemove(cmd: PersonaPictureRemove): Promise<PersonaPictureReply>;
   /** req-281: the persona's instructions (`prompt.md`) as text, for an editor that changes them; '' when the file is absent. */
   personaInstructions(personaId: string): Promise<{ readonly ok: true; readonly text: string } | { readonly ok: false; readonly error: string }>;
   /** req-293: the assistant's connection and the models its endpoint lists (Mission Control's persona's Model choice). */
@@ -215,9 +220,10 @@ export interface TicketsRemotePort extends SkillsPort, PersonaRemovePort {
     readonly persona: string;
     readonly title?: string;
     readonly role?: string;
-    readonly worker?: string;
-    readonly model?: string;
-    readonly pool?: readonly string[];
+    /** req-288: the capability class. */
+    readonly class?: string;
+    /** req-288: the pinned model; null = the next free model of the class. */
+    readonly model?: string | null;
     readonly color?: string;
     readonly skills?: readonly string[];
     readonly prompt?: string;
@@ -303,10 +309,10 @@ export interface PersonaView {
   readonly kind?: 'agent' | 'human' | 'mission';
   readonly title: string;
   readonly role: string;
-  readonly worker: string;
-  /** The default model (`models.default`). */
+  /** req-288: the capability class (`class:`); absent for the owner, Mission Control's persona and a record not migrated yet. */
+  readonly class?: string;
+  /** req-288: the pinned model (`model:`, `<provider>/<model>`); '' = the next free model of its class. */
   readonly model: string;
-  readonly pool: readonly string[];
   /** `#rrggbb`; the chips' and avatars' colour. */
   readonly color: string;
   /** req-292: the picture's version (it changes with the file); absent = no `avatar.png`, the circle draws without one and asks for nothing. */

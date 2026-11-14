@@ -96,12 +96,12 @@ describe('RemoteGateway', () => {
     const { base, token, calls } = await start();
     const patched = await fetch(`${base}/api/personas/pia`, {
       method: 'PATCH',
-      body: JSON.stringify({ model: 'sonnet', pool: ['sonnet'] }),
+      body: JSON.stringify({ class: 'standard', model: 'claude-code/sonnet' }),
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(patched.status).toBe(200);
     expect(await patched.json()).toEqual({ ok: true });
-    expect(calls.patch).toEqual({ persona: 'pia', model: 'sonnet', pool: ['sonnet'] });
+    expect(calls.patch).toEqual({ persona: 'pia', class: 'standard', model: 'claude-code/sonnet' });
 
     // a body-less PATCH is a refused command, not a transport error
     const empty = await fetch(`${base}/api/personas/pia`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } });

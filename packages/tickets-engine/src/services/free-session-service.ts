@@ -3,15 +3,16 @@ import type { ProjectRecord } from '../contracts/projects';
 import type { RepoRef } from '../contracts/repo-ref';
 import { loadPersonaSkills, personaRef, type Persona } from '../core/persona';
 import { expandShippedFragments } from '../core/prompt-file';
-import { parseWorkerValue } from '../fleet/assignment';
 import { composeFreeSessionBrief } from '../fleet/free-session-brief';
 import { FreeSessionRequestBuilder } from '../fleet/free-session-request';
-import type { CapabilityClass, ModelsReply, RunInfo, RunRequest, WorkerProviderId } from '../fleet/protocol';
+import { personaHarnessOf } from '../fleet/persona-harness';
+import type { ModelRow, ModelsReply, RunInfo, RunRequest } from '../fleet/protocol';
 import { isTicketRun } from '../fleet/protocol-session';
 import { SessionDirectoryRule } from '../fleet/session/session-directory-rule';
 import { SessionProjectRule, type SessionProjectVerdict } from '../fleet/session/session-project-rule';
 import type { CrewConfigService } from './crew-config-service';
 import type { EngineHost, EngineVault } from './host';
+import type { ModelTablePort } from './service-model-table';
 
 /** The board as a free session needs it. */
 export interface FreeSessionBoard {
@@ -38,6 +39,8 @@ export interface FreeSessionServiceDeps {
   /** True = a folder, false = something else, null = nothing there (the Node adapter stats). */
   readonly isDirectory: (path: string) => Promise<boolean | null>;
   readonly log: (message: string, level?: 'info' | 'warn' | 'error') => void;
+  /** req-288: the machine's model table, read from `service.json` (no runner needed); absent = the runner's `GET /models`. */
+  readonly table?: ModelTablePort;
 }
 
 const LIVE = new Set(['starting', 'running', 'stopping']);
@@ -83,10 +86,13 @@ export class FreeSessionService {
       this.models(),
       this.projects(),
     ]);
-    const classes = [...new Set((models?.models ?? []).map((row) => row.class))].sort();
+    const classes = [...new Set((models ?? []).map((row) => row.class))].sort();
     return {
       ok: true,
-      personas: personas.filter((p) => p.kind === 'agent' && parseWorkerValue(p.worker) !== null).map((p) => ({ id: p.id, title: p.title, worker: p.worker })),
+      personas: personas.flatMap((p) => {
+        const harness = p.kind === 'agent' ? personaHarnessOf(p, models) : null;
+        return harness === null ? [] : [{ id: p.id, title: p.title, worker: harness.provider }];
+      }),
       classes,
       ticketsVault: vault.path,
       repos: repos.repos.filter((r) => r.path !== null).map((r) => ({ name: r.name, path: r.path! })),
@@ -156,7 +162,7 @@ export class FreeSessionService {
 
   private async requestOf(at: { vault: EngineVault; persona: Persona; ask: FreeSessionAsk; origin: string; directory: string; ticketsVault: boolean; projectId: string | null }): Promise<{ ok: true; request: RunRequest } | { ok: false; error: string }> {
     const { vault, persona, ask } = at;
-    const [crew, classOf] = await Promise.all([this.deps.crew.effective(vault), this.classLookup()]);
+    const [crew, rows] = await Promise.all([this.deps.crew.effective(vault), this.models()]);
     const overrides = {
       ...(ask.permissionMode !== undefined ? { permissionMode: ask.permissionMode } : {}),
       ...(ask.model !== undefined ? { model: ask.model } : {}),
@@ -164,7 +170,7 @@ export class FreeSessionService {
     };
     const permissionMode = overrides.permissionMode ?? crew.permissionMode;
     const instruction = await this.brief(vault, persona, { directory: at.directory, permissionMode, ticketsVault: at.ticketsVault });
-    return this.builder.build({ persona, ticketsVaultPath: vault.path, directory: at.directory, instruction, origin: at.origin, crew, overrides, classOf, projectId: at.projectId });
+    return this.builder.build({ persona, ticketsVaultPath: vault.path, directory: at.directory, instruction, origin: at.origin, crew, overrides, rows, projectId: at.projectId });
   }
 
   private async brief(vault: EngineVault, persona: Persona, where: { directory: string; permissionMode: RunRequest['permissionMode']; ticketsVault: boolean }): Promise<string> {
@@ -192,13 +198,9 @@ export class FreeSessionService {
     }
   }
 
-  private async models(): Promise<ModelsReply | null> {
-    return (await this.deps.fleet.models?.().catch(() => null)) ?? null;
-  }
-
-  /** The model table's class of a model (the runner's `GET /models`); no table = no class asked. */
-  private async classLookup(): Promise<(provider: WorkerProviderId, model: string | null) => CapabilityClass | null> {
-    const models = await this.models();
-    return (provider, model) => models?.models.find((row) => row.provider === provider && row.model === model)?.class ?? null;
+  /** The model table (req-288: the harness follows from the model): `service.json`'s rows, else the runner's `GET /models`. */
+  private async models(): Promise<readonly ModelRow[] | null> {
+    const table = (await this.deps.table?.rows().catch(() => null)) ?? null;
+    return table ?? ((await this.deps.fleet.models?.().catch(() => null)) as ModelsReply | null)?.models ?? null;
   }
 }

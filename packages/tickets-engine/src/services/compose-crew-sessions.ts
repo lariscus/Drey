@@ -7,12 +7,12 @@ import { CrewConfigMigrator } from './crew-config-migrator';
 import { CrewConfigService } from './crew-config-service';
 import { CrewPictures } from './crew-pictures';
 import { CrewSeeder } from './crew-seeder';
-import { CrewSeedModels } from './crew-seed-models';
 import { CrewLegacyFiles, type FlatConfigStore } from './crew-legacy-files';
 import { FreeSessionService, type FreeSessionBoard, type FreeSessionFleet } from './free-session-service';
-import type { EngineHost } from './host';
+import type { EngineHost, EngineVault } from './host';
 import { PersonaAvatars } from './persona-avatars';
 import { PersonaFolders } from './persona-folders';
+import { PersonaPictureService } from './persona-picture-service';
 import { ServiceModelTable } from './service-model-table';
 import { ShippedCrewFiles } from './shipped-crew-files';
 
@@ -39,15 +39,17 @@ export function composeCrewConfig(wiring: { readonly host: EngineHost; readonly 
 }
 
 /** req-173's free sessions, wired after the board they read personas and repos from. */
-export function composeFreeSessions(wiring: { readonly board: FreeSessionBoard; readonly fleet: FreeSessionFleet; readonly crew: CrewConfigService; readonly host: EngineHost; readonly log: Log }): FreeSessionService {
-  return new FreeSessionService({ board: wiring.board, fleet: wiring.fleet, crew: wiring.crew, host: wiring.host, isDirectory, log: wiring.log });
+export function composeFreeSessions(wiring: { readonly board: FreeSessionBoard; readonly fleet: FreeSessionFleet; readonly crew: CrewConfigService; readonly host: EngineHost; readonly home: string; readonly log: Log }): FreeSessionService {
+  return new FreeSessionService({ board: wiring.board, fleet: wiring.fleet, crew: wiring.crew, host: wiring.host, isDirectory, log: wiring.log, table: serviceModelTable(wiring.home) });
 }
 
-/**
- * req-256's default crew seeder, wired after the crew configuration it reads the default worker from. The model
- * table is read from `<service home>/service.json` (the runner may be asleep, and `GET /models` never wakes it).
- */
-export function composeCrewSeeder(wiring: { readonly host: EngineHost; readonly git: TicketsGit; readonly crew: CrewConfigService; readonly home: string; readonly log: Log }): CrewSeeder {
+/** req-288: the machine's model table as the engine reads it — `<service home>/service.json`, no runner needed. */
+export function serviceModelTable(home: string): ServiceModelTable {
+  return new ServiceModelTable(new NodeFileSystem(), path.join(home, 'service.json'));
+}
+
+/** req-256's default crew seeder, wired after the crew configuration whose file holds its marker. */
+export function composeCrewSeeder(wiring: { readonly host: EngineHost; readonly git: TicketsGit; readonly crew: CrewConfigService; readonly log: Log }): CrewSeeder {
   return new CrewSeeder({
     source: new ShippedCrewFiles(),
     host: wiring.host,
@@ -55,9 +57,24 @@ export function composeCrewSeeder(wiring: { readonly host: EngineHost; readonly 
     folders: new PersonaFolders(wiring.host),
     avatars: new PersonaAvatars(wiring.host),
     crew: wiring.crew,
-    table: new ServiceModelTable(new NodeFileSystem(), path.join(wiring.home, 'service.json')),
-    models: new CrewSeedModels(),
     log: wiring.log,
+  });
+}
+
+/** req-288: the owner's picture upload and removal over the board's vault, its git and crew.md. */
+export function composePersonaPictures(
+  parts: { readonly board: { detect(): Promise<EngineVault | null>; announceChanged(): void }; readonly host: EngineHost; readonly git: TicketsGit; readonly crew: CrewConfigService; readonly avatars: PersonaAvatars },
+  log: Log,
+): PersonaPictureService {
+  return new PersonaPictureService({
+    board: parts.board,
+    host: parts.host,
+    git: parts.git,
+    folders: new PersonaFolders(parts.host),
+    files: parts.avatars,
+    crewFiles: parts.crew.crewFiles,
+    changed: () => parts.board.announceChanged(),
+    log,
   });
 }
 

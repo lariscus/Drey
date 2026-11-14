@@ -63,9 +63,10 @@ async function openCrew(page: Page): Promise<void> {
 
 /**
  * The commits the engine makes in a fresh board of its own accord: the default crew when it starts (req-256), then the
- * shipped pictures for the fixture's own Ben and Ralf (req-292), the human persona when the Crew list is first read (E10-6).
+ * shipped pictures for the fixture's own Ben and Ralf (req-292), their move onto class and model (req-288, the fixture's
+ * records are v2), the human persona when the Crew list is first read (E10-6).
  */
-const ENGINE_COMMITS = ['personas: the default crew (req-256)', 'personas: crew pictures', 'tickets: you persona'];
+const ENGINE_COMMITS = ['personas: the default crew (req-256)', 'personas: crew pictures', 'personas: class and model replace worker and models (req-288)', 'tickets: you persona'];
 
 /**
  * A board's persona files are tracked: the seed is committed (the fixture writes it when the app starts), so a deletion is a commit of removals.

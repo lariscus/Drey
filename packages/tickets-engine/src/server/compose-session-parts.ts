@@ -3,11 +3,14 @@ import { hostname } from 'node:os';
 import { createChatBridge } from '../services/chat-llm';
 import { ChatService } from '../services/chat-service';
 import { ChatVoices } from '../services/chat-voices';
+import { serviceModelTable } from '../services/compose-crew-sessions';
+import type { ServiceModelTable } from '../services/service-model-table';
 import { composePersonaSessions } from '../services/compose-persona-sessions';
 import { loadCrewPrompts } from '../services/crew-prompts';
 import { MissionEntryTurns } from '../services/mission-entry-turns';
 import { MissionPersonaPrompt } from '../services/mission-persona-prompt';
 import { PersonaPinReader } from '../services/persona-pin-reader';
+import { PersonaModelMigrator } from '../services/persona-model-migrator';
 import { PersonaProseMigrator } from '../services/persona-prose-migrator';
 import { ProjectMigrator } from '../services/project-migrator';
 import { PersonaRemoveService } from '../services/persona-remove-service';
@@ -32,6 +35,8 @@ export interface SessionParts {
   readonly personaRemoval: PersonaRemoveService;
   /** req-284: Settings → Projects' writes, one commit each. */
   readonly projects: ProjectService;
+  /** req-288: the machine's model table read from `service.json` (the Persona page's Model block, no runner needed). */
+  readonly modelTable: ServiceModelTable;
   /** The start's own work (req-256: seeding the default crew): `ready` of the engine awaits it, and so does `close`. */
   readonly startupWork: Promise<void>;
 }
@@ -92,6 +97,7 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
     bridge: (systemPrompt, model) => opts.chatBridge ?? createChatBridge({ config, crew, systemPrompt, ...(model === null ? {} : { model: () => Promise.resolve(model) }) }),
     log,
     ...(opts.oneOnOneTools === undefined ? {} : { tools: opts.oneOnOneTools }),
+    table: serviceModelTable(opts.home),
   });
   const personaRecords = new PersonaRecords({ board, host, git, log });
   const skills = new SkillService({ board, host, git });
@@ -102,9 +108,10 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
     skills,
     prose: new PersonaProseMigrator({ board, host, git, log }),
     crew: { board, seeder: parts.crewSeeder, pictures: parts.crewPictures },
+    models: opts.seedDefaultCrew === false ? null : new PersonaModelMigrator({ board, host, git, table: serviceModelTable(opts.home), log }),
     projects: (opts.migrateProjects ?? opts.seedDefaultCrew !== false) ? new ProjectMigrator({ board, host, git, log }) : null,
   });
-  return { chat, personaSessions, personaRecords, skills, personaRemoval, projects, startupWork };
+  return { chat, personaSessions, personaRecords, skills, personaRemoval, projects, modelTable: serviceModelTable(opts.home), startupWork };
 }
 
 /** The one-time migrations of the engine's start. */
@@ -115,6 +122,8 @@ interface StartupMigrators {
   readonly crew: { board: Pick<BoardParts['board'], 'detect'>; seeder: BoardParts['crewSeeder']; pictures: BoardParts['crewPictures'] };
   /** req-282: null = `migrateProjects: false`. */
   readonly projects: ProjectMigrator | null;
+  /** req-288: `worker:` / `models:` onto `class:` and `model:`; null = `seedDefaultCrew: false`. */
+  readonly models: PersonaModelMigrator | null;
 }
 
 /** The migrations that run behind startup: failures are logged, never fatal. */
@@ -137,6 +146,9 @@ function migrateOnce(log: Log, migrators: StartupMigrators): Promise<void> {
       }
     })
     .catch((error: unknown) => log(`default crew seeding failed: ${messageOf(error)}`, 'warn'))
+    // req-288: the personas move onto class and model — after the seeding, before the projects, one commit at a time.
+    .then(() => migrators.models?.migrateAll())
+    .catch((error: unknown) => log(`the persona class migration failed: ${messageOf(error)}`, 'warn'))
     // req-282: a board without project records gets its first one — after the seeding, so the two never commit at once.
     .then(() => migrators.projects?.migrate())
     .then(
