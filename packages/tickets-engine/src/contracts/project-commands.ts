@@ -5,7 +5,6 @@
  * change). Pure types; the engine's `services/project-service.ts` answers them.
  */
 import type { ProjectRecord } from './projects';
-import type { RepoRef } from './repo-ref';
 
 /** A record as the page edits it: everything but the id, which the file stem fixes. */
 export type ProjectDraft = Omit<ProjectRecord, 'id'>;
@@ -22,23 +21,33 @@ export interface ProjectRemoveCommand {
 }
 
 /**
- * `projectAddRepo` (*From folder…*): the repository joins `repos.md` when no
- * entry of that name exists and the project lists it — both files, one commit.
+ * `projectAddFolder` (*Add folder*, *From folder…*, and a finished clone):
+ * the folder the owner picked is probed with the installed git. A git
+ * repository — its root or a folder inside it — joins `repos.md` when no
+ * entry names that checkout yet and the project lists it (both files, one
+ * commit); a plain folder becomes one of the project's read-only folders.
+ * `repoOnly` (*From folder…*, a clone) refuses a plain folder instead.
  */
-export interface ProjectAddRepoCommand {
+export interface ProjectAddFolderCommand {
   readonly id: string;
-  readonly repo: RepoRef;
+  readonly folder: string;
+  readonly repoOnly?: boolean;
 }
 
-export type ProjectFailureCode = 'no_vault' | 'invalid' | 'no_project' | 'write';
+export type ProjectFailureCode = 'no_vault' | 'invalid' | 'no_project' | 'write' | 'not_a_folder' | 'not_a_repository';
 
 export type ProjectReply =
   | { readonly ok: true; readonly id: string; readonly warning?: string }
+  | { readonly ok: false; readonly code: ProjectFailureCode; readonly error: string };
+
+/** What `projectAddFolder` made of the folder: the repository it listed, or the folder it added. */
+export type ProjectFolderReply =
+  | { readonly ok: true; readonly id: string; readonly kind: 'repository' | 'folder'; readonly name: string; readonly warning?: string }
   | { readonly ok: false; readonly code: ProjectFailureCode; readonly error: string };
 
 /** The port the invoke table and the routes call. */
 export interface ProjectPort {
   projectSave(cmd: ProjectSaveCommand): Promise<ProjectReply>;
   projectRemove(cmd: ProjectRemoveCommand): Promise<ProjectReply>;
-  projectAddRepo(cmd: ProjectAddRepoCommand): Promise<ProjectReply>;
+  projectAddFolder(cmd: ProjectAddFolderCommand): Promise<ProjectFolderReply>;
 }

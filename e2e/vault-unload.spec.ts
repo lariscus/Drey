@@ -103,7 +103,7 @@ test.use({
 });
 
 /**
- * D-73 (milestone 278): unloading a tickets vault takes its tickets off the
+ * D-73 (milestone 279): unloading a tickets vault takes its tickets off the
  * board everywhere at once -- the Tickets panel, and the engine's board that
  * Mission Control and the phone read -- and adding the vault again brings them
  * back. Nothing on disk is touched. The removal is the IPC the Files panel's

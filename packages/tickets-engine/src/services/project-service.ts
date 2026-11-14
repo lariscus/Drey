@@ -1,10 +1,12 @@
-import type { ProjectAddRepoCommand, ProjectPort, ProjectRemoveCommand, ProjectReply, ProjectSaveCommand } from '../contracts/project-commands';
+import type { ProjectAddFolderCommand, ProjectFolderReply, ProjectPort, ProjectRemoveCommand, ProjectReply, ProjectSaveCommand } from '../contracts/project-commands';
 import { PROJECTS_DIR, type ProjectRecord } from '../contracts/projects';
 import { checkDraft, isProjectId, mintProjectId, recordOf } from '../core/project-edit';
 import { parseProjectFile, projectFileText, projectIdOfPath } from '../core/project-record';
+import { chooseRepoEntry, type RepoSeed } from '../core/repo-entry';
 import { parseRepos, reposFileText, reposProse } from '../core/repos-file';
 import type { TicketsGit } from '../core/tickets-git';
 import type { EngineHost, EngineVault } from './host';
+import type { FolderProbe } from './folder-probe';
 import { SkillCommitter } from './skill-committer';
 import { NodeSkillFileSystem, type SkillFileSystem } from './skill-file-system';
 
@@ -14,13 +16,15 @@ export interface ProjectServiceDeps {
   readonly board: { detect(): Promise<EngineVault | null> };
   readonly host: Pick<EngineHost, 'read' | 'write' | 'listMarkdownFiles' | 'announceChanges' | 'log'>;
   readonly git: Pick<TicketsGit, 'locate' | 'commitTree'>;
+  /** Tells a picked folder's git repository from a plain folder (req-304). */
+  readonly probe: Pick<FolderProbe, 'probe'>;
   /** The disk of a vault (a removal deletes the record's file); default the vault folder itself. */
   readonly fsFor?: (vault: EngineVault) => SkillFileSystem;
   /** Fires after every write that changed a file (the board's change event). */
   readonly changed?: () => void;
 }
 
-const fail = (code: Extract<ProjectReply, { ok: false }>['code'], error: string): ProjectReply => ({ ok: false, code, error });
+const fail = (code: Extract<ProjectReply, { ok: false }>['code'], error: string): Extract<ProjectReply, { ok: false }> => ({ ok: false, code, error });
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -30,7 +34,8 @@ const pathOf = (id: string): string => `${PROJECTS_DIR}/${id}.md`;
 
 /**
  * Settings → Projects' writes (req-284, board 7m): a record created or
- * changed, removed, or given a repository found in a folder — each change
+ * changed, removed, or given a folder — a git repository found in it joins
+ * `repos.md` (req-304) — each change
  * one commit of exactly the files it touched (`projects: …`), then the
  * vault's change round, so every client's snapshot follows. Writes queue;
  * a write that changes nothing commits nothing.
@@ -48,11 +53,11 @@ export class ProjectService implements ProjectPort {
     return this.queue(() => this.remove(cmd));
   }
 
-  projectAddRepo(cmd: ProjectAddRepoCommand): Promise<ProjectReply> {
-    return this.queue(() => this.addRepo(cmd));
+  projectAddFolder(cmd: ProjectAddFolderCommand): Promise<ProjectFolderReply> {
+    return this.queue(() => this.addFolder(cmd));
   }
 
-  private queue(op: () => Promise<ProjectReply>): Promise<ProjectReply> {
+  private queue<R>(op: () => Promise<R>): Promise<R> {
     const next = this.tail.catch(() => undefined).then(op);
     this.tail = next;
     return next;
@@ -101,10 +106,10 @@ export class ProjectService implements ProjectPort {
     return { ok: true, id: cmd.id, ...(warning === null ? {} : { warning }) };
   }
 
-  private async addRepo(cmd: ProjectAddRepoCommand): Promise<ProjectReply> {
-    const name = typeof cmd.repo?.name === 'string' ? cmd.repo.name.trim() : '';
-    if (name === '' || typeof cmd.repo.url !== 'string' || cmd.repo.url.trim() === '') {
-      return fail('invalid', 'a repository needs a name and a url');
+  private async addFolder(cmd: ProjectAddFolderCommand): Promise<ProjectFolderReply> {
+    const folder = typeof cmd.folder === 'string' ? cmd.folder.trim() : '';
+    if (folder === '') {
+      return fail('invalid', 'which folder?');
     }
     const vault = await this.deps.board.detect();
     if (vault === null) {
@@ -114,18 +119,39 @@ export class ProjectService implements ProjectPort {
     if (record === null) {
       return fail('no_project', `no project "${String(cmd.id)}"`);
     }
+    const found = await this.deps.probe.probe(folder);
+    if (found.kind === 'missing') {
+      return fail('not_a_folder', `${folder} is not a folder`);
+    }
+    if (found.kind === 'plain') {
+      return cmd.repoOnly === true ? fail('not_a_repository', `${folder} is not a git repository`) : this.attachFolder(vault, record, folder);
+    }
+    return this.attachRepo(vault, record, found.seed);
+  }
+
+  /** A plain folder: one of the project's read-only folders. */
+  private async attachFolder(vault: EngineVault, record: ProjectRecord, folder: string): Promise<ProjectFolderReply> {
+    const next: ProjectRecord = { ...record, folders: record.folders.includes(folder) ? record.folders : [...record.folders, folder] };
+    const reply = await this.write(vault, [[pathOf(record.id), projectFileText(next)]], `projects: ${record.name} — folder ${folder} added (req-304)`, record.id);
+    return reply.ok ? { ...reply, kind: 'folder', name: folder } : reply;
+  }
+
+  /** A recognised checkout: `repos.md` gains its entry when none names it, the project lists it, one commit. */
+  private async attachRepo(vault: EngineVault, record: ProjectRecord, seed: RepoSeed): Promise<ProjectFolderReply> {
     const reposText = await this.read(vault, REPOS_PATH);
     const repos = parseRepos(reposText);
     if (repos.error !== null) {
       return fail('invalid', `repos.md does not parse: ${repos.error}`);
     }
+    const choice = chooseRepoEntry(repos.repos, seed);
     const files: [string, string][] = [];
-    if (!repos.repos.some((r) => r.name === name)) {
-      files.push([REPOS_PATH, reposFileText([...repos.repos, { ...cmd.repo, name, url: cmd.repo.url.trim() }], reposProse(reposText))]);
+    if (choice.add !== null) {
+      files.push([REPOS_PATH, reposFileText([...repos.repos, choice.add], reposProse(reposText))]);
     }
-    const next: ProjectRecord = { ...record, repos: record.repos.includes(name) ? record.repos : [...record.repos, name] };
+    const next: ProjectRecord = { ...record, repos: record.repos.includes(choice.name) ? record.repos : [...record.repos, choice.name] };
     files.push([pathOf(record.id), projectFileText(next)]);
-    return this.write(vault, files, `projects: ${record.name} — repository ${name} added (req-284)`, record.id);
+    const reply = await this.write(vault, files, `projects: ${record.name} — repository ${choice.name} added (req-304)`, record.id);
+    return reply.ok ? { ...reply, kind: 'repository', name: choice.name } : reply;
   }
 
   /** Writes the files whose text changed, then one commit of exactly those. */

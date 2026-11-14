@@ -10,22 +10,30 @@ const DREY: ProjectRecord = { id: 'drey', name: 'Drey', color: '#8ecbef', repos:
 const LARISCUS: ProjectRecord = { id: 'lariscus', name: 'Lariscus', color: '#f2cfae', repos: [], folders: [], vaults: {}, purpose: '' };
 
 let invoked: [string, unknown][] = [];
+let replies: Record<string, unknown> = {};
+let listeners: Record<string, ((data: unknown) => void)[]> = {};
 let views: { opts: MarkdownViewOptions; text: string }[] = [];
 let host: HTMLElement;
 let dispose: () => void;
 
 function fakeApi(): DreyPluginApi {
   const snapshot = { projects: [DREY, LARISCUS], columns: [{ tickets: [{ meta: { project: 'drey' } }, { meta: { project: 'drey' } }, { meta: {} }] }] };
-  const replies: Record<string, unknown> = {
+  replies = {
     board: snapshot,
     reposListing: { file: null, repos: [{ name: 'drey' }, { name: 'lariscus' }, { name: 'smoke' }], error: null },
     projectSave: { ok: true, id: 'drey' },
+    pickFolder: { ok: true, path: 'E:/picked' },
   };
   return {
     i18n,
     backend: {
       invoke: (method: string, payload?: unknown) => (invoked.push([method, payload]), Promise.resolve(replies[method] ?? { ok: true })),
-      on: () => () => undefined,
+      on: (event: string, listener: (data: unknown) => void) => {
+        (listeners[event] ??= []).push(listener);
+        return () => {
+          listeners[event] = (listeners[event] ?? []).filter((l) => l !== listener);
+        };
+      },
     },
     vault: { listVaults: () => Promise.resolve([{ name: 'Drey notes' }, { name: 'Work notes' }, { name: 'Private' }]) },
     ui: {
@@ -42,9 +50,20 @@ function fakeApi(): DreyPluginApi {
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 const saves = () => invoked.filter(([m]) => m === 'projectSave').map(([, p]) => p as { id?: string; project: Omit<ProjectRecord, 'id'> });
+const calls = (method: string) => invoked.filter(([m]) => m === method).map(([, p]) => p as Record<string, unknown>);
+const addButton = (label: string) => [...host.querySelectorAll<HTMLButtonElement>('.prj-add')].find((b) => b.textContent === label)!;
+const confirmButton = () => host.querySelector<HTMLButtonElement>('.prj-picker-actions button')!;
+const cancelButton = () => host.querySelector<HTMLButtonElement>('.prj-picker-actions button:last-child')!;
+const typeUrl = (value: string) => {
+  const url = host.querySelector<HTMLInputElement>('.prj-url')!;
+  url.value = value;
+  url.dispatchEvent(new Event('input'));
+};
+const pickerError = () => host.querySelector('.prj-picker-error')?.textContent;
 
 beforeEach(async () => {
   invoked = [];
+  listeners = {};
   views = [];
   host = document.createElement('div');
   document.body.append(host);
@@ -111,12 +130,11 @@ describe('Settings → Projects (req-284, board 7m)', () => {
   });
 
   it('offers the other repositories of repos.md and From folder… in the picker, and lists a picked one', async () => {
-    const add = [...host.querySelectorAll<HTMLButtonElement>('.prj-add')].find((b) => b.textContent === 'Add repository')!;
-    add.click();
+    addButton('Add repository').click();
     const select = host.querySelector<HTMLSelectElement>('.prj-picker-list')!;
     expect([...select.options].map((o) => o.text)).toEqual(['lariscus', 'smoke', 'From folder…']);
     select.value = 'smoke';
-    host.querySelector<HTMLButtonElement>('.prj-picker-actions button')!.click();
+    confirmButton().click();
     await settle();
     expect(saves()[0]!.project.repos).toEqual(['drey', 'smoke']);
   });
@@ -125,5 +143,110 @@ describe('Settings → Projects (req-284, board 7m)', () => {
     host.querySelector<HTMLButtonElement>('.prj-list-head button')!.click();
     await settle();
     expect(saves()[0]).toEqual({ project: { name: 'New project', color: '#bfe3cd', repos: [], folders: [], vaults: {}, purpose: '' } });
+  });
+});
+
+describe('Settings → Projects: folders and repositories that work (req-304)', () => {
+  it('Add folder opens the folder picker and hands the folder to the engine, which tells a repository from a plain folder', async () => {
+    replies['projectAddFolder'] = { ok: true, id: 'drey', kind: 'folder', name: 'E:/picked' };
+    addButton('Add folder').click();
+    await settle();
+    await settle();
+    expect(calls('pickFolder')).toEqual([{ title: 'Choose a folder for the project' }]);
+    expect(calls('projectAddFolder')).toEqual([{ id: 'drey', folder: 'E:/picked', repoOnly: false }]);
+    expect(host.querySelector('.prj-status')?.textContent).toBe('Saved · committed just now');
+    expect(calls('board').length).toBeGreaterThan(1);
+  });
+
+  it('does nothing when the folder picker is cancelled', async () => {
+    replies['pickFolder'] = { ok: true };
+    addButton('Add folder').click();
+    await settle();
+    expect(calls('projectAddFolder')).toEqual([]);
+  });
+
+  it('shows a refusal of the engine on the status line', async () => {
+    replies['projectAddFolder'] = { ok: false, code: 'not_a_folder', error: 'E:/picked is not a folder' };
+    addButton('Add folder').click();
+    await settle();
+    await settle();
+    expect(host.querySelector('.prj-status')?.textContent).toBe('Not saved: That folder does not exist');
+  });
+
+  it('From folder… uses the same picker and asks for a repository; a plain folder says so in the picker', async () => {
+    replies['projectAddFolder'] = { ok: false, code: 'not_a_repository', error: 'x' };
+    addButton('Add repository').click();
+    const select = host.querySelector<HTMLSelectElement>('.prj-picker-list')!;
+    select.value = select.options[select.options.length - 1]!.value;
+    confirmButton().click();
+    await settle();
+    await settle();
+    expect(calls('pickFolder')).toEqual([{ title: 'Choose a git repository' }]);
+    expect(calls('projectAddFolder')).toEqual([{ id: 'drey', folder: 'E:/picked', repoOnly: true }]);
+    expect(pickerError()).toBe('No git repository in that folder');
+    expect(host.querySelector<HTMLElement>('.prj-picker')!.hidden).toBe(false);
+  });
+
+  it('a Git URL asks where to clone, clones, lists the checkout and closes the picker', async () => {
+    replies['projectCloneRepo'] = { ok: true, id: 'drey', kind: 'repository', name: 'tool', path: 'E:/picked/tool' };
+    addButton('Add repository').click();
+    typeUrl('https://example.com/owner/tool.git');
+    confirmButton().click();
+    await settle();
+    await settle();
+    expect(calls('pickFolder')).toEqual([{ title: 'Clone tool into…' }]);
+    expect(calls('projectCloneRepo')).toEqual([{ id: 'drey', url: 'https://example.com/owner/tool.git', parent: 'E:/picked' }]);
+    expect(host.querySelector<HTMLElement>('.prj-picker')!.hidden).toBe(true);
+  });
+
+  it('follows the clone’s progress and takes a cancel', async () => {
+    let answer: (reply: unknown) => void = () => undefined;
+    replies['projectCloneRepo'] = new Promise((resolve) => (answer = resolve));
+    addButton('Add repository').click();
+    typeUrl('git@example.com:owner/tool.git');
+    confirmButton().click();
+    await settle();
+    await settle();
+    listeners['repo-clone-progress']![0]!({ phase: 'Receiving objects', percent: 45 });
+    expect(host.querySelector('.prj-picker-progress')?.textContent).toBe('Cloning tool — Receiving objects 45%');
+    expect(host.querySelector<HTMLInputElement>('.prj-url')!.disabled).toBe(true);
+    cancelButton().click();
+    await settle();
+    expect(calls('projectCloneCancel')).toHaveLength(1);
+    answer({ ok: false, code: 'cancelled', error: '' });
+    await settle();
+    await settle();
+    expect(pickerError()).toBe('');
+    expect(host.querySelector<HTMLInputElement>('.prj-url')!.disabled).toBe(false);
+    expect(listeners['repo-clone-progress']).toEqual([]);
+  });
+
+  it.each([
+    ['auth', 'x', "Git was refused access. Sign in with git's credential manager or add an ssh key, then try again."],
+    ['offline', 'x', 'The server could not be reached. Check the connection and the address.'],
+    ['exists', 'E:/picked/tool', 'E:/picked/tool already exists and is not empty. Pick another folder.'],
+    ['git', 'disk full', 'Git failed: disk full'],
+  ])('names a failed clone (%s) in the picker, which stays open', async (code, error, text) => {
+    replies['projectCloneRepo'] = { ok: false, code, error };
+    addButton('Add repository').click();
+    typeUrl('https://example.com/owner/tool.git');
+    confirmButton().click();
+    await settle();
+    await settle();
+    expect(pickerError()).toBe(text);
+    expect(host.querySelector<HTMLElement>('.prj-picker')!.hidden).toBe(false);
+  });
+
+  it('refuses a URL that is not a git URL, or carries credentials, before asking for a folder', async () => {
+    addButton('Add repository').click();
+    typeUrl('not a url');
+    confirmButton().click();
+    await settle();
+    expect(pickerError()).toBe('That is not an https or ssh git URL.');
+    typeUrl('https://me:pw@example.com/a.git');
+    confirmButton().click();
+    await settle();
+    expect(pickerError()).toContain('Drey never stores credentials');
+    expect(calls('pickFolder')).toEqual([]);
   });
 });

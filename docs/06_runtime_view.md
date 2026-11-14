@@ -6295,14 +6295,55 @@ sequenceDiagram
     participant V as Tickets vault
     participant G as git
     P->>P: a click, a field left, the editor blurred: patch over the latest record
-    P->>M: projectSave {id, project} (or projectAddRepo / projectRemove)
+    P->>M: projectSave {id, project} (or projectAddFolder / projectRemove)
     M->>S: invoke (PROJECT_METHODS)
     S->>S: queue; checkDraft; a new record: mintProjectId(name)
-    S->>V: write projects/<id>.md (and repos.md for From folder…) when the text changed
+    S->>V: write projects/<id>.md (and repos.md for a recognised repository) when the text changed
     S->>G: one commit of exactly those files "projects: <name> … (req-284)"
     S-->>P: {ok, id} — the status line says Saved · committed just now
     V-->>P: board-changed → reload (the detail is rebuilt only if what it shows changed)
 ```
+
+## 6.134a A folder or a clone added to a project (req-304)
+
+The system folder picker and the clone run in Drey's own process: the board
+lives in Drey Service, a process without a window, and a picker asked of it
+always answered "cancelled". Whatever changes the project afterwards is the
+engine's one write.
+
+```mermaid
+sequenceDiagram
+    participant P as Settings → Projects (plugin renderer)
+    participant M as Plugin main
+    participant D as System folder picker
+    participant C as RepoCloner (installed git)
+    participant S as ProjectService (engine)
+    participant G as git
+    P->>M: pickFolder {title}
+    M->>D: showOpenDialog
+    D-->>P: the folder (or none: nothing happens)
+    alt Add folder / From folder…
+        P->>M: projectAddFolder {id, folder, repoOnly}
+        M->>S: invoke
+        S->>G: rev-parse --show-toplevel, remote get-url origin, branch (FolderProbe)
+        S->>S: repository → chooseRepoEntry; plain → folders (refused when repoOnly)
+        S->>G: one commit "projects: <name> — repository|folder … (req-304)"
+        S-->>P: {ok, kind, name}
+    else a Git URL
+        P->>P: checkGitUrl; pickFolder "Clone <name> into…"
+        P->>M: projectCloneRepo {id, url, parent}
+        M->>C: clone → git clone --progress -- url parent/name
+        C-->>P: repo-clone-progress {phase, percent} (events)
+        C-->>M: {ok, path} or {code: auth | offline | exists | …}
+        M->>S: projectAddFolder {id, folder: path, repoOnly}
+        S-->>P: {ok, kind: repository, name}
+    end
+    S-->>P: board-changed → the page reloads its copy
+```
+
+A failed clone keeps the picker open with the reason (auth, offline, an
+existing folder, no such repository, no git); *Cancel* kills git and removes
+the folder it began.
 
 ## 6.135 The project filter: a choice per view, followed by Files, the board and Find (req-285, milestone 267)
 
@@ -6666,7 +6707,7 @@ again — and the filer writes on the same `TicketsGit` queue as the closing rou
 (milestone 272), so the two never meet at `index.lock`. A ticket exists only after the owner's confirm,
 through the chat's one decision path.
 
-## 6.145 Unloading a tickets vault: the board goes everywhere at once (D-73, milestone 278)
+## 6.145 Unloading a tickets vault: the board goes everywhere at once (D-73, milestone 279)
 
 ```mermaid
 sequenceDiagram
