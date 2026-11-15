@@ -160,9 +160,8 @@ function chatEntries(llm: ChatLlmSettings): [string, unknown][] {
 /**
  * The same keys {@link syncConfig} pushes, written into the engine's `config.json`
  * BEFORE the service is started (E14-7a). The engine builds its first board while it
- * starts, before anything can reach its invoke channel, and in `shadow` mode that board
- * writes the report: without this the first start after a change of `backend` or
- * `dk.store` described the previous store. Only called with no engine alive, so the
+ * starts, before anything can reach its invoke channel: without this the first
+ * start after a change of `dk.store` described the previous store. Only called with no engine alive, so the
  * file has no other writer; keys the engine owns (its token, paired devices) stay.
  */
 export async function mirrorConfig(home: string, ctx: Parameters<typeof syncConfig>[1]): Promise<void> {
@@ -194,7 +193,7 @@ export async function syncConfig(client: ConfigSyncClient, ctx: {
 }
 
 /**
- * The ticket store's keys (`backend`, `dk.*`) alone, pushed whenever the board is
+ * The ticket store's keys (`dk.*`) alone, pushed whenever the board is
  * fetched: Settings -> Tickets writes them to the plugin config, the engine reads its
  * own, and a changed checkout or sync interval must apply without a restart (E14-4c).
  * Only keys the plugin config holds travel (a cleared field arrives as an empty value).

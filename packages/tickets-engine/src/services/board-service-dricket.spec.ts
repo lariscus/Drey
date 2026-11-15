@@ -66,7 +66,6 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
   let service: EngineBoardService;
   const saved: Record<string, string | undefined> = {};
   const ledgerWrites: string[] = [];
-  const fileStatus: string[] = [];
   const chainConfigs: ChainConfig[] = [];
   const envSet = (key: string, value: string): void => {
     if (!(key in saved)) {
@@ -168,12 +167,12 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
         'utf8',
       );
     }
-    Object.assign(config, { backend: 'dricket', 'dk.path': bin === 'dk' ? '' : bin, 'dk.store': storeDir, 'dk.dataDir': path.join(root, 'data') });
+    Object.assign(config, { 'dk.path': bin === 'dk' ? '' : bin, 'dk.store': storeDir, 'dk.dataDir': path.join(root, 'data') });
     const git2 = new TicketsGit(() => 'git', async () => {
       throw new Error('no git in the spec');
     });
     const fleet: FleetPort = { runs: async () => [], start: async () => ({ ok: false, error: 'not in the spec' }), configureChain: async (c) => { chainConfigs.push(c); } };
-    service = new EngineBoardService(hostOf(), git2, 'opencode', 'accept-edits', '', fleet, '/fleet', normalizeFleetCaps({}), normalizeFleetPools({}), normalizeFleetHandover({}), 'owner@test', { events: { ledger: (write) => ledgerWrites.push(write.kind), status: (_p, _at, verb) => fileStatus.push(verb) } });
+    service = new EngineBoardService(hostOf(), git2, 'opencode', 'accept-edits', '', fleet, '/fleet', normalizeFleetCaps({}), normalizeFleetPools({}), normalizeFleetHandover({}), 'owner@test', { events: { ledger: (write) => ledgerWrites.push(write.kind) } });
   }, 120_000);
 
   afterAll(async () => {
@@ -474,7 +473,6 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
     expect(await service.answerNeed({ id, key: 'no-such-key', text: 'x' })).toMatchObject({ ok: false });
 
     // The ticket file itself carries none of it; no status file landed in the meta vault.
-    expect(fileStatus).toEqual([]);
     expect(dkShow(dkId)).not.toContain('Ctrl+K');
     expect(await fsp.readdir(abs('tickets')).then((names) => names.filter((n) => n !== '_meta'))).toEqual([]);
   });

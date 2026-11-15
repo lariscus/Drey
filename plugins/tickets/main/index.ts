@@ -297,7 +297,7 @@ const plugin: MainPluginModule = {
       vaults: () => ctx.vault.listVaults(),
       checkout: async () => {
         const settings = await readStoreSettings(engineConfig);
-        return settings.backend === 'dricket' ? checkoutOf(settings) : null;
+        return checkoutOf(settings);
       },
       locate: (id) => board.ticketDocument({ id }),
       saveDocument: (input) => board.saveDocument(input),
@@ -536,7 +536,6 @@ const plugin: MainPluginModule = {
 
     // Sortable columns and the folder numbering (req-50).
     ctx.ipc.handle('folders', () => board.folderStatus());
-    ctx.ipc.handle('numberFolders', () => board.numberFolders());
     ctx.ipc.handle('reorderPhases', async (payload) => {
       const p = payload as { order?: unknown };
       if (!Array.isArray(p.order) || !p.order.every((id): id is string => typeof id === 'string')) {

@@ -5,7 +5,7 @@ import { TICKETS_ARCHIVE_DIR, type BoardSnapshot, type PipelinePhase } from '../
 import type { TicketDetail } from '../ports/ticket-store';
 import { ARCHIVED_LABEL, PLACEHOLDER_LABEL } from './legacy-bridge';
 import { assembleBoard, type AssembleInput, type BoardFile } from '../core/ticket-board';
-import { recentDoneOf } from '../core/normalize';
+import { recentDoneOf } from '../core/done-listing';
 import { statusLinesOfComments } from '../core/status-comment';
 import { openStatusItems } from '../core/status-log';
 import { chainColumnOf, placementColumnsOf, type PlacementColumns } from '../core/chain-placement';

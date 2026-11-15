@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { assembleBoard } from '../core/ticket-board';
 import { parseTicketFile } from '../core/ticket-files';
 import type { TicketDetail } from '../ports/ticket-store';
-import { diffBoards } from './board-diff';
 import { assembleBoardFromRecords, recordToBoardFile, resolvePhase } from './store-board';
 
 const PIPELINE = `---
@@ -268,32 +267,5 @@ describe('assembleBoardFromRecords', () => {
     const column = board.columns.find((c) => c.phase.id === 'needs-input');
     expect(column?.unknown).toBe(true);
     expect(board.issues.some((i) => i.message.includes('needs-input'))).toBe(true);
-  });
-
-  it('is equal to the files board over the same tickets (the shadow criterion)', () => {
-    const legacy = (id: string, dir: string, extra = ''): { path: string; text: string } => ({
-      path: `tickets/${dir}/${id}.md`,
-      text: `---\nid: ${id}\ntitle: ${id}\npriority: normal\n${extra}---\n\n## Description\n\nBody.\n`,
-    });
-    const files = [
-      legacy('T-0001', 'inbox', 'entered-inbox: 2026-11-01T00:00:00Z\n'),
-      legacy('T-0002', 'build', 'blocked-by: [T-0001]\nrank: 20\n'),
-      legacy('T-0003', 'build', 'rank: 10\nchain: [ralf]\npersona: ben\n'),
-      legacy('T-0004', 'done'),
-    ];
-    const fromFiles = assembleBoard({ ...BASE, files });
-    const fromStore = assembleBoardFromRecords({
-      ...BASE,
-      records: [
-        det({ id: 'T-0001', stage: 'inbox', extensions: { 'x-entered-inbox': '2026-11-01T00:00:00Z' } }),
-        det({ id: 'T-0002', stage: 'build', dependsOn: ['T-0001'], extensions: { 'x-rank': '20' } }),
-        det({ id: 'T-0003', stage: 'build', extensions: { 'x-rank': '10', 'x-chain': 'ralf', 'x-persona': 'ben' } }),
-        det({ id: 'T-0004', stage: 'done' }),
-      ],
-    });
-    const diff = diffBoards(fromFiles, fromStore);
-    expect(diff.differing).toEqual([]);
-    expect(diff.equal).toBe(true);
-    expect(diff.identical).toBe(4);
   });
 });

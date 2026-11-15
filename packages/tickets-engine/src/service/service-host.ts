@@ -103,7 +103,7 @@ export class ServiceHost {
       root: path.join(opts.home, 'fleet'),
       ...(opts.runnerIdleMs === undefined ? {} : { idleMs: opts.runnerIdleMs }),
       // The engine's store is the one Drey's sync writes; before it exists, the file.
-      storeBacked: async () => (await (this.engine?.config ?? ownConfig).get<string>('backend')) === 'dricket',
+      storeBacked: async () => ((await (this.engine?.config ?? ownConfig).get<string>('dk.store')) ?? '').trim() !== '',
       log: (line) => this.log('runner', line.replace(/^\[fleet [^\]]+\] /, '')),
       onChange: () => void this.refreshLock(),
       // req-180: the governor reads the Load group from the settings the tick refreshes.

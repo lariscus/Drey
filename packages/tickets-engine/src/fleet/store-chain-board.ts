@@ -32,8 +32,6 @@ export interface ChainStoreIo {
 
 export function chainStoreSettings(config: ChainStoreConfig): StoreSettings {
   return {
-    backend: 'dricket',
-    shadow: false,
     dkPath: config.dkPath,
     dkStore: config.dkStore,
     dkDataDir: config.dkDataDir,

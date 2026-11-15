@@ -87,7 +87,7 @@ export function composeBoardParts(opts: EngineOptions, config: FileConfigStore, 
 function ownRunner(root: string, config: FileConfigStore, log: Log): RunnerComponent {
   return new RunnerComponent({
     root,
-    storeBacked: async () => (await config.get<string>('backend')) === 'dricket',
+    storeBacked: async () => ((await config.get<string>('dk.store')) ?? '').trim() !== '',
     log: (line) => log(line),
     onChange: () => undefined,
   });

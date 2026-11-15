@@ -31,7 +31,6 @@ export interface StoreCall {
  * `loseClaim()` was called) and lets a spec fail one operation.
  */
 export class FakeTicketStore implements TicketStore {
-  readonly backend = 'dricket' as const;
   readonly calls: StoreCall[] = [];
   epoch = 1;
   stage = 'prioritized';

@@ -36,11 +36,10 @@ import { blockerOf, indicesToMint, lockedIndices, matchPartTickets, partStateOf,
 import type { PlanPartCard, PlanPartsEdit, PlanPartsReply, PlanReleaseReply, PlanReleaseScope } from '../contracts/plan-approval';
 import type { ChainEntry } from '../contracts/chain';
 import { refineTicket, revisionOf } from '../core/ticket-refine';
-import { applyFolderNumbering, listTicketDirs, planFolderNumbering, resolvePhaseDir } from '../core/phase-dirs';
-import { archivedEntriesOf, detectDrift, recentDoneOf, type DriftDetection } from '../core/normalize';
+import { archivedEntriesOf } from '../core/done-listing';
 import { blockedRefusal } from '../core/blocked';
 import { runTransition, type TransitionIo } from '../core/transition';
-import { openStatusItems, parseStatusLog, type StatusLine, type StatusVerb } from '../core/status-log';
+import { openStatusItems, type StatusLine, type StatusVerb } from '../core/status-log';
 import { commentViewsOf, renderStatusComment, slugStatusKey, statusLinesOfComments, type TicketCommentView } from '../core/status-comment';
 import { LEDGER_FILE, parseLedger, settledUsageByTicket, type LedgerWrite } from '../core/ledger';
 import { estimateFrom, type EstimateKey, type RunEstimate } from '../core/estimate';
@@ -50,8 +49,7 @@ import { mergeWorktreeChanges, diffOfOutput, isSafeRepoPath, MAX_FILE_VIEW_BYTES
 import { planWorktreeRemoval } from '../core/worktree-removal';
 import { TicketsGit, type RepoLocation } from '../core/tickets-git';
 import { TicketStoreError } from '../ports/ticket-store';
-import { FileTicketStore } from '../store/file-ticket-store';
-import { checkoutOf, createDricketStore, groupByStage, readStoreSettings, type StoreListing, type StoreSettings } from '../store/store-settings';
+import { checkoutOf, createDricketStore, groupByStage, readStoreSettings, UNCONFIGURED_STORE, type StoreListing, type StoreSettings } from '../store/store-settings';
 import { archivedRecordFiles, recordToBoardFile, type HolderPlacement } from '../store/store-board';
 import { withChainAndCursor, withCursorForMove } from '../store/chain-move';
 import { personaMoveOf } from './persona-board-moves';
@@ -95,7 +93,6 @@ import { columnPromptRef, isAutoPhase, nextPhaseIdOf } from '../fleet/chain';
 import { readRepoInstructions, worktreeDiffStat } from '../fleet/context-pack';
 import { cleanWorktrees, listOrphans, removeWorktree, type CleanupReport } from '../fleet/worktree-clean';
 import { unlinkShared } from '../fleet/worktrees';
-import { statusLogPathOf } from '../fleet/event-writer';
 import { legacyWorktreeBase, worktreeBaseFor, worktreePathFor, WORKTREES_DIR } from '../fleet/worktree-home';
 import { FinishedWorktrees } from '../fleet/orchestrate/finished-worktrees';
 import { GitWorktreeRemover } from '../fleet/git-worktree-remover';
@@ -254,8 +251,6 @@ export interface ImprovementInput {
  */
 export interface LedgerEvents {
   readonly ledger: (write: LedgerWrite) => void;
-  /** The ticket's status log (E7); the manual step's finish writes its line here (E10-6). */
-  readonly status?: (cardPath: string, at: string, verb: StatusVerb, payload: string) => void;
 }
 
 /** The optional construction extras (E7); the default keeps every existing call site. */
@@ -305,10 +300,10 @@ export class EngineBoardService {
   /** Who hears the debounced board change besides the renderer (the remote, req-66). */
   private readonly changeListeners = new Set<() => void>();
   private lastChainConfig: string | null = null;
-  /** The dricket-backed board and the shadow comparison (E14-2); idle while `tickets.backend` is `files`. */
+  /** The dricket-backed board: its tickets are read and written through the store, never as vault files. */
   private readonly storeBoard: StoreBoardSource;
-  /** E14-4b: the store settings while the board runs on dricket (set by every snapshot), else null: tickets are then read and written through the store, never as vault files. */
-  private dricket: StoreSettings | null = null;
+  /** The store settings as the last snapshot or {@link refreshStore} read them; {@link UNCONFIGURED_STORE} (an empty `dkStore`) before one. */
+  private store: StoreSettings = UNCONFIGURED_STORE;
   /** E14-4b: the record each board mutation read (ticket id -> record), so its write carries the rev it was made on. Refreshed by every read inside the queue. */
   private readonly records = new Map<string, TicketDetail>();
   /** The commit steps Accept started on a store (ticket id -> run id), until their run settles; see {@link settleCommitSteps}. */
@@ -341,7 +336,7 @@ export class EngineBoardService {
     /** The optional extras (E7 ledger writes); `{}` keeps the service event-free. */
     private readonly options: BoardServiceOptions = {},
   ) {
-    this.storeBoard = new StoreBoardSource(path.join(host.userRoot, 'shadow'), (message, level) => host.log(message, level), undefined, createDricketStore, {
+    this.storeBoard = new StoreBoardSource((message, level) => host.log(message, level), createDricketStore, {
       // E14-4: the store's own writes, its file watcher and the remote sync round announce a changed board.
       onChange: () => this.announceChanged(),
       // D-28: the checkout's files Drey shows, whoever changed them.
@@ -432,14 +427,7 @@ export class EngineBoardService {
     return this.gitLocations.get(vaultPath) ?? null;
   }
 
-  /** The directories under `tickets/` as they exist on disk (T-0041) —
-   *  what every writer resolves its target directory against. */
-  private async ticketDirs(vault: EngineVault): Promise<string[]> {
-    const abs = this.host.resolveAssetPath(vault.id, 'tickets');
-    return abs === null ? [] : await listTicketDirs(abs);
-  }
-
-  /** Snapshot from files — every fetch rebuilds (no stored board state). */
+  /** The board from the store — every fetch rebuilds (no stored board state). */
   async snapshot(): Promise<BoardSnapshot> {
     // A settled commit step lands in Done with the next read of the board (every client re-reads on a fleet change).
     if (this.commitSteps.size > 0) {
@@ -471,7 +459,6 @@ export class EngineBoardService {
       this.readOptional(vault.id, LEDGER_FILE),
     ]);
     await this.applyCrew(vault);
-    const files = await this.readFiles(vault, mdFiles.filter((p) => p.startsWith('tickets/') && !p.startsWith('tickets/_meta/')));
     const common = {
       vaultId: vault.id,
       vaultName: vault.name,
@@ -486,23 +473,9 @@ export class EngineBoardService {
       // pure assembly only attaches the sums to the matching cards.
       ticketUsage: settledUsageByTicket(parseLedger(ledgerText ?? '')),
     };
-    // E14-2: `tickets.backend` decides where the TICKETS come from; the
-    // pipeline, repos and ledger stay in this vault either way.
-    const store = await readStoreSettings(this.host.configGet.bind(this.host));
-    this.dricket = store.backend === 'dricket' ? store : null;
-    const snapshot = store.backend === 'dricket'
-      ? await this.personaBoardOf(store, vault, { mdFiles, pipelineText }, await this.dricketSnapshot(store, { ...common, crew: await this.crewKinds(vault, mdFiles) }))
-      : assembleBoard({
-        ...common,
-        files,
-        // The same file list already carries the archive — no extra reads.
-        recentDone: recentDoneOf(files, Date.now()),
-      });
-    if (store.shadow) {
-      // The UI keeps the files board; the store's board is built beside it
-      // and the difference is written to a report (never shown, never fatal).
-      this.storeBoard.scheduleShadow(store, common, snapshot);
-    }
+    // The TICKETS come from the store; the pipeline, repos and ledger stay in this vault.
+    const store = await this.refreshStore();
+    const snapshot = await this.personaBoardOf(store, vault, { mdFiles, pipelineText }, await this.dricketSnapshot(store, { ...common, crew: await this.crewKinds(vault, mdFiles) }));
     // The chain follows the pipeline: an automatic column anywhere
     // points the runner at this vault (M85). Cheap and idempotent —
     // the runner re-reads the vault on every dispatch pass anyway.
@@ -554,8 +527,8 @@ export class EngineBoardService {
   migrateBoard(input: { readonly step: BoardMigrationStep }): Promise<BoardMigrationResult> {
     return this.enqueue(async () => {
       const vault = await this.detect();
-      const store = await this.refreshDricket();
-      if (vault === null || store === null || !isLifecycleStore(await this.storeBoard.stages(store).catch(() => null))) {
+      const store = await this.refreshStore();
+      if (vault === null || !isLifecycleStore(await this.storeBoard.stages(store).catch(() => null))) {
         return { ok: false, error: 'the board migration runs on a dricket store on the lifecycle stages — migrate the store first' };
       }
       const crew = await this.crewInOrder(vault, await this.host.listMarkdownFiles(vault.id));
@@ -640,38 +613,22 @@ export class EngineBoardService {
   }
 
   /**
-   * The read-only listing from the `TicketStore` behind `tickets.backend`
-   * (E14-1, ADR-0090): `files` reads the tickets vault through the file
-   * store, `dricket` shells out to `dk`. Never throws — a missing `dk` or a
-   * misconfigured store comes back as `{ ok: false, error }`. Not the board:
-   * columns here are the store's stages; the board over `TicketRecord[]` is
-   * E14-2.
+   * The read-only listing from the dricket store (E14-1, ADR-0090): `dk` is
+   * shelled out to. Never throws — a missing `dk` or a misconfigured store
+   * comes back as `{ ok: false, error }`. Not the board: columns here are the
+   * store's stages; the board over `TicketRecord[]` is E14-2.
    */
   async storeListing(): Promise<StoreListing> {
     const settings = await readStoreSettings(this.host.configGet.bind(this.host));
     try {
-      if (settings.backend === 'dricket') {
-        if (settings.dkStore === '') {
-          return { ok: false, backend: 'dricket', error: 'no dricket store configured (tickets.dk.store)' };
-        }
-        const store = createDricketStore(settings);
-        const [records, capabilities] = await Promise.all([store.list(), store.capabilities()]);
-        return { ok: true, backend: 'dricket', version: capabilities.version, columns: groupByStage(records) };
+      if (settings.dkStore === '') {
+        return { ok: false, error: 'no dricket store configured (tickets.dk.store)' };
       }
-      const vault = await this.detect();
-      if (vault === null) {
-        return { ok: false, backend: 'files', error: 'no tickets vault detected' };
-      }
-      const store = new FileTicketStore({
-        listMarkdownFiles: () => this.host.listMarkdownFiles(vault.id),
-        read: (p) => this.host.read(vault.id, p),
-        write: (p, text) => this.host.write(vault.id, p, text),
-        commit: (paths, message) => this.commit(vault, paths, message),
-        announce: (paths) => this.host.announceChanges(vault.id, paths),
-      });
-      return { ok: true, backend: 'files', version: null, columns: groupByStage(await store.list()) };
+      const store = createDricketStore(settings);
+      const [records, capabilities] = await Promise.all([store.list(), store.capabilities()]);
+      return { ok: true, version: capabilities.version, columns: groupByStage(records) };
     } catch (error) {
-      return { ok: false, backend: settings.backend, error: error instanceof TicketStoreError || error instanceof Error ? error.message : String(error) };
+      return { ok: false, error: error instanceof TicketStoreError || error instanceof Error ? error.message : String(error) };
     }
   }
 
@@ -718,16 +675,13 @@ export class EngineBoardService {
   }
 
   /**
-   * Why the chain may not be switched on, or null. On `tickets.backend = dricket` the chain reads
-   * its tickets from the store's checkout (E14-5b), so it needs one: an explicit
-   * `tickets.dk.checkout`, or a local `tickets.dk.store` directory. A remote store without a
-   * checkout would leave the runner one `dk` call per ticket; that is refused.
+   * Why the chain may not be switched on, or null. The chain reads its tickets from the
+   * store's checkout (E14-5b), so it needs one: an explicit `tickets.dk.checkout`, or a
+   * local `tickets.dk.store` directory. A remote store without a checkout would leave the
+   * runner one `dk` call per ticket; that is refused.
    */
   async chainRefusal(): Promise<string | null> {
-    const store = await this.refreshDricket();
-    if (store === null) {
-      return null;
-    }
+    const store = await this.refreshStore();
     if (store.dkStore === '') {
       return 'The chain needs the dricket store (tickets.dk.store)';
     }
@@ -742,10 +696,7 @@ export class EngineBoardService {
    * claim of this host that no live run holds - back to where the ticket sat, else one stage back.
    */
   async releaseLeftoverClaims(): Promise<{ readonly ok: true; readonly released: readonly string[]; readonly skipped: readonly { readonly id: string; readonly reason: string }[] } | { readonly ok: false; readonly error: string }> {
-    const store = await this.refreshDricket();
-    if (store === null) {
-      return { ok: false, error: 'There are no dk claims on the files backend' };
-    }
+    const store = await this.refreshStore();
     const snap = await this.snapshot();
     try {
       if (this.fleet.releaseLeftoverClaims === undefined) {
@@ -778,10 +729,7 @@ export class EngineBoardService {
    * every call, so an interrupted migration resumes. Runs in the single-writer queue.
    */
   async migrateStoreStages(): Promise<StoreStageMigrationResult> {
-    const store = await this.refreshDricket();
-    if (store === null) {
-      return { ok: false, error: 'the stage migration is for a dricket store' };
-    }
+    const store = await this.refreshStore();
     const result = await this.enqueue(async () => {
       try {
         const pinCursor = await this.pinCursorOf();
@@ -831,8 +779,8 @@ export class EngineBoardService {
     pipeline: readonly PipelinePhase[],
     personaBoard = false,
   ): Promise<ChainConfig | null> {
-    const dricket = this.dricket;
-    if (dricket !== null && (dricket.dkStore === '' || checkoutOf(dricket) === null)) {
+    const store = this.store;
+    if (store.dkStore === '' || checkoutOf(store) === null) {
       return null; // the dispatcher reads the store's checkout (E14-5b): without one there is nothing to point it at
     }
     const defaultPersona = await this.defaultPersonaOf();
@@ -840,7 +788,7 @@ export class EngineBoardService {
       vault !== null && (personaBoard || pipeline.some((phase) => isAutoPhase(phase)))
         ? {
             ticketsVaultPath: vault.path,
-            ...(dricket !== null ? { store: await this.chainStoreOf(dricket) } : {}),
+            store: await this.chainStoreOf(store),
             git: this.gitPath.trim() === '' ? 'git' : this.gitPath.trim(),
             defaultWorker: this.defaultWorker,
             defaultPersona,
@@ -878,7 +826,7 @@ export class EngineBoardService {
     for (const column of snap.columns) {
       const card = column.tickets.find((t) => t.id === id);
       if (card !== undefined) {
-        return { vault, card, text: await this.readCardText(vault, card) };
+        return { vault, card, text: await this.readCardText(card) };
       }
     }
     return null;
@@ -886,8 +834,8 @@ export class EngineBoardService {
 
   /**
    * A ticket that left the board's columns -- accepted into the archive (E13-21): the
-   * files backend reads `tickets/archive/<id>.md`, dricket the record that carries the
-   * `archived` label. Read-only: it opens like any ticket, only its moves are off.
+   * store record that carries the `archived` label. Read-only: it opens like any ticket,
+   * only its moves are off.
    */
   private async findArchived(id: string): Promise<{ vault: EngineVault; card: TicketCard; text: string } | null> {
     const vault = await this.detect();
@@ -897,15 +845,11 @@ export class EngineBoardService {
     const path = `${TICKETS_ARCHIVE_DIR}/${id}.md`;
     let text: string;
     try {
-      if (this.dricket === null) {
-        text = await this.host.read(vault.id, path);
-      } else {
-        const record = await this.storeBoard.record(this.dricket, id);
-        if (!record.labels.includes(ARCHIVED_LABEL)) {
-          return null;
-        }
-        text = recordToBoardFile(record, 'archive').text;
+      const record = await this.storeBoard.record(this.store, id);
+      if (!record.labels.includes(ARCHIVED_LABEL)) {
+        return null;
       }
+      text = recordToBoardFile(record, 'archive').text;
     } catch {
       return null;
     }
@@ -916,8 +860,8 @@ export class EngineBoardService {
 
   /**
    * The archive's tickets of any age (E13-21 "Show older"), newest first, narrowed by
-   * `query` (id or title words): the files backend reads `tickets/archive/`, dricket the
-   * archived records. The Work panel and Mission Control list them behind "Show older".
+   * `query` (id or title words): the store's archived records.
+   * The Work panel and Mission Control list them behind "Show older".
    */
   async archivedTickets(input: { query?: string; limit?: number } = {}): Promise<{ ok: true; tickets: readonly RecentDone[] } | { ok: false; error: string }> {
     try {
@@ -925,14 +869,8 @@ export class EngineBoardService {
       if (vault === null) {
         return { ok: true, tickets: [] };
       }
-      const store = await this.refreshDricket();
-      const files = store === null
-        ? await Promise.all(
-            (await this.host.listMarkdownFiles(vault.id))
-              .filter((p) => p.startsWith(`${TICKETS_ARCHIVE_DIR}/`))
-              .map(async (path) => ({ path, text: await this.host.read(vault.id, path) })),
-          )
-        : archivedRecordFiles(await this.storeBoard.records(store));
+      const store = await this.refreshStore();
+      const files = archivedRecordFiles(await this.storeBoard.records(store));
       return { ok: true, tickets: archivedEntriesOf(files, { query: input.query, limit: input.limit }) };
     } catch (error) {
       return { ok: false, error: messageOf(error) };
@@ -945,21 +883,19 @@ export class EngineBoardService {
     if (found === null) {
       return { ok: false, error: `${id} is not on the board` };
     }
-    const comments = this.dricket === null ? null : await this.commentsOf(this.dricket, id);
     return {
       ok: true,
       card: found.card,
       text: found.text,
       revision: revisionOf(found.text),
-      ...(comments === null ? {} : { comments }),
+      comments: await this.commentsOf(this.store, id),
     };
   }
 
   /**
    * One ticket by id for the chat (D-7a): a card on the board, else an archived
-   * ticket — an accepted ticket leaves the board (`tickets/archive/` on the files
-   * backend, the `archived` label on dricket) and `readTicket` knows no card for
-   * it. Text and comments only: an archived ticket has no card to show.
+   * ticket — an accepted ticket leaves the board (the `archived` label) and
+   * `readTicket` knows no card for it. Text and comments only: an archived ticket has no card to show.
    */
   async readAnyTicket(id: string): Promise<{ readonly ok: true; readonly text: string; readonly comments?: readonly TicketCommentView[] } | { readonly ok: false; readonly error: string }> {
     const onBoard = await this.readTicket(id);
@@ -971,22 +907,16 @@ export class EngineBoardService {
       return onBoard;
     }
     try {
-      const store = this.dricket;
-      if (store !== null) {
-        const record = await this.storeBoard.record(store, id);
-        return { ok: true, text: recordToBoardFile(record, record.stage).text, comments: await this.commentsOf(store, id) };
-      }
-      const archived = (await this.host.listMarkdownFiles(vault.id)).find((p) => p === `${TICKETS_ARCHIVE_DIR}/${id}.md`);
-      return archived === undefined ? onBoard : { ok: true, text: await this.host.read(vault.id, archived) };
+      const record = await this.storeBoard.record(this.store, id);
+      return { ok: true, text: recordToBoardFile(record, record.stage).text, comments: await this.commentsOf(this.store, id) };
     } catch {
       return onBoard; // the store does not know the id either: the honest "not on the board"
     }
   }
 
-  /** The ticket's comments read from the store's `comments/` files, oldest first (E14-6); empty off dricket. */
+  /** The ticket's comments read from the store's `comments/` files, oldest first (E14-6). */
   async ticketComments(id: string): Promise<readonly TicketCommentView[]> {
-    await this.refreshDricket();
-    return this.dricket === null ? [] : this.commentsOf(this.dricket, id);
+    return this.commentsOf(await this.refreshStore(), id);
   }
 
   /** A comment-read failure is an empty thread, never a failed ticket view. */
@@ -1000,48 +930,36 @@ export class EngineBoardService {
   }
 
   /**
-   * One status event of a ticket (E14-6). On a store it is a keyed comment
-   * (`dk comment`; `working` is never persisted, a keyless `resolved` closes
-   * nothing); on the files backend the old status log line. A failure is a log
-   * line, never a failed mutation (the same contract as the ledger).
+   * One status event of a ticket (E14-6): a keyed comment (`dk comment`;
+   * `working` is never persisted, a keyless `resolved` closes nothing). A failure
+   * is a log line, never a failed mutation (the same contract as the ledger).
    */
   private async noteStatus(card: TicketCard, verb: StatusVerb, input: { key?: string | null; text?: string; detail?: string }, actor: string): Promise<void> {
-    const store = this.dricket;
-    if (store === null) {
-      this.options.events?.status?.(card.path, new Date().toISOString(), verb, input.text ?? input.key ?? '');
-      return;
-    }
     const text = renderStatusComment({ verb, ...input });
     if (text === null) {
       return;
     }
     try {
-      await this.storeBoard.comment(store, card.id, text, actor);
+      await this.storeBoard.comment(this.store, card.id, text, actor);
     } catch (error) {
       this.host.log(`tickets: the ${verb} comment on ${card.id} could not be written: ${messageOf(error)}`, 'warn');
     }
   }
 
   /**
-   * The E7 status read (concept §3.3): the ticket's `<card>.status.log`
-   * parsed tolerant — the persona's verbs, newest last. An absent ticket
-   * or log reads as no lines; broken lines are skipped, never guessed.
+   * The E7 status read (concept §3.3): the verbs are the first lines of the
+   * ticket's comments (E14-6), newest last. An absent ticket reads as no lines.
    */
   async statusOf(id: string): Promise<readonly StatusLine[]> {
     const found = await this.findCard(id);
     if (found === null) {
       return [];
     }
-    if (this.dricket !== null) {
-      // E14-6: on a store the verbs are the first lines of the ticket's comments.
-      try {
-        return statusLinesOfComments(await this.storeBoard.comments(this.dricket, id));
-      } catch {
-        return [];
-      }
+    try {
+      return statusLinesOfComments(await this.storeBoard.comments(this.store, id));
+    } catch {
+      return [];
     }
-    const text = await this.readOptional(found.vault.id, statusLogPathOf(found.card.path));
-    return text === null ? [] : parseStatusLog(text);
   }
 
   /**
@@ -1072,16 +990,14 @@ export class EngineBoardService {
         return { ok: false, error: messageOf(error) };
       }
       try {
-        await this.writeCardText(vault, card, refined);
+        await this.writeCardText(card, refined);
       } catch (error) {
         return error instanceof TicketChangedError
           ? { ok: false, conflict: true, error: error.message }
           : { ok: false, error: `write failed: ${messageOf(error)}` };
       }
-      const warning = await this.commitCard(vault, card, `tickets: ${input.id} refined`);
-      this.announceCard(vault, card);
       this.announceChanged();
-      return { ok: true, revision: revisionOf(refined), ...(warning === null ? {} : { warning }) };
+      return { ok: true, revision: revisionOf(refined) };
     });
   }
 
@@ -1117,16 +1033,14 @@ export class EngineBoardService {
         return { ok: false, error: `the text does not parse: ${messageOf(error)}` };
       }
       try {
-        await this.writeCardText(vault, card, input.text);
+        await this.writeCardText(card, input.text);
       } catch (error) {
         return error instanceof TicketChangedError
           ? { ok: false, conflict: true, error: error.message }
           : { ok: false, error: `write failed: ${messageOf(error)}` };
       }
-      const warning = await this.commitCard(vault, card, `tickets: ${input.id} edited`);
-      this.announceCard(vault, card);
       this.announceChanged();
-      return { ok: true, revision: revisionOf(input.text), ...(warning === null ? {} : { warning }) };
+      return { ok: true, revision: revisionOf(input.text) };
     });
   }
 
@@ -1241,14 +1155,12 @@ export class EngineBoardService {
       let refined: string;
       try {
         refined = refineTicket(text, { sections: {}, header: { priority: input.priority } }, input.actor ?? this.owner, new Date(), snap.priorities);
-        await this.writeCardText(vault, card, refined);
+        await this.writeCardText(card, refined);
       } catch (error) {
         return { ok: false, error: messageOf(error) };
       }
-      const warning = await this.commitCard(vault, card, `tickets: ${input.id} refined`);
-      this.announceCard(vault, card);
       this.announceChanged();
-      return { ok: true, ...(warning === null ? {} : { warning }) };
+      return { ok: true };
     });
   }
 
@@ -1274,14 +1186,12 @@ export class EngineBoardService {
       let patched: string;
       try {
         patched = patchTrack(text, input.track, new Date(), input.actor ?? this.owner);
-        await this.writeCardText(vault, card, patched);
+        await this.writeCardText(card, patched);
       } catch (error) {
         return { ok: false, error: messageOf(error) };
       }
-      const warning = await this.commitCard(vault, card, `tickets: ${input.id} track ${input.track ?? 'none'}`);
-      this.announceCard(vault, card);
       this.announceChanged();
-      return { ok: true, ...(warning === null ? {} : { warning }) };
+      return { ok: true };
     });
   }
 
@@ -1304,14 +1214,12 @@ export class EngineBoardService {
         return { ok: false, error: 'A run is live on this ticket. Change the class when the run has ended.' };
       }
       try {
-        await this.writeCardText(vault, card, patchClass(text, input.class, new Date(), input.actor ?? this.owner));
+        await this.writeCardText(card, patchClass(text, input.class, new Date(), input.actor ?? this.owner));
       } catch (error) {
         return { ok: false, error: messageOf(error) };
       }
-      const warning = await this.commitCard(vault, card, `tickets: ${input.id} class ${input.class ?? 'none'}`);
-      this.announceCard(vault, card);
       this.announceChanged();
-      return { ok: true, ...(warning === null ? {} : { warning }) };
+      return { ok: true };
     });
   }
 
@@ -1337,14 +1245,12 @@ export class EngineBoardService {
       let patched: string;
       try {
         patched = patchForm(text, input.form, new Date(), input.actor ?? this.owner);
-        await this.writeCardText(vault, card, patched);
+        await this.writeCardText(card, patched);
       } catch (error) {
         return { ok: false, error: messageOf(error) };
       }
-      const warning = await this.commitCard(vault, card, `tickets: ${input.id} form ${input.form}`);
-      this.announceCard(vault, card);
       this.announceChanged();
-      return { ok: true, ...(warning === null ? {} : { warning }) };
+      return { ok: true };
     });
   }
 
@@ -1373,15 +1279,12 @@ export class EngineBoardService {
         return chained.refusal === null ? { ok: true } : { ok: true, warning: chained.refusal };
       }
       try {
-        await this.writeCardText(vault, card, patched);
+        await this.writeCardText(card, patched);
       } catch (error) {
         return { ok: false, error: messageOf(error) };
       }
-      const commitWarning = await this.commitCard(vault, card, `tickets: ${input.id} plan${chained.changed ? ', chain' : ''}`);
-      this.announceCard(vault, card);
       this.announceChanged();
-      const warning = [chained.refusal === null ? null : `The plan's chain was not taken: ${chained.refusal}`, commitWarning].filter((w) => w !== null).join(' ');
-      return { ok: true, ...(warning === '' ? {} : { warning }) };
+      return chained.refusal === null ? { ok: true } : { ok: true, warning: `The plan's chain was not taken: ${chained.refusal}` };
     });
   }
 
@@ -1491,14 +1394,12 @@ export class EngineBoardService {
       let patched: string;
       try {
         patched = patchChain(text, canonical, new Date(), input.actor ?? this.owner);
-        await this.writeCardText(vault, card, patched);
+        await this.writeCardText(card, patched);
       } catch (error) {
         return { ok: false, error: messageOf(error) };
       }
-      const warning = await this.commitCard(vault, card, `tickets: ${input.id} chain ${canonical.join('; ')}`);
-      this.announceCard(vault, card);
       this.announceChanged();
-      return { ok: true, ...(warning === null ? {} : { warning }) };
+      return { ok: true };
     });
   }
 
@@ -1535,15 +1436,13 @@ export class EngineBoardService {
       let patched: string;
       try {
         patched = patchBlockedBy(text, input.blockedBy, new Date(), input.actor ?? this.owner);
-        await this.writeCardText(vault, card, patched);
+        await this.writeCardText(card, patched);
       } catch (error) {
         return { ok: false, error: messageOf(error) };
       }
       const value = input.blockedBy.length === 0 ? 'none' : `${input.blockedBy.length} ${input.blockedBy.length === 1 ? 'id' : 'ids'}`;
-      const warning = await this.commitCard(vault, card, `tickets: ${input.id} blocked-by ${value}`);
-      this.announceCard(vault, card);
       this.announceChanged();
-      return { ok: true, ...(warning === null ? {} : { warning }) };
+      return { ok: true };
     });
   }
 
@@ -1680,14 +1579,12 @@ export class EngineBoardService {
         return { ok: true };
       }
       try {
-        await this.writeCardText(vault, card, patched);
+        await this.writeCardText(card, patched);
       } catch (error) {
         return { ok: false, error: messageOf(error) };
       }
-      const warning = await this.commitCard(vault, card, `tickets: ${input.id} parts`);
-      this.announceCard(vault, card);
       this.announceChanged();
-      return { ok: true, ...(warning === null ? {} : { warning }) };
+      return { ok: true };
     });
   }
 
@@ -1853,14 +1750,12 @@ export class EngineBoardService {
         return { ok: true };
       }
       try {
-        await this.writeCardText(frame.vault, frame.card, patched);
+        await this.writeCardText(frame.card, patched);
       } catch (error) {
         return { ok: false, error: messageOf(error) };
       }
-      const warning = await this.commitCard(frame.vault, frame.card, `tickets: ${input.id} part ${partIndex + 1} flow`);
-      this.announceCard(frame.vault, frame.card);
       this.announceChanged();
-      return { ok: true, ...(warning === null ? {} : { warning }) };
+      return { ok: true };
     });
   }
 
@@ -1937,16 +1832,14 @@ export class EngineBoardService {
         return { ok: false, error: 'This plan has no parts to release.' };
       }
       const matches = matchPartTickets(parts, this.childrenOf(snap, input.id));
-      const store = this.dricket;
+      const store = this.store;
       // A released part whose ticket is still the empty stub `dk add` made (a release that
       // broke between add and put) is filled by the next approval: that is the resume.
       const stubs: number[] = [];
-      if (store !== null) {
-        for (let i = 0; i < matches.length; i += 1) {
-          const match = matches[i];
-          if (match !== null && match !== undefined && (await this.storeBoard.record(store, match.id)).body.includes(DK_EMPTY_DESCRIPTION)) {
-            stubs.push(i);
-          }
+      for (let i = 0; i < matches.length; i += 1) {
+        const match = matches[i];
+        if (match !== null && match !== undefined && (await this.storeBoard.record(store, match.id)).body.includes(DK_EMPTY_DESCRIPTION)) {
+          stubs.push(i);
         }
       }
       const mint = [...new Set([...stubs, ...indicesToMint(matches, input.scope)])].sort((a, b) => a - b);
@@ -1966,67 +1859,7 @@ export class EngineBoardService {
           return { ok: false, error: `Part ${index + 1}: ${refusal}` };
         }
       }
-      if (store !== null) {
-        return this.releaseInStore(store, { vault, card, text }, snap, build, parts, matches, mint, input);
-      }
-      const known = [
-        ...snap.columns.flatMap((c) => c.tickets.map((t) => t.id)),
-        ...archivedTicketIds(await this.host.listMarkdownFiles(vault.id)),
-      ];
-      const dirs = await this.ticketDirs(vault);
-      const buildDir = resolvePhaseDir(dirs, snap.pipeline.findIndex((p) => p.id === build.id) + 1, build.id);
-      const ids = new Map<number, string>();
-      matches.forEach((m, i) => {
-        if (m !== null) {
-          ids.set(i, m.id);
-        }
-      });
-      const now = new Date();
-      const actor = input.actor ?? this.owner;
-      const files: { path: string; text: string }[] = [];
-      for (const index of mint) {
-        const id = nextTicketId(known);
-        known.push(id);
-        ids.set(index, id);
-        files.push({
-          path: `tickets/${buildDir}/${id}.md`,
-          text: partTicketText({
-            id,
-            parentId: input.id,
-            parentTitle: card.meta.title ?? input.id,
-            part: parts[index]!,
-            index,
-            total: parts.length,
-            repo: card.meta.repo,
-            repos: card.meta.repos,
-            priority: card.meta.priority,
-            priorities: snap.priorities,
-            firstPhase: snap.pipeline[0]!.id,
-            phase: build.id,
-            blockedBy: blockerOf(index, ids),
-            now,
-            actor,
-            standard: renderChainEntries(snap.flow ?? []),
-          }),
-        });
-      }
-      const minted = mint.map((index) => ids.get(index)!);
-      try {
-        for (const file of files) {
-          await this.host.writeAnnounced(vault.id, file.path, file.text);
-        }
-        await this.writeCardText(vault, card, withLogLine(text, now, actor, releaseLogText(minted)));
-      } catch (error) {
-        return { ok: false, error: `write failed: ${messageOf(error)}` };
-      }
-      const warning = await this.commit(
-        vault,
-        [...files.map((f) => f.path), card.path],
-        `tickets: ${input.id} plan released (${minted.length} ${minted.length === 1 ? 'part' : 'parts'})`,
-      );
-      this.announceCard(vault, card);
-      this.announceChanged();
-      return { ok: true, tickets: minted, ...(warning === null ? {} : { warning }) };
+      return this.releaseInStore(store, { vault, card, text }, snap, build, parts, matches, mint, input);
     });
   }
 
@@ -2095,7 +1928,7 @@ export class EngineBoardService {
         await this.putRecord(store, await this.storeBoard.record(store, id), body, { phase: build.id });
         done.push(id);
       }
-      await this.writeCardText(vault, card, withLogLine(text, now, actor, releaseLogText(done)));
+      await this.writeCardText(card, withLogLine(text, now, actor, releaseLogText(done)));
     } catch (error) {
       this.announceChanged();
       const so = done.length === 0 ? '' : ` Released so far: ${done.join(', ')}.`;
@@ -2146,94 +1979,9 @@ export class EngineBoardService {
     });
   }
 
-  /**
-   * The `board` IPC route (T-0041): normalize first — a file move is a
-   * ticket move — then snapshot. Normalization runs enqueued (the same
-   * single-writer queue as every mutation) and snapshots are taken
-   * OUTSIDE it, so this never nests `enqueue` inside `enqueue`. (The
-   * legacy column-key migration onto `<phase>-default` personas retired
-   * with req-257: no persona is created from a column any more.)
-   */
+  /** The `board` IPC route: the snapshot (the store owns its layout, there is no drift to normalize). */
   async refresh(): Promise<BoardSnapshot> {
-    await this.normalizeDrift();
     return this.snapshot();
-  }
-
-  /**
-   * Stateless drift treatment, derived from the files alone (T-0041,
-   * ADR-0076 later change): every ticket that sits in a phase its
-   * `entered-*` stamps disagree with receives the full board-move
-   * treatment — stamp, Log line, pin cleanup, exactly one commit. A
-   * file dropped into `tickets/archive/` gets the archive treatment.
-   * Idempotent by construction: the treatment makes the file's state
-   * consistent, so the next pass finds nothing (the announce → re-fetch
-   * echo lands on the fixpoint). Per-item try/catch: one broken ticket
-   * never blocks the rest or the board.
-   */
-  private normalizeDrift(): Promise<void> {
-    return this.enqueue(async () => {
-      const vault = await this.detect();
-      if (vault === null || (await this.refreshDricket()) !== null) {
-        // On dricket the store owns the layout: there are no phase folders to drift.
-        return;
-      }
-      const pipelineText = await this.readOptional(vault.id, PIPELINE_PATH);
-      if (pipelineText === null) {
-        return;
-      }
-      const { phases, pushRemote } = parsePipeline(pipelineText);
-      const mdFiles = await this.host.listMarkdownFiles(vault.id);
-      const paths = mdFiles.filter((p) => p.startsWith('tickets/') && !p.startsWith('tickets/_meta/'));
-      const files: { path: string; text: string }[] = [];
-      for (const p of paths) {
-        const text = await this.host.read(vault.id, p).catch(() => null);
-        if (text !== null) {
-          files.push({ path: p, text });
-        }
-      }
-      for (const drift of detectDrift(files, phases)) {
-        const text = files.find((f) => f.path === drift.path)?.text;
-        if (text === undefined) {
-          continue;
-        }
-        try {
-          await this.treatDrift(vault, drift, text, pushRemote);
-        } catch (error) {
-          this.host.log(`normalizing ${drift.id} (${drift.path}) failed: ${messageOf(error)}`, 'warn');
-        }
-      }
-    });
-  }
-
-  /** One drift's full transition treatment. The path never changes —
-   *  only stamps and Log; exactly one commit closes it. In-place run of
-   *  the one transition machine with the pre-read text (the normalization
-   *  pass bulk-read the files; a failure throws so the caller logs
-   *  `normalizing <id> (<path>) failed: …`). */
-  private async treatDrift(
-    vault: EngineVault,
-    drift: DriftDetection,
-    text: string,
-    pushRemote: string | null,
-  ): Promise<void> {
-    const result = await runTransition(this.transitionIo(vault), {
-      id: drift.id,
-      fromPath: drift.path,
-      text,
-      patch:
-        drift.kind === 'archive'
-          ? { to: 'archive', from: null, now: new Date(), actor: this.owner, action: 'archived' }
-          : // null (no event at all) logs honestly as `unknown -> <phase>`
-            { to: drift.phase, from: drift.from ?? 'unknown', now: new Date(), actor: this.owner },
-      commitMessage:
-        drift.kind === 'archive'
-          ? `tickets: ${drift.id} archived`
-          : `tickets: ${drift.id} ${drift.from ?? 'unknown'} -> ${drift.phase}`,
-      pushRemote,
-    });
-    if (!result.ok) {
-      throw new Error(result.error);
-    }
   }
 
   /** Serialize mutations; failures never block the next one. */
@@ -2247,15 +1995,14 @@ export class EngineBoardService {
 
   /**
    * Where the ticket's document is: the store's checkout and the checkout-relative path
-   * (`tickets/<prefix>/<shard>/<id>/ticket.md`). Null on the files backend, without a
-   * checkout, and for a ticket the store does not have: the caller then opens the vault
-   * file as before.
+   * (`tickets/<prefix>/<shard>/<id>/ticket.md`). Null without a checkout and for a ticket
+   * the store does not have.
    */
   async ticketDocument(input: { id: string }): Promise<TicketDocumentLocation | null> {
-    const store = await this.refreshDricket();
-    const checkout = store === null ? null : checkoutOf(store);
+    const store = await this.refreshStore();
+    const checkout = checkoutOf(store);
     const relPath = documentRelPath(input.id);
-    if (store === null || checkout === null || relPath === null) {
+    if (checkout === null || relPath === null) {
       return null;
     }
     try {
@@ -2276,10 +2023,7 @@ export class EngineBoardService {
    */
   saveDocument(input: { path: string; text: string; force?: boolean }): Promise<DocumentSaveReply> {
     return this.enqueue(async () => {
-      const store = await this.refreshDricket();
-      if (store === null) {
-        return { ok: false, error: 'Ticket documents are saved through dricket; the dricket backend is off.' };
-      }
+      const store = await this.refreshStore();
       const id = idOfDocumentPath(input.path);
       if (id === null) {
         return { ok: false, error: `${input.path} is not a ticket document.` };
@@ -2304,32 +2048,23 @@ export class EngineBoardService {
   }
 
   // --- the ticket write door (E14-4b, ADR-0090) ---------------------------------
-  // On the files backend a card is a vault file: written, committed, announced.
-  // On dricket a card is a store record folded into the legacy shape: the very
-  // same text patchers run on it, and the result goes back through `dk put
-  // --claim --if-version <rev>` (legacy-bridge). Exit 12 means the ticket moved
-  // on: nothing was written, the user is told and re-reads.
+  // A card is a store record folded into the legacy shape: the text patchers run on
+  // it, and the result goes back through `dk put --claim --if-version <rev>`
+  // (legacy-bridge). Exit 12 means the ticket moved on: nothing was written, the
+  // user is told and re-reads.
 
-  /** The card's file text — read from the vault, or the store record folded into the legacy shape. */
-  private async readCardText(vault: EngineVault, card: TicketCard): Promise<string> {
-    if (this.dricket === null) {
-      return this.host.read(vault.id, card.path);
-    }
-    const record = await this.storeBoard.record(this.dricket, card.id);
+  /** The card's file text: the store record folded into the legacy shape. */
+  private async readCardText(card: TicketCard): Promise<string> {
+    const record = await this.storeBoard.record(this.store, card.id);
     this.records.set(card.id, record);
     return recordToBoardFile(record, card.phase).text;
   }
 
   /** Writes the patched card text; a changed-in-the-meantime ticket (dk exit 12) throws {@link TicketChangedError}. */
-  private async writeCardText(vault: EngineVault, card: TicketCard, text: string): Promise<void> {
-    const store = this.dricket;
-    if (store === null) {
-      await this.host.write(vault.id, card.path, text);
-      return;
-    }
-    const record = this.records.get(card.id) ?? (await this.storeBoard.record(store, card.id));
+  private async writeCardText(card: TicketCard, text: string): Promise<void> {
+    const record = this.records.get(card.id) ?? (await this.storeBoard.record(this.store, card.id));
     // A header edit keeps the stage (and the column pin) the document has; only a move changes it.
-    await this.putRecord(store, record, text, { keepStage: true });
+    await this.putRecord(this.store, record, text, { keepStage: true });
     this.records.delete(card.id);
   }
 
@@ -2340,22 +2075,10 @@ export class EngineBoardService {
     }
   }
 
-  /** The commit of a card edit: a git commit on the files backend; on dricket `put` already committed. */
-  private commitCard(vault: EngineVault, card: TicketCard, message: string): Promise<string | null> {
-    return this.dricket === null ? this.commit(vault, [card.path], message) : Promise.resolve(null);
-  }
-
-  private announceCard(vault: EngineVault, card: TicketCard): void {
-    if (this.dricket === null) {
-      this.host.announceChanges(vault.id, [card.path]);
-    }
-  }
-
-  /** Re-reads `tickets.backend`: the store settings while the board runs on dricket, else null. */
-  private async refreshDricket(): Promise<StoreSettings | null> {
-    const settings = await readStoreSettings(this.host.configGet.bind(this.host));
-    this.dricket = settings.backend === 'dricket' ? settings : null;
-    return this.dricket;
+  /** Re-reads the store settings from the config (the settings may have changed since the last snapshot). */
+  private async refreshStore(): Promise<StoreSettings> {
+    this.store = await readStoreSettings(this.host.configGet.bind(this.host));
+    return this.store;
   }
 
   /**
@@ -2391,8 +2114,7 @@ export class EngineBoardService {
   }
 
   /**
-   * The transition machine's IO over the store: no vault file moves, no commit of
-   * its own (one `put` is the commit). `read` folds the record, `write` is the
+   * The transition machine's IO over the store: one `put` is the whole move. `read` folds the record, `write` is the
    * `put` with the target stage; the archive is stage `terminal` + the `archived`
    * label, an unarchive removes it.
    */
@@ -2418,18 +2140,13 @@ export class EngineBoardService {
         await this.putRecord(store, record, moved, phase === undefined ? { keepStage: true } : { phase, archived: inArchive(p) });
         this.records.delete(id);
       },
-      renameInto: () => Promise.resolve({ ok: true }),
-      commit: () => Promise.resolve(null),
-      push: () => Promise.resolve(null),
       announce: () => this.announceChanged(),
     };
   }
 
-  /** The IO of a board move: vault files on the files backend, the store on dricket (the terminal phase is where an archived ticket stays). */
+  /** The IO of a board move over the store (the terminal phase is where an archived ticket stays). */
   private moveIo(vault: EngineVault, snap: BoardSnapshot): TransitionIo {
-    return this.dricket === null
-      ? this.transitionIo(vault)
-      : this.dricketTransitionIo(this.dricket, snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done', () => this.holderPlacement(vault, snap.pipeline));
+    return this.dricketTransitionIo(this.store, snap.pipeline[snap.pipeline.length - 1]?.id ?? 'done', () => this.holderPlacement(vault, snap.pipeline));
   }
 
   /**
@@ -2450,8 +2167,7 @@ export class EngineBoardService {
 
   /** req-257: what places a chain ticket by its holder — null unless the board runs on a lifecycle store. */
   private async holderPlacement(vault: EngineVault, pipeline: readonly PipelinePhase[]): Promise<HolderPlacement | null> {
-    const store = this.dricket;
-    if (store === null || !isLifecycleStore(await this.storeBoard.stages(store).catch(() => null))) {
+    if (!isLifecycleStore(await this.storeBoard.stages(this.store).catch(() => null))) {
       return null;
     }
     const kinds = await this.crewKinds(vault, await this.host.listMarkdownFiles(vault.id));
@@ -2473,67 +2189,6 @@ export class EngineBoardService {
       this.host.log(`git commit failed: ${text}`, 'warn');
       return `git commit failed: ${text.split('\n')[0]}`;
     }
-  }
-
-  /**
-   * The optional auto-push after a transition commit (T-0041,
-   * pipeline.md `push:`): `git push <remote> HEAD` from the tickets repo
-   * root. A failure is a warning the panel shows — never a failed
-   * transition; the commit is already durable. Null remote = no push.
-   */
-  private async pushTransition(vault: EngineVault, remote: string | null): Promise<string | null> {
-    if (remote === null) {
-      return null;
-    }
-    const location = await this.locate(vault.path);
-    if (location === null) {
-      return null;
-    }
-    try {
-      await this.git.push(location.root, remote);
-      return null;
-    } catch (error) {
-      const text = messageOf(error).split('\n')[0] ?? 'push failed';
-      this.host.log(`git push to "${remote}" failed: ${text}`, 'warn');
-      return `git push to "${remote}" failed: ${text}`;
-    }
-  }
-
-  /**
-   * The host adapter for the one transition machine (ADR-0088, E1): vault
-   * reads/writes, the mkdir+rename with the verbatim path-escape wording,
-   * the warning-level commit/push plumbing and the closing announcement
-   * (vault round + board-changed). Every move kind — transition, archive,
-   * unarchive, drift — runs through `runTransition` with this IO.
-   */
-  private transitionIo(vault: EngineVault): TransitionIo {
-    return {
-      read: (path) => this.host.read(vault.id, path),
-      write: async (path, text) => {
-        await this.host.write(vault.id, path, text);
-      },
-      renameInto: async (fromPath, toPath) => {
-        const oldAbs = this.host.resolveAssetPath(vault.id, fromPath);
-        const dirAbs = this.host.resolveAssetPath(vault.id, path.posix.dirname(toPath));
-        const newAbs = this.host.resolveAssetPath(vault.id, toPath);
-        if (oldAbs === null || dirAbs === null || newAbs === null) {
-          return { ok: false, error: 'ticket path escapes the vault' };
-        }
-        try {
-          await fsp.mkdir(dirAbs, { recursive: true });
-          await fsp.rename(oldAbs, newAbs);
-          return { ok: true };
-        } catch (error) {
-          return { ok: false, error: `move failed: ${messageOf(error)}` };
-        }
-      },
-      commit: (paths, message) => this.commit(vault, paths, message),
-      push: (remote) => this.pushTransition(vault, remote),
-      announce: (changedPaths, deletedPaths) => {
-        this.host.announceChanges(vault.id, [...changedPaths], deletedPaths.length > 0 ? [...deletedPaths] : undefined);
-        this.announceChanged();
-      },
-    };
   }
 
   createTicket(input: {
@@ -2570,42 +2225,7 @@ export class EngineBoardService {
           error: `unknown priority "${input.priority}" — this board's vocabulary is ${snap.priorities.order.join(', ')}`,
         };
       }
-      const store = this.dricket;
-      if (store !== null) {
-        return this.createInStore(store, snap, input);
-      }
-      // Archived ids count too: an id is never reused, even after the
-      // ticket with the highest one was archived.
-      const id = nextTicketId([
-        ...snap.columns.flatMap((c) => c.tickets.map((t) => t.id)),
-        ...archivedTicketIds(await this.host.listMarkdownFiles(vault.id)),
-      ]);
-      const firstPhase = snap.pipeline[0]!.id;
-      const firstDir = resolvePhaseDir(await this.ticketDirs(vault), 1, firstPhase);
-      const path = `tickets/${firstDir}/${id}.md`;
-      const text = newTicketFileText({
-        id,
-        title: input.title,
-        repo: input.repo,
-        ...(input.repos !== undefined ? { repos: input.repos } : {}),
-        priority: input.priority,
-        rank: 5000,
-        firstPhase,
-        now: new Date(),
-        actor: input.actor ?? this.owner,
-        description: input.description,
-        ...(input.raw !== undefined ? { rawCapture: input.raw } : {}),
-        ...(input.project !== undefined ? { project: input.project } : {}),
-        chain: renderChainEntries(snap.flow ?? []),
-      });
-      try {
-        await this.host.writeAnnounced(vault.id, path, text);
-      } catch (error) {
-        return { ok: false, error: `write failed: ${messageOf(error)}` };
-      }
-      const warning = await this.commit(vault, [path], `tickets: ${id} + ${firstPhase}`);
-      this.announceChanged();
-      return { ok: true, id, path, ...(warning === null ? {} : { warning }) };
+      return this.createInStore(this.store, snap, input);
     });
   }
 
@@ -2676,8 +2296,7 @@ export class EngineBoardService {
    * The board's move, already inside the queue (shared by `transition`,
    * the Ready card's Accept and its Send back, req-75 W3): validate the
    * target and the path guard here, then run the one transition machine —
-   * patch (plus the optional second Log line), rename into the resolved
-   * numbered directory, one commit, the optional push, one announcement.
+   * patch (plus the optional second Log line), one `put`, one announcement.
    */
   private async moveCard(
     vault: EngineVault,
@@ -2700,11 +2319,6 @@ export class EngineBoardService {
       return { ok: false, error: `${card.id} sits in an unexpected path (${card.path})` };
     }
 
-    const toDir = resolvePhaseDir(
-      await this.ticketDirs(vault),
-      snap.pipeline.findIndex((p) => p.id === to) + 1,
-      to,
-    );
     // A hand-move never touches the claim (owner ruling, 2026-10-18): a
     // stamp here would block the target column's pool, since the
     // dispatcher never takes claimed cards. Claims belong to the
@@ -2715,27 +2329,18 @@ export class EngineBoardService {
       ...(text !== undefined ? { text } : {}),
       patch: { to, from, now: new Date(), actor },
       ...(extraLog !== undefined ? { extraLog } : {}),
-      toPath: `tickets/${toDir}/${card.id}.md`,
-      commitMessage: `tickets: ${card.id} ${from} -> ${to}`,
-      pushRemote: snap.pushRemote,
+      toPath: `tickets/${to}/${card.id}.md`,
     });
-    // E7: the ledger's phase line rides the successful move.
-    // On a store the stage history is dk's (and derivable), so no `phase` line (E14-6).
-    if (result.ok && this.dricket === null) {
-      this.options.events?.ledger({ kind: 'phase', ticket: card.id, from, to });
-    }
+    // The stage history is dk's (and derivable): the ledger gets no `phase` line (E14-6).
     return result;
   }
 
   /**
-   * Archives a ticket (T-0041): the reserved `tickets/archive/` folder
-   * beside `_meta` — not a column, invisible on the board. The treatment
-   * is exact: Log line `archived`, one commit `tickets: <id> archived`;
-   * NO `entered-` stamp (the Log marker is what makes it
-   * idempotent and a revive detectable); claim fields ride along.
-   * Reviving is a move back into a phase folder — normalization stamps
-   * it as `archive -> <phase>`. Final deletion is the owner's manual
-   * act inside `archive/`.
+   * Archives a ticket (T-0041): the terminal stage plus the `archived` label —
+   * not a column, invisible on the board. The treatment is exact: Log line
+   * `archived`, NO `entered-` stamp (the Log marker is what makes it idempotent
+   * and a revive detectable); claim fields ride along. Reviving is
+   * {@link unarchive}.
    */
   archive(input: { id: string; actor?: string }): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
@@ -2756,11 +2361,8 @@ export class EngineBoardService {
    * The archive treatment itself, already inside the queue (the Ready
    * card's terminal Accept reuses it, req-75 W3) — one transition-machine
    * run: the `archived` Log line, NO `entered-` stamp (the Log marker is
-   * what makes it idempotent and a revive detectable), the move into
-   * `tickets/archive/`, one commit, the optional push. Claim fields ride
-   * along. Reviving is a move back into a phase folder — normalization
-   * stamps it as `archive -> <phase>`. Final deletion is the owner's
-   * manual act inside `archive/`.
+   * what makes it idempotent and a revive detectable), the terminal stage
+   * plus the `archived` label. Claim fields ride along.
    */
   private async archiveCard(vault: EngineVault, snap: BoardSnapshot, card: TicketCard, actor: string): Promise<BoardMutationResult> {
     const result = await runTransition(this.moveIo(vault, snap), {
@@ -2768,8 +2370,6 @@ export class EngineBoardService {
       fromPath: card.path,
       patch: { to: 'archive', from: null, now: new Date(), actor, action: 'archived' },
       toPath: `${TICKETS_ARCHIVE_DIR}/${card.id}.md`,
-      commitMessage: `tickets: ${card.id} archived`,
-      pushRemote: snap.pushRemote,
     });
     // E7: the ledger's archived line rides the successful archive.
     if (result.ok) {
@@ -2911,10 +2511,7 @@ export class EngineBoardService {
    * `active`), or the ticket to `done` — with the status line, one `put`.
    */
   private async writeChainCursor(card: TicketCard, target: { readonly at: number; readonly returned?: boolean; readonly chain?: readonly string[] } | { readonly done: string }, why: { readonly line: string; readonly actor: string; readonly text?: string }): Promise<BoardMutationResult> {
-    const store = this.dricket;
-    if (store === null) {
-      return { ok: false, error: 'the cursor of a chain lives on a dricket store' };
-    }
+    const store = this.store;
     try {
       const record = await this.storeBoard.record(store, card.id);
       const legacy = why.text ?? recordToBoardFile(record, card.phase).text;
@@ -2940,7 +2537,7 @@ export class EngineBoardService {
    */
   async missionEntries(): Promise<readonly MissionEntry[]> {
     const vault = await this.detect();
-    const store = vault === null ? null : await this.refreshDricket();
+    const store = vault === null ? null : await this.refreshStore();
     if (store === null || !isLifecycleStore(await this.storeBoard.stages(store).catch(() => null))) {
       return []; // no chain board: no snapshot on every board and fleet change
     }
@@ -2965,9 +2562,9 @@ export class EngineBoardService {
   /** req-257: the ticket waits for the owner — `awaiting: you` and a `needs-decision` under `key` (Pia's entry after her turn). */
   waitForOwner(input: { readonly id: string; readonly key: string; readonly text: string; readonly detail: string }): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
-      const store = this.dricket;
-      const card = store === null ? null : findOnBoard(await this.snapshot(), input.id);
-      if (store === null || card === null) {
+      const store = this.store;
+      const card = findOnBoard(await this.snapshot(), input.id);
+      if (card === null) {
         return { ok: false, error: `${input.id} is not on a dricket board` };
       }
       try {
@@ -3015,8 +2612,8 @@ export class EngineBoardService {
    * moved to `done` by the engine — an agent may not release into a terminal stage. Idempotent.
    */
   async settleFinishedChains(): Promise<void> {
-    if (this.dricket === null) {
-      return;
+    if (this.store.dkStore === '') {
+      return; // no store, no chains
     }
     const due = await this.enqueue(async () => {
       const snap = await this.snapshot();
@@ -3026,9 +2623,9 @@ export class EngineBoardService {
     });
     for (const card of due) {
       await this.enqueue(async () => {
-        const store = this.dricket;
-        const record = store === null ? null : await this.storeBoard.record(store, card.id).catch(() => null);
-        if (store === null || record === null || record.stage !== ACTIVE_STAGE) {
+        const store = this.store;
+        const record = await this.storeBoard.record(store, card.id).catch(() => null);
+        if (record === null || record.stage !== ACTIVE_STAGE) {
           return;
         }
         const moved = await this.putRecord(store, record, recordToBoardFile(record, card.phase).text, { phase: card.phase }).then(
@@ -3068,11 +2665,9 @@ export class EngineBoardService {
    * Accept on Ready to try is the sign-off (req-99a, build plan Q8): You's
    * `commit` leaving action (req-267) as a MACHINE run on the target
    * repository — no worker, no model: the ticket's branch merged into the
-   * integration branch and pushed (`fleet/orchestrate/commit-run.ts`). On
-   * the files backend its green end moves the ticket into Done like every
-   * run. On a store dk never lets an agent release into the terminal stage,
-   * so the run moves nothing and {@link settleCommitSteps} makes the owner's
-   * move afterwards. A blocked or red end leaves the ticket where it is with
+   * integration branch and pushed (`fleet/orchestrate/commit-run.ts`). Dk never
+   * lets an agent release into the terminal stage, so the run moves nothing and
+   * {@link settleCommitSteps} makes the owner's move afterwards. A blocked or red end leaves the ticket where it is with
    * the reason, and Accept again starts it again (it completes at once when
    * the work is already on main).
    */
@@ -3088,7 +2683,7 @@ export class EngineBoardService {
     if (!started.ok) {
       return { ok: false, error: started.error ?? `the commit step of ${ticketId} did not start` };
     }
-    if (this.dricket !== null && started.runId !== undefined) {
+    if (started.runId !== undefined) {
       this.commitSteps.set(ticketId, started.runId);
     }
     return { ok: true, ...(started.runId !== undefined ? { runId: started.runId } : {}) };
@@ -3231,11 +2826,11 @@ export class EngineBoardService {
       }
       let text: string | undefined;
       if (input.comments !== undefined && input.comments.length > 0) {
-        text = withReviewFeedback(await this.readCardText(vault, card), input.comments);
+        text = withReviewFeedback(await this.readCardText(card), input.comments);
       }
       const actor = input.actor ?? this.owner;
       const moved = await this.moveCard(vault, snap, card, to, actor, `sent back: ${input.note.trim().slice(0, 500)}`, text);
-      if (moved.ok && this.dricket !== null) {
+      if (moved.ok) {
         // E14-6: the note, whole, is a comment on the ticket (the Log line keeps the short form for the story).
         await this.commentOn(card, `sent back: ${input.note.trim()}`, actor);
       }
@@ -3254,7 +2849,7 @@ export class EngineBoardService {
       return { ok: false, error: decision.error };
     }
     const actor = input.actor ?? this.owner;
-    const text = input.comments !== undefined && input.comments.length > 0 ? withReviewFeedback(await this.readCardText(vault, card), input.comments) : undefined;
+    const text = input.comments !== undefined && input.comments.length > 0 ? withReviewFeedback(await this.readCardText(card), input.comments) : undefined;
     const line = `sent back to position ${decision.at} (${decision.persona}): ${input.note.trim().slice(0, 500)}`;
     const written = await this.writeChainCursor(card, { at: decision.at }, { line, actor, ...(text !== undefined ? { text } : {}) });
     if (written.ok) {
@@ -3269,10 +2864,10 @@ export class EngineBoardService {
    */
   personaBoardMove(move: PersonaBoardMove): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
-      const store = this.dricket;
+      const store = this.store;
       const snap = await this.snapshot();
       const lanes = snap.lanes;
-      if (store === null || lanes === undefined) {
+      if (lanes === undefined) {
         return { ok: false, error: 'the persona board runs on a migrated dricket store' };
       }
       const card = findOnBoard(snap, move.id);
@@ -3300,12 +2895,8 @@ export class EngineBoardService {
 
   /** A plain comment on a store ticket; a failure is a log line, the move it follows already happened. */
   private async commentOn(card: TicketCard, text: string, actor: string): Promise<void> {
-    const store = this.dricket;
-    if (store === null) {
-      return;
-    }
     try {
-      await this.storeBoard.comment(store, card.id, text, actor);
+      await this.storeBoard.comment(this.store, card.id, text, actor);
     } catch (error) {
       this.host.log(`tickets: the comment on ${card.id} could not be written: ${messageOf(error)}`, 'warn');
     }
@@ -3314,12 +2905,11 @@ export class EngineBoardService {
   /**
    * The owner's answer to a Needs-you decision (E14-6): a `resolved: <key>`
    * comment closing the key, the answer as its detail. The key defaults to the
-   * ticket's only open `needs-decision`/`blocked` key. On the files backend
-   * the status log gets the `resolved` line (the answer text has no home there).
+   * ticket's only open `needs-decision`/`blocked` key.
    */
   answerNeed(input: { id: string; key?: string; text?: string; actor?: string }): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
-      await this.refreshDricket();
+      await this.refreshStore();
       const found = await this.findCard(input.id);
       if (found === null) {
         return { ok: false, error: `${input.id} is not on the board` };
@@ -3388,12 +2978,10 @@ export class EngineBoardService {
   }
 
   /**
-   * Unarchives a ticket (T-0042): a move out of `tickets/archive/` back
-   * into a phase folder IS the board treatment — `archive -> <phase>`
-   * stamp, Log line, one commit — never a raw move plus drift
-   * normalization. The drag in Files feels exactly like the board's own
-   * move (decision 7). The board itself shows nothing in archive/; the
-   * file is read directly.
+   * Unarchives a ticket (T-0042): the move out of the archive back into a
+   * phase IS the board treatment — `archive -> <phase>` stamp, Log line, one
+   * `put` that drops the `archived` label. The board itself shows nothing
+   * archived; the record is read directly.
    */
   unarchive(input: { id: string; to: string; actor?: string }): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
@@ -3406,19 +2994,12 @@ export class EngineBoardService {
       if (toPhase === null) {
         return { ok: false, error: `"${input.to}" is not a phase in the pipeline` };
       }
-      const toDir = resolvePhaseDir(
-        await this.ticketDirs(vault),
-        snap.pipeline.findIndex((p) => p.id === input.to) + 1,
-        input.to,
-      );
       return runTransition(this.moveIo(vault, snap), {
         id: input.id,
         fromPath: `${TICKETS_ARCHIVE_DIR}/${input.id}.md`,
         readError: `${input.id} is not in the archive`,
         patch: { to: input.to, from: 'archive', now: new Date(), actor: input.actor ?? this.owner },
-        toPath: `tickets/${toDir}/${input.id}.md`,
-        commitMessage: `tickets: ${input.id} archive -> ${input.to}`,
-        pushRemote: snap.pushRemote,
+        toPath: `tickets/${input.to}/${input.id}.md`,
       });
     });
   }
@@ -3466,47 +3047,7 @@ export class EngineBoardService {
 
   setClaim(input: { id: string; mode: 'takeover' | 'release'; actor?: string }): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
-      const store = await this.refreshDricket();
-      if (store !== null) {
-        return this.setClaimInStore(store, input);
-      }
-      const found = await this.findCard(input.id);
-      if (found === null) {
-        return { ok: false, error: `${input.id} is not on the board` };
-      }
-      const { vault, card, text } = found;
-      const previous = card.meta.claimedBy;
-      if (input.mode === 'takeover' && previous === (input.actor ?? this.owner)) {
-        return { ok: false, error: 'you already hold this claim' };
-      }
-      if (input.mode === 'release' && previous === null) {
-        return { ok: false, error: 'this ticket is not claimed' };
-      }
-      let patched: string;
-      try {
-        patched = patchTicketFile(text, {
-          to: card.phase,
-          from: null,
-          now: new Date(),
-          actor: input.actor ?? this.owner,
-          action:
-            input.mode === 'takeover'
-              ? `claim takeover${previous !== null ? ` (was ${previous})` : ''}`
-              : 'claim release',
-          ...(input.mode === 'takeover' ? { claimBy: input.actor ?? this.owner } : { releaseClaim: true }),
-        });
-      } catch (error) {
-        return { ok: false, error: messageOf(error) };
-      }
-      try {
-        await this.writeCardText(vault, card, patched);
-      } catch (error) {
-        return { ok: false, error: `write failed: ${messageOf(error)}` };
-      }
-      const warning = await this.commitCard(vault, card, `tickets: ${input.id} claim ${input.mode}`);
-      this.announceCard(vault, card);
-      this.announceChanged();
-      return { ok: true, ...(warning === null ? {} : { warning }) };
+      return this.setClaimInStore(await this.refreshStore(), input);
     });
   }
 
@@ -3546,7 +3087,10 @@ export class EngineBoardService {
     commitStep: boolean,
   ): Promise<{ ok: boolean; error?: string; runId?: string }> {
     this.host.log(`run start: ${input.ticketId} asked by ${input.origin}`);
-    const dricket = await this.refreshDricket();
+    const store = await this.refreshStore();
+    if (store.dkStore === '') {
+      return { ok: false, error: 'no dricket store configured (tickets.dk.store)' };
+    }
     const vault = await this.detect();
     if (vault === null) {
       return { ok: false, error: 'no tickets vault detected' };
@@ -3565,9 +3109,6 @@ export class EngineBoardService {
     if (card === null || phaseId === null) {
       return { ok: false, error: `${input.ticketId} is not on the board` };
     }
-    if (dricket === null && card.meta.run !== null && !(await this.clearEndedRunStamp(vault, card))) {
-      return { ok: false, error: `${card.id} already has a live run — stop it first` };
-    }
     const blocked = blockedRefusal(card);
     if (blocked !== null) {
       return { ok: false, error: blocked };
@@ -3585,7 +3126,7 @@ export class EngineBoardService {
       .filter((name) => name !== card.meta.repo)
       .map((name) => snap.repos.find((r) => r.name === name)!)
       .filter((r) => r !== undefined);
-    const text = await this.readCardText(vault, card);
+    const text = await this.readCardText(card);
     let prompt: string | null = null;
     if (input.interactive !== null) {
       // req-65: the dialog's brief — the phase's `interactive:` ref,
@@ -3613,8 +3154,8 @@ export class EngineBoardService {
     }
     // req-257: on a lifecycle store a chain ticket's run hands on by its cursor, never by a move.
     const chainRun = await this.chainRunOf(vault, snap, card);
-    // On a store the commit step moves nothing itself: dk refuses an agent's release into the terminal stage (settleCommitSteps).
-    const nextPhaseId = (commitStep && dricket !== null) || chainRun !== null ? null : nextPhaseIdOf(snap.columns, phaseId);
+    // The commit step moves nothing itself: dk refuses an agent's release into the terminal stage (settleCommitSteps).
+    const nextPhaseId = commitStep || chainRun !== null ? null : nextPhaseIdOf(snap.columns, phaseId);
     const nextPhaseClaims =
       nextPhaseId !== null ? (snap.pipeline.find((p) => p.id === nextPhaseId)?.claim === true) : false;
     // The context pack (T-0048): repo instructions, the worktree's diff
@@ -3663,14 +3204,7 @@ export class EngineBoardService {
       vaultPath: vault.path,
       workingPhase,
       nextPhaseId,
-      nextPhaseDir:
-        nextPhaseId === null
-          ? null
-          : resolvePhaseDir(
-              await this.ticketDirs(vault),
-              snap.pipeline.findIndex((p) => p.id === nextPhaseId) + 1,
-              nextPhaseId,
-            ),
+      nextPhaseDir: nextPhaseId, // a store has no phase folders: the stage is the phase id
       pushRemote: snap.pushRemote,
       nextPhaseClaims,
       repo,
@@ -3690,7 +3224,7 @@ export class EngineBoardService {
       ...(input.interactive !== null ? { interactive: input.interactive } : {}),
       ...(commitStep ? { commitStep: true } : {}),
       ...(chainRun !== null && !commitStep ? { cursor: chainRun.cursor } : {}),
-      ...(dricket !== null ? { dk: await this.runTarget(dricket, snap.pipeline, phaseId) } : {}),
+      dk: await this.runTarget(store, snap.pipeline, phaseId),
     });
     if (!composed.ok) {
       return { ok: false, error: composed.error };
@@ -3725,36 +3259,6 @@ export class EngineBoardService {
   /** Every fleet run record (live or historical) the client can see. */
   private async fleetRecords(): Promise<readonly RunInfo[]> {
     return this.fleet.runs();
-  }
-
-  /**
-   * A `run:` stamp whose run provably ended (its record settled with an
-   * end time — a down runner's synthetic `stopped` carries none) is a
-   * leftover, e.g. of a card moved while its run went on: cleared with a
-   * Log line and one commit. True when the ticket is free now.
-   */
-  private async clearEndedRunStamp(vault: EngineVault, card: TicketCard): Promise<boolean> {
-    const stream = card.meta.run?.stream ?? null;
-    if (stream === null) {
-      return true;
-    }
-    const record = (await this.fleetRecords()).find((r) => r.id === stream) ?? null;
-    if (record === null || !['done', 'stopped', 'failed'].includes(record.state) || record.endedAt === null) {
-      return false;
-    }
-    const text = await this.host.read(vault.id, card.path);
-    const patched = patchTicketFile(text, {
-      to: card.phase,
-      from: null,
-      now: new Date(),
-      actor: this.owner,
-      clearRun: true,
-      action: `stale run stamp cleared — run ${stream} had ended (${record.state})`,
-    });
-    await this.writeCardText(vault, card, patched);
-    await this.commitCard(vault, card, `tickets: ${card.id} stale run stamp cleared`);
-    this.announceCard(vault, card);
-    return true;
   }
 
   /**
@@ -3932,8 +3436,8 @@ export class EngineBoardService {
         }
       }
 
-      // The owner's button: one action-only Log line, one commit.
-      const text = await this.readCardText(vault, card);
+      // The owner's button: one action-only Log line.
+      const text = await this.readCardText(card);
       let warning: string | null = warnings.length > 0 ? `extra worktrees: ${warnings.join('; ')}` : null;
       try {
         const patched = patchTicketFile(text, {
@@ -3943,12 +3447,7 @@ export class EngineBoardService {
           actor: this.owner,
           action: `worktree removed (${worktreePath})`,
         });
-        await this.writeCardText(vault, card, patched);
-        const commitNote = await this.commitCard(vault, card, `tickets: ${card.id} worktree removed`);
-        if (commitNote !== null) {
-          warning = warning === null ? commitNote : `${warning} — ${commitNote}`;
-        }
-        this.announceCard(vault, card);
+        await this.writeCardText(card, patched);
       } catch (error) {
         warning = `the worktree was removed, but the Log line failed: ${messageOf(error)}`;
       }
@@ -5013,40 +4512,18 @@ export class EngineBoardService {
   }
 
   /**
-   * Whether the phase folders carry their derived numbers (T-0041), and
-   * the renames "Number folders" would make. Also names the tickets
-   * folder for the settings page's header.
+   * The tickets folder for the settings page's header. A store has no phase
+   * folders, so there is never a renumbering to offer (`moves` stays empty;
+   * the Settings pipeline page that reads it goes with req-307's step 6).
    */
   async folderStatus(): Promise<FolderStatus> {
     const vault = await this.detect();
-    if (vault === null) {
-      return { root: null, moves: [] };
-    }
-    const snap = await this.snapshot();
-    const root = this.host.resolveAssetPath(vault.id, 'tickets');
-    return {
-      root,
-      moves: planFolderNumbering(await this.ticketDirs(vault), snap.pipeline.map((p) => p.id)),
-    };
-  }
-
-  /** "Number folders": the renumbering alone, one commit (req-50). */
-  numberFolders(): Promise<BoardMutationResult> {
-    return this.enqueue(async () => {
-      const vault = await this.detect();
-      if (vault === null) {
-        return { ok: false, error: 'no tickets vault detected' };
-      }
-      const snap = await this.snapshot();
-      return this.renumber(vault, snap, snap.pipeline.map((p) => p.id), null, 'tickets: number phase folders');
-    });
+    return { root: vault === null ? null : this.host.resolveAssetPath(vault.id, 'tickets'), moves: [] };
   }
 
   /**
    * The settings page's sortable columns (req-50): pipeline.md takes the
-   * new order and the phase folders their new numbers — one commit.
-   * Refused while a ticket in a renamed folder has a live run (the
-   * runner holds its path).
+   * new order — one commit.
    */
   reorderPhases(order: readonly string[]): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
@@ -5067,8 +4544,7 @@ export class EngineBoardService {
       if (reordered === text) {
         return { ok: true };
       }
-      const snap = await this.snapshot();
-      return this.renumber(vault, snap, order, reordered, `tickets: reorder phases ${order.join(' ')}`);
+      return this.writePipeline(vault, reordered, `tickets: reorder phases ${order.join(' ')}`);
     });
   }
 
@@ -5120,77 +4596,21 @@ export class EngineBoardService {
       } catch (error) {
         return { ok: false, error: messageOf(error) };
       }
-      try {
-        await this.host.write(vault.id, PIPELINE_PATH, patched);
-      } catch (error) {
-        return { ok: false, error: `write failed: ${messageOf(error)}` };
-      }
-      const warning = await this.commit(vault, [PIPELINE_PATH], message);
-      this.host.announceChanges(vault.id, [PIPELINE_PATH]);
-      this.announceChanged();
-      return warning === null ? { ok: true } : { ok: true, warning };
+      return this.writePipeline(vault, patched, message);
     });
   }
 
-  /** The shared body of reorder and "Number folders"; runs inside the queue. */
-  private async renumber(
-    vault: EngineVault,
-    snap: BoardSnapshot,
-    order: readonly string[],
-    pipelineText: string | null,
-    message: string,
-  ): Promise<BoardMutationResult> {
-    const root = this.host.resolveAssetPath(vault.id, 'tickets');
-    if (root === null) {
-      return { ok: false, error: 'the tickets folder is outside the vault' };
-    }
-    const moves = planFolderNumbering(await this.ticketDirs(vault), order);
-    const moved = new Set(moves.map((m) => m.from));
-    const busy = snap.columns
-      .flatMap((c) => c.tickets)
-      .filter((t) => t.meta.run !== null && moved.has(t.path.split('/')[1] ?? ''));
-    if (busy.length > 0) {
-      return {
-        ok: false,
-        error: `${busy.map((t) => t.id).join(', ')} ${busy.length === 1 ? 'has a live run' : 'have live runs'} — stop ${busy.length === 1 ? 'it' : 'them'} or wait, then try again`,
-      };
-    }
-    if (moves.length === 0 && pipelineText === null) {
-      return { ok: true };
-    }
-    let touched: string[];
+  /** One commit for a new `pipeline.md` text; runs inside the queue. */
+  private async writePipeline(vault: EngineVault, text: string, message: string): Promise<BoardMutationResult> {
     try {
-      touched = await applyFolderNumbering(root, moves);
+      await this.host.write(vault.id, PIPELINE_PATH, text);
     } catch (error) {
-      return { ok: false, error: messageOf(error) };
+      return { ok: false, error: `write failed: ${messageOf(error)}` };
     }
-    if (pipelineText !== null) {
-      try {
-        await this.host.write(vault.id, PIPELINE_PATH, pipelineText);
-      } catch (error) {
-        return { ok: false, error: `write failed: ${messageOf(error)}` };
-      }
-    }
-    const paths = [...touched.map((dir) => `tickets/${dir}`), ...(pipelineText !== null ? [PIPELINE_PATH] : [])];
-    const location = await this.locate(vault.path);
-    let warning: string | null = null;
-    if (location === null) {
-      warning = 'the tickets vault is not a git repository — the change is not versioned';
-    } else {
-      try {
-        await this.git.commitTree(location.root, paths.map((p) => `${location.prefix}${p}`), message);
-      } catch (error) {
-        warning = `git commit failed: ${messageOf(error).split('\n')[0]}`;
-        this.host.log(warning, 'warn');
-      }
-    }
-    this.host.announceChanges(vault.id, paths);
+    const warning = await this.commit(vault, [PIPELINE_PATH], message);
+    this.host.announceChanges(vault.id, [PIPELINE_PATH]);
     this.announceChanged();
-    return {
-      ok: true,
-      moved: moves.length,
-      ...(warning === null ? {} : { warning }),
-    };
+    return warning === null ? { ok: true } : { ok: true, warning };
   }
 
   initialize(vaultId: string | null): Promise<BoardMutationResult> {

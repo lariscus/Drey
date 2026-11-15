@@ -1,9 +1,10 @@
 /**
- * The ticket status log (E7, concept §3.3): `<ticket>.status.log` beside
- * the ticket file lives one machine line per event — the persona's
- * verbs. It is the single source for "whose turn / what blocks": the
- * UI reads projections from it, never free text. Strict writer,
- * tolerant reader (ADR-0076 discipline).
+ * The ticket status line format (E7, concept §3.3): one machine line per event —
+ * the persona's verbs. On a store the lines are the first lines of the ticket's
+ * comments (`status-comment.ts`, E14-6); the former `<ticket>.status.log` file
+ * is gone (E14-9b). It is the single source for "whose turn / what blocks": the
+ * UI reads projections from it, never free text. Tolerant reader (ADR-0076
+ * discipline).
  *
  *     - '2026-11-02T09:00:00Z' working: build on opus
  *     - '2026-11-02T09:12:00Z' needs-decision: [palette-shortcut] Which shortcut should open the palette?
@@ -99,10 +100,4 @@ export function openStatusItems(lines: readonly StatusLine[]): readonly OpenStat
     }
   }
   return [...keyless, ...open.values()];
-}
-
-/** Appends one strict line; the file may be absent (the first line starts it). */
-export function appendStatusLine(text: string, at: string, verb: StatusVerb, payload: string): string {
-  const base = text === '' ? '' : text.endsWith('\n') ? text : `${text}\n`;
-  return `${base}- '${at}' ${verb}: ${payload.trim()}\n`;
 }

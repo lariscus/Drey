@@ -1,35 +1,22 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseTicketBackend, type TicketRecord } from '../ports/ticket-store';
-import { groupByStage, readStoreSettings } from './store-settings';
+import type { TicketRecord } from '../ports/ticket-store';
+import { groupByStage, readStoreSettings, UNCONFIGURED_STORE } from './store-settings';
 
 const rec = (id: string, stage: string): TicketRecord => ({
   id, stage, title: id, owner: null, priority: null, kind: null, epoch: null, rev: null, labels: [], dependsOn: [], parent: null,
   claimedAt: null, leaseUntil: null, size: null, branch: null, repos: [], extensions: {},
 });
 
-describe('tickets.backend', () => {
-  it('is files unless the value says dricket', () => {
-    expect(parseTicketBackend(undefined)).toBe('files');
-    expect(parseTicketBackend('')).toBe('files');
-    expect(parseTicketBackend('nonsense')).toBe('files');
-    expect(parseTicketBackend('dricket')).toBe('dricket');
-  });
-
-  it('reads the four keys, trimmed', async () => {
-    const values: Record<string, string> = { backend: 'dricket', 'dk.path': ' C:\\x\\dk.exe ', 'dk.store': 'E:\\scratch' };
+describe('store settings', () => {
+  it('reads the keys, trimmed', async () => {
+    const values: Record<string, string> = { 'dk.path': ' C:\\x\\dk.exe ', 'dk.store': 'E:\\scratch' };
     const settings = await readStoreSettings(<T>(key: string) => Promise.resolve(values[key] as T | undefined));
-    expect(settings).toEqual({ backend: 'dricket', shadow: false, dkPath: 'C:\\x\\dk.exe', dkStore: 'E:\\scratch', dkDataDir: '', dkCheckout: '', dkSyncSeconds: 30 });
+    expect(settings).toEqual({ dkPath: 'C:\\x\\dk.exe', dkStore: 'E:\\scratch', dkDataDir: '', dkCheckout: '', dkSyncSeconds: 30 });
   });
 
-  it('reads shadow as files plus the shadow flag', async () => {
-    const settings = await readStoreSettings(<T>(key: string) => Promise.resolve((key === 'backend' ? 'shadow' : undefined) as T | undefined));
-    expect(settings).toMatchObject({ backend: 'files', shadow: true });
-  });
-
-  it('defaults to files with nothing set', async () => {
-    const settings = await readStoreSettings(() => Promise.resolve(undefined));
-    expect(settings.backend).toBe('files');
+  it('is the unconfigured store with nothing set', async () => {
+    expect(await readStoreSettings(() => Promise.resolve(undefined))).toEqual(UNCONFIGURED_STORE);
   });
 });
 

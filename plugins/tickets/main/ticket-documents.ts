@@ -19,7 +19,7 @@ import { splitFrontmatter } from '../../../shared/frontmatter';
  */
 export interface TicketDocumentsDeps {
   readonly vaults: () => Promise<readonly { readonly id: string; readonly path: string; readonly exists: boolean }[]>;
-  /** The checkout while `tickets.backend` is `dricket`, else null. */
+  /** The store's checkout, null while there is none. */
   readonly checkout: () => Promise<string | null>;
   readonly locate: (id: string) => Promise<TicketDocumentLocation | null>;
   readonly saveDocument: (input: { path: string; text: string; force: boolean }) => Promise<DocumentSaveReply>;

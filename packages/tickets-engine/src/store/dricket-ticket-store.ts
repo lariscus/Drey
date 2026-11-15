@@ -36,13 +36,11 @@ import { toDisplayId, toDricketId } from './ids';
  * comment list (R-08) — see `docs/design/dricket/dricket-requirements.md`.
  */
 export class DricketTicketStore implements TicketStore {
-  readonly backend = 'dricket' as const;
-
   constructor(private readonly dk: DkProcess) {}
 
   async capabilities(): Promise<StoreCapabilities> {
     const version = await this.dk.version();
-    return { backend: 'dricket', comments: false, leases: true, version };
+    return { comments: false, leases: true, version };
   }
 
   async list(filter: TicketFilter = {}, call: CallOptions = {}): Promise<readonly TicketRecord[]> {

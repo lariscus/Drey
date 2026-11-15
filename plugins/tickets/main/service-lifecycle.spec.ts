@@ -204,18 +204,18 @@ describe('mirrorConfig (E14-7a)', () => {
 
   it('writes the plugin keys and the chat keys into the engine home, and keeps what the engine owns', async () => {
     root = await fsp.mkdtemp(path.join(tmpdir(), 'engine-mirror-'));
-    await fsp.writeFile(path.join(root, 'config.json'), JSON.stringify({ 'engine.token': 'tok', backend: 'files', 'dk.store': 'E:/old' }), 'utf8');
-    await mirrorConfig(root, ctxWith({ backend: 'dricket', 'dk.store': 'E:/new' }, { baseUrl: 'http://h/v1', apiKey: null, model: 'm' }));
+    await fsp.writeFile(path.join(root, 'config.json'), JSON.stringify({ 'engine.token': 'tok', 'dk.store': 'E:/old' }), 'utf8');
+    await mirrorConfig(root, ctxWith({ 'dk.store': 'E:/new' }, { baseUrl: 'http://h/v1', apiKey: null, model: 'm' }));
     const file = JSON.parse(await fsp.readFile(path.join(root, 'config.json'), 'utf8')) as Record<string, unknown>;
-    expect(file).toMatchObject({ 'engine.token': 'tok', backend: 'dricket', 'dk.store': 'E:/new', 'chat.baseUrl': 'http://h/v1', 'chat.apiKey': null });
+    expect(file).toMatchObject({ 'engine.token': 'tok', 'dk.store': 'E:/new', 'chat.baseUrl': 'http://h/v1', 'chat.apiKey': null });
   });
 
   it('leaves a key the plugin config does not hold as it is', async () => {
     root = await fsp.mkdtemp(path.join(tmpdir(), 'engine-mirror-'));
-    await fsp.writeFile(path.join(root, 'config.json'), JSON.stringify({ backend: 'dricket' }), 'utf8');
+    await fsp.writeFile(path.join(root, 'config.json'), JSON.stringify({ 'dk.store': 'E:/kept' }), 'utf8');
     await mirrorConfig(root, ctxWith({}, { baseUrl: 'http://h/v1', apiKey: null, model: 'm' }));
     const file = JSON.parse(await fsp.readFile(path.join(root, 'config.json'), 'utf8')) as Record<string, unknown>;
-    expect(file['backend']).toBe('dricket');
+    expect(file['dk.store']).toBe('E:/kept');
   });
 });
 
@@ -276,7 +276,7 @@ describe('ensureService: the first start reads the new settings (E14-7a)', () =>
     engine = new EngineClient(endpoints);
   }
 
-  it('the shadow report of the very first start describes the store the settings name', async () => {
+  it('the board of the very first start reads the store the settings name', async () => {
     root = await fsp.mkdtemp(path.join(tmpdir(), 'engine-first-start-'));
     const vault = path.join(root, 'vault');
     const home = path.join(root, 'home');
@@ -287,16 +287,11 @@ describe('ensureService: the first start reads the new settings (E14-7a)', () =>
     const oldStore = await storeWith('old-store', 1);
     const newStore = await storeWith('new-store', 3);
     // What the previous run left behind: the engine's config still names the old store.
-    await fsp.writeFile(path.join(home, 'config.json'), JSON.stringify({ backend: 'shadow', 'dk.store': oldStore }), 'utf8');
+    await fsp.writeFile(path.join(home, 'config.json'), JSON.stringify({ 'dk.store': oldStore }), 'utf8');
 
-    await start(vault, home, { backend: 'shadow', 'dk.store': newStore });
-    // The startup scan builds the board inside createEngine; the shutdown waits for its report.
-    await engine!.invoke('snapshot');
-    await service!.shutdown({ handover: false });
-    service = null;
-
-    const report = JSON.parse(await fsp.readFile(path.join(home, 'shadow', 'board-diff.json'), 'utf8')) as { diff: { rightCount: number } };
-    expect(report.diff.rightCount).toBe(3);
+    await start(vault, home, { 'dk.store': newStore });
+    const board = (await engine!.invoke('snapshot')) as { columns: readonly { tickets: readonly unknown[] }[] };
+    expect(board.columns.reduce((n, column) => n + column.tickets.length, 0)).toBe(3);
   });
 });
 

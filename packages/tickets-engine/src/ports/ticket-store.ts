@@ -1,8 +1,7 @@
 /**
  * The `TicketStore` port (E14-1, ADR-0090): the one narrow seam between the
- * engine and wherever tickets live. Two implementations sit behind it —
- * `FileTicketStore` (today's files, wrapped, no behaviour change) and
- * `DricketTicketStore` (the installed `dk` program, called with `--json`).
+ * engine and wherever tickets live. `DricketTicketStore` (the installed `dk`
+ * program, called with `--json`) is the one implementation behind it.
  *
  * Ids cross the port in Drey's DISPLAY form (`T-0063`); the dricket side maps
  * to `t-63` internally (`store/ids.ts`). The port carries no dricket logic:
@@ -10,13 +9,6 @@
  *
  * This file is pure types plus the error model — no Node imports.
  */
-
-/** Which implementation backs the port (`tickets.backend`, `files` by default until E14-7). */
-export type TicketBackend = 'files' | 'dricket';
-
-export function parseTicketBackend(value: unknown): TicketBackend {
-  return value === 'dricket' ? 'dricket' : 'files';
-}
 
 /** One ticket's header, normalised. Fields a backend cannot know are null / empty. */
 export interface TicketRecord {
@@ -159,12 +151,11 @@ export interface AddResult {
 
 /** What a backend can do — the engine asks instead of guessing from a version. */
 export interface StoreCapabilities {
-  readonly backend: TicketBackend;
   /** `comments()` works (dricket needs R-08, v0.6). */
   readonly comments: boolean;
-  /** `extend()` works (the file store has no leases). */
+  /** `extend()` works. */
   readonly leases: boolean;
-  /** The backend's own version text (`v0.5.0`), null for files. */
+  /** The backend's own version text (`v0.5.0`). */
   readonly version: string | null;
 }
 
@@ -174,7 +165,6 @@ export interface CallOptions {
 }
 
 export interface TicketStore {
-  readonly backend: TicketBackend;
   capabilities(): Promise<StoreCapabilities>;
   list(filter?: TicketFilter, call?: CallOptions): Promise<readonly TicketRecord[]>;
   show(id: string, call?: CallOptions): Promise<TicketDetail>;
