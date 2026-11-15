@@ -16,7 +16,6 @@ import { NgTemplateOutlet } from '@angular/common';
 import { AppBar } from '../app-bar/app-bar';
 import { BurnRateCardView } from '../autopilot/burn-rate-card';
 import { PersonaCardsView } from './persona-cards/persona-cards';
-import { BurnRateCardView } from '../autopilot/burn-rate-card';
 import { MC_WORK_STATE, questionCardOf, ticketPersonaOf, type McBoard, type QuestionCardVm } from '../work/work.model';
 import { McI18nPipe } from '../i18n/i18n.pipe';
 import { McI18n } from '../i18n/i18n.service';
