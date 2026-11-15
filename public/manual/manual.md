@@ -868,12 +868,20 @@ is just another vault with a board: point the empty state's
 **Initialize the tickets board** at it, or initialize in the other
 vault from its own Files panel.
 
-**Setup.** Create an empty git repository for your tickets (it can live
-on GitHub, Azure DevOps or anywhere plain git works — the board never
+**Setup.** On a fresh install Settings → Tickets shows the setup on
+its own: **Create a tickets repository…** or **Use an existing
+folder…** opens the folder dialog — an empty folder becomes a git
+repository, an existing repository is taken as it is. Drey registers
+the folder as a vault, starts the background service for it and
+initializes the board in it: the configuration files under
+`tickets/_meta/` (below) and the ticket store beside the repository.
+The alternative is the Work panel's empty state: create an empty git
+repository for your tickets (it can live
+on GitHub, Azure DevOps or anywhere plain git works - the board never
 talks to a host API), clone it locally and register the folder as a
-vault (see [Vaults and files](#3-vaults-and-files)). Open the Work
-panel; the empty state offers **Initialize the tickets board**, which
-creates the configuration files under `tickets/_meta/`:
+vault (see [Vaults and files](#3-vaults-and-files)), then click
+**Initialize the tickets board**, which creates the configuration
+files under `tickets/_meta/`:
 
 - `pipeline.md` — the phases in order, each with a title, an
   optional WIP limit, a claim flag and what must happen for a ticket to
@@ -3120,8 +3128,8 @@ history store is deliberately outside it).
 
 ---
 
-*Manual for Drey 0.8.1; manual content last changed
-2026-11-15. Screenshots were captured automatically from
+*Manual for Drey {{MANUAL_VERSION}}; manual content last changed
+{{MANUAL_GENERATED}}. Screenshots were captured automatically from
 the built app (Anthrazit theme, 1600Ã—1000) by
 `e2e/manual-screenshots.spec.ts` — run
 `$env:DREY_MANUAL_SHOTS='1'; npm run e2e:run -- manual-screenshots`

@@ -43,13 +43,14 @@ import { personaModelGuess } from '../../../packages/tickets-engine/src/core/per
 import { captureTidyMessages, parseCaptureTidy } from '../shared/capture-tidy';
 import type { AttachmentReply, RefineReply, TicketReply } from '../shared/remote-protocol';
 import { hostVaultIdMapper } from './engine/host-vault-id';
+import { UnconfiguredTicketsError, type TicketsVaultRef } from './engine/unconfigured-error';
 import { openTerminalAt } from './worker/open-terminal';
 import { startWindowsDictation } from './worker/dictation';
 import { createFleetMcpTools } from './ipc/mcp-tools';
 import { chainAutopilotOf } from './ipc/autopilot-ipc';
 import { createFleetSnapshotSender } from './engine/fleet-snapshot';
 import { listWorkerModels } from './worker/worker-models';
-import { EngineClient } from './engine/engine-client';
+import { EngineClient, type EngineEndpoints } from './engine/engine-client';
 import { PathAnnouncer } from './engine/path-announcer';
 import { withEffectiveDkPath } from './engine/dk-path';
 import { ensureService, syncChatConfig, syncNotesVault, syncStoreConfig, syncVaultRegistry } from './service/service-lifecycle';
@@ -67,6 +68,8 @@ import { launchGit } from './worker/repo-clone-process';
 import { registerRepoCloneIpc } from './ipc/repo-clone-ipc';
 import { registerModelsIpc } from './ipc/models-ipc';
 import { MissionControlHost, createMissionControlView } from './service/mission-control';
+import { folderEntries, setupTicketsVault } from './setup/tickets-setup';
+import { assembleBoard } from '../../../packages/tickets-engine/src/core/ticket/ticket-board';
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -109,26 +112,32 @@ const plugin: MainPluginModule = {
       appConfig: ctx.appConfig,
       config: withEffectiveDkPath(ctx.config, { packaged: app.isPackaged, resourcesPath: process.resourcesPath, platform: process.platform, exists: existsSync }),
     };
-    const endpoints = await ensureService(engineCtx, ctx.log);
-    const client = new EngineClient(endpoints);
-    // D-1: the assistant LLM settings reach the engine at activation (above)
+    // D-74: the client exists from activation on; the service binds when it
+    // is up. Until then every engine-bound call answers
+    // UnconfiguredTicketsError — the plugin stays active, Settings →
+    // Tickets offers the setup, and the Work panel shows the empty state.
+    const client = new EngineClient(null);
+    // D-1: the assistant LLM settings reach the engine at the boot below
     // AND whenever Settings -> Assistant changes them -- the chat reads them
     // per turn, so a change applies to the next question.
     const chatSignature = (llm: ReturnType<typeof ctx.appConfig.get>['llm']): string =>
       JSON.stringify([llm.enabled, llm.provider, llm.baseUrl, llm.apiKey, llm.model]);
     let pushedChat = chatSignature(ctx.appConfig.get().llm);
     // req-100: the Notes API follows the active vault. The SDK has no event for a
-    // switch, so this runs at activation and with every board fetch.
+    // switch, so this runs at the boot and with every board fetch.
     // req-167: the vault registry rides along — the workers' vault MCP reaches every registered vault.
     const registry = { pushed: null as string | null };
-    const pushNotesVault = (): Promise<void> =>
-      Promise.all([syncNotesVault(client, ctx), syncVaultRegistry(client, ctx, registry)])
+    const pushNotesVault = async (): Promise<void> => {
+      if (!client.bound) {
+        return;
+      }
+      await Promise.all([syncNotesVault(client, ctx), syncVaultRegistry(client, ctx, registry)])
         .then(() => undefined)
         .catch((error: unknown) => ctx.log(`engine notes vault sync failed: ${messageOf(error)}`, 'warn'));
-    void pushNotesVault();
+    };
     ctx.appConfig.onChange((config) => {
       // Unrelated config writes (a spell-check word, a layout) change nothing here.
-      if (chatSignature(config.llm) === pushedChat) {
+      if (!client.bound || chatSignature(config.llm) === pushedChat) {
         return;
       }
       pushedChat = chatSignature(config.llm);
@@ -136,7 +145,6 @@ const plugin: MainPluginModule = {
     });
     const board = client.board();
     const fleet = client.fleet();
-    engineFleet = fleet;
     const remoteService = client.remote();
     // req-173: the default worker is the vault layer's (tickets/_meta/crew.md), resolved by the engine.
     const defaultWorker = async (): Promise<string> => {
@@ -147,16 +155,10 @@ const plugin: MainPluginModule = {
     // The vault's priority vocabulary (pipeline.md's `priorities:`), as
     // the engine's board service reads it. The header/headerEdit parsers
     // and setPriority need it without rebuilding the board, so it is
-    // cached here: prefetched once at activation, then refreshed from
+    // cached here: prefetched once at the boot, then refreshed from
     // every board fetch the renderer makes (a pipeline.md change always
     // announces `board-changed` first, so the next fetch re-arms the cache).
     let priorities: PriorityConfig = DEFAULT_PRIORITY_CONFIG;
-    void board
-      .snapshot()
-      .then((snap) => {
-        priorities = snap.priorities;
-      })
-      .catch(() => undefined);
     // D-3: the engine is a separate process and Drey's watcher is off by
     // default -- the engine reports the files it wrote, and this tells the
     // vault layer (Files tree, indexes, open tabs) in one batched round.
@@ -166,24 +168,60 @@ const plugin: MainPluginModule = {
       log: ctx.log,
     });
     const announcer = pathAnnouncer;
-    const sendFleetSnapshot = createFleetSnapshotSender(
-      fleet,
-      (snapshot) => ctx.ipc.emit('fleet-changed', snapshot),
-      (error) => ctx.log(`engine fleet read failed: ${messageOf(error)}`, 'warn'),
-    );
-    engineEvents = client.onEvent(
-      (what) => {
-        if (what === 'fleet') {
-          void sendFleetSnapshot();
-        } else {
-          ctx.ipc.emit(what === 'board' ? 'board-changed' : 'remote-changed');
-        }
-      },
-      undefined,
-      (event) => announcer.add(event),
-    );
-    void fleet.startPolling();
-    void board.worktreeBootSweep().catch((error: unknown) => ctx.log(`engine boot sweep: ${messageOf(error)}`, 'warn'));
+    // D-74: the engine's live wiring — event stream, fleet polling, boot
+    // sweep, the first config pushes — runs once, after the first
+    // successful start or adoption. Views that fetched while the service
+    // was down hold the unconfigured snapshot; one round re-reads all.
+    let wired = false;
+    const wireEngine = (): void => {
+      if (wired) {
+        return;
+      }
+      wired = true;
+      engineFleet = fleet;
+      const sendFleetSnapshot = createFleetSnapshotSender(
+        fleet,
+        (snapshot) => ctx.ipc.emit('fleet-changed', snapshot),
+        (error) => ctx.log(`engine fleet read failed: ${messageOf(error)}`, 'warn'),
+      );
+      engineEvents = client.onEvent(
+        (what) => {
+          if (what === 'fleet') {
+            void sendFleetSnapshot();
+          } else {
+            ctx.ipc.emit(what === 'board' ? 'board-changed' : 'remote-changed');
+          }
+        },
+        undefined,
+        (event) => announcer.add(event),
+      );
+      void fleet.startPolling();
+      void board.worktreeBootSweep().catch((error: unknown) => ctx.log(`engine boot sweep: ${messageOf(error)}`, 'warn'));
+      void board
+        .snapshot()
+        .then((snap) => {
+          priorities = snap.priorities;
+        })
+        .catch(() => undefined);
+      void pushNotesVault();
+      void syncChatConfig(client, ctx.appConfig.get().llm).catch(() => undefined);
+      ctx.ipc.emit('board-changed');
+      void sendFleetSnapshot();
+    };
+    /** Starts (or adopts) the service — for the named vault even before its board exists (D-74). */
+    const startEngine = async (startVault?: TicketsVaultRef): Promise<EngineEndpoints> => {
+      const endpoints = await ensureService(engineCtx, ctx.log, { startVault });
+      client.rebind(endpoints);
+      wireEngine();
+      return endpoints;
+    };
+    // A vault of this Drey by id, else the active one — the same target the
+    // engine's `initialize` picks (the Work panel's empty state, the setup).
+    const vaultRefOf = async (vaultId: string | null): Promise<TicketsVaultRef | null> => {
+      const vaults = await ctx.vault.listVaults();
+      const found = vaults.find((v) => v.id === vaultId && v.exists) ?? vaults.find((v) => v.active && v.exists) ?? null;
+      return found === null ? null : { id: found.id, name: found.name, path: found.path };
+    };
     // req-164 (the owner's Q3 ruling: the background service is optional) and req-165
     // (board 8c): Settings → Background service, a core category of Drey, reads and
     // writes the service's preferences and status through these methods; each write
@@ -198,7 +236,7 @@ const plugin: MainPluginModule = {
       engineConfigSet: (key, value) => client.invoke('configSet', { key, value }),
       engineConfigGet: (key) => client.invoke('configGet', { key }),
       control: serviceControl,
-      start: async () => client.rebind(await ensureService(engineCtx, ctx.log)),
+      start: () => startEngine().then(() => undefined),
       openFolder: async (dir) => {
         const failure = await shell.openPath(dir);
         if (failure !== '') {
@@ -322,6 +360,21 @@ const plugin: MainPluginModule = {
       return typeof id === 'string' ? documents.open(id) : { ok: false, error: 'bad ticket document payload' };
     });
     ctx.ipc.handle('board', async () => {
+      if (!client.bound) {
+        // D-74: the honest unconfigured board — the same shape the engine
+        // itself answers for a hosted vault whose board does not exist yet.
+        const active = (await ctx.vault.listVaults()).find((v) => v.active) ?? null;
+        return assembleBoard({
+          vaultId: null,
+          vaultName: null,
+          activeVaultName: active?.name ?? null,
+          isGitRepo: false,
+          defaultWorker: 'opencode',
+          pipelineText: null,
+          reposText: null,
+          files: [],
+        });
+      }
       await syncStoreConfig(client, engineCtx).catch(() => undefined);
       // D-73: awaited, so a vault Drey just unloaded is unloaded for the board this fetch reads.
       await pushNotesVault();
@@ -943,7 +996,51 @@ const plugin: MainPluginModule = {
 
     ctx.ipc.handle('initialize', async (payload) => {
       const p = payload as { vaultId?: unknown };
-      return board.initialize(typeof p.vaultId === 'string' ? p.vaultId : null);
+      const vaultId = typeof p.vaultId === 'string' ? p.vaultId : null;
+      // D-74: the empty state's button runs before a service exists — the
+      // named (or active) vault becomes the hosted one, board or not. An
+      // unconfigured refusal surfaces through the initialize call itself;
+      // any other start failure travels unchanged.
+      try {
+        await startEngine((await vaultRefOf(vaultId)) ?? undefined);
+      } catch (error) {
+        if (!(error instanceof UnconfiguredTicketsError)) {
+          throw error;
+        }
+      }
+      return board.initialize(vaultId);
+    });
+
+    // D-74: the settings page's setup — folder, repository, registry,
+    // service, board, in that order (`setup/tickets-setup.ts`). The
+    // picker runs here (the engine has no window); `git init` uses the
+    // configured git, else the one on PATH.
+    ctx.ipc.handle('setupTicketsVault', async (payload) => {
+      const folder = typeof payload === 'object' && payload !== null ? (payload as Record<string, unknown>)['folder'] : undefined;
+      const gitExe = ((await ctx.config.get<string>('gitPath')) ?? '').trim() || 'git';
+      return setupTicketsVault(
+        {
+          listVaults: () => ctx.vault.listVaults(),
+          register: (dir) => ctx.vault.register(dir),
+          hasBoard: async (id) => {
+            try {
+              await ctx.vault.read('tickets/_meta/pipeline.md', { vaultId: id });
+              return true;
+            } catch {
+              return false;
+            }
+          },
+          startEngine: (vault) => startEngine(vault).then(() => undefined),
+          initialize: async (id) => await board.initialize(id),
+          gitInit: (dir) =>
+            new Promise<void>((resolve, reject) => {
+              execFile(gitExe, ['init', dir], { windowsHide: true }, (error) => (error === null ? resolve() : reject(error)));
+            }),
+          entries: folderEntries,
+          log: (line) => ctx.log(line),
+        },
+        folder,
+      );
     });
 
     // The fleet's MCP tools (M85, SDK 1.29): the assistant and any
@@ -974,17 +1071,39 @@ const plugin: MainPluginModule = {
     // ticket files, our own announces (the debounced emit coalesces).
     // A registry mutation (vault added, removed, switched) is a `refresh` round of every vault: the engine
     // hears the new registry first (D-73: an unloaded vault leaves its board), then the round.
+    // D-74: while the service is down, a registry round is the cue to try
+    // the start again — the setup or a hand-registered tickets vault may
+    // have arrived.
     ctx.vault.onChanged((event) => {
       const registryRound = event.kind === 'refresh' && event.vaultId === undefined;
+      if (!client.bound) {
+        if (registryRound) {
+          void startEngine().catch((error: unknown) => {
+            if (!(error instanceof UnconfiguredTicketsError)) {
+              ctx.log(`tickets: engine start failed: ${messageOf(error)}`, 'warn');
+            }
+          });
+        }
+        return;
+      }
       void (registryRound ? pushNotesVault() : Promise.resolve())
         .then(() => board.onVaultEvent(event))
         .catch((error: unknown) => ctx.log(`engine vault round failed: ${messageOf(error)}`, 'warn'));
     });
     ctx.save.onNoteSaved((event) => {
-      if (event.path.startsWith('tickets/')) {
+      if (client.bound && event.path.startsWith('tickets/')) {
         board.announceChanged();
       }
     });
+
+    // D-74: the ordinary boot. "No tickets vault" leaves the plugin active
+    // in its unconfigured state; any other start failure is logged, not
+    // thrown — a failed plugin has no settings to repair itself from.
+    try {
+      await startEngine();
+    } catch (error) {
+      ctx.log(`tickets: ${messageOf(error)}`, 'warn');
+    }
   },
 };
 

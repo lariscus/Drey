@@ -9,6 +9,7 @@ import { createDeskSettings, type DeskSettingsHooks } from '../desk-settings';
 import { ticketsEntries, ticketsSections, type TicketsSectionId } from '../sections.ts/settings-sections';
 import { createModelsSection } from '../models-section';
 import { createSkillsLibrarySection } from '../skills-library-section';
+import { createTicketsSetup } from '../setup';
 import { createWorkersSection } from '../workers.ts/settings-workers';
 import { CrewSettings } from '../crew.ts/settings-crew';
 
@@ -36,6 +37,13 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
     mount: (body) => {
       body.classList.add('tset');
 
+      // D-74: while no tickets repository is configured, the page is the
+      // setup block alone; the parts land once the board exists (one
+      // board-changed after the setup's initialize).
+      const setup = createTicketsSetup(api, () => void reload());
+      const rest = el('div', 'tset-rest');
+      let restShown = false;
+
       const repo = el('div', 'tset-repo');
       const repoPath = el('span', 'tset-repo-path');
       const openRepo = iconButton(api, 'folder', 'Open the tickets folder');
@@ -47,16 +55,28 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
       const crew = new CrewSettings(api);
       let timer: ReturnType<typeof setTimeout> | null = null;
       const load = async (): Promise<void> => {
-        const [snap, reposListing, configured] = await Promise.all([
-          api.backend.invoke('board') as Promise<BoardSnapshot>,
+        const snap = (await api.backend.invoke('board')) as BoardSnapshot;
+        if (disposed) {
+          return;
+        }
+        const unconfigured = snap.vaultId === null;
+        setup.root.hidden = !unconfigured;
+        if (!unconfigured && !restShown) {
+          restShown = true;
+          body.append(rest);
+        }
+        repoPath.textContent = snap.vaultPath ?? 'No tickets vault detected';
+        openRepo.disabled = snap.vaultPath === undefined;
+        if (unconfigured) {
+          return;
+        }
+        const [reposListing, configured] = await Promise.all([
           api.backend.invoke('reposListing') as Promise<ReposListing>,
           crew.resolved('defaultWorker').then((value) => (typeof value === 'string' ? value : undefined)),
         ]);
         if (disposed) {
           return;
         }
-        repoPath.textContent = snap.vaultPath ?? 'No tickets vault detected';
-        openRepo.disabled = snap.vaultPath === undefined;
         desk.update(snap);
         void models.refresh();
         void skillsLibrary.refresh();
@@ -88,7 +108,7 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
       // One scrolling page; the sections of TICKETS_SECTIONS in this order.
       anchored(repo, 'store');
       anchored(remote.root, 'devices');
-      body.append(
+      rest.append(
         desk.root,
         fleetSection(api, crew),
         workers.root,
@@ -98,6 +118,7 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
         storeSection(api),
         repos.root,
       );
+      body.append(setup.root);
 
       // The board's change events cover every write here and the runner's.
       const off = api.backend.on('board-changed', () => {
@@ -191,9 +212,19 @@ function storeSection(api: DreyPluginApi): HTMLElement {
   sync.placeholder = '30';
   const rows = el('div', 'tset-kv');
   rows.append(
+    ...kv('tset-dk-store', 'Store', textConfig(api, 'dk.store'), 'Folder of the dricket store, or remote#branch. Empty: none — the setup creates one beside the repository.'),
     ...kv('tset-dk-checkout', 'Checkout', textConfig(api, 'dk.checkout'), 'Working copy of the store\'s ticket branch. Empty: the store folder itself. Not in OneDrive.'),
     ...kv('tset-dk-sync', 'Sync interval — seconds', sync, '0 turns it off. Remote stores only.'),
   );
-  section.append(head, rows);
+  // Rarely worth touching: folded away, every empty field showing its default.
+  const advanced = el('details', 'tset-advanced');
+  advanced.append(el('summary', undefined, 'Advanced'));
+  const advancedRows = el('div', 'tset-kv');
+  advancedRows.append(
+    ...kv('tset-dk-path', 'dk executable', textConfig(api, 'dk.path'), 'Only needed when dk is neither on PATH nor bundled.'),
+    ...kv('tset-dk-data-dir', 'Private working copies', textConfig(api, 'dk.dataDir'), 'dk\'s own working-copy root (DK_DATA_DIR). Empty: dk\'s default.'),
+  );
+  advanced.append(advancedRows);
+  section.append(head, rows, advanced);
   return section;
 }

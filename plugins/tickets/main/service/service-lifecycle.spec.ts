@@ -9,6 +9,7 @@ import { formatStamp } from '../../../../packages/tickets-engine/src/fleet/runne
 import { ServiceHost } from '../../../../packages/tickets-engine/src/service/service-host';
 import { writeServiceLock, type ServiceLock } from '../../../../packages/tickets-engine/src/service/service-lock';
 import { EngineClient } from '../engine/engine-client';
+import { UnconfiguredTicketsError } from '../engine/unconfigured-error';
 import { ensureService, mirrorConfig, syncChatConfig, syncConfig, syncNotesVault, syncVaultRegistry } from './service-lifecycle';
 
 /**
@@ -302,6 +303,84 @@ describe('ensureService: the first start reads the new settings (E14-7a)', () =>
     await start(vault, home, { 'dk.store': newStore });
     const board = (await engine!.invoke('snapshot')) as { columns: readonly { tickets: readonly unknown[] }[] };
     expect(board.columns.reduce((n, column) => n + column.tickets.length, 0)).toBe(3);
+  });
+});
+
+/**
+ * The unconfigured state (D-74): without a tickets vault anywhere the
+ * start refuses with the typed error — the plugin's state, not a failure
+ * — and the setup's named vault starts the service BEFORE its board
+ * exists; the board then answers the honest null snapshot.
+ */
+describe('ensureService: the unconfigured state (D-74)', () => {
+  let root = '';
+  let service: ServiceHost | null = null;
+  let engine: EngineClient | null = null;
+
+  afterEach(async () => {
+    await service?.shutdown({ handover: false });
+    service = null;
+    engine = null;
+    await fsp.rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
+  });
+
+  it('refuses with the typed error when no vault carries a board and none is named', async () => {
+    const base = ctxWith({}, { baseUrl: 'http://h/v1', apiKey: null, model: 'm' });
+    const home = await fsp.mkdtemp(path.join(tmpdir(), 'engine-unconfigured-'));
+    await expect(
+      ensureService(
+        {
+          ...base,
+          vault: {
+            listVaults: async () => [{ id: 'notes', name: 'Notes', path: path.join(home, 'notes'), exists: true }],
+            read: async () => {
+              throw new Error('no such file');
+            },
+          },
+        },
+        () => undefined,
+        { home },
+      ),
+    ).rejects.toThrow(UnconfiguredTicketsError);
+    await fsp.rm(home, { recursive: true, force: true });
+  });
+
+  it('starts for the named vault before its board exists; the board answers the null snapshot', async () => {
+    root = await fsp.mkdtemp(path.join(tmpdir(), 'engine-start-vault-'));
+    const vault = path.join(root, 'vault');
+    const home = path.join(root, 'home');
+    await fsp.mkdir(vault, { recursive: true });
+    await fsp.mkdir(home, { recursive: true });
+    const base = ctxWith({}, { baseUrl: 'http://h/v1', apiKey: null, model: 'm' });
+    const endpoints = await ensureService(
+      {
+        ...base,
+        vault: {
+          listVaults: async () => [{ id: 'v', name: 'vault', path: vault, exists: true }],
+          read: async () => {
+            throw new Error('no pipeline yet');
+          },
+        },
+      },
+      () => undefined,
+      {
+        home,
+        startVault: { id: 'v', name: 'vault', path: vault },
+        spawn: async (vaultPath, serviceHome) => {
+          service = await ServiceHost.start({
+            home: serviceHome,
+            vaultPath,
+            clientDir: path.join(root, 'client'),
+            build: 'spec',
+            idleMs: 3_600_000,
+            exit: () => undefined,
+          });
+        },
+      },
+    );
+    engine = new EngineClient(endpoints);
+    const snapshot = (await engine.invoke('snapshot')) as { vaultId: string | null };
+    expect(snapshot.vaultId).toBeNull();
   });
 });
 

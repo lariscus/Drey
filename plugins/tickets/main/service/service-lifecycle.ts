@@ -16,6 +16,7 @@ import {
 import { STORE_SETTING_KEYS } from '../../../../packages/tickets-engine/src/store/store-settings';
 import { SERVICE_PREF_KEYS } from '../../../../shared/service-settings';
 import { EngineClient, type EngineEndpoints } from '../engine/engine-client';
+import { UnconfiguredTicketsError, type TicketsVaultRef } from '../engine/unconfigured-error';
 
 /**
  * Drey Service from the plugin's side (req-164, ADR-0092): Drey is a client
@@ -95,6 +96,22 @@ async function locateTicketsVault(ctx: {
     }
   }
   return null;
+}
+
+/**
+ * The explicitly named start vault (D-74), when it is still a registered,
+ * existing vault. The engine hosts it before its board exists —
+ * "Initialize board" is the engine's fresh path (E14-9b item 6).
+ */
+async function startVaultOf(
+  ctx: Parameters<typeof locateTicketsVault>[0],
+  ref: TicketsVaultRef | null | undefined,
+): Promise<{ id: string; name: string; path: string } | null> {
+  if (ref === undefined || ref === null) {
+    return null;
+  }
+  const found = (await ctx.vault.listVaults()).find((v) => v.id === ref.id || v.path === ref.path);
+  return found !== undefined && found.exists ? { id: found.id, name: found.name, path: found.path } : null;
 }
 
 /**
@@ -263,20 +280,33 @@ function startService(vaultPath: string, home: string, log: (message: string) =>
   log(`Drey Service started (pid ${pid ?? '?'}) for ${vaultPath}`);
 }
 
+/** What a service start takes: the test seams and, when named, the vault to host before its board exists. */
+export interface EnsureServiceDeps {
+  readonly home?: string;
+  readonly spawn?: (vaultPath: string, home: string) => void | Promise<void>;
+  /** This build's stamp; the built service entry's by default. */
+  readonly ownBuild?: () => Promise<string | null>;
+  /**
+   * D-74: a vault the setup or the Work panel's "Initialize board" named.
+   * Used when the detector's probe finds no board anywhere — the engine
+   * hosts it and the fresh path initializes the board in it. Ignored when
+   * the probe found a board elsewhere or the vault left the registry.
+   */
+  readonly startVault?: TicketsVaultRef | null;
+}
+
 /**
  * Adopt a running Drey Service, hand an older build over, or start one;
  * then sync Drey's settings into its engine. Resolves with the engine's
- * invoke endpoints — what the plugin talks to.
+ * invoke endpoints — what the plugin talks to. Without any tickets vault
+ * it refuses with {@link UnconfiguredTicketsError} — the plugin's
+ * unconfigured state (D-74), not a failure: the setup names the vault and
+ * calls again.
  */
 export async function ensureService(
   ctx: Parameters<typeof locateTicketsVault>[0] & Parameters<typeof syncConfig>[1],
   log: (message: string, level?: 'info' | 'warn' | 'error') => void,
-  deps: {
-    readonly home?: string;
-    readonly spawn?: (vaultPath: string, home: string) => void | Promise<void>;
-    /** This build's stamp; the built service entry's by default. */
-    readonly ownBuild?: () => Promise<string | null>;
-  } = {},
+  deps: EnsureServiceDeps = {},
 ): Promise<EngineEndpoints> {
   const home = deps.home ?? SERVICE_HOME();
   const adopt = async (endpoints: EngineEndpoints): Promise<EngineEndpoints> => {
@@ -296,9 +326,9 @@ export async function ensureService(
     }
   }
 
-  const vault = await locateTicketsVault(ctx);
+  const vault = (await locateTicketsVault(ctx)) ?? (await startVaultOf(ctx, deps.startVault));
   if (vault === null) {
-    throw new Error('no tickets vault detected — Drey Service has nothing to host');
+    throw new UnconfiguredTicketsError();
   }
   await fsp.mkdir(home, { recursive: true });
   // A failed mirror costs what it always cost (the adoption's sync below still runs), not the start.

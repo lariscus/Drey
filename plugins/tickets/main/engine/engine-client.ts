@@ -1,6 +1,7 @@
 import type { EngineBoardService } from '../../../../packages/tickets-engine/src/services/board-service';
 import type { FleetClient } from '../../../../packages/tickets-engine/src/services/fleet-client';
 import type { RemoteService } from '../../../../packages/tickets-engine/src/server/service';
+import { UnconfiguredTicketsError } from './unconfigured-error';
 import type { PathsEvent } from './path-announcer';
 
 /**
@@ -40,18 +41,33 @@ export function dispatchFrame(
 }
 
 export class EngineClient {
-  constructor(private endpoints: EngineEndpoints) {}
+  /**
+   * Null until the service is up (D-74): the plugin constructs the client at
+   * activation and every engine-bound call answers
+   * {@link UnconfiguredTicketsError} until `rebind` points it at the service
+   * the setup (or an ordinary start) brought up.
+   */
+  constructor(private endpoints: EngineEndpoints | null) {}
+
+  /** Whether the client has endpoints to talk to. */
+  get bound(): boolean {
+    return this.endpoints !== null;
+  }
 
   /**
    * Points the client at a restarted service (Settings → Background service,
-   * Restart / Start). Every call and the event stream's reconnect read the
-   * endpoints when they run, so nothing else needs to know.
+   * Restart / Start — and the setup's first start, D-74). Every call and the
+   * event stream's reconnect read the endpoints when they run, so nothing
+   * else needs to know.
    */
   rebind(endpoints: EngineEndpoints): void {
     this.endpoints = endpoints;
   }
 
   async health(): Promise<boolean> {
+    if (this.endpoints === null) {
+      return false;
+    }
     try {
       const response = await fetch(`${this.endpoints.invokeUrl}/api/health`, {
         headers: { authorization: `Bearer ${this.endpoints.token}` },
@@ -63,6 +79,9 @@ export class EngineClient {
   }
 
   async invoke(method: string, payload?: unknown): Promise<unknown> {
+    if (this.endpoints === null) {
+      throw new UnconfiguredTicketsError();
+    }
     const response = await fetch(`${this.endpoints.invokeUrl}/api/invoke`, {
       method: 'POST',
       headers: {
@@ -89,6 +108,10 @@ export class EngineClient {
     /** The `paths` frames (D-3): undebounced -- the receiver batches. */
     onPaths?: (event: PathsEvent) => void,
   ): () => void {
+    const endpoints = this.endpoints;
+    if (endpoints === null) {
+      return () => undefined; // the unconfigured state never opens the stream (D-74)
+    }
     let closed = false;
     let current: AbortController | null = null;
     const timers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -108,8 +131,8 @@ export class EngineClient {
       while (!closed) {
         current = new AbortController();
         try {
-          const response = await fetch(`${this.endpoints.invokeUrl}/api/events`, {
-            headers: { authorization: `Bearer ${this.endpoints.token}` },
+          const response = await fetch(`${endpoints.invokeUrl}/api/events`, {
+            headers: { authorization: `Bearer ${endpoints.token}` },
             signal: current.signal,
           });
           if (!response.ok || response.body === null) {

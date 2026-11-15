@@ -544,6 +544,11 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
       {},
     );
     try {
+      // D-74: the engine hosts the vault BEFORE a board exists — the setup
+      // starts the service against this honest null board, then initializes.
+      const before = await fresh.snapshot();
+      expect(before.vaultId).toBeNull();
+      expect(before.vaultPath).toBeUndefined();
       expect(await fresh.initialize('fresh')).toMatchObject({ ok: true });
       expect(freshConfig['dk.store']).toBe(storeDir2);
       expect(setKeys).toContainEqual(['dk.store', storeDir2]);
