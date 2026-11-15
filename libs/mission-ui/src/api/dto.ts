@@ -714,6 +714,8 @@ export interface ChatProposalView {
   readonly chain?: { readonly id: string; readonly chain: readonly string[] };
   /** req-298: the project a createTicket card names; absent on every other card and on a create without one. */
   readonly project?: string;
+  /** req-315: the before/after of a prompt patch (the card's diff); present exactly on a patchPersona proposal with a `prompt`. */
+  readonly diff?: string | null;
 }
 
 export interface ActiveSession {
@@ -1649,6 +1651,7 @@ function proposalOf(raw: unknown): ChatProposalView | null {
   const state = str(proposal['state']);
   const chain = chainCommandOf(proposal['command']);
   const project = createProjectOf(proposal['command']);
+  const diff = strOrNull(proposal['diff']);
   return {
     id,
     state: state === 'confirmed' || state === 'dismissed' ? state : 'pending',
@@ -1658,6 +1661,7 @@ function proposalOf(raw: unknown): ChatProposalView | null {
     outcome: strOrNull(proposal['outcome']),
     ...(chain !== undefined ? { chain } : {}),
     ...(project !== null ? { project } : {}),
+    ...(diff !== null ? { diff } : {}),
   };
 }
 

@@ -152,4 +152,37 @@ describe('validateChatCommand', () => {
       ],
     });
   });
+
+  // -- req-315: the patchPersona card -------------------------------------
+
+  it('keeps a patchPersona with the page-shaped fields (req-315)', () => {
+    expect(
+      validateChatCommand({ kind: 'patchPersona', persona: 'ben', patch: { budget: 5 } }),
+    ).toEqual({ kind: 'patchPersona', persona: 'ben', patch: { budget: 5 } });
+    expect(
+      validateChatCommand({
+        kind: 'patchPersona',
+        persona: 'ralf',
+        patch: { summary: 'Reads harder', model: null, allowed: { network: true }, settings: { parallel: 2, leaving: ['commit'] } },
+      }),
+    ).toEqual({
+      kind: 'patchPersona',
+      persona: 'ralf',
+      patch: { summary: 'Reads harder', model: null, allowed: { network: true }, settings: { parallel: 2, leaving: ['commit'] } },
+    });
+    expect(
+      validateChatCommand({ kind: 'patchPersona', persona: 'pia', patch: { chatModel: null, skills: [] } }),
+    ).toEqual({ kind: 'patchPersona', persona: 'pia', patch: { chatModel: null, skills: [] } });
+  });
+
+  it('refuses a patchPersona with junk (unknown field, wrong kind, empty patch, bad persona)', () => {
+    expect(validateChatCommand({ kind: 'patchPersona', persona: 'ben', patch: { color: '#fff' } })).toBeNull();
+    expect(validateChatCommand({ kind: 'patchPersona', persona: 'ben', patch: { budget: 'five' } })).toBeNull();
+    expect(validateChatCommand({ kind: 'patchPersona', persona: 'ben', patch: { allowed: { vaults: ['x'] } } })).toBeNull();
+    expect(validateChatCommand({ kind: 'patchPersona', persona: 'ben', patch: { settings: { gate: 'structural' } } })).toBeNull();
+    expect(validateChatCommand({ kind: 'patchPersona', persona: 'ben', patch: {} })).toBeNull();
+    expect(validateChatCommand({ kind: 'patchPersona', persona: 'Not A Persona', patch: { title: 'x' } })).toBeNull();
+    expect(validateChatCommand({ kind: 'patchPersona', persona: 'ben' })).toBeNull();
+    expect(validateChatCommand({ kind: 'patchPersona', persona: 'ben', patch: { prompt: '   ' } })).toBeNull();
+  });
 });

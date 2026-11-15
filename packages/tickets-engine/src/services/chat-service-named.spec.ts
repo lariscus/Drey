@@ -108,6 +108,7 @@ function boot(): ChatService {
   const git = { locate: async (p: string) => ({ root: p, prefix: '' }), commitPaths: async () => undefined } as unknown as TicketsGit;
   let clock = Date.parse('2026-11-05T09:00:00Z');
   return new ChatService({
+    personas: async () => [],
     host,
     board,
     bridge,

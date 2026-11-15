@@ -16,6 +16,8 @@ export interface PersonaSessionBoard {
   detect(): Promise<EngineVault | null>;
   loadPersona(vault: EngineVault, id: string): Promise<Persona | null>;
   personaPatch(input: { readonly id: string; readonly prompt?: string; readonly skills?: readonly string[] }): Promise<{ readonly ok: true } | { readonly ok: false; readonly error: string }>;
+  /** req-315: the crew, read fresh — the mission persona's brief carries the owner's instructions from it; absent = no owner section. */
+  listPersonas?(): Promise<readonly Persona[]>;
 }
 
 /** The runner as the 1:1 needs it. */

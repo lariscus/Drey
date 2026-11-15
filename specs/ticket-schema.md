@@ -2023,11 +2023,18 @@ line is skipped, never guessed — the asymmetric-tolerance rule):
   in an indented fenced block marked `json` — a **proposal card**:
   `<summary>` is the human sentence the card shows, the block is the
   typed `ChatCommand` (`createTicket` / `transition` / `setPriority` /
-  `promote` / `setChain` / `setStandardFlow` (req-306: the board's `flow:`, no ticket id) — the union in
+  `promote` / `setChain` / `setStandardFlow` (req-306: the board's `flow:`, no ticket id) /
+  `patchPersona` (req-315: a persona's settings — the Persona page's field
+  set, one commit through the page's own `personaPatch`; the summary
+  carries every sent field as `field: old → new`)) — the union in
   `packages/tickets-engine/src/contracts/chat.ts`
   is the entire write surface; a `createTicket` may carry the ticket's
   `project` (req-298) and `repo` (req-299, a `repos.md` name — a worker's
   follow-up card names its source ticket's)). Ids mint per session (`p-1`, `p-2`, …).
+  A patchPersona whose `patch` carries `prompt` is followed by one more
+  indented fenced block marked `diff` — the instructions' before/after
+  (`@@ line <n>` groups, `- old` / `+ new` lines, like the plan-edit's
+  diff), so the owner sees exactly what a confirm would write.
 - `- '<UTC>' proposal p-<n> confirmed|dismissed — <summary>` — the
   owner's decision. The summary repeats the pending card's; a
   ` → <outcome>` tail (the moved path, a refusal) rides when the

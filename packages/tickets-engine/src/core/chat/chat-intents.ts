@@ -12,7 +12,7 @@ import {
   type PriorityConfig,
   type TicketPriority,
 } from '../../contracts/tickets';
-import type { ChatCommand, ChatQuestionOption } from '../../contracts/chat';
+import type { ChatCommand, ChatPersonaPatch, ChatQuestionOption } from '../../contracts/chat';
 import { classNameOf } from '../../contracts/capability-class';
 import { PROJECT_ID_PATTERN } from '../../contracts/projects';
 
@@ -231,6 +231,9 @@ export function validateChatCommand(
   if (kind === 'startSession') {
     return startSessionOf(obj);
   }
+  if (kind === 'patchPersona') {
+    return patchPersonaOf(obj);
+  }
   return null;
 }
 
@@ -245,6 +248,74 @@ function startSessionOf(obj: Record<string, unknown>): ChatCommand | null {
     return null;
   }
   return { kind: 'startSession', persona, directory, poolClass, brief };
+}
+
+/**
+ * req-315: the patchPersona card's shape check — a persona id and a patch
+ * that carries only the page's fields, each of the right kind. Values are
+ * NOT validated here (`personaPatchError` refuses at execution); an empty
+ * patch is no card.
+ */
+function patchPersonaOf(obj: Record<string, unknown>): ChatCommand | null {
+  const persona = textOf(obj['persona']);
+  const patch = obj['patch'];
+  if (persona === null || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(persona) || typeof patch !== 'object' || patch === null || Array.isArray(patch)) {
+    return null;
+  }
+  const checked = personaPatchShapeOf(patch as Record<string, unknown>);
+  return checked === null ? null : { kind: 'patchPersona', persona, patch: checked };
+}
+
+/** The patch's fields: every key known and of its kind; null on the first stranger. */
+function personaPatchShapeOf(patch: Record<string, unknown>): ChatPersonaPatchShape | null {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(patch)) {
+    if (!personaPatchFieldOk(key, value)) {
+      return null;
+    }
+    out[key] = value;
+  }
+  return Object.keys(out).length === 0 ? null : (out as ChatPersonaPatchShape);
+}
+
+type ChatPersonaPatchShape = ChatPersonaPatch;
+
+function personaPatchFieldOk(key: string, value: unknown): boolean {
+  switch (key) {
+    case 'title':
+    case 'role':
+    case 'summary':
+    case 'class':
+    case 'prompt':
+      return typeof value === 'string' && value.trim() !== '';
+    case 'model':
+    case 'chatModel':
+      return value === null || (typeof value === 'string' && value.trim() !== '' && value.length <= 200);
+    case 'budget':
+      return value === null || (typeof value === 'number' && Number.isFinite(value) && value >= 0);
+    case 'skills':
+      return Array.isArray(value) && value.every((s) => typeof s === 'string');
+    case 'allowed':
+      return typeof value === 'object' && value !== null && !Array.isArray(value) && allowedShapeOk(value as Record<string, unknown>);
+    case 'settings':
+      return typeof value === 'object' && value !== null && !Array.isArray(value) && settingsShapeOk(value as Record<string, unknown>);
+    default:
+      return false;
+  }
+}
+
+function allowedShapeOk(allowed: Record<string, unknown>): boolean {
+  const bools = ['spendAboveAllowance', 'network', 'writeNotes'].every((k) => allowed[k] === undefined || typeof allowed[k] === 'boolean');
+  const commands = allowed['runCommands'] === undefined || allowed['runCommands'] === null || allowed['runCommands'] === 'accept-edits' || allowed['runCommands'] === 'bypass';
+  return bools && commands && Object.keys(allowed).every((k) => ['spendAboveAllowance', 'network', 'writeNotes', 'runCommands'].includes(k));
+}
+
+function settingsShapeOk(settings: Record<string, unknown>): boolean {
+  const ok = Object.keys(settings).every((k) => ['parallel', 'min', 'readOnly', 'leaving'].includes(k));
+  const counts = (settings['parallel'] === undefined || settings['parallel'] === null || typeof settings['parallel'] === 'number') && (settings['min'] === undefined || settings['min'] === null || typeof settings['min'] === 'number');
+  const readOnly = settings['readOnly'] === undefined || settings['readOnly'] === null || typeof settings['readOnly'] === 'boolean';
+  const leaving = settings['leaving'] === undefined || (Array.isArray(settings['leaving']) && settings['leaving'].every((s) => typeof s === 'string'));
+  return ok && counts && readOnly && leaving;
 }
 
 /** The setChain payload's shape check: a list of non-empty strings (the

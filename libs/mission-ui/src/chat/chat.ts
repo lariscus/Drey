@@ -73,6 +73,8 @@ export interface TimelineProposal {
   readonly chain?: { readonly id: string; readonly chain: readonly string[] };
   /** req-298: the project a createTicket card names (Pia names it; the confirm creates the ticket there). */
   readonly project?: string;
+  /** req-315: the before/after of a prompt patch; present exactly on a patchPersona proposal with a `prompt`. */
+  readonly diff?: string | null;
 }
 
 /** The session slice the merged timeline renders. */

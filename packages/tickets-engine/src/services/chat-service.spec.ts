@@ -252,6 +252,7 @@ function boot(): ChatService {
     },
   } as unknown as TicketsGit;
   return new ChatService({
+    personas: async () => [],
     host,
     board,
     bridge,
@@ -293,7 +294,9 @@ async function seedSession(
                   : `Block ${command.id} by ${command.blockedBy.join(', ')}`
                 : command.kind === 'setPriority'
                   ? `Set ${command.id} priority to ${command.priority}`
-                  : `Start a session of ${command.persona} in ${command.directory}`;
+                  : command.kind === 'startSession'
+                    ? `Start a session of ${command.persona} in ${command.directory}`
+                    : `Patch ${command.persona} — ${Object.keys(command.patch).join(', ')}`;
     text = appendProposal(text, new Date('2026-11-02T08:02:00Z'), summary, command).text;
   }
   const file = `tickets/_meta/chat/20261102-080000-${sessionSlug(title)}.md`;

@@ -293,8 +293,8 @@ create as a `raw capture:` Log line (ticket-schema).
 - **`FLOW_SYSTEM_PROMPT` is gone (req-306).** The file `prompts/crew/flow.md`, the flow draft bridge call (`draftFlow`, `flowDraftText`), the plan-entry speaker (`flowSpeakerOf`) and the flow editor's *Ask Paul* line were removed: it answered "Trimmed the flow…" and changed nothing. A flow is changed in words through Mission Control's `setChain` / `setStandardFlow` cards (the mission entry below).
 - **`MISSION_SYSTEM_PROMPT` and its context** (the file `packages/tickets-engine/prompts/crew/mission.md`
   via `services/crew-prompts.ts`; the context `chat-service.ts`,
-  E5a; D-7a / milestone 165; req-173; **req-306, mission.md version 5**) — the eight intents (steer, create, promote, chain,
-  **flow**, blocked, session, report) and the strict `{say, thought, commands}` envelope. The system
+  E5a; D-7a / milestone 165; req-173; **req-306, mission.md version 5; req-315, mission.md version 6**) — the nine intents (steer, create, promote, chain,
+  **flow**, blocked, session, **persona**, report) and the strict `{say, thought, commands}` envelope. The system
   message is — **req-269** — the persona part of Mission Control's persona (the crew's first
   `kind: mission` persona, Pia as shipped; read from the vault on **every** turn by
   `services/mission-persona-prompt.ts`, so the owner's edit applies on the next message):
@@ -390,6 +390,75 @@ create as a `raw capture:` Log line (ticket-schema).
   knows stays, else the filter's, else the board's only one, else none — so
   the card names it before the owner confirms, and the confirm passes it to
   `createTicket` (`project:` / `x-project`).
+- **req-315 — the `persona` intent, Pia's tools, and the owner's instructions**
+  (owner 2026-11-15: *"über Pia die Einstellungen, nur die ich auch per Hand
+  editieren kann … für alle Personas"*; *"sie soll den Text lesen können, wenn
+  sie ihn braucht"*; *"mehr wie MCP access"*) — `mission.md` v6:
+  the intent line *"persona — the owner wants a persona's settings changed …"*
+  (title, role, summary, class, model pin, budget, skills, rights, the run
+  pool, instructions), the `patchPersona` command with every field and its
+  kind (an object; `"prompt"` is the persona's WHOLE new instructions file,
+  carried complete after reading the current one; `"settings"` an object of
+  `parallel` / `min` / `readOnly` / `leaving`; `"allowed"` an object of
+  `spendAboveAllowance` / `runCommands` / `network` / `writeNotes`), three
+  examples, and the rule *"patchPersona values come only from the "Crew
+  settings" block and the owner's words … The owner's persona takes only
+  title, summary, prompt and leaving; Mission Control's persona takes only
+  title, summary, prompt, chatModel and skills — a patchPersona beyond a
+  persona's fields is refused."* The tools ride the request (below); the
+  `report` intent now names `ticket_read` for a ticket the digest omits.
+  **The `## Crew settings` block** (`services/mission-crew-settings.ts`,
+  read on every turn, under `## Crew`): per persona one line of the fields a
+  patch may set as they stand — class, model pin, budget, pool, read-only,
+  leaving, skills, allowed, summary; the owner's and Mission Control's
+  persona lines name their shorter sets. The prompt texts are deliberately
+  NOT in the block: the model reads one through `persona_read` when it needs
+  it (before it proposes a `prompt` patch, or when the owner asks what a
+  persona's instructions say).
+  **The tools** (`services/mission-tools.ts`, the seam `ChatToolSeam`): an
+  ordinary mission turn carries them on the request — `persona_read` (a
+  persona's `persona.md` / `prompt.md` / `memory.md` by path
+  `tickets/_meta/personas/<id>/<file>`, pattern-checked, cap 20,000
+  characters), `ticket_read` (one ticket's whole file through
+  `readAnyTicket`, cap 20,000), and the shared vault tools' reads
+  `vault_list` / `vault_search` / `vault_read` — the one tool set
+  (ADR-0071) over the host's registry, `write: 'off'`, every registered
+  vault in scope, the tickets repository itself reachable only through
+  `persona_read`. The loop (`chat-turn.ts`): a tool call answers through the
+  seam, the round repeats, at most six rounds; the final reply — the one
+  without a tool call — parses as the envelope, exactly as before; a model
+  that never calls tools turns as it always did, and the round cap ends
+  honestly (*"I ran out of rounds before I could answer — ask again"*). Both
+  dialects accumulate through the shared `shared/llm` stream sinks, and
+  `chatRequest(spec, messages, tools?)` sends `tools` /
+  `input_schema` (`toOpenAiTools` / `toAnthropicTools`). The bridge never
+  touches the vault — the chat service owns the seam (the iron rule).
+  **The patchPersona card:** the summary carries every sent field as
+  `field: old → new` against the crew read just now
+  (`services/persona-patch-summary.ts`; the prompt part reads
+  `instructions: <n edits · +a −r>`); a `prompt` patch's before/after rides
+  the card as its **diff** — `@@ line N` groups, `- old` / `+ new`
+  (`planDelta`), persisted in the session file as a `diff` fence behind the
+  command block, shown on every surface (`planedit-diff` on the phone and
+  the iPad, `target-card-diff` on the desk). The confirm executes through
+  the **same `personaPatch` the Persona page saves with** (`ChatBoardPort`
+  gained `personas()` and `personaPatch`; the crew is re-read at execution,
+  a persona deleted since the card stays a refusal); `chatPatchRefusalOf`
+  refuses beyond a kind's fields before anything is written — the agent
+  takes the page's set, the human only title / summary / prompt / leaving,
+  the mission persona only title / summary / prompt / chatModel / skills.
+  Values validate through `personaPatchError`, as on the page; the file-only
+  run keys (`needs`, the ceilings, `gate`) stay edited in the file, and
+  `color` is not a chat field (both owner rulings, 2026-11-12 / 2026-11-15).
+  **The owner's instructions in every dealing** (owner: *"im Umgang mit mir
+  soll Pia berücksichtigen, was in der You persona steht, unabhängig davon,
+  wie sie heißt"*): `## The owner` (`services/mission-owner-block.ts`) rides
+  the system message after the crew settings when the human persona (found
+  by `kind: human`, never by name) carries a `prompt.md` — read fresh on
+  every turn, absent when it is empty or missing. Pia's 1:1 gets the same
+  text as its `## The owner` section
+  (`fleet/one-on-one-brief.ts`, after *Your instructions*), and no other
+  persona's brief does.
 - **The Mission Control bridge's provider call** (`packages/tickets-engine/src/services/chat-model.ts`,
   `chat-llm.ts`, D-1 / milestone 131; since req-269 one turn is `chat-turn.ts`, its system message
   `chat-system-prompt.ts` `chatSystemOf` — the persona prompt rides only a mission turn of the
@@ -404,8 +473,12 @@ create as a `raw capture:` Log line (ticket-schema).
   `anthropic`, `zai-glm` `POST {baseUrl}/v1/messages` with `{model,
   max_tokens: 4096, stream: true, system, messages}` (the system prompt
   lifted out, roles alternating — `toAnthropicMessages`), `x-api-key` and
-  `anthropic-version: 2023-06-01`; the text deltas (`choices[0].delta.content`
-  or `content_block_delta` `text_delta`) accumulate and parse as the
+  `anthropic-version: 2023-06-01`; an ordinary mission turn adds the request's
+  `tools` (`toOpenAiTools` / `toAnthropicTools`, req-315 above), and the
+  round's reply accumulates through the shared `shared/llm` stream sinks —
+  the text deltas (`choices[0].delta.content` or
+  `content_block_delta` `text_delta`) forward live, the tool-call fragments
+  assemble beside them, and the round's reply parses as the
   envelope. The prompts themselves did not change. A provider without
   one of these dialects (`claude-code`, `copilot-cli`, `copilot-web`) is not
   called: the turn fails with *"<provider>: Mission Control cannot talk to

@@ -189,6 +189,7 @@ describe('FollowupFiler — a run’s proposals as pending cards (req-299)', () 
     const file = filed.ok ? filed.file! : '';
     let clock = Date.parse('2026-11-14T10:00:00Z');
     const chat = new ChatService({
+      personas: async () => [],
       host,
       board,
       bridge: {} as ChatBridge,
