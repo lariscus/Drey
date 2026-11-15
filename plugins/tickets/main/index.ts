@@ -59,7 +59,6 @@ import { ServiceControl, serviceHomeOf } from './service/service-control';
 import { ServiceSettingsHandlers } from './service/service-settings';
 import { TicketDocuments, askToAddCheckout } from './documents/ticket-documents';
 import { isStoreDocumentPath, storeDocumentHeader, storeDocumentHeaderEdit } from './documents/store-document-header';
-import { checkoutOf, readStoreSettings } from '../../../packages/tickets-engine/src/store/store-settings';
 import { registerChatIpc } from './ipc/chat-ipc';
 import { registerSessionIpc } from './ipc/session-ipc';
 import { pickFolderDialog } from './ipc/folder-dialog';
@@ -330,12 +329,14 @@ const plugin: MainPluginModule = {
     // Ticket documents of a dricket store in the editor (E14-4c): the checkout is a
     // vault, its tickets/ tree is routed -- the editor save goes through the engine
     // (dk put --if-version), every other write of it is refused by the base.
-    const engineConfig = <T,>(key: string): Promise<T | undefined> => client.invoke('configGet', { key }) as Promise<T | undefined>;
     const documents = new TicketDocuments({
       vaults: () => ctx.vault.listVaults(),
+      // req-315: the checkout is the project's own — the engine resolves it
+      // (its pipeline's `store:`, else the settings override, else beside the
+      // vault); the machine-wide key is not the answer any more.
       checkout: async () => {
-        const settings = await readStoreSettings(engineConfig);
-        return checkoutOf(settings);
+        const reply = (await client.invoke('storeCheckout').catch(() => null)) as { checkout?: string | null } | null;
+        return typeof reply?.checkout === 'string' && reply.checkout !== '' ? reply.checkout : null;
       },
       locate: (id) => board.ticketDocument({ id }),
       saveDocument: (input) => board.saveDocument(input),

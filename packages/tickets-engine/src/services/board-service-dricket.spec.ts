@@ -584,6 +584,8 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
       // machine-wide key is never written for it.
       expect(readStoreRef(await fsp.readFile(fAbs('tickets/_meta/pipeline.md'), 'utf8'))).toBe(storeDir2);
       expect(config['dk.store']).toBeUndefined();
+      // The editor's checkout follows the same source (the plugin's `checkout` asks this).
+      expect(await fresh.storeCheckout()).toEqual({ checkout: storeDir2 });
       // The toml lives on the store's main branch; the working copy is the tickets branch.
       const toml = (await promisify(execFile)('git', ['show', 'main:dricket.toml'], { cwd: storeDir2, windowsHide: true, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })).stdout;
       expect(isLifecycleStore(parseStoreStages(toml))).toBe(true);

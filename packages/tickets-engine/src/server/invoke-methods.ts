@@ -12,7 +12,7 @@ export const BOARD_METHODS = [
   'switchProject', 'openTicketsFolder',
   'personaLearn', 'listPersonas', 'projectRecords', 'estimateOf',
   'chatSessions', 'chatOpen', 'chatSend', 'chatStart', 'chatConfirm', 'chatDismiss', 'chatShapeDecide', 'chatPlanStatus',
-  'ticketDocument', 'saveDocument', 'setHumanName',
+  'ticketDocument', 'saveDocument', 'storeCheckout', 'setHumanName',
   'initialize', 'onVaultEvent', 'personaBoardMove',
 ] as const;
 

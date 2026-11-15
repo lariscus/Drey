@@ -1829,6 +1829,11 @@ export class EngineBoardService {
    * (`tickets/<prefix>/<shard>/<id>/ticket.md`). Null without a checkout and for a ticket
    * the store does not have.
    */
+  /** The checkout the board reads (req-315): the project's pipeline names it, the default stays beside the vault. Null: remote without a checkout. */
+  async storeCheckout(): Promise<{ checkout: string | null }> {
+    return { checkout: checkoutOf(await this.refreshStore((await this.detect()) ?? undefined)) };
+  }
+
   async ticketDocument(input: { id: string }): Promise<TicketDocumentLocation | null> {
     const store = await this.refreshStore((await this.detect()) ?? undefined);
     const checkout = checkoutOf(store);
