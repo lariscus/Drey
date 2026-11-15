@@ -36,7 +36,7 @@ describe('vaultScanIgnore', () => {
 
   it('a _-folder below the root is NOT reserved -- tickets/_meta stays watched', () => {
     expect(ignored(`${root}/tickets/_meta/pipeline.md`)).toBe(false);
-    expect(ignored(`${root}/tickets/_meta/prompts/build-default.md`)).toBe(false);
+    expect(ignored(`${root}/tickets/_meta/personas/ben/prompt.md`)).toBe(false);
     expect(ignored(`${root}/deep/nested/_other/file.md`)).toBe(false);
   });
 

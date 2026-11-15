@@ -326,7 +326,11 @@ plugin folder, no npm workspaces, and a renderer/remote bundling guard
     in `## Verification` otherwise. The builder declares
     `proof: ui|tests` in the Handover, the review prompt confirms or
     corrects it, the ticket frontmatter `proof:` pins it, missing means
-    `ui`; the verify harness starts the app only for `ui`.
+    `ui`; the successor of the engine's machine verify step is
+    [ADR-0101](0101-chain-step-skills.md) — the step runs as a chain step
+    skill with its own machine gate, and the engine service was removed
+    with the req-307 teardown (the proof format, the section display, the
+    videos folder and the gateway route stay).
   - **Videos.** Reserved folder `tickets/videos/`, not in git by default
     (the engine maintains the `.gitignore`); engine keys `videos.inGit`
     (default false, turning it on is a warned and confirmed act) and

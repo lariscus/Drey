@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promises as fsp } from 'node:fs';
 import { tmpdir } from 'node:os';
 import * as path from 'node:path';
@@ -6,6 +6,8 @@ import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { seededCrewOf } from '../core/crew-seed-marker';
 import { parsePersonaFile } from '../core/persona';
+import { isLifecycleStore, parseStoreStages } from '../store/store-stages';
+import { defaultStorePathOf } from '../store/fresh-store';
 import { createEngine, type Engine } from './engine';
 
 const run = promisify(execFile);
@@ -28,7 +30,7 @@ const start = async (): Promise<Engine> => {
   return engine;
 };
 
-describe('the engine seeds the default crew at its start (req-256)', () => {
+describe('the engine seeds the default crew at its start (req-256)', { timeout: 60_000 }, () => {
   beforeEach(async () => {
     root = await fsp.mkdtemp(path.join(tmpdir(), 'drey-engine-crew-'));
     vault = path.join(root, 'vault');
@@ -46,7 +48,7 @@ describe('the engine seeds the default crew at its start (req-256)', () => {
 
   afterEach(async () => {
     await Promise.all(engines.splice(0).map((engine) => engine.close()));
-    await fsp.rm(root, { recursive: true, force: true });
+    await fsp.rm(root, { recursive: true, force: true, maxRetries: 20 }).catch(() => undefined);
   });
 
   it('gives an existing board without the crew Pia, Paul, Ben, Ralf and Tessa in one commit, and the Crew tab lists them', async () => {
@@ -73,17 +75,67 @@ describe('the engine seeds the default crew at its start (req-256)', () => {
   });
 
   it('leaves the owner\'s own personas and pipeline as they are — but moves a v2 record onto class and model once (req-288)', async () => {
-    await fsp.mkdir(path.join(vault, PERSONAS, 'build-default'), { recursive: true });
-    const own = "---\ntitle: Build default\nrole: builder\nworker: kimi\nmodels:\n  default: owner-model\n  pool: [owner-model]\ncolor: '#123456'\nskills: []\n---\n";
-    await fsp.writeFile(path.join(vault, PERSONAS, 'build-default/persona.md'), own, 'utf8');
+    await fsp.mkdir(path.join(vault, PERSONAS, 'mina'), { recursive: true });
+    const own = "---\ntitle: Mina\nrole: builder\nworker: kimi\nmodels:\n  default: owner-model\n  pool: [owner-model]\ncolor: '#123456'\nskills: []\n---\n";
+    await fsp.writeFile(path.join(vault, PERSONAS, 'mina/persona.md'), own, 'utf8');
     await git(['add', '-A']);
     await git(['commit', '-m', 'owner persona']);
     const engine = await start();
     await engine.ready;
-    const migrated = (await read(`${PERSONAS}/build-default/persona.md`))!;
-    expect(parsePersonaFile('build-default', migrated)).toMatchObject({ title: 'Build default', class: 'heavy', model: 'kimi/owner-model', color: '#123456' });
+    const migrated = (await read(`${PERSONAS}/mina/persona.md`))!;
+    expect(parsePersonaFile('mina', migrated)).toMatchObject({ title: 'Mina', class: 'heavy', model: 'kimi/owner-model', color: '#123456' });
     expect(migrated).not.toMatch(/^(worker|models):/m);
     expect((await git(['log', '--format=%s'])).trim().split('\n')).toContain('personas: class and model replace worker and models (req-288)');
     expect(await read('tickets/_meta/pipeline.md')).toBe(PIPELINE);
   });
 });
+
+/** E14-9b item 6: the fresh-install store — the engine's start creates one beside the vault when none is configured. */
+const dkBin = process.env['DREY_DK_BIN'] ?? 'dk';
+const dkFound = (): boolean => {
+  try {
+    execFileSync(dkBin, ['--version'], { stdio: 'pipe', windowsHide: true });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+describe.skipIf(!dkFound())('the engine creates the fresh-install store at its start (E14-9b)', { timeout: 120_000 }, () => {
+  beforeEach(async () => {
+    root = await fsp.mkdtemp(path.join(tmpdir(), 'drey-engine-store-'));
+    vault = path.join(root, 'vault');
+    home = path.join(root, 'home');
+    await fsp.mkdir(path.join(vault, 'tickets/_meta'), { recursive: true });
+    await fsp.mkdir(path.join(root, 'client'), { recursive: true });
+    await fsp.mkdir(home, { recursive: true });
+    await fsp.writeFile(path.join(vault, 'tickets/_meta/pipeline.md'), PIPELINE, 'utf8');
+    await git(['init', '-b', 'main']);
+    await git(['config', 'user.name', 'spec']);
+    await git(['config', 'user.email', 'spec@example.com']);
+    await git(['add', '-A']);
+    await git(['commit', '-m', 'seed']);
+  });
+
+  afterEach(async () => {
+    await Promise.all(engines.splice(0).map((engine) => engine.close()));
+    await fsp.rm(root, { recursive: true, force: true, maxRetries: 20 }).catch(() => undefined);
+  });
+
+  it('a board without a configured store gets one beside the vault — the lifecycle stages, the config names it, the next start adopts it', async () => {
+    const dir = defaultStorePathOf(vault);
+    const engine = await start();
+    // The toml lives on the store's main branch; the working copy is the tickets branch.
+    const toml = await run('git', ['show', 'main:dricket.toml'], { cwd: dir });
+    expect(isLifecycleStore(parseStoreStages(toml.stdout))).toBe(true);
+    expect(await engine.invoke('configGet', { key: 'dk.store' })).toBe(dir);
+    await engine.close();
+    const engine2 = await start();
+    expect(await engine2.invoke('configGet', { key: 'dk.store' })).toBe(dir);
+    // The store's own history carries the stages swap; the vault's does not.
+    const storeLog = await run('git', ['log', '--format=%s', 'main'], { cwd: dir });
+    expect(storeLog.stdout.trim().split('\n')[0]).toBe('the lifecycle stages');
+    expect((await git(['log', '--format=%s'])).trim().split('\n').join(',')).not.toContain('lifecycle stages');
+  });
+});
+

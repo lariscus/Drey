@@ -133,7 +133,7 @@ test.beforeEach(({ userDataDir }) => {
   }
   const dir = path.join(userDataDir, 'plugins', 'tickets');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ backend: 'dricket', 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0 }, null, 2));
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0 }, null, 2));
 });
 
 test('a store document shows the header and widgets of a ticket, and its title edit is one dk put', async ({ page, electronApp }, testInfo) => {

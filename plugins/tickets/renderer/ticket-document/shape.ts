@@ -11,7 +11,6 @@
 import type { PlanMark } from '../../../../packages/tickets-engine/src/contracts/chat';
 import type { BoardSnapshot } from '../../shared/tickets';
 import { cardOfDocument, showsTicketDocument } from '../ticket-header';
-import { ideaPhaseIds } from '../work-groups';
 
 export interface ShapeTarget {
   readonly id: string;
@@ -21,9 +20,9 @@ export interface ShapeTarget {
 }
 
 /**
- * The ticket a vault file is, when it can be shaped: it sits in an Ideas
- * phase of the board's vault and no run works on it. Null for every other
- * file.
+ * The ticket a vault file is, when it can be shaped: it sits in the
+ * board's capture phase (Inbox) and no run works on it. Null for every
+ * other file.
  */
 export function shapeTargetOf(
   snapshot: BoardSnapshot | null,
@@ -34,7 +33,7 @@ export function shapeTargetOf(
     return null;
   }
   const card = cardOfDocument(snapshot, doc.path);
-  if (card === null || !ideaPhaseIds(snapshot.pipeline).includes(card.phase) || runLive(card.id)) {
+  if (card === null || card.phase !== snapshot.pipeline[0]?.id || runLive(card.id)) {
     return null;
   }
   // The open document's path: a dricket card's own is a stand-in no tab has (D-23).

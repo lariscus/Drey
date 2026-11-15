@@ -1,4 +1,4 @@
-import type { BoardSnapshot, PipelinePhase, TicketCard } from '../../contracts/tickets';
+import type { BoardSnapshot, TicketCard } from '../../contracts/tickets';
 import { personaModelGuess } from '../../core/persona';
 import { parseWorkerValue, resolveAssignment } from '../assignment';
 import type { ChainConfig, WorkerProviderId } from '../protocol';
@@ -19,14 +19,14 @@ export class PassPools {
     private readonly classPool: boolean,
   ) {}
 
-  readonly poolOf = (card: TicketCard, phase: PipelinePhase): WorkerProviderId | null => {
+  readonly poolOf = (card: TicketCard): WorkerProviderId | null => {
     const persona = this.personas.get(card.id)?.persona ?? null;
     if (persona !== null && this.classPool) {
       return null;
     }
     const guess = persona === null ? null : personaModelGuess(persona);
     const pinned = guess === null ? null : parseWorkerValue(guess.provider ?? '');
-    return pinned !== null ? pinned.provider : this.ringPool(card, phase);
+    return pinned !== null ? pinned.provider : this.ringPool(card);
   };
 
   /** True when the card's run asks the capacity pool for its class (req-288: every persona's run does, its harness follows from the grant). */
@@ -35,14 +35,11 @@ export class PassPools {
     return this.classPool && persona !== null;
   }
 
-  /** The assignment ring: ticket, column, repo, the configured default. */
-  private ringPool(card: TicketCard, phase: PipelinePhase): WorkerProviderId | null {
+  /** The assignment ring: ticket, repo, the configured default. */
+  private ringPool(card: TicketCard): WorkerProviderId | null {
     const repo = card.meta.repo === null ? null : (this.snap.repos.find((r) => r.name === card.meta.repo) ?? null);
     const assignment = resolveAssignment({
       ticketWorker: card.meta.worker,
-      columnWorker: phase.worker,
-      columnModel: phase.model,
-      handover: phase.handover,
       repoWorker: repo?.worker ?? null,
       configuredDefault: this.config.defaultWorker,
     });

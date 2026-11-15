@@ -130,15 +130,9 @@ export function boardModelOf(
     }
   }
   const terminal = configured.length > 0 ? configured[configured.length - 1]!.phase.id : null;
-  const columnPersonaOf = new Map<string, string | null>();
-  for (const column of snap.columns) {
-    for (const card of column.tickets) {
-      columnPersonaOf.set(card.id, column.phase.persona);
-    }
-  }
   const personaOf = (card: TicketCard): string | null => {
     const run = liveRunOf(card.id, runs);
-    return (run?.persona ?? null) || card.meta.persona || (columnPersonaOf.get(card.id) ?? null);
+    return (run?.persona ?? null) || card.meta.persona;
   };
   const partOf = (child: TicketCard): BoardPartModel => {
     const run = liveRunOf(child.id, runs);

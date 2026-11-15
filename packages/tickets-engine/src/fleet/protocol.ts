@@ -88,13 +88,6 @@ export interface RunDkTarget {
   readonly parkStage: string | null;
   /** E14-5b (Q-03): the stage a run that waits for the owner is released to; null = it stays where it is, unclaimed. Absent on older runners. */
   readonly needsInputStage?: string | null;
-  /**
-   * A store still on phase stages: the stage before the working one, for a release that may not stay
-   * put (dk refuses `build -> build` for an agent, R-31). Null on a lifecycle store.
-   */
-  readonly retreatStage: string | null;
-  /** req-265: the store is on the lifecycle stages (see {@link ChainStoreConfig.lifecycle}); absent = phase stages. */
-  readonly lifecycle?: boolean;
   /** Workers put `Dricket-*` trailers on their commits and the gate runs `dk validate --trailers` (off by default). */
   readonly trailers: boolean;
 }
@@ -212,29 +205,11 @@ export interface RunRequest {
   readonly gate: 'commands' | 'structural' | 'none';
   /** Git executable for worktree + ticket commits (the plugin's gitPath or `git`). */
   readonly git: string;
-  /** Transition target after a green gate — the pipeline's next phase id. */
-  readonly nextPhase: string | null;
-  /** Resolved directory name for `nextPhase` (numbered `NN-<id>` folders,
-   *  T-0041); null exactly when `nextPhase` is null. Older stored records
-   *  predate it — readers fall back to the phase id. */
-  readonly nextPhaseDir: string | null;
-  /** pipeline.md `push:` — the remote the transition commit is pushed to
-   *  after a green move (T-0041); null = never push. */
-  readonly pushRemote: string | null;
-  /** Next phase claims (claim: true) → stamped with this identity. */
-  readonly claimIdentity: string | null;
   /**
-   * E10-6: a manual step follows this gate in the ticket's chain. On a
-   * green gate the ticket does not move on (a pulled ticket moves into the
-   * working column only): it parks with `awaiting: <human persona id>`.
-   */
-  readonly parkFor?: string;
-  /**
-   * req-257: the chain entry this run works on a lifecycle store — its position and the chain's
-   * length. A green end writes the next position as the cursor (`x-at`) inside the claim and
-   * releases into `active`; past the last entry the chain is through and the engine moves the
-   * ticket to `done`. Present = `nextPhase` is null (the column follows the holder). Absent = a
-   * column run (the files backend, a store on phase stages).
+   * req-257: the chain entry this run works — its position and the chain's length. A green end
+   * writes the next position as the cursor (`x-at`) inside the claim and releases into `active`;
+   * past the last entry the chain is through and the engine moves the ticket to `done`. Absent =
+   * a run that moves nothing (a dialog, a scout, a session): the ticket stays where it was.
    */
   readonly cursor?: RunCursor;
   /**

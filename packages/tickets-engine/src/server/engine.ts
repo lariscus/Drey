@@ -4,7 +4,6 @@ import { composeBoardParts } from './compose-board-parts';
 import { composeLearningParts } from './compose-learning-parts';
 import { composeRemoteParts } from './compose-remote-parts';
 import { composeSessionParts } from './compose-session-parts';
-import { composeVerifyParts } from './compose-verify-parts';
 import { buildInvokeTable } from './build-invoke-table';
 import type { Engine, EngineOptions } from './engine-types';
 import { FileConfigStore } from './file-config';
@@ -28,11 +27,10 @@ export async function createEngine(opts: EngineOptions): Promise<Engine> {
   const config = new FileConfigStore(path.join(opts.home, 'config.json'));
   const token = await tokenOf(config);
   const board = composeBoardParts(opts, config, log);
-  const verify = await composeVerifyParts(opts, config, board, log);
   const sessions = await composeSessionParts(opts, config, board, log);
-  const remote = await composeRemoteParts(opts, config, { board, verify, sessions }, log);
+  const remote = await composeRemoteParts(opts, config, { board, sessions }, log);
   const learning = await composeLearningParts(config, board, log);
-  const parts = { config, board, verify, sessions, remote, learning };
+  const parts = { config, board, sessions, remote, learning };
 
   const table = buildInvokeTable(parts);
   const server = new InvokeServer({ token, vaultPath: opts.vaultPath, table, hub: board.hub, presence: board.presence, log });

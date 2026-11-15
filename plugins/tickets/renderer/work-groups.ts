@@ -14,11 +14,9 @@
  * phase's `color:` in pipeline.md or the default palette by position —
  * the panel draws it as the row's phase chip.
  */
-import { BUILDING_STATE, READY_STATE, SHAPING_STATE } from '../shared/pipeline-states';
 import type { NeedItem } from '../shared/remote-protocol';
 import {
   DEFAULT_PRIORITY_CONFIG,
-  parseHandover,
   priorityWeight,
   type BoardColumn,
   type BoardSnapshot,
@@ -33,7 +31,7 @@ import { YOU_LANE } from '../../../packages/tickets-engine/src/contracts/persona
 
 const LIVE: ReadonlySet<RunState> = new Set(['starting', 'running', 'stopping', 'detached']);
 
-export type WorkGroupId = 'needs' | 'shaping' | 'running' | 'prioritized' | 'ideas' | 'done';
+export type WorkGroupId = 'needs' | 'running' | 'prioritized' | 'ideas' | 'done';
 
 export interface WorkRow {
   readonly card: TicketCard;
@@ -51,44 +49,8 @@ export interface WorkRow {
 
 export interface WorkGroups {
   readonly needs: readonly WorkRow[];
-  readonly shaping: readonly WorkRow[];
   readonly running: readonly WorkRow[];
   readonly ideas: readonly WorkRow[];
-}
-
-/** A phase the machine works: an agent pool or a CI check. */
-export function isMachinePhase(phase: PipelinePhase): boolean {
-  const mode = parseHandover(phase.handover).mode;
-  return mode === 'agent' || mode === 'ci';
-}
-
-/**
- * The phases whose tickets are ideas: the first phase plus every manual
- * phase before the first machine phase. With no machine phase at all
- * only the first phase holds ideas.
- */
-export function ideaPhaseIds(pipeline: readonly PipelinePhase[]): readonly string[] {
-  const firstMachine = pipeline.findIndex(isMachinePhase);
-  if (firstMachine < 0) {
-    return pipeline.length > 0 ? [pipeline[0]!.id] : [];
-  }
-  return pipeline.slice(0, Math.max(1, firstMachine)).map((phase) => phase.id);
-}
-
-/**
- * Where "Queue for the fleet" moves an idea: the last idea phase (the
- * queue the first machine phase pulls from), or the first machine phase
- * itself when the ideas are just the first phase. Null when there is no
- * machine phase to queue for, or the ticket already sits there.
- */
-export function queueTargetOf(pipeline: readonly PipelinePhase[], phaseId: string): string | null {
-  const ideas = ideaPhaseIds(pipeline);
-  const firstMachine = pipeline.find(isMachinePhase) ?? null;
-  if (firstMachine === null) {
-    return null;
-  }
-  const target = ideas.length > 1 ? ideas[ideas.length - 1]! : firstMachine.id;
-  return target === phaseId ? null : target;
 }
 
 /** The newest live run of a ticket. */
@@ -204,7 +166,7 @@ export function dependencyOrder<T extends { readonly card: TicketCard }>(
  * live runs first), Prioritized and Inbox from their lifecycle columns. No
  * Shaping group: a Shape entry is held by its persona and runs as Running.
  */
-function personaWorkGroups(board: BoardSnapshot, runs: readonly RunInfo[]): WorkGroups {
+export function workGroups(board: BoardSnapshot, runs: readonly RunInfo[]): WorkGroups {
   const positionOf = new Map(board.columns.map((column, index) => [column.phase.id, index]));
   const row = (card: TicketCard, column: BoardColumn, need: NeedItem | null, queued = false): WorkRow => ({
     card,
@@ -247,137 +209,9 @@ function personaWorkGroups(board: BoardSnapshot, runs: readonly RunInfo[]): Work
   };
   return {
     needs,
-    shaping: [],
     running: [...live, ...waiting],
     // Prioritized rides as the queued ideas: the filter splits it into its own group.
     ideas: [...dependencyOrder(edge('prioritized', true), () => 0, board.priorities), ...dependencyOrder(edge('inbox', false), ideaRecency('inbox'), board.priorities)],
-  };
-}
-
-export function workGroups(board: BoardSnapshot, runs: readonly RunInfo[]): WorkGroups {
-  if (board.lanes !== undefined) {
-    return personaWorkGroups(board, runs);
-  }
-  const configured = board.columns.filter((column) => !column.unknown);
-  const pipeline = configured.map((column) => column.phase);
-  const firstPhaseId = pipeline[0]?.id ?? '';
-  const ideaIds = new Set(ideaPhaseIds(pipeline));
-  const terminal = pipeline.length > 0 ? pipeline[pipeline.length - 1]!.id : null;
-
-  // Chip colours keyed on the board position (T-0084): the configured
-  // columns in pipeline order, unknown directories after them.
-  const positionOf = new Map<string, number>();
-  configured.forEach((column, index) => positionOf.set(column.phase.id, index));
-  let afterConfigured = configured.length;
-  for (const column of board.columns) {
-    if (column.unknown && !positionOf.has(column.phase.id)) {
-      positionOf.set(column.phase.id, afterConfigured++);
-    }
-  }
-
-  const placed = new Map<string, { card: TicketCard; column: BoardColumn; index: number }>();
-  board.columns.forEach((column) => {
-    column.tickets.forEach((card, index) => {
-      if (!placed.has(card.id)) {
-        placed.set(card.id, { card, column, index });
-      }
-    });
-  });
-
-  const row = (card: TicketCard, column: BoardColumn, need: NeedItem | null): WorkRow => ({
-    card,
-    phase: column.phase,
-    phaseColor: phaseColorOf(column.phase, positionOf.get(column.phase.id) ?? 0),
-    need,
-    // The Shaping stage has its own group (board 7a, decision 15): not yet a queue.
-    queued: need === null && ideaIds.has(column.phase.id) && column.phase.id !== firstPhaseId && column.phase.id !== SHAPING_STATE,
-    run: liveRunOf(card.id, runs),
-  });
-
-  // Needs you: the remote's list (questions, approvals, red gates, failed
-  // runs, checkpoints), plus every ticket in the terminal phase — the
-  // owner accepts it into the archive. One row per ticket, first reason wins.
-  // With a Ready to try stage the sign-off is there, and Done asks nothing.
-  const signsOffBeforeTerminal = pipeline.some((phase) => phase.id === READY_STATE);
-  const needs: WorkRow[] = [];
-  const seen = new Set<string>();
-  for (const need of needsOf(board, runs)) {
-    const at = placed.get(need.ticketId);
-    if (at === undefined || seen.has(need.ticketId)) {
-      continue;
-    }
-    seen.add(need.ticketId);
-    needs.push(row(at.card, at.column, need));
-  }
-  if (terminal !== null && !signsOffBeforeTerminal) {
-    const column = configured[configured.length - 1]!;
-    for (const card of column.tickets) {
-      if (seen.has(card.id)) {
-        continue;
-      }
-      seen.add(card.id);
-      needs.push(
-        row(card, column, {
-          kind: 'checkpoint',
-          ticketId: card.id,
-          title: card.meta.title ?? card.id,
-          phase: terminal,
-          runId: null,
-          text: '',
-          since: card.meta.entered[terminal] ?? null,
-        }),
-      );
-    }
-  }
-
-  const ideas: WorkRow[] = [];
-  const shaping: { row: WorkRow; position: number; index: number }[] = [];
-  const running: { row: WorkRow; position: number; index: number }[] = [];
-  for (const { card, column, index } of placed.values()) {
-    if (seen.has(card.id) || (signsOffBeforeTerminal && column.phase.id === terminal)) {
-      continue;
-    }
-    // Shaping: the ticket's stage (board 7a, decision 15), or the owner works
-    // it in an interactive dialog -- the reservation stands or a live dialog
-    // run carries it.
-    if (column.phase.id === SHAPING_STATE || card.meta.interactive || liveRunOf(card.id, runs)?.interactive !== undefined) {
-      const position = column.unknown ? -1 : pipeline.findIndex((phase) => phase.id === column.phase.id);
-      shaping.push({ row: row(card, column, null), position, index });
-      continue;
-    }
-    if (ideaIds.has(column.phase.id)) {
-      ideas.push(row(card, column, null));
-      continue;
-    }
-    // Unknown directories sort after every configured phase.
-    const position = column.unknown ? -1 : pipeline.findIndex((phase) => phase.id === column.phase.id);
-    running.push({ row: row(card, column, null), position, index });
-  }
-  // Shaping: closest to done first (finishing beats starting), then the
-  // column's own derived order.
-  const byProgress = (a: { position: number; index: number }, b: { position: number; index: number }): number =>
-    a.position !== b.position ? b.position - a.position : a.index - b.index;
-  shaping.sort(byProgress);
-  // Running (owner, 2026-10-31): the tickets with a live run on top, then
-  // the queue — dependencies first, then priority (the vault's vocabulary),
-  // then closest to done.
-  type Placed = { row: WorkRow; card: TicketCard; position: number; index: number };
-  const placedRunning: Placed[] = running.map((entry) => ({ ...entry, card: entry.row.card }));
-  const weightOf = (card: TicketCard): number => priorityWeight(card.meta.priority, board.priorities);
-  const live = placedRunning
-    .filter((entry) => entry.row.run !== null)
-    .sort((a, b) => weightOf(a.card) - weightOf(b.card) || byProgress(a, b));
-  const queued = dependencyOrder(
-    placedRunning.filter((entry) => entry.row.run === null),
-    byProgress,
-    board.priorities,
-  );
-
-  return {
-    needs,
-    shaping: shaping.map((entry) => entry.row),
-    running: [...live, ...queued].map((entry) => entry.row),
-    ideas: dependencyOrder(ideas, ideaRecency(firstPhaseId), board.priorities),
   };
 }
 
@@ -407,7 +241,7 @@ export function rowStatusOf(row: WorkRow): WorkStatus {
   if (row.card.blocked.length > 0) {
     return 'blocked';
   }
-  if (row.queued || isMachinePhase(row.phase)) {
+  if (row.queued) {
     return 'queued';
   }
   if (row.card.meta.parkedReason !== null) {
@@ -424,9 +258,6 @@ export type CheckpointAction =
   | { readonly kind: 'accept'; readonly label: string };
 
 export function checkpointActionOf(board: BoardSnapshot, phaseId: string): CheckpointAction {
-  if (phaseId === READY_STATE) {
-    return { kind: 'sign-off', label: 'Accept' };
-  }
   const configured = board.columns.filter((column) => !column.unknown);
   const index = configured.findIndex((column) => column.phase.id === phaseId);
   const next = index >= 0 ? configured[index + 1] : undefined;
@@ -454,18 +285,10 @@ export function needKindLabel(need: NeedItem, board: BoardSnapshot): string {
     case 'blocked':
       return 'Blocked';
     default: {
-      if (need.phase === READY_STATE) {
-        return 'Ready to try';
-      }
       const configured = board.columns.filter((column) => !column.unknown);
       const index = configured.findIndex((column) => column.phase.id === need.phase);
-      // The terminal phase holds a result to try; a checkpoint right
-      // after the plan column holds a plan to accept.
-      if (index === configured.length - 1) {
-        return 'Ready to try';
-      }
-      const firstMachine = configured.findIndex((column) => isMachinePhase(column.phase));
-      return index - 1 === firstMachine ? 'Plan to accept' : 'Review';
+      // The terminal phase holds a result to try.
+      return index === configured.length - 1 ? 'Ready to try' : 'Review';
     }
   }
 }
@@ -482,15 +305,7 @@ export function runningStepOf(row: WorkRow, board: BoardSnapshot, queueWords: st
   const run = row.run;
   if (run !== null) {
     const title = board.columns.find((c) => c.phase.id === row.phase.id)?.phase.title ?? row.phase.title;
-    const step =
-      row.phase.id === 'plan'
-        ? 'Planning'
-        : row.phase.id === 'build' || row.phase.id === BUILDING_STATE
-          ? 'Building'
-          : row.phase.id === 'commit' || row.phase.id === READY_STATE
-            ? 'Merging'
-            : title;
-    return { step, line: (run.activity ?? '').trim(), live: true };
+    return { step: title, line: (run.activity ?? '').trim(), live: true };
   }
   const blocker = row.card.blocked[0];
   if (blocker === undefined) {
@@ -546,15 +361,7 @@ export function statusLineOf(row: WorkRow, board: BoardSnapshot): string {
     case 'blocked':
       return need.text;
     default: {
-      switch (needKindLabel(need, board)) {
-        case 'Ready to try':
-          // `<n> files · checks green` is W3's; until then the checks say it.
-          return 'checks green';
-        case 'Plan to accept':
-          return 'plan ready';
-        default:
-          return 'waits for your review';
-      }
+      return needKindLabel(need, board) === 'Ready to try' ? 'checks green' : 'waits for your review';
     }
   }
 }

@@ -12,14 +12,13 @@
  */
 import type { ChainEntry, TicketChainFields } from './chain';
 import type { PersonaBoardFields, TicketHoldField } from './persona-board';
-import type { PhasePoolMeta, TicketPoolMeta } from './ticket-pool-meta';
+import type { TicketPoolMeta } from './ticket-pool-meta';
 import type { BoardProjects, TicketProjectField } from './projects';
 import type { RepoRef } from './repo-ref';
 import type { PriorityConfig, TicketPriority } from './ticket-priority';
 import type { TicketRun } from './ticket-run';
 export type { TicketRun } from './ticket-run';
-export type { StoreStageMigrationOffer, StoreStageMigrationResult } from './store-stage-migration';
-export type { FolderStatus } from './folder-status';
+export { DEFAULT_PRIORITY_CONFIG, TICKET_PRIORITIES, parsePriorityConfig, priorityClass, priorityWeight } from './ticket-priority';
 
 /** `T-` + at least four digits (`T-0042`). Grammar of ids AND file stems. */
 export const TICKET_ID_PATTERN = /^T-\d{4,}$/;
@@ -40,44 +39,8 @@ export function stripPhasePrefix(dir: string): string {
   return dir.replace(/^\d+-/, '');
 }
 
-/** `(1-based pipeline position) * 10` + '-' + id → '10-inbox' … '80-done'. */
-export function phaseDirectoryName(position1: number, id: string): string {
-  return `${String(position1 * 10).padStart(2, '0')}-${id}`;
-}
-
 // ---------------------------------------------------------------------------
-// The pipeline's handover spec (`_meta/pipeline.md`, ADR-0076):
-// `manual | agent <prompt-ref>[@<worker>] | ci | none`. Parsed here so
-// the board, the fleet run start and the specs share one grammar.
-
-export type HandoverMode = 'manual' | 'agent' | 'ci' | 'none';
-
-export interface HandoverSpec {
-  readonly mode: HandoverMode;
-  /** The prompt the fleet runs (`agent build-default`); null unless agent. */
-  readonly promptRef: string | null;
-  /** The worker pin (`@opencode`) on the handover, when present. */
-  readonly worker: string | null;
-}
-
-/** Reads a handover spec; anything unreadable degrades to `manual` (the
- *  asymmetric-tolerance rule: forgive, never guess). */
-export function parseHandover(spec: string): HandoverSpec {
-  const text = spec.trim();
-  if (text === 'manual' || text === 'ci' || text === 'none') {
-    return { mode: text, promptRef: null, worker: null };
-  }
-  if (text === '' || text === 'agent') {
-    return { mode: 'agent', promptRef: null, worker: null };
-  }
-  const match = /^agent\s+(\S+?)(?:@(\S+))?$/.exec(text);
-  if (match !== null) {
-    return { mode: 'agent', promptRef: match[1]!, worker: match[2] ?? null };
-  }
-  return { mode: 'manual', promptRef: null, worker: null };
-}
-
-/** The deterministic work-branch rule — `t/` + the id, both directions. */
+// The deterministic work-branch rule — `t/` + the id, both directions.
 export function branchForTicket(id: string): string {
   return `t/${id}`;
 }
@@ -231,71 +194,10 @@ export interface TicketCard extends TicketHoldField {
   readonly issues: readonly TicketIssue[];
 }
 
-/** One pipeline phase from `tickets/_meta/pipeline.md`. */
-export interface PipelinePhase extends PhasePoolMeta {
+/** One pipeline phase from `tickets/_meta/pipeline.md`: a column the board draws. */
+export interface PipelinePhase {
   readonly id: string;
   readonly title: string;
-  readonly wip: number | null;
-  readonly claim: boolean;
-  /** Raw handover spec (`manual | agent <ref>[@<worker>] | ci | none`). */
-  readonly handover: string;
-  /**
-   * The column's worker pin (`worker: opencode`, M85) — the assignment
-   * ring's column level; unset on a hand-edited manual column.
-   */
-  readonly worker: string | null;
-  /** The column's model pin (`model: zai/glm-5.3`, M85); null = unset. */
-  readonly model: string | null;
-  /** Explicit prompt ref override (`prompt: plan-heavy`, M85); null = handover ref. */
-  readonly prompt: string | null;
-  /**
-   * The interactive dialog's prompt ref (`interactive: plan-interview`,
-   * req-65) — the brief an interactive run in this column gets; null =
-   * the shipped default (`plan-interactive-default`).
-   */
-  readonly interactive: string | null;
-  /**
-   * The phase's persona (`persona: paul`, ADR-0088 E3) — the ladder's
-   * middle level; null = the ticket pin or the default decides.
-   */
-  readonly persona: string | null;
-  /**
-   * The circuit breaker's threshold (`max-red:`, M85): consecutive red
-   * gates the column tolerates before it trips. Default 3.
-   */
-  readonly maxRed: number | null;
-  /**
-   * The column's daily token budget (`token-budget:`, M85); null = off.
-   * Summed over the runs the pool settles per day.
-   */
-  readonly tokenBudget: number | null;
-  /**
-   * The most model turns one run of the column may take (`max-turns:`);
-   * null = the runner's default ceiling.
-   */
-  readonly maxTurns: number | null;
-  /**
-   * The most working minutes one run of the column may take (`max-work:`,
-   * busy time only — a wait for the owner does not count); null = the
-   * runner's default ceiling.
-   */
-  readonly maxWorkMin: number | null;
-  /**
-   * The ci handover's check command (`ci:`, M85): a green run moves the
-   * ticket one column right — the machine gate in the work repo.
-   */
-  readonly ci: string | null;
-  /**
-   * The sampling audit's fraction (`audit:`, M85, 0–1; default off): a
-   * green step is sampled and a second worker reviews it before the
-   * move. The live trial decides whether the rung stays.
-   */
-  readonly audit: number | null;
-  /**
-   * The semantic gate (`semantic: true`, M85; default off): every green
-   * step in the column gets a second worker's review before it moves.
-   */
-  readonly semantic: boolean;
   /**
    * The Work panel's phase chip colour (`color:`, T-0084) — `#rrggbb`;
    * null = the curated default palette colours by board position.
@@ -303,43 +205,18 @@ export interface PipelinePhase extends PhasePoolMeta {
   readonly color: string | null;
 }
 
-/** The default for a phase entry that omits the M85 pool keys —
- *  explicit values win over the defaults. */
-export function phaseWithoutPoolKeys(
-  phase: Partial<PipelinePhase> & Pick<PipelinePhase, 'id' | 'title' | 'wip' | 'claim' | 'handover'>,
-): PipelinePhase {
-  return {
-    worker: null,
-    model: null,
-    prompt: null,
-    interactive: null,
-    persona: null,
-    maxRed: null,
-    tokenBudget: null,
-    maxTurns: null,
-    maxWorkMin: null,
-    ci: null,
-    audit: null,
-    semantic: false,
-    color: null,
-    ...phase,
-  };
-}
-
 /**
  * The display-grade worker resolution for a card (M84): the ticket's
- * pin wins, then the phase handover's pin, then the repo default, then
- * the plugin's configured default. The run start re-resolves strictly
- * (unreadable pins refuse there) — this one only picks what a card
- * shows.
+ * pin wins, then the repo default, then the plugin's configured default.
+ * The run start re-resolves strictly (unreadable pins refuse there) —
+ * this one only picks what a card shows.
  */
 export function resolveCardWorker(
   ticketWorker: string | null,
-  handover: string | null,
   repoWorker: string | null,
   defaultWorker: string,
 ): string {
-  for (const value of [ticketWorker, handover === null ? null : parseHandover(handover).worker, repoWorker]) {
+  for (const value of [ticketWorker, repoWorker]) {
     if (value !== null && value.trim() !== '') {
       return value;
     }
@@ -348,7 +225,6 @@ export function resolveCardWorker(
 }
 
 export type { RepoRef } from './repo-ref';
-export { DEFAULT_PRIORITY_CONFIG, TICKET_PRIORITIES, parsePriorityConfig, priorityClass, priorityWeight } from './ticket-priority';
 export type { PriorityConfig, TicketPriority } from './ticket-priority';
 
 export interface BoardColumn {
@@ -383,14 +259,14 @@ export interface RecentDone {
 export interface BoardSnapshot extends PersonaBoardFields, BoardProjects {
   readonly vaultId: string | null;
   readonly vaultName: string | null;
+  /** The tickets vault's absolute path (absent without a vault) — the Settings page's header. */
+  readonly vaultPath?: string | null;
   /** Display name of the active vault — the empty state's initialize hint. */
   readonly activeVaultName: string | null;
   /** False when the tickets vault is not a git repo (transitions unversioned). */
   readonly isGitRepo: boolean;
   /** On the dricket backend: where the tickets live (store, branch, head, sync) — the panel's footer line (D-9). */
   readonly storeLine?: string | null;
-  /** req-265: the store still uses the old phase stages; absent when it does not (or on the files backend). */
-  readonly storeMigration?: import('./store-stage-migration').StoreStageMigrationOffer | null;
   /** The configured default fleet worker (M84). */
   readonly defaultWorker: string;
   readonly pipeline: readonly PipelinePhase[];
@@ -429,64 +305,19 @@ export interface BoardSnapshot extends PersonaBoardFields, BoardProjects {
   readonly recentDone: readonly RecentDone[];
 }
 
-/** `true` when the id parses AND matches the file stem it came from. */
-export function isValidTicketFile(name: string): boolean {
-  return /^T-\d{4,}\.md$/.test(name);
-}
-
-/** Next free id: max existing + 1 — ids are never reused (burned in git). */
-export function nextTicketId(existing: readonly string[]): string {
-  let max = 0;
-  for (const id of existing) {
-    const match = /^T-(\d+)$/.exec(id);
-    if (match !== null) {
-      max = Math.max(max, Number(match[1]));
-    }
-  }
-  return `T-${String(max + 1).padStart(4, '0')}`;
-}
-
-/** The ids of the archived tickets among vault-relative paths — minting
- *  counts them, so an archived id is never handed out again. */
-export function archivedTicketIds(paths: readonly string[]): string[] {
-  const prefix = `${TICKETS_ARCHIVE_DIR}/`;
-  return paths
-    .filter((p) => p.startsWith(prefix) && p.endsWith('.md') && !p.slice(prefix.length).includes('/'))
-    .map((p) => p.slice(prefix.length, -'.md'.length));
-}
-
-/** Result of every mutation IPC call (`create` / `transition` / `reorder` /
- *  `claim` / `initialize`): `ok` with an optional warning line the panel
+/** Result of every mutation IPC call (`create` / `transition` /
+ *  `initialize`): `ok` with an optional warning line the panel
  *  shows, or a refusal with the reason. */
 export interface MutationResult {
   readonly ok: boolean;
   readonly error?: string;
   readonly warning?: string;
-  /** Reorder / "Number folders" (req-50): how many folders were renamed. */
-  readonly moved?: number;
   /**
    * A move's final vault-relative path (`transition` / `archive` /
    * `unarchive`, T-0042): the Files panel re-keys open tabs to it when
    * the plugin performed the move as a structured action.
    */
   readonly path?: string;
-}
-
-/** One file of `tickets/_meta/prompts/` as it is on disk (req-50). */
-export interface PromptEntry {
-  readonly ref: string;
-  readonly text: string;
-  /** Drey ships a prompt of this name, so "Reset to the shipped version" applies. */
-  readonly shipped: boolean;
-}
-
-/** The settings page's prompt list: the folder's files and nothing else. */
-export interface PromptListing {
-  /** Absolute path of `tickets/_meta/prompts/`; null without a tickets vault. */
-  readonly folder: string | null;
-  readonly entries: readonly PromptEntry[];
-  /** Every prompt name Drey ships (the "Add Drey's prompts" offer). */
-  readonly shipped: readonly string[];
 }
 
 /** One work repo a folder scan found (req-72): the "Add from folder" seed. */

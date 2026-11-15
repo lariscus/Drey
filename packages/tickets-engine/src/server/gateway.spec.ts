@@ -8,7 +8,7 @@ import { parseByteRange, RemoteGateway } from './gateway';
 
 /**
  * req-66: the HTTP server on a real loopback socket — security headers,
- * the built-in pairing page, Host refusal, JSON errors and the event
+ * Host refusal, JSON errors and the event
  * stream.
  */
 
@@ -64,16 +64,14 @@ async function start(videos?: (name: string) => Promise<{ file: string; bytes: n
 }
 
 describe('RemoteGateway', () => {
-  it('serves the pairing page with a strict CSP', async () => {
+  it('answers with a strict CSP and keeps files outside the client folder shut', async () => {
     const { base } = await start();
-    const res = await fetch(`${base}/`);
+    const res = await fetch(`${base}/api/health`);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-security-policy')).toContain("script-src 'self'");
     // D-18: Mission Control's index.html sets <base href="/">; 'none' logged a violation on every load.
     expect(res.headers.get('content-security-policy')).toContain("base-uri 'self'");
     expect(res.headers.get('x-content-type-options')).toBe('nosniff');
-    expect(await res.text()).toContain('<script src="pair.js" defer></script>');
-    expect((await fetch(`${base}/pair.js`)).headers.get('content-type')).toContain('text/javascript');
     expect((await fetch(`${base}/../secret.json`)).status).toBe(404);
     expect((await fetch(`${base}/main.ts`)).status).toBe(404);
   });

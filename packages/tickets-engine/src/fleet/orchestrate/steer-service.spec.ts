@@ -6,7 +6,7 @@ import { harness, liveRun, runnerNotes, runRequest, startRun, storedRecord, stre
 describe('SteerService — the owner prompts a run', () => {
   const dirs = useTempDirs();
   const request = (over: Partial<RunRequest> = {}): RunRequest => runRequest(dirs.vault, over);
-  const dialog = (): RunRequest => request({ acceptance: [], gate: 'structural', nextPhase: null, nextPhaseDir: null, interactive: 'plan' });
+  const dialog = (): RunRequest => request({ acceptance: [], gate: 'structural', interactive: 'plan' });
 
   it('the first prompt takes the run over by itself; opening and watching never do', async () => {
     const { sup, adapter } = harness(dirs.fleet);

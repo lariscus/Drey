@@ -2,8 +2,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DreyPluginApi } from '../../../shared/plugin-api/renderer';
 import type { RunInfo } from '../../../packages/tickets-engine/src/fleet/protocol';
+import type { TicketHold } from '../../../packages/tickets-engine/src/contracts/persona-board';
 import {
-  phaseWithoutPoolKeys,
   type BoardColumn,
   type BoardSnapshot,
   type PipelinePhase,
@@ -20,21 +20,11 @@ import {
 
 /** T-0084: the Work panel's filter — state, store, apply and popover. */
 
-const phase = (id: string, handover: string): PipelinePhase =>
-  phaseWithoutPoolKeys({ id, title: id[0]!.toUpperCase() + id.slice(1), wip: null, claim: false, handover });
+const phase = (id: string): PipelinePhase => ({ id, title: id[0]!.toUpperCase() + id.slice(1), color: null });
 
-const PIPELINE: readonly PipelinePhase[] = [
-  phase('inbox', 'manual'),
-  phase('prioritized', 'manual'),
-  phase('plan', 'agent plan-default'),
-  phase('plan-review', 'manual'),
-  phase('build', 'agent build-default'),
-  phase('review', 'manual'),
-  phase('commit', 'agent commit-default'),
-  phase('done', 'none'),
-];
+const PIPELINE: readonly PipelinePhase[] = [phase('inbox'), phase('prioritized'), phase('active'), phase('done')];
 
-const card = (id: string, at: string, blocked: readonly string[] = []): TicketCard =>
+const card = (id: string, at: string, blocked: readonly string[] = [], ticketHold?: TicketHold): TicketCard =>
   ({
     id,
     path: `tickets/${at}/${id}.md`,
@@ -43,12 +33,28 @@ const card = (id: string, at: string, blocked: readonly string[] = []): TicketCa
     blocked,
     blocks: [],
     issues: [],
+    ...(ticketHold === undefined ? {} : { hold: ticketHold }),
   }) as unknown as TicketCard;
+
+/** An active card's hold at an agent entry. */
+const hold = (holder = 'ben'): TicketHold => ({
+  holder,
+  why: 'entry',
+  position: 1,
+  length: 2,
+  chain: [holder, 'you'],
+  mode: null,
+  named: null,
+  claimed: false,
+  sentBack: null,
+  questions: 0,
+});
 
 const board = (placed: Record<string, readonly TicketCard[]>): BoardSnapshot =>
   ({
+    pipeline: PIPELINE,
     columns: PIPELINE.map((p): BoardColumn => ({ phase: p, unknown: false, tickets: placed[p.id] ?? [] })),
-    checkpoints: ['plan-review', 'review', 'done'],
+    checkpoints: [],
   }) as unknown as BoardSnapshot;
 
 const run = (ticketId: string): RunInfo =>
@@ -58,8 +64,7 @@ const groupsOf = (): WorkGroups =>
   workGroups(
     board({
       inbox: [card('T-0001', 'inbox')],
-      plan: [card('T-0002', 'plan')],
-      build: [card('T-0003', 'build')],
+      active: [card('T-0002', 'active', [], hold()), card('T-0003', 'active', [], hold())],
     }),
     [run('T-0003')],
   );
@@ -105,18 +110,18 @@ describe('applyWorkFilter', () => {
   it('filters by phase, by status, and by both — totals stay the unfiltered size', () => {
     const groups = groupsOf();
     const ids = (rows: readonly { card: TicketCard }[]): string[] => rows.map((r) => r.card.id);
-    const byPhase = applyWorkFilter(groups, { phases: ['build'], statuses: [] });
-    expect(ids(byPhase.running.rows)).toEqual(['T-0003']);
+    const byPhase = applyWorkFilter(groups, { phases: ['active'], statuses: [] });
+    expect(ids(byPhase.running.rows)).toEqual(['T-0003', 'T-0002']);
     expect(byPhase.running.total).toBe(2);
-    expect(byPhase.ideas.rows).toHaveLength(0); // the idea is in inbox, not build
+    expect(byPhase.ideas.rows).toHaveLength(0); // the idea is in inbox, not active
     expect(byPhase.ideas.total).toBe(1);
 
     const byStatus = applyWorkFilter(groups, { phases: [], statuses: ['running'] });
     expect(ids(byStatus.running.rows)).toEqual(['T-0003']);
     expect(byStatus.running.total).toBe(2);
 
-    const both = applyWorkFilter(groups, { phases: ['plan'], statuses: ['running'] });
-    expect(both.running.rows).toHaveLength(0); // plan matches, running does not
+    const both = applyWorkFilter(groups, { phases: ['inbox'], statuses: ['running'] });
+    expect(both.running.rows).toHaveLength(0); // inbox matches no running row
     expect(both.running.total).toBe(2);
   });
 
@@ -140,9 +145,9 @@ describe('filterPopover', () => {
     const chips = [...pop.querySelectorAll<HTMLButtonElement>('.work-filter-chip')];
     const statusLabels = ['Waiting for you', 'Needs review', 'Failed', 'Running', 'Queued', 'Blocked', 'Parked', 'Idle'];
     expect(chips.map((c) => c.textContent)).toEqual([...PIPELINE.map((p) => p.title), ...statusLabels]);
-    const build = chips[4]!;
-    expect(build.style.getPropertyValue('--chip-color')).not.toBe('');
-    expect(build.getAttribute('aria-pressed')).toBe('false');
+    const active = chips[2]!;
+    expect(active.style.getPropertyValue('--chip-color')).not.toBe('');
+    expect(active.getAttribute('aria-pressed')).toBe('false');
     // Clear starts disabled: nothing is filtered.
     expect((pop.querySelector('.work-filter-clear') as HTMLButtonElement).disabled).toBe(true);
   });
@@ -156,15 +161,15 @@ describe('filterPopover', () => {
       onApply: (next) => applied.push(next),
     });
     const chips = [...pop.querySelectorAll<HTMLButtonElement>('.work-filter-chip')];
-    chips[4]!.click(); // phase Build
-    expect(applied.at(-1)).toEqual({ phases: ['build'], statuses: [] });
-    expect(chips[4]!.getAttribute('aria-pressed')).toBe('false'); // the pre-toggle node
-    expect([...pop.querySelectorAll('.work-filter-chip')][4]!.getAttribute('aria-pressed')).toBe('true');
+    chips[2]!.click(); // phase Active
+    expect(applied.at(-1)).toEqual({ phases: ['active'], statuses: [] });
+    expect(chips[2]!.getAttribute('aria-pressed')).toBe('false'); // the pre-toggle node
+    expect([...pop.querySelectorAll('.work-filter-chip')][2]!.getAttribute('aria-pressed')).toBe('true');
     const running = [...pop.querySelectorAll<HTMLButtonElement>('.work-filter-chip')].find(
       (c) => c.textContent === 'Running',
     )!;
     running.click();
-    expect(applied.at(-1)).toEqual({ phases: ['build'], statuses: ['running'] });
+    expect(applied.at(-1)).toEqual({ phases: ['active'], statuses: ['running'] });
     const clear = pop.querySelector('.work-filter-clear') as HTMLButtonElement;
     expect(clear.disabled).toBe(false);
     clear.click();
@@ -177,20 +182,23 @@ describe('filterPopover', () => {
     const pop = filterPopover({
       api,
       columns: board({}).columns,
-      state: { phases: ['build'], statuses: [] },
+      state: { phases: ['active'], statuses: [] },
       onApply: (next) => applied.push(next),
     });
-    const build = [...pop.querySelectorAll<HTMLButtonElement>('.work-filter-chip')][4]!;
-    expect(build.getAttribute('aria-pressed')).toBe('true');
-    build.click();
+    const active = [...pop.querySelectorAll<HTMLButtonElement>('.work-filter-chip')][2]!;
+    expect(active.getAttribute('aria-pressed')).toBe('true');
+    active.click();
     expect(applied.at(-1)).toEqual(NO_WORK_FILTER);
   });
 
   it('unknown phase directories get a chip too', () => {
-    const limbo: BoardColumn = { phase: phase('limbo', 'manual'), unknown: true, tickets: [] };
+    const limbo: BoardColumn = { phase: phase('limbo'), unknown: true, tickets: [] };
     const snap = board({});
     const pop = filterPopover({ api, columns: [...snap.columns, limbo], state: NO_WORK_FILTER, onApply: () => undefined });
     const titles = [...pop.querySelectorAll('.work-filter-chip')].map((c) => c.textContent);
     expect(titles).toContain('Limbo');
   });
 });
+
+
+

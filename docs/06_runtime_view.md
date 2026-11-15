@@ -3214,7 +3214,7 @@ board warns "not versioned", and the commit step is skipped.
 
 ## 6.65 A fleet run: start, steer, gate, and the ticket moves itself (milestone 84, [ADR-0075](09_architecture_decisions/0075-agent-fleet-architecture-governance-and-run-control.md))
 
-The whole default run — the pipeline, one agent run end to end, how the brief is composed from the step prompt and the disciplines, and what each step hands on through the ticket — is drawn in [design/ticket-run-flow.md](design/ticket-run-flow.md) (Mermaid) and [design/ticket-run-flow.drawio](design/ticket-run-flow.drawio) (req-280, [ADR-0097](09_architecture_decisions/0097-run-brief-composed-from-shared-disciplines.md)); the diagram below is the original milestone-84 path.
+The whole default run — the pipeline, one agent run end to end, how the brief is composed from the persona's prompt and the disciplines, and what each step hands on through the ticket — is drawn in [design/ticket-run-flow.md](design/ticket-run-flow.md) (Mermaid) and [design/ticket-run-flow.drawio](design/ticket-run-flow.drawio) (req-280, [ADR-0097](09_architecture_decisions/0097-run-brief-composed-from-shared-disciplines.md); since req-307 the persona is the prompt, there is no step prompt); the diagram below is the original milestone-84 path.
 
 ```mermaid
 sequenceDiagram
@@ -4422,12 +4422,10 @@ follows.
 
 ## 6.92 A ticket claim through `dk` (E14-1, milestone 151)
 
-The first slice of tickets on dricket (ADR-0090), read-mostly and behind
-`tickets.backend` (`files` by default): the engine reaches tickets through the
+The first slice of tickets on dricket (ADR-0090) — today the one path
+(ADR-0100): the engine reaches tickets through the
 `TicketStore` port; the dricket implementation shells out to the installed
-`dk`. Only `storeListing` is wired into the board service so far; claim,
-release and extend are exercised by the contract suite and the CLI probe
-`scripts/dricket-slice.mjs`.
+`dk` (a fresh install's own store comes from `store/fresh-store.ts`).
 
 ```mermaid
 sequenceDiagram
@@ -4455,12 +4453,11 @@ Reads (`list`, `show`) take the same path without the write turn and with a
 30 s timeout. A `claim-lost` (13) on any later write is the signal for the
 fleet to stop the worker (E14-5).
 
-## 6.93 The board from a dricket store, and the shadow comparison (E14-2, milestone 152)
+## 6.93 The board from the dricket store (E14-2, milestone 152)
 
-`tickets.backend` decides where the board's tickets come from; the pipeline,
-repos and ledger stay in the meta vault either way. `files` (default) is the
-old path. `dricket` shows the store's board. `shadow` shows the files board and
-compares it, in the background, with the store's.
+The board's tickets come from the one store (req-307: the `tickets.backend`
+key, the `files` path and the shadow comparison are gone); the pipeline,
+repos, projects and ledger stay in the meta vault.
 
 ```mermaid
 sequenceDiagram
@@ -5693,7 +5690,7 @@ sequenceDiagram
     participant Fold as PersonaFolders
     participant Git as TicketsGit
     Trig->>Seed: seed(vault)
-    Seed->>Ship: load() — four personas (persona.md + the who part of prompt.md), the step prompts
+    Seed->>Ship: load() — five personas (persona.md + the who part of prompt.md, as shipped)
     Seed->>Crew: effective(vault).defaultWorker (the crew.md migration of 6.114 runs first)
     Seed->>Tab: rows() — the model table; the runner may be asleep, the file is read
     Note over Seed,Crew: inside the crew.md queue
@@ -6726,8 +6723,8 @@ sequenceDiagram
 
 The engine hosts one vault folder for the life of the service; whether that folder is *loaded* is Drey's
 registry, pushed under `vaults.registered` (req-167) — the same key the workers' vault MCP reads. Unloaded
-means the host lists no vault, so every reader of the board (`detect`, `listProjects`, the chat, the verify
-service) finds none; the files are never deleted. With no key (no Drey ever named a registry) the vault is
+means the host lists no vault, so every reader of the board (`detect`, `listProjects`, the chat)
+finds none; the files are never deleted. With no key (no Drey ever named a registry) the vault is
 loaded. The `board` IPC awaits the registry push before it reads, so a fetch right after a removal cannot
 see the old list.
 ## 6.146 One entry shapes and plans; the standard flow is set through Mission Control (req-305, req-306, milestone 280)

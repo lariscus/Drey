@@ -3,32 +3,19 @@ import { decideRedGate } from '../../core/chain-red-gate';
 import { DEFAULT_MAX_RED } from './breaker';
 import { hasScoutReport } from '../../core/scout';
 import { capTail, SANITY_CAP } from '../capping';
-import type { RunRequest } from '../protocol';
 import { cursorChain } from '../run-cursor';
-import type { RunStateMachine } from '../run/run-state-machine';
 import { shortGateLine } from '../run/run-summary';
 import { exitVerdict } from './exit-verdict';
 import type { GateRunner } from './gate-runner';
 import { messageOf, type LiveRun } from './live-run';
-import type { ProcessSupervisor } from './process-supervisor';
 import type { RunBookkeeper } from './run-bookkeeper';
-import type { RunRepository } from './run-repository';
 import type { RunSettler } from './run-settler';
 import { syncMainLine, type SyncMainOutcome } from './sync-main-action';
 
 export interface RunCompletionDeps {
-  readonly machine: RunStateMachine;
-  readonly repo: RunRepository;
   readonly gate: GateRunner;
   readonly bookkeeper: RunBookkeeper;
   readonly settler: RunSettler;
-  readonly processes: ProcessSupervisor;
-  /**
-   * The quality rungs (M85, flagged off): on a green gate, an instruction to
-   * re-run the step with — a second worker reviews the branch before the
-   * move — or null to move as normal. Asked once per run.
-   */
-  readonly secondOpinion?: (request: RunRequest) => Promise<string | null>;
   /** req-169: the closing round after the gate verdict (a noteworthy run only); absent = none (a spec). */
   readonly closing?: { afterGate(run: LiveRun): Promise<void> };
   /** req-267: the persona's leaving actions before the hand-on (Ben's `sync-main`); absent = none (a spec). */
@@ -153,9 +140,6 @@ export class RunCompletion {
       return this.deps.settler.finish(run, 'failed');
     }
     run.info = { ...run.info, gateResult: 'green' };
-    if (await this.secondOpinion(run)) {
-      return;
-    }
     await this.deps.closing?.afterGate(run); // before the move: the round runs while the run still holds its ticket
     const left = await this.leave(run);
     if (left !== null) {
@@ -216,38 +200,12 @@ export class RunCompletion {
       : syncMainLine(outcome);
   }
 
-  /** The move or the park after a green gate; null when it went through, else the note of its failure. */
+  /** The cursor's hand-on after a green gate; null when it went through (or the run moves nothing), else the note of its failure. */
   private async handOn(run: LiveRun): Promise<string | null> {
-    if (run.request.cursor !== undefined) {
-      const advanced = await this.deps.bookkeeper.advanceOnSuccess(run);
-      return advanced.ok ? null : `the gate passed but handing the ticket on failed — ${advanced.error}`;
+    if (run.request.cursor === undefined) {
+      return null;
     }
-    if (run.request.nextPhase !== null) {
-      const moved = await this.deps.bookkeeper.moveOnSuccess(run, run.request.nextPhase);
-      return moved.ok ? null : `the gate passed but the move failed — ${moved.error}`;
-    }
-    if (run.request.parkFor !== undefined) {
-      const parked = await this.deps.bookkeeper.parkOnSuccess(run, run.request.parkFor);
-      return parked.ok ? null : `the gate passed but parking the ticket failed — ${parked.error}`;
-    }
-    return null;
-  }
-
-  /** The quality rungs (M85): one round only, a fresh worker reviews the step; its own gate decides. True when it took over. */
-  private async secondOpinion(run: LiveRun): Promise<boolean> {
-    if (run.audited || this.deps.secondOpinion === undefined) {
-      return false;
-    }
-    const brief = await this.deps.secondOpinion(run.request).catch(() => null);
-    if (brief === null || run.handle === null) {
-      return false;
-    }
-    run.audited = true;
-    const handle = this.deps.processes.spawn(run, { instruction: brief, resumeRef: null });
-    run.gating = false;
-    run.info = this.deps.machine.transition({ ...run.info, pid: handle.pid }, { kind: 'spawned' });
-    await this.deps.bookkeeper.note(run, 'second opinion — a fresh worker reviews the step before it moves');
-    await this.deps.repo.persist(run);
-    return true;
+    const advanced = await this.deps.bookkeeper.advanceOnSuccess(run);
+    return advanced.ok ? null : `the gate passed but handing the ticket on failed — ${advanced.error}`;
   }
 }

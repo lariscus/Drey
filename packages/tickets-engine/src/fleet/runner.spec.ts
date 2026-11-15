@@ -15,9 +15,9 @@ import { startRunner, type RunnerHandle } from './runner';
 const PIPELINE = [
   '---',
   'phases:',
-  '  - { id: inbox, title: Inbox, handover: manual }',
-  '  - { id: build, title: Build, handover: agent build-default, claim: true }',
-  '  - { id: done, title: Done, handover: none }',
+  '  - { id: inbox, title: Inbox }',
+  '  - { id: prioritized, title: Prioritized }',
+  '  - { id: done, title: Done }',
   '---',
   'Prose.',
   '',
@@ -35,10 +35,9 @@ describe('fleet runner exit (req-110)', () => {
   beforeEach(async () => {
     root = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-runner-'));
     vault = path.join(root, 'vault');
-    await fsp.mkdir(path.join(vault, 'tickets', '_meta', 'prompts'), { recursive: true });
+    await fsp.mkdir(path.join(vault, 'tickets', '_meta'), { recursive: true });
     await fsp.writeFile(path.join(vault, 'tickets', '_meta', 'pipeline.md'), PIPELINE, 'utf8');
     await fsp.writeFile(path.join(vault, 'tickets', '_meta', 'repos.md'), REPOS, 'utf8');
-    await fsp.writeFile(path.join(vault, 'tickets', '_meta', 'prompts', 'build-default.md'), 'Build it.', 'utf8');
     exits.length = 0;
     lines.length = 0;
     runner = await startRunner(

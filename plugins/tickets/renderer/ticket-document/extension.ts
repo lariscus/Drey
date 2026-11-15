@@ -14,7 +14,7 @@
 import type { DreyPluginApi, EditorSurfaceContext } from '../../../../shared/plugin-api/renderer';
 import type { BoardSnapshot, TicketCard } from '../../shared/tickets';
 import { maskFenceLines } from '../../../../shared/markdown/fences';
-import { ideaPhaseIds, type WorkRow } from '../work-groups';
+import type { WorkRow } from '../work-groups';
 import { costNode, proofNode, shapeMarksNode } from './dom';
 import { actionBarOf, chainOf, costTableOfText, pageShapeOf, proofOfText, sectionRange, type PageShape, type TextRange } from './model';
 import { partsNode, createPartsStore } from './parts';
@@ -252,7 +252,7 @@ export function createTicketDocumentExtension(deps: TicketDocumentDeps): TicketD
       // The cost by phase starts with the work (7j); before it (9a, 7b, 7c) the card says the cost.
       const cost = costTableOfText(deps.api.i18n, text, phaseTitle, chain);
       if (cost !== null) {
-        const planning = card === null || ideaPhaseIds(snapshot.pipeline).includes(card.phase);
+        const planning = card === null || card.phase === snapshot.pipeline[0]?.id;
         stand(sectionRange(text, 'Verlauf'), JSON.stringify(['cost', planning, cost]), () => (planning ? document.createElement('div') : costNode(deps.api.i18n, cost)));
       }
 

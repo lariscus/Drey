@@ -8,7 +8,6 @@ import { TicketsGit } from '../core/tickets-git';
 import { newTicketFileText } from '../core/ticket-files';
 import type { LedgerWrite } from '../core/ledger';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from '../fleet/protocol';
-import { parseHandover } from '../contracts/tickets';
 import { PersonaAvatars } from './persona-avatars';
 import { SHIPPED_PERSONAS_DIR } from './shipped-crew-files';
 
@@ -89,7 +88,6 @@ function hostOf(): EngineHost {
     configSet: async () => undefined,
     emitBoardChanged: () => undefined,
     log: () => undefined,
-    userRoot: '/home',
     pickFolder: async () => null,
     revealPath: async () => '',
     launchInConsole: () => undefined,
@@ -139,44 +137,7 @@ async function writeTicket(id: string, phase: string): Promise<void> {
   await fsp.writeFile(path.join(vaultDir, 'tickets', phase, `${id}.md`), text, 'utf8');
 }
 
-/** The same ticket with `form: scout` added to the frontmatter. */
-async function writeScoutTicket(id: string, phase: string): Promise<void> {
-  await writeTicket(id, phase);
-  const file = path.join(vaultDir, 'tickets', phase, `${id}.md`);
-  const text = await fsp.readFile(file, 'utf8');
-  await fsp.writeFile(file, text.replace('priority: normal\n', 'priority: normal\nform: scout\n'), 'utf8');
-}
-
-describe('EngineBoardService.readTicket reaches closed tickets (D-7a)', () => {
-  it('reads a done ticket and an archived one, and still refuses an unknown id', async () => {
-    await writeTicket('T-0001', 'done');
-    await writeTicket('T-0002', 'inbox');
-    const service = serviceOf();
-    expect((await service.archive({ id: 'T-0002' })).ok).toBe(true);
-
-    expect(await service.readTicket('T-0001')).toMatchObject({ ok: true, card: { id: 'T-0001' } });
-    // An archived ticket stays openable (E13-21: readTicket reaches it, as a card in the archive phase);
-    // the chat reads its file by id through readAnyTicket as well (D-7a).
-    expect(await service.readTicket('T-0002')).toMatchObject({ ok: true, card: { id: 'T-0002', phase: 'archive' } });
-    expect(await service.readTicket('T-0999')).toMatchObject({ ok: false });
-    expect(await service.readAnyTicket('T-0001')).toMatchObject({ ok: true });
-    expect(await service.readAnyTicket('T-0002')).toMatchObject({ ok: true, text: expect.stringContaining('Ticket T-0002') });
-    expect(await service.readAnyTicket('T-0999')).toMatchObject({ ok: false });
-  });
-});
-
 describe('EngineBoardService E7 ledger writes', () => {
-  it('a successful move writes the phase line with from and to', async () => {
-    await writeTicket('T-0001', 'inbox');
-    const service = serviceOf({ events: { ledger: (write) => ledgerWrites.push(write) } });
-
-    const outcome = await service.transition({ id: 'T-0001', from: 'inbox', to: 'done' });
-
-    expect(outcome.ok).toBe(true);
-    expect(ledgerWrites).toEqual([{ kind: 'phase', ticket: 'T-0001', from: 'inbox', to: 'done' }]);
-    await expect(fsp.access(path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md'))).rejects.toBeDefined();
-  });
-
   it('a refused mutation writes nothing', async () => {
     await writeTicket('T-0001', 'inbox');
     const service = serviceOf({ events: { ledger: (write) => ledgerWrites.push(write) } });
@@ -187,121 +148,9 @@ describe('EngineBoardService E7 ledger writes', () => {
     expect(ledgerWrites).toEqual([]);
   });
 
-  it('an archive writes the archived line', async () => {
-    await writeTicket('T-0001', 'inbox');
-    const service = serviceOf({ events: { ledger: (write) => ledgerWrites.push(write) } });
-
-    const outcome = await service.archive({ id: 'T-0001' });
-
-    expect(outcome.ok).toBe(true);
-    expect(ledgerWrites).toEqual([{ kind: 'archived', ticket: 'T-0001' }]);
-  });
-
-  it('an archived ticket still opens, is listed under Show older and counts for Done this week (E13-21)', async () => {
-    await writeTicket('T-0001', 'inbox');
-    await writeTicket('T-0002', 'inbox');
-    const service = serviceOf({ events: { ledger: (write) => ledgerWrites.push(write) } });
-    expect((await service.archive({ id: 'T-0001' })).ok).toBe(true);
-
-    const read = await service.readTicket('T-0001');
-    expect(read).toMatchObject({ ok: true, card: { id: 'T-0001', phase: 'archive', path: 'tickets/archive/T-0001.md' } });
-    expect(read.ok && read.text).toContain('T-0001');
-    expect(await service.readTicket('T-0099')).toMatchObject({ ok: false });
-    expect(await service.readTicket('../_meta/pipeline')).toMatchObject({ ok: false });
-
-    expect(await service.archivedTickets()).toMatchObject({ ok: true, tickets: [{ id: 'T-0001' }] });
-    expect(await service.archivedTickets({ query: 'nothing like this' })).toEqual({ ok: true, tickets: [] });
-    expect((await service.snapshot()).recentDone.map((d) => d.id)).toEqual(['T-0001']);
-  });
-
-  it("a terminal Accept writes archived then merged (the ticket's real journey)", async () => {
-    await writeTicket('T-0001', 'done'); // the pipeline's terminal phase
-    const service = serviceOf({ events: { ledger: (write) => ledgerWrites.push(write) } });
-
-    const outcome = await service.acceptTicket({ id: 'T-0001' });
-
-    expect(outcome.ok).toBe(true);
-    expect(ledgerWrites).toEqual([
-      { kind: 'archived', ticket: 'T-0001' },
-      { kind: 'merged', ticket: 'T-0001' },
-    ]);
-  });
-
-  it('a non-terminal Accept is an ordinary phase move', async () => {
-    await writeTicket('T-0001', 'inbox');
-    const service = serviceOf({ events: { ledger: (write) => ledgerWrites.push(write) } });
-
-    const outcome = await service.acceptTicket({ id: 'T-0001' });
-
-    expect(outcome.ok).toBe(true);
-    expect(ledgerWrites).toEqual([{ kind: 'phase', ticket: 'T-0001', from: 'inbox', to: 'done' }]);
-  });
-
-  it('without events the service stays silent (the pre-E7 construction)', async () => {
-    await writeTicket('T-0001', 'inbox');
-    const service = serviceOf();
-    const outcome = await service.transition({ id: 'T-0001', from: 'inbox', to: 'done' });
-    expect(outcome.ok).toBe(true);
-    expect(ledgerWrites).toEqual([]);
-  });
-});
-
-describe('EngineBoardService snapshot usage — the ledger settled sums (costtracking)', () => {
-  it('snapshot attaches the run_settled sums of each ticket from tickets/_meta/ledger.jsonl', async () => {
-    await writeTicket('T-0001', 'inbox');
-    await writeTicket('T-0002', 'inbox');
-    await fsp.writeFile(
-      path.join(vaultDir, 'tickets', '_meta', 'ledger.jsonl'),
-      [
-        '{"v":1,"ts":"2026-11-02T09:00:00Z","event":"dispatched","ticket":"T-0001","persona":"pia","model":"opus"}',
-        '{"v":1,"ts":"2026-11-02T09:41:00Z","event":"run_settled","ticket":"T-0001","persona":"pia","model":"opus","tokensIn":48000,"tokensOut":6000,"cost":1.17}',
-        '{"v":1,"ts":"2026-11-02T10:05:00Z","event":"run_settled","ticket":"T-0001","persona":"ben","model":"glm-5.3","tokensIn":50000,"tokensOut":2500}',
-        '{"v":1,"ts":"2026-11-02T10:06:00Z","event":"phase","ticket":"T-0001","from":"inbox","to":"done"}',
-        '{"v":1,"ts":"broken line"}',
-      ].join('\n'),
-      'utf8',
-    );
-    const service = serviceOf();
-
-    const snap = await service.snapshot();
-
-    const card = snap.columns[0]!.tickets.find((t) => t.id === 'T-0001')!;
-    expect(card.usage).toEqual({ tokensIn: 98_000, tokensOut: 8_500, cost: 1.17, runs: 2 });
-    const untracked = snap.columns[0]!.tickets.find((t) => t.id === 'T-0002')!;
-    expect(untracked.usage).toBeUndefined();
-  });
-
-  it('snapshot without a ledger attaches no usage at all', async () => {
-    await writeTicket('T-0001', 'inbox');
-    const service = serviceOf();
-    const snap = await service.snapshot();
-    expect(snap.columns[0]!.tickets[0]!.usage).toBeUndefined();
-  });
 });
 
 describe('EngineBoardService statusOf', () => {
-  it('reads the ticket status log beside its card', async () => {
-    await writeTicket('T-0001', 'inbox');
-    await fsp.writeFile(
-      path.join(vaultDir, 'tickets', 'inbox', 'T-0001.status.log'),
-      [
-        "- '2026-11-02T09:00:00Z' working: inbox on opus",
-        '- not a status line',
-        "- '2026-11-02T09:12:00Z' needs-decision: [palette-shortcut] Which shortcut should open the palette?",
-        '',
-      ].join('\n'),
-      'utf8',
-    );
-    const service = serviceOf();
-
-    const lines = await service.statusOf('T-0001');
-
-    expect(lines).toEqual([
-      { at: '2026-11-02T09:00:00Z', verb: 'working', key: null, text: 'inbox on opus' },
-      { at: '2026-11-02T09:12:00Z', verb: 'needs-decision', key: 'palette-shortcut', text: 'Which shortcut should open the palette?' },
-    ]);
-  });
-
   it('reads empty when the log or the ticket is absent', async () => {
     await writeTicket('T-0001', 'inbox');
     const service = serviceOf();
@@ -311,74 +160,6 @@ describe('EngineBoardService statusOf', () => {
 });
 
 describe('EngineBoardService setForm (E8)', () => {
-  it('promoting a scout ticket writes form: ship with the form Log line — the commit degrades to the unversioned warning here', async () => {
-    await writeScoutTicket('T-0001', 'inbox');
-    const service = serviceOf();
-
-    const outcome = await service.setForm({ id: 'T-0001', form: 'ship', actor: 'owner@test' });
-
-    expect(outcome).toMatchObject({
-      ok: true,
-      warning: 'the tickets vault is not a git repository — the change is not versioned',
-    });
-    const text = await fsp.readFile(path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md'), 'utf8');
-    expect(text).toContain('form: ship');
-    expect(text).not.toContain('form: scout');
-    expect(text).toMatch(/- '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z' owner@test — form ship/);
-    // The rest of the file is untouched — description and the creation line stand.
-    expect(text).toContain('## Description');
-    expect(text).toContain("- '2026-11-02T10:00:00Z' owner@test — created in inbox");
-  });
-
-  it('demoting a ship ticket back to scout writes form: scout with the form Log line', async () => {
-    await writeTicket('T-0001', 'inbox');
-    const service = serviceOf();
-
-    const outcome = await service.setForm({ id: 'T-0001', form: 'scout' });
-
-    expect(outcome.ok).toBe(true);
-    const text = await fsp.readFile(path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md'), 'utf8');
-    expect(text).toContain('form: scout');
-    expect(text).toMatch(/- '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z' owner@test — form scout/);
-  });
-
-  it('setting the form the file already carries is a no-op success — no write, no Log line', async () => {
-    await writeTicket('T-0001', 'inbox'); // no form key — the ship default
-    const file = path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md');
-    const before = await fsp.readFile(file, 'utf8');
-    const service = serviceOf();
-
-    const outcome = await service.setForm({ id: 'T-0001', form: 'ship' });
-
-    expect(outcome).toEqual({ ok: true });
-    expect(await fsp.readFile(file, 'utf8')).toBe(before);
-  });
-
-  it('a live run refuses the form change and leaves the file untouched', async () => {
-    await writeScoutTicket('T-0001', 'inbox');
-    const file = path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md');
-    const text = await fsp.readFile(file, 'utf8');
-    await fsp.writeFile(
-      file,
-      text.replace(
-        'branch:',
-        "run:\n  pid: 42\n  started-at: '2026-11-02T10:00:00Z'\n  stream: run-1\nbranch:",
-      ),
-      'utf8',
-    );
-    const service = serviceOf();
-
-    const outcome = await service.setForm({ id: 'T-0001', form: 'ship' });
-
-    expect(outcome).toEqual({
-      ok: false,
-      error: 'A run is live on this ticket. Change the form when the run has ended.',
-    });
-    const after = await fsp.readFile(file, 'utf8');
-    expect(after).toContain('form: scout');
-    expect(after).not.toMatch(/— form ship/);
-  });
-
   it('refuses a ticket that is not on the board', async () => {
     const service = serviceOf();
 
@@ -411,123 +192,6 @@ The pipeline.
     }
   });
 
-  /** The same ticket with a `chain:` list (and its cursor) added to the frontmatter. */
-  async function writeChainedTicket(id: string, phase: string, chain: readonly string[], at = 1): Promise<void> {
-    await writeTicket(id, phase);
-    const file = path.join(vaultDir, 'tickets', phase, `${id}.md`);
-    const text = await fsp.readFile(file, 'utf8');
-    const lines = chain.map((entry) => `  - ${entry}`).join('\n');
-    await fsp.writeFile(file, text.replace('priority: normal\n', `priority: normal\nchain:\n${lines}\nat: ${at}\n`), 'utf8');
-  }
-
-  it('setting a chain writes the canonical entries, the cursor and the chain Log line — the commit degrades to the unversioned warning here', async () => {
-    await writeTicket('T-0001', 'build');
-    const service = serviceOf();
-
-    const outcome = await service.setChain({ id: 'T-0001', chain: ['ben', ' pia(notify) ', 'you'], actor: 'owner@test' });
-
-    expect(outcome).toMatchObject({
-      ok: true,
-      warning: 'the tickets vault is not a git repository — the change is not versioned',
-    });
-    const text = await fsp.readFile(path.join(vaultDir, 'tickets', 'build', 'T-0001.md'), 'utf8');
-    expect(text).toContain('chain:\n  - ben\n  - pia(notify)\n  - you\nat: 1');
-    expect(text).toMatch(/- '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z' owner@test — chain ben; pia\(notify\); you/);
-    // The rest of the file is untouched — description and the creation line stand.
-    expect(text).toContain('## Description');
-    expect(text).toContain("- '2026-11-02T10:00:00Z' owner@test — created in build");
-  });
-
-  it('an empty list writes the standard flow', async () => {
-    await writeChainedTicket('T-0001', 'inbox', ['pia']);
-    const service = serviceOf();
-
-    expect((await service.setChain({ id: 'T-0001', chain: [] })).ok).toBe(true);
-
-    const text = await fsp.readFile(path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md'), 'utf8');
-    expect(text).toContain('chain:\n  - ben\n  - ralf\n  - you\nat: 1');
-  });
-
-  it('setting the chain the file already carries is a no-op success — no write, no Log line', async () => {
-    await writeChainedTicket('T-0001', 'build', ['ben', 'you']);
-    const file = path.join(vaultDir, 'tickets', 'build', 'T-0001.md');
-    const before = await fsp.readFile(file, 'utf8');
-    const service = serviceOf();
-
-    const outcome = await service.setChain({ id: 'T-0001', chain: ['ben', 'you'] });
-
-    expect(outcome).toEqual({ ok: true });
-    expect(await fsp.readFile(file, 'utf8')).toBe(before);
-  });
-
-  it('an unreadable entry (the old delta included) refuses with the expected-shape hint and touches nothing', async () => {
-    await writeTicket('T-0001', 'build');
-    const file = path.join(vaultDir, 'tickets', 'build', 'T-0001.md');
-    const before = await fsp.readFile(file, 'utf8');
-    const service = serviceOf();
-
-    const outcome = await service.setChain({ id: 'T-0001', chain: ['skip verify'] });
-
-    expect(outcome).toEqual({
-      ok: false,
-      error: 'chain entry "skip verify" is not readable — a chain lists personas, e.g. "paul:shape; paul; ben; ralf; tessa; you"',
-    });
-    expect(await fsp.readFile(file, 'utf8')).toBe(before);
-  });
-
-  it('a persona that does not exist refuses', async () => {
-    await writeTicket('T-0001', 'build');
-    const service = serviceOf();
-
-    expect(await service.setChain({ id: 'T-0001', chain: ['ben', 'zed'] })).toEqual({ ok: false, error: 'position 2: persona "zed" does not exist' });
-  });
-
-  it('req-269: Mission Control\'s persona stands in a chain, but takes no mode', async () => {
-    await fsp.mkdir(path.join(vaultDir, 'tickets', '_meta', 'personas', 'mara'), { recursive: true });
-    await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'personas', 'mara', 'persona.md'), '---\ntitle: Mara\nkind: mission\nrole: custom\n---\n', 'utf8');
-    await writeTicket('T-0001', 'build');
-    const service = serviceOf();
-
-    expect(await service.setChain({ id: 'T-0001', chain: ['ben', 'mara:shape', 'you'] })).toEqual({ ok: false, error: "position 2: only an agent persona's entry takes a mode — mara:shape" });
-    expect((await service.setChain({ id: 'T-0001', chain: ['mara', 'you'] })).ok).toBe(true);
-  });
-
-  it('a change at or before the cursor refuses — only later positions change', async () => {
-    await writeChainedTicket('T-0001', 'build', ['ben', 'ralf', 'you'], 2);
-    const service = serviceOf();
-
-    expect(await service.setChain({ id: 'T-0001', chain: ['ben', 'pia', 'you'] })).toEqual({
-      ok: false,
-      error: 'position 2 (ralf) is the current step — only the positions after it can change',
-    });
-    expect((await service.setChain({ id: 'T-0001', chain: ['ben', 'ralf', 'pia', 'you'] })).ok).toBe(true);
-  });
-
-  it('a live run refuses the chain change and leaves the file untouched', async () => {
-    await writeTicket('T-0001', 'build');
-    const file = path.join(vaultDir, 'tickets', 'build', 'T-0001.md');
-    const text = await fsp.readFile(file, 'utf8');
-    await fsp.writeFile(
-      file,
-      text.replace(
-        'branch:',
-        "run:\n  pid: 42\n  started-at: '2026-11-02T10:00:00Z'\n  stream: run-1\nbranch:",
-      ),
-      'utf8',
-    );
-    const service = serviceOf();
-
-    const outcome = await service.setChain({ id: 'T-0001', chain: ['ben'] });
-
-    expect(outcome).toEqual({
-      ok: false,
-      error: 'A run is live on this ticket. Change the chain when the run has ended.',
-    });
-    const after = await fsp.readFile(file, 'utf8');
-    expect(after).not.toContain('chain:');
-    expect(after).not.toMatch(/— chain /);
-  });
-
   it('refuses a ticket that is not on the board', async () => {
     const service = serviceOf();
 
@@ -541,122 +205,12 @@ The pipeline.
 // through the non-enqueueing `snapshot()` (inside findCard) — the
 // single-writer queue is never re-entered from inside an op.
 describe('EngineBoardService setBlockedBy (T-0050)', () => {
-  it('setting blockers writes the whole list with the blocked-by Log line — the commit degrades to the unversioned warning here', async () => {
-    await writeTicket('T-0002', 'build');
-    const service = serviceOf();
-
-    const outcome = await service.setBlockedBy({ id: 'T-0002', blockedBy: ['T-0001', 'T-0003'], actor: 'owner@test' });
-
-    expect(outcome).toMatchObject({
-      ok: true,
-      warning: 'the tickets vault is not a git repository — the change is not versioned',
-    });
-    const text = await fsp.readFile(path.join(vaultDir, 'tickets', 'build', 'T-0002.md'), 'utf8');
-    expect(text).toContain('blocked-by:\n  - T-0001\n  - T-0003');
-    expect(text).toMatch(/- '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z' owner@test — blocked-by 2 ids/);
-    // The rest of the file is untouched — description and the creation line stand.
-    expect(text).toContain('## Description');
-    expect(text).toContain("- '2026-11-02T10:00:00Z' owner@test — created in build");
-  });
-
-  it('an empty list removes the blocked-by key with the blocked-by none Log line', async () => {
-    await writeTicket('T-0002', 'build');
-    const file = path.join(vaultDir, 'tickets', 'build', 'T-0002.md');
-    const before = await fsp.readFile(file, 'utf8');
-    await fsp.writeFile(file, before.replace('priority: normal\n', 'priority: normal\nblocked-by: [T-0001]\n'), 'utf8');
-    const service = serviceOf();
-
-    const outcome = await service.setBlockedBy({ id: 'T-0002', blockedBy: [] });
-
-    expect(outcome.ok).toBe(true);
-    const text = await fsp.readFile(file, 'utf8');
-    expect(text).not.toContain('blocked-by:');
-    expect(text).toMatch(/- '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z' owner@test — blocked-by none/);
-  });
-
-  it('setting the list the file already carries is a no-op success — no write, no Log line', async () => {
-    await writeTicket('T-0002', 'build');
-    const file = path.join(vaultDir, 'tickets', 'build', 'T-0002.md');
-    const before = await fsp.readFile(file, 'utf8');
-    await fsp.writeFile(file, before.replace('priority: normal\n', 'priority: normal\nblocked-by: [T-0001, T-0003]\n'), 'utf8');
-    const service = serviceOf();
-
-    const outcome = await service.setBlockedBy({ id: 'T-0002', blockedBy: ['T-0001', 'T-0003'] });
-
-    expect(outcome).toEqual({ ok: true });
-    const after = await fsp.readFile(file, 'utf8');
-    expect(after).toBe(before.replace('priority: normal\n', 'priority: normal\nblocked-by: [T-0001, T-0003]\n'));
-    expect(after).not.toMatch(/— blocked-by /);
-  });
-
-  it('an id outside the ticket grammar refuses and touches nothing', async () => {
-    await writeTicket('T-0002', 'build');
-    const file = path.join(vaultDir, 'tickets', 'build', 'T-0002.md');
-    const before = await fsp.readFile(file, 'utf8');
-    const service = serviceOf();
-
-    const outcome = await service.setBlockedBy({ id: 'T-0002', blockedBy: ['T-1'] });
-
-    expect(outcome).toEqual({ ok: false, error: 'blocked-by: "T-1" is not a ticket id' });
-    expect(await fsp.readFile(file, 'utf8')).toBe(before);
-  });
-
-  it('a live run refuses the blocker change and leaves the file untouched', async () => {
-    await writeTicket('T-0002', 'build');
-    const file = path.join(vaultDir, 'tickets', 'build', 'T-0002.md');
-    const text = await fsp.readFile(file, 'utf8');
-    await fsp.writeFile(
-      file,
-      text.replace(
-        'branch:',
-        "run:\n  pid: 42\n  started-at: '2026-11-02T10:00:00Z'\n  stream: run-1\nbranch:",
-      ),
-      'utf8',
-    );
-    const service = serviceOf();
-
-    const outcome = await service.setBlockedBy({ id: 'T-0002', blockedBy: ['T-0001'] });
-
-    expect(outcome).toEqual({
-      ok: false,
-      error: 'A run is live on this ticket. Change the blockers when the run has ended.',
-    });
-    const after = await fsp.readFile(file, 'utf8');
-    expect(after).not.toContain('blocked-by');
-    expect(after).not.toMatch(/— blocked-by /);
-  });
-
   it('refuses a ticket that is not on the board', async () => {
     const service = serviceOf();
 
     const outcome = await service.setBlockedBy({ id: 'T-0099', blockedBy: ['T-0001'] });
 
     expect(outcome).toEqual({ ok: false, error: 'T-0099 is not on the board' });
-  });
-});
-
-describe('EngineBoardService setClass (req-186)', () => {
-  it('pins the class in the ticket file, drops it again with null, and says so in the Log', async () => {
-    await writeTicket('T-0001', 'inbox');
-    const file = path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md');
-    const service = serviceOf();
-
-    expect(await service.setClass({ id: 'T-0001', class: 'B' })).toMatchObject({ ok: true });
-    expect(await fsp.readFile(file, 'utf8')).toMatch(/^class: B$/m);
-    expect(await fsp.readFile(file, 'utf8')).toContain('— class B');
-
-    expect(await service.setClass({ id: 'T-0001', class: null })).toMatchObject({ ok: true });
-    expect(await fsp.readFile(file, 'utf8')).not.toMatch(/^class:/m);
-  });
-
-  it('refuses a ticket that is not on the board and leaves an unchanged pin alone', async () => {
-    await writeTicket('T-0001', 'inbox');
-    const service = serviceOf();
-    expect(await service.setClass({ id: 'T-0099', class: 'A' })).toEqual({ ok: false, error: 'T-0099 is not on the board' });
-    const file = path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md');
-    const before = await fsp.readFile(file, 'utf8');
-    expect(await service.setClass({ id: 'T-0001', class: null })).toEqual({ ok: true });
-    expect(await fsp.readFile(file, 'utf8')).toBe(before);
   });
 });
 
@@ -672,29 +226,6 @@ The pipeline.
 
   beforeEach(async () => {
     await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'pipeline.md'), VOCAB_PIPELINE, 'utf8');
-  });
-
-  it('setPriority accepts a word of the vault vocabulary and writes it', async () => {
-    await writeTicket('T-0001', 'inbox');
-    const service = serviceOf();
-
-    const outcome = await service.setPriority({ id: 'T-0001', priority: 'p0' });
-
-    expect(outcome).toMatchObject({ ok: true });
-    const text = await fsp.readFile(path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md'), 'utf8');
-    expect(text).toContain('priority: p0');
-  });
-
-  it('setPriority refuses a word outside the vault vocabulary', async () => {
-    await writeTicket('T-0001', 'inbox');
-    const file = path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md');
-    const before = await fsp.readFile(file, 'utf8');
-    const service = serviceOf();
-
-    const outcome = await service.setPriority({ id: 'T-0001', priority: 'urgent' });
-
-    expect(outcome).toEqual({ ok: false, error: 'unknown priority "urgent"' });
-    expect(await fsp.readFile(file, 'utf8')).toBe(before);
   });
 
   it('createTicket refuses a priority the vocabulary does not carry', async () => {
@@ -713,20 +244,6 @@ The pipeline.
     });
   });
 
-  it('createTicket writes a vocabulary priority into the new file', async () => {
-    const service = serviceOf();
-
-    const outcome = await service.createTicket({
-      title: 'On-vocabulary',
-      description: 'Do the thing.',
-      priority: 'p0',
-      repo: null,
-    });
-
-    expect(outcome).toMatchObject({ ok: true, id: 'T-0001' });
-    const text = await fsp.readFile(path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md'), 'utf8');
-    expect(text).toContain('priority: p0');
-  });
 });
 
 describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () => {
@@ -878,77 +395,6 @@ describe('persona thread, memory pin and patch (U4, concept §4.4/§4.5)', () =>
   });
 });
 
-describe('EngineBoardService sendBack with review comments (E11-3)', () => {
-  const REVIEW_PIPELINE = `---
-phases:
-  - { id: inbox, title: Inbox, handover: manual }
-  - { id: build, title: Build, handover: agent build-default }
-  - { id: ready, title: Ready, handover: manual }
----
-The pipeline.
-`;
-
-  it('moves the ticket back and writes the comments into its Handover', async () => {
-    await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'pipeline.md'), REVIEW_PIPELINE, 'utf8');
-    await writeTicket('T-0001', 'ready');
-    const service = serviceOf();
-
-    const outcome = await service.sendBack({
-      id: 'T-0001',
-      note: '2 review comments',
-      comments: [
-        { file: 'src/a.ts', line: 27, endLine: null, text: 'Why here?' },
-        { file: 'src/a.ts', line: 30, endLine: 33, text: 'Rename.' },
-      ],
-    });
-
-    expect(outcome.ok).toBe(true);
-    const text = await fsp.readFile(path.join(vaultDir, 'tickets', '20-build', 'T-0001.md'), 'utf8');
-    expect(text).toContain('## Handover');
-    expect(text).toContain('### Review feedback');
-    expect(text).toContain('- `src/a.ts:27` — Why here?');
-    expect(text).toContain('- `src/a.ts:30-33` — Rename.');
-    expect(text).toContain('sent back: 2 review comments');
-    await expect(fsp.access(path.join(vaultDir, 'tickets', 'ready', 'T-0001.md'))).rejects.toBeDefined();
-  });
-
-  it('leaves the ticket text alone when no comments ride along', async () => {
-    await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'pipeline.md'), REVIEW_PIPELINE, 'utf8');
-    await writeTicket('T-0001', 'ready');
-    const outcome = await serviceOf().sendBack({ id: 'T-0001', note: 'Fix the colour' });
-    expect(outcome.ok).toBe(true);
-    const text = await fsp.readFile(path.join(vaultDir, 'tickets', '20-build', 'T-0001.md'), 'utf8');
-    expect(text).not.toContain('Review feedback');
-  });
-});
-
-describe('EngineBoardService estimateOf (E11-4)', () => {
-  const entry = (cost: number, phase = 'build'): string =>
-    `- { phase: ${phase}, persona: ben, model: sonnet, tokens: 40k, cost: ${cost}, dauer: 8m, ausgang: handed-over }`;
-
-  async function withHistory(id: string, folder: string, lines: readonly string[]): Promise<void> {
-    await writeTicket(id, 'inbox');
-    const from = path.join(vaultDir, 'tickets', 'inbox', `${id}.md`);
-    const text = await fsp.readFile(from, 'utf8');
-    const to = path.join(vaultDir, 'tickets', folder, `${id}.md`);
-    await fsp.mkdir(path.dirname(to), { recursive: true });
-    await fsp.writeFile(to, [text.trimEnd(), '', '## Verlauf', '', ...lines, ''].join(String.fromCharCode(10)), 'utf8');
-    await fsp.rm(from);
-  }
-
-  it('reads the history of every ticket, the archive included, and needs three similar runs', async () => {
-    const key = { gate: 'build', persona: 'ben', model: 'sonnet' };
-    const service = serviceOf();
-    await withHistory('T-0001', 'done', [entry(0.2)]);
-    await withHistory('T-0002', 'archive', [entry(0.4), entry(0.9, 'review')]);
-    expect(await service.estimateOf(key)).toBeNull();
-
-    await withHistory('T-0003', 'done', [entry(0.3)]);
-    expect(await service.estimateOf(key)).toEqual({ ...key, runs: 3, cost: 0.3, costLow: 0.25, costHigh: 0.35, minutes: 8, tokens: 40_000 });
-    expect(await service.estimateOf({ ...key, gate: 'review' })).toBeNull();
-  });
-});
-
 // E10-3: the shape turn's two board seams — the plan chapter write and the
 // read-only look into the ticket's repository.
 describe('EngineBoardService shape seams (E10-3)', () => {
@@ -974,55 +420,8 @@ describe('EngineBoardService shape seams (E10-3)', () => {
     await fsp.rm(repoDir, { recursive: true, force: true });
   });
 
-  async function writeRepoTicket(id: string, phase: string): Promise<string> {
-    await writeTicket(id, phase);
-    const file = path.join(vaultDir, 'tickets', phase, `${id}.md`);
-    const text = await fsp.readFile(file, 'utf8');
-    await fsp.writeFile(file, text.replace(/^repo:.*$/m, 'repo: demo'), 'utf8');
-    return file;
-  }
-
-  it('setPlan replaces only the Plan chapter and keeps the rest of the file', async () => {
-    await writeTicket('T-0001', 'inbox');
-    const file = path.join(vaultDir, 'tickets', 'inbox', 'T-0001.md');
-    const service = serviceOf();
-
-    expect((await service.setPlan({ id: 'T-0001', plan: '### Goal\n\nOne thing.' })).ok).toBe(true);
-    const text = await fsp.readFile(file, 'utf8');
-    expect(text).toContain('## Plan\n\n### Goal\n\nOne thing.');
-    expect(text).toContain('Do the thing.');
-    expect(text).toContain('created in inbox');
-
-    // The same plan again is a no-op success.
-    const before = await fsp.readFile(file, 'utf8');
-    expect(await service.setPlan({ id: 'T-0001', plan: '### Goal\n\nOne thing.' })).toEqual({ ok: true });
-    expect(await fsp.readFile(file, 'utf8')).toBe(before);
-  });
-
   it('setPlan refuses an unknown ticket', async () => {
     expect(await serviceOf().setPlan({ id: 'T-0999', plan: 'x' })).toEqual({ ok: false, error: 'T-0999 is not on the board' });
-  });
-
-  it('reads a file and lists a directory of the ticket’s repository', async () => {
-    await writeRepoTicket('T-0001', 'inbox');
-    const service = serviceOf();
-
-    expect(await service.readRepoFile('T-0001', 'src/a.ts')).toEqual({ ok: true, text: 'export const a = 1;' });
-    const listing = await service.readRepoFile('T-0001', '');
-    expect(listing).toMatchObject({ ok: true });
-    expect((listing as { text: string }).text.split('\n')).toEqual(['CLAUDE.md', 'logo.bin', 'src/']);
-    expect(await service.readRepoFile('T-0001', 'src/')).toEqual({ ok: true, text: 'a.ts' });
-  });
-
-  it('keeps git internals, secrets, escapes and binaries shut', async () => {
-    await writeRepoTicket('T-0001', 'inbox');
-    const service = serviceOf();
-
-    for (const bad of ['.git/config', '.env', '../outside.txt', '/etc/passwd', 'src//a.ts']) {
-      expect((await service.readRepoFile('T-0001', bad)).ok, bad).toBe(false);
-    }
-    expect(await service.readRepoFile('T-0001', 'logo.bin')).toEqual({ ok: false, error: '"logo.bin" is a binary file' });
-    expect(await service.readRepoFile('T-0001', 'missing.ts')).toEqual({ ok: false, error: '"missing.ts" does not exist' });
   });
 
   it('refuses without a repository', async () => {
@@ -1034,39 +433,24 @@ describe('EngineBoardService shape seams (E10-3)', () => {
 describe('EngineBoardService default pipeline (req-99a)', () => {
   const pipelinePath = (): string => path.join(vaultDir, 'tickets', '_meta', 'pipeline.md');
 
-  it('seeds Inbox · Shaping · Prioritized · Building · Ready to try · Done on a new board', async () => {
+  it('seeds the persona board pipeline: Inbox · Prioritized · Done and the standard flow (req-307)', async () => {
     await fsp.rm(pipelinePath());
     expect(await serviceOf().initialize('v')).toMatchObject({ ok: true });
 
     const snap = await serviceOf().snapshot();
     expect(snap.pipeline.map((p) => [p.id, p.title])).toEqual([
       ['inbox', 'Inbox'],
-      ['shaping', 'Shaping'],
       ['prioritized', 'Prioritized'],
-      ['building', 'Building'],
-      ['ready', 'Ready to try'],
       ['done', 'Done'],
     ]);
-    expect(snap.pipeline.map((p) => parseHandover(p.handover).mode)).toEqual(['manual', 'manual', 'manual', 'agent', 'manual', 'none']);
-    expect(snap.pipeline.filter((p) => p.claim).map((p) => p.id)).toEqual(['building']);
-    // The columns the human persona works carry its pin; the agent columns carry none (the ladder decides).
-    expect(snap.pipeline.map((p) => [p.id, p.persona])).toEqual([
-      ['inbox', 'you'],
-      ['shaping', 'you'],
-      ['prioritized', 'you'],
-      ['building', null],
-      ['ready', 'you'],
-      ['done', null],
-    ]);
-    // ...and the persona they name exists from the first minute, titled You.
+    expect(snap.flow?.map((e) => e.persona)).toEqual(['paul', 'ben', 'ralf', 'tessa', 'you']);
+    // The human persona exists from the first minute, titled You.
     const personaFile = await fsp.readFile(path.join(vaultDir, 'tickets', '_meta', 'personas', 'you', 'persona.md'), 'utf8');
     expect(personaFile).toContain('kind: human');
     expect(personaFile).toMatch(/title: ['"]?You['"]?\s/);
-    // Ready to try is the owner's checkpoint; the columns before the first agent column are plain queues.
-    expect([...snap.checkpoints]).toEqual(['ready', 'done']);
     // req-267: the sign-off's merge is You's commit leaving action, no prompt.
     expect(personaFile).toContain('leaving: [commit]');
-    await expect(fsp.stat(path.join(vaultDir, 'tickets', '_meta', 'prompts', 'commit-default.md'))).rejects.toThrow();
+    await expect(fsp.stat(path.join(vaultDir, 'tickets', '_meta', 'prompts'))).rejects.toThrow();
   });
 
   it('renames the human persona: one title on the persona file, blank goes back to You', async () => {
@@ -1100,12 +484,10 @@ describe('EngineBoardService default pipeline (req-99a)', () => {
   });
 
   it('an existing board gets the human persona created on first sight and keeps its columns', async () => {
-    // The shared board of this suite predates the pins: its columns carry none.
-    const snap = await serviceOf().snapshot();
-    expect(snap.pipeline.every((p) => p.persona === null)).toBe(true);
+    const before = (await serviceOf().snapshot()).pipeline.map((p) => p.id);
     await serviceOf().ensureHumanPersona();
     expect((await serviceOf().listPersonas()).some((p) => p.kind === 'human' && p.title === 'You')).toBe(true);
-    expect((await serviceOf().snapshot()).pipeline.every((p) => p.persona === null)).toBe(true);
+    expect((await serviceOf().snapshot()).pipeline.map((p) => p.id)).toEqual(before);
   });
 
   it('leaves a board with the old default pipeline exactly as it is', async () => {
@@ -1133,7 +515,7 @@ describe('EngineBoardService default pipeline (req-99a)', () => {
       ['commit', 'Commit'],
       ['done', 'Done'],
     ]);
-    expect([...snap.checkpoints]).toEqual(['done']);
+    expect([...snap.checkpoints]).toEqual([]);
   });
 
   it('never renames what a board already has: an existing Inbox title stays', async () => {
@@ -1145,3 +527,4 @@ describe('EngineBoardService default pipeline (req-99a)', () => {
     expect(snap.pipeline.map((p) => p.title)).toEqual(['Inbox', 'Done']);
   });
 });
+

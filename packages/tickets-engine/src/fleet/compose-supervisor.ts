@@ -133,8 +133,6 @@ export interface RunSupervisorDeps {
   readonly leaseTimers?: LeaseTimers;
   /** Run settled (terminal): the orchestrator's slot-freed trigger (M85). */
   readonly onRunSettled?: (info: RunInfo) => void;
-  /** The quality rungs (M85, flagged off): a second worker's brief on a green gate, or null. */
-  readonly secondOpinion?: (request: RunRequest) => Promise<string | null>;
   /** Per-run ceilings (0 = unlimited); a run that passes one is failed, never retried at once. */
   readonly limits?: Partial<RunLimits>;
   /** req-177: the slot (account) each run starts on; absent = no slots. */
@@ -191,10 +189,9 @@ function runtimeOf(deps: RunSupervisorDeps): Runtime {
   const processes: ProcessSupervisor = new ProcessSupervisor({ adapter: deps.adapter, repo, events, background, settings, table, log, ...slotEnvOf(deps.slots), ...(deps.vault !== undefined ? { vault: deps.vault } : {}), onExit: (run, code): Promise<void> => completion.onWorkerExit(run, code) });
   const stopper: RunStopper = new RunStopper(machine, repo, processes, { settler, bookkeeper, log });
   const gate = new GateRunner({ bookkeeper, shell: deps.execShell ?? execShell, trailers: deps.validateTrailers ?? validateTrailers, repo, review, ...(deps.seats !== undefined ? { seats: deps.seats } : {}) });
-  const opinion = deps.secondOpinion !== undefined ? { secondOpinion: deps.secondOpinion } : {};
   const closing = closingRoundOf({ shared, repo, processes, log, channel: deps.personaRecords });
   const leaving = runLeavingOf({ git, bookkeeper, repo, claims, seats: deps.seats });
-  const completion: RunCompletion = new RunCompletion({ machine, repo, gate, bookkeeper, settler, processes, closing, leaving, ...opinion });
+  const completion: RunCompletion = new RunCompletion({ gate, bookkeeper, settler, closing, leaving });
   return { ...shared, deps, table, machine, background, repo, settings, claims, settler, processes, stopper, takeover, completion, git, review };
 }
 

@@ -8,7 +8,7 @@ describe('RunSettler — the settled cost and the Verlauf chapter', () => {
   const dirs = useTempDirs();
   /** An interactive dialog run: no gate, no move — the settle keeps the ticket where it is. */
   const dialogRequest = (over: Partial<RunRequest> = {}): RunRequest =>
-    runRequest(dirs.vault, { acceptance: [], gate: 'structural', nextPhase: null, nextPhaseDir: null, interactive: 'plan', ...over });
+    runRequest(dirs.vault, { acceptance: [], gate: 'structural', interactive: 'plan', ...over });
   const lastVerlaufLine = (text: string): string | null => {
     const at = text.lastIndexOf('- { phase:');
     return at === -1 ? null : text.slice(at, text.indexOf('\n', at));

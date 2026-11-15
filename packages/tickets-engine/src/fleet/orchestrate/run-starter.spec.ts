@@ -9,7 +9,7 @@ import { gitRecorder } from './tickets-git.fake';
 describe('RunStarter — the rules, the claim first, then the worktree and the worker', () => {
   const dirs = useTempDirs();
   const request = (over: Partial<RunRequest> = {}): RunRequest => runRequest(dirs.vault, over);
-  const dialog = (): RunRequest => request({ acceptance: [], gate: 'structural', nextPhase: null, nextPhaseDir: null, interactive: 'plan' });
+  const dialog = (): RunRequest => request({ acceptance: [], gate: 'structural', interactive: 'plan' });
 
   it('refuses a second live run for the ticket', async () => {
     const { sup, adapter } = harness(dirs.fleet);
@@ -110,7 +110,7 @@ describe('RunStarter — the rules, the claim first, then the worktree and the w
       await settled(sup, info!.id, 'done');
       expect(gate).toEqual([]);
       expect(store.of('release').map((c) => c.stage)).not.toContain('build');
-      expect(store.stage).toBe('prioritized'); // no move: back where it sat is refused (R-31), so it retreats - a lifecycle store releases to active (req-265)
+      expect(store.stage).toBe('active'); // no move: back where it sat is refused (R-31, the claim stage), so it goes to active (req-265)
       expect((await runnerNotes(dirs.fleet, info!.id)).some((line) => line.startsWith('interactive dialog ended'))).toBe(true);
     });
 

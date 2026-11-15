@@ -88,13 +88,13 @@ describe('Delete persona… on the Persona page (req-261)', () => {
     expect(fx.removed).toBe(1);
   });
 
-  it("shows the engine's refusal in the ask, names the pinning columns, and keeps the ask and the page", async () => {
-    fx.replies['personaRemove'] = { ok: false, code: 'pinned', error: 'pinned', columns: ['Build', 'Review'], crewDefault: false };
+  it("shows the engine's refusal in the ask, and keeps the ask and the page", async () => {
+    fx.replies['personaRemove'] = { ok: false, code: 'busy', error: 'Ben has a live run or 1:1 — stop it first' };
     await openAsk();
     type(field(), 'Ben');
     deleteButton().click();
     await settle();
-    expect(modal().querySelector('[role="alert"]')?.textContent).toBe('The columns Build and Review pin Ben. Unpin it first.');
+    expect(modal().querySelector('[role="alert"]')?.textContent).toBe('Ben has a run or a 1:1 open. Stop it first.');
     expect(fx.removed).toBe(0);
     type(field(), 'Ben2');
     expect((modal().querySelector('[role="alert"]') as HTMLElement).hidden).toBe(true);

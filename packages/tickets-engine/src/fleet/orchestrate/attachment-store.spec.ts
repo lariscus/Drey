@@ -9,7 +9,7 @@ describe('AttachmentStore — files the owner attaches in the takeover tab', () 
   it('a scout run stores owner attachments in its run dir — the read ground is never written', async () => {
     const git = gitRecorder();
     const { sup } = harness(dirs.fleet, { ticketsGit: git.ticketsGit });
-    const scout = runRequest(dirs.vault, { form: 'scout', acceptance: [], gate: 'none', nextPhase: null, nextPhaseDir: null, worktreePath: 'W:/kt', instruction: 'Scout it.' });
+    const scout = runRequest(dirs.vault, { form: 'scout', acceptance: [], gate: 'none', worktreePath: 'W:/kt', instruction: 'Scout it.' });
     const id = await startRun(sup, scout);
 
     const attached = await sup.attachFile(id, 'log.txt', Buffer.from('evidence').toString('base64'));

@@ -72,13 +72,6 @@ describe('PersonaDeleteAsk', () => {
 describe('refusalText', () => {
   const text = (reply: unknown): string => refusalText(i18n, 'Ben', failureOf(reply)!);
 
-  it('names the pinning columns, one or many, and the crew default', () => {
-    expect(text({ ok: false, code: 'pinned', error: 'x', columns: ['Build'] })).toBe('The column Build pins Ben. Unpin it first.');
-    expect(text({ ok: false, code: 'pinned', error: 'x', columns: ['Build', 'Review'] })).toBe('The columns Build and Review pin Ben. Unpin it first.');
-    expect(text({ ok: false, code: 'pinned', error: 'x', columns: [], crewDefault: true })).toBe("Ben is the crew's default persona. Choose another one first.");
-    expect(text({ ok: false, code: 'pinned', error: 'x', columns: ['Build'], crewDefault: true })).toBe("The column Build pins Ben, and Ben is the crew's default persona. Unpin it first.");
-  });
-
   it('has a line for every code the engine answers', () => {
     expect(text({ ok: false, code: 'human', error: 'x' })).toBe('Your own persona cannot be deleted.');
     expect(text({ ok: false, code: 'confirm', error: 'x' })).toBe('That is not the name.');

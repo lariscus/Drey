@@ -212,10 +212,10 @@ describe('workerLabelOf', () => {
 describe('fleetLine — the footer\'s one fleet line (T-0086)', () => {
   const alert = (patch: Partial<ChainAlert> = {}): ChainAlert =>
     ({
-      kind: 'breaker',
-      key: 'breaker:build:',
-      title: 'Build stopped by the circuit breaker',
-      text: '3 red gates in a row',
+      kind: 'quota',
+      key: 'quota:opencode:',
+      title: 'OpenCode is out of quota',
+      text: 'No new run before 16:00',
       action: null,
       ...patch,
     }) as ChainAlert;
@@ -267,12 +267,12 @@ describe('fleetLine — the footer\'s one fleet line (T-0086)', () => {
     const line = fleetLine([run({ turn: 'busy' })], [alert()], NOW);
     expect(line.light).toBe('amber');
     expect(line.text).toBe('1 running · OpenCode 1');
-    expect(line.long.endsWith('Build stopped by the circuit breaker: 3 red gates in a row')).toBe(true);
+    expect(line.long.endsWith('OpenCode is out of quota: No new run before 16:00')).toBe(true);
   });
 
   it('shows the alert itself when nothing runs — one by title, several by count', () => {
-    expect(fleetLine([], [alert()], NOW)).toMatchObject({ light: 'amber', text: 'Build stopped by the circuit breaker' });
-    expect(fleetLine([], [alert(), alert({ kind: 'held', key: 'held:build', title: 'Build is on hold' })], NOW)).toMatchObject({
+    expect(fleetLine([], [alert()], NOW)).toMatchObject({ light: 'amber', text: 'OpenCode is out of quota' });
+    expect(fleetLine([], [alert(), alert({ key: 'quota:kimi:', title: 'Kimi Code is out of quota' })], NOW)).toMatchObject({
       light: 'amber',
       text: '2 fleet alerts',
     });

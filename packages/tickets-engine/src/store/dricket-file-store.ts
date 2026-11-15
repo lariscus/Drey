@@ -36,8 +36,6 @@ export type WriteOutcome =
  * own write, because a write only returns once the checkout shows its `rev`.
  */
 export class DricketFileStore implements TicketStore {
-  readonly backend = 'dricket' as const;
-
   constructor(
     private readonly reader: FileStoreReader,
     private readonly dk: DricketTicketStore,

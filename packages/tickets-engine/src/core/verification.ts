@@ -1,8 +1,7 @@
 /**
  * The `## Verification` section's writer and reader (E4, ADR-0088 later
- * change). The verify service replaces the section after every run; the
- * proof card reads it back tolerantly. Machine writes are strict — the
- * exact shapes below; the reader forgives (the asymmetric-tolerance
+ * change). Writes are strict - the exact shapes below; the proof card
+ * reads the section back tolerantly (the asymmetric-tolerance
  * rule, ADR-0076): an absent or partially unreadable section simply
  * means "not verified yet", never a guess.
  *

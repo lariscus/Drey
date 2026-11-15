@@ -143,7 +143,7 @@ export function crewVault(env: CrewRunEnv, flow: string, personas: readonly Crew
 export function writeTicketsConfig(userDataDir: string, env: CrewRunEnv): void {
   const dir = path.join(userDataDir, 'plugins', 'tickets');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ backend: 'dricket', 'dk.store': env.storeDir, 'dk.dataDir': env.dataDir, 'dk.syncSeconds': 0 }, null, 2));
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ 'dk.store': env.storeDir, 'dk.dataDir': env.dataDir, 'dk.syncSeconds': 0 }, null, 2));
 }
 
 /** A ticket body whose machine gate runs one command; `type`/`test -f` keeps it free of any toolchain. */

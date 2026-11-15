@@ -67,7 +67,6 @@ function hostOf(files: Map<string, string>): EngineHost {
     configSet: async () => undefined,
     emitBoardChanged: () => undefined,
     log: () => undefined,
-    userRoot: '/home',
     pickFolder: async () => null,
     revealPath: async () => '',
     launchInConsole: () => undefined,

@@ -557,25 +557,15 @@ export class DreyTicketsPort implements TicketsRemotePort {
 
   async personas(): Promise<readonly PersonaView[]> {
     await this.boardService.ensureHumanPersona?.();
-    const [personas, ledgerText, snapshot, chain] = await Promise.all([
+    const [personas, ledgerText, chain] = await Promise.all([
       this.boardService.listPersonas(),
       this.boardService.ledgerText(),
-      this.boardService.snapshot(),
       this.fleetClient.chainStatus().catch(() => null),
     ]);
     // The Team view's "Tageskosten gegen Budget" (concept §4.3): today's
     // settled costs, persona-keyed from the fleet ledger; UTC day — the
     // same convention the chain's token budgets use.
     const daily = personaDailyCosts(parseLedger(ledgerText ?? ''), new Date().toISOString().slice(0, 10));
-    // U4: the phases each persona owns (`persona:` in pipeline.md), from
-    // the same snapshot; and the chain's persona pause — absent while the
-    // chain state is unknown (the runner is down), never a guessed false.
-    const phases: Record<string, string[]> = {};
-    for (const phase of snapshot.pipeline) {
-      if (phase.persona !== null && phase.persona !== '') {
-        (phases[phase.persona] ??= []).push(phase.id);
-      }
-    }
     const paused = chain?.pausedPersonas;
     // req-239: the commit age of each persona's folder; a failing git leaves the field out.
     const committed: Readonly<Record<string, string>> = (await this.records?.commitAges?.(personas.map((p) => p.id)).catch(() => ({}))) ?? {};
@@ -598,7 +588,6 @@ export class DreyTicketsPort implements TicketsRemotePort {
       ...(committed[p.id] !== undefined ? { committedAt: committed[p.id] } : {}),
       budget: p.budget,
       ...(daily[p.id] !== undefined ? { dailyCost: daily[p.id] } : {}),
-      ...(phases[p.id] !== undefined ? { phases: phases[p.id] } : {}),
       ...(paused !== undefined ? { paused: paused.includes(p.id) } : {}),
     }));
   }

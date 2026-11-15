@@ -1,6 +1,5 @@
 import type { BoardSnapshot, PriorityConfig } from '../contracts/tickets';
 import type { TicketComment, TicketDetail, TicketStore } from '../ports/ticket-store';
-import type { BoardDiff } from './board-diff';
 import { assembleBoardFromRecords, type RecordsBoardInput } from './store-board';
 import type { AddOptions, AddResult, Claim, ClaimOptions, PutOptions, ReleaseOptions, ReleaseResult } from '../ports/ticket-store';
 import type { DricketTicketStore } from './dricket-ticket-store';
@@ -11,12 +10,10 @@ import { StoreChangeFeed, type StoreChangeFeedStats, type WatchFn } from './stor
 import { headFingerprint, remoteMovedProbe } from './store-git-probe';
 import { StorePathReporter, type StorePathChange } from './store-path-report';
 import { StoreConfigCache } from './store-config-cache';
-import { readStoreConfigText } from './store-config-text';
 import { StoreReader } from './store-reader';
 import { checkoutOf, createDricketStore, type StoreSettings } from './store-settings';
-import { StoreShadow } from './store-shadow';
-import { writePlacement, type StoreStageSet } from './store-stages';
-import { ACTIVE_STAGE, PHASE_PIN_KEY, RUNNING_STAGE } from '../core/lifecycle-stages';
+import type { StoreStageSet } from './store-stages';
+import { stageOfPhase } from '../core/lifecycle-stages';
 
 /** The seams of the file path (E14-4); specs replace them, the engine leaves them out. */
 export interface StoreBoardSourceOptions {
@@ -44,8 +41,8 @@ export interface StoreBoardSourceOptions {
 }
 
 /**
- * A board write: the column the ticket ends in (the store's stage and pin follow from it, req-265),
- * or `keepStage` for an edit that moves nothing (stage and pin stay as the document has them).
+ * A board write: the column the ticket ends in (the store's stage follows from it, req-265),
+ * or `keepStage` for an edit that moves nothing (the stage stays as the document has it).
  */
 export type LegacyWrite =
   | {
@@ -70,30 +67,22 @@ interface Source {
  * The glue between the board service and the dricket store: builds the store
  * (once per settings) and reads its tickets (E14-2) — from the files of the
  * store's checkout when there is one (E14-4: 18 ms for 91 tickets, no process),
- * else through the caching {@link StoreReader} — runs the `shadow` comparison
- * off the request path, and is the one door for writes (`dk put`, the engine the
- * single writer) and for change detection (own writes, watcher, `dk sync`).
+ * else through the caching {@link StoreReader} — and is the one door for writes
+ * (`dk put`, the engine the single writer) and for change detection (own writes,
+ * watcher, `dk sync`).
  */
 export class StoreBoardSource {
   private current: Source | null = null;
   private readonly feeds = new Set<StoreChangeFeed>();
   private readonly pathReporters = new Set<StorePathReporter>();
-  private readonly shadow: StoreShadow;
   private readonly config: StoreConfigCache;
-  /** req-257: an `active` ticket of the last board read still carries req-265's column pin. */
-  private pinned = false;
 
   constructor(
-    /** Where the shadow report lands (`<userRoot>/shadow`). */
-    reportDir: string,
     private readonly log: (message: string, level?: 'info' | 'warn' | 'error') => void,
-    /** Minimum gap between two shadow runs (every snapshot would otherwise cost a `dk` pass). */
-    shadowIntervalMs = 30_000,
     /** Test seam: a store instead of the real `dk`. */
     private readonly storeFactory: (settings: StoreSettings) => TicketStore = createDricketStore,
     private readonly options: StoreBoardSourceOptions = {},
   ) {
-    this.shadow = new StoreShadow(reportDir, log, shadowIntervalMs, (settings) => this.records(settings));
     this.config = new StoreConfigCache({
       ...(options.readPriorities === undefined ? {} : { priorities: options.readPriorities }),
       ...(options.readStages === undefined ? {} : { stages: options.readStages }),
@@ -156,12 +145,12 @@ export class StoreBoardSource {
   }
 
   /**
-   * Resolves when the background work is over: the watcher's HEAD reads, the ref check, a sync round (of any
-   * feed, also one replaced by new settings) and a running shadow comparison. Call after {@link dispose} before
+   * Resolves when the background work is over: the watcher's HEAD reads, the ref check and a sync round (of any
+   * feed, also one replaced by new settings). Call after {@link dispose} before
    * the folders are let go; the processes it waits for hold their working directory.
    */
   async idle(): Promise<void> {
-    await Promise.allSettled([...[...this.feeds].map((feed) => feed.idle()), this.shadow.idle()]);
+    await Promise.allSettled([...this.feeds].map((feed) => feed.idle()));
     await Promise.allSettled([...this.pathReporters].map((paths) => paths.idle()));
   }
 
@@ -238,35 +227,14 @@ export class StoreBoardSource {
     }
     const bridge = 'keepStage' in target
       ? { stage: current.stage }
-      : { ...writePlacement(target.phase, await this.stages(settings), current.text), ...(target.archived === undefined ? {} : { archived: target.archived }) };
+      : { stage: stageOfPhase(target.phase), ...(target.archived === undefined ? {} : { archived: target.archived }) };
     return this.write(settings, current.id, legacyToDricketDocument(current.text, legacyText, bridge), { expectedRev: current.rev });
-  }
-
-  /** The stage a release from the board hands a ticket in column `phase` to (req-265: a lifecycle stage on a migrated store). */
-  async releaseStageOf(settings: StoreSettings, phase: string): Promise<string> {
-    return writePlacement(phase, await this.stages(settings), '').stage;
-  }
-
-  /** req-257: whether the last board read found an `active` ticket still carrying req-265's column pin (the migration converts it). */
-  pinsLeft(): boolean {
-    return this.pinned;
   }
 
   /** The store's `[stages]` (cached a minute); null without a checkout, a config or a table. */
   async stages(settings: StoreSettings): Promise<StoreStageSet | null> {
     const checkout = checkoutOf(settings);
     return checkout === null ? null : this.config.stages(checkout);
-  }
-
-  /** The store's `dricket.toml` as it is now (uncached; the stage migration plans from it). */
-  async configText(settings: StoreSettings): Promise<{ readonly ref: string; readonly text: string } | null> {
-    const checkout = checkoutOf(settings);
-    return checkout === null ? null : readStoreConfigText(checkout);
-  }
-
-  /** The store's config was just committed: the next read asks git again. */
-  invalidateConfig(): void {
-    this.config.invalidate();
   }
 
   /** Creates an unclaimed ticket through `dk add`; dk allocates the number. */
@@ -314,7 +282,6 @@ export class StoreBoardSource {
   async board(settings: StoreSettings, input: Omit<RecordsBoardInput, 'records'>): Promise<BoardSnapshot> {
     try {
       const records = await this.records(settings);
-      this.pinned = records.some((r) => (r.stage === ACTIVE_STAGE || r.stage === RUNNING_STAGE) && (r.extensions[PHASE_PIN_KEY] ?? '') !== '');
       const [priorities, comments] = await Promise.all([this.prioritiesOf(settings), this.commentsByTicket(settings, records)]);
       return assembleBoardFromRecords({ ...input, records, comments, ...(priorities === null ? {} : { priorities }) });
     } catch (error) {
@@ -343,20 +310,5 @@ export class StoreBoardSource {
       }),
     );
     return out;
-  }
-
-  /** The last comparison, or null before the first shadow run finished. */
-  get lastShadowDiff(): BoardDiff | null {
-    return this.shadow.lastDiff;
-  }
-
-  /** Shadow mode (E14-2): the store's board compared with the one the UI shows, off the request path ({@link StoreShadow}). */
-  scheduleShadow(settings: StoreSettings, input: Omit<RecordsBoardInput, 'records'>, shown: BoardSnapshot): void {
-    this.shadow.schedule(settings, input, shown);
-  }
-
-  /** The awaitable core of {@link scheduleShadow} (specs call it directly). */
-  runShadow(settings: StoreSettings, input: Omit<RecordsBoardInput, 'records'>, shown: BoardSnapshot): Promise<BoardDiff | null> {
-    return this.shadow.run(settings, input, shown);
   }
 }

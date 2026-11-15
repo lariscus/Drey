@@ -3,8 +3,6 @@ import { storeFooterLine } from './store-footer';
 import type { StoreSettings } from './store-settings';
 
 const BASE: StoreSettings = {
-  backend: 'dricket',
-  shadow: false,
   dkPath: '',
   dkStore: 'E:\\dkv',
   dkDataDir: '',

@@ -7,65 +7,47 @@ function messageOf(error: unknown): string {
 
 /**
  * The machine's result: the ok:false variant names the error; ok:true
- * carries the optional warnings (commit/push are warning-level) and the
- * resulting path. Structurally assignable to the board's richer
+ * carries the resulting path. Structurally assignable to the board's richer
  * MutationResult — the machine never produces `moved`.
  */
 export type TransitionResult =
   | { readonly ok: false; readonly error: string }
-  | { readonly ok: true; readonly warning?: string; readonly path?: string };
+  | { readonly ok: true; readonly path?: string };
 
 /**
  * THE one transition machine (ADR-0088, E1). Every ticket move — the
- * board's `transition`, archive, unarchive, the Ready card's Accept /
- * Send back and the drift treatment — is the same pipeline with different
- * parameters:
+ * board's `transition`, archive, unarchive and the Ready card's Accept /
+ * Send back — is the same pipeline with different parameters:
  *
- *   read → patch (+ optional extra Log line) → [rename] → write
- *        → one commit → the optional push → announce
+ *   read → patch (+ optional extra Log line) → write → announce
  *
- * Before E1 the five call sites each owned a copy of this pipeline
- * (`moveCard`, `archiveCard`, `unarchive`, `treatDrift`, `acceptTicket`
- * in the plugin's board service). `acceptTicket` stays a dispatcher by
- * nature (terminal phase archives, anything else moves); the rest build a
- * {@link TransitionSpec} and run it here.
+ * On the store the write is one `put` (the board service's IO decides the
+ * stage from the target path); there is no rename, commit or push of a
+ * ticket file any more (E14-9b).
  *
  * The machine is pure domain: all IO arrives injected through
  * {@link TransitionIo}, so `core/` keeps its no-node/no-Electron rule and
  * the spec covers every step with fakes.
  */
 
-/** The IO the machine needs, supplied by the host (plugin board service today, engine server in E2). */
+/** The IO the machine needs, supplied by the host (the board service over the store). */
 export interface TransitionIo {
-  /** Read a vault-relative ticket file. */
+  /** Read a ticket by its board path. */
   read(path: string): Promise<string>;
-  /** Write a vault-relative ticket file (no announcement — the machine announces once at the end). */
+  /** Write a ticket at its board path (no announcement — the machine announces once at the end). */
   write(path: string, text: string): Promise<void>;
-  /**
-   * mkdir the target directory and rename `from` → `to` (both vault-relative).
-   * A structured failure keeps the current wording verbatim: a path that
-   * escapes the vault is `ticket path escapes the vault`, a filesystem
-   * error is `move failed: …`.
-   */
-  renameInto(fromPath: string, toPath: string): Promise<{ ok: true } | { ok: false; error: string }>;
-  /** One commit for exactly these vault-relative paths; a warning string or null. */
-  commit(paths: readonly string[], message: string): Promise<string | null>;
-  /** The optional auto-push (`pipeline.md push:`); a warning string or null. */
-  push(remote: string | null): Promise<string | null>;
-  /** The closing announcement: the vault round plus the board-changed signal. */
-  announce(changedPaths: readonly string[], deletedPaths: readonly string[]): void;
+  /** The closing announcement: the board changed. */
+  announce(): void;
 }
 
 export interface TransitionSpec {
-  /** The ticket id — the commit message and results name it. */
+  /** The ticket id — the results name it. */
   readonly id: string;
-  /** Current vault-relative path. */
+  /** Current board path. */
   readonly fromPath: string;
   /**
-   * Pre-read content: the drift treatment already holds the file's text
-   * (read in bulk by the normalization pass) and must not re-read — the
-   * on-disk file may have changed between listing and treatment, and the
-   * treatment patches what the pass saw.
+   * Pre-read content; when present the machine does not read through
+   * {@link TransitionIo.read} (the caller already holds the text).
    */
   readonly text?: string;
   /**
@@ -79,18 +61,14 @@ export interface TransitionSpec {
   readonly patch: TransitionPatch;
   /** An optional second Log line after the ordinary `<from> -> <to>` line (the send-back note). */
   readonly extraLog?: string;
-  /** Target vault-relative path; absent = in-place patch (the drift treatment never renames). */
+  /** Target board path (it names the phase the ticket ends in); absent = in-place patch. */
   readonly toPath?: string;
-  /** Commit message, already formatted (`tickets: T-0001 build -> review`). */
-  readonly commitMessage: string;
-  /** `pipeline.md push:` remote, null = no push. */
-  readonly pushRemote: string | null;
 }
 
 /**
- * Run one transition. Never throws for patch/write/commit/push failures —
- * those surface as `ok: false` (or as warnings on an `ok: true`). A read
- * failure propagates unless the spec names a `readError`.
+ * Run one transition. Never throws for patch/write failures — those
+ * surface as `ok: false`. A read failure propagates unless the spec names
+ * a `readError`.
  */
 export async function runTransition(io: TransitionIo, spec: TransitionSpec): Promise<TransitionResult> {
   let text: string;
@@ -118,30 +96,11 @@ export async function runTransition(io: TransitionIo, spec: TransitionSpec): Pro
   }
 
   const toPath = spec.toPath ?? spec.fromPath;
-  if (spec.toPath !== undefined) {
-    const moved = await io.renameInto(spec.fromPath, spec.toPath);
-    if (!moved.ok) {
-      return { ok: false, error: moved.error };
-    }
-  }
   try {
     await io.write(toPath, patched);
   } catch (error) {
     return { ok: false, error: `move failed: ${messageOf(error)}` };
   }
-
-  const commitPaths = spec.toPath !== undefined ? [spec.fromPath, spec.toPath] : [spec.fromPath];
-  const warning = await io.commit(commitPaths, spec.commitMessage);
-  // The optional auto-push (T-0041): warning-level, never a failed move.
-  const pushWarning = await io.push(spec.pushRemote);
-  const warnings = [warning, pushWarning].filter((w): w is string => w !== null);
-  io.announce(
-    [toPath],
-    spec.toPath !== undefined ? [spec.fromPath] : [],
-  );
-  return {
-    ok: true,
-    path: toPath,
-    ...(warnings.length === 0 ? {} : { warning: warnings.join('; ') }),
-  };
+  io.announce();
+  return { ok: true, path: toPath };
 }

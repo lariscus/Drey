@@ -37,8 +37,7 @@ const report: VerificationReport = {
   ],
 };
 
-const phase = (id: string, title: string, handover: string, persona: string | null = null): PipelinePhase =>
-  ({ id, title, handover, persona, wip: null, claim: false }) as unknown as PipelinePhase;
+const phase = (id: string, title: string): PipelinePhase => ({ id, title, color: null });
 
 describe('words', () => {
   it('writes chapter offsets as m:ss', () => {
@@ -149,12 +148,12 @@ describe('cost table', () => {
 
 describe('chainOf', () => {
   const pipeline = [
-    phase('ideas', 'Ideas', 'manual'),
-    phase('plan', 'Plan', 'agent plan', 'paul'),
-    phase('build', 'Build', 'agent build', 'ben'),
-    phase('review', 'Review', 'agent review', 'ralf'),
-    phase('commit', 'Commit', 'manual'),
-    phase('done', 'Done', 'none'),
+    phase('ideas', 'Ideas'),
+    phase('plan', 'Plan'),
+    phase('build', 'Build'),
+    phase('review', 'Review'),
+    phase('commit', 'Commit'),
+    phase('done', 'Done'),
   ];
   const entry = (persona: string, extra: Record<string, unknown> = {}) => ({ persona, mode: null, notify: false, ...extra });
   const card = (meta: Record<string, unknown>): TicketCard =>
@@ -174,12 +173,12 @@ describe('chainOf', () => {
     expect(chain[3]!.personaId).toBeNull();
   });
 
-  it('falls back to the working columns without a chain of its own and without a standard flow', () => {
+  it('falls back to the pipeline\'s inner columns without a chain of its own and without a standard flow — the owner\'s checkpoints', () => {
     const chain = chainOf({ pipeline, currentPhaseId: 'build', card: card({}), personas });
     expect(chain.map((s) => [s.title, s.state, s.who])).toEqual([
-      ['Plan', 'past', 'Paul'],
-      ['Build', 'current', 'Ben'],
-      ['Review', 'future', 'Ralf'],
+      ['Plan', 'past', 'you'],
+      ['Build', 'current', 'you'],
+      ['Review', 'future', 'you'],
       ['Commit', 'future', 'you'],
     ]);
   });
@@ -197,13 +196,9 @@ describe('chainOf', () => {
 
 describe('the card of a page', () => {
   const pipeline = [
-    { id: 'inbox', title: 'Inbox', handover: 'manual' },
-    { id: 'shaping', title: 'Shaping', handover: 'manual' },
-    { id: 'prioritized', title: 'Prioritized', handover: 'manual' },
-    { id: 'plan', title: 'Plan', handover: 'agent plan-default', persona: 'paul' },
-    { id: 'build', title: 'Build', handover: 'agent build-default', persona: 'ben' },
-    { id: 'ready', title: 'Ready to try', handover: 'manual' },
-    { id: 'done', title: 'Done', handover: 'none' },
+    { id: 'inbox', title: 'Inbox' },
+    { id: 'prioritized', title: 'Prioritized' },
+    { id: 'done', title: 'Done' },
   ] as unknown as PipelinePhase[];
   const standard = [
     { persona: 'paul', mode: null, notify: false },
@@ -213,32 +208,24 @@ describe('the card of a page', () => {
   const chain = (currentPhaseId: string, at = 1) =>
     chainOf({ pipeline, currentPhaseId, card: { meta: { chain: standard, at } } as unknown as TicketCard, personas: [] });
 
-  it('Inbox and Prioritized follow board 9a, Shaping and later row 7', () => {
-    expect(['inbox', 'prioritized', 'shaping', 'build', 'ready', null].map((phase) => pageShapeOf(phase, pipeline))).toEqual(['early', 'early', 'flow', 'flow', 'flow', 'flow']);
+  it('the capture columns follow board 9a, later columns row 7', () => {
+    expect(['inbox', 'prioritized', 'active', 'done', null].map((phaseId) => pageShapeOf(phaseId, pipeline))).toEqual(['early', 'early', 'flow', 'flow', 'flow']);
   });
 
   it('words the flow row as the boards do', () => {
-    const titles = (phase: string, parts: boolean, at = 1) => flowItemsOf(i18n, chain(phase, at), phase, parts).map((item) => [item.title, item.state, item.note]);
-    expect(titles('shaping', false)).toEqual([
-      ['Shape', 'current', '(with you)'],
+    const titles = (at = 1) => flowItemsOf(i18n, chain('active', at)).map((item) => [item.title, item.state, item.note]);
+    expect(titles()).toEqual([
       ['Paul', 'current', null],
       ['Ben', 'future', null],
       ['Accept', 'future', null],
     ]);
-    expect(titles('shaping', true).slice(0, 2)).toEqual([
-      ['Shape', 'past', null],
-      ['Paul', 'current', '(waits for you)'],
-    ]);
-    expect(titles('ready', false, 3).slice(-2)).toEqual([
-      ['Ben', 'past', null],
-      ['Accept', 'current', '(your turn)'],
-    ]);
+    expect(titles(3).slice(-1)).toEqual([['Accept', 'current', '(your turn)']]);
   });
 
-  it('names the :shape entry of the chain Shape and adds no second one (req-266)', () => {
-    const shaped = chainOf({ pipeline, currentPhaseId: 'shaping', card: { meta: { chain: [{ persona: 'paul', mode: 'shape', notify: false }, ...standard], at: 1 } } as unknown as TicketCard, personas: [] });
-    expect(flowItemsOf(i18n, shaped, 'shaping', false).map((item) => [item.title, item.state, item.note])).toEqual([
-      ['Shape', 'current', '(with you)'],
+  it('names the :shape entry of the chain Shape (req-266)', () => {
+    const shaped = chainOf({ pipeline, currentPhaseId: 'active', card: { meta: { chain: [{ persona: 'paul', mode: 'shape', notify: false }, ...standard], at: 1 } } as unknown as TicketCard, personas: [] });
+    expect(flowItemsOf(i18n, shaped).map((item) => [item.title, item.state, item.note])).toEqual([
+      ['Shape', 'current', null],
       ['Paul', 'future', null],
       ['Ben', 'future', null],
       ['Accept', 'future', null],
@@ -246,16 +233,15 @@ describe('the card of a page', () => {
   });
 
   it('names the worker of the current step, else the last one, else the next one', () => {
-    expect(workerOf(chain('build', 2))?.phase).toBe('build');
-    expect(workerOf(chain('ready', 3))?.phase).toBe('build');
-    expect(workerOf(chain('shaping'))?.phase).toBe('plan');
+    expect(workerOf(chain('active', 2))?.personaId).toBe('ben');
+    expect(workerOf(chain('active', 3))?.personaId).toBe('ben');
+    expect(workerOf(chain('active'))?.personaId).toBe('paul');
   });
 
-  it('a Shaping ticket whose plan lists parts is a plan to accept', () => {
+  it('picks the pill of the phase', () => {
     const board = { pipeline } as unknown as Parameters<typeof statusOf>[2];
-    expect(statusOf(i18n, null, board, 'Shaping', true)).toMatchObject({ label: 'Plan to accept', pill: 'peach' });
-    expect(statusOf(i18n, null, board, 'Shaping')).toMatchObject({ label: 'Shaping', pill: 'pink' });
     expect(statusOf(i18n, null, board, 'Prioritized')).toMatchObject({ label: 'Prioritized', pill: 'accent' });
+    expect(statusOf(i18n, null, board, 'Inbox')).toMatchObject({ pill: 'grey' });
   });
 });
 

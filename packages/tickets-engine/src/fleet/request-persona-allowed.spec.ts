@@ -6,7 +6,7 @@ import { base, phase } from './request-spec-support';
 describe("a persona's Allowed to on its run", () => {
   const PIA = { id: 'pia', worker: 'claude-code', model: 'sonnet', prompt: 'You are Pia.', memory: '' };
   const compose = (allowed: { runCommands?: 'accept-edits' | 'bypass'; network: boolean } | undefined, over: Parameters<typeof base>[0] = {}) => {
-    const result = composeRunRequest(base({ workingPhase: phase('build', { handover: 'agent build-default' }), persona: { ...PIA, ...(allowed !== undefined ? { allowed } : {}) }, ...over }));
+    const result = composeRunRequest(base({ workingPhase: phase('build'), persona: { ...PIA, ...(allowed !== undefined ? { allowed } : {}) }, ...over }));
     if (!result.ok) {
       throw new Error(result.error);
     }
@@ -29,3 +29,4 @@ describe("a persona's Allowed to on its run", () => {
     expect('network' in compose(undefined)).toBe(false);
   });
 });
+

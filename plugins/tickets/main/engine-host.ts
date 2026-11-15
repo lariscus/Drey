@@ -37,7 +37,6 @@ export class DreyEngineHost implements EngineHost {
       };
       ipc: { emit(event: string, payload?: unknown): void };
       log(message: string, level?: 'info' | 'warn' | 'error'): void;
-      app: { userRoot: string };
     },
   ) {}
 
@@ -79,10 +78,6 @@ export class DreyEngineHost implements EngineHost {
 
   log = (message: string, level?: 'info' | 'warn' | 'error'): void => this.ctx.log(message, level);
 
-  get userRoot(): string {
-    return this.ctx.app.userRoot;
-  }
-
   pickFolder = (title: string): Promise<string | null> => pickFolderDialog(title);
 
   revealPath = (absPath: string): Promise<string> => shell.openPath(absPath);
@@ -100,5 +95,5 @@ export class FleetClientPort implements FleetPort {
 
   configureChain = (config: Parameters<FleetClient['configureChain']>[0]) => this.fleet.configureChain(config);
 
-  releaseLeftoverClaims = (store: Parameters<FleetClient['releaseLeftoverClaims']>[0], retreat: Parameters<FleetClient['releaseLeftoverClaims']>[1]) => this.fleet.releaseLeftoverClaims(store, retreat);
+  releaseLeftoverClaims = (store: Parameters<FleetClient['releaseLeftoverClaims']>[0]) => this.fleet.releaseLeftoverClaims(store);
 }

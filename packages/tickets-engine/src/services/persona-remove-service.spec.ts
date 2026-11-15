@@ -4,7 +4,6 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parsePersonaFile } from '../core/persona';
-import type { PersonaPins } from '../core/persona-removal';
 import { TicketsGit } from '../core/tickets-git';
 import type { EngineVault } from './host';
 import { PersonaRemoveService, type PersonaRemoveDeps } from './persona-remove-service';
@@ -29,7 +28,7 @@ interface Rig {
   readonly announce: ReturnType<typeof vi.fn>;
 }
 
-function rig(options: { runs?: readonly { persona: string | null; state: string }[]; pins?: PersonaPins; noRunner?: boolean; git?: boolean } = {}): Rig {
+function rig(options: { runs?: readonly { persona: string | null; state: string }[]; noRunner?: boolean; git?: boolean } = {}): Rig {
   const vault: EngineVault = { id: 'v', name: 'tickets', path: dir, exists: true, active: true };
   const announce = vi.fn();
   const deps: PersonaRemoveDeps = {
@@ -41,7 +40,6 @@ function rig(options: { runs?: readonly { persona: string | null; state: string 
       },
     },
     fleet: { runs: options.noRunner === true ? () => Promise.reject(new Error('the runner is down')) : async () => options.runs ?? [] },
-    pins: { pinsOf: async () => options.pins ?? { columns: [], crewDefault: false } },
     host: { announceChanges: announce, log: vi.fn() },
     git: options.git === false ? { locate: async () => null, commitTree: async () => undefined } : new TicketsGit(() => 'git'),
   };
@@ -138,14 +136,6 @@ describe('PersonaRemoveService', () => {
     expect((await rig({ noRunner: true }).service.personaRemove({ persona: 'ralf', confirm: 'Ralf' })).ok).toBe(true);
   });
 
-  it('refuses a pinned persona and names the columns and the crew default', async () => {
-    const pins = { columns: ['Build', 'Review'], crewDefault: true };
-    const reply = await rig({ pins }).service.personaRemove({ persona: 'ben', confirm: 'Ben' });
-    expect(reply).toMatchObject({ ok: false, code: 'pinned', columns: ['Build', 'Review'], crewDefault: true });
-    expect(reply.ok === false && reply.error).toContain('Build');
-    expect(existsSync(path.join(dir, BEN, 'persona.md'))).toBe(true);
-  });
-
   it('answers a code for an unknown persona, a bad id and a missing vault', async () => {
     expect(await rig().service.personaRemove({ persona: 'nobody', confirm: 'Nobody' })).toMatchObject({ ok: false, code: 'no_persona' });
     expect(await rig().service.personaRemove({ persona: '../x', confirm: 'x' })).toMatchObject({ ok: false, code: 'no_persona' });
@@ -161,3 +151,5 @@ describe('PersonaRemoveService', () => {
     expect(git('log', '--format=%s')).toBe('personas: ben removed\ninitial');
   });
 });
+
+

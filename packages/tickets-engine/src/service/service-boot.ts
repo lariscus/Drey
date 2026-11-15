@@ -7,7 +7,6 @@
  */
 import { closeSync, openSync, promises as fsp } from 'node:fs';
 import * as path from 'node:path';
-import { clientDirOf } from '../server/client-dir';
 import { FileConfigStore } from '../server/file-config';
 import { serviceLaunchCommand, setAutostart, spawnService, spawnWindow, windowLaunchCommand } from './launch';
 import type { CliOptions } from './service-args';
@@ -93,7 +92,7 @@ export async function runService(opts: CliOptions, paths: BootPaths, out: (line:
 }
 
 async function startHost(opts: CliOptions, paths: BootPaths, run: { vault: string; config: FileConfigStore; out: (line: string) => void }): Promise<void> {
-  const clientDir = await clientDirOf(path.join(paths.appRoot, 'dist', 'mission-control', 'browser'), path.join(paths.appRoot, 'plugins', 'tickets', 'remote'));
+  const clientDir = path.join(paths.appRoot, 'dist', 'mission-control', 'browser');
   const spawn = windowSpawn(paths, opts.home);
   const host = await ServiceHost.start({
     home: opts.home,

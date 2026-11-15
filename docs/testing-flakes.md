@@ -118,6 +118,10 @@ spec waits for it before it scrolls. No timeout changed.
 | 10 CPU burners, 16 and 24 runs | failed in both repeats (2 or more each) | not repeated |
 | 10 CPU burners, 30 runs | not measured | 0 failed |
 
+**Closed (req-307):** the `tickets-remote` spec went with the legacy phone
+remote; the scroll-restore fix it measured lives in the iPad view's build
+path and carries no flake of its own any more.
+
 ## Rules for new tests
 
 - A component that starts background work exposes how to wait for it

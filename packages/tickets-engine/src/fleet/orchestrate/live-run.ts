@@ -20,8 +20,6 @@ export interface LiveRun {
   readonly startedAtMs: number;
   /** The worker exited and the machine gate is deciding — the reaper stands down. */
   gating: boolean;
-  /** The second-opinion round ran (the move follows its own gate). */
-  audited: boolean;
   /** The worker finished its turn — the adapter's `result` event, the agent-done signal. */
   agentDone: boolean;
   /** Why the worker declared the step incomplete (`BLOCKED:`), set with `agentDone`; the exit decides from it. */
@@ -90,7 +88,6 @@ export function newLiveRun(seed: LiveRunSeed): LiveRun {
     handle: null,
     startedAtMs: seed.startedAtMs ?? Date.parse(seed.info.startedAt),
     gating: false,
-    audited: false,
     agentDone: false,
     telemetry: new TelemetryFold(seed.freshTelemetry === true ? undefined : telemetryOf(seed.info)),
     eventQueue: Promise.resolve(),

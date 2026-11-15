@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { phaseWithoutPoolKeys, type PipelinePhase, type RepoRef, type TicketCard } from '../contracts/tickets';
+import type { PipelinePhase, RepoRef, TicketCard } from '../contracts/tickets';
 import { parseRepos } from '../core/ticket-board';
 import { composeRunRequest } from './request';
 import { DISCIPLINES } from './request-spec-support';
@@ -128,8 +128,7 @@ describe('parseRepos: the worktrees: key', () => {
 });
 
 describe('composeRunRequest carries the home rule', () => {
-  const phase = (id: string): PipelinePhase =>
-    phaseWithoutPoolKeys({ id, title: id, wip: null, claim: false, handover: 'agent plan-default' });
+  const phase = (id: string): PipelinePhase => ({ id, title: id, color: null });
 
   const card: TicketCard = {
     id: 'T-0001',
@@ -185,10 +184,6 @@ describe('composeRunRequest carries the home rule', () => {
       ticketText,
       vaultPath: 'V:/tickets',
       workingPhase: phase('plan'),
-      nextPhaseId: 'plan',
-      nextPhaseDir: null,
-      pushRemote: null,
-      nextPhaseClaims: false,
       repo: repo(over),
       promptText: null,
       defaultWorker: 'opencode',
@@ -239,3 +234,4 @@ describe('the working copy and the review checkout (req-183)', () => {
     expect(isReviewCheckoutPath(worktreePathFor('V:/tickets', repo(), 'T-0044'))).toBe(false);
   });
 });
+

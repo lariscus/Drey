@@ -42,13 +42,13 @@ describe('resolveDkPath', () => {
 });
 
 describe('withEffectiveDkPath', () => {
-  const store: Record<string, unknown> = { backend: 'dricket', 'dk.store': 'E:/store' };
+  const store: Record<string, unknown> = { 'dk.store': 'E:/store' };
   const config = { get: <T,>(key: string): Promise<T | undefined> => Promise.resolve(store[key] as T | undefined) };
 
   it('resolves dk.path when the config holds none and reads the other keys through', async () => {
     const effective = withEffectiveDkPath(config, runtime());
     expect(await effective.get<string>('dk.path')).toBe(BUNDLED);
-    expect(await effective.get<string>('backend')).toBe('dricket');
+    expect(await effective.get<string>('dk.store')).toBe('E:/store');
     expect(await effective.get<string>('dk.checkout')).toBeUndefined();
   });
 

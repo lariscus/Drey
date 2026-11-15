@@ -46,7 +46,7 @@ describe('RunStarter worktree wiring', () => {
     await settled(sup, firstId, 'done');
 
     // Next phase, same ticket: the worktree already exists.
-    const second = await sup.start(request({ ticketRelPath: 'tickets/build/T-0001.md', phase: 'build', nextPhase: null }));
+    const second = await sup.start(request({ ticketRelPath: 'tickets/build/T-0001.md', phase: 'build' }));
     expect(second.ok).toBe(true);
     const info = (second as { run: RunInfo }).run;
     expect(info.worktree).toBe('reused');
@@ -78,6 +78,6 @@ describe('RunStarter worktree wiring', () => {
     expect((started as { error: string }).error).toContain('is locked');
     expect(sup.list()).toHaveLength(0);
     expect(adapter.handles).toHaveLength(0);
-    expect(store.of('release').map((c) => c.stage)).toEqual(['plan', 'prioritized']); // back where it sat, else one stage back
+    expect(store.of('release').map((c) => c.stage)).toEqual(['plan', 'active']); // back where it sat (refused in the claim stage), else active
   });
 });

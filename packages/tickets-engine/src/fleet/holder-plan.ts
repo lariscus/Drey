@@ -144,10 +144,9 @@ function placeOf(own: PersonaPool, count: number, room: boolean): { readonly kin
 }
 
 /**
- * The working column of a chain run: the pipeline column the ticket stands in, else (a pipeline of
- * lifecycle columns only, the stage shown as its own column) a plain agent column of that id — the
- * persona's settings carry what the column's keys used to (req-258).
+ * The working column of a chain run: the pipeline column the ticket stands in, else (the stage shown
+ * as its own column) a plain column of that id.
  */
 export function chainWorkingPhase(pipeline: readonly PipelinePhase[], id: string): PipelinePhase {
-  return pipeline.find((p) => p.id === id) ?? pipelinePhaseOf({ title: 'Active', claim: true, handover: 'agent' }, id, []);
+  return pipeline.find((p) => p.id === id) ?? { id, title: 'Active', color: null };
 }

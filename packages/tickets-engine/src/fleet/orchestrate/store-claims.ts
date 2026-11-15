@@ -1,6 +1,6 @@
 import { stayPutStagesOf } from '../../core/lifecycle-stages';
 import type { Clock } from '../ports/clock';
-import type { RunDkTarget, RunRequest } from '../protocol';
+import type { RunDkTarget } from '../protocol';
 import { RunLease, runOwnerId } from '../run-lease';
 import type { StoreForTarget, TicketStore } from '../store/ticket-store';
 import type { LiveRun } from './live-run';
@@ -24,12 +24,11 @@ export class StoreClaims {
   }
 
   /**
-   * Where a ticket goes when the run does not move it: on a lifecycle store back to where it sat
-   * (`active` for a ticket the claim took from there) — one release; on a store still on phase
-   * stages back to where it sat, else the stage before (R-31).
+   * Where a ticket goes when the run does not move it: back to where it sat (`active` for a ticket
+   * the claim took from there) — one release.
    */
-  stayPutStages(request: RunRequest, lease: RunLease): readonly (string | null)[] {
-    return request.dk?.lifecycle === true ? stayPutStagesOf(lease.preStage) : [lease.preStage, request.dk?.retreatStage ?? null];
+  stayPutStages(lease: RunLease): readonly string[] {
+    return stayPutStagesOf(lease.preStage);
   }
 
   /**

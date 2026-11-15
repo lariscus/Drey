@@ -2038,20 +2038,11 @@ details[open] > summary > .tickets-tx-think-preview {
   background: color-mix(in srgb, var(--status-modified) 12%, transparent);
 }
 
-.work-alert[data-kind='breaker'] {
-  border-left-color: var(--status-deleted);
-  background: color-mix(in srgb, var(--status-deleted) 12%, transparent);
-}
-
 .work-alert-icon {
   flex: none;
   display: inline-flex;
   margin-top: 1px;
   color: var(--status-modified);
-}
-
-.work-alert[data-kind='breaker'] .work-alert-icon {
-  color: var(--status-deleted);
 }
 
 .work-alert-body {
@@ -3805,55 +3796,5 @@ button.tickets-statusbar-fleet:focus-visible {
   background: transparent;
   color: var(--text-2);
   font-size: 0.75rem;
-}
-
-/* req-265: the store's stage migration — the warn line with its Migrate / Copy stages buttons. */
-.tickets-store-migration-btn {
-  flex: none;
-  padding: 2px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-chip);
-  background: transparent;
-  color: var(--text-2);
-  font: inherit;
-  cursor: pointer;
-}
-
-.tickets-store-migration-btn:hover:not(:disabled) {
-  color: var(--text-primary);
-  background: var(--hover-bg);
-}
-
-.tickets-store-migration-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-/* req-268: the board migration's line — wraps when unfolded: the step's details, then Migrate and Cancel. */
-.tickets-board-migration {
-  flex-wrap: wrap;
-}
-
-.tickets-board-migration:has(.tickets-board-migration-list) .tickets-warn-text {
-  white-space: normal;
-}
-
-.tickets-board-migration-list {
-  flex-basis: 100%;
-  margin: 2px 0 0;
-  padding-left: 18px;
-  color: var(--text-2);
-}
-
-.tickets-board-migration-actions {
-  display: flex;
-  gap: 6px;
-  flex-basis: 100%;
-  justify-content: flex-end;
-}
-
-.tickets-board-migration-run {
-  border-color: var(--accent);
-  color: var(--text-primary);
 }
 

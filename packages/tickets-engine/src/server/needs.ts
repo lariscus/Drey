@@ -14,7 +14,6 @@ import type { NeedItem, NeedKind } from '../contracts/remote-protocol';
 import type { ScoutReport } from '../contracts/scout';
 import { scoutNeedText } from '../contracts/scout';
 import type { BoardSnapshot, TicketCard } from '../contracts/tickets';
-import { READY_STATE } from '../core/pipeline-states';
 import { slugStatusKey } from '../core/status-comment';
 import type { OpenStatusItem } from '../core/status-log';
 import type { RunInfo, RunState } from '../fleet/protocol';
@@ -112,11 +111,6 @@ export function needsOf(board: BoardSnapshot, runs: readonly RunInfo[]): readonl
   }
 
   const checkpoints = new Set(board.checkpoints);
-  // With a Ready to try stage the sign-off is there: a ticket in the terminal column is finished.
-  const lastColumn = board.columns.filter((column) => !column.unknown).at(-1);
-  if (lastColumn !== undefined && board.columns.some((column) => column.phase.id === READY_STATE)) {
-    checkpoints.delete(lastColumn.phase.id);
-  }
   for (const { card, phase } of placed.values()) {
     if (checkpoints.has(phase) && !hasLiveRun.has(card.id) && card.meta.awaiting === undefined) {
       items.push({

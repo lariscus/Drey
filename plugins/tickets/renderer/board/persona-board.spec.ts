@@ -252,7 +252,6 @@ describe('the Tickets panel on a persona board', () => {
     const groups = workGroups(snap, runs);
     expect(groups.needs.map((row) => row.card.id)).toEqual(['T-0121', 'T-0118']);
     expect(groups.running.map((row) => row.card.id)).toEqual(['T-0130', 'T-0129', 'T-0122']);
-    expect(groups.shaping).toEqual([]);
     expect(groups.ideas.filter((row) => row.queued).map((row) => row.card.id)).toEqual(['T-0136']);
     expect(groups.ideas.filter((row) => !row.queued)).toHaveLength(4);
   });

@@ -49,13 +49,13 @@ describe('OneOnOneRequestBuilder — the 1:1 asks the pool like any session (req
       worktreePath: 'E:/tickets',
       gate: 'none',
       acceptance: [],
-      nextPhase: null,
       column: null,
       poolClass: 'heavy',
       ledger: { allowance: null, personaBudget: 4, spendAboveAllowance: false, noTicket: true },
       session: { kind: '1:1', persona: 'ben', workingDirectory: 'E:/tickets', chatFile: 'tickets/_meta/chat/20261109-100000-1-1-ben.md' },
     });
     expect(request?.dk).toBeUndefined();
+    expect(request?.cursor).toBeUndefined(); // nothing moves
   });
 
   it('req-288: a pinned model runs on its own harness, its class from its row', () => {

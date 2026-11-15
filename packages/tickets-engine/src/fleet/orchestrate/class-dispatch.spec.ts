@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { RunInfo } from '../protocol';
 import { slot } from '../routing/routing.fake';
-import { ChainHarness, fakePort, pipelineWithPlan } from './chain-harness.fake';
+import { ChainHarness, fakePort } from './chain-harness.fake';
 import { PoolRig } from './pool.fake';
 
 /**
@@ -26,7 +26,6 @@ const TABLE = {
 let h: ChainHarness;
 
 async function setUp(config: Record<string, unknown> = TABLE, cls?: string): Promise<{ rig: PoolRig; built: ReturnType<ChainHarness['build']> }> {
-  await h.write('tickets/_meta/pipeline.md', pipelineWithPlan('persona: ben'));
   // A v2 record (its old default opus: heavy, by the migration's rule) unless a v3 class is named (req-288).
   await h.writePersona('ben', cls !== undefined ? { class: cls } : { worker: 'claude-code', model: 'opus', pool: ['opus', 'sonnet'] });
   const rig = new PoolRig([CLAUDE_A], NOW);
@@ -46,8 +45,8 @@ describe('the class request at dispatch (req-170)', () => {
   });
 
   it('waits, never downgrades: the second heavy ticket queues while the standard model is free', async () => {
-    h.io.seed('T-0001', 'plan', { rank: 1000 });
-    h.io.seed('T-0002', 'plan', { rank: 2000 });
+    h.seedRun('T-0001', { rank: 1000 });
+    h.seedRun('T-0002', { rank: 2000 });
     const { built } = await setUp();
     await built.orch.configure(h.config());
     await built.orch.setMaster('run');
@@ -69,9 +68,9 @@ describe('the class request at dispatch (req-170)', () => {
   });
 
   it('serves the queue front to back when capacity frees', async () => {
-    h.io.seed('T-0001', 'plan', { rank: 1000 });
-    h.io.seed('T-0002', 'plan', { rank: 2000 });
-    h.io.seed('T-0003', 'plan', { rank: 3000 });
+    h.seedRun('T-0001', { rank: 1000 });
+    h.seedRun('T-0002', { rank: 2000 });
+    h.seedRun('T-0003', { rank: 3000 });
     const { rig, built } = await setUp();
     await built.orch.configure(h.config());
     await built.orch.setMaster('run');
@@ -87,7 +86,7 @@ describe('the class request at dispatch (req-170)', () => {
   });
 
   it("req-288: the persona's class asks; the part's size raises it, the reason rides the request", async () => {
-    h.io.seed('T-0004', 'plan', { extensions: { size: 'L' } });
+    h.seedRun('T-0004', { extensions: { size: 'L' } });
     const { built } = await setUp(TABLE, 'standard');
     await built.orch.configure(h.config());
     await built.orch.setMaster('run');
@@ -96,7 +95,7 @@ describe('the class request at dispatch (req-170)', () => {
   });
 
   it('req-288: a size never lowers the class', async () => {
-    h.io.seed('T-0004', 'plan', { extensions: { size: 'S' } });
+    h.seedRun('T-0004', { extensions: { size: 'S' } });
     const { built } = await setUp(TABLE, 'standard');
     await built.orch.configure(h.config());
     await built.orch.setMaster('run');
@@ -104,8 +103,7 @@ describe('the class request at dispatch (req-170)', () => {
   });
 
   it('req-288: a pinned model runs alone — the router grants no other model of the class', async () => {
-    h.io.seed('T-0004', 'plan');
-    await h.write('tickets/_meta/pipeline.md', pipelineWithPlan('persona: ben'));
+    h.seedRun('T-0004');
     const rig = new PoolRig([CLAUDE_A], NOW);
     await rig.load(TABLE);
     await h.writePersona('ben', { class: 'standard', pin: 'claude-code/sonnet' });
@@ -116,7 +114,7 @@ describe('the class request at dispatch (req-170)', () => {
   });
 
   it("req-178: the ticket's needs ride the start with the dispatch's route; a model without the capability is never taken", async () => {
-    h.io.seed('T-0004', 'plan', { extensions: { needs: 'image' } });
+    h.seedRun('T-0004', { extensions: { needs: 'image' } });
     const vision = { ...TABLE, models: [TABLE.models[0], { ...TABLE.models[1], input: ['text', 'image'] }] };
     const { built } = await setUp(vision, 'standard');
     await built.orch.configure(h.config());
@@ -127,7 +125,7 @@ describe('the class request at dispatch (req-170)', () => {
   });
 
   it('req-178: no model of the class reads images — the ticket waits on the configuration, named', async () => {
-    h.io.seed('T-0004', 'plan', { extensions: { needs: 'image' } });
+    h.seedRun('T-0004', { extensions: { needs: 'image' } });
     const { built } = await setUp(TABLE, 'standard');
     await built.orch.configure(h.config());
     await built.orch.setMaster('run');
@@ -136,7 +134,7 @@ describe('the class request at dispatch (req-170)', () => {
   });
 
   it('a full ledger grants nothing and raises one Needs-you card; the grant resolves it', async () => {
-    h.io.seed('T-0005', 'plan', { extensions: { allowance: '2' } });
+    h.seedRun('T-0005', { extensions: { allowance: '2' } });
     const { rig, built } = await setUp();
     rig.book.seed([{ id: 'R-old', ticketId: 'T-0005', persona: 'ben', costUsd: 3, startedAt: NOW.toISOString() } as RunInfo]);
     await built.orch.configure(h.config());
@@ -149,7 +147,7 @@ describe('the class request at dispatch (req-170)', () => {
       "blocked: [ledger-ticket] T-0005 has spent $3.00 of its $2.00 allowance — raise the ticket's allowance: or let the persona spend above it (allowed: spend-above-allowance)",
     ]);
 
-    h.io.seed('T-0005', 'plan', { extensions: { allowance: '5' } });
+    h.seedRun('T-0005', { extensions: { allowance: '5' } });
     await built.orch.setMaster('run');
     expect(built.fleet.records.map((r) => r.request.ticketId)).toEqual(['T-0005']);
     expect(built.fleet.records[0]!.request.ledger).toEqual({ allowance: 5, personaBudget: null, spendAboveAllowance: false });

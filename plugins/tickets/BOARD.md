@@ -13,52 +13,39 @@ the fleet runner and the chain daemon — has its own guide,
 [`FLEET.md`](FLEET.md); the format itself is
 [`specs/ticket-schema.md`](../../../specs/ticket-schema.md).
 
-## The one state list (req-99a)
+## The lifecycle stages (req-265, req-307)
 
-A new board, and the dricket store after the cut-over, has six stages:
+The one board runs on a dricket store on the lifecycle stages. The
+board's columns are the edges plus the working area — every ticket a
+chain holds stands in **Active**, its lane naming the holder (req-257,
+the persona board):
 
-| Stage id | Title | Worked by |
+| Stage | Title | Worked by |
 |---|---|---|
-| `inbox` | Inbox | you (`persona: you`), the capture target |
-| `shaping` | Shaping | you |
-| `prioritized` | Prioritized | you |
-| `building` | Building | the fleet: the only agent `claim` stage |
-| `ready` | Ready to try | you: the owner's checkpoint |
+| `inbox` | Inbox | you — the capture target |
+| `prioritized` | Prioritized | you — the queued work |
+| `active` | Active | the chain: every held ticket, its lane names the holder |
+| `running` | (the claim's own stage) | `dk claim` moves `active -> running` while a run works the ticket |
 | `done` | Done | nobody: terminal |
 
-**Read `commit` in this guide as the column of that role on your board:**
-`ready` on the six stages, **Sign Off** (`sign-off`) on a board of E12-9c,
-`commit` on an older one. Older boards keep their columns and are fully
-supported; nothing renames them. Tickets move to the six stages once, with
-the dricket import (mapping below), never by renaming folders.
-
-Plan, build, review and test are phases of the chain inside Building, not
-stages. **Accept on Ready to try is the sign-off:** it starts the human
+**Accept at You is the sign-off:** it starts the human
 persona's `commit` leaving action (req-267) on the **target repository**, the
 one the ticket's work went into, never the tickets store — a machine run of the
 Crew runner (claim, record, stream; no worker, no model): the ticket's branch
 merged into the integration branch in a scratch worktree and pushed to that
 branch's git upstream. On a green end the ticket lands in Done, as bookkeeping.
 A protected repository blocks for the owner's merge, a conflict or a failed push
-ends red with git's output, and either leaves it on Ready to try — the machine
+ends red with git's output, and either leaves it at You — the machine
 resolves no conflict; Accept again starts it again, and it completes at once
 when the work is already on the remote (a protected repository's merged pull
 request). A sign-off whose You persona lists no `commit` in `leaving:` is
 refused with the way to add it. A ticket with no `repo:`
-has nothing to merge, and its Accept is the plain move. Send back goes to Building.
+has nothing to merge, and its Accept is the plain move. Send back goes to
+the earlier position the owner picks.
 
-On a store, `dk` never lets an agent release into a terminal stage: the commit
-run hands the ticket back to Ready to try and the engine then makes the owner's
-move into Done. While the run holds its claim, `dk` shows the ticket in Building.
-
-| Old phase | Stage |
-|---|---|
-| `inbox` | `inbox` |
-| `plan` | `shaping` |
-| `prioritized` | `prioritized` |
-| `build` | `building` |
-| `review`, `sign-off`, `commit` | `ready` |
-| `done` | `done` |
+On the store, `dk` never lets an agent release into a terminal stage: the commit
+run hands the ticket back to `active` and the engine then makes the owner's
+move into Done. While the run holds its claim, `dk` shows the ticket in `running`.
 
 ## The rule (owner ruling, 2026-10-18)
 
@@ -263,43 +250,23 @@ board ticket simply never blocks (the dependency pass's tolerance).
 
 ## What is — and is not — automated
 
-- On the six stages only Building runs itself; everything below about an
-  agent `commit` column describes older boards.
-- Whether a column runs itself is the **pipeline's call**
-  (`_meta/pipeline.md`): `handover: manual` = the human's queue;
-  `handover: agent <prompt-ref>` = the chain dispatches it (worker,
-  model, pool size per the M85 column keys; the settings dialog
-  writes them). The live board has run `plan`, `build` and — since
-  2026-10-19 — `commit` as agent columns; a `commit` column with an
-  agent handover lets the machine move tickets **into `done`** on a
-  green gate (the same mechanism that does `build -> review (fleet)`).
-  Note the terminal phase itself never dispatches (it has nothing to
-  move into); moving **into** `done` is humans, or — since the owner
-  ruling of 2026-10-19 — the commit column's agent: its
-  `commit-default` prompt (no longer shipped since req-267; a board's own copy
-  still serves such a column) is the push step (branch onto the
-  integration branch and the remote; a `policy:`-protected repo
-  waits for the owner's merge), and on completion the machine moves
-  the ticket `commit -> done`.
-- An agent column dispatches only when its prompt file exists
-  (`tickets/_meta/prompts/<ref>.md`) — a missing ref logs
-  `dispatch skips <id>: prompt "<ref>" is missing` and the column
-  idles. Check the prompt exists before expecting moves.
-- The chain orchestrator automates only `agent` and `ci` handovers
-  (M85): `ci` runs the phase's acceptance command runner-side — green
-  → one column right, red → a 10-minute backoff. The machine never
-  pulls from a `manual` column.
+- The chain dispatches by holder (req-257): the tickets an agent
+  persona holds at the cursor are the candidates, ordered by priority
+  class and cursor position; the human persona's entries park at You
+  (`awaiting:`) and the machine never takes them.
+- The run ceilings, the class floor and the model needs ride the
+  persona's record (`persona.md`); the pools — the provider slots and
+  the capacity classes — are shared, the persona's `parallel:`/`min:`
+  cap its own runs. There are no per-column keys left: a phase is
+  `{ id, title, color }`.
+- **The machine never moves into `done`**: a through chain stands in
+  the terminal column and the engine's own move lands it there; Accept
+  at You is the owner's sign-off (the `commit` leaving action, above).
 - **No push/PR/merge detection exists anywhere in the fleet**
   (ADR-0075: hosts are interchangeable, the fleet never calls a host
-  API). "Merged and pushed" as a *done* criterion is enforced either
-  by this guide (a human/agent on the owner's word, local git as the
-  only witness) or by whatever the owner's commit-column prompt tells
-  the agent to check — never by the runner itself.
-
-A future `handover: merge` mode (branch merged into the integration
-branch ⇒ move right) would stay local-git-only and ADR-0075-clean,
-but it changes the "never into the last phase" rule — an owner
-decision with its own roadmap ticket, not a drive-by.
+  API). "Merged and pushed" as a *done* criterion is enforced by the
+  sign-off's `commit` leaving action (local git as the witness) —
+  never by the runner itself.
 
 ## Pointers
 

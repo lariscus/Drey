@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appendStatusLine, openStatusItems, parseStatusLog } from './status-log';
+import { openStatusItems, parseStatusLog } from './status-log';
 
 describe('parseStatusLog', () => {
   it('reads the strict verb grammar and forgives the rest', () => {
@@ -44,15 +44,5 @@ describe('openStatusItems — the open-decisions fold', () => {
   it('a keyless line surfaces as its own item instead of vanishing', () => {
     const lines = parseStatusLog(`- '1' blocked: something opaque\n`);
     expect(openStatusItems(lines)).toEqual([{ verb: 'blocked', key: null, text: 'something opaque', since: '1' }]);
-  });
-});
-
-describe('appendStatusLine', () => {
-  it('starts an absent file and appends with one newline between lines', () => {
-    const first = appendStatusLine('', '1', 'working', ' build');
-    expect(first).toBe(`- '1' working: build\n`);
-    expect(appendStatusLine(first, '2', 'done', 'handed over')).toBe(
-      `- '1' working: build\n- '2' done: handed over\n`,
-    );
   });
 });

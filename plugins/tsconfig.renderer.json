@@ -18,7 +18,6 @@
   "//": "Typecheck only (noEmit): scripts/build-plugins.mjs bundles each plugin's renderer/index.ts into one ES module with esbuild (ADR-0044, later change). Runtime imports may reach the plugin's own folder and the repo's shared/, nothing else -- the bundle step fails on a package import; types of packages come in as import type.",
   "include": [
     "./**/renderer/**/*.ts",
-    "./*/remote/**/*.ts",
     "./**/shared/**/*.ts",
     "../shared/**/*.ts",
     "../packages/tickets-engine/src/**/*.ts"
@@ -27,7 +26,6 @@
     "../shared/**/*.spec.ts",
     "../packages/**/*.spec.ts",
     "./**/renderer/**/*.spec.ts",
-    "./*/remote/**/*.spec.ts",
     "./**/shared/**/*.spec.ts"
   ]
 }

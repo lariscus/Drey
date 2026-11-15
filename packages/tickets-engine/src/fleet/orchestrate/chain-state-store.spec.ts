@@ -69,7 +69,7 @@ describe('ChainStateStore per vault', () => {
 
   it('moves a pre-req-173 chain.json into its vault file and keeps it as chain.legacy.json', async () => {
     const { fs, store, logs } = setup();
-    const old = { version: 1, config: { ...A, defaultWorker: 'claude-code', permissionMode: 'accept-edits' }, master: 'halted', columns: { review: 'held' }, redStreak: { build: 2 } };
+    const old = { version: 1, config: { ...A, defaultWorker: 'claude-code', permissionMode: 'accept-edits' }, master: 'halted', columns: { review: 'held' } };
     await fs.writeText('/fleet/chain.json', JSON.stringify(old));
     const state = new ChainState();
     await store.load(state);
@@ -78,7 +78,6 @@ describe('ChainStateStore per vault', () => {
     expect(state.vault).toEqual(A);
     expect(state.config).toBeNull();
     expect(state.columns).toEqual({ review: 'held' });
-    expect(state.redStreak).toEqual({ build: 2 });
     const moved = JSON.parse((await fs.readTextOrNull(store.fileFor(A.ticketsVaultPath)))!) as Record<string, unknown>;
     expect(moved['config']).toBeUndefined();
     expect(logs.some((l) => l.includes('moved to the vault'))).toBe(true);

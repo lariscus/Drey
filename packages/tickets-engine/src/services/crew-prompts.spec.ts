@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SHIPPED_PROMPTS_DIR } from '../core/default-prompts';
-import { loadCrewPrompts } from './crew-prompts';
+import { loadCrewPrompts, loadDialogPrompt } from './crew-prompts';
 
 /**
  * req-279: the crew's chat prompts ship as real files beside the pipeline
@@ -13,10 +13,10 @@ import { loadCrewPrompts } from './crew-prompts';
  */
 
 describe('the crew prompt files', () => {
-  it('ships exactly the three chat prompts, LF and newline-terminated', async () => {
+  it('ships exactly the three chat prompts and the dialog protocol, LF and newline-terminated', async () => {
     const dir = path.join(SHIPPED_PROMPTS_DIR, 'crew');
     const names = (await fsp.readdir(dir)).filter((n) => n.endsWith('.md')).sort();
-    expect(names).toEqual(['aggregator.md', 'mission.md', 'shape.md']);
+    expect(names).toEqual(['aggregator.md', 'dialog.md', 'mission.md', 'shape.md']);
     for (const name of names) {
       const raw = await fsp.readFile(path.join(dir, name), 'utf8');
       expect(raw.endsWith('\n'), name).toBe(true);
@@ -37,6 +37,14 @@ describe('the crew prompt files', () => {
     for (const text of [crew.mission, crew.shape, crew.aggregator]) {
       expect(text).toContain('STRICT');
     }
+  });
+
+  it('loads the dialog protocol with its fragments expanded and no version line', async () => {
+    const dialog = await loadDialogPrompt();
+    expect(dialog).toMatch(/^You are the planning step of the owner's ticket pipeline, in a dialog/);
+    expect(dialog).not.toContain('drey-prompt-version');
+    expect(dialog).not.toContain('{{');
+    expect(dialog).toContain('QUESTION:');
   });
 
   it('names a missing file, and refuses an empty one', async () => {

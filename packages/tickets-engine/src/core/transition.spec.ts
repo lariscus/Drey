@@ -2,11 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { newTicketFileText } from './ticket-files';
 import { runTransition, type TransitionIo, type TransitionSpec } from './transition';
 
-/** An in-memory host: files, a commit/push log and the last announcement. */
-function fakeIo(files: Map<string, string>, opts?: { renameFails?: string; readFails?: Set<string> }) {
-  const commits: { paths: readonly string[]; message: string }[] = [];
-  const pushes: (string | null)[] = [];
-  let announced: { changed: readonly string[]; deleted: readonly string[] } | null = null;
+/** An in-memory host: ticket texts and the announcement count. */
+function fakeIo(files: Map<string, string>, opts?: { readFails?: Set<string> }) {
+  let announced = 0;
   const io: TransitionIo = {
     async read(path) {
       if (opts?.readFails?.has(path)) {
@@ -21,37 +19,17 @@ function fakeIo(files: Map<string, string>, opts?: { renameFails?: string; readF
     async write(path, text) {
       files.set(path, text);
     },
-    async renameInto(fromPath, toPath) {
-      if (opts?.renameFails !== undefined) {
-        return { ok: false, error: opts.renameFails };
-      }
-      const text = files.get(fromPath);
-      if (text === undefined) {
-        return { ok: false, error: `move failed: missing ${fromPath}` };
-      }
-      files.delete(fromPath);
-      files.set(toPath, text);
-      return { ok: true };
-    },
-    async commit(paths, message) {
-      commits.push({ paths, message });
-      return null;
-    },
-    async push(remote) {
-      pushes.push(remote);
-      return null;
-    },
-    announce(changed, deleted) {
-      announced = { changed, deleted };
+    announce() {
+      announced += 1;
     },
   };
-  return { io, files, commits, pushes, announced: () => announced };
+  return { io, files, announced: () => announced };
 }
 
 const NOW = new Date('2026-11-01T12:00:00Z');
 
 function seedTicket(files: Map<string, string>, id = 'T-0001'): string {
-  const path = `tickets/10-inbox/${id}.md`;
+  const path = `tickets/inbox/${id}.md`;
   files.set(
     path,
     newTicketFileText({
@@ -72,54 +50,36 @@ function seedTicket(files: Map<string, string>, id = 'T-0001'): string {
 function spec(overrides: Partial<TransitionSpec>): TransitionSpec {
   return {
     id: 'T-0001',
-    fromPath: 'tickets/10-inbox/T-0001.md',
+    fromPath: 'tickets/inbox/T-0001.md',
     patch: { to: 'build', from: 'inbox', now: NOW, actor: 'owner@desk' },
-    commitMessage: 'tickets: T-0001 inbox -> build',
-    pushRemote: null,
     ...overrides,
   };
 }
 
 describe('runTransition', () => {
-  it('patches, renames, commits both paths, pushes and announces once', async () => {
+  it('patches, writes at the target path and announces once', async () => {
     const files = new Map<string, string>();
-    const from = seedTicket(files);
+    seedTicket(files);
     const host = fakeIo(files);
 
-    const result = await runTransition(host.io, spec({ toPath: 'tickets/40-build/T-0001.md', pushRemote: 'origin' }));
+    const result = await runTransition(host.io, spec({ toPath: 'tickets/build/T-0001.md' }));
 
-    expect(result.ok).toBe(true);
-    const written = files.get('tickets/40-build/T-0001.md')!;
+    expect(result).toEqual({ ok: true, path: 'tickets/build/T-0001.md' });
+    const written = files.get('tickets/build/T-0001.md')!;
     expect(written).toContain('entered-build');
     expect(written).toContain('inbox -> build');
-    expect(files.has(from)).toBe(false);
-    expect(host.commits).toEqual([
-      { paths: ['tickets/10-inbox/T-0001.md', 'tickets/40-build/T-0001.md'], message: 'tickets: T-0001 inbox -> build' },
-    ]);
-    expect(host.pushes).toEqual(['origin']);
-    expect(host.announced()).toEqual({
-      changed: ['tickets/40-build/T-0001.md'],
-      deleted: ['tickets/10-inbox/T-0001.md'],
-    });
+    expect(host.announced()).toBe(1);
   });
 
-  it('treats a drift correction in place: no rename, one commit path, nothing deleted', async () => {
+  it('patches in place without a target path', async () => {
     const files = new Map<string, string>();
     const path = seedTicket(files);
     const host = fakeIo(files);
 
-    const result = await runTransition(
-      host.io,
-      spec({
-        text: files.get(path)!,
-        toPath: undefined,
-        commitMessage: 'tickets: T-0001 unknown -> inbox',
-      }),
-    );
+    const result = await runTransition(host.io, spec({ text: files.get(path)!, toPath: undefined }));
 
     expect(result).toEqual({ ok: true, path });
-    expect(host.commits).toEqual([{ paths: [path], message: 'tickets: T-0001 unknown -> inbox' }]);
-    expect(host.announced()).toEqual({ changed: [path], deleted: [] });
+    expect(host.announced()).toBe(1);
   });
 
   it('appends the extra Log line after the ordinary transition line (send back)', async () => {
@@ -127,16 +87,13 @@ describe('runTransition', () => {
     seedTicket(files);
     const host = fakeIo(files);
 
-    await runTransition(
-      host.io,
-      spec({ extraLog: 'sent back: the gate log', toPath: 'tickets/40-build/T-0001.md' }),
-    );
+    await runTransition(host.io, spec({ extraLog: 'sent back: the gate log', toPath: 'tickets/build/T-0001.md' }));
 
-    const written = files.get('tickets/40-build/T-0001.md')!;
+    const written = files.get('tickets/build/T-0001.md')!;
     expect(written.indexOf('inbox -> build')).toBeLessThan(written.indexOf('sent back: the gate log'));
   });
 
-  it('returns a patch failure without committing or announcing', async () => {
+  it('returns a patch failure without announcing', async () => {
     const files = new Map<string, string>();
     seedTicket(files);
     const host = fakeIo(files);
@@ -145,20 +102,7 @@ describe('runTransition', () => {
     const result = await runTransition(host.io, spec({}));
 
     expect(result).toEqual({ ok: false, error: 'ticket has no frontmatter fence' });
-    expect(host.commits).toEqual([]);
-    expect(host.announced()).toBeNull();
-  });
-
-  it('keeps the rename failure wording verbatim and aborts before the commit', async () => {
-    const files = new Map<string, string>();
-    seedTicket(files);
-    const host = fakeIo(files, { renameFails: 'ticket path escapes the vault' });
-
-    const result = await runTransition(host.io, spec({ toPath: 'tickets/40-build/T-0001.md' }));
-
-    expect(result).toEqual({ ok: false, error: 'ticket path escapes the vault' });
-    expect(host.commits).toEqual([]);
-    expect(host.announced()).toBeNull();
+    expect(host.announced()).toBe(0);
   });
 
   it('reports a write failure as a failed move', async () => {
@@ -169,31 +113,15 @@ describe('runTransition', () => {
       throw new Error('disk full');
     };
 
-    const result = await runTransition(host.io, spec({ toPath: 'tickets/40-build/T-0001.md' }));
+    const result = await runTransition(host.io, spec({ toPath: 'tickets/build/T-0001.md' }));
 
     expect(result).toEqual({ ok: false, error: 'move failed: disk full' });
-    expect(host.commits).toEqual([]);
-  });
-
-  it('joins commit and push warnings without failing the move', async () => {
-    const files = new Map<string, string>();
-    seedTicket(files);
-    const host = fakeIo(files);
-    host.io.commit = async () => 'git commit failed: nothing staged';
-    host.io.push = async () => 'git push to "origin" failed: offline';
-
-    const result = await runTransition(host.io, spec({ toPath: 'tickets/40-build/T-0001.md', pushRemote: 'origin' }));
-
-    expect(result).toEqual({
-      ok: true,
-      path: 'tickets/40-build/T-0001.md',
-      warning: 'git commit failed: nothing staged; git push to "origin" failed: offline',
-    });
+    expect(host.announced()).toBe(0);
   });
 
   it('returns the spec readError instead of propagating a read failure', async () => {
     const files = new Map<string, string>();
-    const host = fakeIo(files, { readFails: new Set(['tickets/10-inbox/T-0001.md']) });
+    const host = fakeIo(files, { readFails: new Set(['tickets/inbox/T-0001.md']) });
 
     const result = await runTransition(host.io, spec({ readError: 'T-0001 is not in the archive' }));
 
@@ -202,7 +130,7 @@ describe('runTransition', () => {
 
   it('propagates a read failure when the spec names no readError', async () => {
     const files = new Map<string, string>();
-    const host = fakeIo(files, { readFails: new Set(['tickets/10-inbox/T-0001.md']) });
+    const host = fakeIo(files, { readFails: new Set(['tickets/inbox/T-0001.md']) });
 
     await expect(runTransition(host.io, spec({}))).rejects.toThrow('ENOENT (fake)');
   });

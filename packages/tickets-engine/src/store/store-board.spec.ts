@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { assembleBoard } from '../core/ticket-board';
 import { parseTicketFile } from '../core/ticket-files';
 import type { TicketDetail } from '../ports/ticket-store';
-import { diffBoards } from './board-diff';
 import { assembleBoardFromRecords, recordToBoardFile, resolvePhase } from './store-board';
 
 const PIPELINE = `---
@@ -57,32 +56,22 @@ describe('resolvePhase', () => {
     expect(resolvePhase(det({ id: 'T-0001', stage: 'build' }), phases)).toEqual({ phase: 'build', unmapped: false });
   });
 
-  it('lets x-phase win over the stage (variant B)', () => {
-    const r = det({ id: 'T-0001', stage: 'in-progress', extensions: { 'x-phase': 'prioritized' } });
-    expect(resolvePhase(r, phases)).toEqual({ phase: 'prioritized', unmapped: false });
-  });
-
   it('maps dricket built-in stages by role', () => {
     const at = (stage: string): string => resolvePhase(det({ id: 'T-0001', stage }), phases).phase;
     expect(at('open')).toBe('inbox');
     expect(at('blocked')).toBe('inbox');
-    expect(at('in-progress')).toBe('build');
-    expect(at('review')).toBe('commit');
     expect(at('done')).toBe('done');
     expect(at('cancelled')).toBe('done');
   });
 
-  it('req-265: an active or running ticket stands in its pinned column; without a pin in the first claiming one', () => {
-    const at = (stage: string, pin?: string): string =>
-      resolvePhase(det({ id: 'T-0001', stage, extensions: pin === undefined ? {} : { 'x-phase': pin } }), phases).phase;
-    expect(at('active', 'commit')).toBe('commit');
-    expect(at('running', 'commit')).toBe('commit'); // a run holds it: the card stays in its column
-    expect(at('active')).toBe('build');
-    expect(at('running')).toBe('build');
+  it('an active or running ticket without a chain stands in the second column', () => {
+    const at = (stage: string): string => resolvePhase(det({ id: 'T-0001', stage }), phases).phase;
+    expect(at('active')).toBe('prioritized');
+    expect(at('running')).toBe('prioritized');
   });
 
-  it('req-265: the lifecycle edges are their own column, a stale pin does not move them', () => {
-    const at = (stage: string): string => resolvePhase(det({ id: 'T-0001', stage, extensions: { 'x-phase': 'build' } }), phases).phase;
+  it('req-265: the lifecycle edges are their own column', () => {
+    const at = (stage: string): string => resolvePhase(det({ id: 'T-0001', stage }), phases).phase;
     expect(at('inbox')).toBe('inbox');
     expect(at('prioritized')).toBe('prioritized');
     expect(at('done')).toBe('done');
@@ -170,22 +159,6 @@ phases:
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   const old = new Date(Date.now() - 10 * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z');
 
-  it('stays listed under Done this week: Done asks nothing there, so no other group shows it', () => {
-    const board = assembleBoardFromRecords({
-      ...BASE,
-      pipelineText: SIX,
-      records: [
-        det({ id: 'T-0001', stage: 'done', title: 'Accepted', extensions: { 'x-entered-done': now } }),
-        det({ id: 'T-0002', stage: 'done', title: 'From a terminal', body: `\n## Log\n\n- ${now} henrik release t-2 -> done: Seeded.\n` }),
-        det({ id: 'T-0003', stage: 'done', title: 'Long ago', extensions: { 'x-entered-done': old } }),
-        det({ id: 'T-0004', stage: 'ready', title: 'Waiting' }),
-      ],
-    });
-    expect(board.recentDone.map((d) => [d.id, d.title]).sort()).toEqual([['T-0001', 'Accepted'], ['T-0002', 'From a terminal']]);
-    expect(board.recentDone.find((d) => d.id === 'T-0001')?.at).toBe(now);
-    expect(board.recentDone.find((d) => d.id === 'T-0002')?.at).toBe(now);
-  });
-
   it('is not doubled once it is archived too', () => {
     const board = assembleBoardFromRecords({
       ...BASE,
@@ -268,32 +241,5 @@ describe('assembleBoardFromRecords', () => {
     const column = board.columns.find((c) => c.phase.id === 'needs-input');
     expect(column?.unknown).toBe(true);
     expect(board.issues.some((i) => i.message.includes('needs-input'))).toBe(true);
-  });
-
-  it('is equal to the files board over the same tickets (the shadow criterion)', () => {
-    const legacy = (id: string, dir: string, extra = ''): { path: string; text: string } => ({
-      path: `tickets/${dir}/${id}.md`,
-      text: `---\nid: ${id}\ntitle: ${id}\npriority: normal\n${extra}---\n\n## Description\n\nBody.\n`,
-    });
-    const files = [
-      legacy('T-0001', 'inbox', 'entered-inbox: 2026-11-01T00:00:00Z\n'),
-      legacy('T-0002', 'build', 'blocked-by: [T-0001]\nrank: 20\n'),
-      legacy('T-0003', 'build', 'rank: 10\nchain: [ralf]\npersona: ben\n'),
-      legacy('T-0004', 'done'),
-    ];
-    const fromFiles = assembleBoard({ ...BASE, files });
-    const fromStore = assembleBoardFromRecords({
-      ...BASE,
-      records: [
-        det({ id: 'T-0001', stage: 'inbox', extensions: { 'x-entered-inbox': '2026-11-01T00:00:00Z' } }),
-        det({ id: 'T-0002', stage: 'build', dependsOn: ['T-0001'], extensions: { 'x-rank': '20' } }),
-        det({ id: 'T-0003', stage: 'build', extensions: { 'x-rank': '10', 'x-chain': 'ralf', 'x-persona': 'ben' } }),
-        det({ id: 'T-0004', stage: 'done' }),
-      ],
-    });
-    const diff = diffBoards(fromFiles, fromStore);
-    expect(diff.differing).toEqual([]);
-    expect(diff.equal).toBe(true);
-    expect(diff.identical).toBe(4);
   });
 });

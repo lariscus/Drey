@@ -3,7 +3,6 @@ import type { BoardSnapshot, PipelinePhase, RepoRef, TicketCard } from '../../co
 import { personaModelGuess, personaRunAllowedOf, splitPoolEntry, type Persona } from '../../core/persona';
 import { personaRunSettingsOf } from '../../core/persona-settings';
 import { TicketsGit } from '../../core/tickets-git';
-import { isAutoPhase, nextPhaseIdOf } from '../chain';
 import { chainWorkingPhase } from '../holder-plan';
 import { readRepoInstructions, worktreeDiffStat } from '../context-pack';
 import { dkTargetFor } from '../dk-target';
@@ -28,7 +27,7 @@ export interface PoolGrantFor {
   readonly decision: PoolGrantDecision;
 }
 
-/** One planned dispatch: the card, the column it works in, and what the pass resolved for it. */
+/** One planned dispatch: the card, the column it stands in, and what the pass resolved for it. */
 export interface PlannedDispatch {
   readonly card: TicketCard;
   readonly workingPhaseId: string;
@@ -83,24 +82,6 @@ function poolParts(grant: PoolGrantFor | null): Pick<RunRequest, 'poolClass' | '
   };
 }
 
-/** Where a column run's green gate moves the ticket: the next column, or only as far as the working column before a manual step (E10-6). */
-function moveTargetOf(snap: BoardSnapshot, card: TicketCard, workingPhaseId: string, parkFor: string | null): string | null {
-  if (parkFor === null) {
-    return nextPhaseIdOf(snap.columns, workingPhaseId);
-  }
-  return card.phase !== workingPhaseId ? workingPhaseId : null;
-}
-
-/** req-257: a run on a lifecycle store of a ticket with a chain works a chain entry (its cursor); false on the phase board. */
-function chained(config: ChainConfig, card: TicketCard): boolean {
-  return config.store?.lifecycle === true && (card.meta.chain?.length ?? 0) > 0;
-}
-
-/** Whose gate failure a retry reads: a chain run its own position's (req-78), a column run its column's. */
-function retryOf(cursor: RunCursor | null, workingPhaseId: string): { readonly column: string } | { readonly position: number } {
-  return cursor !== null ? { position: cursor.at } : { column: workingPhaseId };
-}
-
 /** What the repo side of a dispatch resolved to. */
 interface Target {
   readonly phase: PipelinePhase;
@@ -109,10 +90,10 @@ interface Target {
 }
 
 /**
- * One planned dispatch (M85, E3, E8, E10-6): the repos, the instruction
- * base, the manual step after the gate, the ticket's text from the store,
- * the context pack (T-0048), the composed request and the start. A skip is
- * said once per ticket and reason.
+ * One planned dispatch (M85, E3, E8, req-257): the repos, the instruction
+ * base (the persona's prompt), the chain's cursor, the ticket's text from the
+ * store, the context pack (T-0048), the composed request and the start. A skip
+ * is said once per ticket and reason.
  */
 export class TicketDispatch {
   private disciplinesOnce: Promise<DisciplineTexts> | null = null;
@@ -131,9 +112,7 @@ export class TicketDispatch {
     if (ready === null) {
       return 'skipped';
     }
-    // req-266: the chain is a persona list now; the manual step it inserted pauses until req-257 parks at a You entry.
-    const parkFor = null;
-    const composed = composeRunRequest(await this.input(config, snap, planned, { ...ready, parkFor }));
+    const composed = composeRunRequest(await this.input(config, snap, planned, ready));
     if (!composed.ok) {
       this.deps.notes.skip(card.id, `dispatch skips ${card.id}: ${composed.error}`);
       return 'skipped';
@@ -147,8 +126,8 @@ export class TicketDispatch {
   /** The target, the instruction base and the ticket's text; null (said once) when one of them is missing. */
   private async ready(config: ChainConfig, snap: BoardSnapshot, planned: PlannedDispatch): Promise<{ target: Target; prompt: DispatchPrompt; text: string } | null> {
     const { card } = planned;
-    const target = this.target(snap, card, planned.workingPhaseId, chained(config, card));
-    const prompt = target === null ? null : await this.deps.prompts.promptFor(config, card, target.phase, planned.persona);
+    const target = this.target(snap, card, planned.workingPhaseId);
+    const prompt = target === null ? null : this.deps.prompts.promptFor(card, planned.persona);
     if (target === null || prompt === null) {
       return null;
     }
@@ -177,12 +156,12 @@ export class TicketDispatch {
   }
 
   /** The working phase and the repos; a scout ticket may name none (E8), a named one must resolve — a typo is a skip, never a guess. */
-  private target(snap: BoardSnapshot, card: TicketCard, workingPhaseId: string, chains: boolean): Target | null {
-    const phase = chains ? chainWorkingPhase(snap.pipeline, workingPhaseId) : (snap.pipeline.find((p) => p.id === workingPhaseId) ?? null);
+  private target(snap: BoardSnapshot, card: TicketCard, workingPhaseId: string): Target | null {
+    const phase = chainWorkingPhase(snap.pipeline, workingPhaseId);
     const repo = card.meta.repo === null ? null : (snap.repos.find((r) => r.name === card.meta.repo) ?? null);
     const scout = (card.meta.form ?? 'ship') === 'scout';
-    if (phase === null || (repo === null && !scout)) {
-      this.deps.notes.skip(card.id, `dispatch skips ${card.id}: ${repo === null ? `repo "${card.meta.repo ?? ''}" is not in repos.md` : 'unknown working phase'}`);
+    if (repo === null && !scout) {
+      this.deps.notes.skip(card.id, `dispatch skips ${card.id}: repo "${card.meta.repo ?? ''}" is not in repos.md`);
       return null;
     }
     const extraRepos = this.extraRepos(snap, card, repo);
@@ -203,29 +182,23 @@ export class TicketDispatch {
     return extras;
   }
 
-  /** The composer's input: the move or the park after the gate, the context pack, the persona's pins. */
-  private async input(config: ChainConfig, snap: BoardSnapshot, planned: PlannedDispatch, got: { target: Target; prompt: DispatchPrompt; text: string; parkFor: string | null }): Promise<Parameters<typeof composeRunRequest>[0]> {
+  /** The composer's input: the cursor, the context pack, the persona's pins. */
+  private async input(config: ChainConfig, snap: BoardSnapshot, planned: PlannedDispatch, got: { target: Target; prompt: DispatchPrompt; text: string }): Promise<Parameters<typeof composeRunRequest>[0]> {
     const { card, workingPhaseId } = planned;
-    const { target, parkFor } = got;
-    // req-257: a chain run hands on by its cursor (the column follows the holder), never by a move.
-    const cursor = chained(config, card) ? await this.cursorOf(config, card, { phase: target.phase, proposeFlow: snap.proposeFlow === true }) : null;
-    // E10-6: a manual step after this gate parks the ticket on a green gate — it moves only as far as the working column.
-    const nextPhaseId = cursor !== null ? null : moveTargetOf(snap, card, workingPhaseId, parkFor);
-    const context = await this.context(config, card, target.repo, retryOf(cursor, workingPhaseId));
+    const { target } = got;
+    // req-257: a run hands on by its cursor (the column follows the holder), never by a move.
+    const cursor = await this.cursorOf(config, card, { phase: target.phase, proposeFlow: snap.proposeFlow === true });
+    const context = await this.context(config, card, target.repo, cursor.at);
     return {
       disciplines: await this.disciplines(),
       card,
       ticketText: got.text,
       vaultPath: config.ticketsVaultPath,
       workingPhase: target.phase,
-      nextPhaseId,
-      nextPhaseDir: nextPhaseId, // a store has no phase folders: the stage is the phase id
-      pushRemote: snap.pushRemote,
       ...(snap.closingSignals !== undefined ? { closingSignals: snap.closingSignals } : {}),
-      nextPhaseClaims: nextPhaseId !== null && snap.pipeline.find((p) => p.id === nextPhaseId)?.claim === true,
       repo: target.repo,
       extraRepos: [...target.extraRepos],
-      promptText: got.prompt.promptText,
+      promptText: null,
       defaultWorker: config.defaultWorker,
       permissionMode: config.permissionMode,
       gitPath: config.git,
@@ -233,13 +206,10 @@ export class TicketDispatch {
       ...context,
       origin: 'chain',
       caps: config.caps ?? DEFAULT_FLEET_CAPS,
-      // The pipeline's first worker column takes in fresh tickets: it gates structurally (the plan WRITES the criteria).
-      // req-257: on a chain the persona's `gate` decides alone (req-258).
-      structuralGateAllowed: cursor === null && snap.pipeline.find((p) => isAutoPhase(p))?.id === workingPhaseId,
-      ...(cursor !== null ? { cursor } : {}),
+      // req-257: the persona's `gate` decides alone (req-258).
+      cursor,
       dispatchedBy: workingPhaseId,
-      parkFor,
-      ...(config.store !== undefined ? { dk: dkTargetFor(config.store, snap.pipeline, workingPhaseId) } : {}),
+      ...(config.store !== undefined ? { dk: dkTargetFor(config.store, snap.pipeline) } : {}),
       handover: 'auto', // the supervisor's rules decide (T-0049); the dialog is the only place a mode is chosen
       project: ticketProject(card.meta.project, snap.projects ?? []), // req-282: its purpose rides the brief
       ...this.personaPins(planned, got.prompt),
@@ -256,16 +226,16 @@ export class TicketDispatch {
     const { returnTo, redBacks } = card.meta;
     const from = returnTo !== undefined && returnTo > (card.meta.at ?? 1) ? returnTo : null;
     const redBack = from === null ? undefined : { from, persona: chain[from - 1]?.persona ?? '?', failure: this.deps.directory.lastGateFailureAt(card.id, from) };
-    const redLoop = { ...(returnTo !== undefined ? { returnTo } : {}), ...(redBacks !== undefined ? { redBacks } : {}), maxRed: run.phase.maxRed ?? DEFAULT_MAX_RED, ...(redBack !== undefined ? { redBack } : {}) };
+    const redLoop = { ...(returnTo !== undefined ? { returnTo } : {}), ...(redBacks !== undefined ? { redBacks } : {}), maxRed: DEFAULT_MAX_RED, ...(redBack !== undefined ? { redBack } : {}) };
     return runCursorOf({ chain, at: card.meta.at, sentBack: card.meta.sentBack, crew: await this.deps.personas.crewGuard(config), redLoop, proposeFlow: run.proposeFlow });
   }
 
-  /** The context pack (T-0048): the repo's instructions, the worktree's diff stat and a retry's gate failure (its column's, a chain run's own position's — req-78); a scout run has neither worktree nor gate. */
-  private async context(config: ChainConfig, card: TicketCard, repo: RepoRef | null, retry: { readonly column: string } | { readonly position: number }): Promise<{ repoInstructions: string | null; diffStat: string | null; gateFailure: string | null }> {
+  /** The context pack (T-0048): the repo's instructions, the worktree's diff stat and a retry's gate failure (the run's own position's — req-78); a scout run has neither worktree nor gate. */
+  private async context(config: ChainConfig, card: TicketCard, repo: RepoRef | null, position: number): Promise<{ repoInstructions: string | null; diffStat: string | null; gateFailure: string | null }> {
     const scout = (card.meta.form ?? 'ship') === 'scout';
     const repoInstructions = repo !== null && repo.path !== null ? await readRepoInstructions(repo.path, repo.instructions) : null;
     const directory = this.deps.directory;
-    const gateFailure = scout ? null : 'position' in retry ? directory.lastGateFailureAt(card.id, retry.position) : directory.lastGateFailure(card.id, retry.column);
+    const gateFailure = scout ? null : directory.lastGateFailureAt(card.id, position);
     const diffStat =
       scout || repo === null || repo.path === null ? null : await worktreeDiffStat(new TicketsGit(() => config.git), worktreePathFor(config.ticketsVaultPath, repo, card.id), repo.branch);
     if (!scout && gateFailure !== null && diffStat === null) {

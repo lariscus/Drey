@@ -11,9 +11,8 @@ import type { StoreSettings } from './store-settings';
 
 /**
  * The board built from a REAL `dk` and a SCRATCH store with a configured
- * `[stages]` vocabulary (E14-2): extension fields, `depends`, `parent`, claims
- * and the shadow report, end to end. Temp dir + temp HOME, never the owner's
- * repos. Skipped (with the reason printed) when `dk` is missing or too old.
+ * `[stages]` vocabulary (E14-2): extension fields, `depends`, `parent`, claims,
+ * end to end. Temp dir + temp HOME, never the owner's repos. Skipped (with the reason printed) when `dk` is missing or too old.
  *
  *   DREY_DK_BIN=<path to dk>   which dk to test (default: `dk` on PATH)
  */
@@ -100,18 +99,18 @@ describe.skipIf(!found.ok)('the board over a real dk store', { timeout: 120_000 
     dk(['claim', '--size', 'S', 't-3'], 'ben.run-1');
     dk(['claim', '--size', 'S', 't-4'], 'owner@scratch');
     dk(['release', '--stage', 'commit', 't-4'], 'owner@scratch');
-    settings = { backend: 'dricket', shadow: false, dkPath: bin === 'dk' ? '' : bin, dkStore: storeDir, dkDataDir: path.join(root, 'data'), dkCheckout: '', dkSyncSeconds: 30 };
+    settings = { dkPath: bin === 'dk' ? '' : bin, dkStore: storeDir, dkDataDir: path.join(root, 'data'), dkCheckout: '', dkSyncSeconds: 30 };
   }, 120_000);
 
   afterAll(() => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  const sourceFor = (reportDir: string): StoreBoardSource =>
-    new StoreBoardSource(reportDir, () => undefined, 0, () => new DricketTicketStore(new DkProcess({ bin, store: settings.dkStore, dataDir: settings.dkDataDir, env, readConcurrency: 1 })));
+  const sourceFor = (): StoreBoardSource =>
+    new StoreBoardSource(() => undefined, () => new DricketTicketStore(new DkProcess({ bin, store: settings.dkStore, dataDir: settings.dkDataDir, env, readConcurrency: 1 })));
 
   it('puts each ticket in the column of its stage, ordered, with blocked and extension fields', async () => {
-    const board = await sourceFor(path.join(root, 'report')).board(settings, BASE);
+    const board = await sourceFor().board(settings, BASE);
     expect(board.issues.filter((i) => i.level === 'error')).toEqual([]);
     const ids = (phase: string): string[] => board.columns.find((c) => c.phase.id === phase)!.tickets.map((t) => t.id);
     expect(board.columns.map((c) => c.phase.id)).toEqual(['inbox', 'prioritized', 'build', 'commit', 'done']);
@@ -133,23 +132,5 @@ describe.skipIf(!found.ok)('the board over a real dk store', { timeout: 120_000 
     expect(card('T-0002').meta).toMatchObject({ parent: 'T-0001', blockedBy: ['T-0001'] });
     expect(card('T-0003').meta).toMatchObject({ claimedBy: 'ben.run-1', priority: 'high' });
     expect(card('T-0003').meta.claimedAt).toMatch(/^\d{4}-\d\d-\d\dT/);
-  });
-
-  it('writes the shadow report against a files board that differs', async () => {
-    const reportDir = path.join(root, 'shadow');
-    const { assembleBoard } = await import('../core/ticket-board');
-    const shown = assembleBoard({
-      ...BASE,
-      files: [
-        { path: 'tickets/inbox/T-0001.md', text: '---\nid: T-0001\ntitle: "First: with a colon"\npriority: urgent\nrank: 99\npersona: ben\n---\n' },
-        { path: 'tickets/inbox/T-0009.md', text: '---\nid: T-0009\ntitle: Only in files\npriority: normal\n---\n' },
-      ],
-    });
-    const diff = await sourceFor(reportDir).runShadow({ ...settings, shadow: true }, BASE, shown);
-    expect(diff?.onlyLeft).toEqual(['T-0009']);
-    expect(diff?.onlyRight).toEqual(['T-0002', 'T-0003', 'T-0004']);
-    const first = diff?.differing.find((d) => d.id === 'T-0001');
-    expect(first?.fields.map((f) => f.field)).toContain('meta.rank');
-    expect(readFileSync(path.join(reportDir, 'board-diff.md'), 'utf8')).toContain('`meta.rank`: `99` -> `10`');
   });
 });

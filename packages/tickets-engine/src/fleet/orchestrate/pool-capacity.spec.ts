@@ -21,8 +21,8 @@ describe('PoolCapacity', () => {
   });
 
   it('a probed llama.cpp server caps the pool (req-63)', async () => {
-    h.io.seed('T-0001', 'plan');
-    h.io.seed('T-0002', 'plan');
+    h.seedRun('T-0001');
+    h.seedRun('T-0002');
     const probeSlots = vi.fn(async (): Promise<number | null> => 1);
     const { orch, fleet, logs } = h.build({ probeSlots });
     await orch.configure(h.config({ pools: normalizeFleetPools({ opencode: { size: 4, probeUrl: 'http://127.0.0.1:8080' } }) }));
@@ -33,9 +33,9 @@ describe('PoolCapacity', () => {
   });
 
   it('a run out of quota pauses its provider pool — no new run, no red gate', async () => {
-    h.io.seed('T-0001', 'plan');
-    h.io.seed('T-0002', 'plan');
-    h.io.seed('T-0003', 'plan');
+    h.seedRun('T-0001');
+    h.seedRun('T-0002');
+    h.seedRun('T-0003');
     const { orch, fleet, logs } = h.build();
     await orch.configure(h.config());
     await orch.setMaster('run');
@@ -52,9 +52,9 @@ describe('PoolCapacity', () => {
   });
 
   it('a rate-limited run shrinks its provider pool for a while (req-63)', async () => {
-    h.io.seed('T-0001', 'plan');
-    h.io.seed('T-0002', 'plan');
-    h.io.seed('T-0003', 'plan');
+    h.seedRun('T-0001');
+    h.seedRun('T-0002');
+    h.seedRun('T-0003');
     const { orch, fleet, logs } = h.build();
     await orch.configure(h.config());
     await orch.setMaster('run');

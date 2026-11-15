@@ -79,12 +79,12 @@ export function fakeAdapter(id: ProviderAdapter['id'] = 'opencode'): FakeAdapter
 }
 
 /** The fake store's target; its stages are the phases the requests below move through. */
-export const DK_TARGET: RunDkTarget = { bin: 'dk', store: 'E:/store', dataDir: '', checkout: '', parkStage: null, retreatStage: 'prioritized', trailers: false };
+export const DK_TARGET: RunDkTarget = { bin: 'dk', store: 'E:/store', dataDir: '', checkout: '', parkStage: null, trailers: false };
 
-/** A store that holds T-0001 in `plan` (the claim stage) and takes releases into the pipeline's stages. */
+/** A store that holds T-0001 in `plan` (the claim stage) and takes releases into the pipeline's stages; `active` is where a run that moved nothing hands the ticket back (req-307). */
 export function planStore(): FakeTicketStore {
   const store = new FakeTicketStore();
-  store.stages = ['inbox', 'prioritized', 'plan', 'build', 'review', 'commit', 'done'];
+  store.stages = ['inbox', 'prioritized', 'plan', 'build', 'review', 'commit', 'active', 'done'];
   store.stage = 'plan';
   store.claimStage = 'plan';
   return store;
@@ -108,10 +108,6 @@ export function runRequest(vaultDir: string, overrides: Partial<RunRequest> = {}
     acceptance: ['npm run verify:unit'],
     gate: 'commands',
     git: 'git',
-    nextPhase: 'build',
-    nextPhaseDir: 'build',
-    pushRemote: null,
-    claimIdentity: null,
     dk: DK_TARGET,
     ...overrides,
   };
@@ -175,7 +171,7 @@ export async function runnerNotes(fleetRoot: string, runId: string): Promise<str
  * moves on to `commit`.
  */
 export function buildRequest(vaultDir: string, overrides: Partial<RunRequest> = {}): RunRequest {
-  return runRequest(vaultDir, { ticketRelPath: 'tickets/build/T-0001.md', phase: 'build', nextPhase: 'commit', nextPhaseDir: 'commit', ...overrides });
+  return runRequest(vaultDir, { ticketRelPath: 'tickets/build/T-0001.md', phase: 'build', ...overrides });
 }
 
 /** The stream file as text (every line, runner notes and worker events alike). */

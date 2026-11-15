@@ -407,6 +407,8 @@ a stored `x-holder`; `x-phase` retired), a send-back adds `x-sent-back`, a
 question or a second send-back `x-awaiting: you`; the persona board's lanes
 are Drey's, so the store's `dricket.toml` never names a persona. The board's
 own migration steps (`pipeline.md`, `crew.md`, the two default personas) are
-Drey's files, not the store's. "Initialize board" still writes the phase
-pipeline; creating a store on the lifecycle stages is E14-9b. See
+Drey's files, not the store's. "Initialize board" writes the persona board's
+pipeline; with no store configured Drey creates one on the lifecycle stages
+itself ([ADR-0100](0100-drey-on-dricket-only.md), req-307: the files backend
+and the two-backend reading of this ADR's earlier changes are gone). See
 [ADR-0098](0098-the-persona-board.md).

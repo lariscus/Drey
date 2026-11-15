@@ -4,8 +4,14 @@ import { atLastEntry, ownerSendBackTarget } from '../core/chain-cursor';
 import { renderChainEntry } from '../core/chain-list';
 import { chainFinished } from '../core/chain-placement';
 import { cursorAfterGreen } from '../core/chain-red-gate';
+import type { PersonaLookup } from '../core/chain-holder';
 import { EDGE_STAGES } from '../core/lifecycle-stages';
-import type { HolderPlacement } from '../store/store-board';
+
+/** What the owner's chain moves read of the board: the terminal column and the crew's kinds. */
+export interface OwnerChainContext {
+  readonly terminal: string | null;
+  readonly lookup: PersonaLookup;
+}
 
 /**
  * The owner's Accept and Send back on a chain ticket of a lifecycle store
@@ -49,9 +55,9 @@ export type OwnerSendBack =
   | { readonly kind: 'cursor'; readonly at: number; readonly persona: string };
 
 /** The cursor of an `active` chain ticket in a holder's column; null when the owner's move is the column move of old. */
-function activeChainOf(card: TicketCard, placement: HolderPlacement): { readonly at: number; readonly length: number } | null {
+function activeChainOf(card: TicketCard, placement: OwnerChainContext): { readonly at: number; readonly length: number } | null {
   const chain = card.meta.chain;
-  if (chain === undefined || chain.length === 0 || EDGE_STAGES.includes(card.phase) || card.phase === placement.columns.terminal) {
+  if (chain === undefined || chain.length === 0 || EDGE_STAGES.includes(card.phase) || card.phase === placement.terminal) {
     return null;
   }
   if (chainFinished(chain, card.meta.at)) {
@@ -61,7 +67,7 @@ function activeChainOf(card: TicketCard, placement: HolderPlacement): { readonly
 }
 
 /** req-305: Accept at an agent's `:shape` entry ends the shaping in place; null at any other entry. */
-function shapedAcceptOf(chain: readonly ChainEntry[], at: number, placement: HolderPlacement): OwnerAccept | null {
+function shapedAcceptOf(chain: readonly ChainEntry[], at: number, placement: OwnerChainContext): OwnerAccept | null {
   const current = chain[at - 1]!;
   if (current.mode !== 'shape' || placement.lookup(current.persona)?.kind !== 'agent') {
     return null;
@@ -71,7 +77,7 @@ function shapedAcceptOf(chain: readonly ChainEntry[], at: number, placement: Hol
 }
 
 /** What the owner's Accept does to a chain ticket. */
-export function ownerAcceptOf(card: TicketCard, placement: HolderPlacement): OwnerAccept {
+export function ownerAcceptOf(card: TicketCard, placement: OwnerChainContext): OwnerAccept {
   const active = activeChainOf(card, placement);
   const chain = card.meta.chain;
   if (active === null || chain === undefined) {
@@ -97,7 +103,7 @@ export function ownerAcceptOf(card: TicketCard, placement: HolderPlacement): Own
 }
 
 /** What the owner's Send back does to a chain ticket; `position` = the owner's pick of an earlier position. */
-export function ownerSendBackOf(card: TicketCard, placement: HolderPlacement, position?: number): OwnerSendBack {
+export function ownerSendBackOf(card: TicketCard, placement: OwnerChainContext, position?: number): OwnerSendBack {
   const active = activeChainOf(card, placement);
   const chain = card.meta.chain;
   if (active === null || chain === undefined) {
@@ -114,3 +120,4 @@ export function ownerSendBackOf(card: TicketCard, placement: HolderPlacement, po
   }
   return { kind: 'cursor', at: target, persona: chain[target - 1]!.persona };
 }
+

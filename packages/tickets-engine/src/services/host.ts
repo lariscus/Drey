@@ -48,8 +48,6 @@ export interface EngineHost {
   /** The renderer's `board-changed` push — the host debounces and emits. */
   emitBoardChanged(): void;
   log(message: string, level?: 'info' | 'warn' | 'error'): void;
-  /** The machine-local root (run history, the legacy worktree base). */
-  readonly userRoot: string;
 
   /** A native folder picker; null when cancelled (Drey: the Electron dialog). */
   pickFolder(title: string): Promise<string | null>;
@@ -68,6 +66,5 @@ export interface FleetPort {
   /** E14-5b: the runner releases the agent claims of this host that no live run holds. */
   releaseLeftoverClaims?(
     store: ChainStoreConfig,
-    retreat: Readonly<Record<string, string | null>>,
   ): Promise<{ readonly ok: true; readonly released: readonly string[]; readonly skipped: readonly { readonly id: string; readonly reason: string }[] } | { readonly ok: false; readonly error: string }>;
 }

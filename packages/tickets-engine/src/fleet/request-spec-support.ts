@@ -1,4 +1,4 @@
-import { phaseWithoutPoolKeys, type PipelinePhase, type TicketCard } from '../contracts/tickets';
+import { type PipelinePhase, type TicketCard } from '../contracts/tickets';
 import type { composeRunRequest } from './request';
 import type { DisciplineTexts } from './discipline-texts';
 
@@ -31,7 +31,7 @@ export const DISCIPLINES: DisciplineTexts = {
 
 
 export function phase(id: string, over: Partial<PipelinePhase> = {}): PipelinePhase {
-  return phaseWithoutPoolKeys({ id, title: id, wip: null, claim: false, handover: 'manual', ...over });
+  return { id, title: id, color: null, ...over };
 }
 
 export function card(over: Partial<TicketCard> = {}): TicketCard {
@@ -105,10 +105,6 @@ export function base(over: Partial<Parameters<typeof composeRunRequest>[0]> = {}
     ticketText: TICKET,
     vaultPath: 'V:/tickets',
     workingPhase: null,
-    nextPhaseId: 'plan',
-    nextPhaseDir: null,
-    pushRemote: null,
-    nextPhaseClaims: false,
     repo: REPO,
     promptText: null,
     defaultWorker: 'opencode',
@@ -121,3 +117,4 @@ export function base(over: Partial<Parameters<typeof composeRunRequest>[0]> = {}
     ...over,
   };
 }
+

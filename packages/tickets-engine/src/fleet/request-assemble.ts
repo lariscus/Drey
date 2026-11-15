@@ -28,8 +28,8 @@ type WorkParts = Pick<
   RunRequest,
   'provider' | 'model' | 'permissionMode' | 'network' | 'instruction' | 'continuationInstruction' | 'briefDigest' | 'acceptance' | 'gate' | 'git'
 >;
-type MoveParts = Pick<RunRequest, 'nextPhase' | 'nextPhaseDir' | 'pushRemote' | 'claimIdentity' | 'cursor'>;
-type OptionalParts = Pick<RunRequest, 'limits' | 'recordWorker' | 'column' | 'handover' | 'interactive' | 'dk' | 'parkFor' | 'leaving' | 'machine' | 'reviewCheckout' | 'closing'>;
+type MoveParts = Pick<RunRequest, 'cursor'>;
+type OptionalParts = Pick<RunRequest, 'limits' | 'recordWorker' | 'column' | 'handover' | 'interactive' | 'dk' | 'leaving' | 'machine' | 'reviewCheckout' | 'closing'>;
 
 /** The wire request, its keys in the order the runner's log and record have always shown them. */
 export function assembleRunRequest(plan: RunPlan, worker: RunWorkerPin, instruction: ComposedInstruction): RunRequest {
@@ -75,22 +75,16 @@ function workParts(plan: RunPlan, worker: RunWorkerPin, instruction: ComposedIns
   };
 }
 
-/** Where a green gate takes the ticket, and who claims it there. */
+/** Where a green gate takes the ticket: the chain's cursor on (a run that moves nothing carries none). */
 function moveParts(plan: RunPlan): MoveParts {
   const { input, moves } = plan;
-  return {
-    nextPhase: moves ? input.nextPhaseId : null,
-    nextPhaseDir: !moves || input.nextPhaseId === null ? null : input.nextPhaseDir,
-    pushRemote: input.pushRemote,
-    claimIdentity: moves && input.nextPhaseClaims && input.nextPhaseId !== null ? agentIdentity() : null,
-    ...(moves && input.cursor !== undefined ? { cursor: input.cursor } : {}),
-  };
+  return moves && input.cursor !== undefined ? { cursor: input.cursor } : {};
 }
 
 /** The keys a request carries only when they are set. */
 function optionalParts(plan: RunPlan): OptionalParts {
-  const { input, moves } = plan;
-  const limits = limitsOf(input.workingPhase, input.persona?.run ?? null);
+  const { input } = plan;
+  const limits = limitsOf(input.persona?.run ?? null);
   return {
     ...(limits !== null ? { limits } : {}),
     ...(input.workerChoice !== null ? { recordWorker: input.workerChoice } : {}),
@@ -98,7 +92,6 @@ function optionalParts(plan: RunPlan): OptionalParts {
     ...(input.handover !== undefined ? { handover: input.handover } : {}),
     ...(input.interactive !== undefined ? { interactive: input.interactive } : {}),
     ...(input.dk !== undefined ? { dk: input.dk } : {}),
-    ...(moves && input.parkFor ? { parkFor: input.parkFor } : {}),
     ...leavingParts(plan),
     ...(plan.reviewCheckout !== null ? { reviewCheckout: plan.reviewCheckout } : {}),
     ...closingParts(input.closingSignals, input.gateFailure),
@@ -126,12 +119,10 @@ function closingParts(signals: readonly ClosingSignal[] | undefined, gateFailure
   return { closing: { signals: signals ?? DEFAULT_CLOSING_SPEC.signals, retry: gateFailure !== null } };
 }
 
-const firstSet = (own: number | null | undefined, column: number | null | undefined): number | null => own ?? column ?? null;
-
-/** The run ceilings as the request carries them — the persona's where its record sets one (req-258), else the column's; null when neither does. */
-function limitsOf(phase: PipelinePhase | null, persona: Pick<PersonaRunSettings, 'maxTurns' | 'maxWorkMin'> | null): { maxTurns?: number; maxWorkMs?: number } | null {
-  const maxTurns = firstSet(persona?.maxTurns, phase?.maxTurns);
-  const maxWorkMin = firstSet(persona?.maxWorkMin, phase?.maxWorkMin);
+/** The run ceilings as the request carries them — the persona's where its record sets one (req-258); null when it sets none. */
+function limitsOf(persona: Pick<PersonaRunSettings, 'maxTurns' | 'maxWorkMin'> | null): { maxTurns?: number; maxWorkMs?: number } | null {
+  const maxTurns = persona?.maxTurns ?? null;
+  const maxWorkMin = persona?.maxWorkMin ?? null;
   if (maxTurns === null && maxWorkMin === null) {
     return null;
   }

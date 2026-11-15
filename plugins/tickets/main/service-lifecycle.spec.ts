@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { promises as fsp } from 'node:fs';
 import * as http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -204,18 +205,18 @@ describe('mirrorConfig (E14-7a)', () => {
 
   it('writes the plugin keys and the chat keys into the engine home, and keeps what the engine owns', async () => {
     root = await fsp.mkdtemp(path.join(tmpdir(), 'engine-mirror-'));
-    await fsp.writeFile(path.join(root, 'config.json'), JSON.stringify({ 'engine.token': 'tok', backend: 'files', 'dk.store': 'E:/old' }), 'utf8');
-    await mirrorConfig(root, ctxWith({ backend: 'dricket', 'dk.store': 'E:/new' }, { baseUrl: 'http://h/v1', apiKey: null, model: 'm' }));
+    await fsp.writeFile(path.join(root, 'config.json'), JSON.stringify({ 'engine.token': 'tok', 'dk.store': 'E:/old' }), 'utf8');
+    await mirrorConfig(root, ctxWith({ 'dk.store': 'E:/new' }, { baseUrl: 'http://h/v1', apiKey: null, model: 'm' }));
     const file = JSON.parse(await fsp.readFile(path.join(root, 'config.json'), 'utf8')) as Record<string, unknown>;
-    expect(file).toMatchObject({ 'engine.token': 'tok', backend: 'dricket', 'dk.store': 'E:/new', 'chat.baseUrl': 'http://h/v1', 'chat.apiKey': null });
+    expect(file).toMatchObject({ 'engine.token': 'tok', 'dk.store': 'E:/new', 'chat.baseUrl': 'http://h/v1', 'chat.apiKey': null });
   });
 
   it('leaves a key the plugin config does not hold as it is', async () => {
     root = await fsp.mkdtemp(path.join(tmpdir(), 'engine-mirror-'));
-    await fsp.writeFile(path.join(root, 'config.json'), JSON.stringify({ backend: 'dricket' }), 'utf8');
+    await fsp.writeFile(path.join(root, 'config.json'), JSON.stringify({ 'dk.store': 'E:/kept' }), 'utf8');
     await mirrorConfig(root, ctxWith({}, { baseUrl: 'http://h/v1', apiKey: null, model: 'm' }));
     const file = JSON.parse(await fsp.readFile(path.join(root, 'config.json'), 'utf8')) as Record<string, unknown>;
-    expect(file['backend']).toBe('dricket');
+    expect(file['dk.store']).toBe('E:/kept');
   });
 });
 
@@ -225,7 +226,9 @@ describe('mirrorConfig (E14-7a)', () => {
  * The first start after `dk.store` changed must report the NEW store, with no second start.
  */
 describe('ensureService: the first start reads the new settings (E14-7a)', () => {
-  const PIPELINE = ['---', 'phases:', '  - { id: inbox, title: Inbox, handover: manual }', '  - { id: done, title: Done, handover: none }', '---', ''].join('\n');
+  /** The lifecycle stages of the stores below: the board shows no other. */
+  const STAGES_TOML = ['[stages]', 'values = ["inbox", "prioritized", "active", "running", "done"]', 'initial = "inbox"', 'terminal = ["done"]', 'claim = ["running"]', 'cancelled = "cancelled"', ''].join('\n');
+  const PIPELINE =['---', 'phases:', '  - { id: inbox, title: Inbox, handover: manual }', '  - { id: done, title: Done, handover: none }', '---', ''].join('\n');
   let root = '';
   let service: ServiceHost | null = null;
   let engine: EngineClient | null = null;
@@ -234,12 +237,19 @@ describe('ensureService: the first start reads the new settings (E14-7a)', () =>
     await service?.shutdown({ handover: false });
     service = null;
     engine = null;
-    await fsp.rm(root, { recursive: true, force: true });
+    // A store-backed engine leaves a handle on its store folder for a moment after the shutdown (the owner of it is not found yet).
+    await fsp.rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
   });
 
-  /** A store checkout holding `count` inbox tickets (t-1, t-2, ...), in dk's file layout. */
+  /** A store checkout on the lifecycle stages (the board shows no other) holding `count` inbox tickets (t-1, t-2, ...), in dk's file layout. */
   async function storeWith(name: string, count: number): Promise<string> {
     const store = path.join(root, name);
+    await fsp.mkdir(store, { recursive: true });
+    await fsp.writeFile(path.join(store, 'dricket.toml'), STAGES_TOML, 'utf8');
+    const git = (...args: string[]): void => void execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@test.invalid', ...args], { cwd: store, windowsHide: true, stdio: 'pipe' });
+    git('init', '-q', '-b', 'main');
+    git('add', 'dricket.toml');
+    git('commit', '-q', '-m', 'stages');
     for (let n = 1; n <= count; n += 1) {
       const dir = path.join(store, 'tickets', 't', '0000', `t-${n}`);
       await fsp.mkdir(dir, { recursive: true });
@@ -276,7 +286,7 @@ describe('ensureService: the first start reads the new settings (E14-7a)', () =>
     engine = new EngineClient(endpoints);
   }
 
-  it('the shadow report of the very first start describes the store the settings name', async () => {
+  it('the board of the very first start reads the store the settings name', async () => {
     root = await fsp.mkdtemp(path.join(tmpdir(), 'engine-first-start-'));
     const vault = path.join(root, 'vault');
     const home = path.join(root, 'home');
@@ -287,16 +297,11 @@ describe('ensureService: the first start reads the new settings (E14-7a)', () =>
     const oldStore = await storeWith('old-store', 1);
     const newStore = await storeWith('new-store', 3);
     // What the previous run left behind: the engine's config still names the old store.
-    await fsp.writeFile(path.join(home, 'config.json'), JSON.stringify({ backend: 'shadow', 'dk.store': oldStore }), 'utf8');
+    await fsp.writeFile(path.join(home, 'config.json'), JSON.stringify({ 'dk.store': oldStore }), 'utf8');
 
-    await start(vault, home, { backend: 'shadow', 'dk.store': newStore });
-    // The startup scan builds the board inside createEngine; the shutdown waits for its report.
-    await engine!.invoke('snapshot');
-    await service!.shutdown({ handover: false });
-    service = null;
-
-    const report = JSON.parse(await fsp.readFile(path.join(home, 'shadow', 'board-diff.json'), 'utf8')) as { diff: { rightCount: number } };
-    expect(report.diff.rightCount).toBe(3);
+    await start(vault, home, { 'dk.store': newStore });
+    const board = (await engine!.invoke('snapshot')) as { columns: readonly { tickets: readonly unknown[] }[] };
+    expect(board.columns.reduce((n, column) => n + column.tickets.length, 0)).toBe(3);
   });
 });
 

@@ -9,11 +9,11 @@
  * decision line with the outcome. Dismiss appends the decision without
  * executing. Proposals are append-only history.
  *
- * Persistence mirrors the verify service: one chat-file write per round
- * (the owner line, the turn block, the decision), each its own commit
- * through a locate+commitPaths helper; the board mutations behind a
- * confirm carry their own commits through the board port. All file IO
- * goes through the host; the bridge never touches the vault.
+ * Persistence is one chat-file write per round (the owner line, the turn
+ * block, the decision), each its own commit through a locate+commitPaths
+ * helper; the board mutations behind a confirm carry their own commits
+ * through the board port. All file IO goes through the host; the bridge
+ * never touches the vault.
  *
  * A session runs one mission turn at a time: a send while the stream is
  * still running refuses politely instead of interleaving a second owner

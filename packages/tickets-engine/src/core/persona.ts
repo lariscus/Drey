@@ -396,24 +396,13 @@ export function personaFileText(persona: Persona, body?: string): string {
 }
 
 /**
- * Who works a ticket and why (req-257, the persona board): on a lifecycle
- * store the chain's entry at the cursor (`chain`); on the phase board (the
- * files backend, a store not migrated) the column's `persona:` (`phase`).
- * The ticket pin `x-persona` and the crew's `default-persona` were retired
- * with the ladder's other levels (owner 2026-11-11: no role fallback, no
- * persona -> no run, `decisions.md`).
+ * Who works a ticket and why (req-257, the persona board): the chain's
+ * entry at the cursor (`chain`). No persona -> no run
+ * (owner 2026-11-11: no role fallback, `decisions.md`).
  */
 export interface PersonaResolution {
   readonly persona: string | null;
-  readonly source: 'chain' | 'phase' | 'none';
-}
-
-/** The phase board's resolution: the column's persona, else none. */
-export function resolvePersona(input: { readonly phasePersona: string | null }): PersonaResolution {
-  if (input.phasePersona !== null && input.phasePersona.trim() !== '') {
-    return { persona: input.phasePersona.trim(), source: 'phase' };
-  }
-  return { persona: null, source: 'none' };
+  readonly source: 'chain' | 'none';
 }
 
 export { splitPoolEntry } from './pool-entry';

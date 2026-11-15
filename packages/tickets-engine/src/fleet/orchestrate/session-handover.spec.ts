@@ -101,7 +101,7 @@ describe('SessionHandover — which session a start resumes (T-0049)', () => {
     const { sup, adapter } = harness(dirs.fleet);
     await sup.adopt();
 
-    const started = await sup.start(request({ ticketRelPath: 'tickets/build/T-0001.md', phase: 'build', nextPhase: 'review', handover: 'auto' }));
+    const started = await sup.start(request({ ticketRelPath: 'tickets/build/T-0001.md', phase: 'build', handover: 'auto' }));
     expect(started.ok && started.run.handoverMode).toBe('fresh');
     expect(adapter.starts[0]!.resumeRef).toBeNull();
     expect(await streamText(dirs.fleet, started.ok ? started.run.id : '')).toContain('worked the plan phase');

@@ -104,8 +104,8 @@ describe.skipIf(!found.ok)('DricketFileStore over a real dk store', { timeout: 1
 
   it('announces an own write through the board source', async () => {
     const onChange = vi.fn();
-    const settings: StoreSettings = { backend: 'dricket', shadow: false, dkPath: bin === 'dk' ? '' : bin, dkStore: storeDir, dkDataDir: path.join(root, 'data'), dkCheckout: '', dkSyncSeconds: 30 };
-    const source = new StoreBoardSource(path.join(root, 'report'), () => undefined, 0, undefined, {
+    const settings: StoreSettings = { dkPath: bin === 'dk' ? '' : bin, dkStore: storeDir, dkDataDir: path.join(root, 'data'), dkCheckout: '', dkSyncSeconds: 30 };
+    const source = new StoreBoardSource(() => undefined, undefined, {
       onChange,
       watch: () => ({ close: () => undefined }),
       dkFactory: () => new DricketTicketStore(new DkProcess({ bin, store: storeDir, dataDir: settings.dkDataDir, env, readConcurrency: 1 })),
@@ -123,9 +123,9 @@ describe.skipIf(!found.ok)('DricketFileStore over a real dk store', { timeout: 1
   });
 
   describe('change detection against a real watcher and a foreign dk (E14-8)', () => {
-    const settingsOf = (): StoreSettings => ({ backend: 'dricket', shadow: false, dkPath: bin === 'dk' ? '' : bin, dkStore: storeDir, dkDataDir: path.join(root, 'data'), dkCheckout: '', dkSyncSeconds: 30 });
-    const makeSource = (onChange: () => void, extra: Partial<ConstructorParameters<typeof StoreBoardSource>[4]> = {}): StoreBoardSource =>
-      new StoreBoardSource(path.join(root, 'report'), () => undefined, 0, undefined, {
+    const settingsOf = (): StoreSettings => ({ dkPath: bin === 'dk' ? '' : bin, dkStore: storeDir, dkDataDir: path.join(root, 'data'), dkCheckout: '', dkSyncSeconds: 30 });
+    const makeSource = (onChange: () => void, extra: Partial<ConstructorParameters<typeof StoreBoardSource>[2]> = {}): StoreBoardSource =>
+      new StoreBoardSource(() => undefined, undefined, {
         onChange,
         dkFactory: () => new DricketTicketStore(new DkProcess({ bin, store: storeDir, dataDir: path.join(root, 'data'), env, readConcurrency: 1 })),
         ...extra,

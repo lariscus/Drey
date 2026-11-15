@@ -52,15 +52,6 @@ export interface ChainFile {
   /** The owner's switch (req-95); absent in older files, then `master` stands in. */
   readonly autopilot?: AutopilotRecord;
   readonly columns: Record<string, ColumnMode>;
-  readonly redStreak: Record<string, number>;
-  readonly cooldownUntil: Record<string, string>;
-  /** Per column: the day the token sum belongs to, and the sum itself. */
-  readonly tokensDay: Record<string, string>;
-  readonly tokensUsed: Record<string, number>;
-  /** Per ticket: the ci check's next attempt (a failed check backs off). */
-  readonly ciBackoff: Record<string, string>;
-  /** Per column: the breaker's trip while it holds (absent in older files). */
-  readonly tripped?: Record<string, ChainTrip>;
   /** Set by a runner retiring for a newer build: its successor keeps the master. */
   readonly handoverAt?: string;
   readonly ticketFailures?: Record<string, TicketFailure>;
@@ -94,14 +85,8 @@ export class ChainState {
   vault: ChainVaultLocator | null = null;
   autopilot: AutopilotRecord = AUTOPILOT_OFF;
   readonly columns: Record<string, ColumnMode> = {};
-  readonly redStreak: Record<string, number> = {};
-  readonly cooldownUntil: Record<string, string> = {};
-  readonly tokensDay: Record<string, string> = {};
-  readonly tokensUsed: Record<string, number> = {};
-  readonly tripped: Record<string, ChainTrip> = {};
   readonly ticketFailures: Record<string, TicketFailure> = {};
   readonly ownerHold: Record<string, OwnerHold> = {};
-  readonly ciBackoff: Record<string, string> = {};
   readonly pausedPersonas = new Set<string>();
   /** req-257: the persona breaker on a chain board (see {@link ChainFile}). */
   readonly personaRedStreak: Record<string, number> = {};
@@ -133,7 +118,7 @@ export class ChainState {
   /** Drops the per-phase state of phases the pipeline no longer has; true when anything went. */
   prune(known: ReadonlySet<string>): boolean {
     let changed = false;
-    for (const map of [this.columns, this.redStreak, this.cooldownUntil, this.tokensDay, this.tokensUsed, this.tripped] as Record<string, unknown>[]) {
+    for (const map of [this.columns] as Record<string, unknown>[]) {
       for (const key of Object.keys(map)) {
         if (!known.has(key)) {
           delete map[key];
@@ -151,9 +136,6 @@ export class ChainState {
       master: this.master,
       autopilot: this.autopilot,
       columns: { ...this.columns },
-      redStreak: { ...this.redStreak },
-      cooldownUntil: { ...this.cooldownUntil },
-      tripped: { ...this.tripped },
       quotaPausedUntil: pools.quotaPausedUntil,
       pausedPersonas: [...this.pausedPersonas].sort(),
       personaRedStreak: { ...this.personaRedStreak },
@@ -169,7 +151,7 @@ export class ChainState {
     this.config = null;
     this.vault = null;
     this.autopilot = AUTOPILOT_OFF;
-    const maps = [this.columns, this.redStreak, this.cooldownUntil, this.tokensDay, this.tokensUsed, this.tripped, this.ticketFailures, this.ownerHold, this.ciBackoff, this.ledgerCards, this.holds, this.personaRedStreak, this.personaCooldownUntil, this.personaTripped, this.personaWaits];
+    const maps = [this.columns, this.ticketFailures, this.ownerHold, this.ledgerCards, this.holds, this.personaRedStreak, this.personaCooldownUntil, this.personaTripped, this.personaWaits];
     for (const map of maps as Record<string, unknown>[]) {
       for (const key of Object.keys(map)) {
         delete map[key];
@@ -187,12 +169,6 @@ export class ChainState {
       master: this.master,
       autopilot: this.autopilot,
       columns: { ...this.columns },
-      redStreak: { ...this.redStreak },
-      cooldownUntil: { ...this.cooldownUntil },
-      tokensDay: { ...this.tokensDay },
-      tokensUsed: { ...this.tokensUsed },
-      ciBackoff: { ...this.ciBackoff },
-      tripped: { ...this.tripped },
       ticketFailures: { ...this.ticketFailures },
       ownerHold: { ...this.ownerHold },
       pausedPersonas: [...this.pausedPersonas].sort(),

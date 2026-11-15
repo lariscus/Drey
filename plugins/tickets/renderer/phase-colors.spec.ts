@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { phaseWithoutPoolKeys, type PipelinePhase } from '../shared/tickets';
+import type { PipelinePhase } from '../shared/tickets';
 import { TAG_AUTO_PALETTE } from '../../../shared/tag-style';
 import { phaseColorOf } from './phase-colors';
 
 /** T-0084: explicit `color:` wins, else the tag palette by board position. */
 
-const phase = (color: string | null): PipelinePhase =>
-  phaseWithoutPoolKeys({ id: 'build', title: 'Build', wip: null, claim: false, handover: 'agent build-default', color });
+const phase = (color: string | null): PipelinePhase => ({ id: 'build', title: 'Build', color });
 
 describe('phaseColorOf', () => {
   it('an explicit color wins over the palette', () => {
@@ -27,3 +26,5 @@ describe('phaseColorOf', () => {
     expect(phaseColorOf(phase(null), -1)).toBe(TAG_AUTO_PALETTE[TAG_AUTO_PALETTE.length - 1]);
   });
 });
+
+

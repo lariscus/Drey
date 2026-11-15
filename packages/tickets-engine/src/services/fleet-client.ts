@@ -219,13 +219,12 @@ export class FleetClient {
   /** E14-5b: releases the agent claims of this host that no live run of the runner holds. */
   async releaseLeftoverClaims(
     store: ChainStoreConfig,
-    retreat: Readonly<Record<string, string | null>>,
   ): Promise<{ readonly ok: true; readonly released: readonly string[]; readonly skipped: readonly { readonly id: string; readonly reason: string }[] } | { readonly ok: false; readonly error: string }> {
     if (!(await this.conn.ensure())) {
       return { ok: false, error: 'the fleet runner is not running' };
     }
     try {
-      return await this.conn.post('/claims/release-leftovers', { dk: store, retreat });
+      return await this.conn.post('/claims/release-leftovers', { dk: store });
     } catch (error) {
       return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }

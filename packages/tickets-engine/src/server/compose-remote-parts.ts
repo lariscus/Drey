@@ -5,9 +5,9 @@ import { BoardAvatars } from '../services/board-avatars';
 import { composePersonaPictures } from '../services/compose-crew-sessions';
 import { listChatModels } from '../services/chat-model-probe';
 import { NotesService } from '../services/notes-service';
+import { VideoService } from '../services/video-service';
 import type { BoardParts } from './compose-board-parts';
 import type { SessionParts } from './compose-session-parts';
-import type { VerifyParts } from './compose-verify-parts';
 import { DreyTicketsPort } from './drey-port';
 import type { EngineOptions } from './engine-types';
 import type { FileConfigStore } from './file-config';
@@ -27,8 +27,13 @@ export interface RemoteParts {
  * gateway's service. A phone's note save tells Drey's vault round through
  * the hub's paths channel (D-3).
  */
-export async function composeRemoteParts(opts: EngineOptions, config: FileConfigStore, parts: { board: BoardParts; verify: VerifyParts; sessions: SessionParts }, log: Log): Promise<RemoteParts> {
-  const { board, verify, sessions } = parts;
+export async function composeRemoteParts(opts: EngineOptions, config: FileConfigStore, parts: { board: BoardParts; sessions: SessionParts }, log: Log): Promise<RemoteParts> {
+  const { board, sessions } = parts;
+  // E11-1: the walkthrough videos' folder and its ignore rule, the settings'
+  // keys behind it — housekeeping settled here, the gateway's video route
+  // reads `stat` through the service below.
+  const videos = new VideoService({ board: board.board, host: board.host, git: board.git, config, log });
+  await videos.prepare().catch(() => undefined);
   // Resolved lazily: the port asks the service about bypass runs, the service takes the port.
   let remoteService: RemoteService | null = null;
   const remotePort = new DreyTicketsPort(
@@ -80,10 +85,10 @@ export async function composeRemoteParts(opts: EngineOptions, config: FileConfig
       }
     },
     // E12-3: the settings screen's "Include the n existing videos" count.
-    countVideos: async () => (await verify.videos.status()).count,
-    videos: (name) => verify.videos.stat(name),
+    countVideos: async () => (await videos.status()).count,
+    videos: (name) => videos.stat(name),
     videosChanged: async (includeExisting) => {
-      await verify.videos.applyInGit(includeExisting);
+      await videos.applyInGit(includeExisting);
     },
     log,
     onChanged: () => board.hub.emit('remote'),

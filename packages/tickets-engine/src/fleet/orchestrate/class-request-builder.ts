@@ -16,7 +16,6 @@ export interface ClassLookup {
 /** One dispatch as the builder reads it. */
 export interface ClassRequestInput {
   readonly card: TicketCard;
-  readonly phase: PipelinePhase;
   readonly persona: Persona;
   /** req-178: the slot the ticket's last run lived on (its session can only continue there); null = none. */
   readonly prefer?: string | null;
@@ -34,14 +33,13 @@ const FALLBACK_PROVIDER: WorkerProviderId = 'claude-code';
 /**
  * Who asks for which class (req-170; Persona v3, req-288): a ticket pin
  * `model:` asks for that model alone; otherwise the persona's `class:` is the
- * run's class, raised — never lowered — by the ticket's `class:`, the plan
- * part's `size:` (S → light, M → standard, L → heavy) and the phase's
- * `min-class:` floor; the owner's class list ranks (req-287). The pool is
- * every model of the table the router may use, so the next free model of the
- * class runs. A persona pinned to one model runs that model while nothing
- * raised its class; a raise takes the next free model of the raised class.
- * req-178: the phase's and the ticket's `needs:` ride along for the routing's
- * filter; a pin forbids the step up.
+ * run's class, raised — never lowered — by the ticket's `class:` and the plan
+ * part's `size:` (S → light, M → standard, L → heavy); the owner's class list
+ * ranks (req-287). The pool is every model of the table the router may use,
+ * so the next free model of the class runs. A persona pinned to one model
+ * runs that model while nothing raised its class; a raise takes the next
+ * free model of the raised class. req-178: the persona's and the ticket's
+ * `needs:` ride along for the routing's filter; a pin forbids the step up.
  */
 export class ClassRequestBuilder {
   constructor(private readonly lookup: ClassLookup) {}
@@ -50,8 +48,8 @@ export class ClassRequestBuilder {
     const { card, persona } = input;
     const own = this.ownOf(persona);
     const pinnedEntry = own.model === null ? null : this.entryOf(own.model);
-    // req-258: the persona's own needs replace the column's when its record names any.
-    const needs = mergeNeeds(persona.settings.needs ?? input.phase.needs, card.meta.needs);
+    // req-258: the persona's own needs.
+    const needs = mergeNeeds(persona.settings.needs, card.meta.needs);
     const base = {
       ticket: card.id,
       persona: persona.id,
@@ -81,9 +79,9 @@ export class ClassRequestBuilder {
     return { class: migrated.class, model: migrated.model };
   }
 
-  /** What may raise the persona's class: the ticket's class, the part's size, the phase's floor — each with why. */
+  /** What may raise the persona's class: the ticket's class, the part's size — each with why. */
   private raisersOf(input: ClassRequestInput): readonly { readonly name: CapabilityClass; readonly why: string }[] {
-    const { card, phase } = input;
+    const { card } = input;
     const size = card.meta.size ?? null;
     const raisers: { readonly name: CapabilityClass; readonly why: string }[] = [];
     if (card.meta.class !== undefined && card.meta.class !== null) {
@@ -92,13 +90,10 @@ export class ClassRequestBuilder {
     if (size !== null) {
       raisers.push({ name: PART_SIZE_CLASS[size], why: `size ${size} → ${PART_SIZE_CLASS[size]}` });
     }
-    if (phase.minClass !== undefined && phase.minClass !== null) {
-      raisers.push({ name: phase.minClass, why: `floor ${phase.minClass} in ${phase.id}` });
-    }
     return raisers;
   }
 
-  /** The persona's class raised by the ticket's class, the size and the phase's floor; `raised` when one of them lifted it. */
+  /** The persona's class raised by the ticket's class and the size; `raised` when one of them lifted it. */
   private asked(input: ClassRequestInput, own: CapabilityClass | null): { class: CapabilityClass | null; why: string; raised: boolean } {
     const { persona } = input;
     const raisers = this.raisersOf(input);

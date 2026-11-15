@@ -4,26 +4,20 @@
  * runner's one `RunBookkeeper`; a spec without the shared part gets its own.
  */
 import { ChainConfigRestorer } from './config/chain-config-restorer';
-import type { PipelinePhase } from '../contracts/tickets';
 import { loadDisciplineTexts, type DisciplineTexts } from './discipline-texts';
 import { NodeFileSystem } from './node-file-system';
 import { Orchestrator, type OrchestratorParts, type SlotSummarySource } from './orchestrator';
 import type { FileSystem } from './ports/file-system';
 import { clockOf } from './ports/clock';
 import type { ChainConfig, ChainStoreConfig, WorkerProviderId } from './protocol';
-import { execShell } from './shell-exec';
 import { chainStoreIoOf, StoreChainBoard } from './store-chain-board';
 import type { RunBookkeeper } from './orchestrate/run-bookkeeper';
 import { BoardPersonas } from './orchestrate/board-personas';
-import { Breaker } from './orchestrate/breaker';
 import { ChainBoard } from './orchestrate/chain-board';
 import { ChainState } from './orchestrate/chain-state';
 import { ChainStateStore } from './orchestrate/chain-state-store';
-import { CiSweep } from './orchestrate/ci-sweep';
 import type { DispatchPool } from './orchestrate/dispatch-pool';
 import { Dispatcher } from './orchestrate/dispatcher';
-import type { GateSeats, GateShell } from './orchestrate/gate-runner';
-import { HumanGates } from './orchestrate/human-gates';
 import { HolderPass } from './orchestrate/holder-pass';
 import { HoldRecorder } from './orchestrate/hold-recorder';
 import { PersonaBreaker } from './orchestrate/persona-breaker';
@@ -57,12 +51,6 @@ export interface OrchestratorDeps {
   readonly now?: () => Date;
   /** The safety-net rescan interval (default 15 s). */
   readonly scanIntervalMs?: number;
-  /** The ci handover's shell exec (cwd = the work repo). */
-  readonly execShell?: GateShell;
-  /** req-180: the governor's heavy seat a ci check takes; absent = none. */
-  readonly seats?: GateSeats;
-  /** The shipped default prompt's text for a ref (version comparison); absent = no check. */
-  readonly shippedPrompt?: (ref: string) => Promise<string | null>;
   /**
    * The discipline texts of the run briefs (req-279: `prompts/disciplines/`);
    * absent = the shipped files beside the compiled engine (a spec may
@@ -76,7 +64,7 @@ export interface OrchestratorDeps {
   /** The store door of a dricket chain (production: the checkout's files + `dk`). */
   readonly storeChainFor?: (store: ChainStoreConfig) => StoreChainBoard;
   /** E14-5b: gives up the claims no live run holds, once per runner life and store, before its first dispatch. */
-  readonly releaseLeftovers?: (store: ChainStoreConfig, pipeline: readonly PipelinePhase[]) => Promise<void>;
+  readonly releaseLeftovers?: (store: ChainStoreConfig) => Promise<void>;
   /** The files of the chain's state and the meta vault's personas and prompts; Node's by default. */
   readonly fs?: FileSystem;
   /** req-177: the slots' summary the chain status carries (the 7e band). */
@@ -152,7 +140,7 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
   };
   const pipelineRead = (): Promise<void> => orchestrator.pipelineRead();
   const board = new ChainBoard({
-    doorFor: deps.storeChainFor ?? ((config) => new StoreChainBoard(chainStoreIoOf(config), log, config.lifecycle === true)),
+    doorFor: deps.storeChainFor ?? ((config) => new StoreChainBoard(chainStoreIoOf(config), log)),
     ...(deps.releaseLeftovers !== undefined ? { releaseLeftovers: deps.releaseLeftovers } : {}),
     log,
   });
@@ -162,10 +150,8 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
   const note = (key: string, line: string): void => notes.skip(key, line);
   const personas = new BoardPersonas(note, fs);
   const events = deps.events !== undefined ? { events: deps.events } : {};
-  const breaker = new Breaker(state, board, bookkeeper, { clock, log, persist });
   const personaBreaker = new PersonaBreaker(state, { clock, log, persist });
-  const dispatch = new TicketDispatch({ board, directory, personas, prompts: new PromptSource(note, fs, log, deps.shippedPrompt), disciplines: disciplinesOf(deps), notes, log, ...events });
-  const humanGates = new HumanGates(board, personas, bookkeeper, log);
+  const dispatch = new TicketDispatch({ board, directory, personas, prompts: new PromptSource(note), disciplines: disciplinesOf(deps), notes, log, ...events });
   const pool = deps.pool !== undefined ? { pool: deps.pool, ledgerCards: new LedgerCards({ state, board, bookkeeper, persist, log }) } : {};
   const hold = holdOf(deps);
   const orchestrator: Orchestrator = new Orchestrator({
@@ -173,9 +159,8 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
     store,
     directory,
     pools,
-    settled: new SettledRuns({ state, directory, pools, breaker, personaBreaker, clock, persist, ...events }),
-    dispatcher: new Dispatcher({ state, board, directory, pools, personas, humanGates, dispatch, notes, clock, log, pipelineRead, persist, tranches, holders: new HolderPass({ state, personas, directory, notes, breaker: personaBreaker, holds: new HoldRecorder({ book: state, persist, ...events }) }), ...pool, ...hold }),
-    ci: new CiSweep({ state, board, bookkeeper, shell: deps.execShell ?? execShell, clock, log, pipelineRead, persist, ...(deps.seats !== undefined ? { seats: deps.seats } : {}) }),
+    settled: new SettledRuns({ state, directory, pools, personaBreaker, clock, persist, ...events }),
+    dispatcher: new Dispatcher({ state, board, directory, pools, dispatch, notes, clock, log, pipelineRead, persist, tranches, holders: new HolderPass({ state, personas, directory, notes, breaker: personaBreaker, holds: new HoldRecorder({ book: state, persist, ...events }) }), ...pool, ...hold }),
     clock,
     log,
     scanIntervalMs: deps.scanIntervalMs ?? 15_000,

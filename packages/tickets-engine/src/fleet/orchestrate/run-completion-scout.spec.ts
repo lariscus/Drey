@@ -13,8 +13,6 @@ describe('RunCompletion — scout runs', () => {
       form: 'scout',
       acceptance: [],
       gate: 'none',
-      nextPhase: null,
-      nextPhaseDir: null,
       worktreePath: 'W:/kt', // the read ground — the repo checkout itself
       instruction: 'Scout it.',
       ...over,

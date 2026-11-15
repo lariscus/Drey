@@ -1,47 +1,36 @@
 import { promises as fsp } from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadShippedPrompts, promptVersion, SHIPPED_PROMPTS_DIR, stripPromptVersion } from './default-prompts';
+import { promptVersion, SHIPPED_PROMPTS_DIR, stripPromptVersion } from './default-prompts';
 
 describe('shipped prompts', () => {
-  it('ships a prompt file for every agent column the default pipeline can name', async () => {
-    const prompts = await loadShippedPrompts();
-    expect([...prompts.keys()]).toEqual([
-      'build-default',
-      'plan-default',
-      'plan-interactive-default',
-      'qa-default',
-      'review-default',
-      'scout-default',
-    ]);
+  it('the package ships the disciplines, the crew prompts and the fragments — and nothing beside them', async () => {
+    const entries = await fsp.readdir(SHIPPED_PROMPTS_DIR);
+    expect(entries.sort()).toEqual(['crew', 'disciplines', 'fragments']);
   });
 
-  it('reads the files as they are: newline-terminated, the role only (req-280: the shared rules are disciplines)', async () => {
-    const prompts = await loadShippedPrompts();
-    for (const [ref, text] of prompts) {
-      expect(text.endsWith('\n'), ref).toBe(true);
-      expect(text, ref).not.toContain('How to work:');
-      expect(text, ref).not.toContain('status.log');
-      expect(text, ref).not.toContain('\r');
-      expect(await fsp.readFile(path.join(SHIPPED_PROMPTS_DIR, `${ref}.md`), 'utf8')).toBe(text);
-    }
-    expect(prompts.get('plan-default')).toContain('`## Plan`');
-    // The build step ends on the Changes section the Ready page reads (req-75 W3).
-    expect(prompts.get('build-default')).toContain('## Changes');
-    expect(prompts.get('build-default')).toContain('**What changed for you:**');
-    // The commit is You's machine action since req-267: no prompt ships for it.
-    expect(prompts.has('commit-default')).toBe(false);
-    // The interactive default (req-65): interview first. (The refine twin
-    // was removed in E13-9.)
-    expect(prompts.get('plan-interactive-default')).toContain('QUESTION:');
-    expect(prompts.has('refine-interactive-default')).toBe(false);
-  });
-
-  it('every shipped prompt carries a version marker the runner can compare', async () => {
-    for (const [ref, text] of await loadShippedPrompts()) {
-      expect(promptVersion(text), ref).toBeGreaterThan(0);
-      expect(stripPromptVersion(text), ref).not.toContain('drey-prompt-version');
+  it('every shipped file carries a version marker the reader can strip; the dialog protocol carries none', async () => {
+    const files: string[] = [];
+    const walk = async (dir: string): Promise<void> => {
+      for (const entry of await fsp.readdir(dir, { withFileTypes: true })) {
+        const file = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await walk(file);
+        } else if (entry.name.endsWith('.md')) {
+          files.push(file);
+        }
+      }
+    };
+    await walk(SHIPPED_PROMPTS_DIR);
+    expect(files.length).toBeGreaterThan(10);
+    for (const file of files) {
+      const text = await fsp.readFile(file, 'utf8');
+      if (file.endsWith(path.join('crew', 'dialog.md'))) {
+        expect(promptVersion(text), file).toBe(0);
+        continue;
+      }
+      expect(promptVersion(text), file).toBeGreaterThan(0);
+      expect(stripPromptVersion(text), file).not.toContain('drey-prompt-version');
     }
   });
 
@@ -51,18 +40,5 @@ describe('shipped prompts', () => {
     expect(stripPromptVersion(marked)).toBe('Body');
     expect(promptVersion('Body')).toBe(0);
     expect(stripPromptVersion('Body')).toBe('Body');
-  });
-
-  it('reads a missing folder as no prompts and skips files that are not prompt names', async () => {
-    const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-prompts-'));
-    try {
-      expect((await loadShippedPrompts(path.join(dir, 'absent'))).size).toBe(0);
-      await fsp.writeFile(path.join(dir, 'a.md'), 'A\r\n', 'utf8');
-      await fsp.writeFile(path.join(dir, '.hidden.md'), 'x', 'utf8');
-      await fsp.writeFile(path.join(dir, 'notes.txt'), 'x', 'utf8');
-      expect([...(await loadShippedPrompts(dir))]).toEqual([['a', 'A\n']]);
-    } finally {
-      await fsp.rm(dir, { recursive: true, force: true });
-    }
   });
 });

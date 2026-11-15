@@ -38,7 +38,7 @@ import { governorSeats, type Governor } from './compose-governor';
 import { composeOrchestrator } from './compose-orchestrator';
 import { composeRouting, type Routing } from './compose-routing';
 import { composeRunSupervisor, composeShared } from './compose-supervisor';
-import { dkTargetFor, retreatStages } from './dk-target';
+import { dkTargetFor } from './dk-target';
 import { FleetEventWriter } from './event-writer';
 import { kimiAdapter } from './harness/kimi';
 import { nodeKimiUsageReader } from './harness/kimi-usage';
@@ -241,7 +241,6 @@ function composeFleet(ctx: FleetContext): { supervisors: SupervisorSet; orchestr
           ctx.governor.governor.runSettled(info.id);
           void orchestrator.onRunSettled(info);
         },
-        secondOpinion: (request) => orchestrator.secondOpinion(request),
         slots: routing.gate,
         seats,
         ...serviceSeamsOf(ctx),
@@ -260,19 +259,15 @@ function composeFleet(ctx: FleetContext): { supervisors: SupervisorSet; orchestr
     migratePools: (config) => routing.pool.migrate(config.pools),
     dayBudget: dayBudgetOf(routing),
     sink: hub,
-    seats,
     supervisorOf: (provider) => supervisors.forProvider(provider),
     // E14-5b: a killed runner's claims on a dricket store are released before the chain's first dispatch there.
-    releaseLeftovers: async (store, pipeline) => {
-      const report = await supervisors.releaseLeftoverClaims(dkTargetFor(store, pipeline, pipeline[0]?.id ?? ''), retreatStages(pipeline));
+    releaseLeftovers: async (store) => {
+      const report = await supervisors.releaseLeftoverClaims(dkTargetFor(store, []));
       if (report.released.length > 0 || report.skipped.length > 0) {
         const skipped = report.skipped.length > 0 ? `; skipped ${report.skipped.map((s) => `${s.id} (${s.reason})`).join(', ')}` : '';
         log(`leftover claims: released ${report.released.join(', ') || 'none'}${skipped}`);
       }
     },
-    // The shipped default prompt beside the built plugin, for the "vault copy is older" note.
-    shippedPrompt: (ref) =>
-      /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(ref) ? fsp.readFile(path.join(__dirname, '..', '..', 'prompts', `${ref}.md`), 'utf8').catch(() => null) : Promise.resolve(null),
   });
   return { supervisors, orchestrator };
 }

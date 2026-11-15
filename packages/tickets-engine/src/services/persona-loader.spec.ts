@@ -45,14 +45,11 @@ describe('personaLoader', () => {
 });
 
 describe('resolvePersonaForTicket', () => {
-  it('resolves the chain entry, else the column, end to end', async () => {
+  it('resolves the chain entry, end to end', async () => {
     const loader = loaderWith({ 'tickets/_meta/personas/pia/persona.md': PIA });
-    const hit = await resolvePersonaForTicket(loader, { phasePersona: 'pia' });
-    expect(hit.persona!.id).toBe('pia');
-    expect(hit.resolution.source).toBe('phase');
-    const chain = await resolvePersonaForTicket(loader, { chainPersona: 'pia', phasePersona: 'ben' });
+    const chain = await resolvePersonaForTicket(loader, { chainPersona: 'pia' });
     expect(chain.resolution).toEqual({ persona: 'pia', source: 'chain' });
-    const miss = await resolvePersonaForTicket(loader, { chainPersona: 'ghost', phasePersona: null });
+    const miss = await resolvePersonaForTicket(loader, { chainPersona: 'ghost' });
     expect(miss.persona).toBeNull();
     expect(miss.resolution.source).toBe('chain');
   });
@@ -61,7 +58,7 @@ describe('resolvePersonaForTicket', () => {
 describe('deriveWorkerModel', () => {
   it('feeds the worker and the model from the persona', async () => {
     const loader = loaderWith({ 'tickets/_meta/personas/pia/persona.md': PIA });
-    const { persona } = await resolvePersonaForTicket(loader, { phasePersona: 'pia' });
+    const { persona } = await resolvePersonaForTicket(loader, { chainPersona: 'pia' });
     expect(deriveWorkerModel(persona!)).toEqual({ workerChoice: 'claude-code', model: 'opus' });
   });
 });

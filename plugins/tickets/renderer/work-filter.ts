@@ -48,7 +48,6 @@ export function applyWorkFilter(groups: WorkGroups, state: WorkFilterState): Rec
   // the fleet, each waiting on its persona; Ideas keeps the rest.
   return {
     needs: filter(groups.needs),
-    shaping: filter(groups.shaping),
     running: filter(groups.running),
     prioritized: filter(groups.ideas.filter((row) => row.queued)),
     ideas: filter(groups.ideas.filter((row) => !row.queued)),

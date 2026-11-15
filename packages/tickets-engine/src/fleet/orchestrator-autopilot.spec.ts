@@ -12,16 +12,6 @@ import { normalizeFleetPools, type ChainConfig } from './protocol';
  * on the scan tick.
  */
 
-const PIPELINE = [
-  '---',
-  'phases:',
-  '  - { id: inbox, title: Inbox, handover: manual }',
-  '  - { id: plan, title: Plan, handover: agent plan-default, worker: opencode }',
-  '  - { id: done, title: Done, handover: none }',
-  '---',
-  '',
-].join('\n');
-
 const NOON = new Date('2026-11-06T12:00:00Z');
 const AT_SIX = '2026-11-06T18:00:00.000Z';
 
@@ -42,9 +32,9 @@ const chainFile = (): Promise<Record<string, unknown>> => h.chainFile();
 describe('the Autopilot', () => {
   beforeEach(async () => {
     h = new ChainHarness();
-    await h.setUp(PIPELINE);
-    h.io.seed('T-0001', 'plan');
-    h.io.seed('T-0002', 'plan');
+    await h.setUp();
+    h.seedRun('T-0001');
+    h.seedRun('T-0002');
   });
 
   afterEach(async () => {
@@ -200,7 +190,7 @@ describe('the Autopilot', () => {
     async function persisted(autopilot: unknown, master: string, handoverAt?: string): Promise<void> {
       await fsp.writeFile(
         path.join(h.fleetRoot, 'chain.json'),
-        JSON.stringify({ version: 1, config: config(), master, autopilot, columns: {}, redStreak: {}, cooldownUntil: {}, tokensDay: {}, tokensUsed: {}, ciBackoff: {}, handoverAt }),
+        JSON.stringify({ version: 1, config: config(), master, autopilot, columns: {}, handoverAt }),
         'utf8',
       );
     }

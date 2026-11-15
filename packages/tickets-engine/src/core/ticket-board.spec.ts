@@ -1,16 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addPipelinePhase,
   assembleBoard,
   derivedOrder,
   orderColumn,
   parsePipeline,
   parseRepos,
-  patchPipelinePhase,
-  phaseIdFromTitle,
-  removePipelinePhase,
-  renamePipelinePhase,
-  reorderPipelinePhases,
   reposFileText,
 } from './ticket-board';
 
@@ -25,28 +19,11 @@ Prose.
 `;
 
 describe('parsePipeline', () => {
-  it('reads the default shape with wip/claim/handover', () => {
+  it('reads the columns — id, title, color — and ignores keys it does not know', () => {
     const { phases, error } = parsePipeline(PIPELINE);
     expect(error).toBeNull();
     expect(phases.map((p) => p.id)).toEqual(['inbox', 'prioritized', 'build', 'done']);
-    expect(phases[2]!.wip).toBe(2);
-    expect(phases[2]!.claim).toBe(true);
-    expect(phases[2]!.handover).toBe('agent build-default');
     expect(phases[0]!.title).toBe('Inbox');
-  });
-
-  it('reads the per-column run ceilings max-turns and max-work, ignoring junk', () => {
-    const text = `---
-phases:
-  - { id: inbox }
-  - { id: build, handover: agent build-default, max-turns: 80, max-work: 45 }
-  - { id: done, max-turns: -3, max-work: soon }
----
-`;
-    const { phases } = parsePipeline(text);
-    expect(phases[1]).toMatchObject({ maxTurns: 80, maxWorkMin: 45 });
-    expect(phases[0]).toMatchObject({ maxTurns: null, maxWorkMin: null });
-    expect(phases[2]).toMatchObject({ maxTurns: null, maxWorkMin: null });
   });
 
   it('reads the optional push: remote (T-0041)', () => {
@@ -342,139 +319,6 @@ describe('assembleBoard', () => {
   });
 });
 
-describe('patchPipelinePhase - the settings dialog writer', () => {
-  it('setting a worker writes the agent handover and keeps the file shape', () => {
-    const patched = patchPipelinePhase(PIPELINE, 'prioritized', { worker: 'opencode' });
-    const { phases, error } = parsePipeline(patched);
-    expect(error).toBeNull();
-    const prioritized = phases.find((p) => p.id === 'prioritized')!;
-    expect(prioritized.worker).toBe('opencode');
-    expect(prioritized.handover).toBe('agent prioritized-default');
-    // Everything else survives untouched.
-    expect(patched).toContain('wip: 2, claim: true');
-    expect(patched).toContain('Prose.');
-    expect(parsePipeline(patched).phases.find((p) => p.id === 'inbox')!.handover).toBe('manual');
-  });
-
-  it('an explicit prompt rides the new handover; an existing ref is kept', () => {
-    const withPrompt = patchPipelinePhase(PIPELINE, 'prioritized', { worker: 'opencode', prompt: 'plan-heavy' });
-    expect(parsePipeline(withPrompt).phases.find((p) => p.id === 'prioritized')!.handover).toBe('agent plan-heavy');
-    const kept = patchPipelinePhase(PIPELINE, 'build', { worker: 'claude-code' });
-    expect(parsePipeline(kept).phases.find((p) => p.id === 'build')!.handover).toBe('agent build-default');
-  });
-
-  it('clearing the worker writes manual and takes the pool keys with it', () => {
-    const withPool = patchPipelinePhase(PIPELINE.replace('id: build,', 'id: build, workers: 4,'), 'build', {
-      model: 'zai/glm-5.3',
-    });
-    expect(withPool).toContain('workers: 4');
-    const cleared = patchPipelinePhase(withPool, 'build', { worker: null });
-    expect(cleared).not.toContain('workers:'); // the retired key goes with the pool
-    const build = parsePipeline(cleared).phases.find((p) => p.id === 'build')!;
-    expect(build.handover).toBe('manual');
-    expect(build.worker).toBeNull();
-    expect(build.model).toBeNull();
-    expect(build.claim).toBe(true); // claim and wip survive the manual flip
-    expect(build.wip).toBe(2);
-  });
-
-  it('model and prompt patch independently; unknown phases refuse', () => {
-    const patched = patchPipelinePhase(PIPELINE, 'build', { model: 'zai/glm-5.3-flash', prompt: 'build-heavy' });
-    const build = parsePipeline(patched).phases.find((p) => p.id === 'build')!;
-    expect(build.model).toBe('zai/glm-5.3-flash');
-    expect(build.prompt).toBe('build-heavy');
-    expect(() => patchPipelinePhase(PIPELINE, 'nope', { model: 'x' })).toThrow('no phase "nope"');
-  });
-
-  it('color patches on and off (T-0084); a worker clear keeps it', () => {
-    const set = patchPipelinePhase(PIPELINE, 'build', { color: '#c96442' });
-    expect(set).toContain('color: "#c96442"');
-    expect(parsePipeline(set).phases.find((p) => p.id === 'build')!.color).toBe('#c96442');
-    const cleared = patchPipelinePhase(set, 'build', { color: null });
-    expect(cleared).not.toContain('color:');
-    expect(parsePipeline(cleared).phases.find((p) => p.id === 'build')!.color).toBeNull();
-    // Clearing the worker takes the pool keys but never the colour.
-    const manual = patchPipelinePhase(set, 'build', { worker: null });
-    expect(parsePipeline(manual).phases.find((p) => p.id === 'build')!.color).toBe('#c96442');
-    expect(parsePipeline(manual).phases.find((p) => p.id === 'build')!.handover).toBe('manual');
-  });
-
-  it('a column workers: key is no longer read — the pools are the providers\' (req-63)', () => {
-    const legacy = PIPELINE.replace('id: build,', 'id: build, workers: 4,');
-    const parsed = parsePipeline(legacy);
-    expect(parsed.error).toBeNull();
-    const noise = parsed.issues.filter((issue) => issue.message.includes('workers:'));
-    expect(noise).toHaveLength(1);
-    expect(noise[0]!.level).toBe('noise');
-    expect(noise[0]!.message).toContain('Settings → Tickets → Workers');
-  });
-});
-
-describe('reorderPipelinePhases - the sortable columns (req-50)', () => {
-  it('moves whole entries and keeps every key and the prose', () => {
-    const swapped = reorderPipelinePhases(PIPELINE, ['inbox', 'build', 'prioritized', 'done']);
-    const { phases, error } = parsePipeline(swapped);
-    expect(error).toBeNull();
-    expect(phases.map((p) => p.id)).toEqual(['inbox', 'build', 'prioritized', 'done']);
-    expect(phases[1]!.wip).toBe(2);
-    expect(phases[1]!.handover).toBe('agent build-default');
-    expect(swapped).toContain('Prose.');
-  });
-
-  it('refuses an order that drops, repeats or invents a phase, or moves the ends', () => {
-    expect(() => reorderPipelinePhases(PIPELINE, ['inbox', 'build', 'done'])).toThrow('exactly once');
-    expect(() => reorderPipelinePhases(PIPELINE, ['inbox', 'build', 'build', 'done'])).toThrow('exactly once');
-    expect(() => reorderPipelinePhases(PIPELINE, ['inbox', 'qa', 'prioritized', 'done'])).toThrow('exactly once');
-    expect(() => reorderPipelinePhases(PIPELINE, ['prioritized', 'inbox', 'build', 'done'])).toThrow('keep their places');
-    expect(() => reorderPipelinePhases(PIPELINE, ['inbox', 'prioritized', 'done', 'build'])).toThrow('keep their places');
-  });
-});
-
-describe('phase editor - add, rename, remove', () => {
-  it('derives a stable id from a title and avoids clashes', () => {
-    expect(phaseIdFromTitle('QA & Sign-off', [])).toBe('qa-sign-off');
-    expect(phaseIdFromTitle('Build', ['build'])).toBe('build-2');
-    expect(phaseIdFromTitle('2nd look', [])).toBe('p-2nd-look');
-    expect(phaseIdFromTitle('???', [])).toBe('phase');
-  });
-
-  it('adds a manual phase before the terminal one by default, or after a named phase', () => {
-    const added = addPipelinePhase(PIPELINE, { title: 'QA' });
-    const parsed = parsePipeline(added.text);
-    expect(parsed.error).toBeNull();
-    expect(added.id).toBe('qa');
-    expect(parsed.phases.map((p) => p.id)).toEqual(['inbox', 'prioritized', 'build', 'qa', 'done']);
-    expect(parsed.phases[3]!.handover).toBe('manual');
-    expect(added.text).toContain('Prose.');
-    const after = addPipelinePhase(PIPELINE, { title: 'Triage', afterId: 'inbox' });
-    expect(parsePipeline(after.text).phases.map((p) => p.id)).toEqual(['inbox', 'triage', 'prioritized', 'build', 'done']);
-  });
-
-  it('refuses a blank name, an unknown anchor and a slot after the terminal phase', () => {
-    expect(() => addPipelinePhase(PIPELINE, { title: '  ' })).toThrow('needs a name');
-    expect(() => addPipelinePhase(PIPELINE, { title: 'X', afterId: 'nope' })).toThrow('no phase');
-    expect(() => addPipelinePhase(PIPELINE, { title: 'X', afterId: 'done' })).toThrow('terminal');
-  });
-
-  it('renames the title only; id, keys and prose stay', () => {
-    const renamed = renamePipelinePhase(PIPELINE, 'build', '  Implementation  ');
-    const phase = parsePipeline(renamed).phases.find((p) => p.id === 'build')!;
-    expect(phase.title).toBe('Implementation');
-    expect(phase.wip).toBe(2);
-    expect(phase.handover).toBe('agent build-default');
-    expect(renamed).toContain('Prose.');
-    expect(() => renamePipelinePhase(PIPELINE, 'nope', 'X')).toThrow('no phase');
-    expect(() => renamePipelinePhase(PIPELINE, 'build', '')).toThrow('needs a name');
-  });
-
-  it('removes a middle phase but keeps the capture target and the terminal phase', () => {
-    const removed = removePipelinePhase(PIPELINE, 'prioritized');
-    expect(parsePipeline(removed).phases.map((p) => p.id)).toEqual(['inbox', 'build', 'done']);
-    expect(() => removePipelinePhase(PIPELINE, 'inbox')).toThrow('stay');
-    expect(() => removePipelinePhase(PIPELINE, 'done')).toThrow('stay');
-    expect(() => removePipelinePhase(PIPELINE, 'nope')).toThrow('no phase');
-  });
-});
 
 describe('repos.md writer (req-72)', () => {
   it('round-trips through the parser, optional keys omitted when unset', () => {

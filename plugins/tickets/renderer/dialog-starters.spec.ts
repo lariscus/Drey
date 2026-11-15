@@ -7,13 +7,13 @@ import { PENDING_HINT, dialogStarter } from './dialog-starters';
  */
 describe('dialogStarter', () => {
   it('plan: interview first, then propose, then write the ticket', () => {
-    expect(dialogStarter('plan')).toBe(
+    expect(dialogStarter()).toBe(
       'Plan step — interview me first, then propose the plan, then write it into the ticket with acceptance criteria.\nMy question: ',
     );
   });
 
   it('ends on the question lead-in, so the owner types right after it', () => {
-    expect(dialogStarter('plan').endsWith('My question: ')).toBe(true);
+    expect(dialogStarter().endsWith('My question: ')).toBe(true);
   });
 });
 

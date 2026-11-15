@@ -158,8 +158,8 @@ export class RunSupervisor {
   }
 
   /** E14-5b (4): the claims of this host no live run holds; `alsoLive` = the other supervisors' live tickets. */
-  releaseLeftoverClaims(target: RunDkTarget, retreatByStage: Readonly<Record<string, string | null>>, alsoLive: ReadonlySet<string> = new Set()): Promise<LeftoverClaimsReport> {
-    return this.parts.leftovers.release(target, retreatByStage, new Set([...alsoLive, ...this.liveTickets()]));
+  releaseLeftoverClaims(target: RunDkTarget, alsoLive: ReadonlySet<string> = new Set()): Promise<LeftoverClaimsReport> {
+    return this.parts.leftovers.release(target, new Set([...alsoLive, ...this.liveTickets()]));
   }
 
   /** Resolves when none of the work the supervisor started on its own is still running (docs/testing-flakes.md). */

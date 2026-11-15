@@ -12,8 +12,6 @@ import type { RunnerEvent } from './ports/event-sink';
  * restart continues the same tranche, an anomaly stops it early.
  */
 
-const PIPELINE = ['---', 'phases:', '  - { id: inbox, title: Inbox, handover: manual }', '  - { id: plan, title: Plan, handover: agent plan-default, worker: opencode }', '  - { id: done, title: Done, handover: none }', '---', ''].join('\n');
-
 const NOON = new Date('2026-11-09T12:00:00Z');
 
 let h: ChainHarness;
@@ -46,9 +44,9 @@ async function settle(b: Built, gate: 'green' | 'red', costUsd = 0.4): Promise<v
 describe('tranches', () => {
   beforeEach(async () => {
     h = new ChainHarness();
-    await h.setUp(PIPELINE);
+    await h.setUp();
     for (const id of ['T-0001', 'T-0002', 'T-0003', 'T-0004']) {
-      h.io.seed(id, 'plan');
+      h.seedRun(id);
     }
   });
 

@@ -7,7 +7,7 @@ import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from 
 import { EngineBoardService } from './board-service';
 import type { EngineHost, EngineVault, FleetPort } from './host';
 
-/** req-256: "Initialize board" offers the default crew to the seeder, after the pipeline and the prompts, and only when it initialized. */
+/** req-256: "Initialize board" offers the default crew to the seeder, after the pipeline and the human persona, and only when it initialized. */
 
 let vaultDir = '';
 const vault = (): EngineVault => ({ id: 'v', name: 'tickets', path: vaultDir, exists: true, active: true });
@@ -31,7 +31,6 @@ function serviceOf(seed: { seed(target: EngineVault): Promise<unknown> } | undef
     configSet: async () => undefined,
     emitBoardChanged: () => undefined,
     log: () => undefined,
-    userRoot: '/home',
   } as unknown as EngineHost;
   const git = new TicketsGit(() => 'git', async () => {
     throw new Error('no git in the spec');
@@ -50,7 +49,7 @@ describe('EngineBoardService.initialize and the default crew (req-256)', () => {
     await fsp.rm(vaultDir, { recursive: true, force: true });
   });
 
-  it('seeds the crew once the pipeline, the human persona and the prompts are written, for the vault it initialized', async () => {
+  it('seeds the crew once the pipeline and the human persona are written, for the vault it initialized', async () => {
     const seeded: string[] = [];
     const seeder = {
       seed: async (target: EngineVault) => {
@@ -63,7 +62,7 @@ describe('EngineBoardService.initialize and the default crew (req-256)', () => {
     expect(seeded).toEqual(['v']);
     expect(order.at(-1)).toBe('seed');
     expect(order.indexOf('write tickets/_meta/pipeline.md')).toBeLessThan(order.indexOf('seed'));
-    expect(order.some((line) => line.startsWith('write tickets/_meta/prompts/'))).toBe(true);
+    expect(order.some((line) => line.startsWith('write tickets/_meta/prompts/'))).toBe(false);
   });
 
   it('seeds nothing when the vault already has a board, and works without a seeder', async () => {

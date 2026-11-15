@@ -7,13 +7,13 @@ export const BOARD_METHODS = [
   'snapshot', 'storeListing', 'refresh', 'readTicket', 'refineTicket', 'setPriority', 'setTrack', 'setClass', 'saveAttachment',
   'createTicket', 'transition', 'archive', 'unarchive', 'acceptTicket', 'sendBack', 'answerNeed', 'ticketComments', 'archivedTickets', 'launchVersion',
   'changesOf', 'worktreeChangesOf', 'removeWorktreeForTicket', 'worktreeCleanup', 'worktreeBootSweep',
-  'worktreesStatus', 'chainRefusal', 'setClaim', 'startRun', 'setColumnConfig', 'listPrompts', 'savePrompt',
-  'restoreShippedPrompts', 'listRepos', 'saveRepos', 'pickFolder', 'scanRepos', 'listProjects',
-  'switchProject', 'openTicketsFolder', 'folderStatus', 'numberFolders', 'reorderPhases', 'editPhase',
-  'personaLearn', 'listPersonas', 'projectRecords', 'verifyTicket', 'verifyStatus', 'estimateOf',
+  'worktreesStatus', 'chainRefusal', 'setClaim', 'startRun',
+  'listRepos', 'saveRepos', 'pickFolder', 'scanRepos', 'listProjects',
+  'switchProject', 'openTicketsFolder',
+  'personaLearn', 'listPersonas', 'projectRecords', 'estimateOf',
   'chatSessions', 'chatOpen', 'chatSend', 'chatStart', 'chatConfirm', 'chatDismiss', 'chatShapeDecide', 'chatPlanStatus',
   'ticketDocument', 'saveDocument', 'setHumanName',
-  'initialize', 'onVaultEvent', 'migrateStoreStages', 'personaBoardMove', 'migrateBoard',
+  'initialize', 'onVaultEvent', 'personaBoardMove',
 ] as const;
 
 // The team's reads and controls (E13-8): the remote port's own methods, so

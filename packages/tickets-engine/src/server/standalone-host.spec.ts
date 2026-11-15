@@ -24,7 +24,7 @@ describe('FsEngineHost — an unloaded vault (D-73)', () => {
     const hub = new ChangeHub();
     events = [];
     hub.subscribe((what) => events.push(what));
-    host = new FsEngineHost(vaultPath, new FileConfigStore(path.join(root, 'config.json')), hub, () => undefined, root);
+    host = new FsEngineHost(vaultPath, new FileConfigStore(path.join(root, 'config.json')), hub, () => undefined);
   });
 
   afterEach(async () => {

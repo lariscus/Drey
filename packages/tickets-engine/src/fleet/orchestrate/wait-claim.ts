@@ -51,7 +51,7 @@ export class WaitClaim {
       text: (text.split('\n')[0] ?? '').slice(0, 200) || 'waits for the owner',
       detail: `run ${run.info.id} waits for the owner:\n\n${text}`,
     });
-    const result = await lease.release([target.needsInputStage ?? null, ...this.claims.stayPutStages(run.request, lease)], note);
+    const result = await lease.release([target.needsInputStage ?? null, ...this.claims.stayPutStages(lease)], note);
     if (!result.ok) {
       this.log(`run ${run.info.id}: giving up the claim for the wait failed - ${result.error} (the lease keeps running)`);
       return;

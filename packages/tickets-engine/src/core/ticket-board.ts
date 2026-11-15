@@ -10,10 +10,8 @@ import { isCollection, isMap, parseDocument, type Document, type YAMLMap, type Y
 import { splitFrontmatter } from '../../../../shared/frontmatter';
 import {
   DEFAULT_PRIORITY_CONFIG,
-  parseHandover,
   parsePriorityConfig,
   priorityWeight,
-  phaseWithoutPoolKeys,
   resolveCardWorker,
   TICKETS_ARCHIVE_DIR,
   type BoardColumn,
@@ -26,9 +24,6 @@ import {
   type TicketPriority,
   type TicketUsage,
 } from '../contracts/tickets';
-import { checkpointPhaseIds } from '../fleet/chain';
-import { withTerminalTickets } from './normalize';
-import { READY_STATE } from './pipeline-states';
 import { runDependencyPass } from './blocked';
 import { parseProjects } from './project-record';
 import { parseRepos } from './repos-file';
@@ -116,308 +111,6 @@ export function parsePipeline(text: string): PipelineParse {
   return { phases, pushRemote, priorities, error: null, issues, closingSignals, flow, proposeFlow };
 }
 
-// --- pipeline.md patching (the settings dialog's writer, M85) ----------------
-
-export interface PhasePoolPatch {
-  /** `opencode`, `claude-code` or `kimi` sets the worker (and the `agent` handover);
-   *  null clears it — the column becomes a manual step and loses its pool. */
-  readonly worker?: string | null;
-  /** The model pin; an empty string or null clears it. */
-  readonly model?: string | null;
-  /** The prompt ref override; an empty string or null clears it. */
-  readonly prompt?: string | null;
-  /** The phase chip colour (`color:`, T-0084) — `#rrggbb`; an empty string
-   *  or null removes the key (the default palette applies). Never removed
-   *  by a worker clear. */
-  readonly color?: string | null;
-  /**
-   * The phase's persona (`persona: paul`, ADR-0088 E3) — an empty string
-   *  or null removes the key. Setting a persona REPLACES the column-level
-   *  agent configuration: the legacy `worker:`/`workers:`/`model:`/
-   *  `prompt:` keys go (they are the persona's job now); the `handover:`
-   *  stays as it is, so an `agent …` column keeps draining itself. The
-   *  old column keys stay readable until the board service's migration
-   *  rewrites them onto personas.
-   */
-  readonly persona?: string | null;
-}
-
-/**
- * The one patcher for a phase's pool keys in `_meta/pipeline.md` — the
- * settings dialog writes through here, so a hand-formatted file keeps
- * its layout, comments and unknown keys (the same document-mutation
- * discipline as the ticket patcher). Setting a worker writes the
- * matching `agent <prompt-ref>` handover; clearing it writes `manual`.
- * Throws on an unparseable pipeline or an unknown phase — the caller
- * refuses, it never guesses.
- */
-export function patchPipelinePhase(text: string, phaseId: string, patch: PhasePoolPatch): string {
-  const { yamlText, body, hadFence } = splitFrontmatter(text);
-  if (!hadFence || yamlText === null) {
-    throw new Error('pipeline.md has no frontmatter fence');
-  }
-  const doc = parseDocument(yamlText);
-  if (doc.errors.length > 0) {
-    throw new Error('pipeline.md does not parse');
-  }
-  const phases = doc.get('phases', true);
-  if (!isCollection(phases)) {
-    throw new Error('pipeline.md needs a phases list');
-  }
-  let entry: YAMLMap | null = null;
-  for (const item of (phases as YAMLSeq).items) {
-    const value = isMap(item) ? item : null;
-    if (value !== null && value.get('id') === phaseId) {
-      entry = value;
-      break;
-    }
-  }
-  if (entry === null) {
-    throw new Error(`pipeline.md has no phase "${phaseId}"`);
-  }
-
-  const removeKey = (key: string): void => {
-    if (entry!.has(key)) {
-      entry!.delete(key);
-    }
-  };
-
-  if (patch.worker !== undefined) {
-    const worker = patch.worker?.trim() ?? '';
-    if (worker === '') {
-      // A manual step: the pool and its keys go with the worker.
-      removeKey('worker');
-      removeKey('model');
-      removeKey('workers');
-      removeKey('prompt');
-      entry.set('handover', 'manual');
-    } else {
-      entry.set('worker', worker);
-      const handover = parseHandover(String(entry.get('handover') ?? ''));
-      const promptFromPatch =
-        patch.prompt !== undefined && patch.prompt !== null && patch.prompt.trim() !== ''
-          ? patch.prompt.trim()
-          : null;
-      const promptFromKey =
-        typeof entry.get('prompt') === 'string' && (entry.get('prompt') as string).trim() !== ''
-          ? (entry.get('prompt') as string).trim()
-          : null;
-      const ref = promptFromPatch ?? promptFromKey ?? handover.promptRef ?? `${phaseId}-default`;
-      entry.set('handover', `agent ${ref}`);
-    }
-  }
-  if (patch.model !== undefined) {
-    const model = patch.model?.trim() ?? '';
-    if (model === '') {
-      removeKey('model');
-    } else {
-      entry.set('model', model);
-    }
-  }
-  if (patch.prompt !== undefined) {
-    const prompt = patch.prompt?.trim() ?? '';
-    if (prompt === '') {
-      removeKey('prompt');
-    } else {
-      entry.set('prompt', prompt);
-    }
-  }
-  if (patch.color !== undefined) {
-    const color = patch.color?.trim() ?? '';
-    if (color === '') {
-      removeKey('color');
-    } else {
-      entry.set('color', color);
-    }
-  }
-  if (patch.persona !== undefined) {
-    const persona = patch.persona?.trim() ?? '';
-    if (persona === '') {
-      removeKey('persona');
-    } else {
-      entry.set('persona', persona);
-      // The persona owns the column's agent configuration — the legacy
-      // keys would only shadow it (the handover stays: an `agent …`
-      // column keeps draining itself, now through the persona).
-      removeKey('worker');
-      removeKey('workers');
-      removeKey('model');
-      removeKey('prompt');
-    }
-  }
-
-  let yaml = doc.toString({ flowCollectionPadding: false, lineWidth: 0 });
-  if (!yaml.endsWith('\n')) {
-    yaml += '\n';
-  }
-  return `---\n${yaml}---\n${body}`;
-}
-
-/**
- * Rewrites the order of pipeline.md's phases (req-50, the settings page's
- * sortable columns). `order` must name every phase exactly once, and the
- * first (capture target) and last (terminal) phase keep their places.
- * Each entry moves whole — keys, comments and the prose body stay.
- */
-export function reorderPipelinePhases(text: string, order: readonly string[]): string {
-  const { yamlText, body, hadFence } = splitFrontmatter(text);
-  if (!hadFence || yamlText === null) {
-    throw new Error('pipeline.md has no frontmatter fence');
-  }
-  const doc = parseDocument(yamlText);
-  if (doc.errors.length > 0) {
-    throw new Error('pipeline.md does not parse');
-  }
-  const phases = doc.get('phases', true);
-  if (!isCollection(phases)) {
-    throw new Error('pipeline.md needs a phases list');
-  }
-  const items = (phases as YAMLSeq).items;
-  const idOf = (item: unknown): string | null => {
-    const id = isMap(item) ? item.get('id') : null;
-    return typeof id === 'string' ? id : null;
-  };
-  const current = items.map(idOf);
-  if (
-    order.length !== current.length ||
-    new Set(order).size !== order.length ||
-    current.some((id) => id === null || !order.includes(id))
-  ) {
-    throw new Error('the new order must name every pipeline phase exactly once');
-  }
-  if (order[0] !== current[0] || order[order.length - 1] !== current[current.length - 1]) {
-    throw new Error('the first and the last phase keep their places');
-  }
-  (phases as YAMLSeq).items = order.map((id) => items[current.indexOf(id)]!);
-  let yaml = doc.toString({ flowCollectionPadding: false, lineWidth: 0 });
-  if (!yaml.endsWith('\n')) {
-    yaml += '\n';
-  }
-  return `---\n${yaml}---\n${body}`;
-}
-
-// --- phase add / rename / remove (the settings page's column editor) ----------
-
-/**
- * A phase id from a human title: lower-case, every run of characters
- * outside `[a-z0-9]` becomes one `-`, a leading digit gets a `p-` prefix
- * (an id starts with a letter), and a clash with `taken` takes the first
- * free `-2`, `-3`, … suffix. Empty input falls back to `phase`.
- */
-export function phaseIdFromTitle(title: string, taken: readonly string[]): string {
-  let base = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  if (base === '') {
-    base = 'phase';
-  }
-  if (!/^[a-z]/.test(base)) {
-    base = `p-${base}`;
-  }
-  let id = base;
-  for (let n = 2; taken.includes(id); n += 1) {
-    id = `${base}-${n}`;
-  }
-  return id;
-}
-
-/** Parses pipeline.md into its document and phase list, or throws the one refusal. */
-function openPipelineDoc(text: string): { doc: Document; phases: YAMLSeq; body: string } {
-  const { yamlText, body, hadFence } = splitFrontmatter(text);
-  if (!hadFence || yamlText === null) {
-    throw new Error('pipeline.md has no frontmatter fence');
-  }
-  const doc = parseDocument(yamlText);
-  if (doc.errors.length > 0) {
-    throw new Error('pipeline.md does not parse');
-  }
-  const phases = doc.get('phases', true);
-  if (!isCollection(phases)) {
-    throw new Error('pipeline.md needs a phases list');
-  }
-  return { doc, phases: phases as YAMLSeq, body };
-}
-
-function closePipelineDoc(doc: Document, body: string): string {
-  let yaml = doc.toString({ flowCollectionPadding: false, lineWidth: 0 });
-  if (!yaml.endsWith('\n')) {
-    yaml += '\n';
-  }
-  return `---\n${yaml}---\n${body}`;
-}
-
-function phaseIdOfItem(item: unknown): string | null {
-  const id = isMap(item) ? item.get('id') : null;
-  return typeof id === 'string' ? id : null;
-}
-
-/** The title of a phase never carries a line break or a YAML-hostile edge. */
-function cleanTitle(title: string): string {
-  const clean = title.replace(/\s+/g, ' ').trim();
-  if (clean === '') {
-    throw new Error('a phase needs a name');
-  }
-  return clean;
-}
-
-/**
- * Adds a manual phase. It lands right after `afterId` (default: just
- * before the terminal phase) — never before the capture target or after
- * the terminal one. Returns the new text and the id the phase got.
- */
-export function addPipelinePhase(
-  text: string,
-  input: { readonly title: string; readonly afterId?: string | null },
-): { readonly text: string; readonly id: string } {
-  const { doc, phases, body } = openPipelineDoc(text);
-  const ids = phases.items.map(phaseIdOfItem);
-  const title = cleanTitle(input.title);
-  const id = phaseIdFromTitle(title, ids.filter((x): x is string => x !== null));
-  let at = ids.length - 1; // before the terminal phase
-  if (input.afterId !== undefined && input.afterId !== null) {
-    const after = ids.indexOf(input.afterId);
-    if (after < 0) {
-      throw new Error(`pipeline.md has no phase "${input.afterId}"`);
-    }
-    if (after === ids.length - 1) {
-      throw new Error('nothing comes after the terminal phase');
-    }
-    at = after + 1;
-  }
-  phases.items.splice(at, 0, doc.createNode({ id, title, handover: 'manual' }, { flow: true }));
-  return { text: closePipelineDoc(doc, body), id };
-}
-
-/**
- * Renames a phase: only its `title`. The id — and with it the phase
- * folder, every ticket's place and every `handover` / prompt reference —
- * stays, so a rename touches no ticket.
- */
-export function renamePipelinePhase(text: string, phaseId: string, title: string): string {
-  const { doc, phases, body } = openPipelineDoc(text);
-  const entry = phases.items.find((item) => phaseIdOfItem(item) === phaseId);
-  if (entry === undefined || !isMap(entry)) {
-    throw new Error(`pipeline.md has no phase "${phaseId}"`);
-  }
-  entry.set('title', cleanTitle(title));
-  return closePipelineDoc(doc, body);
-}
-
-/** Removes a phase entry; the capture target and the terminal phase are kept. */
-export function removePipelinePhase(text: string, phaseId: string): string {
-  const { doc, phases, body } = openPipelineDoc(text);
-  const ids = phases.items.map(phaseIdOfItem);
-  const at = ids.indexOf(phaseId);
-  if (at < 0) {
-    throw new Error(`pipeline.md has no phase "${phaseId}"`);
-  }
-  if (at === 0 || at === ids.length - 1) {
-    throw new Error('the first and the last phase stay');
-  }
-  phases.items.splice(at, 1);
-  return closePipelineDoc(doc, body);
-}
 
 // --- repos.md: core/repos-file.ts (req-177) ----------------------------------
 
@@ -542,7 +235,6 @@ export function assembleBoard(input: AssembleInput): BoardSnapshot {
     blocks: readonly string[];
   }
   const byPhase = new Map<string, AssemblyCard[]>();
-  const textById = new Map<string, string>();
   for (const file of input.files) {
     // The reserved archive folder (T-0041): beside `_meta`, never a
     // column, never a counter, never a stray badge — invisible here.
@@ -589,7 +281,6 @@ export function assembleBoard(input: AssembleInput): BoardSnapshot {
       meta: parsed.meta,
       worker: resolveCardWorker(
         parsed.meta.worker,
-        phases.find((p) => p.id === parts.phase)?.handover ?? null,
         repoWorker,
         input.defaultWorker,
       ),
@@ -601,7 +292,6 @@ export function assembleBoard(input: AssembleInput): BoardSnapshot {
     const list = byPhase.get(parts.phase) ?? [];
     list.push(card);
     byPhase.set(parts.phase, list);
-    textById.set(parts.stem, file.text);
   }
 
   // An id in more than one phase is ambiguous — every occurrence carries
@@ -664,7 +354,7 @@ export function assembleBoard(input: AssembleInput): BoardSnapshot {
     if (!knownDirs.has(dir)) {
       issues.push({ level: 'warning', message: `directory "${dir}" is not a phase in pipeline.md` });
       columns.push({
-        phase: phaseWithoutPoolKeys({ id: dir, title: dir, wip: null, claim: false, handover: 'manual' }),
+        phase: { id: dir, title: dir, color: null },
         unknown: true,
         tickets: orderColumn(byPhase.get(dir)!, columnKey(dir), pipelineParse.priorities),
       });
@@ -689,11 +379,7 @@ export function assembleBoard(input: AssembleInput): BoardSnapshot {
     ...(projectsParse.projects.length > 0 ? { projects: projectsParse.projects } : {}),
     columns,
     issues,
-    checkpoints: [...checkpointPhaseIds(columns)],
-    // With a Ready to try stage, Done asks nothing and no other group lists it: without this a ticket
-    // accepted there vanishes (D-13). Without that stage its terminal column is a Needs-you row.
-    recentDone: phaseIds.has(READY_STATE)
-      ? withTerminalTickets(input.recentDone ?? [], (byPhase.get(terminalPhase) ?? []).map((card) => ({ card, text: textById.get(card.id) ?? '' })), terminalPhase, Date.now())
-      : [...(input.recentDone ?? [])],
+    checkpoints: [], // the persona board has no owner checkpoint column (req-307); the field stays on the contract
+    recentDone: [...(input.recentDone ?? [])],
   };
 }

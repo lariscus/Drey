@@ -6,7 +6,6 @@ import {
   patchTicketFile,
   ticketSections,
 } from '../../../packages/tickets-engine/src/core/ticket-files';
-import { parseHandover } from '../shared/tickets';
 import {
   composeInstruction,
   parseWorkerValue,
@@ -20,9 +19,9 @@ const DISCIPLINES = await loadDisciplineTexts();
 
 /**
  * The fleet's assignment brain (M84, the owner's ruling): ticket pin >
- * phase handover pin > repo default > configured default > the fleet's
- * first worker — and every explicit-but-unreadable pin refuses instead
- * of falling through (ADR-0076: tolerate noise, never ambiguity).
+ * repo default > configured default > the fleet's first worker — and
+ * every explicit-but-unreadable pin refuses instead of falling through
+ * (ADR-0076: tolerate noise, never ambiguity).
  */
 
 const newTicket = (): string =>
@@ -117,10 +116,9 @@ describe('worker values and the assignment ladder', () => {
     expect(parseWorkerValue('claude-code/')).toEqual({ provider: 'claude-code', model: null });
   });
 
-  it('ticket pin beats handover pin beats repo default beats configured default', () => {
+  it('ticket pin beats repo default beats configured default', () => {
     const base = {
       ticketWorker: null,
-      handover: 'agent build-default',
       repoWorker: null,
       configuredDefault: null,
     };
@@ -129,7 +127,6 @@ describe('worker values and the assignment ladder', () => {
       provider: 'opencode',
       model: null,
       source: 'default',
-      promptRef: 'build-default',
     });
     expect(resolveAssignment({ ...base, configuredDefault: 'claude-code' })).toMatchObject({ source: 'default' });
     expect(resolveAssignment({ ...base, configuredDefault: 'claude-code', repoWorker: 'opencode' })).toEqual({
@@ -137,19 +134,11 @@ describe('worker values and the assignment ladder', () => {
       provider: 'opencode',
       model: null,
       source: 'repo',
-      promptRef: 'build-default',
-    });
-    expect(resolveAssignment({ ...base, repoWorker: 'opencode', handover: 'agent build-default@claude-code' })).toEqual({
-      ok: true,
-      provider: 'claude-code',
-      model: null,
-      source: 'handover',
-      promptRef: 'build-default',
     });
     expect(
       resolveAssignment({
         ...base,
-        handover: 'agent build-default@claude-code',
+        repoWorker: 'claude-code',
         ticketWorker: 'opencode/fast',
       }),
     ).toEqual({
@@ -157,12 +146,11 @@ describe('worker values and the assignment ladder', () => {
       provider: 'opencode',
       model: 'fast',
       source: 'ticket',
-      promptRef: 'build-default',
     });
   });
 
   it('an explicit unreadable pin refuses; a stale repo default falls through', () => {
-    const base = { handover: null, repoWorker: null, configuredDefault: 'opencode' };
+    const base = { repoWorker: null, configuredDefault: 'opencode' };
     expect(resolveAssignment({ ...base, ticketWorker: 'codex' })).toEqual({
       ok: false,
       error: `the ticket's worker "codex" is unknown — use opencode, claude-code or kimi`,
@@ -172,16 +160,7 @@ describe('worker values and the assignment ladder', () => {
       provider: 'opencode',
       model: null,
       source: 'default',
-      promptRef: null,
     });
-  });
-
-  it('non-agent handovers contribute no pin and no prompt', () => {
-    const spec = parseHandover('manual');
-    expect(spec.promptRef).toBeNull();
-    expect(
-      resolveAssignment({ ticketWorker: null, handover: 'manual', repoWorker: 'opencode', configuredDefault: null }),
-    ).toEqual({ ok: true, provider: 'opencode', model: null, source: 'repo', promptRef: null });
   });
 });
 

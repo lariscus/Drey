@@ -129,8 +129,7 @@ export function createTicketStrip(deps: TicketStripDeps): TicketStrip {
         const phase = snapshot.pipeline.find((p) => p.id === card.phase);
         const phaseTitle = phase?.title ?? card.phase;
         const chain = chainOf({ pipeline: snapshot.pipeline, currentPhaseId: card.phase, card, personas: personas ?? [], flow: snapshot.flow });
-        const planToAccept = card.phase === 'shaping' && hasOpenParts(text);
-        const status = statusOf(deps.i18n, row, snapshot, phaseTitle, planToAccept);
+        const status = statusOf(deps.i18n, row, snapshot, phaseTitle);
         const shape = pageShapeOf(card.phase, snapshot.pipeline);
         const entries = parseVerlaufEntries(text);
         const cost = costSummary(deps.i18n, entries, row?.need !== null && row?.run === null);
@@ -156,7 +155,7 @@ export function createTicketStrip(deps: TicketStripDeps): TicketStrip {
           pill: heldPill(deps.i18n, card, status, held !== null ? titleOf : null, phaseTitle) ?? { label: phaseTitleOrArchive(status.label, card.phase), tone: status.pill },
           kind: status.kind,
           issues: issuesBadge(issues()),
-          flow: held?.flow ?? flowItemsOf(deps.i18n, chain, card.phase, planToAccept),
+          flow: held?.flow ?? flowItemsOf(deps.i18n, chain),
           personaBoard: held !== null,
           holder: held?.holder ?? null,
           priority: own.priority === null || own.priority === undefined ? deps.i18n.t('ticket.card.none') : titleCase(own.priority),
@@ -167,9 +166,7 @@ export function createTicketStrip(deps: TicketStripDeps): TicketStrip {
               ? shaper === null
                 ? null
                 : { color: shaperColor, name: held.holder?.label ?? shaper, id: shaper }
-              : card.phase === 'shaping' && !planToAccept && worker !== null
-                ? { color: pinned?.color ?? '', name: worker.who, ...(pinned === undefined ? {} : { id: pinned.id }) }
-                : null,
+              : null,
           repo: own.repo ?? deps.i18n.t('ticket.card.none'),
           branch: own.branch ?? '',
           cost: [cost.label, estimate].filter((part): part is string => part !== null).join(' · '),

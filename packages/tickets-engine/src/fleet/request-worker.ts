@@ -38,14 +38,10 @@ function personaPin(input: ComposeRunInput): RunWorkerPin | null {
   return personaWorker === null ? null : { provider: personaWorker.provider, model: persona.model };
 }
 
-/** The assignment ring: the owner's pick or the ticket pin, then column, handover, repo, configured default. */
+/** The assignment ring: the owner's pick or the ticket pin, then repo, the configured default. */
 function ringAssignment(input: ComposeRunInput): Assignment {
-  const phase = input.workingPhase;
   return resolveAssignment({
     ticketWorker: input.workerChoice ?? input.card.meta.worker,
-    columnWorker: phase?.worker ?? null,
-    columnModel: phase?.model ?? null,
-    handover: phase?.handover ?? null,
     repoWorker: input.repo?.worker ?? null,
     configuredDefault: input.defaultWorker,
   });

@@ -1,4 +1,3 @@
-import { stripPromptVersion } from '../core/default-prompts';
 import { ticketSections } from '../core/ticket-files';
 import { composeInstruction, composeScoutInstruction, type InstructionInput, type ScoutInstructionInput } from './assignment';
 import { personaMemorySection } from './context-pack';
@@ -81,21 +80,18 @@ function titleOf(input: ComposeRunInput): string {
 }
 
 /**
- * The persona's prompt is the instruction base when it has one; else the
- * phase's prompt stands. req-258's interactive mode wrapper: on a dialog run
- * the column's interactive prompt (the shape dialog's interview-first
- * protocol) follows the persona's prompt instead of being displaced by it.
+ * The persona's prompt is the instruction base (req-307: nothing else is). req-258's interactive mode
+ * wrapper: on a dialog run the shipped dialog protocol (the interview-first text, `prompts/crew/dialog.md`)
+ * follows the persona's prompt instead of being displaced by it.
  */
 function runPrompt(input: ComposeRunInput): string | null {
   const persona = input.persona ?? null;
-  const personaPrompt = persona !== null && persona.prompt !== null && persona.prompt.trim() !== '' ? persona.prompt : null;
-  // req-280: a board-started run reads the vault prompt raw — its version marker is for the drift check, never for the model.
-  const phasePrompt = input.promptText === null ? null : stripPromptVersion(input.promptText);
-  if (personaPrompt === null) {
-    return phasePrompt;
+  const own = persona !== null && persona.prompt !== null && persona.prompt.trim() !== '' ? persona.prompt : null;
+  const dialog = input.promptText;
+  if (own === null) {
+    return dialog;
   }
-  const own = stripPromptVersion(personaPrompt);
-  return input.interactive !== undefined && phasePrompt !== null && phasePrompt.trim() !== '' ? `${own.trimEnd()}\n\n${phasePrompt.trim()}` : own;
+  return input.interactive !== undefined && dialog !== null && dialog.trim() !== '' ? `${own.trimEnd()}\n\n${dialog.trim()}` : own;
 }
 
 /** req-282: the ticket's project for the brief's `## Project`; nothing for an Unassigned ticket. */

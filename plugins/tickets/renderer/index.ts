@@ -9,14 +9,12 @@
 import { createTranscriptView } from './transcript-view';
 import { formatWatch, parseStreamEvents } from './watch-format';
 import { newWaits } from './waiting';
-import { interactiveEndMoves, interactiveModeFor, type InteractiveMode } from './end-moves';
 import { chainAlertsOf, newChainAlerts, type ChainAlert } from './chain-alerts';
 import type { DreyPluginApi, PluginWidgetContrib } from '../../../shared/plugin-api/renderer';
 import {
   branchForTicket,
   DEFAULT_PRIORITY_CONFIG,
   openTicketCount,
-  parseHandover,
   type BoardSnapshot,
   type CreateResult,
   type MutationResult,
@@ -26,19 +24,18 @@ import {
   type TicketPriority,
   type TicketTrack,
 } from '../shared/tickets';
-import { needsBlockedConfirm } from './blocked-view';
 import { PRIORITY_LABEL, createGroupFoldStore, workListLivePaint, workListNode, type WorkPanelDeps } from './work-panel';
 import { createRunComposer } from './run-composer';
 import { createThreadComments } from './thread-comments';
 import { THREAD_KEY } from './ticket-page';
-import { PENDING_HINT, dialogStarter } from './dialog-starters';
+import { PENDING_HINT } from './dialog-starters';
 import { AUTOPILOT_COMMAND_ID, costSlotOf, createStatusSlots, type StatusSlotController } from './status-slot';
 import { createAutopilotCommand } from './autopilot/command';
 import { writeAutopilot } from './autopilot/controller';
 import { autopilotSwitchViewOf } from '../../../shared/autopilot';
 import { burnRateHoldOf } from '../../../shared/burn-rate';
 import { trancheViewOf } from '../../../shared/tranche';
-import { ageWords, checkpointActionOf, crewLineOf, ideaPhaseIds, needKindLabel, queueTargetOf, workGroups, workListSignature } from './work-groups';
+import { ageWords, checkpointActionOf, crewLineOf, needKindLabel, workGroups, workListSignature } from './work-groups';
 import { readyBarNode, readyCardNode, storyNode } from './ready-view';
 import { stepCardOf } from '../shared/step-card';
 import type { ChangesReply } from '../shared/changes';
@@ -50,7 +47,6 @@ import { createWorkFilterStore, filterPopover, isFilterActive, NO_WORK_FILTER, t
 import { createTicketsSettingsPage } from './settings-page';
 import { createProjectsSettingsPage } from './projects/projects-page';
 import { createProjectFilter, type ProjectFilter } from './projects/project-filter';
-import { createFilesOperationsHandler, ticketsContextMenuItems } from './files-guard';
 import { createTicketHeader, showsTicketDocument, ticketLogFold, ticketTabTitle } from './ticket-header';
 import { openTicketDocument, type TicketDocumentReply } from './open-ticket';
 import { createBoardRefresh, createChangeGate } from './board-refresh';
@@ -65,8 +61,6 @@ import { openFlowTab, registerFlowKind } from './flow/register';
 import { openReviewTab, registerReviewKind } from './review/register';
 import type { WorkRow } from './work-groups';
 import { boardIssuesChip, boardIssuesList, type BoardIssuesDeps } from './board-issues';
-import { boardMigrationBar } from './board-migration-bar';
-import { storeMigrationBar } from './store-migration-bar';
 import { DEFAULT_CLASS_NAMES } from '../../../packages/tickets-engine/src/contracts/capability-class';
 import type { ChainStatus, FleetHandoverConfig, RunInfo } from '../../../packages/tickets-engine/src/fleet/protocol';
 import type { NormalizedEvent } from '../../../packages/tickets-engine/src/fleet/harness/contract';
@@ -597,8 +591,6 @@ function boardViewControlsNode(api: DreyPluginApi): { node: HTMLElement; dispose
 
 /** The non-git note was dismissed in this window (A-09); it returns on the next start. */
 let gitWarningDismissed = false;
-/** req-268: whether the board migration's details are unfolded (this window only). */
-let boardMigrationOpen = false;
 
 function buildBoardView(api: DreyPluginApi): BoardView {
   const root = el('div', 'tickets-view');
@@ -639,27 +631,6 @@ function buildBoardView(api: DreyPluginApi): BoardView {
     const issues = boardIssuesList(boardIssuesDeps(api, snap.issues));
     if (issues !== null) {
       root.append(issues);
-    }
-    if (snap.storeMigration !== undefined && snap.storeMigration !== null) {
-      // req-265: the store still uses the old stages - the owner's click migrates it, nothing else does.
-      const migrate = (): void => void runMutation(api.i18n.t('work.store_migration.busy'), () => invokeBoard('migrateStoreStages'));
-      root.append(storeMigrationBar({ api, offer: snap.storeMigration, migrate }));
-    }
-    if (snap.boardMigration !== undefined) {
-      // req-268: the meta vault's next migration step (3-5) - shown with what it writes, run only on the owner's confirmation.
-      root.append(
-        boardMigrationBar({
-          i18n: api.i18n,
-          offer: snap.boardMigration,
-          open: boardMigrationOpen,
-          toggle: (open) => {
-            boardMigrationOpen = open;
-            render();
-          },
-          invoke: (method, payload) => invokeBoard(method, payload),
-          mutate: (label, run) => void runMutation(label, run),
-        }),
-      );
     }
     root.append(workListNode(workPanelDeps(api), projectFilter?.scoped(snap) ?? snap, fleetRuns, folds, notifyViews, workFilter.get()));
     const statusBar = statusBarNode(api, snap, fleet.node);
@@ -739,10 +710,7 @@ function workPanelDeps(api: DreyPluginApi): WorkPanelDeps {
     // The row menu shares the panel's seams (Track › / Priority ›).
     openMenu: (card, at) => openCardMenu(api, card, at, runMutation, deps),
     alerts: currentChainAlerts(),
-    onAlertAction: (action) =>
-      void (action.kind === 'play-column'
-        ? runChainAction('chainColumn', { phase: action.phase, mode: 'playing' })
-        : runChainAction('chainMaster', { mode: 'run' })),
+    onAlertAction: () => void runChainAction('chainMaster', { mode: 'run' }),
     // The hidden-by-filter marker's button (T-0084): both axes go empty.
     clearFilter: () => {
       workFilter.set(NO_WORK_FILTER);
@@ -775,9 +743,9 @@ function ticketAllowanceDefault(): number | null {
   return allowanceDefault;
 }
 
-/** What stops the fleet right now, over the current snapshot and chain. */
+/** What stops the fleet right now, over the current chain. */
 function currentChainAlerts(): readonly ChainAlert[] {
-  return snapshot === null || snapshot.vaultId === null ? [] : chainAlertsOf(chain, snapshot, fleetRuns, Date.now());
+  return snapshot === null || snapshot.vaultId === null ? [] : chainAlertsOf(chain, Date.now());
 }
 
 /** The breaker trips and quota pauses this window already announced. */
@@ -791,16 +759,9 @@ function announceChainAlerts(api: DreyPluginApi): void {
 }
 
 /**
- * An owner move from the Work panel: the ordinary transition. A blocked
- * ticket moved into a machine phase asks first (T-0050) — the owner is
- * the final authority.
+ * An owner move from the Work panel: the ordinary transition.
  */
 function moveTicket(api: DreyPluginApi, card: TicketCard, to: string): void {
-  const handover = snapshot?.columns.find((c) => c.phase.id === to)?.phase.handover ?? 'manual';
-  if (needsBlockedConfirm(card, handover)) {
-    openBlockedMoveConfirm(api, card, card.phase, to);
-    return;
-  }
   void runMutation(`Moving ${card.id}`, () => invokeBoard('transition', { id: card.id, from: card.phase, to }));
 }
 
@@ -946,7 +907,7 @@ function emptyState(
   button.addEventListener('click', () => {
     if (!armed) {
       armed = true;
-      button.textContent = `Creates tickets/_meta/{pipeline,repos}.md and the default prompts in ${target} — click again`;
+      button.textContent = `Creates the tickets board (pipeline, repos, the human persona) and a dricket store beside the vault in ${target} — click again`;
       button.classList.add('tickets-init-armed');
       return;
     }
@@ -1449,237 +1410,10 @@ function fleetFooterNode(api: DreyPluginApi): { readonly node: HTMLElement; read
   };
 }
 
-function openRunModal(api: DreyPluginApi, card: TicketCard): void {
-  const close = api.ui.showModal((host) => {
-    const form = el('div', 'tickets-form');
-    form.append(el('h3', 'tickets-form-heading', `Run ${card.id} — ${card.meta.title ?? '(untitled)'}`));
-
-    const field = (label: string, control: HTMLElement): HTMLElement => {
-      const wrap = el('label', 'tickets-form-field');
-      wrap.append(el('span', 'tickets-form-label', label), control);
-      return wrap;
-    };
-    const worker = el('select') as HTMLSelectElement;
-    worker.setAttribute('aria-label', 'Worker');
-    for (const [value, label] of WORKER_LABEL) {
-      const option = el('option', undefined, label) as HTMLOptionElement;
-      option.value = value;
-      if (value === card.worker.split('/')[0]) {
-        option.selected = true;
-      }
-      worker.append(option);
-    }
-    const permission = el('select') as HTMLSelectElement;
-    permission.setAttribute('aria-label', 'Permissions');
-    for (const [value, label] of [
-      ['accept-edits', 'Accept edits (asks before commands)'],
-      ['bypass', 'Bypass permissions (unattended)'],
-    ] as const) {
-      const option = el('option', undefined, label) as HTMLOptionElement;
-      option.value = value;
-      if (value === 'accept-edits') {
-        option.selected = true;
-      }
-      permission.append(option);
-    }
-    const rowFields = el('div', 'tickets-form-row');
-    rowFields.append(field('Worker', worker), field('Permissions', permission));
-
-    // --- the handover choice (T-0049): the pure rules over the fleet
-    // snapshot decide the default and which options are legal at all;
-    // nothing is persisted — each run asks anew.
-    const handover = el('select') as HTMLSelectElement;
-    handover.setAttribute('aria-label', 'Handover');
-    const handoverStatus = el('p', 'tickets-form-hint', '');
-    const candidate: HandoverCandidate | null = (() => {
-      const newest = fleetRuns
-        .filter((r) => r.ticketId === card.id && ['done', 'stopped', 'failed'].includes(r.state))
-        .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
-      if (newest === undefined) {
-        return null;
-      }
-      return {
-        phase: newest.phase ?? '',
-        provider: newest.provider,
-        model: newest.model ?? null,
-        state: newest.state,
-        sessionRef: newest.sessionRef,
-        lastTurnContext: newest.lastTurnContext ?? null,
-        endedAt: newest.endedAt,
-      };
-    })();
-    const cardPin = parseWorkerValue(card.worker);
-    let handoverConfig: FleetHandoverConfig = DEFAULT_FLEET_HANDOVER;
-    const renderHandover = (): void => {
-      const provider = worker.value;
-      const state = handoverDialogState({
-        phase: card.phase,
-        candidate,
-        provider,
-        // The dialog offers no model pin of its own; the card's applies
-        // while the worker stays the card's resolved one.
-        model: cardPin !== null && cardPin.provider === provider ? cardPin.model : null,
-        config: handoverConfig,
-        nowMs: Date.now(),
-      });
-      handover.replaceChildren();
-      for (const option of state.options) {
-        const node = el('option', undefined, option.label) as HTMLOptionElement;
-        node.value = option.mode;
-        node.disabled = option.disabled;
-        node.title = option.why;
-        node.selected = option.mode === state.defaultMode;
-        handover.append(node);
-      }
-      handover.title = state.options.find((o) => o.mode === handover.value)?.why ?? '';
-      handoverStatus.textContent = state.statusLine;
-    };
-    renderHandover();
-    worker.addEventListener('change', renderHandover);
-    void (async () => {
-      // req-173: the thresholds are the vault layer's (tickets/_meta/crew.md), resolved by the engine.
-      const crew = (await api.backend.invoke('crewConfig').catch(() => null)) as CrewConfigReply | null;
-      const resolved = crew !== null && crew.ok ? crew.resolved : null;
-      handoverConfig = normalizeFleetHandover({
-        ...(typeof resolved?.['handover.compactAboveTokens'] === 'number' ? { compactAboveTokens: resolved['handover.compactAboveTokens'] } : {}),
-        ...(typeof resolved?.['handover.resumePauseTtlMin'] === 'number' ? { resumePauseTtlMin: resolved['handover.resumePauseTtlMin'] } : {}),
-      });
-      renderHandover();
-    })();
-
-    const hint = el(
-      'p',
-      'tickets-form-hint',
-      'The instruction is composed from the ticket (description, plan, acceptance criteria) plus the phase handover’s prompt. ' +
-        'On a green machine gate the runner moves the ticket to the next phase.',
-    );
-
-    const actions = el('div', 'tickets-form-actions');
-    const cancel = el('button', undefined, 'Cancel');
-    cancel.type = 'button';
-    cancel.addEventListener('click', () => close());
-    const start = el('button', 'tickets-form-create', 'Start run');
-    start.type = 'button';
-    start.addEventListener('click', () => {
-      const workerValue = worker.value;
-      const handoverValue = handover.value;
-      close();
-      void runMutation('Starting the run', () =>
-        invokeBoard('fleetStart', {
-          origin: 'drey:run-dialog',
-          id: card.id,
-          worker: workerValue,
-          permissionMode: permission.value,
-          handover: handoverValue,
-        }),
-      );
-    });
-    actions.append(cancel, start);
-
-    form.append(rowFields, field('Handover', handover), handoverStatus, hint, actions);
-    form.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        close();
-      }
-    });
-    host.append(form);
-    worker.focus();
-  });
-}
-
-/** The blocked-move ask (T-0050): a blocked ticket moved into a worker
- *  phase. The owner is the final authority — Cancel keeps the ticket
- *  where it is, Move anyway performs the ordinary transition. */
-function openBlockedMoveConfirm(
-  api: DreyPluginApi,
-  card: TicketCard,
-  from: string,
-  to: string,
-): void {
-  const close = api.ui.showModal((host) => {
-    const form = el('div', 'tickets-form');
-    form.append(el('h3', 'tickets-form-heading', `Move ${card.id} — it is blocked`));
-    form.append(
-      el(
-        'p',
-        'tickets-form-hint',
-        `${card.id} is blocked by ${card.blocked.join(', ')} — the blockers have not reached the ` +
-          'terminal phase, so the worker column will not pick it up until they do. You stay the final authority.',
-      ),
-    );
-    const actions = el('div', 'tickets-form-actions');
-    const cancel = el('button', undefined, 'Cancel');
-    cancel.type = 'button';
-    cancel.addEventListener('click', () => close());
-    const move = el('button', 'tickets-form-create', 'Move anyway');
-    move.type = 'button';
-    move.addEventListener('click', () => {
-      close();
-      void runMutation('Moving', () => invokeBoard('transition', { id: card.id, from, to }));
-    });
-    actions.append(cancel, move);
-    form.append(actions);
-    form.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        close();
-      }
-    });
-    host.append(form);
-    cancel.focus();
-  });
-}
-
 // --- the takeover tab (owner request, follow-up of M86; ADR-0078) -------------
 
 const TAKEOVER_KIND = 'tickets-takeover';
 const TAKEOVER_SCHEME = 'takeover://';
-
-/**
- * Starts the owner's interactive dialog (req-65): one click — the
- * column's worker by the assignment ladder, the default permission
- * mode, no form. The ticket page opens (the file with its thread beside
- * it) unless the thread itself started the run (`open: false`).
- * Resolves to the new run's id, or null when none started.
- */
-async function startInteractive(
-  api: DreyPluginApi,
-  card: TicketCard,
-  mode: InteractiveMode,
-  open = true,
-): Promise<string | null> {
-  const label = 'Starting the plan dialog';
-  const result = await runMutation(label, () =>
-    invokeBoard('fleetStart', { origin: 'drey:plan-dialog', id: card.id, worker: card.worker, permissionMode: 'accept-edits', interactive: mode }),
-  );
-  if (!result.ok) {
-    return null;
-  }
-  const runId = (result as { runId?: string }).runId ?? null;
-  // The thread follows the fleet snapshot; pull one so it shows the run now.
-  await pullFleetStatus().catch(() => undefined);
-  if (open) {
-    openTicketThread(api, card);
-  }
-  return runId;
-}
-
-/**
- * Ends an interactive dialog (req-65): the run stops (an ended run skips
- * this), then the owner move the button named — the ordinary transition,
- * exactly the move across the checkpoint the owner makes by hand.
- */
-async function finishInteractiveMove(runId: string, ticketId: string, from: string, to: string): Promise<void> {
-  const run = fleetRuns.find((r) => r.id === runId);
-  if (run !== undefined && LIVE_RUN_STATES.includes(run.state)) {
-    const stopped = await runMutation('Ending the dialog', () =>
-      invokeBoard('fleetStop', { runId, reason: `the dialog ended — the owner moves the ticket to ${to}` }),
-    );
-    if (!stopped.ok) {
-      return;
-    }
-  }
-  await runMutation(`Moving ${ticketId} to ${to}`, () => invokeBoard('transition', { id: ticketId, from, to }));
-}
 
 /** The waits this window already announced (`newWaits` keeps it current). */
 const announcedWaits = new Set<string>();
@@ -1692,8 +1426,6 @@ function announceWaits(api: DreyPluginApi): void {
       body: notice.body,
       tag: notice.run.id,
       onClick: () => {
-        // A run without a card on the board has no page to open — the
-        // takeover tab it once fell back to is gone (W4a).
         const card = boardCard(notice.run.ticketId);
         if (card !== null) {
           void openTicketPage(api, card);
@@ -1701,50 +1433,6 @@ function announceWaits(api: DreyPluginApi): void {
       },
     });
   }
-}
-/**
- * The takeover tab is gone (req-75 W4a, ADR-0087 decision 3): the
- * worker lives on the ticket thread, which carries its controls. The
- * `tickets-takeover` doc kind stays registered below only so an old
- * session restores onto the ticket page instead of a dead tab.
- */
-
-/**
- * The dialog's end moves (req-65): an interactive run is the owner's
- * conversation — when it is over, these buttons perform the owner move
- * that closes it (stop the run if it still lives, then the transition).
- */
-function createEndMoves(): { element: HTMLElement; paint(run: RunInfo | null): void } {
-  const element = el('div', 'tickets-takeover-endmoves');
-  element.hidden = true;
-  const paint = (run: RunInfo | null): void => {
-    if (run === null || run.interactive === undefined || snapshot === null) {
-      element.hidden = true;
-      return;
-    }
-    // Where the ticket sits NOW — the owner may have moved it since the
-    // run started, and a ticket off the board has nowhere to go.
-    const card = boardCard(run.ticketId);
-    const moves = card === null ? [] : interactiveEndMoves(run.interactive, card.phase, snapshot.columns);
-    if (card === null || moves.length === 0) {
-      element.hidden = true;
-      return;
-    }
-    element.replaceChildren(
-      el('span', 'tickets-takeover-endmoves-label', 'Dialog done? End it with a move:'),
-      ...moves.map((move) => {
-        const b = el('button', 'tickets-takeover-btn tickets-takeover-endmove', move.label);
-        b.type = 'button';
-        b.title = move.title;
-        b.addEventListener('click', () => {
-          void finishInteractiveMove(run.id, run.ticketId, card.phase, move.toPhase);
-        });
-        return b;
-      }),
-    );
-    element.hidden = false;
-  };
-  return { element, paint };
 }
 
 // --- the ticket thread (req-75 W1, ADR-0087 decision 3) ----------------------
@@ -2026,15 +1714,6 @@ function mountThreadOf(api: DreyPluginApi, host: HTMLElement, ticketId: string):
       });
     },
   );
-  // Start (W4a): the existing manual start — the phase's plan dialog
-  // in a worker, the same first-message path the composer takes.
-  const startRun = iconButton('play', 'Start a worker on this ticket', 'Start', () => {
-    const card = boardCard(ticketId);
-    const mode = dialogMode();
-    if (card !== null && mode !== null) {
-      void startInteractive(api, card, mode, false);
-    }
-  });
   // The checkpoint actions (req-81): a ticket waiting on the owner
   // carries Launch, Accept and Send back in the status row beside the
   // run controls — always there, whatever the Ready card does.
@@ -2061,10 +1740,9 @@ function mountThreadOf(api: DreyPluginApi, host: HTMLElement, ticketId: string):
     readyOpen = !readyOpen;
     paintReady();
   });
-  controls.append(pauseRun, continueRun, takeOverRun, stopRun, handBackRun, resumeRun, startRun, checkpoints);
+  controls.append(pauseRun, continueRun, takeOverRun, stopRun, handBackRun, resumeRun, checkpoints);
   head.append(light, stateWord, titleNode, metaNode, readyChip, el('span', 'tickets-takeover-spacer'), controls);
 
-  const endMoves = createEndMoves();
   // --- the Ready card (req-75 W3) ---------------------------------------
   // The canvas's bordered card above the transcript, its story beside
   // it (a right column from 900 px pane width, below when narrower).
@@ -2189,7 +1867,6 @@ function mountThreadOf(api: DreyPluginApi, host: HTMLElement, ticketId: string):
       pipeline: snap.pipeline.map((p) => ({ id: p.id, title: p.title })),
       phaseId: card.phase,
       atCheckpoint: kind !== null,
-      planGate: kind === 'Plan to accept',
       hasReport: (reply?.changes ?? null) !== null || (reply?.result ?? null) !== null,
       launchable: reply?.launchable ?? false,
     });
@@ -2477,10 +2154,6 @@ function mountThreadOf(api: DreyPluginApi, host: HTMLElement, ticketId: string):
   };
   stepsBox.prepend(changesBox);
 
-  const dialogMode = (): InteractiveMode | null => {
-    const card = boardCard(ticketId);
-    return card === null || snapshot === null ? null : interactiveModeFor(card.phase, snapshot.columns);
-  };
   const isLive = (run: RunInfo | null): boolean => run !== null && (LIVE_RUN_STATES.includes(run.state) || run.state === 'detached');
   const composer = createRunComposer({
     api,
@@ -2493,26 +2166,7 @@ function mountThreadOf(api: DreyPluginApi, host: HTMLElement, ticketId: string):
     target: () => threadRun(ticketId),
     onReopened: () => undefined,
     othersLive: () => fleetRuns.filter((r) => LIVE_RUN_STATES.includes(r.state) && r.id !== threadRun(ticketId)?.id).length,
-    // No live run: the first message starts the phase's plan dialog.
-    startFor: async () => {
-      const card = boardCard(ticketId);
-      const mode = dialogMode();
-      return card === null || mode === null ? null : startInteractive(api, card, mode, false);
-    },
-    canStart: () => dialogMode() !== null && !isLive(threadRun(ticketId)),
     placeholder: 'Message the worker — type / for commands',
-    // The quiet start's pre-fill (req-75): a live quiet run that has seen
-    // no owner message opens the box carrying the step and its meaning.
-    // A ticket without a run opens an empty box (E12-12): nothing is
-    // started, so nothing is drafted for the owner.
-    prefill: () => {
-      const mode = dialogMode();
-      if (mode === null) {
-        return null;
-      }
-      const run = threadRun(ticketId);
-      return run !== null && isLive(run) && run.quietStart === true ? dialogStarter(mode) : null;
-    },
   });
 
   let pulledFor: string | null = null;
@@ -2619,7 +2273,6 @@ function mountThreadOf(api: DreyPluginApi, host: HTMLElement, ticketId: string):
     stopRun.hidden = !show.has('stop');
     handBackRun.hidden = !show.has('handback');
     resumeRun.hidden = !show.has('resume');
-    startRun.hidden = !show.has('start') || dialogMode() === null;
     // The checkpoint actions (req-81): in the status row whenever the
     // ticket waits on the owner — independent of the Ready card's fold.
     const need =
@@ -2650,13 +2303,7 @@ function mountThreadOf(api: DreyPluginApi, host: HTMLElement, ticketId: string):
     }
     transcript.element.hidden = run === null;
     empty.hidden = run !== null;
-    const mode = dialogMode();
-    empty.textContent =
-      mode === null
-        ? 'No run on this ticket yet.'
-        : mode === 'plan'
-          ? 'No run yet — write below to plan this ticket with a worker.'
-          : 'No run yet — write below to refine this ticket with a worker.';
+    empty.textContent = 'No run on this ticket yet.';
     // The shaped-with-you line: the owner approved this ticket's plan.
     const approved = readyReply?.planApproved ?? null;
     shapedLine.hidden = approved === null;
@@ -2680,7 +2327,6 @@ function mountThreadOf(api: DreyPluginApi, host: HTMLElement, ticketId: string):
     paintReady();
     paintDecisions();
     composer.paint();
-    endMoves.paint(run);
   };
 
   fleetListeners.add(paint);
@@ -2696,7 +2342,7 @@ function mountThreadOf(api: DreyPluginApi, host: HTMLElement, ticketId: string):
       pullChanges();
     }
   }, 30_000);
-  wrap.append(head, actionNotice, readyWrap, pendingHint, stepsBox, endMoves.element, decisionBar, composer.element);
+  wrap.append(head, actionNotice, readyWrap, pendingHint, stepsBox, decisionBar, composer.element);
   host.append(wrap);
   return () => {
     alive = false;
@@ -2898,17 +2544,6 @@ function openCardMenu(
 
   const live = runForCard(card.id);
   const columns = snapshot?.columns.filter((c) => !c.unknown) ?? [];
-  const pipeline = columns.map((c) => c.phase);
-  const firstPhase = pipeline[0]?.id ?? null;
-  const queueTo = queueTargetOf(pipeline, card.phase);
-  if (queueTo !== null && ideaPhaseIds(pipeline).includes(card.phase)) {
-    item('Queue for the fleet', () => moveTicket(api, card, queueTo), 'The next free worker takes it');
-  }
-  // Back to ideas: a queued idea, or one the fleet has not picked up yet.
-  const queuedAt = firstPhase === null ? null : queueTargetOf(pipeline, firstPhase);
-  if (firstPhase !== null && card.phase !== firstPhase && live === null && (ideaPhaseIds(pipeline).includes(card.phase) || card.phase === queuedAt)) {
-    item('Back to Inbox', () => moveTicket(api, card, firstPhase), 'Out of the queue — back to the Inbox');
-  }
   const targets = columns.filter((c) => c.phase.id !== card.phase);
   if (targets.length > 0) {
     submenus.push(
@@ -2971,19 +2606,7 @@ function openCardMenu(
   );
   menu.append(el('div', 'tickets-menu-sep'));
 
-  // The one-click interactive dialog (req-65): plan on the first
-  // automatic phase — only without a live run.
-  if (snapshot !== null && live === null) {
-    const mode = interactiveModeFor(card.phase, snapshot.columns);
-    if (mode !== null) {
-      item(`Plan with agent (${card.worker})`, () => void startInteractive(api, card, mode));
-    }
-  }
-  // D-29: an owner's column offers no run; the engine refuses one anyway.
-  const runnable = snapshot?.columns.find((c) => c.phase.id === card.phase)?.phase;
-  if (live === null && runnable !== undefined && parseHandover(runnable.handover).mode === 'agent') {
-    item(`Run agent (${card.worker})…`, () => openRunModal(api, card));
-  } else if (live !== null) {
+  if (live !== null) {
     item('Open ticket', () => void openTicketPage(api, card));
     item('Stop run', () => {
       void run('Stopping the run', () => invokeBoard('fleetStop', { runId: live.id, reason: null }));
@@ -3298,18 +2921,6 @@ const plugin: { activate(api: DreyPluginApi): void } = {
     // req-284: Settings → Projects, a category of its own (board 7m).
     api.ui.registerSettingsPage(createProjectsSettingsPage(api));
 
-    // The Files-panel seam (T-0042, SDK 1.32): veto/takeover over the
-    // board's ground, and the per-target context rows. Both read the
-    // module-level board store, so they follow every board-changed
-    // refresh — including a re-registered tickets vault.
-    const filesDeps = {
-      snapshot: () => snapshot,
-      invoke: invokeBoard,
-      showMessage: (message: string, title?: string) => api.ui.showMessage(message, title),
-    };
-    api.files.registerOperations(createFilesOperationsHandler(filesDeps));
-    api.files.registerContextMenuItems(ticketsContextMenuItems(filesDeps));
-
     // The ticket header and the folded Log in the editor (req-62, SDK 1.34).
     // Both match on the board's vault, so they register again when that
     // vault becomes known or changes — the registration is what makes open
@@ -3322,7 +2933,7 @@ const plugin: { activate(api: DreyPluginApi): void } = {
         return null;
       }
       const groups = workGroups(snapshot, liveRuns());
-      return [...groups.needs, ...groups.shaping, ...groups.running, ...groups.ideas].find((row) => row.card.id === card.id) ?? null;
+      return [...groups.needs, ...groups.running, ...groups.ideas].find((row) => row.card.id === card.id) ?? null;
     };
     // E13-11: the Flow tab -- a ticket's chain as an editor (gates, personas, Paul's draft).
     registerFlowKind(api, deskDeps(api));
@@ -3343,7 +2954,7 @@ const plugin: { activate(api: DreyPluginApi): void } = {
         marks: (id) => shapeMarksOf(planStatus.get(id), new Date()),
         want: (id, text) => {
           const phase = snapshot?.columns.flatMap((column) => column.tickets).find((ticket) => ticket.id === id)?.phase;
-          if (snapshot !== null && phase !== undefined && ideaPhaseIds(snapshot.pipeline).includes(phase)) {
+          if (snapshot !== null && phase !== undefined && phase === snapshot.pipeline[0]?.id) {
             planStatus.want(id, text);
           }
         },

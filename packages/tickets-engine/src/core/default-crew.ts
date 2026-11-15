@@ -1,5 +1,5 @@
 import { stripPromptVersion } from './default-prompts';
-import { parsePersonaFile, personaFileText, type Persona, type PersonaRole } from './persona';
+import { parsePersonaFile, personaFileText, type Persona } from './persona';
 
 /**
  * The default crew (req-256, decision D7): planner Paul, builder Ben,
@@ -8,24 +8,15 @@ import { parsePersonaFile, personaFileText, type Persona, type PersonaRole } fro
  * `packages/tickets-engine/personas/<id>/{persona,prompt}.md` and seeded
  * into a board's `tickets/_meta/personas/` ({@link CrewSeeder}). The
  * shipped `persona.md` of an agent names its `class:` and pins no model
- * (req-288: the next free model of the class runs; Pia runs no session). The
- * shipped `prompt.md` is the persona's "who it is" part (R11, the prompt is
- * the persona); the seeded one of an agent adds the step text of its role
- * below it, because a persona's prompt replaces the step prompt as the
- * run's instruction base. Pia's is seeded as shipped: Mission Control
- * composes it before its own prompt on every turn.
+ * (req-288: the next free model of the class runs; Pia runs no session).
+ * The shipped `prompt.md` is the persona's "who it is" part (R11, the
+ * prompt is the persona) — its role knowledge; the run brief carries the
+ * disciplines. Pia's is seeded as shipped: Mission Control composes it
+ * before its own prompt on every turn.
  */
 
 /** The ids the engine ships, in crew order — Mission Control's persona first (the concept §12). */
 export const DEFAULT_CREW_IDS: readonly string[] = ['pia', 'paul', 'ben', 'ralf', 'tessa'];
-
-/** The roles a shipped persona may have, and the shipped step prompt each one runs (and the word its heading uses). */
-export const CREW_STEPS: Readonly<Partial<Record<PersonaRole, { readonly ref: string; readonly name: string }>>> = {
-  planner: { ref: 'plan-default', name: 'planning' },
-  builder: { ref: 'build-default', name: 'build' },
-  reviewer: { ref: 'review-default', name: 'review' },
-  tester: { ref: 'qa-default', name: 'verify' },
-};
 
 /** One shipped persona as read from the package: its parsed record and the "who it is" prose. */
 export interface ShippedPersona {
@@ -38,7 +29,7 @@ export interface ShippedPersona {
 
 /** True when the shipped record is a crew member the package may ship: an agent of a stepped role, or Mission Control's persona. */
 function isShippable(persona: Persona): boolean {
-  return persona.kind === 'mission' || (persona.kind === 'agent' && CREW_STEPS[persona.role] !== undefined);
+  return persona.kind === 'mission' || (persona.kind === 'agent' && ['planner', 'builder', 'reviewer', 'tester'].includes(persona.role));
 }
 
 /** The persona, or why the shipped files are not a crew member (a broken package never seeds half a persona). */
@@ -59,21 +50,7 @@ export function seededPersonaText(shipped: ShippedPersona): string {
   return personaFileText(shipped.persona);
 }
 
-/**
- * The `prompt.md` a vault gets: the shipped "who it is" part, then the
- * shipped step prompt of the role (its version marker dropped) under its
- * own heading. `stepMissing` when the package holds no step prompt for the
- * role — the persona then seeds with its character alone and the caller
- * says so. Mission Control's persona has no step: her prompt is seeded as shipped.
- */
-export function seededPromptText(shipped: ShippedPersona, steps: ReadonlyMap<string, string>): { readonly text: string; readonly stepMissing: boolean } {
-  const step = shipped.persona.kind === 'mission' ? undefined : CREW_STEPS[shipped.persona.role];
-  if (step === undefined) {
-    return { text: shipped.who, stepMissing: shipped.persona.kind !== 'mission' };
-  }
-  const body = steps.get(step.ref);
-  if (body === undefined) {
-    return { text: shipped.who, stepMissing: true };
-  }
-  return { text: `${shipped.who}\n## The ${step.name} step\n\n${stripPromptVersion(body).trim()}\n`, stepMissing: false };
+/** The `prompt.md` a vault gets: the shipped "who it is" part, as shipped. */
+export function seededPromptText(shipped: ShippedPersona): string {
+  return stripPromptVersion(shipped.who);
 }
