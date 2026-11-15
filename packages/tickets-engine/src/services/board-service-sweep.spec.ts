@@ -82,7 +82,6 @@ describe.skipIf(!found.ok)('the sweep defects on a scratch dk store', { timeout:
       configSet: async () => undefined,
       emitBoardChanged: () => undefined,
       log: () => undefined,
-      userRoot: path.join(root, 'userroot'),
       pickFolder: async () => null,
       revealPath: async () => '',
       launchInConsole: () => undefined,

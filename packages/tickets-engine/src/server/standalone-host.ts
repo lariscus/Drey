@@ -26,7 +26,6 @@ export class FsEngineHost implements EngineHost {
     /** The gateway's fan-out — board/fleet/remote events reach SSE here. */
     private readonly hub: ChangeHub,
     private readonly logSink: (message: string, level?: 'info' | 'warn' | 'error') => void,
-    readonly userRoot: string,
   ) {
     this.vault = {
       id: 'standalone',

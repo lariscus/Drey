@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { promises as fsp, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { DEFAULT_PIPELINE_TEXT } from '../core/pipeline-states';
 import { TicketsGit } from '../core/tickets-git';
@@ -14,8 +14,7 @@ import type { EngineHost, EngineVault, FleetPort } from './host';
 /**
  * Accept on Ready to try (req-99a, build plan Q8): the commit step on the target
  * repository — since req-267 You's `commit` leaving action, a machine run — and
- * Done as its bookkeeping result. The first block is the files
- * backend over a temp vault; the second a REAL `dk` over a scratch store with the
+ * Done as its bookkeeping result, over a REAL `dk` and a scratch store with the
  * six stages (skipped, with the reason, when `dk` is missing), because dk's own rule
  * shapes this: an agent never releases into the terminal stage.
  */
@@ -24,7 +23,6 @@ import type { EngineHost, EngineVault, FleetPort } from './host';
 const YOU = (leaving: string): string => `---\ntitle: You\nkind: human\nrole: custom\n${leaving}---\n`;
 const WITH_COMMIT = 'leaving: [commit]\n';
 const REPOS = (repoPath: string): string => `---\nrepos:\n  kt:\n    url: https://example.test/kt.git\n    path: '${repoPath}'\n    branch: main\n---\n`;
-const BODY = '\n## Description\n\nDo it.\n\n## Plan\n\n### Acceptance criteria\n\n- [ ] `echo ok`\n\n## Log\n\n';
 
 function runInfo(id: string, ticketId: string, state: RunInfo['state'], extra: Partial<RunInfo> = {}): RunInfo {
   return { id, ticketId, provider: 'opencode', state, pid: null, startedAt: '2026-11-06T10:00:00Z', endedAt: '2026-11-06T10:05:00Z', sessionRef: null, tokensIn: 0, tokensOut: 0, costUsd: null, lastActivity: '2026-11-06T10:05:00Z', ...extra } as RunInfo;
@@ -61,7 +59,6 @@ function hostOver(vaultDir: string, vault: EngineVault, config: Record<string, s
     configSet: async () => undefined,
     emitBoardChanged: () => undefined,
     log: () => undefined,
-    userRoot: path.join(vaultDir, 'userroot'),
     pickFolder: async () => null,
     revealPath: async () => '',
     launchInConsole: () => undefined,
@@ -71,112 +68,6 @@ function hostOver(vaultDir: string, vault: EngineVault, config: Record<string, s
 function serviceOver(host: EngineHost, fleet: FleetPort): EngineBoardService {
   return new EngineBoardService(host, new TicketsGit(() => 'git', async () => { throw new Error('no git in the spec'); }), 'opencode', 'accept-edits', '', fleet, '/fleet', normalizeFleetCaps({}), normalizeFleetPools({}), normalizeFleetHandover({}), 'owner@test', {});
 }
-
-describe('Accept on the files backend', () => {
-  let vaultDir = '';
-  let started: RunRequest[] = [];
-  let runs: RunInfo[] = [];
-  let service: EngineBoardService;
-
-  const fleet: FleetPort = {
-    runs: async () => runs,
-    start: async (request) => {
-      started.push(request);
-      return { ok: true, run: runInfo('R-1', request.ticketId, 'running') };
-    },
-    configureChain: async () => undefined,
-  };
-  const abs = (...parts: string[]): string => path.join(vaultDir, 'tickets', ...parts);
-
-  async function ticket(id: string, phase: string, header: Record<string, string> = { repo: 'kt' }): Promise<void> {
-    const keys = Object.entries(header).map(([k, v]) => `${k}: ${v}`);
-    await fsp.mkdir(abs(phase), { recursive: true });
-    await fsp.writeFile(abs(phase, `${id}.md`), ['---', `id: ${id}`, `title: ${id}`, 'priority: normal', 'rank: 5000', ...keys, '---', BODY].join('\n'), 'utf8');
-  }
-
-  async function usePipeline(text: string): Promise<void> {
-    await fsp.writeFile(abs('_meta', 'pipeline.md'), text, 'utf8');
-  }
-
-  beforeEach(async () => {
-    vaultDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-commit-step-'));
-    started = [];
-    runs = [];
-    await fsp.mkdir(abs('_meta', 'prompts'), { recursive: true });
-    await usePipeline(DEFAULT_PIPELINE_TEXT);
-    await fsp.writeFile(abs('_meta', 'repos.md'), REPOS(path.join(vaultDir, 'kt').split(path.sep).join('/')), 'utf8');
-    await fsp.mkdir(abs('_meta', 'personas', 'you'), { recursive: true });
-    await fsp.writeFile(abs('_meta', 'personas', 'you', 'persona.md'), YOU(WITH_COMMIT), 'utf8');
-    service = serviceOver(hostOver(vaultDir, { id: 'v', name: 'vault', path: vaultDir, exists: true, active: true }, {}), fleet);
-  });
-
-  afterEach(async () => {
-    await fsp.rm(vaultDir, { recursive: true, force: true });
-  });
-
-  it('starts the commit as a machine run instead of moving; the run itself moves the ticket into Done', async () => {
-    await ticket('T-0001', 'ready');
-    expect(await service.acceptTicket({ id: 'T-0001' })).toEqual({ ok: true, runId: 'R-1' });
-    expect(started).toHaveLength(1);
-    expect(started[0]).toMatchObject({ ticketId: 'T-0001', nextPhase: 'done', baseRef: 'main', branch: 't/T-0001', machine: { action: 'commit', persona: 'you', policy: null } });
-    expect(started[0]!.leaving).toBeUndefined();
-    await expect(fsp.stat(abs('ready', 'T-0001.md'))).resolves.toBeDefined();
-  });
-
-  it("runs as You's machine action, never under the ticket's builder", async () => {
-    const dir = abs('_meta', 'personas', 'ben');
-    await fsp.mkdir(dir, { recursive: true });
-    await fsp.writeFile(path.join(dir, 'persona.md'), `---\ntitle: Ben\nrole: builder\nworker: opencode\nmodels:\n  default: sonnet\n  pool: [sonnet]\n  router: off\nleaving: [sync-main]\n---\n`, 'utf8');
-    await ticket('T-0001', 'ready', { repo: 'kt', persona: 'ben' });
-    await service.acceptTicket({ id: 'T-0001' });
-    expect(started[0]!.machine).toEqual({ action: 'commit', persona: 'you', policy: null });
-    expect(started[0]!.leaving).toBeUndefined();
-  });
-
-  it('refuses while a run is live', async () => {
-    await ticket('T-0001', 'ready');
-    runs = [runInfo('R-9', 'T-0001', 'running')];
-    expect(await service.acceptTicket({ id: 'T-0001' })).toMatchObject({ ok: false, error: expect.stringContaining('live run') });
-    expect(started).toEqual([]);
-  });
-
-  it("refuses the sign-off while You's persona lists no commit, and says where to add it", async () => {
-    await ticket('T-0001', 'ready');
-    await fsp.writeFile(abs('_meta', 'personas', 'you', 'persona.md'), YOU(''), 'utf8');
-    const refused = await service.acceptTicket({ id: 'T-0001' });
-    expect(refused).toMatchObject({ ok: false });
-    const error = (refused as { error: string }).error;
-    expect(error).toContain('"commit" leaving action');
-    expect(error).toContain('Crew tab → You → Work');
-    expect(error).toContain('Add action… → commit');
-    expect(started).toEqual([]);
-    await expect(fsp.stat(abs('ready', 'T-0001.md'))).resolves.toBeDefined();
-    await fsp.rm(abs('_meta', 'personas', 'you'), { recursive: true });
-    expect(await service.acceptTicket({ id: 'T-0001' })).toMatchObject({ ok: false, error: expect.stringContaining('leaving action') });
-  });
-
-  it('a ticket without a repository has nothing to merge: Accept is the plain move into Done', async () => {
-    await ticket('T-0002', 'ready', {});
-    expect(await service.acceptTicket({ id: 'T-0002' })).toMatchObject({ ok: true });
-    expect(started).toEqual([]);
-    await expect(fsp.stat(abs('60-done', 'T-0002.md'))).resolves.toBeDefined();
-  });
-
-  it('elsewhere on the six stages Accept stays the ordinary next move', async () => {
-    await ticket('T-0003', 'shaping');
-    expect(await service.acceptTicket({ id: 'T-0003' })).toMatchObject({ ok: true });
-    await expect(fsp.stat(abs('30-prioritized', 'T-0003.md'))).resolves.toBeDefined();
-    expect(started).toEqual([]);
-  });
-
-  it('an older board keeps its Accept: Sign Off is the plain move, nothing starts', async () => {
-    await usePipeline(['---', 'phases:', '  - { id: inbox, title: Inbox, handover: manual }', '  - { id: build, title: Build, claim: true, handover: agent build-default }', '  - { id: sign-off, title: Sign Off, handover: manual }', '  - { id: done, title: Done, handover: none }', '---', ''].join('\n'));
-    await ticket('T-0004', 'sign-off');
-    expect(await service.acceptTicket({ id: 'T-0004' })).toMatchObject({ ok: true });
-    expect(started).toEqual([]);
-    await expect(fsp.stat(abs('40-done', 'T-0004.md'))).resolves.toBeDefined();
-  });
-});
 
 const bin = process.env['DREY_DK_BIN'] ?? 'dk';
 

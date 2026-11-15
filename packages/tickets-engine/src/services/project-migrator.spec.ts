@@ -75,7 +75,7 @@ async function migrator(registered: unknown): Promise<{ migrator: ProjectMigrato
     // D-73: the hosted vault is one of the registered ones (else it is unloaded and the board has none).
     await config.set(VAULTS_KEY, [...(registered as unknown[]), { id: 'vhost', name: 'board', path: vaultDir(), active: false }]);
   }
-  const host = new FsEngineHost(vaultDir(), config, new ChangeHub(), () => undefined, home);
+  const host = new FsEngineHost(vaultDir(), config, new ChangeHub(), () => undefined);
   const board = {
     detect: async (): Promise<EngineVault | null> => (await host.listVaults())[0] ?? null,
     listPersonaIds: async () => (await fsp.readdir(path.join(vaultDir(), 'tickets', '_meta', 'personas')).catch(() => [])).sort(),

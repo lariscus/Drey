@@ -31,7 +31,6 @@ function serviceOf(seed: { seed(target: EngineVault): Promise<unknown> } | undef
     configSet: async () => undefined,
     emitBoardChanged: () => undefined,
     log: () => undefined,
-    userRoot: '/home',
   } as unknown as EngineHost;
   const git = new TicketsGit(() => 'git', async () => {
     throw new Error('no git in the spec');

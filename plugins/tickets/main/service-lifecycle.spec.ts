@@ -234,7 +234,8 @@ describe('ensureService: the first start reads the new settings (E14-7a)', () =>
     await service?.shutdown({ handover: false });
     service = null;
     engine = null;
-    await fsp.rm(root, { recursive: true, force: true });
+    // A store-backed engine leaves a handle on its store folder for a moment after the shutdown (the owner of it is not found yet).
+    await fsp.rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
   });
 
   /** A store checkout holding `count` inbox tickets (t-1, t-2, ...), in dk's file layout. */

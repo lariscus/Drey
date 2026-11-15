@@ -48,7 +48,7 @@ export interface BoardParts {
  */
 export function composeBoardParts(opts: EngineOptions, config: FileConfigStore, log: Log): BoardParts {
   const hub = new ChangeHub();
-  const host = new FsEngineHost(opts.vaultPath, config, hub, log, opts.home);
+  const host = new FsEngineHost(opts.vaultPath, config, hub, log);
   const git = new TicketsGit(() => 'git');
   const fleetRoot = path.join(opts.home, 'fleet');
   const fleet = new FleetClient({ root: fleetRoot, runner: opts.runner ?? ownRunner(fleetRoot, config, log), log, onFleetChanged: () => hub.emit('fleet') });

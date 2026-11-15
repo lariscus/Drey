@@ -28,7 +28,7 @@ const subjects = async (): Promise<string[]> => (await git(['log', '--format=%s'
 const filesOf = async (ref: string): Promise<string[]> => (await git(['show', '--name-only', '--format=', ref])).trim().split('\n');
 
 function records(): { records: PersonaRunRecords; git: TicketsGit } {
-  const host = new FsEngineHost(vault, new FileConfigStore(path.join(root, 'config.json')), new ChangeHub(), () => undefined, root);
+  const host = new FsEngineHost(vault, new FileConfigStore(path.join(root, 'config.json')), new ChangeHub(), () => undefined);
   const ticketsGit = new TicketsGit(() => 'git');
   const board = {
     detect: async (): Promise<EngineVault | null> => (await host.listVaults())[0] ?? null,

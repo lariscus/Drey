@@ -48,8 +48,6 @@ export interface EngineHost {
   /** The renderer's `board-changed` push — the host debounces and emits. */
   emitBoardChanged(): void;
   log(message: string, level?: 'info' | 'warn' | 'error'): void;
-  /** The machine-local root (run history, the legacy worktree base). */
-  readonly userRoot: string;
 
   /** A native folder picker; null when cancelled (Drey: the Electron dialog). */
   pickFolder(title: string): Promise<string | null>;

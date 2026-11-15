@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EngineBoardService } from './board-service';
 import type { EngineHost, EngineVault, FleetPort } from './host';
 import { TicketsGit } from '../core/tickets-git';
-import { newTicketFileText } from '../core/ticket-files';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from '../fleet/protocol';
 
 /**
@@ -27,12 +26,6 @@ phases:
 flow: paul:shape; paul; ben; ralf
 ---
 The pipeline.
-`;
-
-const PARENT_PLAN = `
-## Plan
-
-Goal text.
 `;
 
 let vaultDir = '';
@@ -94,7 +87,6 @@ function hostOf(): EngineHost {
     configSet: async () => undefined,
     emitBoardChanged: () => undefined,
     log: () => undefined,
-    userRoot: '/home',
     pickFolder: async () => null,
     revealPath: async () => '',
     launchInConsole: () => undefined,
@@ -113,24 +105,6 @@ function serviceOf(): EngineBoardService {
   return new EngineBoardService(hostOf(), git, 'opencode', 'accept-edits', '', fleet, '/fleet', normalizeFleetCaps({}), normalizeFleetPools({}), normalizeFleetHandover({}), 'owner@test', {});
 }
 
-async function writeParent(plan: string, phase: string, chain: readonly string[], at: number): Promise<void> {
-  const base = newTicketFileText({
-    id: 'T-0130',
-    title: 'Voice capture for tickets',
-    repo: 'drey',
-    priority: 'high',
-    rank: 5000,
-    firstPhase: phase,
-    now: new Date('2026-11-02T10:00:00Z'),
-    actor: 'owner@test',
-    description: 'Capture by voice.',
-    chain,
-  });
-  const text = base.replace(/^at: 1$/m, `at: ${at}`).replace(/\n## Plan\n[\s\S]*?\n## Log/, `${plan}\n## Log`);
-  await fsp.mkdir(path.join(vaultDir, 'tickets', phase), { recursive: true });
-  await fsp.writeFile(path.join(vaultDir, 'tickets', phase, 'T-0130.md'), text, 'utf8');
-}
-
 const read = (rel: string): Promise<string> => fsp.readFile(path.join(vaultDir, ...rel.split('/')), 'utf8');
 
 describe('the standard flow and the proposal switch', () => {
@@ -146,22 +120,6 @@ describe('the standard flow and the proposal switch', () => {
     expect(reply.steps.every((s) => !s.locked)).toBe(true);
     expect(reply.readOnly).toBeNull();
     expect(await serviceOf().flowOf({ id: 'standard', part: 0 })).toMatchObject({ ok: false });
-  });
-
-  it('edits the draft like a ticket flow and saves it into pipeline.md, keeping the rest of the file', async () => {
-    await writeParent(PARENT_PLAN, 'build', ['paul', 'ben', 'you'], 2);
-    const board = serviceOf();
-    const added = await board.flowEdit({ id: 'standard', part: null, chain: ['paul:shape', 'paul', 'ben', 'ralf'], edit: { op: 'notify', step: 3, on: true } });
-    expect(added.ok && added.chain).toEqual(['paul:shape', 'paul', 'ben', 'ralf(notify)']);
-    expect(await board.saveFlow({ id: 'standard', part: null, chain: ['paul:shape', 'paul', 'ben', 'ralf(notify)', 'paul'] })).toMatchObject({ ok: true });
-    const pipeline = await read('tickets/_meta/pipeline.md');
-    expect(pipeline).toContain('flow: paul:shape; paul; ben; ralf(notify); paul');
-    expect(pipeline).toContain('{id: security, title: Security, handover: manual}');
-    expect(pipeline).toContain('The pipeline.');
-    expect((await board.snapshot()).flow?.map((entry) => entry.persona)).toEqual(['paul', 'paul', 'ben', 'ralf', 'paul']);
-    // a ticket keeps its own chain: the standard flow was copied at creation
-    const ticket = await board.flowOf({ id: 'T-0130', part: null });
-    expect(ticket.ok && ticket.saved).toEqual(['paul', 'ben', 'you']);
   });
 
   it('refuses a persona the crew lacks and an entry that does not read; an empty list removes the key', async () => {

@@ -72,7 +72,6 @@ function hostOver(vaultDir: string, vault: EngineVault, config: Record<string, s
     configSet: async () => undefined,
     emitBoardChanged: () => undefined,
     log: () => undefined,
-    userRoot: path.join(vaultDir, 'userroot'),
     pickFolder: async () => null,
     revealPath: async () => '',
     launchInConsole: () => undefined,

@@ -110,7 +110,6 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
       configSet: async () => undefined,
       emitBoardChanged: () => undefined,
       log: () => undefined,
-      userRoot: path.join(root, 'userroot'),
       pickFolder: async () => null,
       revealPath: async () => '',
       launchInConsole: () => undefined,
