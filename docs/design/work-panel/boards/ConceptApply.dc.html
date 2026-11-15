@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Apply: changes since the last apply</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{cursor:default;font:inherit}
+.vt{height:26px;padding:0 12px;display:flex;align-items:center;background:transparent;border:0;border-radius:4px;color:#b3b7bc;font-size:14px}
+.vt[aria-selected="true"]{background:#2c2d31;color:#f4f5f6;font-weight:600}
+.btn{height:28px;padding:0 12px;border:1px solid #747980;border-radius:8px;background:transparent;color:#f4f5f6;font-size:13px}
+.pri{background:#8ecbef;border-color:#8ecbef;color:#101113;font-weight:600}
+.sr{display:flex;align-items:center;gap:8px;height:28px;padding:0 12px;font-size:13px}
+.bd{width:16px;height:16px;border-radius:3px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.bm{color:#e0bb6e;border:1px solid #5c4b27}
+.ba{color:#93c47f;border:1px solid #3f5a35}
+.dh{font-weight:600;font-size:14px;padding:10px 16px 6px;border-top:1px solid #3b3d42;display:flex;align-items:center;gap:8px}
+.ln{display:grid;grid-template-columns:40px minmax(0,1fr);font-family:ui-monospace,Consolas,monospace;font-size:13px;line-height:21px}
+.ln span:first-child{color:#747980;text-align:right;padding-right:10px;user-select:none}
+.del{background:#3a2423}
+.add{background:#1f3320}
+.ctx{color:#b3b7bc}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; flex-direction: column; background: #18191b; color: #f4f5f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif; font-size: 13px; line-height: 18px; overflow: hidden">
+<header style="height: 40px; flex-shrink: 0; display: flex; align-items: center; gap: 4px; padding: 0 8px; background: #222326; border-bottom: 1px solid #3b3d42">
+<span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 4px; background: #8ecbef; color: #101113; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 8px">D</span>
+<span style="font-size: 14px; padding: 0 8px">File</span><span style="font-size: 14px; padding: 0 8px">Edit</span><span style="font-size: 14px; padding: 0 8px">View</span><span style="font-size: 14px; padding: 0 8px">Help</span>
+<div role="tablist" aria-label="Views" style="display: flex; gap: 2px; margin-left: 24px; padding: 2px; border: 1px solid #3b3d42; border-radius: 6px"><button type="button" class="vt" role="tab" aria-selected="true">Notes</button><button type="button" class="vt" role="tab" aria-selected="false">Work</button><button type="button" class="vt" role="tab" aria-selected="false">Crew</button></div>
+<span style="margin-left: 12px; height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid #3b3d42; border-radius: 6px"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #8ecbef"></span>Drey</span>
+</header>
+<div style="flex: 1; display: flex; min-height: 0">
+<aside style="width: 300px; flex-shrink: 0; background: #222326; border-right: 1px solid #3b3d42; padding-top: 8px">
+<div style="height: 28px; display: flex; align-items: center; padding: 0 12px; font-weight: 600">Changes since 14 Nov</div>
+<div class="sr"><span class="bd bm">M</span>Architecture</div>
+<div class="sr"><span class="bd bm">M</span>Event kinds</div>
+<div class="sr"><span class="bd ba">A</span>Clients subscribe through the engine</div>
+<div class="sr"><span class="bd ba">A</span>Reconnect and replay</div>
+<div style="height: 28px; display: flex; align-items: center; padding: 16px 12px 0; font-weight: 600; color: #b3b7bc">Unchanged</div>
+<div class="sr" style="color: #b3b7bc">Goal</div>
+<div class="sr" style="color: #b3b7bc">Out of scope</div>
+</aside>
+<main style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<div style="height: 36px; display: flex; align-items: center; border-bottom: 1px solid #3b3d42; background: #222326"><span style="height: 36px; display: flex; align-items: center; padding: 0 14px; border-right: 1px solid #3b3d42">runner-event-stream.md</span><span style="height: 36px; display: flex; align-items: center; padding: 0 14px; border-right: 1px solid #3b3d42; background: #18191b">Apply · runner-event-stream.md</span></div>
+<div style="height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid #3b3d42; color: #b3b7bc">
+<span>Last applied 14 Nov</span><span aria-hidden="true">→</span><span>Now</span>
+</div>
+<div style="flex: 1; overflow: hidden">
+<div class="dh" style="border-top: 0"><span class="bd bm">M</span>Architecture</div>
+<div class="ln ctx"><span>8</span><span>flowchart LR</span></div>
+<div class="ln del"><span>9</span><span>-   Runner -- SSE --> Clients</span></div>
+<div class="ln add"><span>9</span><span>+   Runner -- SSE --> Engine</span></div>
+<div class="ln add"><span>10</span><span>+   Engine -- /api/events --> Drey &amp; MC[Mission Control] &amp; Phone[Phone client]</span></div>
+<div class="dh"><span class="bd bm">M</span>Event kinds</div>
+<div class="ln ctx"><span>14</span><span>## Event kinds</span></div>
+<div class="ln del"><span>15</span><span>- started, tool call, silent for N minutes, gate red, done.</span></div>
+<div class="ln add"><span>15</span><span>+ started, tool call, silent for N minutes, gate red, done, and **quota**:</span></div>
+<div class="ln add"><span>16</span><span>+ a slot's remaining share and reset time after every turn.</span></div>
+<div class="dh"><span class="bd ba">A</span>Clients subscribe through the engine</div>
+<div class="ln add"><span>18</span><span>+ ## Clients subscribe through the engine</span></div>
+<div class="ln add"><span>19</span><span>+ Drey, Mission Control and the phone never open the runner's stream.</span></div>
+<div class="ln add"><span>20</span><span>+ The engine subscribes once and relays the events on its own /api/events.</span></div>
+<div class="dh"><span class="bd ba">A</span>Reconnect and replay</div>
+<div class="ln add"><span>22</span><span>+ ## Reconnect and replay</span></div>
+<div class="ln add"><span>23</span><span>+ Every event carries a sequence number; a client that reconnects asks</span></div>
+<div class="ln add"><span>24</span><span>+ for the events after the last one it saw.</span></div>
+</div>
+<div style="height: 56px; flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-top: 1px solid #3b3d42; background: #222326">
+<span style="font-weight: 600">4 sections to apply</span>
+<span style="color: #b3b7bc">2 unchanged sections go along as context</span>
+<button type="button" class="btn" style="margin-left: auto">Cancel</button>
+<button type="button" class="btn pri">Decompose</button>
+</div>
+</main>
+<aside style="width: 380px; flex-shrink: 0; background: #222326; border-left: 1px solid #3b3d42; display: flex; flex-direction: column">
+<div style="height: 36px; display: flex; align-items: center; padding: 0 12px; font-weight: 600">Assistant</div>
+<div style="flex: 1; padding: 8px 16px; display: flex; flex-direction: column; gap: 14px; font-size: 14px; line-height: 21px">
+<div style="align-self: flex-end; max-width: 300px; background: #2c2d31; border-radius: 8px; padding: 10px 12px">Yes, replay. That's it, apply it.</div>
+<div>Four sections changed since the last apply on 14 Nov. Decompose hands only these to Paul for the cut into stages.</div>
+</div>
+<div style="margin: 12px; border: 1px solid #747980; border-radius: 12px; padding: 10px 12px">
+<span style="display: inline-flex; align-items: center; height: 24px; padding: 0 8px; background: #2c2d31; border-radius: 4px; font-size: 13px">runner-event-stream.md</span>
+<input type="text" aria-label="Message" style="display: block; width: 100%; box-sizing: border-box; margin-top: 8px; height: 28px; background: transparent; border: 0; color: #f4f5f6; font-size: 14px">
+</div>
+</aside>
+</div>
+<footer style="height: 28px; flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: 0 12px; background: #222326; border-top: 1px solid #3b3d42; color: #b3b7bc"><span style="margin-left: auto">Autopilot · On</span><span>Settings</span></footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
