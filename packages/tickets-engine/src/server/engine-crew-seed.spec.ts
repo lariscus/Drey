@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { seededCrewOf } from '../core/persona/crew-seed-marker';
 import { parsePersonaFile } from '../core/persona/persona';
+import { readStoreRef, withStoreRef } from '../core/pipeline/pipeline-store';
 import { isLifecycleStore, parseStoreStages } from '../store/store-stages';
 import { defaultStorePathOf } from '../store/fresh-store';
 import { createEngine, type Engine } from './engine';
@@ -58,7 +59,7 @@ describe('the engine seeds the default crew at its start (req-256)', { timeout: 
     }
     expect(parsePersonaFile('pia', (await read(`${PERSONAS}/pia/persona.md`))!)).toMatchObject({ kind: 'mission', title: 'Pia' });
     expect(seededCrewOf(await read('tickets/_meta/crew.md'))).toEqual(['pia', 'paul', 'ben', 'ralf', 'tessa']);
-    expect((await git(['log', '--format=%s'])).trim().split('\n')).toEqual(['projects: the first project "vault" from repos.md and the registered vaults (req-282)', 'personas: the default crew (req-256)', 'seed']);
+    expect((await git(['log', '--format=%s'])).trim().split('\n')).toEqual(['projects: the first project "vault" from repos.md and the registered vaults (req-282)', 'personas: the default crew (req-256)', 'tickets: the store reference moves into the pipeline', 'seed']);
     expect((await git(['status', '--porcelain', '--', 'tickets/_meta'])).trim()).toBe('');
     const ids = ((await engine.invoke('personas')) as readonly { id: string }[]).map((p) => p.id);
     expect(ids).toEqual(expect.arrayContaining(['pia', 'paul', 'ben', 'ralf', 'tessa']));
@@ -71,10 +72,10 @@ describe('the engine seeds the default crew at its start (req-256)', { timeout: 
     await git(['commit', '-m', 'owner removes ralf']);
     await start();
     expect(await read(`${PERSONAS}/ralf/persona.md`)).toBeNull();
-    expect((await git(['log', '--format=%s'])).trim().split('\n')).toEqual(['owner removes ralf', 'projects: the first project "vault" from repos.md and the registered vaults (req-282)', 'personas: the default crew (req-256)', 'seed']);
+    expect((await git(['log', '--format=%s'])).trim().split('\n')).toEqual(['owner removes ralf', 'projects: the first project "vault" from repos.md and the registered vaults (req-282)', 'personas: the default crew (req-256)', 'tickets: the store reference moves into the pipeline', 'seed']);
   });
 
-  it('leaves the owner\'s own personas and pipeline as they are — but moves a v2 record onto class and model once (req-288)', async () => {
+  it('leaves the owner\'s own personas as they are — moves a v2 record onto class and model (req-288) and anchors its store (req-315)', async () => {
     await fsp.mkdir(path.join(vault, PERSONAS, 'mina'), { recursive: true });
     const own = "---\ntitle: Mina\nrole: builder\nworker: kimi\nmodels:\n  default: owner-model\n  pool: [owner-model]\ncolor: '#123456'\nskills: []\n---\n";
     await fsp.writeFile(path.join(vault, PERSONAS, 'mina/persona.md'), own, 'utf8');
@@ -86,7 +87,8 @@ describe('the engine seeds the default crew at its start (req-256)', { timeout: 
     expect(parsePersonaFile('mina', migrated)).toMatchObject({ title: 'Mina', class: 'heavy', model: 'kimi/owner-model', color: '#123456' });
     expect(migrated).not.toMatch(/^(worker|models):/m);
     expect((await git(['log', '--format=%s'])).trim().split('\n')).toContain('personas: class and model replace worker and models (req-288)');
-    expect(await read('tickets/_meta/pipeline.md')).toBe(PIPELINE);
+    // req-315: the owner's pipeline keeps its shape — only the store reference is anchored.
+    expect(await read('tickets/_meta/pipeline.md')).toBe(withStoreRef(PIPELINE, defaultStorePathOf(vault)));
   });
 });
 
@@ -122,16 +124,18 @@ describe.skipIf(!dkFound())('the engine creates the fresh-install store at its s
     await fsp.rm(root, { recursive: true, force: true, maxRetries: 20 }).catch(() => undefined);
   });
 
-  it('a board without a configured store gets one beside the vault — the lifecycle stages, the config names it, the next start adopts it', async () => {
+  it('a board without a configured store gets one beside the vault — the lifecycle stages, the pipeline names it, the next start adopts it', async () => {
     const dir = defaultStorePathOf(vault);
     const engine = await start();
     // The toml lives on the store's main branch; the working copy is the tickets branch.
     const toml = await run('git', ['show', 'main:dricket.toml'], { cwd: dir });
     expect(isLifecycleStore(parseStoreStages(toml.stdout))).toBe(true);
-    expect(await engine.invoke('configGet', { key: 'dk.store' })).toBe(dir);
+    // req-315: the store reference is the project's, anchored in its pipeline.
+    expect(readStoreRef(await fsp.readFile(path.join(vault, 'tickets/_meta/pipeline.md'), 'utf8'))).toBe(dir);
+    expect(await engine.invoke('configGet', { key: 'dk.store' })).toBeUndefined();
     await engine.close();
     const engine2 = await start();
-    expect(await engine2.invoke('configGet', { key: 'dk.store' })).toBe(dir);
+    expect(readStoreRef(await fsp.readFile(path.join(vault, 'tickets/_meta/pipeline.md'), 'utf8'))).toBe(dir);
     // The store's own history carries the stages swap; the vault's does not.
     const storeLog = await run('git', ['log', '--format=%s', 'main'], { cwd: dir });
     expect(storeLog.stdout.trim().split('\n')[0]).toBe('the lifecycle stages');

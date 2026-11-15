@@ -47,7 +47,7 @@ Open work only. Everything implemented lives in
 lives in [`decisions.md`](decisions.md). When an item ships, move it to the
 changelog and delete it here — no shipped history on this page.
 
-**Status (2026-11-15):** version 0.8.1, milestones 1-285 built (1-21 in `docs/milestones-done.md`; 109-111 recorded by the convergence audit backfill), plus the requirements the changelog records without a milestone number (req-95a, req-95b, req-96, req-97, req-98, req-99a, req-99b, req-101, req-102, req-104, req-110, req-126 among them). Milestones 1–83 are
+**Status (2026-11-15):** version 0.8.1, milestones 1-286 built (1-21 in `docs/milestones-done.md`; 109-111 recorded by the convergence audit backfill), plus the requirements the changelog records without a milestone number (req-95a, req-95b, req-96, req-97, req-98, req-99a, req-99b, req-101, req-102, req-104, req-110, req-126 among them). Milestones 1–83 are
 owner-verified (the round for 1–81 closed 2026-10-17; 82, the auto-update, and 83, the tickets foundation, on real use). From milestone 84 on, the changelog marks each entry that still awaits the owner's round — nearly all of them; that round is finish line step 6 below. Milestone and requirement ids are assigned when work starts; the next free ones follow from the top of `changelog.md`. Of the architectural cleanup, A1–A6 and A10–A12 shipped; A7–A9 remain.
 
 ### Finish line (owner, 2026-11-12)

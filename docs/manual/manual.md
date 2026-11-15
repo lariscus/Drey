@@ -875,6 +875,9 @@ repository, an existing repository is taken as it is. Drey registers
 the folder as a vault, starts the background service for it and
 initializes the board in it: the configuration files under
 `tickets/_meta/` (below) and the ticket store beside the repository.
+The store belongs to the project: its reference lives in the project's
+`tickets/_meta/pipeline.md` (`store:`), and switching projects
+(req-72, the project menu) switches the store with it.
 The alternative is the Work panel's empty state: create an empty git
 repository for your tickets (it can live
 on GitHub, Azure DevOps or anywhere plain git works - the board never

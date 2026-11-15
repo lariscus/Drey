@@ -404,6 +404,20 @@ readable error instead of being written).
 On a dricket store the vocabulary is the store's: `[priorities]` of `dricket.toml` on its `main` branch, dk's
 starting set `critical | high | normal | low` without that table. `pipeline.md`'s list then does not apply (D-11).
 
+### The project's store (`store:` in pipeline.md, req-315)
+
+`_meta/pipeline.md`'s top-level `store:` names **this project's ticket
+store** — a local folder or a remote (`remote#branch`). The default is
+beside the repository (`<vault>-tickets-store`, E14-9b item 6): a fresh
+initialize creates its own there and anchors it in the pipeline; a fresh
+project never adopts another project's store. The machine-wide
+`dk.store` setting is the **override for projects that name none** — its
+first board read moves it into that project's pipeline (one commit, the
+req-173 migration pattern) and stays untouched for the others.
+Switching projects (req-72) switches the store with them. The
+`dk.checkout` working copy and `dk.dataDir`/`dk.syncSeconds` ride the
+same settings; `dk.path` (the `dk` binary) stays machine-wide.
+
 ### Body sections
 
 Free Markdown; the section headings below are convention that Drey and

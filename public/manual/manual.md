@@ -875,6 +875,9 @@ repository, an existing repository is taken as it is. Drey registers
 the folder as a vault, starts the background service for it and
 initializes the board in it: the configuration files under
 `tickets/_meta/` (below) and the ticket store beside the repository.
+The store belongs to the project: its reference lives in the project's
+`tickets/_meta/pipeline.md` (`store:`), and switching projects
+(req-72, the project menu) switches the store with it.
 The alternative is the Work panel's empty state: create an empty git
 repository for your tickets (it can live
 on GitHub, Azure DevOps or anywhere plain git works - the board never
@@ -3128,8 +3131,8 @@ history store is deliberately outside it).
 
 ---
 
-*Manual for Drey 0.8.1; manual content last changed
-2026-11-15. Screenshots were captured automatically from
+*Manual for Drey {{MANUAL_VERSION}}; manual content last changed
+{{MANUAL_GENERATED}}. Screenshots were captured automatically from
 the built app (Anthrazit theme, 1600Ã—1000) by
 `e2e/manual-screenshots.spec.ts` — run
 `$env:DREY_MANUAL_SHOTS='1'; npm run e2e:run -- manual-screenshots`

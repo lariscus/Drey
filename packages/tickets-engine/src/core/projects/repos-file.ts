@@ -135,7 +135,7 @@ export function reposProse(text: string | null): string {
   return hadFence && body.trim() !== '' ? body : DEFAULT_REPOS_PROSE;
 }
 
-const DEFAULT_REPOS_PROSE = `Work repositories a ticket's \`repos:\` field may name. The fleet never
+export const DEFAULT_REPOS_PROSE = `Work repositories a ticket's \`repos:\` field may name. The fleet never
 calls a host API — only plain git (ADR-0075); protection on \`main\` is
 the host's branch-policy feature, recorded here when configured.
 \`path\` is the local checkout the board's "Open work folder in

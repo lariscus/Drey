@@ -284,6 +284,7 @@ Top-level rules, once, up front:
   - Frontmatter fields
   - Dependencies (`blocked-by`)
   - Priorities (`priorities:` in pipeline.md)
+  - The project's store (`store:` in pipeline.md, req-315)
   - Body sections
   - The scout form (E8, concept §5.6)
   - The chain (req-266; was the chain delta of E9)

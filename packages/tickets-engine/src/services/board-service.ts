@@ -24,6 +24,8 @@ import { newTicketFileText, parseTicketFile, patchTicketFile, patchBlockedBy, pa
 import { withPlanSection } from '../core/chapters/plan-section';
 import { parsePlanChain } from '../core/ticket/plan-chain';
 import { applyFlowOp, type FlowOp } from '../core/pipeline/flow-edit';
+import { readStoreRef, withStoreRef } from '../core/pipeline/pipeline-store';
+import { DEFAULT_REPOS_PROSE } from '../core/projects/repos-file';
 import { STANDARD_FLOW_ID, type FlowReply, type FlowSaveReply, type FlowStepView, type FlowTarget, type FlowScope } from '../contracts/flow';
 import { patchPipelineFlow } from '../core/pipeline/pipeline-flow-patch';
 import { allowedAfter, type PersonaAllowedPatch } from '../contracts/persona-allowed';
@@ -49,7 +51,7 @@ import { mergeWorktreeChanges, diffOfOutput, isSafeRepoPath, MAX_FILE_VIEW_BYTES
 import { planWorktreeRemoval } from '../core/git/worktree-removal';
 import { TicketsGit, type RepoLocation } from '../core/git/tickets-git';
 import { TicketStoreError } from '../ports/ticket-store';
-import { checkoutOf, createDricketStore, groupByStage, readStoreSettings, UNCONFIGURED_STORE, type StoreListing, type StoreSettings } from '../store/store-settings';
+import { checkoutOf, createDricketStore, groupByStage, isRemoteStore, readStoreSettings, UNCONFIGURED_STORE, type StoreListing, type StoreSettings } from '../store/store-settings';
 import { archivedRecordFiles, assembleBoardFromRecords, recordToBoardFile } from '../store/store-board';
 import { loadDialogPrompt } from './crew-prompts';
 import { columnAfter } from '../core/pipeline/board-columns';
@@ -115,13 +117,7 @@ export const NOT_LIFECYCLE_STORE = 'the store is not on the lifecycle stages —
 const DEFAULT_REPOS = `---
 repos: {}
 ---
-Work repositories a ticket's \`repo:\`/\`repos:\` fields may name. Example:
-
-  lariscus:
-    url: https://dev.azure.com/org/project/_git/lariscus
-    branch: main
-    policy: Azure DevOps branch policies protect main
-`;
+${DEFAULT_REPOS_PROSE}`;
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -463,7 +459,7 @@ export class EngineBoardService {
       ticketUsage: settledUsageByTicket(parseLedger(ledgerText ?? '')),
     };
     // The TICKETS come from the store; the pipeline, repos and ledger stay in this vault.
-    const store = await this.refreshStore();
+    const store = await this.refreshStore(vault);
     const snapshot = await this.storeSnapshot(store, vault, common, { mdFiles });
     // The chain follows the board: a persona board points the runner at this vault (M85,
     // req-257). Cheap and idempotent — the runner re-reads the vault on every dispatch pass anyway.
@@ -571,7 +567,7 @@ export class EngineBoardService {
    * runner one `dk` call per ticket; that is refused.
    */
   async chainRefusal(): Promise<string | null> {
-    const store = await this.refreshStore();
+    const store = await this.refreshStore((await this.detect()) ?? undefined);
     if (store.dkStore === '') {
       return 'The chain needs the dricket store (tickets.dk.store)';
     }
@@ -586,7 +582,7 @@ export class EngineBoardService {
    * claim of this host that no live run holds - back to where the ticket sat, else one stage back.
    */
   async releaseLeftoverClaims(): Promise<{ readonly ok: true; readonly released: readonly string[]; readonly skipped: readonly { readonly id: string; readonly reason: string }[] } | { readonly ok: false; readonly error: string }> {
-    const store = await this.refreshStore();
+    const store = await this.refreshStore((await this.detect()) ?? undefined);
     try {
       if (this.fleet.releaseLeftoverClaims === undefined) {
         return { ok: false, error: 'this fleet port cannot release claims' };
@@ -705,7 +701,7 @@ export class EngineBoardService {
       if (vault === null) {
         return { ok: true, tickets: [] };
       }
-      const store = await this.refreshStore();
+      const store = await this.refreshStore(vault);
       const files = archivedRecordFiles(await this.storeBoard.records(store));
       return { ok: true, tickets: archivedEntriesOf(files, { query: input.query, limit: input.limit }) };
     } catch (error) {
@@ -752,7 +748,7 @@ export class EngineBoardService {
 
   /** The ticket's comments read from the store's `comments/` files, oldest first (E14-6). */
   async ticketComments(id: string): Promise<readonly TicketCommentView[]> {
-    return this.commentsOf(await this.refreshStore(), id);
+    return this.commentsOf(await this.refreshStore((await this.detect()) ?? undefined), id);
   }
 
   /** A comment-read failure is an empty thread, never a failed ticket view. */
@@ -1834,7 +1830,7 @@ export class EngineBoardService {
    * the store does not have.
    */
   async ticketDocument(input: { id: string }): Promise<TicketDocumentLocation | null> {
-    const store = await this.refreshStore();
+    const store = await this.refreshStore((await this.detect()) ?? undefined);
     const checkout = checkoutOf(store);
     const relPath = documentRelPath(input.id);
     if (checkout === null || relPath === null) {
@@ -1858,7 +1854,7 @@ export class EngineBoardService {
    */
   saveDocument(input: { path: string; text: string; force?: boolean }): Promise<DocumentSaveReply> {
     return this.enqueue(async () => {
-      const store = await this.refreshStore();
+      const store = await this.refreshStore((await this.detect()) ?? undefined);
       const id = idOfDocumentPath(input.path);
       if (id === null) {
         return { ok: false, error: `${input.path} is not a ticket document.` };
@@ -1910,10 +1906,49 @@ export class EngineBoardService {
     }
   }
 
-  /** Re-reads the store settings from the config (the settings may have changed since the last snapshot). */
-  private async refreshStore(): Promise<StoreSettings> {
-    this.store = await readStoreSettings(this.host.configGet.bind(this.host));
+  /**
+   * Re-reads the store settings from the config (the settings may have
+   * changed since the last snapshot). With a vault, the store belongs to
+   * the project (req-315): its pipeline.md names it (`store:`), the
+   * default stays beside the repository, and the machine-wide `dk.store`
+   * setting is the override for projects that name none — the first read
+   * moves it into the pipeline, where it belongs to this project alone.
+   */
+  private async refreshStore(vault?: EngineVault | null): Promise<StoreSettings> {
+    const settings = await readStoreSettings(this.host.configGet.bind(this.host));
+    if (vault === undefined || vault === null) {
+      this.store = settings;
+      return settings;
+    }
+    const ref = readStoreRef(await this.readOptional(vault.id, PIPELINE_PATH));
+    if (ref !== null) {
+      this.store = { ...settings, dkStore: ref };
+      return this.store;
+    }
+    if (settings.dkStore !== '') {
+      await this.writeStoreRef(vault, settings.dkStore).catch((error: unknown) =>
+        this.host.log(`the store reference migration failed: ${messageOf(error)}`, 'warn'),
+      );
+      this.store = settings;
+      return this.store;
+    }
+    this.store = { ...settings, dkStore: defaultStorePathOf(vault.path) };
     return this.store;
+  }
+
+  /** Anchors `store` in the project's pipeline (req-315, once — a second call is a no-op). */
+  private async writeStoreRef(vault: EngineVault, store: string): Promise<void> {
+    const pipelineText = await this.readOptional(vault.id, PIPELINE_PATH);
+    if (pipelineText === null || readStoreRef(pipelineText) !== null) {
+      return;
+    }
+    try {
+      await this.host.write(vault.id, PIPELINE_PATH, withStoreRef(pipelineText, store));
+      await this.commit(vault, [PIPELINE_PATH], 'tickets: the store reference moves into the pipeline');
+      this.host.announceChanges(vault.id, [PIPELINE_PATH]);
+    } catch (error) {
+      this.host.log(`anchoring the store reference failed: ${messageOf(error)}`, 'warn');
+    }
   }
 
   /**
@@ -2357,7 +2392,7 @@ export class EngineBoardService {
    */
   async missionEntries(): Promise<readonly MissionEntry[]> {
     const vault = await this.detect();
-    const store = vault === null ? null : await this.refreshStore();
+    const store = vault === null ? null : await this.refreshStore(vault);
     if (vault === null || store === null || store.dkStore === '') {
       return []; // no store: no snapshot on every board and fleet change
     }
@@ -2693,7 +2728,7 @@ export class EngineBoardService {
    */
   answerNeed(input: { id: string; key?: string; text?: string; actor?: string }): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
-      await this.refreshStore();
+      await this.refreshStore((await this.detect()) ?? undefined);
       const found = await this.findCard(input.id);
       if (found === null) {
         return { ok: false, error: `${input.id} is not on the board` };
@@ -2831,7 +2866,7 @@ export class EngineBoardService {
 
   setClaim(input: { id: string; mode: 'takeover' | 'release'; actor?: string }): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
-      return this.setClaimInStore(await this.refreshStore(), input);
+      return this.setClaimInStore(await this.refreshStore((await this.detect()) ?? undefined), input);
     });
   }
 
@@ -2871,7 +2906,7 @@ export class EngineBoardService {
     commitStep: boolean,
   ): Promise<{ ok: boolean; error?: string; runId?: string }> {
     this.host.log(`run start: ${input.ticketId} asked by ${input.origin}`);
-    const store = await this.refreshStore();
+    const store = await this.refreshStore((await this.detect()) ?? undefined);
     if (store.dkStore === '') {
       return { ok: false, error: 'no dricket store configured (tickets.dk.store)' };
     }
@@ -4100,8 +4135,9 @@ export class EngineBoardService {
   /**
    * E14-9b item 6: with no store configured, one is created beside the meta
    * vault — the engine's start calls this for an existing board, "Initialize
-   * board" for a fresh one. Idempotent: a configured store, and a leftover
-   * store of a half first start, are adopted; a foreign directory is named.
+   * board" for a fresh one. Idempotent: the project's own reference (its
+   * pipeline's `store:`), the machine-wide override, and a leftover store of
+   * a half first start are adopted; a foreign directory is named.
    */
   async ensureFreshStore(): Promise<{ ok: true; store: string } | { ok: false; error: string }> {
     const vault = await this.detect();
@@ -4117,20 +4153,35 @@ export class EngineBoardService {
     }
   }
 
-  /** Creates the store beside `vault` and writes `dk.store`, unless one is configured already. */
+  /**
+   * Creates the store beside `vault` and anchors it in the project's
+   * pipeline (`store:`, req-315). Whatever the resolved reference names is
+   * adopted when it exists (the project's own store, a leftover of a half
+   * first start); a remote reference is the project's own from the start;
+   * a missing local store is created here — never a foreign one.
+   */
+  /**
+   * Creates the store beside `vault` and anchors it in the project's
+   * pipeline (`store:`, req-315). Whatever the resolved reference names is
+   * adopted when it exists (the project's own store, a leftover of a half
+   * first start); a remote reference is the project's own from the start;
+   * a missing local store is created here — never a foreign one.
+   */
   private async createStoreBeside(vault: EngineVault): Promise<string> {
-    const settings = await this.refreshStore();
-    if (settings.dkStore !== '') {
-      return settings.dkStore;
+    const settings = await this.refreshStore(vault);
+    const dir = settings.dkStore;
+    if (dir === '' || isRemoteStore(dir)) {
+      return dir;
     }
-    const dir = defaultStorePathOf(vault.path);
     const existing = await fsp.readFile(path.join(dir, 'dricket.toml'), 'utf8').catch(() => null);
-    if (existing === null) {
-      await initLifecycleStore(dir, { dkPath: settings.dkPath, git: (cwd, args) => this.git.run(cwd, args) });
-    } else if (!isLifecycleStore(parseStoreStages(existing))) {
-      throw new Error(`${dir} exists and is not a store on the lifecycle stages — set "dk.store" in the settings`);
+    if (existing !== null) {
+      if (!isLifecycleStore(parseStoreStages(existing))) {
+        throw new Error(`${dir} exists and is not a store on the lifecycle stages — set "store:" in the pipeline`);
+      }
+      return dir;
     }
-    await this.host.configSet('dk.store', dir);
+    await initLifecycleStore(dir, { dkPath: settings.dkPath, git: (cwd, args) => this.git.run(cwd, args) });
+    await this.writeStoreRef(vault, dir);
     return dir;
   }
 
@@ -4149,7 +4200,9 @@ export class EngineBoardService {
       }
       const humanPersonaPath = `${PERSONAS_DIR}/${HUMAN_PERSONA_ID}/persona.md`;
       try {
-        await this.host.write(target.id, PIPELINE_PATH, DEFAULT_PIPELINE_TEXT);
+        // req-315: the fresh pipeline anchors the project's own store beside
+        // the repository — the machine-wide `dk.store` never leaks in here.
+        await this.host.write(target.id, PIPELINE_PATH, withStoreRef(DEFAULT_PIPELINE_TEXT, defaultStorePathOf(target.path)));
         await this.host.write(target.id, REPOS_PATH, DEFAULT_REPOS);
         await this.host.write(target.id, humanPersonaPath, personaFileText(humanPersona(await this.humanNameOfConfig())));
       } catch (error) {

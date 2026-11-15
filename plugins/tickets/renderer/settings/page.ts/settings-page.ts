@@ -212,7 +212,7 @@ function storeSection(api: DreyPluginApi): HTMLElement {
   sync.placeholder = '30';
   const rows = el('div', 'tset-kv');
   rows.append(
-    ...kv('tset-dk-store', 'Store', textConfig(api, 'dk.store'), 'Folder of the dricket store, or remote#branch. Empty: none — the setup creates one beside the repository.'),
+    ...kv('tset-dk-store', 'Store', textConfig(api, 'dk.store'), 'Override: remote#branch or a folder, for projects whose pipeline.md names no store. A fresh project anchors its own beside the repository.'),
     ...kv('tset-dk-checkout', 'Checkout', textConfig(api, 'dk.checkout'), 'Working copy of the store\'s ticket branch. Empty: the store folder itself. Not in OneDrive.'),
     ...kv('tset-dk-sync', 'Sync interval — seconds', sync, '0 turns it off. Remote stores only.'),
   );

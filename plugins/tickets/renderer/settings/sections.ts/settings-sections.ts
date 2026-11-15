@@ -47,7 +47,7 @@ export const TICKETS_ENTRIES: readonly PluginSettingsEntry[] = [
   e('devices', 'remote', 'Serve the phone and iPad app', 'Serve the phone and iPad app, port, Tailscale'),
   e('devices', 'pairing', 'Pair a device', 'Pairing code and QR, revoke devices'),
   e('store', 'repository', 'Tickets repository', 'Path of the tickets folder'),
-  e('store', 'dk.store', 'Ticket store', 'Folder of the dricket store, or remote#branch'),
+  e('store', 'dk.store', 'Store override', 'Remote#branch or folder, for projects that name none in their pipeline'),
   e('store', 'dk.path', 'dk executable', 'Only needed when dk is not on PATH'),
   e('store', 'dk.checkout', 'Ticket store checkout', 'Working copy of the ticket branch'),
   e('store', 'dk.syncSeconds', 'Sync interval', 'Seconds, remote stores only'),

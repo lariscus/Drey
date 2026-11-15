@@ -6748,7 +6748,7 @@ sequenceDiagram
     Note over E: the detector's probe finds no board —<br/>the named vault is hosted anyway (the fresh path)
     E-->>P: endpoints (the client binds, wireEngine runs)
     P->>B: initialize(vaultId)
-    B->>B: pipeline.md, repos.md, the human persona — one commit;<br/>the store beside the vault (dk init, dk.store written)
+    B->>B: pipeline.md (with `store:` anchored, req-315), repos.md,<br/>the human persona — one commit; the store beside the vault<br/>(dk init, the reference anchored in the pipeline)
     B-->>S: board-changed → the settings page reloads
     Note over S: the setup block hides, the full page appears
 ```
