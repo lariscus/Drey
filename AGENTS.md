@@ -12,6 +12,13 @@ hand) is the entry point into `specs/`: the fixed principles, the finish
 line and an index of every section and every excluded idea. Read it before
 a first proposal, then open spec sections by heading — not the whole files.
 
+**Area detail: on demand.** `CLAUDE.md` holds the rules for every change
+and a one-line-per-block ownership map. The detail of an area is in
+`docs/agents/` — `architecture.md`, `ui.md`, `tickets.md`,
+`ownership-map.md`, `toolchain.md` — and is read before the first change
+in that area (the table in `CLAUDE.md` § "Read on demand"), by every tool:
+only Claude Code is pointed there automatically.
+
 **Platform conventions — tell the owner** (owner, 2026-11-11). When a request
 goes against a general convention of the platform or of common UI practice —
 Windows' own patterns (a status badge sits bottom-right on taskbar and tray

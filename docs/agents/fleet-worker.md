@@ -109,8 +109,12 @@ A spec sits beside the file it tests. The dependency rules between
 - Specs overview: `specs/digest.md` (generated) lists the principles, the
   finish line and every section and excluded idea of `specs/` — read it
   once, then open only the spec section a step needs.
-- "Which file owns X": `CLAUDE.md` § "Ownership Map", then `docs/05`
-  § "Feature → files index".
+- "Which file owns X": `CLAUDE.md` § "Ownership Map", then
+  `docs/agents/ownership-map.md` (`tickets.md` for the tickets side) and
+  `docs/05` § "Feature → files index".
+- The rules of an area, before changing it: `docs/agents/architecture.md`
+  (main process, LLM, tools, plugins) and `docs/agents/ui.md` (anything a
+  user sees) — the matching bullet, not the file.
 - Why something is the way it is: the ADR the code comment or the
   ownership map names; ideas already rejected: `specs/decisions.md` (do
   not re-propose them).
