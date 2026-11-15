@@ -52,7 +52,7 @@ function classPartsOf(persona: Persona, patch: ChatPersonaPatch): readonly strin
     parts.push(`class ${persona.class ?? 'none'} → ${patch.class}`);
   }
   if (patch.model !== undefined) {
-    parts.push(`model ${modelSideOf(persona.model, patch.model)} → ${modelSideOf(patch.model, null)}`);
+    parts.push(`model ${pinSide(persona.model)} → ${pinSide(patch.model)}`);
   }
   const chatModel = chatModelPartOf(persona, patch);
   if (chatModel !== null) {
@@ -61,10 +61,9 @@ function classPartsOf(persona: Persona, patch: ChatPersonaPatch): readonly strin
   return parts;
 }
 
-/** One side of the model pair: the pin, or what a null means. */
-function modelSideOf(current: string | null, sent: string | null | undefined): string {
-  const value = sent === undefined ? current : sent;
-  return value === null || value === '' ? '(the class decides)' : clip(value);
+/** One side of the model pair: the pin, or what a null or blank means. */
+function pinSide(value: string | null | undefined): string {
+  return value === null || value === undefined || value === '' ? '(the class decides)' : clip(value);
 }
 
 /** The chat-model part; null when the patch does not carry it. */
