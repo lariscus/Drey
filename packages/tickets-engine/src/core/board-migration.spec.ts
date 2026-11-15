@@ -1,12 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { builderOf, crewMigrationOf, defaultsMigrationOf, flowOrderOf, pipelineMigrationOf } from './board-migration';
 import { parsePersonaFile, type Persona } from './persona';
-import { DEFAULT_PIPELINE_TEXT, LIFECYCLE_PIPELINE_PROSE, STANDARD_FLOW_LINE } from './pipeline-states';
+import { LIFECYCLE_PIPELINE_PROSE, PIPELINE_PROSE, STANDARD_FLOW_LINE } from './pipeline-states';
 import { parsePipeline } from './ticket-board';
 
 const persona = (id: string, extra = '', kind = 'agent'): Persona => parsePersonaFile(id, `---\ntitle: ${id === 'you' ? 'You' : id}\nkind: ${kind}\nrole: custom\nworker: opencode\n${extra}---\n`);
 
 const CREW = [persona('pia', '', 'mission'), persona('paul'), persona('ben'), persona('ralf'), persona('tessa'), persona('you', '', 'human'), persona('build-default'), persona('commit-default')];
+
+/** The pipeline "Initialize board" wrote before req-307 (the shipped phase board). */
+const SHIPPED_PHASE_PIPELINE = `---
+phases:
+  - { id: inbox, title: Inbox, handover: manual, persona: you }
+  - { id: shaping, title: Shaping, handover: manual, persona: you }
+  - { id: prioritized, title: Prioritized, handover: manual, persona: you }
+  - { id: building, title: Building, wip: 3, claim: true, handover: agent build-default }
+  - { id: ready, title: Ready to try, handover: manual, persona: you }
+  - { id: done, title: Done, handover: none }
+flow: ${STANDARD_FLOW_LINE}
+---
+${PIPELINE_PROSE}`;
 
 /** The owner's live pipeline as concept §0 read it (2026-11-11): Building names build-default twice. */
 const LIVE = `---
@@ -43,7 +56,7 @@ describe('step 3: the pipeline keeps the lifecycle columns', () => {
   });
 
   it("replaces only the shipped phase-board prose, and leaves a builder's own setting alone", () => {
-    const out = pipelineMigrationOf(DEFAULT_PIPELINE_TEXT, [persona('ben', 'class: heavy\n'), persona('paul')])!;
+    const out = pipelineMigrationOf(SHIPPED_PHASE_PIPELINE, [persona('ben', 'class: heavy\n'), persona('paul')])!;
     expect(out.text.endsWith(`---\n${LIFECYCLE_PIPELINE_PROSE}`)).toBe(true);
     expect(out.plan.flow).toBeNull(); // the shipped pipeline has a flow already
     expect(out.plan.moved).toBeNull();

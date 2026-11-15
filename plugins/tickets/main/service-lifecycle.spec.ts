@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { promises as fsp } from 'node:fs';
 import * as http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -225,7 +226,9 @@ describe('mirrorConfig (E14-7a)', () => {
  * The first start after `dk.store` changed must report the NEW store, with no second start.
  */
 describe('ensureService: the first start reads the new settings (E14-7a)', () => {
-  const PIPELINE = ['---', 'phases:', '  - { id: inbox, title: Inbox, handover: manual }', '  - { id: done, title: Done, handover: none }', '---', ''].join('\n');
+  /** The lifecycle stages of the stores below: the board shows no other. */
+  const STAGES_TOML = ['[stages]', 'values = ["inbox", "prioritized", "active", "running", "done"]', 'initial = "inbox"', 'terminal = ["done"]', 'claim = ["running"]', 'cancelled = "cancelled"', ''].join('\n');
+  const PIPELINE =['---', 'phases:', '  - { id: inbox, title: Inbox, handover: manual }', '  - { id: done, title: Done, handover: none }', '---', ''].join('\n');
   let root = '';
   let service: ServiceHost | null = null;
   let engine: EngineClient | null = null;
@@ -238,9 +241,15 @@ describe('ensureService: the first start reads the new settings (E14-7a)', () =>
     await fsp.rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 50 });
   });
 
-  /** A store checkout holding `count` inbox tickets (t-1, t-2, ...), in dk's file layout. */
+  /** A store checkout on the lifecycle stages (the board shows no other) holding `count` inbox tickets (t-1, t-2, ...), in dk's file layout. */
   async function storeWith(name: string, count: number): Promise<string> {
     const store = path.join(root, name);
+    await fsp.mkdir(store, { recursive: true });
+    await fsp.writeFile(path.join(store, 'dricket.toml'), STAGES_TOML, 'utf8');
+    const git = (...args: string[]): void => void execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@test.invalid', ...args], { cwd: store, windowsHide: true, stdio: 'pipe' });
+    git('init', '-q', '-b', 'main');
+    git('add', 'dricket.toml');
+    git('commit', '-q', '-m', 'stages');
     for (let n = 1; n <= count; n += 1) {
       const dir = path.join(store, 'tickets', 't', '0000', `t-${n}`);
       await fsp.mkdir(dir, { recursive: true });

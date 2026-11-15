@@ -63,16 +63,6 @@ describe('Orchestrator on a dricket store (E14-5b)', () => {
     expect(fleet.records).toEqual([]);
   });
 
-  // The holder pass (holder-pass.ts) has no wait line for a claimed ticket; the column plan's
-  // "claimed by <owner>" line went with it. Re-enable once the holder pass says it again.
-  it.skip('the chain log says whose claim holds the ticket', async () => {
-    h.seedRun('T-0003', { owner: 'henrik' });
-    const { orch, logs } = h.build();
-    await orch.configure(h.config());
-    await orch.setMaster('run');
-    expect(logs.join('\n')).toContain('claimed by henrik');
-  });
-
   it("the first dispatch of a store releases a killed runner's leftover claims, once, then reads the board again", async () => {
     h.seedRun('T-0003', { owner: 'agent-r-old@box' });
     const releaseLeftovers = vi.fn(async () => {

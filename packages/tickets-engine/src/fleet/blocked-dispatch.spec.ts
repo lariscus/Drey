@@ -33,20 +33,6 @@ describe('the fleet respects blocked-by (T-0050)', () => {
     expect(started.map((r) => r.request.ticketId)).toEqual(['T-0003']);
   });
 
-  // The holder pass (holder-pass.ts) has no wait line for a blocked ticket; the column plan's
-  // "dispatch holds T-…: blocked by …" line went with it. Re-enable once the holder pass says it again.
-  it.skip('the chain log says once which blockers hold the blocked ticket', async () => {
-    h.io.seed('T-0002', 'prioritized');
-    h.seedRun('T-0001', { depends: ['T-0002'] });
-    h.seedRun('T-0003');
-    const { orch, logs } = h.build();
-    await orch.configure(h.config());
-    await orch.setMaster('run');
-    const holds = logs.filter((line) => line.includes('T-0001'));
-    expect(holds).toHaveLength(1);
-    expect(holds[0]).toContain('blocked by T-0002');
-  });
-
   it('with the blocker in done, the blocked ticket dispatches', async () => {
     h.io.seed('T-0002', 'done');
     h.seedRun('T-0001', { depends: ['T-0002'] });

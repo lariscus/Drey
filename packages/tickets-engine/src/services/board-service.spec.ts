@@ -434,36 +434,23 @@ describe('EngineBoardService shape seams (E10-3)', () => {
 describe('EngineBoardService default pipeline (req-99a)', () => {
   const pipelinePath = (): string => path.join(vaultDir, 'tickets', '_meta', 'pipeline.md');
 
-  it('seeds Inbox · Shaping · Prioritized · Building · Ready to try · Done on a new board', async () => {
+  it('seeds the persona board pipeline: Inbox · Prioritized · Done and the standard flow (req-307)', async () => {
     await fsp.rm(pipelinePath());
     expect(await serviceOf().initialize('v')).toMatchObject({ ok: true });
 
     const snap = await serviceOf().snapshot();
     expect(snap.pipeline.map((p) => [p.id, p.title])).toEqual([
       ['inbox', 'Inbox'],
-      ['shaping', 'Shaping'],
       ['prioritized', 'Prioritized'],
-      ['building', 'Building'],
-      ['ready', 'Ready to try'],
       ['done', 'Done'],
     ]);
-    expect(snap.pipeline.map((p) => parseHandover(p.handover).mode)).toEqual(['manual', 'manual', 'manual', 'agent', 'manual', 'none']);
-    expect(snap.pipeline.filter((p) => p.claim).map((p) => p.id)).toEqual(['building']);
-    // The columns the human persona works carry its pin; the agent columns carry none (the ladder decides).
-    expect(snap.pipeline.map((p) => [p.id, p.persona])).toEqual([
-      ['inbox', 'you'],
-      ['shaping', 'you'],
-      ['prioritized', 'you'],
-      ['building', null],
-      ['ready', 'you'],
-      ['done', null],
-    ]);
-    // ...and the persona they name exists from the first minute, titled You.
+    expect(snap.pipeline.map((p) => parseHandover(p.handover).mode)).toEqual(['manual', 'manual', 'none']);
+    expect(snap.pipeline.filter((p) => p.claim)).toEqual([]);
+    expect(snap.flow?.map((e) => e.persona)).toEqual(['paul', 'ben', 'ralf', 'tessa', 'you']);
+    // The human persona exists from the first minute, titled You.
     const personaFile = await fsp.readFile(path.join(vaultDir, 'tickets', '_meta', 'personas', 'you', 'persona.md'), 'utf8');
     expect(personaFile).toContain('kind: human');
     expect(personaFile).toMatch(/title: ['"]?You['"]?\s/);
-    // Ready to try is the owner's checkpoint; the columns before the first agent column are plain queues.
-    expect([...snap.checkpoints]).toEqual(['ready', 'done']);
     // req-267: the sign-off's merge is You's commit leaving action, no prompt.
     expect(personaFile).toContain('leaving: [commit]');
     await expect(fsp.stat(path.join(vaultDir, 'tickets', '_meta', 'prompts', 'commit-default.md'))).rejects.toThrow();
@@ -533,7 +520,7 @@ describe('EngineBoardService default pipeline (req-99a)', () => {
       ['commit', 'Commit'],
       ['done', 'Done'],
     ]);
-    expect([...snap.checkpoints]).toEqual(['done']);
+    expect([...snap.checkpoints]).toEqual([]);
   });
 
   it('never renames what a board already has: an existing Inbox title stays', async () => {

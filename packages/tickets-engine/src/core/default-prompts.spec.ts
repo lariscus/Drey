@@ -10,7 +10,6 @@ describe('shipped prompts', () => {
     expect([...prompts.keys()]).toEqual([
       'build-default',
       'plan-default',
-      'plan-interactive-default',
       'qa-default',
       'review-default',
       'scout-default',
@@ -32,9 +31,7 @@ describe('shipped prompts', () => {
     expect(prompts.get('build-default')).toContain('**What changed for you:**');
     // The commit is You's machine action since req-267: no prompt ships for it.
     expect(prompts.has('commit-default')).toBe(false);
-    // The interactive default (req-65): interview first. (The refine twin
-    // was removed in E13-9.)
-    expect(prompts.get('plan-interactive-default')).toContain('QUESTION:');
+    expect(prompts.has('plan-interactive-default')).toBe(false); // the dialog protocol is a crew prompt now (req-307)
     expect(prompts.has('refine-interactive-default')).toBe(false);
   });
 

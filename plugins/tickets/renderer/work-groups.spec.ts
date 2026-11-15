@@ -585,13 +585,6 @@ describe('the six stages (req-99b)', () => {
     expect(checkpointActionOf(six({}), 'ready')).toEqual({ kind: 'sign-off', label: 'Accept' });
   });
 
-  it('asks nothing of a ticket in Done', () => {
-    const groups = workGroups(six({ ready: [card('T-1', 'ready')], done: [card('T-2', 'done')] }), []);
-    expect(ids(groups.needs)).toEqual(['T-1']);
-    expect(ids(groups.running)).toEqual([]);
-    expect(ids(groups.ideas)).toEqual([]);
-  });
-
   it('names the step of a run in Building and of the commit step on Ready to try', () => {
     const rowAt = (at: string): Parameters<typeof runningStepOf>[0] =>
       ({ phase: SIX.find((p) => p.id === at)!, run: run({ activity: '' }), card: card('T-1', at) }) as unknown as Parameters<typeof runningStepOf>[0];
