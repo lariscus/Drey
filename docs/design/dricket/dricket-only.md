@@ -47,14 +47,17 @@ the owner creates a new one.
 
 ## Created
 
-- **A fresh install runs on dricket (E14-9b item 6):** with no store configured, the first start creates one beside the
+- **A fresh install runs on dricket (E14-9b item 6, done):** with no store configured, the first start creates one beside the
   meta vault (`dk init` on the lifecycle stages, `claim = ["running"]`) with the persona board's `pipeline.md`, and seeds
-  the default crew; the bundled `dk` (M240) is used.
+  the default crew; the bundled `dk` (M240) is used. "Initialize board" does the same for a fresh vault
+  (`store/fresh-store.ts`; the store is `<vault>-tickets-store` beside it, `dk.store` is written to the config).
 - **"Initialize board"** writes the persona board's pipeline (Inbox · Prioritized · Done + `flow:`), never the phase pipeline.
 
 ## Order of removal
 
-1. Legacy remote (done) · 2. migration tool (done) · 3. shadow + files backend + `tickets.backend` ·
-4. phase board: runner dispatch, pipeline column keys, `BoardService` forks · 5. stage and board migration ·
-6. Settings pipeline + step prompts + prompt IPC · 7. default personas · 8. fresh-install store · 9. specs, docs, ADR.
+1. Legacy remote (done) · 2. migration tool (done) · 3. shadow + files backend + `tickets.backend` (done) ·
+4. phase board: runner dispatch, pipeline column keys, `BoardService` forks (done) · 5. stage and board migration (done) ·
+6. Settings pipeline + step prompts + prompt IPC (done) · 7. default personas (done) · 8. fresh-install store (done —
+`store/fresh-store.ts`, `<vault>-tickets-store`, `dk init` + the `[stages]` swap in one commit, `dk.store` written) ·
+9. specs, docs, ADR (this change).
 Each step ends with a green typecheck and its own commit.

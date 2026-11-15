@@ -47,7 +47,7 @@ Open work only. Everything implemented lives in
 lives in [`decisions.md`](decisions.md). When an item ships, move it to the
 changelog and delete it here — no shipped history on this page.
 
-**Status (2026-11-15):** version 0.8.1, milestones 1–280 built (1–21 in `docs/milestones-done.md`; 109–111 recorded by the convergence audit backfill), plus the requirements the changelog records without a milestone number (req-95a, req-95b, req-96, req-97, req-98, req-99a, req-99b, req-101, req-102, req-104, req-110, req-126 among them). Milestones 1–83 are
+**Status (2026-11-15):** version 0.8.1, milestones 1–281 built (1–21 in `docs/milestones-done.md`; 109–111 recorded by the convergence audit backfill), plus the requirements the changelog records without a milestone number (req-95a, req-95b, req-96, req-97, req-98, req-99a, req-99b, req-101, req-102, req-104, req-110, req-126 among them). Milestones 1–83 are
 owner-verified (the round for 1–81 closed 2026-10-17; 82, the auto-update, and 83, the tickets foundation, on real use). From milestone 84 on, the changelog marks each entry that still awaits the owner's round — nearly all of them; that round is finish line step 6 below. Milestone and requirement ids are assigned when work starts; the next free ones follow from the top of `changelog.md`. Of the architectural cleanup, A1–A6 and A10–A12 shipped; A7–A9 remain.
 
 ### Finish line (owner, 2026-11-12)
@@ -61,7 +61,7 @@ The owner fixed the end of the current stretch ("ich habe das gefühl mit jedem 
 5. **req-282 – req-291**, projects, Persona v3 and Models v3 (owner 2026-11-13: *"die brauche ich alle vor dem merge nach main … aktuell ist das nicht nutzbar"*), in the order of their section below — and **every correction the owner names before the merge**, each added as a row of that section.
 6. **The owner's verification round** of everything since milestone 213, then the merge of `desktop-integration` into `main` on his word.
 
-**Everything else on this page is frozen** — the rest of "Now", "Tickets on dricket" (E14-9b included, unless the owner starts it), "Later", the cleanup, the backlog and the 148 follow-up rows. Frozen rows stay where they are, are not worked and do not count; after the merge into `main` the owner picks what comes next.
+**Everything else on this page is frozen** — the rest of "Now", the rest of "Tickets on dricket", "Later", the cleanup, the backlog and the 148 follow-up rows. Frozen rows stay where they are, are not worked and do not count; after the merge into `main` the owner picks what comes next.
 
 **No new rows while the finish line stands.** A session adds a roadmap row only when something is broken, blocks an item above, or is a correction the owner names for step 5. Anything else it leaves out is one sentence in its changelog entry, not a row.
 
@@ -249,12 +249,12 @@ The cost of a flat plan is req-287's account cost.
 **req-66 R7 — Web Push (optional, its own decision)** (ADR-0086). Push
 notifications to the phone need HTTPS and Apple's push service, a further
 cloud exception. The rest of req-66 shipped (R1–R6, R8, R9); the legacy
-phone remote it built goes with E14-9b item 4, so a push would reach
+phone remote it built is gone (the decommission), so a push would reach
 Mission Control.
 
 ### Tickets on dricket (owner request 2026-11-04; built, the board on the store since 2026-11-06)
 
-**Built through E14-8 and the cut-over (E14-7 steps 1-8, 2026-11-06): the owner's board runs on the store `E:\projects\drey-board`, `drey-tickets` is the meta vault. Open below: the decommission (E14-9b) and the follow-ups; the owner's round on the store (the cut-over's step 9) is part of finish line step 6. Nothing here reorders the lists above or below.**
+**Built through E14-8 and the cut-over (E14-7 steps 1-8, 2026-11-06): the owner's board runs on the store `E:\projects\drey-board`, `drey-tickets` is the meta vault. The decommission (E14-9b) is built — Drey on dricket only, req-307's changelog entry. Open below: the follow-ups; the owner's round on the store (the cut-over's step 9) is part of finish line step 6. Nothing here reorders the lists above or below.**
 The owner decided to move Drey's whole ticket handling, the fleet included,
 onto **dricket** (`dk`, calls `dk ... --json`; no TypeScript
 re-implementation). Analysis and plan: `docs/design/dricket/`
@@ -326,46 +326,6 @@ No open row: every row of step 5 shipped (milestones 263–271, the last req-298
 
 _Rebuilt from the cloud session of 2026-11-14 (owner: "Ja, so") — its four commits sat on the milestone-209 base and were recorded with `merge -s ours`; their content is rebuilt on the current tree:_
 
-- **req-307 — Retire the phase pipeline, checkpoints and step prompts** (owner, 2026-11-14, finish line step 5: "ignore backward compatibility, I will set up everything manually again … I never released it"). Settings → Tickets still shows the phase pipeline (columns with numbers, Checkpoint, Worker, Model, "Phase folders are not numbered"), and the step prompts (`build-default.md` … "Not used by a column") — leftovers of the phase board that the persona board replaced. Personas own their prompts (the role step comes from the persona). Remove the phase pipeline, its checkpoints and folder numbering, the step prompt files and their page, the default personas `build-default` / `commit-default`, and the migrations and compatibility readers kept for them; keep only the lifecycle stages (Inbox, Prioritized, Active, Done) and the standard flow. **Built together with E14-9b below** (owner, 2026-11-15: "entferne das alte backend"): Drey on dricket only — the files backend, the phase board, the shadow/phase-dir tooling and every migration and compatibility reader for them go; no backward compatibility. Starts after req-305/306 and D-73 are merged (they touch the flow and the board); req-300 (the folder sort) follows it.
-- **E14-9b — Decommission, part b: Drey on dricket only.** **Released by the owner on
-  2026-11-11** ("sicherstellen, dass diese Version nur noch auf dricket läuft, und alle
-  Tickets entsprechend anpassen"; "Ja, so" to the plan) — no longer waits for the
-  verification round; **starts after req-265 is merged** (both touch `board-service.ts`
-  and the store settings). The owner's confirmations: no rollback to the files backend is
-  wanted (item 3 below goes), the legacy phone remote goes (item 4). **Added by the
-  owner's release:** (6) **a fresh install runs on dricket**: `tickets.backend` defaults
-  to `dricket`, and with no store configured the first start creates one (`dk init`, the
-  lifecycle stages of req-265, `claim = ["running"]`) beside the meta vault — the second
-  exception to Q-05 after req-265's stage migration; the bundled `dk` (milestone 240) is used;
-  (7) **the owner's legacy folders**: `E:\projects\drey-tickets\tickets\{10-inbox,
-  20-prioritized,50-build,60-commit,80-done,archive}` hold only the frozen pre-cut-over
-  copies of the store's 92 tickets (the tag `pre-dricket` keeps them) — deleted in one
-  commit **after the owner's OK on the exact list**, the untracked files (`tickets/videos/`,
-  the inbox attachments, `T-0092.md`, `ledger.jsonl`) shown to him one by one first,
-  `tickets/_meta/` untouched; (8) **the store's tickets on the new model**: through
-  req-265's stage migration and req-268's chain migration (where `x-legacy-phase` and
-  `x-rank` go; `x-legacy-id` stays — the board's `T-0091` numbers come from it). Original
-  text: after the cut-over **and the owner's
-  verification round** (owner, 2026-11-05: no fixed 30 days), delete what part (a)
-  proved cannot go earlier — the inventory with callers and evidence is
-  [`docs/design/dricket/decommission.md`](../docs/design/dricket/decommission.md)
-  (part a, milestone 162, found class A empty and removed nothing). Exact scope: (1) the
-  files forks of the board writers, phase-folder numbering ("Number folders", reorder
-  renumbering), the drift pass, the file IO half of `core/transition.ts` (keep its pure
-  patchers — the dricket bridge uses them), `core/phase-dirs.ts`, `core/normalize.ts`;
-  (2) run / claim stamps and takeover-as-overwrite on files, the `.status.log` writer,
-  the files-only ledger writers (the ledger path in the meta vault stays),
-  `FileTicketStore`, `files-guard`; (3) the `files` and `shadow` modes of
-  `tickets.backend`, the migration tool's legacy reader, the shadow diff, the reverse
-  converter and `scripts/migrate-tickets.mjs` — only once the owner confirms no rollback
-  is wanted; (4) the legacy phone remote (`plugins/tickets/remote/`, `fallback-client`,
-  the `engine-main` fallback, the two `tickets-remote*` e2e specs) once Mission Control on
-  the phone is verified — a product decision, nothing depends on it; (5) supersede
-  `specs/ticket-schema.md` and the ADR-0076 file layout; the manual. Not in scope:
-  `core/ticket-files.ts`, `ticket-board.ts`, `legacy-bridge.ts` (the dricket path runs on them).
-  The Crew runner's share of (1)–(2) — its file writer, stamps, moves and status lines —
-  left with req-176 (milestone 214); what remains here is the board and engine side.
-  Three orphan helpers (`parkLine`, `phaseIdFromTitle`, `columnWorkerPin`) can go with it.
 - **req-300 — Sort the tickets plugin and the engine into domain folders** (owner, 2026-11-14; was the cloud's "req-179" – "req-181", commits c88a8411, e69b201a, e102d146 on the milestone-209 base). The plugin's `renderer/` and `main/`, the engine's `core/` and `fleet/` sorted into domain folders, imports and docs updated, behaviour unchanged. Redo it on the current tree **as the last code change before the merge into `main`**, when no other session works in the engine, with the cloud commits as the reference for the folder names; ADR-0096's import boundaries and `eslint.size-baseline.mjs` follow the moves.
 _Added by the owner on 2026-11-14 (crew management and the flow, before the merge into `main`):_
 

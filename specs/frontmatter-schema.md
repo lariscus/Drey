@@ -129,18 +129,18 @@ save-before-exit prompt.
   app's userData, never in the vault; app config and API keys likewise.
   In a Git vault the app runs the installed `git` and adds no files of its own.
 
-## Ticket repositories (separate repo, own format)
+## Ticket repositories (separate store, own format)
 
-A vault can be a dedicated **tickets repository** (ADR-0076): one
-Markdown file per kanban ticket, configured through
-`tickets/_meta/pipeline.md`. On the files backend the phase is the
-directory and transitions are git moves; on a dricket store (ADR-0090) the
-store's stage is the ticket's life (`inbox prioritized active running done`)
-and who works it follows from the ticket's chain and cursor — the persona
-board (ADR-0098). That format has its own complete specification in
+Drey's tickets live in a **dricket store** beside the meta vault
+(ADR-0090, req-307: the one backend — Drey creates one on the first
+start when none is configured). The store's stage is the ticket's life
+(`inbox prioritized active running done`) and who works it follows from
+the ticket's chain and cursor — the persona board (ADR-0098). The meta
+vault keeps the board's configuration and the crew (`tickets/_meta/`);
+that format has its own complete specification in
 [`ticket-schema.md`](ticket-schema.md); only the YAML conventions above
-(quoted dates, LF) carry over — ticket files are not notes, and none of the
-note frontmatter fields apply.
+(quoted dates, LF) carry over — ticket records are not notes, and none
+of the note frontmatter fields apply.
 
 ## Structural folders
 

@@ -1,45 +1,50 @@
 # Ticket Schema — the tickets repository format
 
-The complete, machine-facing specification of the tickets repository
+The complete, machine-facing specification of Drey's ticket handling
 (ADR-0076; the fleet that works it is ADR-0075). Written so that a
 human, a Drey component, or an agent CLI can operate the format from
 this file alone. Ticket files are **not** vault notes — only the YAML
 conventions shared with [`frontmatter-schema.md`](frontmatter-schema.md)
 apply (quoted dates, plain text).
 
+> **req-307, E14-9b (Drey on dricket only):** the TICKETS live in a
+> dricket store — one `dk` store on the lifecycle stages
+> (`inbox prioritized active running done`, `claim = ["running"]`),
+> created by Drey itself on the first start when none is configured
+> (`store/fresh-store.ts`). Their records (`dk show`, the header keys,
+> the body sections below) follow dricket's own format
+> (`docs/design/dricket/`); the section "Reading tickets from a dricket
+> store" at the end says how the board folds them. What remains in the
+> **meta vault** is the board's configuration and the crew: the
+> `_meta` tree below — pipeline, repos, projects, crew, personas,
+> skills, chat, ledger. The old files backend (ticket files in numbered
+> phase folders, `handover:` keys, `_meta/prompts/`) is gone.
+
 Top-level rules, once, up front:
 
-- **One file per ticket. The phase is the directory. The filename is
-  the identity.** A ticket file moves between directories; its name
-  never changes.
-- **Phase directories are numbered** (T-0041): `NN-<id>` with `NN` the
-  phase's 1-based pipeline position × 10 — `10-inbox`, `20-plan`,
-  … `60-done` in the shipped default. The number lives ONLY in the directory name: `entered-*`
-  keys and branch names keep the clean id.
-- **Every phase transition is one git commit** (`git mv` semantics +
-  the frontmatter stamp), message format
-  `tickets: <id> <from> -> <to>` (ASCII arrow).
-- **A file move between phase folders is a ticket move.** Moving a
-  ticket file outside the board (Explorer, Files panel) has exactly the
-  effect of a board transition: on the next board refresh, stateless
-  normalization detects the ticket sitting in phase B with an
-  inconsistent `entered-<B>` stamp and completes the treatment — stamp,
-  Log line, one commit `tickets: <id> <from> -> <to>`,
-  actor `owner@<host>`. Works after restarts (derived from the files,
-  no extra state); lane rules are never enforced on human moves —
-  logged, not blocked.
-- **A refine from the remote is one commit** (req-66):
-  `tickets: <id> refined`, with one Log line
-  `- '<UTC>' owner@<device> — refined (<what changed>)` — the header
+- **One ticket per store record. The stage is the record's `stage:`;
+  the store's id is the identity.** A move is one `dk put` with the new
+  stage — never a file move, never a commit in the meta vault.
+- **The board's columns are the lifecycle edges** (`_meta/pipeline.md`:
+  inbox · prioritized · done, below) plus the working area: every
+  ticket a chain holds stands in the **active** stage column, its lane
+  naming the holder (req-257, the persona board, ADR-0098).
+- **A move in the meta vault is one git commit** — the crew's writes
+  (personas, repos, projects, crew.md, the ledger), never a ticket
+  move. On the store, every change is one `dk put` (dricket's own
+  protocol, R-xx of `docs/design/dricket/dricket-requirements.md`).
+- **A refine from the remote is one record write** (req-66): the header
   keys (`title`, `priority`, `repo`) and section names (`description`,
-  `plan`, `acceptance criteria`). It replaces a section's body up to the
-  next heading of any level (so `## Plan` keeps its `### Acceptance
-  criteria`), adds a missing section before `## Log` (Acceptance
-  criteria at the end of Plan), and never touches the Log otherwise.
+  `plan`, `acceptance criteria`) are replaced through one `dk put`, with one Log line
+  `- '<UTC>' owner@<device> — refined (<what changed>)`. It replaces a
+  section's body up to the next heading of any level (so `## Plan`
+  keeps its `### Acceptance criteria`), and adds a missing section
+  before `## Log` (Acceptance criteria at the end of Plan).
 - **Machine writers write strictly** (the exact shapes below);
-  **humans edit freely**; **readers normalize visibly** — anything a
-  reader cannot parse unambiguously is reported as an issue on the
-  board, never guessed. Tolerate noise, never ambiguity.
+  **humans edit freely** (a hand edit of a record reaches Drey through
+  the store's git); **readers normalize visibly** — anything a reader
+  cannot parse unambiguously is reported as an issue on the board,
+  never guessed. Tolerate noise, never ambiguity.
 - All timestamps are **UTC, seconds precision, quoted**:
   `'2026-10-17T14:32:00Z'`.
 - Line endings LF. Encoding UTF-8.
@@ -47,21 +52,17 @@ Top-level rules, once, up front:
 ## Layout
 
 ```
-<tickets repo root>/
+<meta vault>/
   _worktrees/       # reserved (T-0044): the fleet's worktree home —
                     #   <ticket-id>/ per ticket, gitignored, invisible to
                     #   the vault's tree/index/watcher; a review run's
                     #   read-only checkout <ticket-id>-review/ (req-183)
-  _workcopy/        # reserved (req-183): a store ticket's working copy,
-                    #   <ticket-id>.ticket.md per running ticket, gitignored
   tickets/
     _meta/
-      pipeline.md     # the phases + handover config (config, never data)
-      order.md        # ignored since req-75 W1 (the former order pins), may be absent
+      pipeline.md     # the board's columns + the crew's defaults (config, never data)
       repos.md        # work-repo name -> clone URL/path mapping
       projects/       # the projects (req-282): <id>.md per project — see _meta/projects/ below
       crew.md         # the crew's defaults and limits — the vault layer (req-173), see below
-      prompts/        # the handover prompts (`agent <prompt-ref>` names one file)
       skills/         # the shared skills: <name>/SKILL.md, Agent Skills folders (req-172) — see Skills below
       skill-sources.md # the skills library's GitHub sources (req-289) — see _meta/skills/ below
       personas/       # the agent personas (E3, the improvement loop E6):
@@ -70,91 +71,37 @@ Top-level rules, once, up front:
       chat/           # the Mission Control chat sessions (E5a): one file per
                       #   session — see _meta/chat/ below
       ledger.jsonl    # the fleet event ledger (E7) — see The fleet ledger
-    10-inbox/
-      T-0042.md       # one ticket per file, in its current phase's folder
-    20-shaping/
-    30-prioritized/
-    40-building/
-    50-ready/
-    60-done/
-    archive/          # reserved (T-0041): archived tickets, never a column
     attachments/      # reserved (req-66 R8): images a paired device
                       #   uploaded — binary only, never a column, never
                       #   a ticket
     videos/           # reserved (E11, ADR-0088 later change): the proof
-                      #   walkthrough videos — binary only, never a
-                      #   column, not in git by default (see Videos)
+                      #   walkthrough videos — binary only (see Videos)
 ```
 
-The phase folders are exactly the phases configured in `pipeline.md`
-(the set above is the default, not fixed). `_meta`, `archive` and
-`attachments` are reserved; nothing else lives beside the phase
-folders. A vault whose root contains `tickets/_meta/pipeline.md` **is**
-a tickets vault — that file's presence is the detection marker.
+A vault whose root contains `tickets/_meta/pipeline.md` **is** the meta
+vault — that file's presence is the detection marker. The store beside
+it (a `<vault>-tickets-store` directory by default, or wherever
+`dk.store` names) holds the tickets; nothing of the store lives inside
+the vault.
 
-**Reserved `_`-prefixed folders at the repo root (T-0044, ADR-0080).**
+**Reserved `_`-prefixed folders at the vault root (T-0044, ADR-0080).**
 `_`-prefixed names directly beside `tickets/` are machine state, never
 ticket data: the board, the vault's markdown index and the file watcher
-skip them entirely, and the repo's `.gitignore` covers them (ensured by
+skip them entirely, and the vault's `.gitignore` covers them (ensured by
 the boot sweep, one commit when appended). The fleet's worktrees live in
 `_worktrees/<ticket-id>/` by default; a repo can override its base with
-a `worktrees:` key in repos.md. A review run (req-183: the `review`
-phase, or any gate whose persona has the role `reviewer`) reads the branch
-in a second worktree beside it, `<ticket-id>-review/`, detached at the
-commit the builder handed over, read-only on disk and removed when the run
-ends — never a place to work in. A store ticket's working copy is
-`_workcopy/<ticket-id>.ticket.md` (req-183; until then
-`_worktrees/<ticket-id>.ticket.md`, which the runner still reads — and moves
-into `_workcopy/` — for one release, so a copy is never mistaken for a
-worktree). `.gitignore` carries `/_worktrees/` and `/_workcopy/`. The skip
-is root-depth only — `tickets/_meta` stays indexed and watched.
-
-### Numbered folders (T-0041)
-
-`NN` is derived from the phase's position in pipeline.md (1-based × 10,
-two digits). Readers strip a leading `\d+-` from the directory name and
-match the rest against the pipeline ids; **an unprefixed directory
-stays tolerated** (`tickets/inbox/…` reads exactly like
-`tickets/10-inbox/…` — the migration of an existing repo is 8×
-`git mv`, and ship order is free). Writers resolve their target
-directory per move: the derived `NN-<id>` name when it exists, else any
-existing directory whose stripped id matches, else the derived name
-(created on first use). Inserting a column by hand takes a **gap
-number** (`35-qa`) — no move ever renumbers existing directories, so
-there is no rename cascade. Directory names are never written into
-ticket files or branches.
-
-**Renumbering is an explicit owner action** (req-50, Settings →
-Tickets): reordering the columns there rewrites `pipeline.md` and
-renames every phase folder whose number no longer matches its position,
-in **one commit** (`tickets: reorder phases <ids…>`); "Number folders"
-does the renaming alone (`tickets: number phase folders`) — the
-migration of an unprefixed repo, or tidying gap numbers. Several
-folders of one phase (an unprefixed `inbox` beside a machine-made
-`10-inbox`) fold into the derived one; `_meta`, `archive` and folders
-that name no phase are never touched. Both refuse while a ticket in a
-renamed folder has a live `run:` (the runner holds its path), and
-refuse before touching anything when two files of one name would land
-in one folder.
-
-### Archive (T-0041)
-
-`tickets/archive/` is a reserved folder beside `_meta`: **not a board
-column, invisible on the board, no counter display**. Archiving goes
-through the Work row menu (two-step armed), the Accept of a finished
-ticket (req-75 W1), or by moving the file into
-`archive/` — both yield the Log line `archived` (a machine-shaped
-`— archived` marker, NO `entered-archive` stamp; claim fields ride
-along) and exactly one commit `tickets: <id> archived`. Reviving is a move back into a phase folder — normalization
-treats it as `archive -> <phase>`. Body edits after archiving never
-re-fire normalization. Final deletion is the owner's manual act inside
-`archive/`.
+a `worktrees:` key in repos.md. A review run (req-183: any gate whose
+persona has the role `reviewer`) reads the branch in a second worktree
+beside it, `<ticket-id>-review/`, detached at the commit the builder
+handed over, read-only on disk and removed when the run ends — never a
+place to work in. The skip is root-depth only — `tickets/_meta` stays
+indexed and watched.
 
 ### Attachments (req-66 R8)
 
-`tickets/attachments/` is a reserved folder beside `_meta` and
-`archive`: **binary image files only, never a column, never a ticket**
-(the board lists markdown only, so no column ever appears). An image
+`tickets/attachments/` is a reserved folder beside `_meta` in the meta
+vault: **binary image files only, never a column, never a ticket**
+(the board lists store records only, so no column ever appears). An image
 pasted or picked on a paired device is saved here by the desk — the
 type sniffed from the bytes (PNG, JPEG, GIF, WebP, ≤ 6 MB), never from
 a client-sent name — as `img-<yyyyMMdd>-<HHmmss>-<4 hex>.<ext>`, in
@@ -167,8 +114,8 @@ transition, so only this fixed folder keeps the links intact.
 
 ### Videos (E11, concept v2 §5.3)
 
-`tickets/videos/` is the third reserved folder beside `_meta`,
-`archive` and `attachments`: **binary video files only** — the proof
+`tickets/videos/` is the second reserved folder beside `_meta` and
+`attachments`: **binary video files only** — the proof
 walkthrough of a ticket whose proof mode is `ui` (see
 [Proof mode](#proof-mode-e11)). The board, the validator and the drift
 pass treat it exactly like `attachments/`: skipped as ticket data,
@@ -214,35 +161,32 @@ never a column, never reported as a stray file.
 ### Id minting
 
 `T-` + at least four digits, zero-padded to four (`T-0042`, `T-1327`,
-`T-10000`). The next free id is **max of all existing ids across every
-phase folder + 1** (never reuse a gap — a deleted ticket's id stays
-burned; git history is the record). If two sides minted the same id
-independently, the merge conflict is resolved by the **later** side:
-re-mint the next free id and rename file, `branch:` field and the work
-branch together in one commit.
+`T-10000`). The store mints the id: `dk add` allocates the next number
+(dricket's own rule); Drey never reuses or renumbers. The display id
+keeps the zero padding (`store/ids.ts`).
 
 ### The branch rule
 
 The work branch of a ticket is deterministic: `t/<id>` (`t/T-0042`).
-The `branch:` frontmatter field is cross-validated against the rule —
-**the rule wins**, a mismatch is an issue badge, not an error. Machine
-writers always write the rule's value.
+The fleet derives it from the id when it prepares a worktree; a
+mismatch the owner introduced by hand is an issue badge, not an error.
+Machine writers always write the rule's value.
 
-## Ticket file
+## The record — a store ticket's shape
+
+The header keys are dricket's (`stage`, `priority`, `claim`, `rev`, …
+— `docs/design/dricket/`); Drey's keys ride the record as `x-` fields
+(chain, cursor, flags) and the BODY sections are Drey's:
 
 ```markdown
 ---
 id: T-0042
 title: 'Fix the palette race in CI'
-repo: drey
+stage: inbox
 priority: high
-rank: 5000
-branch: t/T-0042
-entered-inbox: '2026-10-17T14:32:00Z'
-entered-prioritized: '2026-10-17T15:01:12Z'
-claimed-by: owner@desk
-claimed-at: '2026-10-17T15:04:00Z'
-references: ["t/T-0041", "https://github.com/HenrikPuls/Drey/pull/12"]
+repo: drey
+x-chain: paul:shape;ben;ralf(notify);you
+x-at: 1
 ---
 
 ## Description
@@ -357,9 +301,8 @@ of the Plan and removes it for fewer than two parts.
 | `title` | string | Required. One line, quoted when it contains `:`. |
 | `repo` | string | Name from `_meta/repos.md`: the ticket's **primary** work repo (req-72) — where the fleet's gate runs and whose worktree is the run's home. May be empty until the ticket leaves inbox for a work phase; entering one without a known repo is an issue. |
 | `repos` | list of names | Optional (req-72). Every work repo the ticket touches, **primary first** — `repos: [drey, lariscus]`. When set, the list is the truth and `repo:` repeats its first entry (a mismatch is a noise finding, the list wins). One worktree per named repo, all on the ticket's branch; a run refuses while any named repo lacks a local `path:` in `_meta/repos.md`. One or zero names write no `repos:` line. |
-| `worker` | string | Optional pin for the fleet worker (M84): `opencode`, `claude-code`, `kimi`, `copilot` (req-182), or `<provider>/<model>`. Wins over the column's `worker:` key, the phase handover's `@worker` pin, the repo's `worker:` and the configured default (M85's assignment ring). An unknown value badges the card; a run start with it refuses. |
+| `worker` | string | Optional pin for the fleet worker (M84): `opencode`, `claude-code`, `kimi`, `copilot` (req-182), or `<provider>/<model>`. The assignment ring's ticket level — it wins over the repo's `worker:` and the configured default. An unknown value badges the card; a run start with it refuses. |
 | `project` | project id | Optional (req-282; `x-project` on a store). The id of a project in `_meta/projects/` — the work scope the ticket happens in. Absent: the board's only project while it has exactly one, **Unassigned** once it has two or more (tickets are never rewritten for this). An inbox ticket may stay Unassigned; a ticket in any other column but the last without a project is an issue (a warning badge), as is a named project the board does not know, and a `repo:` / `repos:` name that is not one of its project's repos. Its purpose rides the run brief as `## Project`. |
-| `persona` | string | **Retired** (req-257): the old persona pin (ADR-0088 E3, `x-persona` on a store). Still read and shown on a card until req-270, never used to dispatch — on a lifecycle store the chain's entry at the cursor says who works a ticket, on the phase board the column's `persona:`. See `_meta/personas/` below. |
 | `awaiting` | persona id | Optional (E10-6). The ticket is **parked at a manual step** for that human persona (`awaiting: you`): the dispatcher never takes it (no run, no worktree) and it shows in Needs you as a `manual` card. Machine-written when a manual gate parks the ticket; **any transition clears it** (Accept or Send back are ordinary board moves, so is a hand move). See "The human persona" under The chain. |
 | `priority` | one id of the board's configured vocabulary | Required. The vocabulary is the vault's own — `_meta/pipeline.md`'s `priorities:` list (default `urgent \| high \| normal \| low`); the list's order IS the weight, first = highest. An omitted or unknown id reads as the vocabulary's default (its middle entry) with a warning badge; machine writers always write a vocabulary word. See [Priorities](#priorities-priorities-in-pipelinemd). |
 | `track` | `auto \| shape` | Optional (req-75 W1b, ADR-0087 decision 2). The ticket's triage track: `auto` runs on its own, `shape` goes through the plan-mode dialog with the owner. Absent (or any other value — a warning) reads as not triaged; set from the Work panel's row menu (Track ›) until W5c/W6 fill it from triage. |
@@ -378,7 +321,7 @@ of the Plan and removes it for fewer than two parts.
 | `proof` | `ui \| tests` | Optional pin (E11, concept v2 §5.3). Overrides the Handover's proof declaration (see [Proof mode](#proof-mode-e11)). Absent, or any other value (a warning), means no pin; with no pin and no readable declaration the mode reads as `ui`. |
 | `rank` | integer 0-999999 | Default `5000`. Fine ordering inside derived order. |
 | `branch` | `t/<id>` | Written by machine writers; validated against the rule; rule wins. |
-| `entered-<phase>` | UTC timestamp | One per phase ever entered; holds the **most recent** entry time into that phase (first entry lives in git history). `entered-inbox` exists from creation. |
+| `entered-<phase>` | UTC timestamp | Legacy tolerated: an old record's `x-entered-*` ride along read-only (the fold maps them); a store record carries none, and the board's age figures read the stage's claim and log instead. |
 | `claimed-by` | `<who>@<host>` (agents append `:<session>`) | Set when the ticket enters a claim-flagged phase (default: build); `owner@<host>` for the human — `owner@<device>` (e.g. `owner@ipad`) when the action came from a paired remote device (req-66: the device name lowercased, reduced to `[a-z0-9-]`, `remote` when empty). Takeover overwrites and logs the old value. |
 | `claimed-at` | UTC timestamp | Set with `claimed-by`. |
 | `run` | map `{pid, started-at, stream}` | The live run (ADR-0075 run control): stamped by the fleet runner at start, cleared at end — at most one live run per ticket. `stream` names the **run id**; the stream file itself lives machine-local under `<userData>/fleet/runs/<id>/stream.jsonl`, so the ticket stays portable across the machines the repo syncs to. Readers validate the shape. |
@@ -409,12 +352,10 @@ board and the fleet.- **Canonical syntax**: flow list with comma + space —
 - **Derived, never stored**: every board assembly recomputes each
   card's `blocked` (the open blockers, unknown ids included) and the
   inverse `blocks` (the currently-blocked dependents). Both hide when
-  empty — a done blocker shows nothing. A blocker in an unknown
-  directory resolves by its stripped phase id, never terminal, so it
-  blocks. `tickets/archive/` is not read: a blocker deleted, renamed
-  or archived resolves to no board ticket and no longer blocks (owner
-  decision 2026-10-31: archiving a finished blocker must not stall a
-  chain).
+  empty — a done blocker shows nothing. A blocker that is no longer on
+  the board (deleted, archived) resolves to nothing and no longer
+  blocks (owner decision 2026-10-31: archiving a finished blocker must
+  not stall a chain).
 - **Validation**: an id that resolves to no board ticket gives no
   finding and does not block. Self-reference and cycles are one error
   per member naming the cycle (`blocked-by cycle: T-0001 -> T-0002 ->
@@ -723,8 +664,8 @@ or the pipeline's first column has no current position (every entry is
 ahead), one in the terminal column is past the last. `sent-back: <from>><to>`
 marks the one send-back a ticket may use (concept §4).
 
-**The cursor walks on a lifecycle store** (req-257, milestone 247; the files
-backend and a store on phase stages keep the phase board). Who holds a
+**The cursor walks on a lifecycle store** (req-257, milestone 247 — the
+only board there is). Who holds a
 ticket is **derived, never stored** (`core/chain-holder.ts` `holderOf`): a
 lifecycle edge (`inbox`, `prioritized`, `done`, `cancelled`) has no holder;
 `awaiting: you` puts it at You; an entry at the cursor that names no
@@ -878,12 +819,11 @@ may say" above.)
 
 **The human persona (E10-6).** On a lifecycle store a `you` entry of the
 chain is held by You: the card stands in You's column, Accept hands it on,
-Send back returns it (the persona board below). On the phase board a gate
-the human persona works runs no agent: the phase's `persona:` (the ticket
-pin and the engine default no longer resolve, req-257) names a
+Send back returns it (the persona board below). A gate the human persona
+works runs no agent: the chain's `you` entry names the
 `kind: human` persona, and the dispatch pass stamps
 `awaiting` instead of composing a run (once; `paused:` status line, Log line
-`parked for <name> - the <phase> gate is a manual step`). **Accept** is the
+`parked for <name> - the manual gate is a human step`). **Accept** is the
 board's ordinary accept (the ticket moves to the next phase, the field goes,
 Log line `manual step finished by <owner> (<persona>)`), **Send back** the
 ordinary send-back (nearest earlier agent phase, the mandatory note, the
@@ -905,8 +845,8 @@ the desktop Board and Tickets panel, Mission Control with req-273):
 - **`lanes`** — the holder columns in the crew's order (`order:` in
   `crew.md`, `inCrewOrder`), You included (added last when the crew has no
   human record): `{ persona, title, kind: agent | human | mission, color,
-  parallel, min }`. Present exactly when the board is a persona board;
-  absent on the phase board (the files backend, a store on the old stages).
+  parallel, min }`. Present exactly when the board is a persona board —
+  always, on a lifecycle store.
 - **`hold`** on every `active` / `running` card: `{ holder, why, position,
   length, chain, mode, named, claimed, sentBack, questions }` — `why` is
   `entry` (the persona of the entry at the cursor, You's own entry
@@ -954,10 +894,9 @@ head's drag writes the crew's `order:` (`crewOrderSet`, the Crew tab's key).
 
 **What makes a board a persona board.** The store's `[stages]` are the
 lifecycle (`inbox prioritized active running done`, `claim = ["running"]`,
-"The store's stages" below); everything else is derived. The files backend and
-a store still on the phase stages stay a **phase board**: the phase is the
-directory or the stage, the column's `persona:` names who runs it, the ring
-and the column breaker stay (until E14-9b). A persona board has no column
+"The store's stages" below); everything else is derived. That is the only
+board: a store on other stages is not a mode — the board comes up empty
+with the error, and Drey creates a fresh store instead of migrating. A persona board has no column
 vocabulary in `pipeline.md` beyond the lifecycle edges (below).
 
 **Which stage a ticket is in, and who holds it.**
@@ -1047,8 +986,7 @@ so a run's hand-on, a send-back, an owner's drag and a hand edit of
 default). The last recorded hold per ticket is kept in the runner's
 `chain.json` (`holds`), so a restart writes no duplicate. How long a
 holder held a ticket is the time to the ticket's next `hold` line; an
-open hold runs until now (`core/hold-spans.ts`). The phase board
-writes no `hold` lines.
+open hold runs until now (`core/hold-spans.ts`).
 
 ### The ticket status log (E7)
 
@@ -1086,97 +1024,63 @@ the ticket file, and the ticket file never embeds it.
 On a store the verbs are comments (E14-6). A first line `Decision needed: <question>` is also read as
 `needs-decision`, keyed by the slug of the question, the form a person types in a terminal (D-12).
 
-## `_meta/pipeline.md` — the phases and their handovers
+## `_meta/pipeline.md` — the board's columns (the persona board)
 
-> **Two kinds of board** (ADR-0098). This section describes the **phase board**
-> — the files backend and a store still on the phase stages: every phase is a
-> column and the handover keys decide who works it. On a **persona board** (a
-> store on the lifecycle stages, after the board migration's step 3) the file
-> holds only the lifecycle edges, `flow:` and `token-budget:`; the columns are
-> the personas, "The persona board as a whole" above. What "Initialize board"
-> writes is still the phase file below.
+> **req-307, E14-9b (the owner: nothing was ever released, no migration):** Drey runs on
+> the one backend — a dricket store on the lifecycle stages — and draws the one board, the
+> persona board (ADR-0098). The phase board with its handover keys, pool keys and numbered
+> folders is gone; a store on other stages is no mode but an error that says so, and with
+> no store configured Drey creates one beside the vault ("Initialize board", the engine's
+> first start — `store/fresh-store.ts`).
+
+The file holds the board's EDGES and the crew's defaults — never who works a ticket (the
+chain does, "The chain" above):
 
 ```markdown
 ---
-push: origin
 phases:
-  - { id: inbox, title: Inbox, handover: manual, persona: you }
-  - { id: shaping, title: Shaping, handover: manual, persona: you }
-  - { id: prioritized, title: Prioritized, handover: manual, persona: you }
-  - { id: building, title: Building, wip: 3, claim: true, handover: agent build-default, color: '#c96442' }
-  - { id: ready, title: Ready to try, handover: manual, persona: you }
-  - { id: done, title: Done, handover: none }
+  - { id: inbox, title: Inbox }
+  - { id: prioritized, title: Prioritized }
+  - { id: done, title: Done }
 flow: paul:shape; ben; ralf; tessa; you
 ---
 Prose for humans. The board follows this file on refresh.
 ```
 
-**The shipped default (req-99a, owner decisions 2026-11-06)** — what "Initialize board"
-writes on an empty tickets repository, and the stages the dricket import writes
-(`core/pipeline-states.ts`): **Inbox** (the owner's triage queue, the capture target) ·
-**Shaping** · **Prioritized** · **Building** (agent, `build-default`; the only `claim`
-stage: plan, build, review and test are phases of the chain inside it) · **Ready to try**
-(id `ready`, the owner's checkpoint, see "Agent lane rules") · **Done**. The manual columns
-carry `persona: you` (the human persona, whose name is configurable — `personas.humanName`,
-Settings → Tickets → Crew); the fleet takes nothing from them. The shipped `flow:` is the
-default crew's standard flow, `paul:shape; ben; ralf; tessa; you` (req-266, req-305: Paul once, shaping included). Building is the first worker
-column, so a run there on a ticket without acceptance criteria gates structurally.
+**The shipped default** (`core/pipeline-states.ts`, `DEFAULT_PIPELINE_TEXT`) — what
+"Initialize board" writes, and what a fresh install's new store comes with (E14-9b item 6):
+**Inbox** (the owner's triage queue, the capture target) · **Prioritized** (the queued
+work) · **Done** — the lifecycle edges. Between Prioritized and Done the board draws the
+store's **active** stage as the working area: every ticket a chain holds stands there, and
+its lane names the holder (req-257). The stage vocabulary (`inbox prioritized active
+running done`, `claim = ["running"]`) is the store's `[stages]` in `dricket.toml` — not
+this file's; the store comes onto it at creation (`store/fresh-store.ts`).
 
-**Accept on Ready to try is the sign-off** and no plain move: it starts the human persona's
-`commit` leaving action (req-267) on the ticket's **target repository** — a machine run of the
-Crew runner, no worker and no model: the branch merged into the integration branch in a scratch
-worktree, pushed to that branch's git upstream, proven from a fresh fetch (`plugins/tickets/BOARD.md`;
-without an upstream the local branch moves, only when no checkout has it checked out). A green end
-lands the ticket in Done, as bookkeeping; a protected branch (`policy:`) blocks for the owner, a
-conflict or a failed push ends red with git's reason, and either leaves it on Ready to try — the
-machine resolves no conflict. **A sign-off whose human persona does not list `commit` in `leaving:`
-is refused** with the way to add it (the Crew tab → You → Work → Leaving actions). A ticket with no `repo:` has nothing to
-merge and moves directly. On a store dk refuses an agent's release into a terminal stage, so
-the run hands back to `ready` (on a lifecycle store: `active` pinned to `ready`, req-265) and the engine then makes the owner's move into `done`.
-*Send back* is the ordinary send-back to Building (on a persona board: to the
-earlier position the owner picks, "The persona board" above).
+**Accept at You is the sign-off** and no plain move: it starts the human persona's
+`commit` leaving action (req-267) on the ticket's **target repository** — a machine run of
+the Crew runner, no worker and no model: the branch merged into the integration branch in
+a scratch worktree, pushed to that branch's git upstream, proven from a fresh fetch
+(`plugins/tickets/BOARD.md`; without an upstream the local branch moves, only when no
+checkout has it checked out). A green end lands the ticket in Done, as bookkeeping; a
+protected branch (`policy:`) blocks for the owner, a conflict or a failed push ends red
+with git's reason, and either leaves it at You — the machine resolves no conflict. **A
+sign-off whose human persona does not list `commit` in `leaving:` is refused** with the
+way to add it (the Crew tab → You → Work → Leaving actions). A ticket with no `repo:` has
+nothing to merge and moves directly. On the store dk refuses an agent's release into a
+terminal stage, so the run hands back to `active` and the engine then makes the owner's
+move into `done`. *Send back* is the ordinary send-back to the earlier position the owner
+picks ("The persona board" above).
 
-Boards and stores that exist keep their columns: a default is written only into an empty
-repository, and nothing renames a folder. Earlier defaults were `inbox · plan · build ·
-review · sign-off · done` (E12-9c) and `inbox · prioritized · build · commit · done`; such boards
-are unchanged and fully supported, and Accept on them stays the move to the next column.
-**Mapping of the one migration** (`LEGACY_PHASE_STATES`; the owner migrates all tickets once
-into the dricket store, O-3): `inbox` → `inbox`, `plan` → `shaping`, `prioritized` →
-`prioritized`, `build` → `building`, `review` / `sign-off` / `commit` → `ready`, `done` → `done`;
-the old phase stays in `x-legacy-phase`. `migrate-tickets --pipeline-out` writes the matching
-`_meta/pipeline.md`, and the reverse converter goes back (`legacyPhaseOfState`).
+The phase keys:
 
-> **The rest of this file** still describes the numbered-folder layout of the old backend. Its supersession by the dricket format is E14-9: this section gives the stage vocabulary now, and the display names on every surface are req-99b.
-
-- `id`: `[a-z][a-z0-9-]*`, unique, = the phase (the stripped directory
-  name). The first phase is the capture target; the last is terminal —
-  nothing moves out of it. Humans always may move tickets into it, and
-  so may the machine from an agent-driven column whose next phase it is
-  (owner ruling 2026-10-19: the commit column's agent pushes the work
-  onto the integration branch, then the ticket goes `commit -> done`).
+- `id`: `[a-z][a-z0-9-]*`, unique, = the column. The first phase is the
+  capture target; the last is terminal — nothing moves out of it but
+  the owner's Accept: a chain that is through stands in the terminal
+  column and the engine moves the ticket there right after
+  (`core/chain-placement.ts`).
 - `title`: board column header.
-- `wip`: optional integer. Over-limit shows red on the board
-  (`4/3`); it warns, it does not block a human (and it never gates the
-  dispatcher — the provider pools are the parallelism, req-63).
-- `claim`: optional `true` — entering this phase stamps the claim
-  fields.
-- `handover`: what must happen for a ticket to LEAVE this phase:
-  `manual` (a human moves it), `agent <prompt-ref>[@<worker>]` (the
-  fleet runs prompt `<prompt-ref>` — `tickets/_meta/prompts/<ref>.md`
-  in the tickets repo — and the runner moves it on success; the
-  optional `@worker` pins which agent CLI, otherwise the assignment
-  ladder decides), `ci` (an executable check passes — the phase's
-  `ci:` command, run runner-side in the ticket's work repo since M85),
-  `none` (terminal). A column is **automatic** exactly when its
-  handover mode is `agent` (M85's dispatcher drives it); `manual`
-  columns are the human's.
-- `push`: optional (T-0041) — the **name of a git remote** (from git
-  config; never a URL). When set, every transition commit (a board
-  move, a normalization move, an archive, the runner's success move)
-  is pushed: `git push <remote> HEAD` from the tickets repo root.
-  Default off; a push failure is a warning (board) / log line
-  (runner), never a failed transition. Anything but a remote-name
-  string is ignored with a noise badge.
+- `color:` — optional `#rrggbb`. The Work panel's phase chip uses it;
+  without it a curated default palette colours by position.
 - `flow`: optional (req-266) — the **standard flow**, the chain a new ticket
   is created with: one line in the chain grammar, entries separated by `;`
   (`flow: paul:shape; ben; ralf; tessa; you`), or a YAML list. Copied
@@ -1196,37 +1100,13 @@ the old phase stays in `x-legacy-phase`. `migrate-tickets --pipeline-out` writes
   `tickets: propose flow on|off`; off removes the key). Read by
   `core/pipeline-flow.ts` (`parseProposeFlow`) into `BoardSnapshot.proposeFlow`,
   carried to the run as `RunCursor.proposeFlow`.
-- `token-budget`: optional (req-268) — the board's daily token budget once the
-  pipeline holds only the lifecycle columns: step 3 of the board migration
-  keeps the old working column's `token-budget` here (concept §5: it stays a
-  board key). Recorded, not yet read by a chain board's runner.
+- `token-budget`: optional (req-268) — the board's daily token budget.
+  Recorded, not yet read by a chain board's runner.
 - `closing-signals`: optional (req-169) — the signals that earn a run its
   **closing round** (see Personas, *The journal and the closing round*):
   a list of `red-gate`, `retry`, `steer`, `cost`, `friction`; `none` or
   `[]` for no rounds; absent = all five. An unknown name is dropped with a
   noise badge; a value that is neither a list nor `none` keeps all five.
-- `interactive`: optional prompt ref (req-65) — the brief an
-  **interactive dialog run** in this column gets
-  (`interactive: plan-interview` → `tickets/_meta/prompts/plan-interview.md`).
-  Absent, the shipped default applies: `plan-interactive-default` on the
-  pipeline's first automatic column (E13-9 removed the `refine-interactive-default`
-  twin and the "Refine with agent" start of the manual columns; shaping an
-  idea is the ticket file plus Mission Control; automatic columns offer no
-  dialog, the runner works them). An interactive run is started
-  from the board ("Plan with agent"), not by the
-  dispatcher: the worker is the owner's from turn one (held), the run
-  never gates and never moves — the dialog's end moves (in the takeover
-  tab) are owner moves. While the run is live the ticket carries
-  `interactive: true`, which keeps the dispatcher off it; the move
-  drops the field.
-- `persona`: optional persona id (ADR-0088 E3) — on the phase board (the
-  files backend, a store on phase stages) every ticket of this column
-  dispatches with this persona (the ticket pin and the crew default retired
-  with req-257); on a lifecycle store the chain says who works a ticket and
-  this key only picks the column a holder stands in (see "The chain"). For the run the persona's worker and model
-  replace the assignment ring's resolution and the persona's `prompt.md`
-  becomes the instruction base instead of the phase handover prompt.
-  See `_meta/personas/` below.
 - `priorities:` optional top-level list — the board's priority
   vocabulary, in weight order (first = highest). Every ticket's
   `priority:` must carry one of its words; an omitted or unknown id
@@ -1242,107 +1122,20 @@ the old phase stays in `x-legacy-phase`. `migrate-tickets --pipeline-out` writes
   are validated against it) and every header edit's priority guard —
   there is no hard-coded list left in the paths.
 - Editing this file is the owner's; the board re-reads it on every
-  refresh. Unknown keys in a phase entry are ignored.
+  refresh. A phase entry that carries more than `id`, `title` and
+  `color:` is read as those three — nothing else, no forgiveness
+  message.
 
-**Pool keys** (M85, ADR-0077 — the settings dialog writes them with one
-commit per change; hand edits win on refresh):
-
-- `worker:` — the column's worker pin (`opencode`,
-  `claude-code`, `kimi`, `copilot`, `<provider>/<model>`), the assignment ladder's column
-  level (ticket pin > column > handover `@worker` > repo default >
-  configured default). Unset on a manual column. **Deprecated with
-  personas (E3):** stays readable until the board service migrates the
-  column onto a persona, then is rewritten to null — the ladder decides
-  from then on.
-- `model:` — the model pin for the column's runs (OpenCode:
-  `providerID/modelID`). **Deprecated with personas (E3):** readable
-  until migrated onto the persona's `models`, then cleared to null.
-- `workers:` — **retired (req-63).** The parallel slots belong to the
-  accounts (`sessions` of the slots in `service.json`, req-177; req-63's
-  `fleet.pool.<provider>.size` moved there once, req-170), shared by every column. A leftover key is
-  ignored with a noise badge; clearing a column's worker removes it.
-- `prompt:` — the prompt ref override; the default is the handover's
-  ref (and setting a worker in the dialog writes the matching
-  `agent <phase>-default` handover, clearing it writes `manual`).
-  **Deprecated with personas (E3):** readable until migrated — the
-  persona's own `prompt.md` carries the prompt from then on — then
-  cleared to null.
-- `max-red:` — the circuit breaker's tolerance: consecutive red gates
-  the column takes before it trips (holds + parks its next candidate
-  in inbox). Default 3.
-- `max-turns:` / `max-work:` — the column's own run ceilings (milestone
-  96): the most model turns, and the most working minutes (busy time —
-  a wait for the owner does not count), one run of the column may take
-  before the lease reaper stops it and the step fails into the back-off.
-  Positive integers; absent or invalid = the runner's defaults (250
-  turns, 90 minutes).
-- `min-class:` — the column's class floor (req-170): a class name of
-  Settings → Models (req-287; `A`, `B`, `C` read as heavy, standard,
-  light); no run of the column asks the capacity pool for a lighter class
-  (a size S ticket in a `min-class: standard` column asks for standard). A ticket's `class:` /
-  `model:` pin is not raised. Absent = no floor; any other value is
-  ignored with a noise badge. The stock pipeline sets none (its one agent
-  column, Building, runs every step); a pipeline with a plan or review
-  column gives it `min-class: standard`.
-- `needs:` — what every run of the column needs of its model (req-178),
-  the ticket key's grammar (`needs: image`, `needs: [image, context-200k]`);
-  merged with each ticket's own `needs:`. Absent = nothing; an unknown
-  token is ignored with a noise badge.
-- `token-budget:` — the column's daily token budget (the pool's settled
-  runs are summed per day); over budget trips the breaker. Off by
-  default.
-- `ci:` — the `ci` handover's executable check (a shell command, run in
-  the ticket's work repo checkout); a green check moves the ticket one
-  column right, a red one backs the ticket off for ten minutes.
-- `audit:` — a fraction 0–1: a green step is sampled and a fresh second
-  worker reviews it before the move. Default off.
-- `semantic: true` — every green step in the column gets a second
-  worker's review before it moves. Default off.
-- Columns are added, renamed and removed in Settings → Tickets →
-  Pipeline (req-86): an add writes `{ id, title, handover: manual }`
-  (the id derives from the title, a clash takes `-2`), a rename changes
-  `title` only — the id, the folder and every ticket stay — and a remove
-  is refused while tickets sit in the column; the first and last
-  phase are never removed.
-- `color:` — optional `#rrggbb`. The Work panel's phase chip uses it;
-  without it a curated default palette colours by position.
-
-**Agent lane rules** (the phase board; enforced by the runner, not the board — the
-board serves the human): an agent works the tickets the dispatcher
-gives it — the column's own queue first, then the previous column's
-top — and a dispatched run's completion moves the ticket from where it
-sits to the **working column's next phase** (a pulled ticket goes
-`prioritized` → `commit` in one step). A manual column between
-automatic columns is the owner's **checkpoint**: the machine never
-pulls across it, and only the owner's moves cross it (refine /
-implement / park). On the six stages that is Ready to try; Inbox, Shaping
-and Prioritized stand before the first worker column and are plain queues.
-A manual column that directly follows a checkpoint
-is one too (an older board's Review → Sign Off), so the whole run of the
-owner's columns after a worker column raises Needs-you cards. Backward moves are human moves — the one exception
-is the circuit breaker's park into inbox, always logged.
-
-**Dispatch order** (req-63; the phase board — a persona board dispatches by holder, below): one candidate list over every playing
-automatic column, ordered by priority class (the configured
-vocabulary's first half before its second — see `priorities:` above),
-then column rank — the rightmost column first, so
-finishing beats starting — then the column's derived order. A persona run asks the capacity pool for its class
-(req-170, ADR-0095: `class:` / `model:` pin, else the persona's `class:`, raised, never lowered, by `size:` and
-`min-class:`) and gets exactly that class or waits — queued, no process — while the next candidate whose class
-has room goes ahead; within the class the routing (req-178) filters by the phase's and the ticket's `needs:`
-and takes the slot with the largest surplus. No persona, no run (req-257, owner 2026-11-11): the ring run of a ticket nobody works is gone —
-a lifecycle store's ticket whose entry names no readable persona stands at You with the reason, a phase-board ticket whose column names
-no persona waits with *no persona for the … column*. A running run is never preempted.
-
-**On a lifecycle store the dispatch is by holder** (req-257, the persona board concept §9, `fleet/holder-plan.ts`): the candidates are
-the tickets an agent persona holds (no `:shape` entry, no held or cooling persona), ordered by priority class, then **the later cursor
+**Dispatch is by holder** (req-257, the persona board concept §9, `fleet/holder-plan.ts`): the candidates are
+the tickets an agent persona holds (no `:shape` entry, no held or cooling persona), ordered by priority class (the configured
+vocabulary's first half before its second — see `priorities:` above), then **the later cursor
 position first** (finishing beats starting), then rank. A run needs a free place in the **big pool** (the provider's slots and the
-capacity pool's class, as above) **and** in its **persona's pool** (`parallel:` on `persona.md`; absent = no cap): a persona at its cap
+capacity pool's class — req-170, ADR-0095: the persona's `class:`, raised, never lowered, by `size:`) **and** in its **persona's pool** (`parallel:` on `persona.md`; absent = no cap): a persona at its cap
 waits — *waits for Ben* — even with the big pool free. A persona with `min: n` and fewer than n runs starts one even when the big pool
 is full, an overrun on purpose (default 0). **The breaker counts per persona** (`orchestrate/persona-breaker.ts`): a red gate raises the
-persona's streak and cools it down a minute; at the column's `max-red` (default 3) the persona is held like the owner's pause, the
-trip's reason in the chain status (`personaTripped`, `personaRedStreak`); playing the persona again resets it. The column breaker,
-cooldown and column modes stay the phase board's.
+persona's streak and cools it down a minute; at three red gates in a row the persona is held like the owner's pause, the
+trip's reason in the chain status (`personaTripped`, `personaRedStreak`); playing the persona again resets it. No persona, no run
+(req-257, owner 2026-11-11): a ticket whose entry names no readable persona stands at You with the reason. A running run is never preempted.
 
 ## `_meta/personas/` — the agent personas (E3)
 
@@ -1393,9 +1186,8 @@ tickets/_meta/personas/
 
 - `prompt.md` — the longform persona prompt, free Markdown, **the one prose of the persona** (R11, req-171: one prose, not two).
   The "who Ben is" part stands at its top, as a `## Who Ben is` section; `persona.md` keeps the frontmatter and nothing below
-  the fence. When a persona resolves at dispatch, this file is the run's instruction base, replacing the phase handover prompt.
-  On a dialog run (the Shape chat's interactive mode) the column's interactive prompt (`plan-interactive-default`) follows it
-  as the mode wrapper (req-258) instead of being displaced.
+  the fence. When a persona resolves at dispatch, this file is the run's instruction base — the persona is the prompt, there is
+  no other.
   The Persona page edits it in Drey's Markdown editor.
   **Migration (once, idempotent):** at every engine start `PersonaProseMigrator` finds a `persona.md` that still has prose below
   its fence and moves it to the top of `prompt.md` under `## Who <title> is` — one logged commit per persona
@@ -1420,21 +1212,19 @@ pool held exactly that one model. `worker:`, `models:` and `min-class:` are drop
 **The shipped default crew (req-256, decision D7; req-269).** Five personas ship as files in the package,
 `packages/tickets-engine/personas/<id>/persona.md` + `prompt.md`, and are seeded into a board:
 **`pia`** (Mission Control's persona, `kind: mission`, role `custom`, `#d9cff5` — req-269), **`paul`** (planner), **`ben`** (builder), **`ralf`** (reviewer), **`tessa`** (tester); the human
-persona `you` is written by "Initialize board", with `leaving: [commit]` (req-267). Pia's `prompt.md` is `## Who Pia is` and `## How the owner works with Pia` — the second part is the owner's to rewrite; she is seeded **as shipped** (no step below her prompt, no class, no pin). The shipped `persona.md` carries `title`, `role`, `summary:`, `color`
+persona `you` is written by "Initialize board", with `leaving: [commit]` (req-267). Pia's `prompt.md` is `## Who Pia is` and `## How the owner works with Pia` — the second part is the owner's to rewrite; she is seeded **as shipped** (no class, no pin). The shipped `persona.md` carries `title`, `role`, `summary:`, `color`
 (`#f2d3e2`, `#8ecbef`, `#bfe3cd`, `#f2cfae`), `skills: []` and the run settings that differ from nothing (req-258:
 Paul `gate: structural`, Ralf and Tessa `readonly: true`; req-267: Ben `leaving: [sync-main]`) and, since req-288, `class: heavy` with no `model:` pin (Pia none); the shipped `prompt.md` is the
-"who it is" part (`## Who Paul is`, `## How Paul works` — the character only since req-280; what "done" means is the step prompt's). **Seeding** (`CrewSeeder`) writes the
+persona's "who it is" part as shipped (`## Who Paul is`, `## How Paul works` — req-280 made it the character only; the
+disciplines ride the run brief, and the persona is the instruction base, req-307). **Seeding** (`CrewSeeder`) writes the
 vault's copy: `persona.md` as shipped (`class: heavy`, no pin — since req-288 the seeder reads neither the model table nor the crew's default worker), and
-`prompt.md` = the shipped character part **plus the role's shipped step prompt below it**
-(`## The planning|build|review|verify step` + `plan-default` / `build-default` / `review-default` / `qa-default` without its
-version marker), because a persona's prompt replaces the step prompt as the run's instruction base. **When:** "Initialize
-board" after the pipeline and the prompts; and once at the engine's start for a board that lacks them. **Idempotent by id**:
+`prompt.md` as shipped, nothing composed below it. **When:** "Initialize
+board" after the pipeline and the store; and once at the engine's start for a board that lacks them. **Idempotent by id**:
 `seeded-crew: [pia, paul, ben, ralf, tessa]` in `_meta/crew.md` (below) lists the ids already offered, so a persona the owner
 deleted stays deleted; an id whose folder exists is never touched, only listed; the engine never re-seeds an id the marker
 lists — a board seeded before req-269 (`seeded-crew: [paul, ben, ralf, tessa]`) is offered Pia alone at the next start. A `crew.md` without `order:` gets the default crew's, Pia first and the human last (`order: [pia, paul, ben, ralf, tessa, you]`, req-258/req-269);
 an order already set stays, except that Pia, offered for the first time, goes to its front (the concept §12). One commit (`personas: the default crew (req-256)`: the persona files and `crew.md`), one log line. The seeding changes
-**no** pipeline pin: on a chain board the chain names the personas; a phase-board column without a `persona:` pin still runs
-the ring until the owner pins one (`persona: ben` on the column in `pipeline.md`).
+**no** pipeline key: the chain names the personas.
 
 **The persona picture (req-292).** `personas/<id>/avatar.png` is optional: a PNG, drawn cropped to the circle wherever a
 client draws the persona (the Crew cards and detail, the Capacity band, the Persona page's head and Profile, the ticket card
@@ -1650,10 +1440,9 @@ aggregation stamps the file and truncates nothing (req-169):
   brings one. Ids are minted per persona file and never reused. The
   trigger's constant is `IMPROVEMENTS_THRESHOLD` = 3.
 
-**Who works a ticket** (req-257 retired the old three-level ladder): on a
-lifecycle store the **chain's entry at the cursor** (the holder, "The
-chain"); on the phase board the **phase's `persona:` key** in
-`pipeline.md`. The ticket's `persona:` pin and the engine default
+**Who works a ticket** (req-257 retired the old three-level ladder): the
+**chain's entry at the cursor** (the holder, "The chain"). The ticket's
+`persona:` pin and the engine default
 (`personas.default`, `crew.md` `default-persona`) are read by nothing any
 more — no role fallback, no default (`decisions.md`).
 
@@ -1663,21 +1452,13 @@ persona's `class:` (raised, never lowered, by the ticket's `class:`, the part's
 model table, so the next free model of the class runs; a persona's `model:` pin
 runs alone (no step up) while nothing raised the class, a raise takes the next free
 model of the raised class, and a ticket's own `model:` pin beats all (req-288).
-The harness follows from the model. `prompt.md` replaces the handover prompt. When nothing
+The harness follows from the model. `prompt.md` is the run's instruction base. When nothing
 resolves, or the persona file is missing, a phase-board column still runs
 the legacy assignment ring; on a chain board no persona means no run (the
 ticket stands at You with the reason). Every run
 records the resolved id in its `RunInfo.persona` (null on ring
 dispatches), which is also the key the token report's per-persona cost
 grouping aggregates under (`unassigned` for persona-less runs).
-
-**The legacy column keys.** The phase-level `worker:` / `model:` /
-`prompt:` pool keys stay readable (the phase board's ring reads them). The
-migration that once turned them into a `<phase>-default` persona on every
-snapshot (`personaMigrationFor`, commit `tickets: personas migrated`) is
-**retired** (req-257): no persona is created from a column any more; the
-owner's `build-default` and `commit-default` go with the live migration
-(req-268).
 
 ## `_meta/skills/` — skills as Agent Skills (req-172, R8)
 
@@ -1854,15 +1635,6 @@ token); **every other worker and model counts with `openai-estimate`** (4.0).
 A character outside ASCII counts three quarters of a token. `tokenizer` is
 `{id, family: anthropic | openai-compatible, exact: false, model}`; a client
 must not present the figure as exact (req-241).
-
-## `_meta/order.md` — retired (req-75 W1)
-
-The sparse per-column order pins went with the kanban board
-([ADR-0087](../docs/09_architecture_decisions/0087-work-panel-replaces-the-kanban-board.md)).
-Nothing reads or writes `order.md` any more: a column's order is the
-derived order (priority, then `rank`, then `entered-<phase>`, then
-id), and the Work panel sorts Ideas by priority, newest first within one.
-An existing file is left alone — delete it by hand when convenient.
 
 ## `_meta/repos.md` — work repositories
 
@@ -2406,107 +2178,71 @@ deleted a session must not see its cards return).
 
 ## Validation (where it runs, what it checks)
 
-There is **no CI on the tickets repository** (owner's ruling,
+There is **no CI on the meta vault** (owner's ruling,
 ADR-0076). The one deterministic validator runs where the data is
 read: the board on every render (issues are badges on the card and the
 column; the board still renders), the fleet runner before every action
-(refuses an erroneous ticket). Checks, all deterministic:
+(refuses an erroneous record). Checks, all deterministic:
 
-1. id grammar; id = filename stem; no id in two phases.
-2. Required fields present (`id`, `title`, `priority`); enums valid;
-   timestamps parse; `run` map shape.
-3. `branch` matches `t/<id>` (rule wins; mismatch = badge).
-4. Phase directory ∈ `pipeline.md` phases, compared on the
-   prefix-stripped id (`50-build` and `build` both match `build`;
-   tickets in an unknown folder render in a trailing "unknown" column —
-   visible, not lost). `tickets/archive/` is excluded from the board
-   entirely (never a column, never a badge).
-5. `entered-<phase>` keys reference known phases (unknown keys =
-   noise badge).
-6. `claimed-by` grammar; `claimed-at` present with `claimed-by`.
-7. `repo` (when present) resolves in `repos.md`.
-7a. Projects (req-282, only on a board with project records): a named
-    `project` exists in `_meta/projects/`; a ticket outside the first and
-    the last column belongs to a project (its own, or the board's only
-    one); its `repo:` / `repos:` names are its project's repos. All
-    warnings — the board renders, the fleet still dispatches.
-8. (Removed with req-75 W1: `order.md` is no longer read.)
-9. A ticket without backticked acceptance criteria cannot be worked:
+1. id grammar; required fields present (`id`, `title`, `priority`);
+   enums valid; timestamps parse; `run` map shape.
+2. `repo` (when present) resolves in `repos.md`.
+3. Projects (req-282, only on a board with project records): a named
+   `project` exists in `_meta/projects/`; a ticket at You belongs to a
+   project (its own, or the board's only one); its `repo:` / `repos:`
+   names are its project's repos. All warnings — the board renders,
+   the fleet still dispatches.
+4. A record without backticked acceptance criteria cannot be worked:
    the fleet refuses to start an agent run for it (the most common
-   dispatch hold — the gate would have nothing to run). The one exception
-   is a run in the pipeline's first automatic column (req-93): its plan
+   dispatch hold — the gate would have nothing to run). The one
+   exception is a run at the chain's shaping entry (req-93): its plan
    writes the criteria, so that run gates structurally and the gate
    checks that they came into existence.
-10. `blocked-by` resolution (T-0050): ids resolve against the board's
-    columns only — never `tickets/archive/` — and a satisfied reference
-    is one sitting in the terminal phase **or no longer on the board**:
-    an archived, deleted or renamed blocker does not block (owner
-    decision 2026-10-31 — archiving a finished blocker stalled the
-    chain; a mistyped id unblocks too, the accepted price). Self-reference and cycles are one
-    **error** per member naming the cycle (`blocked-by cycle: T-0001 ->
-    T-0002 -> T-0001`; self = `T-0001 -> T-0001`); the board still
-    renders, and cyclic members count as blocked. A duplicate blocker
-    id resolves to the first occurrence in column order (the duplicate
-    itself is already an error per check 1).
-10. `blocked-by` entries resolve against the board's columns (T-0050):
-   an id off the board (archived, deleted) no longer blocks;
-   self-reference and cycles = errors naming the cycle; a
-   reference on the board is satisfied only in the terminal phase — a
-   blocker in an unknown directory blocks. The archive is never consulted.
-11. `form` (E8): when present, `ship` or `scout` — any other value
-    warns (`form must be ship or scout — read as ship`); the key is
-    preserved on rewrite like every unknown field.
-12. `chain` (req-266): each entry parses in the persona-list grammar
-    (`<persona>[:shape][(notify)]`) — one unreadable entry reads the chain
-    as absent with a warning, never guessed; `at` is a position, `sent-back`
-    reads `<from>><to>`; the guard (known personas, nothing changed at or
-    before the cursor) runs where a write is decided, not on read (see
-    [The chain](#the-chain-req-266-was-the-chain-delta-of-e9)).
+5. `blocked-by` resolution (T-0050): ids resolve against the board's
+   records only, and a satisfied reference is one standing in the
+   terminal stage **or no longer on the board**: an archived, deleted
+   or mistyped blocker does not block (owner decision 2026-10-31 —
+   archiving a finished blocker stalled the chain; a mistyped id
+   unblocks too, the accepted price). Self-reference and cycles are one
+   **error** per member naming the cycle (`blocked-by cycle: T-0001 ->
+   T-0002 -> T-0001`; self = `T-0001 -> T-0001`); the board still
+   renders, and cyclic members count as blocked.
+6. `form` (E8): when present, `ship` or `scout` — any other value
+   warns (`form must be ship or scout — read as ship`); the key is
+   preserved on rewrite like every unknown field.
+7. `chain` (req-266): each entry parses in the persona-list grammar
+   (`<persona>[:shape][(notify)]`) — one unreadable entry reads the chain
+   as absent with a warning, never guessed; `at` is a position, `sent-back`
+   reads `<from>><to>`; the guard (known personas, nothing changed at or
+   before the cursor) runs where a write is decided, not on read (see
+   [The chain](#the-chain-req-266-was-the-chain-delta-of-e9)).
 
 A validation issue never blocks rendering and never blocks a human
-transition (a warning shows); it blocks an agent action.
+transition (a warning shows); it blocks an agent action. The store's
+own header (stage, claim, rev) is dricket's to validate — the board
+reads it through `dk` and reports a malformed record as an issue.
 
-## Normalization (a file move is a ticket move, T-0041)
+## Reading tickets from a dricket store
 
-On every board fetch the plugin runs a **stateless drift pass** over
-the ticket files (derived from the files alone — it survives restarts
-and re-runs safely because the treatment is idempotent):
-
-- For a ticket with parseable frontmatter and no live `run:` map, in
-  known phase B: treatment ⟺ `entered-<B>` is missing or older than
-  the newest of (all `entered-*` stamps, the archived marker). The
-  treatment stamps `entered-<B>`, appends the Log line
-  `<from> -> <B>` (`from` = the holder of the newest event;
-  `archive` when the archived marker dominates; `unknown` when no
-  stamp exists at all) and commits exactly once, `tickets: <id> <from> -> <to>`, actor
-  `owner@<host>`.
-- In `tickets/archive/`: treatment ⟺ no `— archived` Log marker newer
-  than every `entered-*` stamp; the treatment appends the marker and
-  commits `tickets: <id> archived` (no `entered-` stamp).
-- Skipped: files with parse errors or error-level findings, tickets
-  with a live `run:` map (the runner owns the file mid-move), unknown
-  directories, `_meta`. Backwards moves and skips are logged, never
-  blocked — lane rules stay runner-only.
-
-## Reading tickets from a dricket store (E14-2, read-only)
-
-With `tickets.backend` set to `dricket` (or `shadow`, which only compares) the
-board's tickets come from a dricket store (`docs/design/dricket/`) instead of
-`tickets/<phase>/*.md`. `pipeline.md`, `repos.md` and the ledger still come
-from the tickets vault. A store ticket is folded into the layout above by
+The board's tickets come from the dricket store — the one backend
+(req-307, E14-9b: the `tickets.backend` key is gone with the files
+backend; a board without a store gets one created beside the vault,
+"Initialize board" and the engine's first start, `store/fresh-store.ts`).
+`pipeline.md`, `repos.md`, the projects and the ledger still come
+from the meta vault. A store ticket is folded into the layout above by
 `packages/tickets-engine/src/store/store-board.ts`; the card's `path` stays
-the virtual `tickets/<phase>/<id>.md` (there is no such file). A worker edits a
-working copy instead, `_workcopy/<id>.ticket.md` (req-183; `_worktrees/<id>.ticket.md` before, read for one release); the runner takes
+the virtual `tickets/<stage>/<id>.md` (there is no such file). A worker edits a
+working copy instead, `_workcopy/<id>.ticket.md` (req-183); the runner takes
 its changed chapters back inside the claim (D-30, [FLEET.md](../plugins/tickets/FLEET.md)).
 
 | dricket | Ticket key here | Note |
 |---|---|---|
-| `stage`, `x-chain`, `x-at`, `x-phase` | the phase directory | an edge stage (`inbox`, `prioritized`, `done`) that is a pipeline phase is its own column; else `x-phase` if it names a phase (req-265's pin on a ticket not yet converted; also variant B); else, for an `active` / `running` ticket with a readable chain, the column of its holder (req-257, see "The chain"); else the stage itself when it is a pipeline phase id (a store not yet migrated); else by role: `active`/`running`/`in-progress` → first `claim: true` column, `open`/`blocked` → first column, `review` → `commit`, `done`/`cancelled` → last column; anything else is an unknown column with a warning |
+| `stage` | the column | an edge stage (`inbox`, `prioritized`, `done`) is its own column; an `active` / `running` ticket stands in the **active** column, its lane naming the holder (the chain's cursor, req-257 — see "The chain"); a chain that is through stands in the terminal column (`core/chain-placement.ts`); `cancelled` reads as done |
 | `id`, `title`, `priority`, `parent`, `repos` | same | the store's `[priorities]` must use the pipeline's words |
 | `depends` | `blocked-by` | `blocked`/`blocks` stay derived |
 | `owner`, `claimed_at` | `claimed-by`, `claimed-at` | |
 | `x-rank` | `rank` | |
-| `x-worker` `x-persona` `x-track` `x-form` `x-proof` `x-awaiting` | `worker` `persona` `track` `form` `proof` `awaiting` | raw values |
+| `x-worker` `x-track` `x-form` `x-proof` `x-awaiting` | `worker` `track` `form` `proof` `awaiting` | raw values; a legacy `x-persona` reads as the raw `persona` value and dispatches from nothing |
 | `x-class` `x-model` `x-size` `x-allowance` | `class` `model` `size` `allowance` | raw values (req-170); `allowance` as a number |
 | `x-needs` | `needs` | the one-line form (req-178), `image, context-200k` |
 | `x-project` | `project` | the project id (req-282) |
@@ -2518,55 +2254,19 @@ its changed chapters back inside the claim (D-30, [FLEET.md](../plugins/tickets/
 | `x-entered-<phase>` | `entered-<phase>` | |
 
 **The store's stages (req-265).** A store's `[stages]` are the lifecycle, never the columns:
-`inbox prioritized active running done` (`cancelled` reserved), `claim = ["running"]`. A board
+`inbox prioritized active running done` (`cancelled` reserved), `claim = ["running"]` — a store
+on any other stages is not a mode: the board comes up empty with the error that says so
+(`NOT_LIFECYCLE_STORE`), and Drey creates a fresh store instead of migrating
+(owner 2026-11-11: nothing was ever released, nothing to carry over). A board
 write of column *c* writes `stage: c` for an edge column (`inbox`, `prioritized`, `done`) and
 `stage: active` for every other column — a chain ticket's cursor moves to the position that stands in
 *c* (req-257) — and removes any `x-phase`; a header edit keeps stage and fields as they are. `dk claim`
 moves `active -> running`; a chain run's green end writes the next position as `x-at` inside its
 claim and releases once into `active`; a run that hands nothing on releases to where it sat.
-**`x-phase` is retired** (req-257): the column of an `active` ticket follows its holder, the pin is
-read only on a ticket the migration has not converted and written by nothing. A store still on the
-phase stages (variant A: the stages are the column ids) is read and written as before, and the
-Tickets panel offers **Migrate** (the owner's click only): one config commit adds `active` /
-`running`, every ticket in an old stage moves to `active` with its old stage turned into its
-**cursor** (`core/chain-placement.ts` `cursorForPin`: Shaping → the `:shape` entry, a working column →
-the first entry after the planning that stands in it — Ben's build on the standard flow —, Ready to
-try → the last You entry; a ticket without a chain gets the standard flow copied; without chain and
-flow the old pin stays), a second config commit removes the old stages (ADR-0090 later change,
-concept §12 steps 1–2). An `active` ticket that a migration of milestones 239–246 left with a pin is
-offered the same conversion (the pin goes, the cursor comes).
-
-**The board migration (req-268, concept §12 steps 3–5).** Once the store runs
-on the lifecycle stages the meta vault still describes the phase board; the
-board snapshot's `boardMigration` offers the next step and the Tickets panel
-shows it as a line with **Review…** (what the step writes) and **Migrate** —
-never run on its own, each step only on the owner's confirmation
-(`core/board-migration.ts`, `BoardService.migrateBoard`):
-
-1. **step 3, `pipeline`** — `pipeline.md` keeps only the lifecycle columns
-   (`inbox`, `prioritized` and the terminal one) with their `persona:` keys
-   gone, gains the standard `flow:` when it has none, keeps the old working
-   column's `token-budget` as a top-level key, and moves its `min-class`,
-   `needs`, `max-turns` and `max-work` onto the builder's `persona.md` (the
-   first persona after the shape persona's entries of the flow — Ben — where
-   its record sets none); `ci`, `audit` and `semantic` have no ruling and go
-   with the column, named in the offer first. The shipped phase-board prose
-   is replaced, any other prose kept. One commit (`pipeline.md` and the
-   builder's record). This unpins `build-default`.
-2. **step 4, `crew`** — `crew.md`'s `order:` when it has none (Mission
-   Control's persona first, then the personas in the order the flow names
-   them, the rest in pipeline order, You last; the legacy defaults left out)
-   and the leaving actions where missing: the builder's `sync-main`, You's
-   `commit`. One commit.
-3. **step 5, `defaults`** — `build-default` and `commit-default` are deleted
-   by req-261's route (`personaRemove`, confirmed by the title), one commit
-   each; a prompt that differs from the builder's own is named in the offer
-   first, never merged.
-
-Steps run in this order; a step another device ran meanwhile is refused with
-the step that is next.
+**`x-phase` is retired** (req-257): the column of an `active` ticket follows its holder; the pin
+is read by nothing and written by nothing.
 
 Not carried: `branch` (the rule `t/<id>` wins), `run` (the runner's table),
 `parked-*` (a parked ticket is stage `blocked`), `labels`, `kind`, `size`,
-`epoch`, `rev`, lease times. The archive is not a column in either backend.
+`epoch`, `rev`, lease times.
 

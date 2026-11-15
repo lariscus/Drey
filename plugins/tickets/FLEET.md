@@ -216,10 +216,11 @@ stream; on daemon builds it also feeds `redStreak` and `cooldownUntil` in
 
 ### Where a run may start (D-29)
 
-Only out of an agent column (`handover: agent …`): the owner's columns give no run, whoever asks,
-the refusal is `composeRunRequest`'s, the one place every start passes. Two runs work in a manual
-column all the same, and neither takes a ticket for the fleet: the owner's dialog (below) and Accept's
-commit step on Ready to try.
+Only for a ticket an agent persona holds: the owner's columns (Inbox,
+Prioritized) and a You entry give no run, whoever asks, the refusal is
+`composeRunRequest`'s, the one place every start passes. Two runs work
+beside the chain all the same, and neither takes a ticket for the
+fleet: the owner's dialog (below) and Accept's commit step at You.
 
 ### A worker's ticket on a store (D-30)
 
