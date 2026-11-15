@@ -534,7 +534,7 @@ const plugin: MainPluginModule = {
       return board.switchProject(p.id);
     });
 
-    // Sortable columns and the folder numbering (req-50).
+    // Sortable columns (req-50); the folders route only names the tickets folder now.
     ctx.ipc.handle('folders', () => board.folderStatus());
     ctx.ipc.handle('reorderPhases', async (payload) => {
       const p = payload as { order?: unknown };

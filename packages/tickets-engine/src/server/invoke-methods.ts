@@ -9,7 +9,7 @@ export const BOARD_METHODS = [
   'changesOf', 'worktreeChangesOf', 'removeWorktreeForTicket', 'worktreeCleanup', 'worktreeBootSweep',
   'worktreesStatus', 'chainRefusal', 'setClaim', 'startRun', 'setColumnConfig', 'listPrompts', 'savePrompt',
   'restoreShippedPrompts', 'listRepos', 'saveRepos', 'pickFolder', 'scanRepos', 'listProjects',
-  'switchProject', 'openTicketsFolder', 'folderStatus', 'numberFolders', 'reorderPhases', 'editPhase',
+  'switchProject', 'openTicketsFolder', 'folderStatus', 'reorderPhases', 'editPhase',
   'personaLearn', 'listPersonas', 'projectRecords', 'verifyTicket', 'verifyStatus', 'estimateOf',
   'chatSessions', 'chatOpen', 'chatSend', 'chatStart', 'chatConfirm', 'chatDismiss', 'chatShapeDecide', 'chatPlanStatus',
   'ticketDocument', 'saveDocument', 'setHumanName',

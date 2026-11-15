@@ -50,7 +50,6 @@ import { createWorkFilterStore, filterPopover, isFilterActive, NO_WORK_FILTER, t
 import { createTicketsSettingsPage } from './settings-page';
 import { createProjectsSettingsPage } from './projects/projects-page';
 import { createProjectFilter, type ProjectFilter } from './projects/project-filter';
-import { createFilesOperationsHandler, ticketsContextMenuItems } from './files-guard';
 import { createTicketHeader, showsTicketDocument, ticketLogFold, ticketTabTitle } from './ticket-header';
 import { openTicketDocument, type TicketDocumentReply } from './open-ticket';
 import { createBoardRefresh, createChangeGate } from './board-refresh';
@@ -3297,18 +3296,6 @@ const plugin: { activate(api: DreyPluginApi): void } = {
     );
     // req-284: Settings → Projects, a category of its own (board 7m).
     api.ui.registerSettingsPage(createProjectsSettingsPage(api));
-
-    // The Files-panel seam (T-0042, SDK 1.32): veto/takeover over the
-    // board's ground, and the per-target context rows. Both read the
-    // module-level board store, so they follow every board-changed
-    // refresh — including a re-registered tickets vault.
-    const filesDeps = {
-      snapshot: () => snapshot,
-      invoke: invokeBoard,
-      showMessage: (message: string, title?: string) => api.ui.showMessage(message, title),
-    };
-    api.files.registerOperations(createFilesOperationsHandler(filesDeps));
-    api.files.registerContextMenuItems(ticketsContextMenuItems(filesDeps));
 
     // The ticket header and the folded Log in the editor (req-62, SDK 1.34).
     // Both match on the board's vault, so they register again when that
