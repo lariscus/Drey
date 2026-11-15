@@ -10,8 +10,8 @@
  */
 import type { PlanPartCard } from '../../../../packages/tickets-engine/src/contracts/plan-approval';
 import type { PlanPartsReply } from '../../../../packages/tickets-engine/src/contracts/plan-approval';
-import { h, textButton, type DeskDeps } from '../desk-deps';
-import { queueWordsOf } from '../queue-line';
+import { h, textButton, type DeskDeps } from './desk-deps';
+import { queueWordsOf } from '../work/queue-line';
 import type { TeamStore } from '../team/team-store';
 import { usd } from '../team/team-model';
 import type { BoardSnapshot } from '../../shared/tickets';

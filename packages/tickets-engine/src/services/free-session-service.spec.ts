@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectRecord } from '../contracts/projects';
-import type { Persona } from '../core/persona';
-import { LayeredConfigResolver } from '../fleet/config/layered-config-resolver';
+import type { Persona } from '../core/persona/persona';
+import { LayeredConfigResolver } from '../fleet/chain/layered-config-resolver';
 import type { ModelsReply, RunInfo, RunRequest } from '../fleet/protocol';
-import { parseCrewFile } from '../core/crew-file';
+import { parseCrewFile } from '../core/persona/crew-file';
 import { FreeSessionService } from './free-session-service';
 import type { EngineVault } from './host';
 

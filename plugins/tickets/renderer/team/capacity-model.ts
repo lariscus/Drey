@@ -8,7 +8,7 @@
 import type { ChainStatus, QuotaReliability, RunInfo, SlotStateName, SlotSummary } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { I18n } from '../../../../shared/i18n/types';
 import { DEFAULT_PRIORITY_CONFIG, priorityClass, type BoardSnapshot } from '../../shared/tickets';
-import { workGroups } from '../work-groups';
+import { workGroups } from '../work/work-groups';
 import { isLiveRun } from './team-model';
 
 /** The surplus above which the chip says an upgrade is allowed (board 7e: `q 1.4` carries the chevron, `q 1.2` does not). */

@@ -6,7 +6,7 @@
  * *From folder…*, which opens the system folder picker and recognises a git
  * repository in the folder it returns.
  */
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import { checkGitUrl } from '../../shared/git-url';
 import type { ProjectRecord } from '../../../../packages/tickets-engine/src/contracts/projects';
 import { iconBtn } from './projects-dom';

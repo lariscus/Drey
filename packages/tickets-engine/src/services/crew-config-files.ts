@@ -1,6 +1,6 @@
 import { CREW_FILE } from '../contracts/crew-config';
-import { parseCrewFile, type CrewParse } from '../core/crew-file';
-import type { TicketsGit } from '../core/tickets-git';
+import { parseCrewFile, type CrewParse } from '../core/persona/crew-file';
+import type { TicketsGit } from '../core/git/tickets-git';
 import type { EngineHost, EngineVault } from './host';
 
 /** The file as read: its text (null = absent) and its parse. */

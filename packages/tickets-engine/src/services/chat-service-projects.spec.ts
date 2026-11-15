@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ChatBridge, ChatCommand } from '../contracts/chat';
 import type { ProjectRecord } from '../contracts/projects';
 import type { BoardSnapshot } from '../contracts/tickets';
-import type { TicketsGit } from '../core/tickets-git';
+import type { TicketsGit } from '../core/git/tickets-git';
 import { ChatService, type ChatBoardPort } from './chat-service';
 import type { EngineHost } from './host';
 

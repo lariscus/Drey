@@ -1,11 +1,11 @@
 import type { ChainEntry } from '../contracts/chain';
 import type { TicketCard } from '../contracts/tickets';
-import { atLastEntry, ownerSendBackTarget } from '../core/chain-cursor';
-import { renderChainEntry } from '../core/chain-list';
-import { chainFinished } from '../core/chain-placement';
-import { cursorAfterGreen } from '../core/chain-red-gate';
-import type { PersonaLookup } from '../core/chain-holder';
-import { EDGE_STAGES } from '../core/lifecycle-stages';
+import { atLastEntry, ownerSendBackTarget } from '../core/pipeline/chain-cursor';
+import { renderChainEntry } from '../core/pipeline/chain-list';
+import { chainFinished } from '../core/pipeline/chain-placement';
+import { cursorAfterGreen } from '../core/pipeline/chain-red-gate';
+import type { PersonaLookup } from '../core/pipeline/chain-holder';
+import { EDGE_STAGES } from '../core/pipeline/lifecycle-stages';
 
 /** What the owner's chain moves read of the board: the terminal column and the crew's kinds. */
 export interface OwnerChainContext {

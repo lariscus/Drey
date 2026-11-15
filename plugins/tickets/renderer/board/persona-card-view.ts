@@ -7,7 +7,7 @@
  */
 import type { HoldBadge, HoldStatus } from '../../../../packages/tickets-engine/src/contracts/persona-board';
 import type { I18n } from '../../../../shared/i18n/types';
-import { h } from '../desk-deps';
+import { h } from './desk-deps';
 import { usd } from '../team/team-model';
 import type { ChainCellModel, PersonaCardModel } from './persona-board-model';
 

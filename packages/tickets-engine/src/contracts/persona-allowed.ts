@@ -1,4 +1,4 @@
-import type { PersonaAllowed, PersonaRunCommands } from '../core/persona';
+import type { PersonaAllowed, PersonaRunCommands } from '../core/persona/persona';
 
 /**
  * The `allowed:` keys a persona patch may send (req-171, the page's "Allowed

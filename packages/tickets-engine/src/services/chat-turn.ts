@@ -8,7 +8,7 @@
  * carrying a `failure`; an unreadable answer resolves an honest say.
  */
 import type { ChatBridge, ChatCommand, ChatModelFailure, ChatShapeReply, ChatStreamEvent } from '../contracts/chat';
-import { parseEnvelope, type ChatEnvelope } from '../core/chat-intents';
+import { parseEnvelope, type ChatEnvelope } from '../core/chat/chat-intents';
 import type { ChatBridgeDeps } from './chat-llm';
 import { causeOf, chatFailure, chatRequest, httpReason, resolveChatModel, type ChatModelSpec } from './chat-model';
 import { readSse } from './chat-sse';

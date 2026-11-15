@@ -9,7 +9,7 @@
  * through the catalog.
  */
 import type { PersonaJournalReply, PersonaMemoryReply, PersonaView } from '../../shared/remote-protocol';
-import { h, textButton, type DeskDeps } from '../desk-deps';
+import { h, textButton, type DeskDeps } from '../board/desk-deps';
 import { journalRows, memoryRows, type JournalRow, type MemoryRow, type Words } from './memory-model';
 
 function wordsOf(deps: DeskDeps): Words {

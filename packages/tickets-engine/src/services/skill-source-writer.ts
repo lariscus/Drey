@@ -1,4 +1,4 @@
-import { sharedSkillDir, SHARED_SKILLS_DIR } from '../core/skill';
+import { sharedSkillDir, SHARED_SKILLS_DIR } from '../core/skills/skill';
 import type { SkillFileSystem } from './skill-file-system';
 import type { FetchedSkill } from './skill-source-fetcher';
 

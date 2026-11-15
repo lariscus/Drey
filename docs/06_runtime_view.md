@@ -3420,7 +3420,7 @@ worker before the move.
 ```mermaid
 sequenceDiagram
     actor O as Owner
-    participant P as Settings → Tickets (settings-columns.ts)
+    participant P as Settings → Tickets (renderer/settings)
     participant B as BoardService (engine process)
     participant V as tickets vault (files)
     participant G as git (tickets repo)
@@ -4667,7 +4667,7 @@ archive.
 ## 6.99 A run through the state machine, the one ticket writer and the event stream (milestone 214, req-176, [ADR-0096](09_architecture_decisions/0096-crew-runner-refactor-state-machine-ports-and-file-size-rule.md))
 
 Since the refactor every change of a run's state is one transition of
-`RunStateMachine` (`packages/tickets-engine/src/fleet/run/run-state-machine.ts`):
+`RunStateMachine` (`packages/tickets-engine/src/fleet/runner/run-state-machine.ts`):
 the supervisor's parts report an event, the machine answers the next state
 or refuses it (`IllegalRunTransition`). Every write to a ticket — the
 supervisor's and the chain's — goes through the one `RunBookkeeper` over the
@@ -4732,7 +4732,7 @@ sequenceDiagram
 ```
 
 Where the parts live and which may import which (`run/` and `ports/` import
-nothing from Node or their siblings; `orchestrate/` sees the harness contract
+nothing from Node or their siblings; `chain/` and `runner/` see the harness contract
 alone; only `runner.ts` wires a concrete adapter) is §5.0's "Crew runner
 structure" row; the rule is enforced by ESLint and `fleet/architecture.spec.ts`.
 
@@ -5881,7 +5881,7 @@ sequenceDiagram
     BS->>S: settleFinishedChains — put --claim stage done
 ```
 
-On a lifecycle store the dispatch asks **who holds the ticket** instead of which column it sits in: the holder rule (`core/chain-holder.ts`) reads the chain's entry at the cursor; an agent entry runs with that persona alone (no ticket pin, no crew default, no ring run), a `:shape` entry waits for the Shape chat, a You entry for the owner, a Pia entry for milestone 248, an entry naming no readable persona stands at You with the reason. A run needs room in the big pool **and** in the persona's own pool; a persona below its `min:` overruns a full big pool. A red gate counts against the persona (`PersonaBreaker`): its streak, a minute's breather, the trip into the pause. Until req-270/271 the board keeps the pipeline's columns and places an `active` ticket in its holder's column (`core/chain-placement.ts`); an owner's move into a working column moves the cursor to the position that stands there (`store/chain-move.ts`). The stage migration turns a ticket's old column into its cursor (`cursorForPin`) and converts the pins a milestone-239 migration left.
+On a lifecycle store the dispatch asks **who holds the ticket** instead of which column it sits in: the holder rule (`core/pipeline/chain-holder.ts`) reads the chain's entry at the cursor; an agent entry runs with that persona alone (no ticket pin, no crew default, no ring run), a `:shape` entry waits for the Shape chat, a You entry for the owner, a Pia entry for milestone 248, an entry naming no readable persona stands at You with the reason. A run needs room in the big pool **and** in the persona's own pool; a persona below its `min:` overruns a full big pool. A red gate counts against the persona (`PersonaBreaker`): its streak, a minute's breather, the trip into the pause. Until req-270/271 the board keeps the pipeline's columns and places an `active` ticket in its holder's column (`core/chain-placement.ts`); an owner's move into a working column moves the cursor to the position that stands there (`store/chain-move.ts`). The stage migration turns a ticket's old column into its cursor (`cursorForPin`) and converts the pins a milestone-239 migration left.
 
 ## 6.124 A chain run's verdicts and Pia's entry — send-back, question, the plan's chain, a Mission Control turn on a ticket (req-257, milestone 248)
 

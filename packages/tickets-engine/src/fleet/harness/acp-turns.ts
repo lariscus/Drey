@@ -1,4 +1,4 @@
-import { costOf } from '../../core/model-prices';
+import { costOf } from '../../core/config/model-prices';
 import { parseShapedQuestion } from '../../contracts/question-shape';
 import { AcpCost } from './acp-cost';
 import type { AcpUsageMeter } from './acp-harness';

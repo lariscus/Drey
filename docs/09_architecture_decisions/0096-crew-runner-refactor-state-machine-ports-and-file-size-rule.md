@@ -7,6 +7,12 @@ Proposed (owner decisions of 2026-11-08, after the review of his Grobkonzept
 structure), ADR-0077 (the orchestrator) and ADR-0088 (the engine package's
 `fleet/` folder). Built as req-176. The alternative the concept weighed, a
 new runner in Go as a separate product, is recorded in `specs/decisions.md`.
+Later change (req-300, 2026-11-15): the fleet's sub-packages are domain
+folders — `chain/`, `runner/` (the run machinery, the pure run core and
+the composition seams), `lease/`, `worktrees/`, `telemetry/`, beside the
+standing `api/`, `governor/`, `harness/`, `ports/`, `routing/`,
+`session/`, with the wire contract `protocol*.ts` at the fleet root; the
+rules below hold unchanged, their paths follow the moves.
 
 ## Context
 

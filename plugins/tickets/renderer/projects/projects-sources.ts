@@ -9,7 +9,7 @@
  */
 import type { ProjectDraft } from '../../../../packages/tickets-engine/src/contracts/project-commands';
 import type { ProjectRecord } from '../../../../packages/tickets-engine/src/contracts/projects';
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import { addButton, iconBtn, tag } from './projects-dom';
 import { repoPicker } from './projects-repo-picker';
 import type { ProjectsContext } from './projects-context';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { telemetryFromEvents } from '../telemetry';
+import { telemetryFromEvents } from '../telemetry/telemetry';
 import type { SpawnFn } from '../ports/process-spawner';
 import { claudeCodeAdapter } from './claude-code';
 import { collect, fakeProcess, spawnOf } from './worker-process.fake';

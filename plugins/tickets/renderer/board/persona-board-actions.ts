@@ -5,7 +5,7 @@
  * card's menu, the keyboard's way to every drop the mouse makes (start on /
  * hand to a persona, park, done).
  */
-import { h, type DeskDeps } from '../desk-deps';
+import { h, type DeskDeps } from './desk-deps';
 import type { PersonaCardModel } from './persona-board-model';
 import { dropCard, type PersonaBoardContext } from './persona-board-drop';
 

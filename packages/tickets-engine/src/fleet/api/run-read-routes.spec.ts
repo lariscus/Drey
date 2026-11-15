@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { SupervisorSet } from '../orchestrate/supervisor-set';
+import type { SupervisorSet } from '../runner/supervisor-set';
 import { attachCommandOf } from './attach-command';
 import type { RouteContext } from './route-context';
-import { parseLedger } from '../../core/ledger';
-import type { JournalReader } from '../journal-reader';
-import type { LedgerReader } from '../ledger-reader';
+import { parseLedger } from '../../core/pipeline/ledger';
+import type { JournalReader } from '../runner/journal-reader';
+import type { LedgerReader } from './ledger-reader';
 import type { RunInfo } from '../protocol';
 import { busyMsOf, RunReadRoutes } from './run-read-routes';
 

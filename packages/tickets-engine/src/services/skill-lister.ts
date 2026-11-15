@@ -1,7 +1,7 @@
 import type { SkillListData, SkillSourceRef, SkillView, TokenizerView } from '../contracts/skills';
-import { declaredNameOf, descriptionFromBody } from '../core/skill';
-import { estimateTokens } from '../core/token-count';
-import { skillsSection } from '../fleet/skills-section';
+import { declaredNameOf, descriptionFromBody } from '../core/skills/skill';
+import { estimateTokens } from '../core/config/token-count';
+import { skillsSection } from '../fleet/runner/skills-section';
 import type { SkillFileSystem } from './skill-file-system';
 import type { SkillFolderReader, SkillRecord } from './skill-folder-reader';
 

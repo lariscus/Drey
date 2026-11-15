@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateChatCommand } from '../core/chat-intents';
+import { validateChatCommand } from '../core/chat/chat-intents';
 import { parseCrewPatches, parseFreeSessionAsk } from './session-payloads';
 
 describe('the req-173 invoke payloads', () => {

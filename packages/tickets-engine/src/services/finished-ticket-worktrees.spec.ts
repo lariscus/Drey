@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { RepoRef, TicketCard } from '../contracts/tickets';
-import { FinishedWorktrees, type FinishedTarget, type RemovalOutcome } from '../fleet/orchestrate/finished-worktrees';
+import { FinishedWorktrees, type FinishedTarget, type RemovalOutcome } from '../fleet/worktrees/finished-worktrees';
 import { finishedTargetsOf, removeDoneWorktrees } from './finished-ticket-worktrees';
 
 const VAULT = path.resolve('/tickets');

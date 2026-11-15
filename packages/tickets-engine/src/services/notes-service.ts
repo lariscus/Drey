@@ -30,7 +30,7 @@ import type {
   NotesRecentReply,
   NotesSearchReply,
 } from '../contracts/notes';
-import { isNoteFileName, isServedChild, parseNoteFolder, parseNotePath } from '../core/note-path';
+import { isNoteFileName, isServedChild, parseNoteFolder, parseNotePath } from '../core/ticket/note-path';
 import { atomicWrite } from './atomic-note-write';
 import { allNotesNewestFirst, noteEntryOf, noteNameOf, staysServed } from './served-files';
 

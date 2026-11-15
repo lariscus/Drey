@@ -1,7 +1,7 @@
 import type { NormalizedEvent } from '../harness/contract';
 import type { EventSink, RunnerEvent } from '../ports/event-sink';
 import type { RunInfo } from '../protocol';
-import { isTerminal } from '../run/run-state';
+import { isTerminal } from '../runner/run-state';
 import type { ClaudeCodeQuotaSource } from './claude-code-quota-source';
 import type { CountingQuotaSource } from './counting-quota-source';
 import { isLoginFailure } from './login-failure';

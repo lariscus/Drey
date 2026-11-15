@@ -1,4 +1,4 @@
-import { MAX_SKILL_BYTES } from '../core/skill-limits';
+import { MAX_SKILL_BYTES } from '../core/skills/skill-limits';
 import type { GithubClient } from './github-client';
 import { HttpGithubClient } from './http-github-client';
 import { SkillLibraryService, type SkillLibraryDeps } from './skill-library-service';

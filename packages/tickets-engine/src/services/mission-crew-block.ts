@@ -9,7 +9,7 @@
  * the owner has set one, else the git user's name; a board that knows neither leaves the name out
  * and the block still maps "me" / "I" to `you`. Pure but for the one name lookup.
  */
-import { HUMAN_PERSONA_ID, isAgentPersona, isHumanPersona, isMissionPersona, type Persona } from '../core/persona';
+import { HUMAN_PERSONA_ID, isAgentPersona, isHumanPersona, isMissionPersona, type Persona } from '../core/persona/persona';
 
 /** The default title of the human persona — no name the owner chose. */
 const DEFAULT_HUMAN_TITLE = 'You';

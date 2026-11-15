@@ -1,4 +1,4 @@
-import type { TicketsGit } from '../core/tickets-git';
+import type { TicketsGit } from '../core/git/tickets-git';
 import type { EngineHost, EngineVault } from './host';
 
 /**

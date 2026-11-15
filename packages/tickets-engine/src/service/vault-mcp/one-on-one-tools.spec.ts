@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ONE_ON_ONE_TOOLS } from '../../fleet/one-on-one-toolset';
+import { ONE_ON_ONE_TOOLS } from '../../fleet/session/one-on-one-toolset';
 import { OneOnOneVaultTools } from './one-on-one-tools';
 
 /**

@@ -1,11 +1,11 @@
 import { splitFrontmatter } from '../../../../shared/frontmatter';
 import { PROJECTS_DIR } from '../contracts/projects';
 import { parseRegisteredVaults, VAULTS_KEY } from '../contracts/vaults';
-import { parsePersonaFile, personaFileText, PERSONAS_DIR, type Persona } from '../core/persona';
-import { planProjectMigration, type ProjectMigrationPlan } from '../core/project-migration';
-import { projectFileText } from '../core/project-record';
-import { parseRepos } from '../core/repos-file';
-import { TicketsGit } from '../core/tickets-git';
+import { parsePersonaFile, personaFileText, PERSONAS_DIR, type Persona } from '../core/persona/persona';
+import { planProjectMigration, type ProjectMigrationPlan } from '../core/projects/project-migration';
+import { projectFileText } from '../core/projects/project-record';
+import { parseRepos } from '../core/projects/repos-file';
+import { TicketsGit } from '../core/git/tickets-git';
 import type { EngineHost, EngineVault } from './host';
 
 const REPOS_PATH = 'tickets/_meta/repos.md';

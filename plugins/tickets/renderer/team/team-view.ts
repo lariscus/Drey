@@ -9,8 +9,8 @@
  */
 import type { I18n } from '../../../../shared/i18n/types';
 import { autopilotSwitchViewOf, autopilotToneOf } from '../../../../shared/autopilot';
-import { h, textButton, type DeskDeps } from '../desk-deps';
-import { NUDGE_TEXT } from '../workers-view';
+import { h, textButton, type DeskDeps } from '../board/desk-deps';
+import { NUDGE_TEXT } from '../run/workers-view';
 import {
   usdBudget,
   teamHeadOf,

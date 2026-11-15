@@ -2,7 +2,7 @@ import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { parsePersonaFile, type Persona } from '../core/persona';
+import { parsePersonaFile, type Persona } from '../core/persona/persona';
 import type { RunInfo, RunRequest } from '../fleet/protocol';
 import type { ApiTurnInput } from './api-persona-turn';
 import type { EngineHost, EngineVault } from './host';

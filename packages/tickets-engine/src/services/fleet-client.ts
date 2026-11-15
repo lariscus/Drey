@@ -11,7 +11,7 @@
  * `GET /status` (polled onto the board while anything is live) and the
  * stream files via `GET /stream/:id` for the watch view.
  */
-import type { ExecFn } from '../fleet/procs';
+import type { ExecFn } from '../fleet/runner/procs';
 import type { AutopilotRecord, AutopilotRefusal, ChainConfig, ChainMaster, ChainStatus, ChainStoreConfig, ColumnMode, ModelsReply, QuestionAnswers, RunInfo, RunRequest, SlotView } from '../fleet/protocol';
 import { RunHistory } from './run-history';
 import { RunnerConnection, type RunnerLocator } from './runner-connection';

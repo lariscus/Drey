@@ -1,11 +1,11 @@
-import { parseNeeds } from '../core/model-needs';
+import { parseNeeds } from '../core/config/model-needs';
 import {
   PERSONA_GATES,
   PERSONA_LEAVING_ACTIONS,
   type PersonaGate,
   type PersonaLeavingAction,
   type PersonaSettings,
-} from '../core/persona-settings';
+} from '../core/persona/persona-settings';
 
 /**
  * The run settings a persona patch may send (req-258, the page's Work block

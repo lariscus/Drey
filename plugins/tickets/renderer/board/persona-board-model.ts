@@ -26,7 +26,7 @@ import {
 } from '../../../../packages/tickets-engine/src/contracts/persona-board';
 import type { ChainStatus, RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { DEFAULT_PRIORITY_CONFIG, priorityWeight, type BoardSnapshot, type TicketCard } from '../../shared/tickets';
-import { liveRunOf } from '../work-groups';
+import { liveRunOf } from '../work/work-groups';
 
 /** One position of a card's chain: the persona's initials and how far the chain is. */
 export interface ChainCellModel {

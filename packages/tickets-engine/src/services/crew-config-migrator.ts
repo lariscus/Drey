@@ -1,4 +1,4 @@
-import { patchCrewFile } from '../core/crew-file-write';
+import { patchCrewFile } from '../core/persona/crew-file-write';
 import type { CrewConfigFiles } from './crew-config-files';
 import { CrewMigrationPlan, type LegacyCrewSources } from './crew-migration-plan';
 import type { EngineVault } from './host';

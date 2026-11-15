@@ -9,9 +9,9 @@
  */
 import { fail, type McpToolDef, type McpToolResult } from '../../../../../shared/vault-tools';
 import type { RunJournalWrite, RunMemoryWrite, RunRecordAuthor, RunRecordReply } from '../../contracts/persona-run-records';
-import { PERSONAS_DIR } from '../../core/persona';
-import { JOURNAL_FILE, oneLine } from '../../core/persona-journal';
-import { CLOSING_FRICTION_MAX, CLOSING_LESSON_MAX } from '../../fleet/closing-round-prompt';
+import { PERSONAS_DIR } from '../../core/persona/persona';
+import { JOURNAL_FILE, oneLine } from '../../core/persona/persona-journal';
+import { CLOSING_FRICTION_MAX, CLOSING_LESSON_MAX } from '../../fleet/runner/closing-round-prompt';
 import { JOURNAL_WRITE_TOOL, MEMORY_WRITE_TOOL } from '../../fleet/protocol-closing';
 import type { TokenSession } from './run-tokens';
 import type { VaultCallTarget } from './vault-call-target';

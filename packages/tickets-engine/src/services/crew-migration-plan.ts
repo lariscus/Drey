@@ -1,7 +1,7 @@
 import { CREW_FIELDS, type CrewKey, type CrewOverrideMap, type CrewPatch, type VaultCrewConfig } from '../contracts/crew-config';
-import { crewValueOf } from '../core/crew-file';
-import type { CrewOverridePatch } from '../core/crew-file-write';
-import { CREW_DEFAULTS } from '../fleet/config/layered-config-resolver';
+import { crewValueOf } from '../core/persona/crew-file';
+import type { CrewOverridePatch } from '../core/persona/crew-file-write';
+import { CREW_DEFAULTS } from '../fleet/chain/layered-config-resolver';
 
 /** What the old places held: the engine's `config.json` (flat keys) and the old `chain.json`'s `config`. */
 export interface LegacyCrewSources {

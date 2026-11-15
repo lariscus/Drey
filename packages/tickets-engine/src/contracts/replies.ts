@@ -1,4 +1,4 @@
-import type { TicketCommentView } from '../core/status-comment';
+import type { TicketCommentView } from '../core/pipeline/status-comment';
 import type { TicketCard } from './tickets';
 
 /** The remote refine's outcome: the new revision, a conflict flag, or the refusal. */

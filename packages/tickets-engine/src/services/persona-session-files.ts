@@ -1,11 +1,11 @@
 import { promises as fsp } from 'node:fs';
 import type { PersonaSessionFile } from '../contracts/persona-session';
-import { CHAT_DIR, chatFileName, decideProposal } from '../core/chat-session';
-import type { Persona } from '../core/persona';
-import { appendPersonaAnswer, appendPersonaOwner, appendPersonaProposal, migrateThread, newPersonaSessionText, personaSessionTitle } from '../core/persona-session-file';
-import { extractProposals, parsePersonaSession } from '../core/persona-session-parse';
-import { threadPathFor } from '../core/persona-thread';
-import { TicketsGit } from '../core/tickets-git';
+import { CHAT_DIR, chatFileName, decideProposal } from '../core/chat/chat-session';
+import type { Persona } from '../core/persona/persona';
+import { appendPersonaAnswer, appendPersonaOwner, appendPersonaProposal, migrateThread, newPersonaSessionText, personaSessionTitle } from '../core/persona/persona-session-file';
+import { extractProposals, parsePersonaSession } from '../core/persona/persona-session-parse';
+import { threadPathFor } from '../core/persona/persona-thread';
+import { TicketsGit } from '../core/git/tickets-git';
 import type { EngineHost, EngineVault } from './host';
 
 export interface PersonaSessionFilesDeps {

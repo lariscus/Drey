@@ -12,8 +12,8 @@
  * not a degraded mode.
  */
 import path from 'node:path';
-import { SHIPPED_PROMPTS_DIR } from '../core/default-prompts';
-import { expandFragments, loadPromptFragments, readPromptFile } from '../core/prompt-file';
+import { SHIPPED_PROMPTS_DIR } from '../core/config/default-prompts';
+import { expandFragments, loadPromptFragments, readPromptFile } from '../core/config/prompt-file';
 
 /** The three chat prompts: Mission Control's turns, shape and the improvement aggregator. */
 export interface CrewPrompts {

@@ -5,13 +5,13 @@ import {
   parseTicketFile,
   patchTicketFile,
   ticketSections,
-} from '../../../packages/tickets-engine/src/core/ticket-files';
+} from '../../../packages/tickets-engine/src/core/ticket/ticket-files';
 import {
   composeInstruction,
   parseWorkerValue,
   resolveAssignment,
-} from '../../../packages/tickets-engine/src/fleet/assignment';
-import { loadDisciplineTexts } from '../../../packages/tickets-engine/src/fleet/discipline-texts';
+} from '../../../packages/tickets-engine/src/fleet/runner/assignment';
+import { loadDisciplineTexts } from '../../../packages/tickets-engine/src/fleet/runner/discipline-texts';
 import { DEFAULT_FLEET_CAPS } from '../../../packages/tickets-engine/src/fleet/protocol';
 
 /** req-279: the real shipped discipline texts — this spec asserts the brief's bytes (the asking example's last line). */

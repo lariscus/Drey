@@ -2,7 +2,7 @@ import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { NodeFileSystem } from '../fleet/node-file-system';
+import { NodeFileSystem } from '../fleet/runner/node-file-system';
 import { ServiceModelTable } from './service-model-table';
 
 describe('ServiceModelTable — the model table read from service.json (req-256)', () => {

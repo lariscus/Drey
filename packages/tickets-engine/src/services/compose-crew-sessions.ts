@@ -1,7 +1,7 @@
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
-import type { TicketsGit } from '../core/tickets-git';
-import { NodeFileSystem } from '../fleet/node-file-system';
+import type { TicketsGit } from '../core/git/tickets-git';
+import { NodeFileSystem } from '../fleet/runner/node-file-system';
 import { CrewConfigFiles } from './crew-config-files';
 import { CrewConfigMigrator } from './crew-config-migrator';
 import { CrewConfigService } from './crew-config-service';

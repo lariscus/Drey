@@ -8,7 +8,7 @@
  * Pure: the records, the registered vaults and the folders' existence come in.
  */
 import type { ProjectRecord } from '../../contracts/projects';
-import type { VaultScope } from '../../fleet/orchestrate/worker-vault';
+import type { VaultScope } from '../../fleet/runner/worker-vault';
 import type { VaultSite } from './disk-tool-vault';
 
 /** The vaults and folders one scope names: vault name → may it be written, and the folders as written. */

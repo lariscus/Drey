@@ -1,10 +1,10 @@
 import { CREW_FILE } from '../contracts/crew-config';
-import { seededPersonaText, seededPromptText, type ShippedPersona } from '../core/default-crew';
-import { SEEDED_PICTURES_KEY, seededCrewOf, seededListOf, withSeededCrew, withSeededList } from '../core/crew-seed-marker';
-import { crewOrderOf, withCrewOrder } from '../core/crew-order';
-import { HUMAN_PERSONA_ID, PERSONAS_DIR } from '../core/persona';
-import type { CrewWrite } from '../core/crew-file-write';
-import type { TicketsGit } from '../core/tickets-git';
+import { seededPersonaText, seededPromptText, type ShippedPersona } from '../core/persona/default-crew';
+import { SEEDED_PICTURES_KEY, seededCrewOf, seededListOf, withSeededCrew, withSeededList } from '../core/persona/crew-seed-marker';
+import { crewOrderOf, withCrewOrder } from '../core/persona/crew-order';
+import { HUMAN_PERSONA_ID, PERSONAS_DIR } from '../core/persona/persona';
+import type { CrewWrite } from '../core/persona/crew-file-write';
+import type { TicketsGit } from '../core/git/tickets-git';
 import type { CrewConfigFiles } from './crew-config-files';
 import type { EngineHost, EngineVault } from './host';
 import type { PersonaAvatarWriter } from './persona-avatars';

@@ -7,7 +7,7 @@ import { claudeCodeMcpLaunch } from '../../fleet/harness/claude-code';
 import type { NormalizedEvent, ProviderAdapter, WorkerHandle } from '../../fleet/harness/contract';
 import { kimiAdapter } from '../../fleet/harness/kimi';
 import { opencodeAdapter } from '../../fleet/harness/opencode';
-import { nodeSpawnFn } from '../../fleet/procs';
+import { nodeSpawnFn } from '../../fleet/runner/procs';
 import { composeVaultMcp } from './compose-vault-mcp';
 import type { VaultMcpComponent } from './vault-mcp-component';
 

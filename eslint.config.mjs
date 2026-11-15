@@ -57,12 +57,14 @@ const NO_APPS = layer(
 );
 
 /**
- * The Crew runner's sub-packages (ADR-0096, req-176): `fleet/run` is the
- * pure core (state machine, records, limits), `fleet/harness/*` are the
- * coding-agent adapters, `fleet/orchestrate` drives runs over ports, and
- * `fleet/runner.ts` is the composition root — the only module that wires a
- * concrete adapter. The architecture spec (`fleet/architecture.spec.ts`)
- * asserts the same graph in the test gate.
+ * The Crew runner's domain folders (ADR-0096, req-176, req-300): `chain`
+ * is the daemon, `runner` the run machinery, its pure core
+ * (`run-state` … `run-limits`) and the composition seams,
+ * `lease` the claims, `worktrees` and `telemetry` their domains,
+ * `harness/*` are the coding-agent adapters, and `runner/runner.ts` is
+ * the composition root — the only module that wires a concrete adapter.
+ * The architecture spec (`fleet/architecture.spec.ts`) asserts the same
+ * graph in the test gate.
  */
 const ENGINE_LAYERS = [NO_RENDERER, NO_MAIN, NO_PLUGINS, NO_APPS];
 const FLEET = 'packages/tickets-engine/src/fleet';
@@ -71,18 +73,19 @@ const NODE_BUILTINS = {
   message: 'This part of the Crew runner reaches the machine through a port in fleet/ports (ADR-0096), never a Node module.',
 };
 const CONCRETE_ADAPTERS = {
-  group: ['**/harness/claude-code', '**/harness/opencode', '**/harness/kimi', '**/harness/kimi-*', '**/harness/copilot', '**/harness/acp-adapter', '**/store/dk-ticket-store'],
-  message: 'Only fleet/runner.ts (the composition root) imports a concrete adapter (ADR-0096); depend on the port it satisfies instead.',
+  group: ['**/harness/claude-code', '**/harness/opencode', '**/harness/kimi', '**/harness/kimi-*', '**/harness/copilot', '**/harness/acp-adapter', '**/lease/dk-ticket-store'],
+  message: 'Only runner/runner.ts (the composition root) imports a concrete adapter (ADR-0096); depend on the port it satisfies instead.',
 };
+const RUN_CORE = `${FLEET}/runner/{run-state,run-state-machine,illegal-run-transition,run-event,run-record,run-summary,exec-span,run-limits}.ts`;
 const RUN_CORE_ONLY = [
   {
     group: ['../**', '!../protocol'],
-    message: 'fleet/run is the pure core (ADR-0096): it imports nothing outside its folder but types from ../protocol.',
+    message: 'The pure run core is the pure core (ADR-0096): it imports nothing outside its files but types from the wire contract.',
   },
   {
     group: ['../protocol'],
     allowTypeImports: true,
-    message: 'fleet/run takes only types from ../protocol (ADR-0096).',
+    message: 'The pure run core takes only types from the wire contract (ADR-0096).',
   },
 ];
 /** Ports take types from the wire protocol and the adapter contract, nothing else. */
@@ -99,14 +102,14 @@ const PORTS_ONLY = [
 ];
 /**
  * `fleet/routing` (req-177): the slots and their quota windows. It takes the
- * wire types, the ports, the adapter contract's types and the run core; the
- * orchestration, the API, the store and the concrete adapters stay out —
+ * wire types, the ports, the adapter contract's types and the pure run core;
+ * the orchestration, the API and the concrete adapters stay out —
  * the orchestration asks it through the consumer's `SlotBinder`.
  */
 const ROUTING_ONLY = [
   {
-    group: ['../**', '!../protocol', '!../ports', '!../ports/*', '!../harness', '!../harness/contract', '!../run', '!../run/*'],
-    message: 'fleet/routing takes ../protocol, ../ports, ../harness/contract and ../run only (ADR-0096, req-177).',
+    group: ['../**', '!../protocol', '!../ports', '!../ports/*', '!../harness', '!../harness/contract', '!../runner', '../runner/*', '!../runner/run-*'],
+    message: 'fleet/routing takes the wire contract, ../ports, ../harness/contract and the pure run core only (ADR-0096, req-177).',
   },
   {
     group: ['../ports/*', '../harness/contract'],
@@ -141,7 +144,7 @@ const NOT_GOVERNOR = {
   message: 'The orchestration and the API never import fleet/governor (req-180): they ask it through the consumer interface (WorkerSeats, GateSeats, GovernorDesk) the composition root satisfies.',
 };
 const HARNESS_NOT_ORCHESTRATE = {
-  group: ['../orchestrate', '../orchestrate/**', '../api', '../api/**', '../store', '../store/**', '../runner', '../../**/orchestrate/**'],
+  group: ['../chain', '../chain/**', '../runner', '../runner/**', '../lease', '../lease/**', '../worktrees', '../worktrees/**', '../api', '../api/**', '../telemetry', '../telemetry/**', '../session', '../session/**', '../../**/chain/**'],
   message: 'An adapter never imports the orchestration (ADR-0096): it reports normalized events, the orchestrator decides.',
 };
 
@@ -356,13 +359,13 @@ export default tseslint.config(
     // each with the engine's layer rules restated: a later block replaces
     // the rule's options for its files, it does not add to them.
     files: [`${FLEET}/**/*.ts`],
-    ignores: [`${FLEET}/runner.ts`, `${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`, `${FLEET}/harness/**`, `${FLEET}/store/**`],
+    ignores: [`${FLEET}/runner/runner.ts`, `${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`, `${FLEET}/harness/**`, `${FLEET}/lease/**`],
     rules: {
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS] }],
     },
   },
   {
-    files: [`${FLEET}/run/**/*.ts`],
+    files: [RUN_CORE],
     ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`],
     rules: {
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, NODE_BUILTINS, ...RUN_CORE_ONLY] }],
@@ -376,18 +379,54 @@ export default tseslint.config(
     },
   },
   {
-    // req-176 step 4: the orchestration reaches the machine only through fleet/ports.
-    files: [`${FLEET}/orchestrate/**/*.ts`],
+    // The daemon (chain): it asks the pool and the governor through its own interfaces.
+    files: [`${FLEET}/chain/**/*.ts`],
     ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`, `${FLEET}/**/*spec-support.ts`],
     rules: {
-      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS, NODE_BUILTINS, NOT_ROUTING, NOT_GOVERNOR] }],
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS, NOT_ROUTING, NOT_GOVERNOR] }],
     },
   },
   {
-    files: [`${FLEET}/api/**/*.ts`],
-    ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`],
+    // The run machinery: the composition seams (runner.ts, compose-*) wire
+    // the parts and are exempt from the routing/governor and adapter rules
+    // by the ignores of the blocks above and below.
+    files: [`${FLEET}/runner/**/*.ts`],
+    ignores: [
+      `${FLEET}/**/*.spec.ts`,
+      `${FLEET}/**/*.fake.ts`,
+      `${FLEET}/runner/runner.ts`,
+      `${FLEET}/runner/compose-supervisor.ts`,
+      `${FLEET}/runner/runner-governor.ts`,
+      `${FLEET}/runner/compose-routing.ts`,
+      `${FLEET}/runner/compose-pool.ts`,
+      `${FLEET}/runner/compose-discovery.ts`,
+      `${FLEET}/runner/compose-governor.ts`,
+    ],
     rules: {
       '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, CONCRETE_ADAPTERS, NOT_ROUTING, NOT_GOVERNOR] }],
+    },
+  },
+  {
+    // The composition seams themselves: they reach every fleet part, never the app layers.
+    files: [
+      `${FLEET}/runner/runner.ts`,
+      `${FLEET}/runner/compose-supervisor.ts`,
+      `${FLEET}/runner/runner-governor.ts`,
+      `${FLEET}/runner/compose-routing.ts`,
+      `${FLEET}/runner/compose-pool.ts`,
+      `${FLEET}/runner/compose-discovery.ts`,
+      `${FLEET}/runner/compose-governor.ts`,
+    ],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: ENGINE_LAYERS }],
+    },
+  },
+  {
+    // The sessions and the resource governor reach the machine only through fleet/ports.
+    files: [`${FLEET}/session/**/*.ts`, `${FLEET}/governor/**/*.ts`],
+    ignores: [`${FLEET}/**/*.spec.ts`, `${FLEET}/**/*.fake.ts`],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [...ENGINE_LAYERS, NODE_BUILTINS] }],
     },
   },
   {

@@ -8,7 +8,7 @@
  * draft chain (the app keeps the draft).
  */
 import type { ChainMode } from './chain';
-import type { FlowOp } from '../core/flow-edit';
+import type { FlowOp } from '../core/pipeline/flow-edit';
 
 export type { FlowOp };
 

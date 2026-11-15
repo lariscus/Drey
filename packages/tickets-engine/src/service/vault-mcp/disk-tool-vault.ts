@@ -11,7 +11,7 @@ import type { VaultFileEntry, VaultStatus } from '../../../../../shared/ipc-api'
 import type { RenameVault } from '../../../../../shared/link-rewriter';
 import type { ToolVault } from '../../../../../shared/vault-tools';
 import type { RegisteredVault } from '../../contracts/vaults';
-import { isServedChild, isServedPath } from '../../core/note-path';
+import { isServedChild, isServedPath } from '../../core/ticket/note-path';
 import type { VaultDisk } from './vault-disk';
 
 /** A registered vault and whether its folder exists right now. */

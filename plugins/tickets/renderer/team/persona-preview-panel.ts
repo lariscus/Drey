@@ -9,7 +9,7 @@
  * title>`): the figure is the run's start, not a run.
  */
 import type { MarkdownViewHandle } from '../../../../shared/plugin-api/renderer';
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { partLinesOf } from './persona-preview-model';
 import type { PromptPreview } from './persona-seams';

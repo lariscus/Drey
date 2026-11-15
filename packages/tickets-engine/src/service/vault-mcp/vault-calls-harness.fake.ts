@@ -5,7 +5,7 @@
  */
 import type { ProjectRecord } from '../../contracts/projects';
 import type { NormalizedEvent } from '../../fleet/harness/contract';
-import type { PersonaRecordsGrant, VaultScope } from '../../fleet/orchestrate/worker-vault';
+import type { PersonaRecordsGrant, VaultScope } from '../../fleet/runner/worker-vault';
 import type { VaultSite } from './disk-tool-vault';
 import { MemoryVaultDisk } from './memory-vault-disk.fake';
 import { PersonaRecordTools, type PersonaRecordsPort } from './persona-record-tools';

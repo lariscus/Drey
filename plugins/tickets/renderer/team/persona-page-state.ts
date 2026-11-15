@@ -5,7 +5,7 @@
  * or a decision sets. The page, its actions and the spec share these types;
  * nothing here touches the DOM.
  */
-import type { ImprovementProposal } from '../../../../packages/tickets-engine/src/core/improvements';
+import type { ImprovementProposal } from '../../../../packages/tickets-engine/src/core/persona/improvements';
 import type { PersonaView } from '../../shared/remote-protocol';
 import type { BlockContext } from './persona-block-context';
 import type { InstructionsBlock } from './persona-instructions-block';

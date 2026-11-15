@@ -11,8 +11,8 @@
  */
 import type { McpToolDef, McpToolResult } from '../../../../../shared/vault-tools';
 import type { WorkerMcpLaunch, WorkerMcpServer } from '../../fleet/harness/contract';
-import type { OneOnOneToolSeam } from '../../fleet/one-on-one-toolset';
-import type { VaultGrantRequest, WorkerVaultAccess, WorkerVaultGate } from '../../fleet/orchestrate/worker-vault';
+import type { OneOnOneToolSeam } from '../../fleet/session/one-on-one-toolset';
+import type { VaultGrantRequest, WorkerVaultAccess, WorkerVaultGate } from '../../fleet/runner/worker-vault';
 import type { ComponentRecord } from '../service-lock';
 import type { LaunchFiles } from './launch-files';
 import { OneOnOneVaultTools } from './one-on-one-tools';

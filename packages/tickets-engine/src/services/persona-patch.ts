@@ -1,8 +1,8 @@
 import type { PersonaAllowedPatch } from '../contracts/persona-allowed';
 import { settingsPatchError, type PersonaSettingsPatch } from '../contracts/persona-settings-patch';
 import { classNameOf } from '../contracts/capability-class';
-import { PERSONA_ROLES, PERSONA_RUN_COMMANDS, type Persona } from '../core/persona';
-import { MIGRATION_FALLBACK_CLASS } from '../core/persona-model-migration';
+import { PERSONA_ROLES, PERSONA_RUN_COMMANDS, type Persona } from '../core/persona/persona';
+import { MIGRATION_FALLBACK_CLASS } from '../core/persona/persona-model-migration';
 
 /** The PATCH body's shape (U4). */
 export interface PersonaPatchFields {

@@ -6,7 +6,7 @@
  * calls back, the block owns the state.
  */
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 
 /** A switch button (`role="switch"`); `large` is the board's 44 × 24 one (Read-only). */
 export function switchButton(label: string, on: boolean, toggle: () => void, options: { readonly large?: boolean; readonly title?: string; readonly field?: string } = {}): HTMLButtonElement {

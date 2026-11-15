@@ -12,9 +12,9 @@
  * unchanged; `service.lock` records them.
  */
 import type { GovernorSettings, RunnerDescriptor } from '../fleet/protocol';
-import { startRunner, type Args, type RunnerDeps, type RunnerHandle } from '../fleet/runner';
-import type { PersonaRecordsChannel } from '../fleet/orchestrate/engine-round-records';
-import type { WorkerVaultGate } from '../fleet/orchestrate/worker-vault';
+import { startRunner, type Args, type RunnerDeps, type RunnerHandle } from '../fleet/runner/runner';
+import type { PersonaRecordsChannel } from '../fleet/runner/engine-round-records';
+import type { WorkerVaultGate } from '../fleet/runner/worker-vault';
 import type { RunnerLocator } from '../services/fleet-client';
 import type { ComponentRecord } from './service-lock';
 

@@ -1,5 +1,5 @@
-import { MEMORY_PIN_MARKER, memoryEntriesOf, parseMemoryLine, type MemoryAuthor } from '../core/memory-line';
-import { PERSONAS_DIR } from '../core/persona';
+import { MEMORY_PIN_MARKER, memoryEntriesOf, parseMemoryLine, type MemoryAuthor } from '../core/persona/memory-line';
+import { PERSONAS_DIR } from '../core/persona/persona';
 
 /**
  * The persona memory store (ADR-0088, E3): the one writer for

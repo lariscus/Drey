@@ -1,8 +1,8 @@
 import { CREW_FILE, type CrewConfigReply, type CrewOverridePatch, type CrewPatch } from '../contracts/crew-config';
-import { patchCrewFile } from '../core/crew-file-write';
-import { withCrewOrder } from '../core/crew-order';
-import { personaRef } from '../core/persona';
-import { LayeredConfigResolver, type EffectiveCrew } from '../fleet/config/layered-config-resolver';
+import { patchCrewFile } from '../core/persona/crew-file-write';
+import { withCrewOrder } from '../core/persona/crew-order';
+import { personaRef } from '../core/persona/persona';
+import { LayeredConfigResolver, type EffectiveCrew } from '../fleet/chain/layered-config-resolver';
 import type { CrewConfigFiles } from './crew-config-files';
 import type { CrewConfigMigrator } from './crew-config-migrator';
 import type { EngineVault } from './host';

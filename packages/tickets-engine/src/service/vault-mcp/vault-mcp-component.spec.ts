@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { NormalizedEvent, WorkerMcpServer } from '../../fleet/harness/contract';
-import type { VaultGrantRequest } from '../../fleet/orchestrate/worker-vault';
+import type { VaultGrantRequest } from '../../fleet/runner/worker-vault';
 import { MemoryVaultDisk } from './memory-vault-disk.fake';
 import { ProjectRights } from './project-rights';
 import { RunTokens } from './run-tokens';

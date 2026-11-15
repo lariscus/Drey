@@ -1,7 +1,7 @@
 import type { PersonaRemoveCommand, PersonaRemoveFailure, PersonaRemovePort, PersonaRemoveReply } from '../contracts/persona-remove';
-import { personaRef, PERSONAS_DIR, type Persona } from '../core/persona';
-import { hasLiveSession, removalRefusal, type RemovalRun } from '../core/persona-removal';
-import type { TicketsGit } from '../core/tickets-git';
+import { personaRef, PERSONAS_DIR, type Persona } from '../core/persona/persona';
+import { hasLiveSession, removalRefusal, type RemovalRun } from '../core/persona/persona-removal';
+import type { TicketsGit } from '../core/git/tickets-git';
 import type { EngineHost, EngineVault } from './host';
 import { SkillCommitter } from './skill-committer';
 import { NodeSkillFileSystem, type SkillFileSystem } from './skill-file-system';

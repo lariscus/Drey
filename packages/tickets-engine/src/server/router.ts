@@ -26,11 +26,11 @@ import {
   parseStopRun,
   parseTransition,
   type Parsed,
-} from '../core/commands';
+} from '../core/ticket/commands';
 import { remoteActorOf, type ImprovementDecision, type TicketsRemotePort } from '../contracts/remote-protocol';
-import { parseAutopilotSet } from '../fleet/autopilot';
+import { parseAutopilotSet } from '../fleet/chain/autopilot';
 import type { AutopilotRefusal } from '../fleet/protocol';
-import { parseReviewComments, sendBackNoteOf, type ReviewComment } from '../core/review-feedback';
+import { parseReviewComments, sendBackNoteOf, type ReviewComment } from '../core/ticket/review-feedback';
 import { parsePersonaPatch } from './persona-patch-body';
 import { parsePersonaPicture, parsePersonaRemove } from './persona-remove-body';
 import { parseSkillRemove, parseSkillToggle, parseSkillUpload } from './skill-bodies';

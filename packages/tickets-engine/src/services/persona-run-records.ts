@@ -1,11 +1,11 @@
 import * as path from 'node:path';
 import type { ClosingRoundWrite, ClosingRoundWritten, RoundProposalWrite, RunJournalWrite, RunMemoryWrite, RunRecordReply } from '../contracts/persona-run-records';
-import { holdsLesson, personaLessonLine } from '../core/memory-line';
-import { PERSONAS_DIR, personaRef, type Persona } from '../core/persona';
-import { JOURNAL_FILE, renderJournalEntry, RUN_JOURNAL_NOTE, type JournalEntry } from '../core/persona-journal';
-import { withJournalEntries, withRoundEntry } from '../core/persona-journal-file';
-import { withRoundProposal } from '../core/round-proposal';
-import type { TicketsGit } from '../core/tickets-git';
+import { holdsLesson, personaLessonLine } from '../core/persona/memory-line';
+import { PERSONAS_DIR, personaRef, type Persona } from '../core/persona/persona';
+import { JOURNAL_FILE, renderJournalEntry, RUN_JOURNAL_NOTE, type JournalEntry } from '../core/persona/persona-journal';
+import { withJournalEntries, withRoundEntry } from '../core/persona/persona-journal-file';
+import { withRoundProposal } from '../core/pipeline/round-proposal';
+import type { TicketsGit } from '../core/git/tickets-git';
 import type { EngineHost, EngineVault } from './host';
 import { appendMemory, memoryPathFor } from './persona-store';
 

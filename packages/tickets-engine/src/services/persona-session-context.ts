@@ -1,8 +1,8 @@
 import type { PersonaMessage } from '../contracts/persona-session';
-import { loadPersonaSkills, type Persona } from '../core/persona';
-import { expandShippedFragments } from '../core/prompt-file';
-import { BRIEF_RUNS, composeOneOnOneBrief, type BriefRun } from '../fleet/one-on-one-brief';
-import { NO_TOOLS, type OneOnOneToolSeam } from '../fleet/one-on-one-toolset';
+import { loadPersonaSkills, type Persona } from '../core/persona/persona';
+import { expandShippedFragments } from '../core/config/prompt-file';
+import { BRIEF_RUNS, composeOneOnOneBrief, type BriefRun } from '../fleet/session/one-on-one-brief';
+import { NO_TOOLS, type OneOnOneToolSeam } from '../fleet/session/one-on-one-toolset';
 import type { RunInfo, WorkerProviderId } from '../fleet/protocol';
 import { isTicketRun } from '../fleet/protocol-session';
 import type { EngineHost, EngineVault } from './host';

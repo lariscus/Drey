@@ -1,6 +1,6 @@
 import { branchForTicket, type RepoRef, type TicketCard } from '../contracts/tickets';
-import { finishedLines, type FinishedTarget, type FinishedWorktrees } from '../fleet/orchestrate/finished-worktrees';
-import { worktreePathFor } from '../fleet/worktree-home';
+import { finishedLines, type FinishedTarget, type FinishedWorktrees } from '../fleet/worktrees/finished-worktrees';
+import { worktreePathFor } from '../fleet/worktrees/worktree-home';
 
 /** The ticket's worktrees on the board's repositories: its repo first, then its further repos (req-72); none without a local path. */
 export function finishedTargetsOf(vaultPath: string, repos: readonly RepoRef[], card: TicketCard): readonly FinishedTarget[] {

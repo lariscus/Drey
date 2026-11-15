@@ -4,7 +4,7 @@
  * call (req-271): `dropOf` decides — a persona board move (`personaBoardMove`)
  * or the ordinary `transition` (Inbox ↔ Prioritized, Done).
  */
-import type { DeskDeps } from '../desk-deps';
+import type { DeskDeps } from './desk-deps';
 import { dropOf } from './persona-board-model';
 
 /** What the view keeps per Board tab. */

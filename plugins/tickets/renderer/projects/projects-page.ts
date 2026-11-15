@@ -12,7 +12,7 @@ import type { DreyPluginApi, PluginSettingsPageContrib } from '../../../../share
 import type { BoardSnapshot, ReposListing } from '../../shared/tickets';
 import type { ProjectDraft, ProjectFolderReply, ProjectReply } from '../../../../packages/tickets-engine/src/contracts/project-commands';
 import type { ProjectRecord } from '../../../../packages/tickets-engine/src/contracts/projects';
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import { dot, iconBtn } from './projects-dom';
 import { colorOf, draftOf, freshColor, newProjectName, ticketCounts } from './projects-model';
 import type { CloneProgressEvent, FolderOutcome, ProjectsContext } from './projects-context';

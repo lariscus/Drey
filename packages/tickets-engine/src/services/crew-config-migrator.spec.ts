@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CREW_FILE } from '../contracts/crew-config';
-import { parseCrewFile } from '../core/crew-file';
+import { parseCrewFile } from '../core/persona/crew-file';
 import { CrewConfigFiles } from './crew-config-files';
 import { CREW_MIGRATED_KEY, CrewConfigMigrator, vaultKeyOf, type CrewLegacyPort } from './crew-config-migrator';
 import { CrewConfigService } from './crew-config-service';

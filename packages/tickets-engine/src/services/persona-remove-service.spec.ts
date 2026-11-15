@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { parsePersonaFile } from '../core/persona';
-import { TicketsGit } from '../core/tickets-git';
+import { parsePersonaFile } from '../core/persona/persona';
+import { TicketsGit } from '../core/git/tickets-git';
 import type { EngineVault } from './host';
 import { PersonaRemoveService, type PersonaRemoveDeps } from './persona-remove-service';
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SkillSourceRecord } from '../core/skill-sources-file';
+import type { SkillSourceRecord } from '../core/skills/skill-sources-file';
 import { GithubError } from './github-client';
 import { FakeGithub } from './github-client.fake';
 import { acmeRepo, C14, C15, MAIN } from './skill-library.fixture';

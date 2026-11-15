@@ -7,7 +7,7 @@
  * all read it; nothing here knows about the DOM.
  */
 import type { PersonaView } from '../../shared/remote-protocol';
-import type { DeskDeps } from '../desk-deps';
+import type { DeskDeps } from '../board/desk-deps';
 import { personaPictures } from './persona-pictures';
 
 const MIN_GAP_MS = 4_000;

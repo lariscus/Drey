@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePersonaFile } from '../core/persona';
+import { parsePersonaFile } from '../core/persona/persona';
 import { flowPersonasOf } from './flow-views';
 
 /** req-269: Mission Control's persona in the flow pickers. */

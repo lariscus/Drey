@@ -6,7 +6,7 @@
  * remove button, which takes the skill off the persona — the library keeps
  * it, an own skill stays in the persona's folder and in the library list.
  */
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
 import { switchButton } from './persona-controls';
 import type { Translate } from './persona-dom';

@@ -8,10 +8,10 @@
  * harness follows from it. DOM-free.
  */
 import { DEFAULT_CLASS_NAMES } from '../../../../packages/tickets-engine/src/contracts/capability-class';
-import { splitPoolEntry } from '../../../../packages/tickets-engine/src/core/pool-entry';
+import { splitPoolEntry } from '../../../../packages/tickets-engine/src/core/config/pool-entry';
 import type { ModelRow, ModelsReply } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { SlotView } from '../../../../packages/tickets-engine/src/fleet/protocol-slots';
-import { RUNNER_LABEL } from '../settings-workers';
+import { RUNNER_LABEL } from '../settings/workers.ts/settings-workers';
 
 /** One model of a class as the listbox offers it. */
 export interface ClassModel {

@@ -8,7 +8,7 @@
  * Move left / Move right. Every way writes the whole list as `order:` in
  * `tickets/_meta/crew.md` (`crewOrderSet`, one commit).
  */
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { Translate } from './persona-dom';
 
 /** The order with `id` moved by `delta` places; the same order at an edge. */

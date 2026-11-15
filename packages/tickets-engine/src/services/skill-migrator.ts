@@ -1,4 +1,4 @@
-import { isSkillName, migratedSkillText, ownSkillsDir, SHARED_SKILLS_DIR, SKILL_FILE } from '../core/skill';
+import { isSkillName, migratedSkillText, ownSkillsDir, SHARED_SKILLS_DIR, SKILL_FILE } from '../core/skills/skill';
 import type { EngineHost, EngineVault } from './host';
 import type { SkillCommitter } from './skill-committer';
 import type { SkillFileSystem } from './skill-file-system';

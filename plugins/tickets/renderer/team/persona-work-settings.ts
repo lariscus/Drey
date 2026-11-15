@@ -6,8 +6,8 @@
  * carries the read-only rules, the harness keeps its permissions. The class
  * floor folded into the Model block's class.
  */
-import type { PersonaLeavingAction } from '../../../../packages/tickets-engine/src/core/persona-settings';
-import { h } from '../desk-deps';
+import type { PersonaLeavingAction } from '../../../../packages/tickets-engine/src/core/persona/persona-settings';
+import { h } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { labelled, outlineButton, selectOf, textInput } from './persona-dom';
 import { switchButton } from './persona-controls';

@@ -15,10 +15,10 @@
  * proposed again, so a send-back loop never asks the same question twice.
  */
 import type { BoardSnapshot } from '../contracts/tickets';
-import { CHAT_DIR, chatFileName, parseSessionFile } from '../core/chat-session';
-import { followupSessionText, followupsTitle, runLinePrefix, type FollowupContext } from '../core/followup-cards';
-import type { FollowupDraft } from '../core/followups';
-import { TicketsGit } from '../core/tickets-git';
+import { CHAT_DIR, chatFileName, parseSessionFile } from '../core/chat/chat-session';
+import { followupSessionText, followupsTitle, runLinePrefix, type FollowupContext } from '../core/ticket/followup-cards';
+import type { FollowupDraft } from '../core/ticket/followups';
+import { TicketsGit } from '../core/git/tickets-git';
 import type { EngineHost, EngineVault } from './host';
 
 /** The session files the chat owns — direct children of its folder only. */

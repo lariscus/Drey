@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { parsePersonaFile, type Persona } from '../core/persona';
+import { parsePersonaFile, type Persona } from '../core/persona/persona';
 import { FakeGithub } from './github-client.fake';
 import type { EngineVault } from './host';
 import { MemorySkillFileSystem } from './skill-file-system.fake';

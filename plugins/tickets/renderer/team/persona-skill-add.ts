@@ -7,7 +7,7 @@
  * `PickedFile`s and handed on; what to send, and what to refuse before
  * sending, is `skill-upload-model.ts`.
  */
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { Translate } from './persona-dom';
 import { outlineButton } from './persona-dom';
 import type { PickedFile } from './skill-upload-model';

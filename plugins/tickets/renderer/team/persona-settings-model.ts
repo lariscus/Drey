@@ -9,7 +9,7 @@
  * in the file.
  */
 import type { PersonaSettingsPatch } from '../../../../packages/tickets-engine/src/contracts/persona-settings-patch';
-import { PERSONA_LEAVING_ACTIONS, type PersonaLeavingAction } from '../../../../packages/tickets-engine/src/core/persona-settings';
+import { PERSONA_LEAVING_ACTIONS, type PersonaLeavingAction } from '../../../../packages/tickets-engine/src/core/persona/persona-settings';
 import type { PersonaView } from '../../shared/remote-protocol';
 
 export interface SettingsDraft {

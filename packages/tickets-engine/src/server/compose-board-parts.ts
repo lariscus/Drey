@@ -1,7 +1,7 @@
 import { hostname } from 'node:os';
 import * as path from 'node:path';
-import { TicketsGit } from '../core/tickets-git';
-import { FleetEventWriter } from '../fleet/event-writer';
+import { TicketsGit } from '../core/git/tickets-git';
+import { FleetEventWriter } from '../fleet/runner/event-writer';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from '../fleet/protocol';
 import { RunnerComponent } from '../service/runner-component';
 import { EngineBoardService } from '../services/board-service';

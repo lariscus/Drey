@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { retireVerdict } from '../fleet/runner-lifecycle';
+import { retireVerdict } from '../fleet/runner/runner-lifecycle';
 import { DEFAULT_SERVICE_IDLE_MS, ServiceIdleWatch, serviceIdleMsOf, serviceSleepVerdict, type ServiceLiveness } from './sleep';
 
 /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePersonaFile, type Persona } from '../core/persona';
+import { parsePersonaFile, type Persona } from '../core/persona/persona';
 import type { EngineVault } from './host';
 import { MissionPersonaPrompt } from './mission-persona-prompt';
 

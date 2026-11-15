@@ -2,7 +2,7 @@ import { promises as fsp, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { planSectionOf } from '../core/plan-delta';
+import { planSectionOf } from '../core/plan/plan-delta';
 import { toDricketId } from '../store/ids';
 import type { EngineBoardService } from './board-service';
 import { openPersonaRig, probeDk, type PersonaRig } from './board-service-persona.fake';

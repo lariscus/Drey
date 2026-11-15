@@ -11,7 +11,7 @@
 import type { ConversationMessage, ConversationThread } from '../../../../shared/plugin-api/renderer';
 import type { PersonaView } from '../../shared/remote-protocol';
 import { ACCEPT, DISMISS, threadOfPersona, type PersonaWords } from '../conversation/persona-map';
-import { h, textButton, type DeskDeps } from '../desk-deps';
+import { h, textButton, type DeskDeps } from '../board/desk-deps';
 
 function wordsOf(deps: DeskDeps): PersonaWords {
   return { t: (key, params) => deps.api.i18n.t(key as never, params as never), formatTime: (date) => deps.api.i18n.formatTime(date) };

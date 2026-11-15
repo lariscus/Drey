@@ -1,5 +1,5 @@
 import { inflateRawSync } from 'node:zlib';
-import { MAX_SKILL_BYTES, MAX_SKILL_FILES, type SkillBundleFile } from '../core/skill-bundle';
+import { MAX_SKILL_BYTES, MAX_SKILL_FILES, type SkillBundleFile } from '../core/skills/skill-bundle';
 
 /**
  * A dependency-free reader of the zip a skill arrives in (req-172): the

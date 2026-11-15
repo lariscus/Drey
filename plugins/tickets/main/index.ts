@@ -35,38 +35,38 @@ import {
   parseTicketId,
   parseTransition,
   parseUnarchive,
-} from '../../../packages/tickets-engine/src/core/commands';
-import { parseTicketFile, patchHeaderFields, type HeaderPatch } from '../../../packages/tickets-engine/src/core/ticket-files';
-import { parseReviewComments, sendBackNoteOf } from '../../../packages/tickets-engine/src/core/review-feedback';
-import { planWorktreeRemoval } from '../../../packages/tickets-engine/src/core/worktree-removal';
-import { personaModelGuess } from '../../../packages/tickets-engine/src/core/persona';
+} from '../../../packages/tickets-engine/src/core/ticket/commands';
+import { parseTicketFile, patchHeaderFields, type HeaderPatch } from '../../../packages/tickets-engine/src/core/ticket/ticket-files';
+import { parseReviewComments, sendBackNoteOf } from '../../../packages/tickets-engine/src/core/ticket/review-feedback';
+import { planWorktreeRemoval } from '../../../packages/tickets-engine/src/core/git/worktree-removal';
+import { personaModelGuess } from '../../../packages/tickets-engine/src/core/persona/persona';
 import { captureTidyMessages, parseCaptureTidy } from '../shared/capture-tidy';
 import type { AttachmentReply, RefineReply, TicketReply } from '../shared/remote-protocol';
-import { hostVaultIdMapper } from './host-vault-id';
-import { openTerminalAt } from './open-terminal';
-import { startWindowsDictation } from './dictation';
-import { createFleetMcpTools } from './mcp-tools';
-import { chainAutopilotOf } from './autopilot-ipc';
-import { createFleetSnapshotSender } from './fleet-snapshot';
-import { listWorkerModels } from './worker-models';
-import { EngineClient } from './engine-client';
-import { PathAnnouncer } from './path-announcer';
-import { withEffectiveDkPath } from './dk-path';
-import { ensureService, syncChatConfig, syncNotesVault, syncStoreConfig, syncVaultRegistry } from './service-lifecycle';
-import { createServiceQuitGuard, liveRunsOf, quitWordsOf, type QuitChoice } from './service-quit-guard';
-import { ServiceControl, serviceHomeOf } from './service-control';
-import { ServiceSettingsHandlers } from './service-settings';
-import { TicketDocuments, askToAddCheckout } from './ticket-documents';
-import { isStoreDocumentPath, storeDocumentHeader, storeDocumentHeaderEdit } from './store-document-header';
+import { hostVaultIdMapper } from './engine/host-vault-id';
+import { openTerminalAt } from './worker/open-terminal';
+import { startWindowsDictation } from './worker/dictation';
+import { createFleetMcpTools } from './ipc/mcp-tools';
+import { chainAutopilotOf } from './ipc/autopilot-ipc';
+import { createFleetSnapshotSender } from './engine/fleet-snapshot';
+import { listWorkerModels } from './worker/worker-models';
+import { EngineClient } from './engine/engine-client';
+import { PathAnnouncer } from './engine/path-announcer';
+import { withEffectiveDkPath } from './engine/dk-path';
+import { ensureService, syncChatConfig, syncNotesVault, syncStoreConfig, syncVaultRegistry } from './service/service-lifecycle';
+import { createServiceQuitGuard, liveRunsOf, quitWordsOf, type QuitChoice } from './service/service-quit-guard';
+import { ServiceControl, serviceHomeOf } from './service/service-control';
+import { ServiceSettingsHandlers } from './service/service-settings';
+import { TicketDocuments, askToAddCheckout } from './documents/ticket-documents';
+import { isStoreDocumentPath, storeDocumentHeader, storeDocumentHeaderEdit } from './documents/store-document-header';
 import { checkoutOf, readStoreSettings } from '../../../packages/tickets-engine/src/store/store-settings';
-import { registerChatIpc } from './chat-ipc';
-import { registerSessionIpc } from './session-ipc';
-import { pickFolderDialog } from './folder-dialog';
-import { RepoCloner } from './repo-clone';
-import { launchGit } from './repo-clone-process';
-import { registerRepoCloneIpc } from './repo-clone-ipc';
-import { registerModelsIpc } from './models-ipc';
-import { MissionControlHost, createMissionControlView } from './mission-control';
+import { registerChatIpc } from './ipc/chat-ipc';
+import { registerSessionIpc } from './ipc/session-ipc';
+import { pickFolderDialog } from './ipc/folder-dialog';
+import { RepoCloner } from './worker/repo-clone';
+import { launchGit } from './worker/repo-clone-process';
+import { registerRepoCloneIpc } from './ipc/repo-clone-ipc';
+import { registerModelsIpc } from './ipc/models-ipc';
+import { MissionControlHost, createMissionControlView } from './service/mission-control';
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

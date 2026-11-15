@@ -113,7 +113,7 @@ e2e isolation stay where they were (req-173 kept it there).
 What this computer is, read and written only through `ServiceConfigFile`
 (`fleet/routing/service-config-file.ts`; a write keeps the keys it does not
 know, a file that does not parse is never overwritten). Its root keys,
-each parsed by its owner (`fleet/routing/service-config-schema.ts`):
+each parsed by its owner (`fleet/routing/` — the per-key readers below):
 
 | Key | Owner | Holds |
 |---|---|---|
@@ -235,7 +235,7 @@ says which persona has one (`avatarVersion`). FLEET.md, "The default crew".
 
 ## Lifecycle
 
-**Start.** The tickets plugin's main process (`plugins/tickets/main/service-lifecycle.ts`,
+**Start.** The tickets plugin's main process (`plugins/tickets/main/service/service-lifecycle.ts`,
 `ensureService`) reads `service.lock`. A live service of the same or a newer
 build is adopted. An **older** build is asked for the handover; if it
 refuses (a run in its gate) Drey keeps using it and the next Drey start asks
@@ -326,7 +326,7 @@ Code: `packages/tickets-engine/src/service/` (`service-host.ts`,
 `control/` (the route groups), `service-log.ts` + `daily-log-files.ts`,
 `window-processes.ts`, `service-stay.ts`, `runner-component.ts`, `sleep.ts`,
 `service-lock.ts`, `legacy.ts`, `launch.ts`, `service-main.ts`); the tray and
-window `electron/service-window/` + `apps/service-window/`; the client `plugins/tickets/main/service-lifecycle.ts`;
+window `electron/service-window/` + `apps/service-window/`; the client `plugins/tickets/main/service/service-lifecycle.ts`;
 the Drey-gone signal `packages/tickets-engine/src/server/drey-presence.ts`.
 Docs: ADR-0092, ADR-0099 (the workers' boundary), docs/05 §5.0, docs/06 "Drey Service: start, adopt, hand over",
 docs/07 (the packaged layout).

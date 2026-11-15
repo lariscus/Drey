@@ -1,10 +1,10 @@
 import type { ProjectAddFolderCommand, ProjectFolderReply, ProjectPort, ProjectRemoveCommand, ProjectReply, ProjectSaveCommand } from '../contracts/project-commands';
 import { PROJECTS_DIR, type ProjectRecord } from '../contracts/projects';
-import { checkDraft, isProjectId, mintProjectId, recordOf } from '../core/project-edit';
-import { parseProjectFile, projectFileText, projectIdOfPath } from '../core/project-record';
-import { chooseRepoEntry, type RepoSeed } from '../core/repo-entry';
-import { parseRepos, reposFileText, reposProse } from '../core/repos-file';
-import type { TicketsGit } from '../core/tickets-git';
+import { checkDraft, isProjectId, mintProjectId, recordOf } from '../core/projects/project-edit';
+import { parseProjectFile, projectFileText, projectIdOfPath } from '../core/projects/project-record';
+import { chooseRepoEntry, type RepoSeed } from '../core/projects/repo-entry';
+import { parseRepos, reposFileText, reposProse } from '../core/projects/repos-file';
+import type { TicketsGit } from '../core/git/tickets-git';
 import type { EngineHost, EngineVault } from './host';
 import type { FolderProbe } from './folder-probe';
 import { SkillCommitter } from './skill-committer';

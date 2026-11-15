@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePersonaFile } from '../core/persona';
+import { parsePersonaFile } from '../core/persona/persona';
 import { crewRosterOf } from './crew-roster';
 
 const persona = (id: string, front: string) => parsePersonaFile(id, `---\n${front}\n---\n`);

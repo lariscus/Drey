@@ -665,7 +665,7 @@ marks the one send-back a ticket may use (concept §4).
 
 **The cursor walks on a lifecycle store** (req-257, milestone 247 — the
 only board there is). Who holds a
-ticket is **derived, never stored** (`core/chain-holder.ts` `holderOf`): a
+ticket is **derived, never stored** (`core/pipeline/chain-holder.ts` `holderOf`): a
 lifecycle edge (`inbox`, `prioritized`, `done`, `cancelled`) has no holder;
 `awaiting: you` puts it at You; an entry at the cursor that names no
 readable persona puts it at You with *no persona for position n*;
@@ -961,7 +961,7 @@ source of the ticket cards' cost and the persona day budgets; a chain
 run adds the chain `position` it worked and the chain's `length`) and
 `hold` (req-274, below).
 `phase`, `merged` and `archived` carry no persona, model or cost.
-The code is `core/ledger.ts` (`LEDGER_FILE`).
+The code is `core/pipeline/ledger.ts` (`LEDGER_FILE`).
 
 **`hold` lines** (req-274, the persona board concept §10) record the
 cursor's moves on a lifecycle store:
@@ -1015,7 +1015,7 @@ is its own item, surfaced visibly instead of matched. Writers append
 their own lines only — an older line is never rewritten or reordered
 (since req-280 no prompt asks an agent for a status line: the runner and
 the board write every persisted verb, on a store as comments —
-`core/status-comment.ts`);
+`core/pipeline/status-comment.ts`);
 readers are tolerant (a broken line is skipped, never guessed). The
 log is plain text a human may read and append; it never lives inside
 the ticket file, and the ticket file never embeds it.
@@ -1085,7 +1085,7 @@ The phase keys:
   (`flow: paul:shape; ben; ralf; tessa; you`), or a YAML list. Copied
   into the ticket at creation and the ticket's own from then on; absent = new
   tickets carry no chain. An unreadable entry drops the whole key with a
-  warning. Read by `core/pipeline-flow.ts`; written by the settings page's
+  warning. Read by `core/pipeline/pipeline-flow.ts`; written by the settings page's
   default flow (`BoardService.setStandardFlow`, one commit `tickets: default flow`).
 - `propose-flow`: optional (E10-5b) — `true` makes the plan persona propose a
   flow for **every new plan**: a plan run's brief closes the plan format with
@@ -1097,7 +1097,7 @@ The phase keys:
   only when the way should differ); any other value reads as off with a
   warning. Written by the settings page's switch (`setStandardFlow`, one commit
   `tickets: propose flow on|off`; off removes the key). Read by
-  `core/pipeline-flow.ts` (`parseProposeFlow`) into `BoardSnapshot.proposeFlow`,
+  `core/pipeline/pipeline-flow.ts` (`parseProposeFlow`) into `BoardSnapshot.proposeFlow`,
   carried to the run as `RunCursor.proposeFlow`.
 - `token-budget`: optional (req-268) — the board's daily token budget.
   Recorded, not yet read by a chain board's runner.
@@ -1125,13 +1125,13 @@ The phase keys:
   `color:` is read as those three — nothing else, no forgiveness
   message.
 
-**Dispatch is by holder** (req-257, the persona board concept §9, `fleet/holder-plan.ts`): the candidates are
+**Dispatch is by holder** (req-257, the persona board concept §9, `fleet/chain/holder-plan.ts`): the candidates are
 the tickets an agent persona holds (no `:shape` entry, no held or cooling persona), ordered by priority class (the configured
 vocabulary's first half before its second — see `priorities:` above), then **the later cursor
 position first** (finishing beats starting), then rank. A run needs a free place in the **big pool** (the provider's slots and the
 capacity pool's class — req-170, ADR-0095: the persona's `class:`, raised, never lowered, by `size:`) **and** in its **persona's pool** (`parallel:` on `persona.md`; absent = no cap): a persona at its cap
 waits — *waits for Ben* — even with the big pool free. A persona with `min: n` and fewer than n runs starts one even when the big pool
-is full, an overrun on purpose (default 0). **The breaker counts per persona** (`orchestrate/persona-breaker.ts`): a red gate raises the
+is full, an overrun on purpose (default 0). **The breaker counts per persona** (`chain/persona-breaker.ts`): a red gate raises the
 persona's streak and cools it down a minute; at three red gates in a row the persona is held like the owner's pause, the
 trip's reason in the chain status (`personaTripped`, `personaRedStreak`); playing the persona again resets it. No persona, no run
 (req-257, owner 2026-11-11): a ticket whose entry names no readable persona stands at You with the reason. A running run is never preempted.
@@ -1403,7 +1403,7 @@ is kept apart from its *lesson*:
   the engine's start and on a journal read; the engine logs it.
 
 **The improvement loop (E6).** The aggregation's proposals live beside
-the journal (the format's grammar in the engine's `core/improvements.ts`,
+the journal (the format's grammar in the engine's `core/persona/improvements.ts`,
 the trigger and the owner's apply in
 [ADR-0088](../docs/09_architecture_decisions/0088-tickets-engine-package-cut.md)'s
 E6 record). Its input is the journal's `friction:` fields newer than the
@@ -1862,7 +1862,7 @@ Prose for humans.
 ```
 
 Every key is optional; an absent key is the built-in default
-(`fleet/config/layered-config-resolver.ts` `CREW_DEFAULTS`). A value of the
+(`fleet/chain/layered-config-resolver.ts` `CREW_DEFAULTS`). A value of the
 wrong kind warns and reads as the default; a file whose YAML does not parse
 reads as empty with the error (the engine logs it once) and is never
 written over — Settings refuses to save into it. `permission-mode` is a
@@ -2104,7 +2104,7 @@ a half-readable one yields what it can.
 A dispatched worker may propose work that is not part of its step. It
 writes nothing to the board: it ends its **last message** with a
 line-start `FOLLOWUPS:` marker and bullets, in the grammar of
-`packages/tickets-engine/src/core/followups.ts`:
+`packages/tickets-engine/src/core/ticket/followups.ts`:
 
 ```markdown
 FOLLOWUPS:
@@ -2131,7 +2131,7 @@ was not told may still end with the marker; it is read all the same.
 
 **The record.** The runner keeps what it read as `followups`
 (`[{title, why, priority}]`) in the run's `run.json` info, from the
-`result` event of the turn (`fleet/orchestrate/event-fold.ts`); the key is
+`result` event of the turn (`fleet/runner/event-fold.ts`); the key is
 absent on a run that never proposed, and a later result with none clears an
 earlier list (a steered run keeps no stale proposals).
 

@@ -6,10 +6,10 @@
  * snapshots — the renderer never parses a ticket file. One module-level
  * store serves every view; a view is just a DOM root plus a render call.
  */
-import { createTranscriptView } from './transcript-view';
-import { formatWatch, parseStreamEvents } from './watch-format';
-import { newWaits } from './waiting';
-import { chainAlertsOf, newChainAlerts, type ChainAlert } from './chain-alerts';
+import { createTranscriptView } from './run/transcript-view';
+import { formatWatch, parseStreamEvents } from './run/watch-format';
+import { newWaits } from './thread/waiting';
+import { chainAlertsOf, newChainAlerts, type ChainAlert } from './run/chain-alerts';
 import type { DreyPluginApi, PluginWidgetContrib } from '../../../shared/plugin-api/renderer';
 import {
   branchForTicket,
@@ -24,31 +24,31 @@ import {
   type TicketPriority,
   type TicketTrack,
 } from '../shared/tickets';
-import { PRIORITY_LABEL, createGroupFoldStore, workListLivePaint, workListNode, type WorkPanelDeps } from './work-panel';
-import { createRunComposer } from './run-composer';
-import { createThreadComments } from './thread-comments';
-import { THREAD_KEY } from './ticket-page';
-import { PENDING_HINT } from './dialog-starters';
+import { PRIORITY_LABEL, createGroupFoldStore, workListLivePaint, workListNode, type WorkPanelDeps } from './work/work-panel';
+import { createRunComposer } from './run/run-composer';
+import { createThreadComments } from './thread/thread-comments';
+import { THREAD_KEY } from './thread/ticket-page';
+import { PENDING_HINT } from './run/dialog-starters';
 import { AUTOPILOT_COMMAND_ID, costSlotOf, createStatusSlots, type StatusSlotController } from './status-slot';
 import { createAutopilotCommand } from './autopilot/command';
 import { autopilotSwitchViewOf } from '../../../shared/autopilot';
 import { burnRateHoldOf } from '../../../shared/burn-rate';
-import { ageWords, checkpointActionOf, crewLineOf, needKindLabel, workGroups, workListSignature } from './work-groups';
-import { readyBarNode, readyCardNode, storyNode } from './ready-view';
+import { ageWords, checkpointActionOf, crewLineOf, needKindLabel, workGroups, workListSignature } from './work/work-groups';
+import { readyBarNode, readyCardNode, storyNode } from './thread/ready-view';
 import { stepCardOf } from '../shared/step-card';
 import type { ChangesReply } from '../shared/changes';
 import type { CrewConfigReply } from '../shared/crew-config';
-import { checkpointControls, headerControls, liveStateWord, threadSteps, durationWords, type ThreadStep } from './thread-steps';
-import { stuckOf } from './stuck';
-import type { WorktreeFile } from '../../../packages/tickets-engine/src/core/worktree-changes';
-import { createWorkFilterStore, filterPopover, isFilterActive, NO_WORK_FILTER, type WorkFilterState } from './work-filter';
-import { createTicketsSettingsPage } from './settings-page';
+import { checkpointControls, headerControls, liveStateWord, threadSteps, durationWords, type ThreadStep } from './thread/thread-steps';
+import { stuckOf } from './thread/stuck';
+import type { WorktreeFile } from '../../../packages/tickets-engine/src/core/git/worktree-changes';
+import { createWorkFilterStore, filterPopover, isFilterActive, NO_WORK_FILTER, type WorkFilterState } from './work/work-filter';
+import { createTicketsSettingsPage } from './settings/page.ts/settings-page';
 import { createProjectsSettingsPage } from './projects/projects-page';
 import { createProjectFilter, type ProjectFilter } from './projects/project-filter';
-import { createTicketHeader, showsTicketDocument, ticketLogFold, ticketTabTitle } from './ticket-header';
-import { openTicketDocument, type TicketDocumentReply } from './open-ticket';
-import { createBoardRefresh, createChangeGate } from './board-refresh';
-import { createSnapshotOrder } from './snapshot-order';
+import { createTicketHeader, showsTicketDocument, ticketLogFold, ticketTabTitle } from './ticket-document/ticket-header';
+import { openTicketDocument, type TicketDocumentReply } from './ticket-document/open-ticket';
+import { createBoardRefresh, createChangeGate } from './board/board-refresh';
+import { createSnapshotOrder } from './board/snapshot-order';
 import { BOARD_KEY, BOARD_KIND, TEAM_KEY, TEAM_KIND, WORK_VIEW_ID, registerWorkView } from './view-preset';
 import { createTicketDocumentExtension } from './ticket-document/extension';
 import { createPlanStatusStore } from './ticket-document/shape-state';
@@ -57,15 +57,15 @@ import { createShapeBinding } from './conversation/shape-binding';
 import { createTicketStrip } from './ticket-document/strip';
 import { openFlowTab, registerFlowKind } from './flow/register';
 import { openReviewTab, registerReviewKind } from './review/register';
-import type { WorkRow } from './work-groups';
-import { boardIssuesChip, boardIssuesList, type BoardIssuesDeps } from './board-issues';
+import type { WorkRow } from './work/work-groups';
+import { boardIssuesChip, boardIssuesList, type BoardIssuesDeps } from './board/board-issues';
 import { DEFAULT_CLASS_NAMES } from '../../../packages/tickets-engine/src/contracts/capability-class';
 import type { ChainStatus, FleetHandoverConfig, RunInfo } from '../../../packages/tickets-engine/src/fleet/protocol';
 import type { NormalizedEvent } from '../../../packages/tickets-engine/src/fleet/harness/contract';
 import { DEFAULT_FLEET_HANDOVER, normalizeFleetHandover } from '../../../packages/tickets-engine/src/fleet/protocol';
-import { handoverDialogState } from './handover-ui';
-import type { HandoverCandidate } from '../../../packages/tickets-engine/src/fleet/handover';
-import { parseWorkerValue } from '../../../packages/tickets-engine/src/fleet/assignment';
+import { handoverDialogState } from './run/handover-ui';
+import type { HandoverCandidate } from '../../../packages/tickets-engine/src/fleet/runner/handover';
+import { parseWorkerValue } from '../../../packages/tickets-engine/src/fleet/runner/assignment';
 import {
   contextFill,
   contextLabel,
@@ -77,8 +77,8 @@ import {
   workerStatus,
   WORKER_LABEL,
   workerLabelOf,
-} from './worker-status';
-import type { DeskDeps } from './desk-deps';
+} from './run/worker-status';
+import type { DeskDeps } from './board/desk-deps';
 import { teamModelOf, usd } from './team/team-model';
 import { createTeamStore, type TeamStore } from './team/team-store';
 import { personaPictures } from './team/persona-pictures';
@@ -88,7 +88,7 @@ import { mountTeam } from './team/team-view';
 import { PERSONA_KIND, personaIdOfKey, personaKeyOf } from './team/persona-model';
 import { mountPersonaPage, personaWordCountOf } from './team/persona-page';
 import { bandStatusOf } from './team/capacity-model';
-import { queueWordsFor } from './queue-line';
+import { queueWordsFor } from './work/queue-line';
 import { mountBoard } from './board/board-view';
 
 function el<K extends keyof HTMLElementTagNameMap>(

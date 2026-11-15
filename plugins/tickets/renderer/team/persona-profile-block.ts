@@ -6,7 +6,7 @@
  * list. A picture change goes to the engine at once (one commit), not with
  * the page's Save; the persona list's next `avatarVersion` redraws the circles.
  */
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { avatarNode, blockHead, labelled, outlineButton, selectOf, textInput } from './persona-dom';
 import { ROLE_OPTIONS } from './persona-model';

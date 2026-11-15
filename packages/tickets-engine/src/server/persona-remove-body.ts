@@ -1,6 +1,6 @@
 import type { PersonaPictureSet } from '../contracts/persona-picture';
 import type { PersonaRemoveCommand } from '../contracts/persona-remove';
-import type { Parsed } from '../core/commands';
+import type { Parsed } from '../core/ticket/commands';
 
 /**
  * The persona removal's request body (req-261): shape only — the persona id is

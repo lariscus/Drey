@@ -1,4 +1,4 @@
-import { isAgentPersona, type Persona } from '../core/persona';
+import { isAgentPersona, type Persona } from '../core/persona/persona';
 
 /**
  * The crew as a shape turn lists it (req-272): the personas a plan part may

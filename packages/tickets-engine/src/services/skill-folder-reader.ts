@@ -1,5 +1,5 @@
 import type { SkillOrigin } from '../contracts/skills';
-import { isSkillName, ownSkillsDir, parseSkillMarkdown, SHARED_SKILLS_DIR, SKILL_FILE, type ParsedSkill } from '../core/skill';
+import { isSkillName, ownSkillsDir, parseSkillMarkdown, SHARED_SKILLS_DIR, SKILL_FILE, type ParsedSkill } from '../core/skills/skill';
 import type { SkillFileSystem } from './skill-file-system';
 
 /** One skill found in a home: where it lives, its text and its parse. */

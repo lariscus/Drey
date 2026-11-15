@@ -40,11 +40,11 @@ import type {
   ChatTurnResult,
 } from '../contracts/chat';
 import { titleFromDescription, type BoardSnapshot, type TicketCard, type TicketForm, type TicketPriority } from '../contracts/tickets';
-import { renderChainLine } from '../core/chain-list';
-import { withCommandProject, withProjectsBlock } from '../core/chat-projects';
-import { parsePlanParts } from '../core/plan-parts';
-import { ticketRefsOf } from '../core/chat-ticket-refs';
-import { changedLinesOf, editsSummary, planDelta, planDeltaForModel, planSectionOf } from '../core/plan-delta';
+import { renderChainLine } from '../core/pipeline/chain-list';
+import { withCommandProject, withProjectsBlock } from '../core/chat/chat-projects';
+import { parsePlanParts } from '../core/plan/plan-parts';
+import { ticketRefsOf } from '../core/chat/chat-ticket-refs';
+import { changedLinesOf, editsSummary, planDelta, planDeltaForModel, planSectionOf } from '../core/plan/plan-delta';
 import type { PlanShadowStore } from './plan-shadow';
 import {
   appendMission,
@@ -60,8 +60,8 @@ import {
   decideProposal,
   newSessionText,
   parseSessionFile,
-} from '../core/chat-session';
-import { TicketsGit } from '../core/tickets-git';
+} from '../core/chat/chat-session';
+import { TicketsGit } from '../core/git/tickets-git';
 import type { ChatVoiceSource } from './chat-voices';
 import type { EngineHost, EngineVault } from './host';
 import type { MissionCrewSource } from './mission-crew-block';

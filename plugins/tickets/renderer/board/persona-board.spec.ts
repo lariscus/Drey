@@ -5,9 +5,9 @@ import { i18n } from '../../../../shared/i18n';
 import type { BoardLane, TicketHold } from '../../../../packages/tickets-engine/src/contracts/persona-board';
 import type { ChainStatus, RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { BoardSnapshot, TicketCard } from '../../shared/tickets';
-import type { DeskDeps } from '../desk-deps';
+import type { DeskDeps } from './desk-deps';
 import type { TeamStore } from '../team/team-store';
-import { workGroups } from '../work-groups';
+import { workGroups } from '../work/work-groups';
 import { mountBoard } from './board-view';
 import { dropOf, initialsOf, laneOrderAfterDrop, personaBoardModelOf } from './persona-board-model';
 

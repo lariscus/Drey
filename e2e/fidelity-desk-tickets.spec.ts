@@ -5,8 +5,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ElectronApplication, Page } from '@playwright/test';
 import { test, expect } from './fixtures/drey';
-import { renderVerificationSection } from '../packages/tickets-engine/src/core/verification';
-import { renderVerlaufLine } from '../packages/tickets-engine/src/core/verlauf';
+import { renderVerificationSection } from '../packages/tickets-engine/src/core/chapters/verification';
+import { renderVerlaufLine } from '../packages/tickets-engine/src/core/chapters/history-chapter';
 
 /**
  * NOT a regression suite: puts the built app in the states boards 7b, 7c, 7d,

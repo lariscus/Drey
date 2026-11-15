@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { humanPersona, type Persona } from '../core/persona';
+import { humanPersona, type Persona } from '../core/persona/persona';
 import { MissionCrewBlock, missionCrewBlockOf, ownerNameOf } from './mission-crew-block';
 
 function agent(id: string, title: string, summary = ''): Persona {

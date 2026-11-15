@@ -10,8 +10,8 @@
 import type { BoardLane } from '../../../../packages/tickets-engine/src/contracts/persona-board';
 import type { ChainStatus, RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { I18n } from '../../../../shared/i18n/types';
-import { h, type DeskDeps } from '../desk-deps';
-import { queueWordsOf } from '../queue-line';
+import { h, type DeskDeps } from './desk-deps';
+import { queueWordsOf } from '../work/queue-line';
 import { sessionCapacityOf, slotChipsOf } from '../team/capacity-model';
 import { clockIconNode, slotChipNode } from '../team/capacity-view';
 import { isLiveRun } from '../team/team-model';

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- the spec stands in for the host, which owns the catalog at runtime
 import { i18n } from '../../../../shared/i18n';
 import type { PersonaView } from '../../shared/remote-protocol';
-import type { DeskDeps } from '../desk-deps';
+import type { DeskDeps } from '../board/desk-deps';
 import { mountOneOnOnePane } from './one-on-one-pane';
 
 const BEN = { id: 'ben', title: 'Ben' } as PersonaView;

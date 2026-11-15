@@ -1,7 +1,7 @@
 import type { Clock } from '../ports/clock';
 import type { EventSink, RunnerEvent } from '../ports/event-sink';
 import type { QuotaWindow, SlotView } from '../protocol';
-import { isTerminal } from '../run/run-state';
+import { isTerminal } from '../runner/run-state';
 import type { ShareEstimates, ShareSubject } from './reserve-guard';
 
 /** A run's share of a window while nothing is known of its ticket or persona there: a twentieth. */

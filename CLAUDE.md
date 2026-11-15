@@ -292,11 +292,15 @@ Plugins (`plugins/<id>/` — `plugin.json`, `main/`, `renderer/`, `shared/`):
 
 Packages (`packages/tickets-engine/`, no Drey/Electron/plugin imports):
 
-- `src/core` — the tickets domain: parse, board assembly, the transition
-  machine, git plumbing
-- `src/fleet` — the Crew runner: `run/` (state machine), `orchestrate/`,
-  `harness/` (Claude Code and ACP adapters), `store/`, `routing/`,
-  `config/`, `session/`, `api/`, `ports/`, `runner.ts` (composition root)
+- `src/core` - the tickets domain in domain folders (req-300): `ticket/`,
+  `pipeline/`, `plan/`, `chapters/`, `review/`, `persona/`, `chat/`,
+  `skills/`, `projects/`, `git/`, `config/`
+- `src/fleet` - the Crew runner (req-300): `chain/` (the daemon),
+  `runner/` (run machinery, pure run core, composition seams with
+  `runner.ts` the composition root), `lease/` (claims), `harness/`
+  (Claude Code and ACP adapters), `routing/`, `session/`, `api/`,
+  `ports/`, `governor/`, `worktrees/`, `telemetry/`; the wire contract
+  `protocol*.ts` at the root
 - `src/contracts` — cross-layer types; `src/services` — the host-agnostic
   board service; `src/service` — **Drey Service**, the one background
   process

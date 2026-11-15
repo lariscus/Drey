@@ -3,7 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FakeQuotaHttp } from '../fleet/routing/routing.fake';
-import { startRunner, type RunnerHandle } from '../fleet/runner';
+import { startRunner, type RunnerHandle } from '../fleet/runner/runner';
 import { FleetClient } from './fleet-client';
 
 /** The engine's read of the slots (req-177) against the real runner, in-process; no network. */

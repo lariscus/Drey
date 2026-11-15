@@ -10,10 +10,10 @@ import type {
   SkillSourceUpdateCommand,
 } from '../contracts/skill-library';
 import type { SkillErrorCode, SkillFailure } from '../contracts/skills';
-import { personaRef, type Persona } from '../core/persona';
-import { isSkillName, ownSkillDir, sharedSkillDir } from '../core/skill';
-import { isRefName, normalizeSourcePath, parseGithubRepo, sourceIdOf, type GithubRepo } from '../core/skill-source';
-import { recordId, type SkillSourceRecord } from '../core/skill-sources-file';
+import { personaRef, type Persona } from '../core/persona/persona';
+import { isSkillName, ownSkillDir, sharedSkillDir } from '../core/skills/skill';
+import { isRefName, normalizeSourcePath, parseGithubRepo, sourceIdOf, type GithubRepo } from '../core/skills/skill-source';
+import { recordId, type SkillSourceRecord } from '../core/skills/skill-sources-file';
 import type { EngineVault } from './host';
 import { NodeSkillFileSystem, type SkillFileSystem } from './skill-file-system';
 import { buildSkillKit, type SkillKit, type SkillKitGit, type SkillKitHost } from './skill-kit';

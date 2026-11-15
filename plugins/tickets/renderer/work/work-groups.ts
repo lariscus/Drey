@@ -1,0 +1,380 @@
+/**
+ * The Work panel's groups (req-75 W1, W1b; ADR-0087): the board snapshot
+ * and the fleet's runs folded into four lists — **Needs you** (everything
+ * that waits on the owner), **Shaping** (the Shaping stage and the interactive dialogs), **Running**
+ * (the rest on its way through the pipeline) and **Ideas** (the backlog
+ * before the machine). Pure, so the panel and its specs share it; the
+ * phases stay the storage format and are only shown as a row's status.
+ *
+ * Every ticket lands in exactly one group: Needs you wins, then Shaping.
+ * The Done-this-week group is not built here — it comes from the
+ * snapshot's `recentDone` (archived tickets), which the panel draws.
+ *
+ * Every row carries its phase's colour (T-0084): `phaseColor`, from the
+ * phase's `color:` in pipeline.md or the default palette by position —
+ * the panel draws it as the row's phase chip.
+ */
+import type { NeedItem } from '../../shared/remote-protocol';
+import {
+  DEFAULT_PRIORITY_CONFIG,
+  priorityWeight,
+  type BoardColumn,
+  type BoardSnapshot,
+  type PipelinePhase,
+  type PriorityConfig,
+  type TicketCard,
+} from '../../shared/tickets';
+import type { RunInfo, RunState } from '../../../../packages/tickets-engine/src/fleet/protocol';
+import { needsOf } from '../../../../packages/tickets-engine/src/server/needs';
+import { phaseColorOf } from './phase-colors';
+import { YOU_LANE } from '../../../../packages/tickets-engine/src/contracts/persona-board';
+
+const LIVE: ReadonlySet<RunState> = new Set(['starting', 'running', 'stopping', 'detached']);
+
+export type WorkGroupId = 'needs' | 'running' | 'prioritized' | 'ideas' | 'done';
+
+export interface WorkRow {
+  readonly card: TicketCard;
+  /** The phase the ticket sits in (an unknown directory carries its own). */
+  readonly phase: PipelinePhase;
+  /** The phase chip's colour — explicit `color:` or the default palette (T-0084). */
+  readonly phaseColor: string;
+  /** Why the owner is needed; null outside Needs you. */
+  readonly need: NeedItem | null;
+  /** An idea already in a queue the fleet pulls from (Ideas only). */
+  readonly queued: boolean;
+  /** The ticket's live run, if any. */
+  readonly run: RunInfo | null;
+}
+
+export interface WorkGroups {
+  readonly needs: readonly WorkRow[];
+  readonly running: readonly WorkRow[];
+  readonly ideas: readonly WorkRow[];
+}
+
+/** The newest live run of a ticket. */
+export function liveRunOf(ticketId: string, runs: readonly RunInfo[]): RunInfo | null {
+  let found: RunInfo | null = null;
+  for (const run of runs) {
+    if (run.ticketId === ticketId && LIVE.has(run.state) && (found === null || run.startedAt > found.startedAt)) {
+      found = run;
+    }
+  }
+  return found;
+}
+
+/**
+ * What the Work list's DOM *structure* depends on (T-0086): per run,
+ * sorted by id, the fields that move a ticket between groups or change
+ * a row's bones — id, state, column, waiting kind, turn, interactive,
+ * held — then the alert keys. `activity`, tokens and clocks change only
+ * the *text* of nodes that already exist and stay out, so a fleet
+ * update that moves nothing re-renders nothing.
+ */
+export function workListSignature(runs: readonly RunInfo[], alertKeys: readonly string[]): string {
+  const perRun = [...runs]
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .map((run) =>
+      [
+        run.id,
+        run.state,
+        run.phase ?? '',
+        run.waiting?.kind ?? '',
+        run.turn ?? '',
+        run.interactive ?? '',
+        run.held === true ? 'held' : '',
+      ].join(':'),
+    );
+  return [...perRun, ...alertKeys].join('|');
+}
+
+/**
+ * Ideas: priority first (through `dependencyOrder`, which also puts a
+ * blocker first), newest first within one (owner, 2026-10-31). "New" is
+ * the capture stamp — `entered-<first phase>`, the ticket's creation (a
+ * revived one carries its revival there).
+ */
+function ideaRecency(firstPhaseId: string): (a: WorkRow, b: WorkRow) => number {
+  return (a, b) => {
+    const at = a.card.meta.entered[firstPhaseId] ?? '';
+    const bt = b.card.meta.entered[firstPhaseId] ?? '';
+    if (at !== bt) {
+      return at < bt ? 1 : -1;
+    }
+    return a.card.id < b.card.id ? 1 : a.card.id > b.card.id ? -1 : 0;
+  };
+}
+
+/**
+ * Dependencies before priority (owner, 2026-10-31): a ticket never sorts
+ * above an open blocker in the same list, and a blocker carries the most
+ * urgent priority of everything it holds up, so a low ticket that blocks
+ * an urgent one moves up with it — its own lower priority no longer
+ * counts. Weights read the vault's vocabulary (`priorities`, the
+ * snapshot's config; the default list when omitted). Within one effective
+ * priority, `tieBreak` decides. A dependency cycle cannot be ordered; its
+ * rows fall back to the key.
+ */
+export function dependencyOrder<T extends { readonly card: TicketCard }>(
+  rows: readonly T[],
+  tieBreak: (a: T, b: T) => number,
+  priorities: PriorityConfig = DEFAULT_PRIORITY_CONFIG,
+): T[] {
+  const byId = new Map(rows.map((row) => [row.card.id, row]));
+  const blockersOf = (row: T): string[] => row.card.blocked.filter((id) => id !== row.card.id && byId.has(id));
+  // The most urgent weight among the row and everything it (transitively) blocks.
+  const weight = new Map<string, number>();
+  const effective = (id: string, seen: Set<string>): number => {
+    const known = weight.get(id);
+    if (known !== undefined) {
+      return known;
+    }
+    const row = byId.get(id)!;
+    let best = priorityWeight(row.card.meta.priority, priorities);
+    seen.add(id);
+    for (const dependent of row.card.blocks) {
+      if (byId.has(dependent) && !seen.has(dependent)) {
+        best = Math.min(best, effective(dependent, seen));
+      }
+    }
+    seen.delete(id);
+    weight.set(id, best);
+    return best;
+  };
+  const key = (a: T, b: T): number => effective(a.card.id, new Set()) - effective(b.card.id, new Set()) || tieBreak(a, b);
+
+  const remaining = new Map(rows.map((row) => [row.card.id, new Set(blockersOf(row))]));
+  const out: T[] = [];
+  while (remaining.size > 0) {
+    const ready = [...remaining.entries()].filter(([, blockers]) => blockers.size === 0).map(([id]) => byId.get(id)!);
+    const pool = ready.length > 0 ? ready : [...remaining.keys()].map((id) => byId.get(id)!);
+    const next = [...pool].sort(key)[0]!;
+    out.push(next);
+    remaining.delete(next.card.id);
+    for (const blockers of remaining.values()) {
+      blockers.delete(next.card.id);
+    }
+  }
+  return out;
+}
+
+/**
+ * The persona board's groups (req-271, board 7a v2): Needs you — the remote's
+ * needs, then every ticket that stands at You (its own entry, a question, the
+ * second send-back, no persona) — then Running (every other held ticket, the
+ * live runs first), Prioritized and Inbox from their lifecycle columns. No
+ * Shaping group: a Shape entry is held by its persona and runs as Running.
+ */
+export function workGroups(board: BoardSnapshot, runs: readonly RunInfo[]): WorkGroups {
+  const positionOf = new Map(board.columns.map((column, index) => [column.phase.id, index]));
+  const row = (card: TicketCard, column: BoardColumn, need: NeedItem | null, queued = false): WorkRow => ({
+    card,
+    phase: column.phase,
+    phaseColor: phaseColorOf(column.phase, positionOf.get(column.phase.id) ?? 0),
+    need,
+    queued,
+    run: liveRunOf(card.id, runs),
+  });
+  const placed = new Map<string, { card: TicketCard; column: BoardColumn }>();
+  for (const column of board.columns) {
+    for (const card of column.tickets) {
+      if (!placed.has(card.id)) {
+        placed.set(card.id, { card, column });
+      }
+    }
+  }
+  const needs: WorkRow[] = [];
+  const seen = new Set<string>();
+  for (const need of needsOf(board, runs)) {
+    const at = placed.get(need.ticketId);
+    if (at !== undefined && !seen.has(need.ticketId)) {
+      seen.add(need.ticketId);
+      needs.push(row(at.card, at.column, need));
+    }
+  }
+  for (const { card, column } of placed.values()) {
+    if (card.hold?.holder === YOU_LANE && !seen.has(card.id)) {
+      seen.add(card.id);
+      needs.push(row(card, column, { kind: 'checkpoint', ticketId: card.id, title: card.meta.title ?? card.id, phase: column.phase.id, runId: null, text: '', since: null }));
+    }
+  }
+  const held = [...placed.values()].filter(({ card }) => card.hold !== undefined && !seen.has(card.id)).map(({ card, column }) => row(card, column, null));
+  const byPosition = (a: WorkRow, b: WorkRow): number => (b.card.hold?.position ?? 0) - (a.card.hold?.position ?? 0);
+  const live = held.filter((entry) => entry.run !== null).sort(byPosition);
+  const waiting = dependencyOrder(held.filter((entry) => entry.run === null), byPosition, board.priorities);
+  const edge = (id: string, queued: boolean): WorkRow[] => {
+    const column = board.columns.find((candidate) => candidate.phase.id === id && !candidate.unknown);
+    return column === undefined ? [] : column.tickets.filter((card) => !seen.has(card.id) && card.hold === undefined).map((card) => row(card, column, null, queued));
+  };
+  return {
+    needs,
+    running: [...live, ...waiting],
+    // Prioritized rides as the queued ideas: the filter splits it into its own group.
+    ideas: [...dependencyOrder(edge('prioritized', true), () => 0, board.priorities), ...dependencyOrder(edge('inbox', false), ideaRecency('inbox'), board.priorities)],
+  };
+}
+
+/** A row's derived status (T-0084, grafted onto the canvas groups): the
+ *  filter's vocabulary and the head counts read it. A need decides first
+ *  — waiting, failed or review; then a live run means running; an open
+ *  blocked-by edge means blocked; what the fleet will take (the ideas'
+ *  queue, a machine phase without a run) is queued; a parked one is
+ *  parked; everything else is idle. The phone's own Needs-you list
+ *  keeps its kind order (`needsOf` is its contract). */
+export type WorkStatus = 'waiting' | 'failed' | 'running' | 'queued' | 'blocked' | 'parked' | 'review' | 'idle';
+
+export function rowStatusOf(row: WorkRow): WorkStatus {
+  const need = row.need;
+  if (need !== null) {
+    if (need.kind === 'question' || need.kind === 'permission') {
+      return 'waiting';
+    }
+    if (need.kind === 'red-gate' || need.kind === 'failed') {
+      return 'failed';
+    }
+    return 'review';
+  }
+  if (row.run !== null) {
+    return 'running';
+  }
+  if (row.card.blocked.length > 0) {
+    return 'blocked';
+  }
+  if (row.queued) {
+    return 'queued';
+  }
+  if (row.card.meta.parkedReason !== null) {
+    return 'parked';
+  }
+  return 'idle';
+}
+
+/** What a checkpoint asks of the owner: approve into the next phase, or accept into the archive. */
+export type CheckpointAction =
+  | { readonly kind: 'approve'; readonly to: string; readonly label: string }
+  /** Accept on Ready to try (req-99a, Q8): it starts the commit step, never a plain move. */
+  | { readonly kind: 'sign-off'; readonly label: string }
+  | { readonly kind: 'accept'; readonly label: string };
+
+export function checkpointActionOf(board: BoardSnapshot, phaseId: string): CheckpointAction {
+  const configured = board.columns.filter((column) => !column.unknown);
+  const index = configured.findIndex((column) => column.phase.id === phaseId);
+  const next = index >= 0 ? configured[index + 1] : undefined;
+  if (next === undefined) {
+    return { kind: 'accept', label: 'Accept' };
+  }
+  return { kind: 'approve', to: next.phase.id, label: `Accept → ${next.phase.title}` };
+}
+
+/** The kind chip of a Needs-you row (req-75 W1b): one short word for why. */
+export function needKindLabel(need: NeedItem, board: BoardSnapshot): string {
+  switch (need.kind) {
+    case 'question':
+      return 'Question';
+    case 'permission':
+      return 'Approval';
+    case 'red-gate':
+      return 'Gate red';
+    case 'failed':
+      return 'Run failed';
+    case 'notify':
+      return 'Gate done';
+    case 'needs-decision':
+      return 'Decision';
+    case 'blocked':
+      return 'Blocked';
+    default: {
+      const configured = board.columns.filter((column) => !column.unknown);
+      const index = configured.findIndex((column) => column.phase.id === need.phase);
+      // The terminal phase holds a result to try.
+      return index === configured.length - 1 ? 'Ready to try' : 'Review';
+    }
+  }
+}
+
+/** One Running row's second line: the step word and what the worker does. */
+export interface RunningStep {
+  readonly step: string;
+  readonly line: string;
+  readonly live: boolean;
+}
+
+/** `queueWords`: the pool's own words for a ticket it holds back (`queued · waits for a B slot · 2nd`, req-186); null = the plain `queued`. */
+export function runningStepOf(row: WorkRow, board: BoardSnapshot, queueWords: string | null = null): RunningStep {
+  const run = row.run;
+  if (run !== null) {
+    const title = board.columns.find((c) => c.phase.id === row.phase.id)?.phase.title ?? row.phase.title;
+    return { step: title, line: (run.activity ?? '').trim(), live: true };
+  }
+  const blocker = row.card.blocked[0];
+  if (blocker === undefined) {
+    return { step: queueWords ?? 'queued', line: 'waits for a free worker', live: false };
+  }
+  const title =
+    board.columns.flatMap((column) => column.tickets).find((card) => card.id === blocker)?.meta.title ?? blocker;
+  return { step: 'queued', line: `waits for “${title}”`, live: false };
+}
+
+/** A stamp as the rows show it: `now`, `4 min`, `3 h`, `yesterday`, `2 d`. */
+export function ageWords(iso: string | null, nowMs: number): string {
+  if (iso === null) {
+    return '';
+  }
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) {
+    return '';
+  }
+  const minutes = Math.floor((nowMs - t) / 60_000);
+  if (minutes < 1) {
+    return 'now';
+  }
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours} h`;
+  }
+  if (hours < 48) {
+    return 'yesterday';
+  }
+  return `${Math.floor(hours / 24)} d`;
+}
+
+/** The muted line after a Needs-you row's kind chip: why it waits. */
+export function statusLineOf(row: WorkRow, board: BoardSnapshot): string {
+  const need = row.need;
+  if (need === null) {
+    return '';
+  }
+  switch (need.kind) {
+    case 'question': {
+      // A shaped question (req-75 W2) reads as its question, not the blob.
+      const shaped = row.run?.waiting?.shaped ?? null;
+      return shaped === null ? need.text : shaped.question;
+    }
+    case 'permission':
+    case 'red-gate':
+    case 'failed':
+    case 'needs-decision':
+    case 'blocked':
+      return need.text;
+    default: {
+      return needKindLabel(need, board) === 'Ready to try' ? 'checks green' : 'waits for your review';
+    }
+  }
+}
+
+/**
+ * The panel footer's crew line (boards 7a-7c): who is out there, in words —
+ * `Crew · Ben, Tessa busy`; `Crew · idle` while nothing runs. Names come from
+ * the live runs' personas; a run without one counts as a plain number.
+ */
+export function crewLineOf(names: readonly (string | null | undefined)[], liveRuns: number): string {
+  if (liveRuns === 0) {
+    return 'Crew · idle';
+  }
+  const unique = [...new Set(names.filter((name): name is string => typeof name === 'string' && name !== ''))];
+  return unique.length > 0 ? `Crew · ${unique.join(', ')} busy` : `Crew · ${liveRuns} busy`;
+}

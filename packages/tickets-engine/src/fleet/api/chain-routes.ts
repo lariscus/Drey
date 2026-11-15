@@ -1,9 +1,9 @@
-import { parseAutopilotSet } from '../autopilot';
-import { dkTargetFor } from '../dk-target';
-import type { Orchestrator } from '../orchestrator';
-import type { SupervisorSet } from '../orchestrate/supervisor-set';
+import { parseAutopilotSet } from '../chain/autopilot';
+import { dkTargetFor } from '../lease/dk-target';
+import type { Orchestrator } from '../chain/orchestrator';
+import type { SupervisorSet } from '../runner/supervisor-set';
 import { normalizeChainStore, normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools, type ChainConfig, type ChainMaster, type ColumnMode } from '../protocol';
-import type { RunnerExit } from '../runner-exit';
+import type { RunnerExit } from '../runner/runner-exit';
 import type { RouteContext, RouteGroup } from './route-context';
 
 /** The chain's controls: its config, the master and the Autopilot, a column, the Notaus, a persona pause, the burn rate's lift, leftover claims. */

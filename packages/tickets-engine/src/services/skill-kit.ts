@@ -1,4 +1,4 @@
-import type { TicketsGit } from '../core/tickets-git';
+import type { TicketsGit } from '../core/git/tickets-git';
 import type { EngineHost } from './host';
 import { PromptPreview } from './prompt-preview';
 import { SkillCommitter } from './skill-committer';

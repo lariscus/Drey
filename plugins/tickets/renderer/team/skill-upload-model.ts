@@ -9,7 +9,7 @@
  * read into one buffer. DOM-free: the pick arrives as `PickedFile`s.
  */
 import type { SkillErrorCode, SkillUploadCommand } from '../../../../packages/tickets-engine/src/contracts/skills';
-import { MAX_SKILL_BYTES, MAX_SKILL_FILES, MAX_SKILL_TEXT_BYTES } from '../../../../packages/tickets-engine/src/core/skill-limits';
+import { MAX_SKILL_BYTES, MAX_SKILL_FILES, MAX_SKILL_TEXT_BYTES } from '../../../../packages/tickets-engine/src/core/skills/skill-limits';
 
 /** One file of a pick: its path as the picker names it (a folder pick: `<folder>/<relative path>`), its size, and a read. */
 export interface PickedFile {

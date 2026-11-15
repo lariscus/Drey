@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { seededCrewOf } from '../core/crew-seed-marker';
-import { DEFAULT_CREW_IDS } from '../core/default-crew';
-import { parsePersonaFile } from '../core/persona';
+import { seededCrewOf } from '../core/persona/crew-seed-marker';
+import { DEFAULT_CREW_IDS } from '../core/persona/default-crew';
+import { parsePersonaFile } from '../core/persona/persona';
 import { CrewSeederRig } from './crew-seeder-rig.fake';
 import { PersonaRemoveService } from './persona-remove-service';
 

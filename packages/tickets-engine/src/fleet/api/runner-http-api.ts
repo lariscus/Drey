@@ -1,7 +1,7 @@
 import * as crypto from 'node:crypto';
 import * as http from 'node:http';
-import type { RunnerExit } from '../runner-exit';
-import type { IdleWatch } from '../runner-lifecycle';
+import type { RunnerExit } from '../runner/runner-exit';
+import type { IdleWatch } from '../runner/runner-lifecycle';
 import { routeContext, type RouteContext, type RouteGroup } from './route-context';
 
 /** The routes a leaving runner still answers: the stop itself and the retire question. */

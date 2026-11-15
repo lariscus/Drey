@@ -11,8 +11,8 @@
 import type { BoardLane, LaneLoad } from '../../../../packages/tickets-engine/src/contracts/persona-board';
 import type { I18n } from '../../../../shared/i18n/types';
 import type { BoardSnapshot } from '../../shared/tickets';
-import { h, type DeskDeps } from '../desk-deps';
-import { queueWordsFor } from '../queue-line';
+import { h, type DeskDeps } from './desk-deps';
+import { queueWordsFor } from '../work/queue-line';
 import { personaPictures } from '../team/persona-pictures';
 import { usd } from '../team/team-model';
 import { openCardMenu, openSendBackPicker } from './persona-board-actions';

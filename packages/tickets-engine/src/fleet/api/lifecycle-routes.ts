@@ -1,7 +1,7 @@
-import type { SupervisorSet } from '../orchestrate/supervisor-set';
-import type { RunnerExit } from '../runner-exit';
-import { retireVerdict } from '../runner-lifecycle';
-import type { RunnerLog } from '../runner-log';
+import type { SupervisorSet } from '../runner/supervisor-set';
+import type { RunnerExit } from '../runner/runner-exit';
+import { retireVerdict } from '../runner/runner-lifecycle';
+import type { RunnerLog } from '../runner/runner-log';
 import type { RouteContext, RouteGroup } from './route-context';
 
 /** The runner's own life: health, the shutdown (graceful or a handover), retire-if-idle, the log. */

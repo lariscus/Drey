@@ -6,8 +6,8 @@
  * Service's vault MCP hand it these payloads over the engine's invoke
  * channel, so the tickets repository has one git queue.
  */
-import type { JournalEntry } from '../core/persona-journal';
-import type { PromptEdit } from '../core/prompt-edits';
+import type { JournalEntry } from '../core/persona/persona-journal';
+import type { PromptEdit } from '../core/config/prompt-edits';
 
 /** The invoke names of these writes (req-225, req-226); Drey Service calls them in-process. */
 export const PERSONA_RUN_METHODS = { closingRound: 'personaClosingRound', memory: 'personaRunMemory', journal: 'personaRunJournal' } as const;

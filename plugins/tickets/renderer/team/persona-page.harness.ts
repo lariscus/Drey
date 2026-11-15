@@ -8,13 +8,13 @@
 import { vi } from 'vitest';
 import type { SkillView } from '../../../../packages/tickets-engine/src/contracts/skills';
 import type { RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
-import { estimateTokens } from '../../../../packages/tickets-engine/src/core/token-count';
+import { estimateTokens } from '../../../../packages/tickets-engine/src/core/config/token-count';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- the spec stands in for the host, which owns the catalog at runtime
 import { i18n } from '../../../../shared/i18n';
 import type { MarkdownViewHandle, MarkdownViewOptions } from '../../../../shared/plugin-api/renderer';
 import type { PersonaView } from '../../shared/remote-protocol';
 import type { BoardSnapshot } from '../../shared/tickets';
-import type { DeskDeps } from '../desk-deps';
+import type { DeskDeps } from '../board/desk-deps';
 import { mountPersonaPage, type PersonaPageHost, type PersonaPageSeams } from './persona-page';
 import type { TeamStore } from './team-store';
 import { skillsOf } from './persona-skills.fixture';

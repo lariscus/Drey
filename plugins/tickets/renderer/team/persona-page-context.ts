@@ -7,7 +7,7 @@
  * assembles what the blocks see.
  */
 import type { PersonaView } from '../../shared/remote-protocol';
-import type { DeskDeps } from '../desk-deps';
+import type { DeskDeps } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import type { PersonaDraft, personaPathsOf } from './persona-model';
 import type { PersonaReads } from './persona-page-load';

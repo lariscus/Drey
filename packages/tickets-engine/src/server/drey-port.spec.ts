@@ -2,11 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { remoteActorOf } from '../contracts/remote-protocol';
 import type { BoardSnapshot, TicketCard } from '../contracts/tickets';
 import type { ScoutReport } from '../contracts/scout';
-import { renderScoutReportSection } from '../core/scout';
-import { parseStatusLog, type StatusLine } from '../core/status-log';
+import { renderScoutReportSection } from '../core/chapters/scout';
+import { parseStatusLog, type StatusLine } from '../core/pipeline/status-log';
 import { BYPASS_REFUSAL, ChangeHub, DreyTicketsPort, type RemoteBoard, type RemoteFleet } from './drey-port';
 
-import { EMPTY_PERSONA_SETTINGS } from '../core/persona-settings';
+import { EMPTY_PERSONA_SETTINGS } from '../core/persona/persona-settings';
 /**
  * req-66: the Drey adapter behind the remote port — the actor reaches
  * every board write, bypass runs are refused unless allowed, and the
@@ -16,7 +16,7 @@ import { EMPTY_PERSONA_SETTINGS } from '../core/persona-settings';
 const ok = { ok: true } as const;
 
 /** A full-shaped persona for the E6 reply fakes (the reply type carries Persona). */
-function fakePersona(id: string, title: string): import('../core/persona').Persona {
+function fakePersona(id: string, title: string): import('../core/persona/persona').Persona {
   return {
     id,
     kind: 'agent',

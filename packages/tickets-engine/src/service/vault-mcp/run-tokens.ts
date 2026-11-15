@@ -8,7 +8,7 @@
  * attaches since req-182), so nothing needs to survive a restart.
  */
 import type { NormalizedEvent } from '../../fleet/harness/contract';
-import type { PersonaRecordsGrant, VaultScope } from '../../fleet/orchestrate/worker-vault';
+import type { PersonaRecordsGrant, VaultScope } from '../../fleet/runner/worker-vault';
 import { RecordQuota } from './record-quota';
 import { StaleWriteGuard } from './stale-writes';
 

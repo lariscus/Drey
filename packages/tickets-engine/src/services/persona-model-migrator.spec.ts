@@ -2,7 +2,7 @@ import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { parsePersonaFile } from '../core/persona';
+import { parsePersonaFile } from '../core/persona/persona';
 import type { ModelRow } from '../fleet/protocol';
 import type { EngineHost, EngineVault } from './host';
 import { PERSONA_MODEL_MIGRATION_COMMIT, PersonaModelMigrator } from './persona-model-migrator';

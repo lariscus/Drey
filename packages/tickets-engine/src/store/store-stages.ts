@@ -1,4 +1,4 @@
-import { isLifecycleStageSet } from '../core/lifecycle-stages';
+import { isLifecycleStageSet } from '../core/pipeline/lifecycle-stages';
 import { tomlList, tomlString, tomlTable } from './store-config-text';
 
 /**

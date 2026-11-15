@@ -6,7 +6,7 @@
  * commit). DOM-free, so the page, its blocks and the spec share it.
  */
 import type { PersonaAllowedPatch } from '../../../../packages/tickets-engine/src/contracts/persona-allowed';
-import type { PersonaRunCommands } from '../../../../packages/tickets-engine/src/core/persona';
+import type { PersonaRunCommands } from '../../../../packages/tickets-engine/src/core/persona/persona';
 import type { PersonaSettingsPatch } from '../../../../packages/tickets-engine/src/contracts/persona-settings-patch';
 import type { PersonaView } from '../../shared/remote-protocol';
 import { savedSettingsOf, settingsDraftOf, settingsPatchOf, type SettingsDraft } from './persona-settings-model';

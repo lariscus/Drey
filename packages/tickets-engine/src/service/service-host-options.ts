@@ -1,5 +1,5 @@
 /** What `ServiceHost.start` takes (req-164, req-165): the paths, the build, the spans and the seams. Types only. */
-import type { Args, RunnerDeps, RunnerHandle } from '../fleet/runner';
+import type { Args, RunnerDeps, RunnerHandle } from '../fleet/runner/runner';
 import type { Engine, EngineOptions } from '../server/engine';
 import type { LegacyDeps } from './legacy';
 import type { LogSink } from './service-log';

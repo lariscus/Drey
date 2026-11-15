@@ -1,5 +1,5 @@
-import { isMissionPersona, PERSONAS_DIR, type Persona } from '../core/persona';
-import { loadPersonaSkills } from '../core/skill-load';
+import { isMissionPersona, PERSONAS_DIR, type Persona } from '../core/persona/persona';
+import { loadPersonaSkills } from '../core/skills/skill-load';
 import type { EngineHost, EngineVault } from './host';
 import { missionPersonaText } from './mission-persona-text';
 

@@ -14,7 +14,7 @@
  */
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
-import { fleetBuildStamp } from '../fleet/build-stamp';
+import { fleetBuildStamp } from '../fleet/runner/build-stamp';
 import { parseServiceArgs, type CliOptions } from './service-args';
 import { runService } from './service-boot';
 import { autostartCommand, statusCommand, stopCommand } from './service-commands';
