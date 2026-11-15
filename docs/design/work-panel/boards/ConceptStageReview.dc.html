@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stage 1 at you</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{cursor:default;font:inherit}
+.vt{height:26px;padding:0 12px;display:flex;align-items:center;background:transparent;border:0;border-radius:4px;color:#b3b7bc;font-size:14px}
+.vt[aria-selected="true"]{background:#2c2d31;color:#f4f5f6;font-weight:600}
+.btn{height:28px;padding:0 12px;border:1px solid #747980;border-radius:8px;background:transparent;color:#f4f5f6;font-size:13px}
+.pri{background:#8ecbef;border-color:#8ecbef;color:#101113;font-weight:600}
+.lr{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 12px;font-size:14px;line-height:18px}
+.lr small{display:block;color:#b3b7bc;font-size:13px}
+.st{border:1px solid #3b3d42;border-radius:8px;background:#18191b;padding:12px 14px;display:grid;grid-template-columns:28px minmax(0,1fr) 150px 220px;gap:12px;align-items:center}
+.cov{display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:4px;font-size:12px;border:1px solid #3b3d42;color:#b3b7bc}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.ol{display:flex;align-items:center;gap:8px;height:28px;padding:0 12px;font-size:13px}
+.chip{margin-left:auto;font-size:12px;line-height:18px;padding:0 6px;border-radius:4px;border:1px solid #3b3d42;color:#b3b7bc;white-space:nowrap}
+.ok{color:#93c47f;border-color:#3f5a35}
+.rv{color:#f2cfae;border-color:#5e4a36}
+.q{color:#b3b7bc}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; flex-direction: column; background: #18191b; color: #f4f5f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif; font-size: 13px; line-height: 18px; overflow: hidden">
+<header style="height: 40px; flex-shrink: 0; display: flex; align-items: center; gap: 4px; padding: 0 8px; background: #222326; border-bottom: 1px solid #3b3d42">
+<span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 4px; background: #8ecbef; color: #101113; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 8px">D</span>
+<span style="font-size: 14px; padding: 0 8px">File</span><span style="font-size: 14px; padding: 0 8px">Edit</span><span style="font-size: 14px; padding: 0 8px">View</span><span style="font-size: 14px; padding: 0 8px">Help</span>
+<div role="tablist" aria-label="Views" style="display: flex; gap: 2px; margin-left: 24px; padding: 2px; border: 1px solid #3b3d42; border-radius: 6px"><button type="button" class="vt" role="tab" aria-selected="false">Notes</button><button type="button" class="vt" role="tab" aria-selected="true">Work</button><button type="button" class="vt" role="tab" aria-selected="false">Crew</button></div>
+<span style="margin-left: 12px; height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid #3b3d42; border-radius: 6px"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #8ecbef"></span>Drey</span>
+</header>
+<div style="flex: 1; display: flex; min-height: 0">
+<aside style="width: 300px; flex-shrink: 0; background: #222326; border-right: 1px solid #3b3d42; padding-top: 8px; display: flex; flex-direction: column">
+<div style="height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 12px"><span style="font-weight: 600">Tickets</span><span style="color: #b3b7bc">1 needs you</span></div>
+<div style="height: 28px; display: flex; align-items: center; padding: 0 12px; font-weight: 600">Needs you</div>
+<div class="lr" style="background: #2c2d31; box-shadow: inset 2px 0 0 #8ecbef"><span>Quota event kind<small>T-0143 · Ready to try · S1 of T-0142</small></span></div>
+<div style="height: 28px; display: flex; align-items: center; padding: 8px 12px 0; font-weight: 600">Waiting</div>
+<div class="lr"><span>Engine relays runner events<small>T-0144 · after S1</small></span></div>
+<div class="lr"><span>Reconnect with replay<small>T-0145 · after S2</small></span></div>
+<div style="margin-top: auto; border-top: 1px solid #3b3d42; padding: 8px 0">
+<div style="height: 28px; display: flex; align-items: center; padding: 0 12px; font-weight: 600">runner-event-stream.md</div>
+<div class="ol">Goal<span class="chip ok">applied</span></div>
+<div class="ol">Event stream at the runner<span class="chip ok">applied</span></div>
+<div class="ol">Event kinds<span class="chip rv">at you</span></div>
+<div class="ol">Clients subscribe through the engine<span class="chip q">queued</span></div>
+<div class="ol">Reconnect and replay<span class="chip q">queued</span></div>
+<div class="ol">Out of scope<span class="chip ok">applied</span></div>
+</div>
+</aside>
+<main style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<div style="height: 36px; display: flex; align-items: center; border-bottom: 1px solid #3b3d42; background: #222326"><span style="height: 36px; display: flex; align-items: center; padding: 0 14px; border-right: 1px solid #3b3d42">T-0142 · Apply: Runner event stream</span><span style="height: 36px; display: flex; align-items: center; padding: 0 14px; border-right: 1px solid #3b3d42; background: #18191b">T-0143 · Quota event kind</span></div>
+<div style="flex: 1; overflow: hidden; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px">
+<div style="border: 1px solid #3b3d42; border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: 90px minmax(0,1fr); gap: 6px 12px">
+<span style="color: #b3b7bc">Stage</span><span>S1 of <a href="ConceptDecompose.dc.html" style="color: #8ecbef">T-0142 · Apply: Runner event stream</a></span>
+<span style="color: #b3b7bc">Covers</span><span>Event kinds</span>
+<span style="color: #b3b7bc">Flow</span><span>✓ Ben · ✓ Ralf · ✓ Tessa · <strong>You</strong></span>
+<span style="color: #b3b7bc">Cost</span><span>$1.10</span>
+</div>
+<h1 style="margin: 4px 0 0; font-size: 24px; line-height: 32px; font-weight: 600">Quota event kind</h1>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px">
+<div style="border: 1px solid #3b3d42; border-radius: 8px; padding: 12px"><div style="color: #b3b7bc">Gate</div><div style="font-weight: 600; font-size: 15px; margin-top: 2px"><span class="dot" style="background: #93c47f" aria-hidden="true"></span>14 tests green</div></div>
+<div style="border: 1px solid #3b3d42; border-radius: 8px; padding: 12px"><div style="color: #b3b7bc">Change</div><div style="font-weight: 600; font-size: 15px; margin-top: 2px">3 files · +86 −4</div></div>
+<div style="border: 1px solid #3b3d42; border-radius: 8px; padding: 12px"><div style="color: #b3b7bc">Against the concept</div><div style="font-weight: 600; font-size: 15px; margin-top: 2px">No mismatch reported</div></div>
+</div>
+<div style="border: 1px solid #3b3d42; border-radius: 8px; background: #222326; padding: 14px">
+<div style="font-weight: 600; font-size: 15px; margin-bottom: 6px">Handover</div>
+<div style="font-size: 14px; line-height: 21px">The runner emits <code>quota</code> after every turn with the slot, remaining share and reset time, read from Claude Code's rate-limit event. Event kinds now match the concept's section.</div>
+<div style="margin-top: 10px; color: #b3b7bc">How to check: run a ticket and watch the Crew band's slot row update after each turn.</div>
+</div>
+<div style="border: 1px solid #3b3d42; border-radius: 8px; background: #222326; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; gap: 8px"><span style="font-weight: 600; font-size: 15px">Stages</span><span style="margin-left: auto; color: #b3b7bc">T-0142</span></div>
+<div class="st" style="border-color: #747980"><span style="color: #b3b7bc">S1</span><span style="font-weight: 600">Quota event kind</span><span><span class="dot" style="background: #e8a25a" aria-hidden="true"></span>At you</span><span style="display: flex; gap: 8px; justify-content: flex-end"><button type="button" class="btn">Send back</button><button type="button" class="btn pri">Accept</button></span></div>
+<div class="st"><span style="color: #b3b7bc">S2</span><span>Engine relays runner events</span><span class="q">Waits for S1</span><span></span></div>
+<div class="st"><span style="color: #b3b7bc">S3</span><span>Reconnect with replay</span><span class="q">Waits for S2</span><span></span></div>
+<div style="display: flex; padding-top: 4px"><button type="button" class="btn" style="margin-left: auto">Drop remaining stages</button></div>
+</div>
+</div>
+</main>
+<aside style="width: 380px; flex-shrink: 0; background: #222326; border-left: 1px solid #3b3d42; display: flex; flex-direction: column">
+<div style="height: 36px; display: flex; align-items: center; padding: 0 12px; font-weight: 600">Mission Control</div>
+<div style="flex: 1; padding: 8px 16px; display: flex; flex-direction: column; gap: 12px; font-size: 14px; line-height: 21px">
+<div style="color: #b3b7bc; font-size: 13px">Tessa via Mission Control</div>
+<div>Stage 1 is ready to try. Gate green, 3 files. Accepting it marks Event kinds as applied and starts stage 2.</div>
+</div>
+<div style="padding: 12px 16px; border-top: 1px solid #3b3d42">
+<div style="font-weight: 600; margin-bottom: 8px">Accept stage 1?</div>
+<label style="display: flex; gap: 8px; align-items: center; border: 1px solid #747980; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px"><input type="radio" name="a" checked>Accept, start stage 2</label>
+<label style="display: flex; gap: 8px; align-items: center; border: 1px solid #3b3d42; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px"><input type="radio" name="a">Accept, hold the rest</label>
+<label style="display: flex; gap: 8px; align-items: center; border: 1px solid #3b3d42; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px"><input type="radio" name="a">Send back to Ben</label>
+<div style="display: flex; justify-content: flex-end"><button type="button" class="btn pri">Send “Accept, start stage 2”</button></div>
+</div>
+<div style="margin: 0 12px 12px; border: 1px solid #747980; border-radius: 12px; padding: 10px 12px">
+<input type="text" aria-label="Message" style="display: block; width: 100%; box-sizing: border-box; height: 28px; background: transparent; border: 0; color: #f4f5f6; font-size: 14px">
+</div>
+</aside>
+</div>
+<footer style="height: 28px; flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: 0 12px; background: #222326; border-top: 1px solid #3b3d42; color: #b3b7bc"><span style="margin-left: auto">$4.30 today</span><span>Autopilot · On</span><span>Settings</span></footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

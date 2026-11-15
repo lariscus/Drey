@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Decompose the delta into stages</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{cursor:default;font:inherit}
+.vt{height:26px;padding:0 12px;display:flex;align-items:center;background:transparent;border:0;border-radius:4px;color:#b3b7bc;font-size:14px}
+.vt[aria-selected="true"]{background:#2c2d31;color:#f4f5f6;font-weight:600}
+.btn{height:28px;padding:0 12px;border:1px solid #747980;border-radius:8px;background:transparent;color:#f4f5f6;font-size:13px}
+.pri{background:#8ecbef;border-color:#8ecbef;color:#101113;font-weight:600}
+.lr{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 12px;font-size:14px;line-height:18px}
+.lr small{display:block;color:#b3b7bc;font-size:13px}
+.st{border:1px solid #3b3d42;border-radius:8px;background:#18191b;padding:12px 14px;display:grid;grid-template-columns:28px minmax(0,1fr) 110px 90px 130px;gap:12px;align-items:center}
+.cov{display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:4px;font-size:12px;border:1px solid #3b3d42;color:#b3b7bc;margin-right:4px}
+.pc{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:1px solid #747980;border-radius:6px;font-size:13px}
+.av{width:18px;height:18px;border-radius:50%;background:#bfe3cd;color:#101113;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.bl{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;font-size:13px;line-height:20px;padding:4px 0}
+.bl span:first-child{color:#b3b7bc}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; flex-direction: column; background: #18191b; color: #f4f5f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif; font-size: 13px; line-height: 18px; overflow: hidden">
+<header style="height: 40px; flex-shrink: 0; display: flex; align-items: center; gap: 4px; padding: 0 8px; background: #222326; border-bottom: 1px solid #3b3d42">
+<span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 4px; background: #8ecbef; color: #101113; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 8px">D</span>
+<span style="font-size: 14px; padding: 0 8px">File</span><span style="font-size: 14px; padding: 0 8px">Edit</span><span style="font-size: 14px; padding: 0 8px">View</span><span style="font-size: 14px; padding: 0 8px">Help</span>
+<div role="tablist" aria-label="Views" style="display: flex; gap: 2px; margin-left: 24px; padding: 2px; border: 1px solid #3b3d42; border-radius: 6px"><button type="button" class="vt" role="tab" aria-selected="false">Notes</button><button type="button" class="vt" role="tab" aria-selected="true">Work</button><button type="button" class="vt" role="tab" aria-selected="false">Crew</button></div>
+<span style="margin-left: 12px; height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid #3b3d42; border-radius: 6px"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #8ecbef"></span>Drey</span>
+</header>
+<div style="flex: 1; display: flex; min-height: 0">
+<aside style="width: 300px; flex-shrink: 0; background: #222326; border-right: 1px solid #3b3d42; padding-top: 8px">
+<div style="height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 12px"><span style="font-weight: 600">Tickets</span><span style="color: #b3b7bc">1 needs you</span></div>
+<div style="height: 28px; display: flex; align-items: center; padding: 0 12px; font-weight: 600">Needs you</div>
+<div class="lr" style="background: #2c2d31; box-shadow: inset 2px 0 0 #8ecbef"><span>Apply: Runner event stream<small>T-0142 · Shaping · 3 stages to accept</small></span></div>
+<div style="height: 28px; display: flex; align-items: center; padding: 8px 12px 0; font-weight: 600">Running</div>
+<div class="lr"><span>Voice capture: dictation hand-off<small>T-0131 · Building · Ben</small></span></div>
+</aside>
+<main style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<div style="height: 36px; display: flex; align-items: center; border-bottom: 1px solid #3b3d42; background: #222326"><span style="height: 36px; display: flex; align-items: center; padding: 0 14px; border-right: 1px solid #3b3d42; background: #18191b">T-0142 · Apply: Runner event stream</span></div>
+<div style="flex: 1; overflow: hidden; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px">
+<div style="border: 1px solid #3b3d42; border-radius: 8px; padding: 12px 14px; display: grid; grid-template-columns: 90px minmax(0,1fr); gap: 6px 12px; font-size: 13px">
+<span style="color: #b3b7bc">Concept</span><span><a href="ConceptLiveEdit.dc.html" style="color: #8ecbef">Drey notes / docs/concepts/runner-event-stream.md</a></span>
+<span style="color: #b3b7bc">Delta</span><span>4 sections · last applied 14 Nov → now</span>
+<span style="color: #b3b7bc">Project</span><span>Drey</span>
+</div>
+<h1 style="margin: 4px 0 0; font-size: 24px; line-height: 32px; font-weight: 600">Apply: Runner event stream</h1>
+<div style="border: 1px solid #3b3d42; border-radius: 8px; background: #222326; padding: 14px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; gap: 8px"><span style="font-weight: 600; font-size: 15px">Stages to accept</span><span style="border: 1px solid #2f4f63; color: #8ecbef; border-radius: 4px; padding: 0 6px; font-size: 12px">3 stages</span><span style="margin-left: auto; color: #b3b7bc">Typical total</span><span style="font-weight: 600">$4.10–6.80</span></div>
+<div class="st"><span style="color: #b3b7bc">S1</span><span><span style="font-weight: 600; font-size: 14px">Quota event kind</span><br><span class="cov">covers · Event kinds</span></span><span style="color: #b3b7bc">Runs first</span><span class="pc"><span class="av" aria-hidden="true">B</span>Ben</span><span style="color: #b3b7bc">$0.90–1.40</span></div>
+<div class="st" style="border-color: #747980"><span style="color: #b3b7bc">S2</span><span><span style="font-weight: 600; font-size: 14px">Engine relays runner events</span><br><span class="cov">covers · Architecture</span><span class="cov">Clients subscribe through the engine</span></span><span style="color: #b3b7bc">After S1</span><span class="pc"><span class="av" aria-hidden="true">B</span>Ben</span><span style="color: #b3b7bc">$2.00–3.20</span></div>
+<div style="margin: -4px 0 0 40px; border-left: 2px solid #3b3d42; padding: 8px 14px; background: #18191b; border-radius: 0 0 8px 0">
+<div style="font-weight: 600; margin-bottom: 4px">Brief for S2</div>
+<div class="bl"><span>Implement</span><span>Architecture · Clients subscribe through the engine · the diff, inline</span></div>
+<div class="bl"><span>Read as context</span><span>the whole concept, as of this apply · via the vault</span></div>
+<div class="bl"><span>Exists in code</span><span>Goal · Out of scope · Event kinds (S1)</span></div>
+<div class="bl"><span>Leave alone</span><span>Reconnect and replay · later stage S3</span></div>
+<div class="bl"><span>On a mismatch</span><span>ask, never fix silently</span></div>
+</div>
+<div class="st"><span style="color: #b3b7bc">S3</span><span><span style="font-weight: 600; font-size: 14px">Reconnect with replay</span><br><span class="cov">covers · Reconnect and replay</span></span><span style="color: #b3b7bc">After S2</span><span class="pc"><span class="av" aria-hidden="true">B</span>Ben</span><span style="color: #b3b7bc">$1.20–2.20</span></div>
+<div style="display: flex; align-items: center; gap: 12px; padding-top: 4px; color: #b3b7bc"><span>Every stage ends with you</span><button type="button" class="btn" style="margin-left: auto">Ask Mission Control to change the cut</button></div>
+</div>
+</div>
+</main>
+<aside style="width: 380px; flex-shrink: 0; background: #222326; border-left: 1px solid #3b3d42; display: flex; flex-direction: column">
+<div style="height: 36px; display: flex; align-items: center; padding: 0 12px; font-weight: 600">Mission Control</div>
+<div style="flex: 1; padding: 8px 16px; display: flex; flex-direction: column; gap: 12px; font-size: 14px; line-height: 21px">
+<div style="color: #b3b7bc; font-size: 13px">Paul via Mission Control</div>
+<div>Four changed sections, three stages. S2 needs S1's event kind, S3 needs S2's relay, so they run one after another.</div>
+<div style="display: flex; align-items: center; gap: 8px; color: #b3b7bc"><span aria-hidden="true" style="color: #93c47f">✓</span>Read runner-event-stream.md · delta of 4 sections</div>
+</div>
+<div style="padding: 12px 16px; border-top: 1px solid #3b3d42">
+<div style="font-weight: 600; margin-bottom: 8px">Start with the first stage?</div>
+<label style="display: flex; gap: 8px; align-items: center; border: 1px solid #747980; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px"><input type="radio" name="r" checked>Run stage 1 only<span style="margin-left: auto; color: #b3b7bc">recommended</span></label>
+<label style="display: flex; gap: 8px; align-items: center; border: 1px solid #3b3d42; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px"><input type="radio" name="r">Release all three</label>
+<div style="display: flex; justify-content: flex-end"><button type="button" class="btn pri">Send “Run stage 1 only”</button></div>
+</div>
+<div style="margin: 0 12px 12px; border: 1px solid #747980; border-radius: 12px; padding: 10px 12px">
+<span style="display: inline-flex; align-items: center; height: 24px; padding: 0 8px; background: #2c2d31; border-radius: 4px; font-size: 13px">T-0142.md</span>
+<input type="text" aria-label="Message" style="display: block; width: 100%; box-sizing: border-box; margin-top: 8px; height: 28px; background: transparent; border: 0; color: #f4f5f6; font-size: 14px">
+</div>
+</aside>
+</div>
+<footer style="height: 28px; flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: 0 12px; background: #222326; border-top: 1px solid #3b3d42; color: #b3b7bc"><span style="margin-left: auto">1 running · $3.20 today</span><span>Autopilot · On</span><span>Settings</span></footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
