@@ -6,6 +6,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, resolve, join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const root = process.cwd();
 const SPEC_FILES = [
@@ -145,6 +146,12 @@ for (const rel of SPEC_FILES) {
     if (!pathPart) continue;
     if (!existsSync(resolve(base, pathPart))) errors.push(`${rel}: broken link → ${target}`);
   }
+}
+
+// --- The generated spec digest is current ------------------------------------
+const digestRun = spawnSync(process.execPath, ['scripts/gen-spec-digest.mjs', '--check'], { cwd: root, encoding: 'utf8' });
+if (digestRun.status !== 0) {
+  errors.push(`specs/digest.md: ${(digestRun.stderr || digestRun.stdout || 'digest check failed').trim()}`);
 }
 
 finish();

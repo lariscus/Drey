@@ -75,7 +75,9 @@ consciously checked and named as untouched, and `check-specs.mjs` exits 0.
    node .claude/skills/drey-milestone-done/check-specs.mjs
    ```
 
-   It checks: changelog milestone numbers unique and the newest on top,
+   It checks: `specs/digest.md` being current (stale → regenerate with
+   `node scripts/gen-spec-digest.mjs` and include it in the change),
+   changelog milestone numbers unique and the newest on top,
    the top entry's verification marker, no open roadmap row whose id a
    changelog heading names, no duplicate roadmap rows, the Status line
    covering the newest milestone, every relative link in the spec files

@@ -7,6 +7,11 @@ anything: language conventions, the no-global-Node toolchain, architecture
 decisions, ownership map, coding style, and working style all apply to every
 agent, regardless of tool.
 
+**Specs: digest first.** `specs/digest.md` (generated, never edited by
+hand) is the entry point into `specs/`: the fixed principles, the finish
+line and an index of every section and every excluded idea. Read it before
+a first proposal, then open spec sections by heading — not the whole files.
+
 **Platform conventions — tell the owner** (owner, 2026-11-11). When a request
 goes against a general convention of the platform or of common UI practice —
 Windows' own patterns (a status badge sits bottom-right on taskbar and tray

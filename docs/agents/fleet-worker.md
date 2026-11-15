@@ -106,6 +106,9 @@ A spec sits beside the file it tests. The dependency rules between
   (a new entry goes at the top: its first 40 lines show the format),
   `specs/roadmap.md`, `docs/manual/manual.md`, `docs/05_building_block_view.md`,
   `plugins/tickets/main/index.ts`, `plugins/tickets/renderer/index.ts`.
+- Specs overview: `specs/digest.md` (generated) lists the principles, the
+  finish line and every section and excluded idea of `specs/` — read it
+  once, then open only the spec section a step needs.
 - "Which file owns X": `CLAUDE.md` § "Ownership Map", then `docs/05`
   § "Feature → files index".
 - Why something is the way it is: the ADR the code comment or the

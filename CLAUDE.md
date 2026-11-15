@@ -10,10 +10,18 @@ data schema, and classifier design live in `specs/`:
 - `specs/frontmatter-schema.md` — file/frontmatter format
 - `specs/ticket-schema.md` — the tickets repository format (ADR-0075/0076)
 - `specs/classifier-spec.md` — LLM prompts for task/note detection and tag suggestions
+- `specs/digest.md` — **generated** (`node scripts/gen-spec-digest.mjs`, never
+  edited by hand): principles, finish line, section and decision index; the
+  first thing to read
 - `specs/changelog.md` — what has shipped, newest first (the record; read on demand)
 
-Read the first four files before making a first proposal — they are the
-binding specification, not just background reading.
+Read `specs/digest.md` before making a first proposal — the generated entry
+point into the binding specification: the fixed principles, the finish line,
+and an index of every roadmap section and every excluded idea. It replaces
+reading `roadmap.md`, `decisions.md`, `frontmatter-schema.md` and
+`ticket-schema.md` whole: for what you are about to touch, open the section
+the digest names (`grep -n`, then the lines around the hit). The four files
+stay the binding specification, not just background reading.
 
 `AGENTS.md` is the tool-neutral entry point for coding agents; it points
 here, and everything in this file binds every agent regardless of tool.
@@ -896,9 +904,10 @@ ones: an item leaves the roadmap exactly when it enters the changelog or
   for status.
 - Last check: the roadmap lists nothing that shipped, the changelog's top
   entry is the newest, ids are unique, links between the specs resolve —
-  `node .claude/skills/drey-milestone-done/check-specs.mjs` checks these
-  and prints the next free ids (Claude Code: the `drey-milestone-done`
-  skill walks the whole list).
+  `node .claude/skills/drey-milestone-done/check-specs.mjs` checks these,
+  fails when `specs/digest.md` is stale (regenerate it with
+  `node scripts/gen-spec-digest.mjs`) and prints the next free ids
+  (Claude Code: the `drey-milestone-done` skill walks the whole list).
 
 A milestone that is code-complete but not yet verified by the owner is
 marked "**Not yet manually verified by the owner**" in its changelog
