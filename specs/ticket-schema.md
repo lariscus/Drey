@@ -527,9 +527,9 @@ sessions are own line grammars, not ticket documents, and not covered.
   step's brief and a resume carry it (capped at 2 KB) instead of the Log
   tail; `ticketSections` reads it. A Log line stays one short line under
   200 characters — detail belongs here.
-- `## Verification` — the verify run's proof (E4, ADR-0088 later
-  change). Written by the engine's verify step, **replaced** after every
-  run (never a second section, before `## Log`). The canonical shape:
+- `## Verification` - the verify run's proof (E4, ADR-0088 later
+  change). Written by the verify run, **replaced** after every run
+  (never a second section, before `## Log`). The canonical shape:
 
   ```markdown
   ## Verification
@@ -562,14 +562,13 @@ sessions are own line grammars, not ticket documents, and not covered.
   Older tickets may still carry the retired `Video removed (size
   limit).` line; the reader ignores it. A `tests` proof
   has no shot, no `### Video` and marks every criterion
-  `- [x] \`cmd\` — checked by the machine gate` (no app was started; the
-  gate that let the ticket reach the verify phase stands in). The proof card
+  `- [x] \`cmd\` - checked by the machine gate` (no app was started; the
+  run's own machine gate stands in). The proof card
   reads the section tolerantly (`core/verification.ts`); an absent
-  section means "not verified yet". The engine's verify step is a
-  machine step, not an agent run: it launches the ticket worktree's
-  built app (repos.md `launch:`, else the `dev.ps1 -Built -Multi`
-  convention), walks the criteria headless, persists the section and
-  moves the ticket to the owner's checkpoint.
+  section means "not verified yet". The verify run walks the ticket's
+  criteria against its work repo's built app (`repos.md` `launch:`);
+  how a verify step runs — a chain step skill with its own machine
+  gate — is ADR-0101's.
 - `## Log` — append-only. Machine-appended entries use the exact line
   shape `- '<UTC timestamp>' <who> — <text>`; humans may append in any
   readable shape. Every transition, claim, takeover, injection, stop

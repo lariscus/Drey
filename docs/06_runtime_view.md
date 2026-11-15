@@ -6720,8 +6720,8 @@ sequenceDiagram
 
 The engine hosts one vault folder for the life of the service; whether that folder is *loaded* is Drey's
 registry, pushed under `vaults.registered` (req-167) — the same key the workers' vault MCP reads. Unloaded
-means the host lists no vault, so every reader of the board (`detect`, `listProjects`, the chat, the verify
-service) finds none; the files are never deleted. With no key (no Drey ever named a registry) the vault is
+means the host lists no vault, so every reader of the board (`detect`, `listProjects`, the chat)
+finds none; the files are never deleted. With no key (no Drey ever named a registry) the vault is
 loaded. The `board` IPC awaits the registry push before it reads, so a fetch right after a removal cannot
 see the old list.
 ## 6.146 One entry shapes and plans; the standard flow is set through Mission Control (req-305, req-306, milestone 280)

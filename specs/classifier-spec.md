@@ -567,9 +567,9 @@ commands in its brief: the runner judges its hand-over structurally.
   `BLOCKED: FAIL — <the main finding in one line>` (the runner parks the
   ticket for the owner's send-back). Nothing parses the verdict word itself.
 - **The tester's verdicts:** one line per criterion, `- passed|failed`
-  `` `<command>` `` ` — <what was seen>`, then `Findings:`, and `BLOCKED:`
-  when any criterion failed. Guidance only — the machine verify step
-  (`services/verify-service.ts`) writes `## Verification` on its own.
+  `` `<command>` `` ` - <what was seen>`, then `Findings:`, and `BLOCKED:`
+  when any criterion failed. Guidance only - the verify run writes
+  `## Verification` on its own.
 - **The crew prompts:** mission lists every command with its fields and an
   example (`createTicket` title, phase, priority, project? (req-298, mission.md version 4), description?;
   `transition` id, from, to; `setPriority` id, priority; `promote` id;
