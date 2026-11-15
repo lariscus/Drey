@@ -196,14 +196,16 @@ Playwright/Electron session", applies to the recording core). Then:
 | 5 | The skill: SKILL.md + `record.mjs` + seeding + shipping spec | ~1 day |
 | 6 | Stage 2 (project `flow:`, shaper skill) | +1 day |
 
-Code anchors for the implementing session: `core/chain-list.ts` (the entry
-regex, the mode gate), `contracts/chain.ts` (`CHAIN_MODES`),
-`core/chain-validate.ts` (the write guard), `fleet/request.ts`
-(`persona.skills` → the skills section, D-46) + `fleet/instruction.ts`
-(`skillsSection`), `fleet/protocol.ts` (the `gate` enum) +
-`fleet/orchestrate/gate-runner.ts`,
-`fleet/orchestrate/run-bookkeeper.ts` (the pickup),
-`services/video-service.ts` (`enforceCap`), `core/proof-mode.ts`,
-`core/verification.ts` (the format), `specs/ticket-schema.md` (Proof mode,
-Videos, The chain), `server/verify-harness.ts` in history at `5c7c75f2`
-(the recording core).
+Code anchors for the implementing session (the req-300 domain folders):
+`core/pipeline/chain-list.ts` (the entry regex, the mode gate),
+`contracts/chain.ts` (`CHAIN_MODES`), `core/pipeline/chain-validate.ts`
+(the write guard), `fleet/runner/request.ts`
+(`persona.skills` → the skills section, D-46) +
+`fleet/runner/instruction.ts` (`skillsSection`), `fleet/protocol.ts`
+(the `gate` enum) + `fleet/runner/gate-runner.ts`,
+`fleet/runner/run-bookkeeper.ts` (the pickup),
+`services/video-service.ts` (`enforceCap`),
+`core/ticket/proof-mode.ts`, `core/chapters/verification.ts` (the
+format), `specs/ticket-schema.md` (Proof mode, Videos, The chain),
+`server/verify-harness.ts` in history at `5c7c75f2` (the recording
+core).
