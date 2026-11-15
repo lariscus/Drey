@@ -43,8 +43,9 @@ cuts only the **delta to the last implemented version**, visible as a diff.
    live edit on. The Assistant writes directly; a diagram changes in front of him. While
    it writes, his input waits (*Assistant is editing*, Stop).
 2. **Edit by hand (7t).** The owner changes the note himself between turns. The editor
-   marks his edits; the next message carries them as a diff (chip *n edits of yours go
-   along*, removable; a card *You edited the note* in the chat). The concept is the
+   marks his edits; the next message **he** sends carries them as a diff (chip *n edits
+   of yours go along*, removable; on send a card *You edited the note* in the chat).
+   His edits never start a turn by themselves (owner, 2026-11-15). The concept is the
    truth, the chat is how it is edited, by both.
 3. **Apply (7u).** The meta bar reads *Last applied 14 Nov · n sections changed*;
    **Apply** opens the diff of the note against its last applied version, per section
@@ -100,8 +101,10 @@ The one piece the Notes Assistant lacks. Per chat session and note, the Assistan
 a **shadow copy**: the note as it stood at the end of the model's last turn. On send, the
 change shadow → current buffer goes along as a unified diff with the section names, under
 the chip *n edits of yours go along* (removable: then only the new text goes, as today).
-A card *You edited the note* records it in the chat note. The model's own changes are
-never mirrored back. The lock of ADR-0049 stays as it is. This is the Shape mechanism of
+A card *You edited the note* records it in the chat note when the message is sent.
+**Nothing triggers on an edit** (owner, 2026-11-15): until the owner sends a message, the
+model hears nothing — the chip only counts what will go along. The model's own changes
+are never mirrored back. The lock of ADR-0049 stays as it is. This is the Shape mechanism of
 v2 §5.8 moved into the Assistant plugin for every live-edited note, not only tickets.
 
 ## 5. How Apply reaches the Crew
