@@ -23,7 +23,7 @@ describe('isReviewRun — the standard review phase, or a reviewer persona on an
 });
 
 describe('composeRunRequest — a review run carries its checkout (req-183)', () => {
-  const review = phase('review', { handover: 'agent review-default' });
+  const review = phase('review');
   const reviewCard = card({ phase: 'review', path: 'tickets/review/T-0001.md' });
 
   it('the review phase gets <id>-review beside the worktree, and the brief names it read-only', () => {
@@ -48,14 +48,15 @@ describe('composeRunRequest — a review run carries its checkout (req-183)', ()
 
   it('a reviewer persona on an inserted gate gets one too', () => {
     const persona = { id: 'ralf', role: 'reviewer', worker: 'claude-code', model: 'opus', prompt: null, memory: '' };
-    const result = composeRunRequest(base({ workingPhase: phase('security', { handover: 'agent x' }), persona }));
+    const result = composeRunRequest(base({ workingPhase: phase('security'), persona }));
     expect(result.ok && result.request.reviewCheckout).toBe(path.join('V:/tickets', '_worktrees', 'T-0001-review'));
   });
 
   it('a build run carries none, and its brief is unchanged', () => {
-    const result = composeRunRequest(base({ workingPhase: phase('build', { handover: 'agent build-default' }) }));
+    const result = composeRunRequest(base({ workingPhase: phase('build') }));
     expect(result.ok && result.request.reviewCheckout).toBeUndefined();
     expect(result.ok && result.request.permissionMode).toBe('accept-edits');
     expect(result.ok && result.request.instruction).toContain('Work checkout:');
   });
 });
+

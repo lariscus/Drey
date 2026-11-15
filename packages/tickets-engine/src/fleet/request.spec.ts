@@ -9,7 +9,7 @@ import { base, card, phase, REPO, TICKET } from './request-spec-support';
  */
 
 describe('composeRunRequest — the owner\'s columns (D-29)', () => {
-  const inbox = phase('inbox', { title: 'Inbox', handover: 'manual', persona: 'you' });
+  const inbox = phase('inbox', { title: 'Inbox' });
 
   it('refuses a run from a manual column: the fleet takes nothing from it, whoever asks', () => {
     for (const asked of [{}, { workerChoice: 'opencode' }, { handover: 'fresh' as const }, { dispatchedBy: 'inbox' }]) {
@@ -21,7 +21,7 @@ describe('composeRunRequest — the owner\'s columns (D-29)', () => {
 
   it('refuses the other edge columns (Prioritized, Done) the same way', () => {
     for (const edge of ['prioritized', 'done']) {
-      const result = composeRunRequest(base({ workingPhase: phase(edge, { title: edge, handover: 'none' }) }));
+      const result = composeRunRequest(base({ workingPhase: phase(edge, { title: edge }) }));
       expect(result.ok).toBe(false);
       expect(result.ok ? '' : result.error).toContain("the owner's column: the fleet takes nothing from it. Start its chain to run it.");
     }
@@ -29,12 +29,12 @@ describe('composeRunRequest — the owner\'s columns (D-29)', () => {
 
   it('the owner\'s own dialog and Accept\'s commit step stay: neither takes a ticket for the fleet', () => {
     expect(composeRunRequest(base({ workingPhase: inbox, interactive: 'plan' })).ok).toBe(true);
-    expect(composeRunRequest(base({ workingPhase: phase('done', { handover: 'manual' }), commitStep: true })).ok).toBe(true);
+    expect(composeRunRequest(base({ workingPhase: phase('done'), commitStep: true })).ok).toBe(true);
   });
 
   it('a working column still runs, whatever its handover says (req-307: the holder dispatches)', () => {
-    expect(composeRunRequest(base({ workingPhase: phase('building', { handover: 'agent build-default' }) })).ok).toBe(true);
-    expect(composeRunRequest(base({ workingPhase: phase('active', { handover: 'manual' }) })).ok).toBe(true);
+    expect(composeRunRequest(base({ workingPhase: phase('building') })).ok).toBe(true);
+    expect(composeRunRequest(base({ workingPhase: phase('active') })).ok).toBe(true);
   });
 });
 
@@ -125,7 +125,7 @@ describe('composeRunRequest', () => {
   it('builds a dispatched run: the pull stays in its phase, the pool is the working column', () => {
     const result = composeRunRequest(
       base({
-        workingPhase: phase('plan', { handover: 'agent plan-default', worker: 'opencode', model: 'zai/glm-5.3' }),
+        workingPhase: phase('plan'),
         dispatchedBy: 'plan',
       }),
     );
@@ -135,7 +135,7 @@ describe('composeRunRequest', () => {
     expect(result.request.phase).toBe('prioritized'); // where the file sits
     expect(result.request.column).toBe('plan'); // the pool whose slot it takes
     expect(result.request.provider).toBe('opencode');
-    expect(result.request.model).toBe('zai/glm-5.3');
+    expect(result.request.model).toBeNull();
     expect(result.request.recordWorker).toBeUndefined(); // the orchestrator never re-pins
     expect(result.request.instruction).toContain('Completion discipline');
     expect(result.request.instruction).toContain('It should work.');
@@ -143,15 +143,15 @@ describe('composeRunRequest', () => {
 
   it('a run with a cursor carries it (a green end hands on by it); a run without one carries none', () => {
     const cursor = { at: 1, length: 3 };
-    const chained = composeRunRequest(base({ workingPhase: phase('active', { handover: 'manual' }), cursor }));
-    const alone = composeRunRequest(base({ workingPhase: phase('active', { handover: 'manual' }) }));
+    const chained = composeRunRequest(base({ workingPhase: phase('active'), cursor }));
+    const alone = composeRunRequest(base({ workingPhase: phase('active') }));
     expect(chained.ok && chained.request.cursor).toEqual(cursor);
     expect(alone.ok && alone.request.cursor).toBeUndefined();
   });
 
   it('an owner run records the dialog choice and carries no column', () => {
     const result = composeRunRequest(
-      base({ workingPhase: phase('build', { handover: 'agent build-default' }), workerChoice: 'claude-code/sonnet' }),
+      base({ workingPhase: phase('build'), workerChoice: 'claude-code/sonnet' }),
     );
     if (!result.ok) {
       throw new Error(result.error);
@@ -177,7 +177,7 @@ describe('composeRunRequest', () => {
     const result = composeRunRequest(
       base({
         ticketText: noCriteria,
-        workingPhase: phase('plan', { handover: 'agent plan-default', interactive: 'plan-interactive-default' }),
+        workingPhase: phase('plan'),
         cursor: { at: 1, length: 3 },
         interactive: 'plan',
       }),
@@ -200,25 +200,20 @@ describe('composeRunRequest', () => {
     expect(normal.request.instruction).toContain('Completion discipline');
   });
 
-  it('the assignment ring: ticket pin over column over handover pin over repo over default', () => {
+  it('the assignment ring: ticket pin over repo over default', () => {
     const pinned = card({ meta: { ...card().meta, worker: 'claude-code' } });
     const ticketWins = composeRunRequest(
       base({
         card: pinned,
-        workingPhase: phase('plan', { handover: 'agent plan-default', worker: 'opencode' }),
+        workingPhase: phase('plan'),
       }),
     );
     expect(ticketWins.ok && ticketWins.request.provider).toBe('claude-code');
 
-    const columnWins = composeRunRequest(
-      base({ workingPhase: phase('plan', { handover: 'agent plan-default@claude-code', worker: 'opencode' }) }),
+    const repoWins = composeRunRequest(
+      base({ repo: { ...REPO, worker: 'kimi' }, workingPhase: phase('plan') }),
     );
-    expect(columnWins.ok && columnWins.request.provider).toBe('opencode');
-
-    const handoverWins = composeRunRequest(
-      base({ workingPhase: phase('plan', { handover: 'agent plan-default@claude-code' }) }),
-    );
-    expect(handoverWins.ok && handoverWins.request.provider).toBe('claude-code');
+    expect(repoWins.ok && repoWins.request.provider).toBe('kimi');
   });
 
   it('refuses the honest reasons: no repo, no checkout, no gate', () => {
@@ -313,7 +308,7 @@ describe('multi-repo runs (req-72)', () => {
 });
 
 describe('composeRunRequest — the ticket\'s project (req-282)', () => {
-  const building = phase('building', { handover: 'agent build-default' });
+  const building = phase('building');
 
   it('the purpose reaches the instruction and changes the brief digest; an Unassigned ticket composes as before', () => {
     const plain = composeRunRequest(base({ workingPhase: building }));
@@ -338,3 +333,5 @@ describe('composeRunRequest — the ticket\'s project (req-282)', () => {
     expect(anonymous.request.projectId).toBeUndefined();
   });
 });
+
+

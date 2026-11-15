@@ -20,11 +20,7 @@ import { costInTotalText, costSoFarText } from '../../../../shared/cost-text';
 import type { I18n } from '../../../../shared/i18n/types';
 import type { VerificationReport } from '../../../../packages/tickets-engine/src/contracts/verify';
 import type { BoardSnapshot, PipelinePhase, TicketCard } from '../../shared/tickets';
-import { READY_STATE } from '../../shared/pipeline-states';
-import { ideaPhaseIds, isMachinePhase, needKindLabel, type WorkRow } from '../work-groups';
-
-/** The owner's shaping column of the one state list (req-99a). */
-export const SHAPING_STATE = 'shaping';
+import { needKindLabel, type WorkRow } from '../work-groups';
 
 export const titleCase = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
 
@@ -249,13 +245,13 @@ export function chainOf(input: {
   const entries = own.length > 0 ? own : (input.flow ?? []);
   const nameOf = (id: string): string => input.personas.find((p) => p.id === id)?.title ?? titleCase(id);
   if (entries.length === 0) {
-    return phaseChainOf(pipeline, input.currentPhaseId, card, nameOf);
+    return phaseChainOf(pipeline, input.currentPhaseId);
   }
   const cursor = chainCursor(entries, card.meta.at, chainLifeOf(input.currentPhaseId, pipeline.map((p) => p.id)));
   return chainSteps(entries, cursor).map((step) => {
     const checkpoint = step.persona === OWNER_PERSONA;
     return {
-      phase: pipeline.find((p) => p.persona === step.persona)?.id ?? step.persona,
+      phase: step.persona,
       position: step.position,
       title: nameOf(step.persona),
       state: step.state,
@@ -270,29 +266,25 @@ export function chainOf(input: {
 
 /**
  * A ticket with neither a chain of its own nor a standard flow (`flow:`
- * absent, every ticket from before req-266): the pipeline's working columns
- * as the steps, as before — the manual ones are the owner's checkpoints.
+ * absent, every ticket from before req-266): the pipeline's inner columns
+ * as the steps — the owner's checkpoints.
  */
-function phaseChainOf(pipeline: readonly PipelinePhase[], currentPhaseId: string, card: TicketCard, nameOf: (id: string) => string): ChainItem[] {
-  const ideas = new Set(ideaPhaseIds(pipeline));
+function phaseChainOf(pipeline: readonly PipelinePhase[], currentPhaseId: string): ChainItem[] {
+  const first = pipeline[0]?.id ?? null;
   const last = pipeline[pipeline.length - 1]?.id ?? null;
-  const shown = pipeline.filter((phase) => !ideas.has(phase.id) && phase.id !== last);
+  const shown = pipeline.filter((phase) => phase.id !== first && phase.id !== last);
   const at = shown.findIndex((phase) => phase.id === currentPhaseId);
-  return shown.map((phase, index) => {
-    const checkpoint = !isMachinePhase(phase);
-    const persona = card.meta.persona ?? phase.persona ?? null;
-    return {
-      phase: phase.id,
-      position: index + 1,
-      title: phase.title,
-      state: at < 0 ? 'future' : index < at ? 'past' : index === at ? 'current' : 'future',
-      who: checkpoint ? OWNER_PERSONA : persona === null ? '' : nameOf(persona),
-      personaId: checkpoint ? null : persona,
-      checkpoint,
-      notify: false,
-      shape: false,
-    };
-  });
+  return shown.map((phase, index) => ({
+    phase: phase.id,
+    position: index + 1,
+    title: phase.title,
+    state: at < 0 ? 'future' : index < at ? 'past' : index === at ? 'current' : 'future',
+    who: OWNER_PERSONA,
+    personaId: null,
+    checkpoint: true,
+    notify: false,
+    shape: false,
+  }));
 }
 
 export type StatusTone = 'needs' | 'running' | 'blocked' | 'idle';
@@ -309,19 +301,14 @@ export interface TicketStatus {
   readonly kind: string;
 }
 
-const pillOfPhase = (phaseId: string): PillTone =>
-  phaseId === 'prioritized' ? 'accent' : phaseId === SHAPING_STATE ? 'pink' : phaseId === READY_STATE ? 'mint' : 'grey';
+const pillOfPhase = (phaseId: string): PillTone => (phaseId === 'prioritized' ? 'accent' : 'grey');
 
 /**
  * The status pill of a ticket on the board (boards 9a, 7b, 7c, 7j): the phase's
- * title in its colour, or the word the owner is wanted for. `planToAccept` is a
- * Shaping ticket whose plan lists parts that are no tickets yet.
+ * title in its colour, or the word the owner is wanted for.
  */
-export function statusOf(i18n: I18n, row: WorkRow | null, board: BoardSnapshot, phaseTitle: string, planToAccept = false): TicketStatus {
+export function statusOf(i18n: I18n, row: WorkRow | null, board: BoardSnapshot, phaseTitle: string): TicketStatus {
   const phaseId = row?.phase.id ?? board.pipeline.find((phase) => phase.title === phaseTitle)?.id ?? '';
-  if (planToAccept) {
-    return { label: i18n.t('ticket.status.plan_to_accept'), tone: 'needs', pill: 'peach', kind: '' };
-  }
   if (row === null) {
     return { label: phaseTitle, tone: 'idle', pill: pillOfPhase(phaseId), kind: '' };
   }
@@ -329,9 +316,6 @@ export function statusOf(i18n: I18n, row: WorkRow | null, board: BoardSnapshot, 
     const kind = needKindLabel(row.need, board);
     if (kind === 'Ready to try') {
       return { label: i18n.t('ticket.status.ready_to_try'), tone: 'needs', pill: 'mint', kind: '' };
-    }
-    if (kind === 'Plan to accept') {
-      return { label: i18n.t('ticket.status.plan_to_accept'), tone: 'needs', pill: 'peach', kind: '' };
     }
     return { label: i18n.t('ticket.status.needs_you'), tone: 'needs', pill: 'peach', kind };
   }
@@ -365,35 +349,16 @@ export interface FlowItem {
 }
 
 /**
- * The card's Flow row: the chain in the words of the boards. A Shaping ticket
- * leads with its own step `Shape` (the chain's `:shape` entry, req-266, or a
- * leading one when the chain has none); a plan to accept has passed it and waits
- * on the first step; the last owner checkpoint is the `Accept` of decision 26.
+ * The card's Flow row: the chain in the words of the boards; the last owner
+ * checkpoint is the `Accept` of decision 26.
  */
-export function flowItemsOf(i18n: I18n, chain: readonly ChainItem[], phaseId: string, planToAccept: boolean): FlowItem[] {
-  const shaping = phaseId === SHAPING_STATE;
+export function flowItemsOf(i18n: I18n, chain: readonly ChainItem[]): FlowItem[] {
   const lastCheckpoint = chain.map((step) => step.checkpoint).lastIndexOf(true);
-  const items: FlowItem[] = chain.map((step, index) => ({
+  return chain.map((step, index) => ({
     title: index === lastCheckpoint ? i18n.t('ticket.flow.accept') : step.shape ? i18n.t('ticket.flow.shape') : step.title,
-    state: planToAccept && index === 0 ? 'current' : step.state,
-    note:
-      planToAccept && index === 0
-        ? i18n.t('ticket.flow.waits_for_you')
-        : step.state === 'current' && step.shape && shaping
-          ? i18n.t('ticket.flow.with_you')
-          : step.state === 'current' && step.checkpoint
-            ? i18n.t('ticket.flow.your_turn')
-            : null,
+    state: step.state,
+    note: step.state === 'current' && step.checkpoint ? i18n.t('ticket.flow.your_turn') : null,
   }));
-  if (!shaping || chain.some((step) => step.shape)) {
-    return items;
-  }
-  const shape: FlowItem = {
-    title: i18n.t('ticket.flow.shape'),
-    state: planToAccept ? 'past' : 'current',
-    note: planToAccept ? null : i18n.t('ticket.flow.with_you'),
-  };
-  return [shape, ...items];
 }
 
 /**
@@ -458,5 +423,5 @@ export function actionBarOf(row: WorkRow | null, board: BoardSnapshot): ActionBa
   const configured = board.columns.filter((column) => !column.unknown);
   const index = configured.findIndex((column) => column.phase.id === phaseId);
   const next = index >= 0 ? configured[index + 1] : undefined;
-  return { decide, acceptLabel: next === undefined || phaseId === READY_STATE ? 'Accept' : `Accept and move to ${next.phase.title}`, ticketId: row === null ? null : row.card.id };
+  return { decide, acceptLabel: next === undefined ? 'Accept' : `Accept and move to ${next.phase.title}`, ticketId: row === null ? null : row.card.id };
 }

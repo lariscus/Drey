@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { PlanPartCard } from '../../../../packages/tickets-engine/src/contracts/plan-approval';
 import type { RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
-import { phaseWithoutPoolKeys, type BoardColumn, type BoardSnapshot, type PipelinePhase, type TicketCard } from '../../shared/tickets';
+import { type BoardColumn, type BoardSnapshot, type PipelinePhase, type TicketCard } from '../../shared/tickets';
 import { boardModelOf, columnCostText, planCandidatesOf } from './board-model';
 
-const phase = (id: string, persona: string | null = null): PipelinePhase => ({
-  ...phaseWithoutPoolKeys({ id, title: id[0]!.toUpperCase() + id.slice(1), wip: null, claim: false, handover: 'manual' }),
-  persona,
-});
+const phase = (id: string): PipelinePhase => ({ id, title: id[0]!.toUpperCase() + id.slice(1), color: null });
 
-const PIPELINE = [phase('inbox'), phase('prioritized'), phase('build', 'ben'), phase('review', 'ralf'), phase('done')];
+const PIPELINE = [phase('inbox'), phase('prioritized'), phase('build'), phase('review'), phase('done')];
 
 const card = (
   id: string,
@@ -55,12 +52,12 @@ describe('the board model', () => {
     expect(columnCostText(model.columns[0]!)).toBe('');
   });
 
-  it('resolves the persona: live run, then the ticket pin, then the column', () => {
+  it('resolves the persona: live run, then the ticket pin', () => {
     const model = boardModelOf(board({ build: [card('T-0010', 'build'), card('T-0011', 'build', { persona: 'tessa' }), card('T-0012', 'build')], inbox: [card('T-0020', 'inbox')] }), [
       run({ ticketId: 'T-0012', persona: 'paul' }),
     ]);
     const build = model.columns.find((c) => c.id === 'build')!;
-    expect(build.cards.map((c) => c.personaId)).toEqual(['ben', 'tessa', 'paul']);
+    expect(build.cards.map((c) => c.personaId)).toEqual([null, 'tessa', 'paul']);
     expect(model.columns[0]!.cards[0]!.personaId).toBeNull();
   });
 
@@ -90,7 +87,7 @@ describe('the board model', () => {
     );
     const parent = model.columns.find((c) => c.id === 'prioritized')!;
     expect(parent.cards[0]!.parts.map((p) => p.handle)).toEqual(['T-0131']);
-    expect(parent.cards[0]!.parts[0]).toMatchObject({ personaId: 'ben', cost: 1.5, state: 'build' });
+    expect(parent.cards[0]!.parts[0]).toMatchObject({ personaId: null, cost: 1.5, state: 'build' });
     expect(parent.cost).toBeCloseTo(1.5);
     expect(model.columns.find((c) => c.id === 'build')!.cards.map((c) => c.id)).toEqual(['T-0132']);
     expect(model.total).toBe(3);
@@ -125,3 +122,5 @@ describe('the board model', () => {
     expect(planCandidatesOf(board({ review: [card('T-0130', 'review')], build: [card('T-0010', 'build')] }))).toEqual(['T-0130']);
   });
 });
+
+

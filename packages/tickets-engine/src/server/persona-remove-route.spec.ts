@@ -37,7 +37,7 @@ describe('POST /api/personas/<id>/remove', () => {
   });
 
   it('hands a refusal with its code to the client unchanged', async () => {
-    const refusal = { ok: false, code: 'pinned', error: 'pinned', columns: ['Build'], crewDefault: false };
+    const refusal = { ok: false, code: 'busy', error: 'Ben has a live run' };
     const { deps, devices } = setup(refusal);
     const authorization = await paired(devices);
     expect((await route(req({ authorization, body: { confirm: 'Ben' } }), deps)).body).toEqual(refusal);

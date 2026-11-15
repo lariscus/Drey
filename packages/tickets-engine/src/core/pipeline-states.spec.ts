@@ -11,7 +11,7 @@ describe('the persona board pipeline "Initialize board" writes', () => {
       ['prioritized', 'Prioritized'],
       ['done', 'Done'],
     ]);
-    expect(parsed.phases.every((p) => !p.claim && p.persona === null && p.wip === null)).toBe(true);
+    expect(parsed.phases.every((p) => p.color === null)).toBe(true);
     expect(parsed.flow?.map((e) => e.persona)).toEqual(['paul', 'ben', 'ralf', 'tessa', 'you']);
     expect(STANDARD_FLOW_LINE).toBe('paul:shape; ben; ralf; tessa; you');
   });

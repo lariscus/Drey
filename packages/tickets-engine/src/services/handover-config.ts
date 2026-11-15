@@ -64,13 +64,6 @@ export function handoverOverrideKeys(snap: BoardSnapshot, defaultWorker: string)
   };
   const floorProvider = parseWorkerValue(defaultWorker)?.provider ?? 'opencode';
   add(defaultWorker);
-  for (const phase of snap.pipeline) {
-    add(phase.worker);
-    if (phase.model !== null && phase.model.trim() !== '') {
-      const provider = phase.worker !== null ? parseWorkerValue(phase.worker)?.provider : undefined;
-      keys.add(`${provider ?? floorProvider}/${phase.model.trim()}`);
-    }
-  }
   for (const column of snap.columns) {
     for (const card of column.tickets) {
       add(card.meta.worker);

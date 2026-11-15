@@ -39,7 +39,6 @@ export const PRIORITY_LABEL: Readonly<Record<TicketPriority, string>> = {
 
 const GROUP_TITLE: Readonly<Record<WorkGroupId, string>> = {
   needs: 'Needs you',
-  shaping: 'Shaping',
   running: 'Running',
   prioritized: 'Prioritized',
   ideas: 'Inbox',
@@ -57,7 +56,7 @@ const IDEAS_SHOWN = 2;
 
 /** The groups in display order (T-0084 made it a constant): what runs
  *  stays above the backlog — Needs you first, then Running. */
-export const WORK_GROUP_ORDER: readonly WorkGroupId[] = ['needs', 'running', 'shaping', 'prioritized', 'ideas', 'done'];
+export const WORK_GROUP_ORDER: readonly WorkGroupId[] = ['needs', 'running', 'prioritized', 'ideas', 'done'];
 
 export interface WorkPanelDeps {
   readonly api: DreyPluginApi;
@@ -167,15 +166,14 @@ export function workListNode(
       continue;
     }
     const group = filtered[id];
-    // Needs you and Shaping show only when something waits / runs — the
+    // Needs you and Prioritized show only when something waits / is queued — the
     // unfiltered totals decide, so a filter never hides a whole group's head.
-    if ((id === 'needs' || id === 'shaping' || id === 'prioritized') && group.total === 0) {
+    if ((id === 'needs' || id === 'prioritized') && group.total === 0) {
       continue;
     }
     list.append(groupNode(deps, snap, id, group, folds, rerender, isFilterActive(filter)));
   }
-  const total =
-    groups.needs.length + groups.shaping.length + groups.running.length + groups.ideas.length + snap.recentDone.length;
+  const total = groups.needs.length + groups.running.length + groups.ideas.length + snap.recentDone.length;
   if (total === 0) {
     list.append(el('div', 'work-empty', 'No tickets yet — capture one with +'));
   }
@@ -208,7 +206,7 @@ export function workListLivePaint(
   const nowMs = Date.now();
   const groups = workGroups(snap, runs);
   const rows = new Map<string, WorkRow>();
-  for (const row of [...groups.needs, ...groups.shaping, ...groups.running, ...groups.ideas]) {
+  for (const row of [...groups.needs, ...groups.running, ...groups.ideas]) {
     rows.set(row.card.id, row);
   }
   const doneAt = new Map(snap.recentDone.map((entry) => [entry.id, entry.at]));
@@ -273,7 +271,7 @@ function alertsNode(deps: WorkPanelDeps, alerts: readonly ChainAlert[]): HTMLEle
     if (action !== null && deps.onAlertAction !== undefined) {
       const button = el('button', 'work-alert-action', action.label);
       button.type = 'button';
-      button.title = action.kind === 'play-column' ? 'Play the column again — the runner dispatches into it' : 'Run the chain — columns with a worker drain themselves';
+      button.title = 'Run the chain — its columns drain themselves';
       button.addEventListener('click', () => deps.onAlertAction?.(action));
       row.append(button);
     }
@@ -308,13 +306,7 @@ function groupNode(
       appendIdeas(deps, snap, id, body, group.rows, group.total, folds, rerender, filterActive);
     } else {
       for (const row of group.rows) {
-        body.append(
-          id === 'shaping'
-            ? shapingRowNode(deps, row)
-            : id === 'running'
-              ? runningRowNode(deps, snap, row)
-              : rowNode(deps, snap, row),
-        );
+        body.append(id === 'running' ? runningRowNode(deps, snap, row) : rowNode(deps, snap, row));
       }
       if (group.rows.length === 0) {
         if (group.total > 0) {

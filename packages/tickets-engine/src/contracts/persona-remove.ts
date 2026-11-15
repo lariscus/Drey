@@ -18,12 +18,10 @@ export const PERSONA_REMOVE_CODES = [
   'no_persona',
   /** The owner's own persona (`you`, `kind: human`) is never deleted. */
   'human',
-  /** Mission Control's persona (`kind: mission`, Pia — req-269): Mission Control speaks with her prompt, so she is edited, never deleted. */
+  /** Mission Control's persona (`kind: mission`, Pia - req-269): Mission Control speaks with her prompt, so she is edited, never deleted. */
   'mission',
   /** A live or held run, 1:1 or free session of the persona. */
   'busy',
-  /** A pipeline column or the crew's default persona pins it. */
-  'pinned',
   /** The typed confirmation is not the persona's title, character for character. */
   'confirm',
   'internal',
@@ -42,10 +40,6 @@ export interface PersonaRemoveFailure {
   readonly code: PersonaRemoveCode;
   /** English text for logs and for a client that does not know the code. */
   readonly error: string;
-  /** `pinned`: the titles of the pipeline columns that pin the persona. */
-  readonly columns?: readonly string[];
-  /** `pinned`: the crew's `default-persona` is this persona. */
-  readonly crewDefault?: boolean;
 }
 
 export type PersonaRemoveReply =

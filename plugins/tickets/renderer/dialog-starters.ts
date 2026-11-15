@@ -1,12 +1,10 @@
-import type { InteractiveMode } from './end-moves';
-
 /**
  * The thread composer's quiet start (req-75): nothing runs until the
  * owner asks, so the prompt box opens pre-filled with the current
  * processing step and its meaning — the owner completes it with their
  * question and sends. Pure text, pinned by the spec beside it.
  */
-export function dialogStarter(_mode: InteractiveMode): string {
+export function dialogStarter(): string {
   return 'Plan step — interview me first, then propose the plan, then write it into the ticket with acceptance criteria.\nMy question: ';
 }
 

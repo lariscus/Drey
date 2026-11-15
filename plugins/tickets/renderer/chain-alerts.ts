@@ -1,24 +1,16 @@
 /**
- * The chain's alerts (fix, owner request 2026-10-31): what stops the
- * fleet from working the board, as rows the Work panel puts on top —
- * a held machine column with tickets in it, a halted chain with work
- * waiting, a provider out of quota. (The circuit breaker is the
- * persona's since req-257, req-307: a tripped persona shows on its own
- * card, not as a column alert.) Pure — the panel and the notifications
- * share it, the spec pins it.
+ * The chain's alerts: what stops the fleet from working the board, as rows
+ * the Work panel puts on top — a provider out of quota. (A tripped
+ * breaker shows on the persona's own card; a paused persona is the pool
+ * chip's own line.) Pure — the panel and the notifications share it, the
+ * spec pins it.
  */
-import type { ChainStatus, RunInfo, RunState } from '../../../packages/tickets-engine/src/fleet/protocol';
-import type { BoardSnapshot } from '../shared/tickets';
-import { isMachinePhase } from './work-groups';
+import type { ChainStatus } from '../../../packages/tickets-engine/src/fleet/protocol';
 
-const LIVE: ReadonlySet<RunState> = new Set(['starting', 'running', 'stopping', 'detached']);
-
-export type ChainAlertKind = 'breaker' | 'held' | 'halted' | 'quota';
+export type ChainAlertKind = 'quota';
 
 /** What the alert's one button does; null = nothing to press (a quota waits by itself). */
-export type ChainAlertAction =
-  | { readonly kind: 'play-column'; readonly phase: string; readonly label: string }
-  | { readonly kind: 'run-chain'; readonly label: string };
+export type ChainAlertAction = { readonly kind: 'run-chain'; readonly label: string };
 
 export interface ChainAlert {
   readonly kind: ChainAlertKind;
@@ -35,68 +27,16 @@ function clock(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function waitingLine(ids: readonly string[]): string {
-  if (ids.length === 0) {
-    return 'nothing waits in it right now';
-  }
-  const shown = ids.slice(0, 3).join(', ');
-  return `${ids.length === 1 ? '1 ticket waits' : `${ids.length} tickets wait`} (${shown}${ids.length > 3 ? ', …' : ''})`;
-}
-
 /** A provider id as people read it. */
 function providerLabel(provider: string): string {
   return provider === 'opencode' ? 'OpenCode' : provider === 'claude-code' ? 'Claude Code' : provider === 'kimi' ? 'Kimi Code' : provider === 'copilot' ? 'Copilot CLI' : provider;
 }
 
-export function chainAlertsOf(
-  chain: ChainStatus | null,
-  board: BoardSnapshot,
-  runs: readonly RunInfo[],
-  nowMs: number,
-): readonly ChainAlert[] {
+export function chainAlertsOf(chain: ChainStatus | null, nowMs: number): readonly ChainAlert[] {
   if (chain === null || !chain.configured) {
     return [];
   }
-  const live = new Set(runs.filter((run) => LIVE.has(run.state)).map((run) => run.ticketId));
-  const machine = board.columns.filter((column) => !column.unknown && isMachinePhase(column.phase));
-  const waitingIn = (phaseId: string): readonly string[] =>
-    machine
-      .find((column) => column.phase.id === phaseId)
-      ?.tickets.filter((card) => !live.has(card.id) && !card.meta.interactive)
-      .map((card) => card.id) ?? [];
-
   const alerts: ChainAlert[] = [];
-  for (const column of machine) {
-    const id = column.phase.id;
-    if (chain.columns[id] !== 'held') {
-      continue;
-    }
-    const waiting = waitingIn(id);
-    const play = { kind: 'play-column' as const, phase: id, label: 'Resume' };
-    if (waiting.length > 0) {
-      alerts.push({
-        kind: 'held',
-        key: `held:${id}`,
-        title: `${column.phase.title} is on hold`,
-        text: `${waitingLine(waiting)} — nothing starts there until you resume it.`,
-        action: play,
-      });
-    }
-  }
-
-  if (chain.master === 'halted') {
-    const waiting = machine.filter((column) => chain.columns[column.phase.id] !== 'held').flatMap((column) => waitingIn(column.phase.id));
-    if (waiting.length > 0) {
-      alerts.unshift({
-        kind: 'halted',
-        key: 'halted',
-        title: 'The chain is halted',
-        text: `${waitingLine(waiting)} — nothing new starts until you run the chain.`,
-        action: { kind: 'run-chain', label: 'Run' },
-      });
-    }
-  }
-
   for (const [provider, until] of Object.entries(chain.quotaPausedUntil ?? {})) {
     if (Date.parse(until) > nowMs) {
       alerts.push({
@@ -113,11 +53,10 @@ export function chainAlertsOf(
 
 /**
  * The alerts worth an OS notification that `announced` has not seen
- * yet; marks them seen. A breaker trip and a quota pause notify — a
- * plain hold or a halted chain is the owner's own doing.
+ * yet; marks them seen. A quota pause notifies.
  */
 export function newChainAlerts(alerts: readonly ChainAlert[], announced: Set<string>): readonly ChainAlert[] {
-  const fresh = alerts.filter((alert) => (alert.kind === 'breaker' || alert.kind === 'quota') && !announced.has(alert.key));
+  const fresh = alerts.filter((alert) => alert.kind === 'quota' && !announced.has(alert.key));
   for (const alert of fresh) {
     announced.add(alert.key);
   }

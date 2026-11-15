@@ -10,10 +10,8 @@ import { isCollection, isMap, parseDocument, type Document, type YAMLMap, type Y
 import { splitFrontmatter } from '../../../../shared/frontmatter';
 import {
   DEFAULT_PRIORITY_CONFIG,
-  parseHandover,
   parsePriorityConfig,
   priorityWeight,
-  phaseWithoutPoolKeys,
   resolveCardWorker,
   TICKETS_ARCHIVE_DIR,
   type BoardColumn,
@@ -283,7 +281,6 @@ export function assembleBoard(input: AssembleInput): BoardSnapshot {
       meta: parsed.meta,
       worker: resolveCardWorker(
         parsed.meta.worker,
-        phases.find((p) => p.id === parts.phase)?.handover ?? null,
         repoWorker,
         input.defaultWorker,
       ),
@@ -357,7 +354,7 @@ export function assembleBoard(input: AssembleInput): BoardSnapshot {
     if (!knownDirs.has(dir)) {
       issues.push({ level: 'warning', message: `directory "${dir}" is not a phase in pipeline.md` });
       columns.push({
-        phase: phaseWithoutPoolKeys({ id: dir, title: dir, wip: null, claim: false, handover: 'manual' }),
+        phase: { id: dir, title: dir, color: null },
         unknown: true,
         tickets: orderColumn(byPhase.get(dir)!, columnKey(dir), pipelineParse.priorities),
       });

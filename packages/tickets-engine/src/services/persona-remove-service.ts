@@ -3,7 +3,6 @@ import { personaRef, PERSONAS_DIR, type Persona } from '../core/persona';
 import { hasLiveSession, removalRefusal, type RemovalRun } from '../core/persona-removal';
 import type { TicketsGit } from '../core/tickets-git';
 import type { EngineHost, EngineVault } from './host';
-import type { PersonaPinPort } from './persona-pin-reader';
 import { SkillCommitter } from './skill-committer';
 import { NodeSkillFileSystem, type SkillFileSystem } from './skill-file-system';
 
@@ -17,7 +16,6 @@ export interface PersonaRemoveDeps {
   readonly board: PersonaRemoveBoard;
   /** The runner's run records (every kind of session); a runner that does not answer has none. */
   readonly fleet: { runs(): Promise<readonly RemovalRun[]> };
-  readonly pins: PersonaPinPort;
   readonly host: Pick<EngineHost, 'announceChanges' | 'log'>;
   readonly git: Pick<TicketsGit, 'locate' | 'commitTree'>;
   /** The disk of a vault; default the vault folder itself. */
@@ -30,7 +28,7 @@ const fail = (code: PersonaRemoveFailure['code'], error: string): PersonaRemoveF
  * Deletes a persona (req-261): `tickets/_meta/personas/<id>/` whole, in one
  * commit `personas: <id> removed`, after the engine itself has checked what
  * the client may only have shown — the typed title, the human persona, a
- * live or held session, a pin ({@link removalRefusal}). The ticket history
+ * live or held session ({@link removalRefusal}). The ticket history
  * and the 1:1 chat files under `_meta/chat/` are not in the folder and
  * stay. A removed seeded persona stays removed: the `seeded-crew:` marker in
  * `crew.md` was written when it was first offered. Removals queue.
@@ -62,7 +60,7 @@ export class PersonaRemoveService implements PersonaRemovePort {
       return fail('no_persona', `no persona named ${id}`);
     }
     const runs = await this.deps.fleet.runs().catch(() => [] as readonly RemovalRun[]);
-    const refusal = removalRefusal({ persona, confirm: cmd.confirm, live: hasLiveSession(runs, id), pins: await this.deps.pins.pinsOf(vault, id) });
+    const refusal = removalRefusal({ persona, confirm: cmd.confirm, live: hasLiveSession(runs, id) });
     if (refusal !== null) {
       return refusal;
     }

@@ -145,7 +145,7 @@ describe.skipIf(!found.ok)('flows and plans on the persona board (real dk)', { t
         expect(await service.saveFlow({ id: 'standard', part: null, chain: ['paul:shape', 'ben', 'ralf(notify)', 'you'] })).toMatchObject({ ok: true });
         const pipeline = readFileSync(meta('pipeline.md'), 'utf8');
         expect(pipeline).toContain('flow: paul:shape; ben; ralf(notify); you');
-        expect(pipeline).toContain('{id: prioritized, title: Prioritized, handover: manual}');
+        expect(pipeline).toContain('{id: prioritized, title: Prioritized}');
         expect(pipeline).toContain('The pipeline of a persona board');
         expect((await service.snapshot()).flow?.map((e) => e.persona)).toEqual(['paul', 'ben', 'ralf', 'you']);
         const ticket = await service.flowOf({ id: own, part: null });

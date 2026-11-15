@@ -11,7 +11,7 @@ describe('persona dispatch (E3, ADR-0088)', () => {
   it('a persona beats the assignment ring for provider and model', () => {
     const result = composeRunRequest(
       base({
-        workingPhase: phase('plan', { handover: 'agent plan-default', worker: 'opencode', model: 'zai/glm-5.3' }),
+        workingPhase: phase('plan'),
         persona: PIA,
       }),
     );
@@ -28,15 +28,15 @@ describe('persona dispatch (E3, ADR-0088)', () => {
   it('a persona with a harness the fleet cannot run leaves the ring in charge', () => {
     const result = composeRunRequest(
       base({
-        workingPhase: phase('plan', { handover: 'agent plan-default', worker: 'opencode', model: 'zai/glm-5.3' }),
+        workingPhase: phase('plan'),
         persona: { ...PIA, worker: 'api' },
       }),
     );
     if (!result.ok) {
       throw new Error(result.error);
     }
-    expect(result.request.provider).toBe('opencode'); // the ring's column pin stands
-    expect(result.request.model).toBe('zai/glm-5.3');
+    expect(result.request.provider).toBe('opencode'); // the ring's default stands
+    expect(result.request.model).toBeNull();
     expect(result.persona).toBe('pia'); // the persona still dispatched — prompt, memory, stamp
   });
 
@@ -120,7 +120,7 @@ describe('scout runs (E8, concept §5.6)', () => {
       base({
         card: scoutCard(),
         ticketText: NO_CRITERIA,
-        workingPhase: phase('active', { handover: 'agent plan-default' }),
+        workingPhase: phase('active'),
         cursor: { at: 1, length: 2 },
         dispatchedBy: 'active',
       }),
@@ -209,3 +209,4 @@ describe('scout runs (E8, concept §5.6)', () => {
     expect(refused.ok).toBe(false);
   });
 });
+

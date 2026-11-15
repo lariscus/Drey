@@ -21,7 +21,6 @@ function removal(): PersonaRemoveService {
       },
     },
     fleet: { runs: async () => [] },
-    pins: { pinsOf: async () => ({ columns: [], crewDefault: false }) },
     host: { announceChanges: vi.fn(), log: vi.fn() },
     git: { locate: async () => null, commitTree: async () => undefined },
     fsFor: () => ({
@@ -55,3 +54,4 @@ describe('a removed seeded persona', () => {
     expect(rig.commits).toEqual([]);
   });
 });
+

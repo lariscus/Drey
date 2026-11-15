@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { TicketIssue } from '../contracts/tickets';
 import { mergeNeeds, needsText, parseNeeds } from './model-needs';
 import { parsePlanParts, renderPlanParts } from './plan-parts';
-import { parsePipeline } from './ticket-board';
 import { parseTicketPoolKeys } from './ticket-pool-keys';
 
 describe('the needs grammar (req-178)', () => {
@@ -53,11 +52,5 @@ describe('where needs: is read (req-178)', () => {
     expect(text).toContain('  needs: image');
     expect(parsePlanParts(text).parts.map((part) => part.needs ?? null)).toEqual([{ image: true }, null]);
     expect(parsePlanParts('## Plan\n\n### Parts\n\n- [ ] A\n  needs: video\n- [ ] B\n').warnings).toEqual(['part "A": need "video" is not image, tools, context-<n> or output-<n>']);
-  });
-
-  it("a pipeline phase's key; an unknown token is noise", () => {
-    const parsed = parsePipeline('---\nphases:\n  - id: proof\n    needs: image, context-200k\n  - id: done\n    needs: [smell]\n---\n');
-    expect(parsed.phases.map((phase) => phase.needs ?? null)).toEqual([{ image: true, contextTokens: 200_000 }, null]);
-    expect(parsed.issues.map((i) => i.message)).toContain("pipeline.md: done's needs smell is not image, tools, context-<n> or output-<n> — ignored");
   });
 });

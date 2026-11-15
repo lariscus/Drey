@@ -367,7 +367,7 @@ describe('the Board tab', () => {
     const build = host.querySelector('[data-phase="done-this-week"]')!;
     expect(build.querySelector('.desk-col-cost')!.textContent).toBe('$1.20');
     expect(build.querySelector('.desk-card-who')!.textContent).toBe('Ben');
-    expect(build.querySelector('.desk-card-kind')?.textContent).toBe('Accept');
+    expect(build.querySelector('.desk-card-kind')).toBeNull();
     expect(host.querySelector('[data-phase="inbox"] .desk-card-who')!.textContent).toBe('unassigned');
     host.querySelector<HTMLElement>('.desk-head .desk-btn-primary')!.click();
     host.querySelector<HTMLElement>('[data-id="T-0126"]')!.click();

@@ -2038,20 +2038,11 @@ details[open] > summary > .tickets-tx-think-preview {
   background: color-mix(in srgb, var(--status-modified) 12%, transparent);
 }
 
-.work-alert[data-kind='breaker'] {
-  border-left-color: var(--status-deleted);
-  background: color-mix(in srgb, var(--status-deleted) 12%, transparent);
-}
-
 .work-alert-icon {
   flex: none;
   display: inline-flex;
   margin-top: 1px;
   color: var(--status-modified);
-}
-
-.work-alert[data-kind='breaker'] .work-alert-icon {
-  color: var(--status-deleted);
 }
 
 .work-alert-body {
@@ -3806,3 +3797,4 @@ button.tickets-statusbar-fleet:focus-visible {
   color: var(--text-2);
   font-size: 0.75rem;
 }
+

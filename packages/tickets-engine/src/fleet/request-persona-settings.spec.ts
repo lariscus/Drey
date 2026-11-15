@@ -17,7 +17,7 @@ function ok(result: ReturnType<typeof composeRunRequest>): Extract<ReturnType<ty
 
 describe('the persona gate (gate:)', () => {
   it('a structural gate judges what the run wrote, never the build commands, and names none in the brief', () => {
-    const request = ok(composeRunRequest(base({ workingPhase: phase('build', { handover: 'agent build-default' }), persona: PAUL })));
+    const request = ok(composeRunRequest(base({ workingPhase: phase('build'), persona: PAUL })));
     expect(request.gate).toBe('structural');
     expect(request.acceptance).toEqual([]);
     expect(request.instruction).not.toContain('npm run verify:unit`\n');
@@ -25,7 +25,7 @@ describe('the persona gate (gate:)', () => {
   });
 
   it('a structural gate lifts the refusal of a ticket without runnable criteria outside the first column', () => {
-    const request = ok(composeRunRequest(base({ ticketText: NO_CRITERIA, workingPhase: phase('build', { handover: 'agent build-default' }), persona: PAUL })));
+    const request = ok(composeRunRequest(base({ ticketText: NO_CRITERIA, workingPhase: phase('build'), persona: PAUL })));
     expect(request.gate).toBe('structural');
   });
 
@@ -37,15 +37,14 @@ describe('the persona gate (gate:)', () => {
 });
 
 describe('the persona ceilings (max-turns:, max-work:)', () => {
-  it("the persona's ceiling wins over the column's, key by key", () => {
-    const column = phase('build', { handover: 'agent build-default', maxTurns: 40, maxWorkMin: 30 });
-    const request = ok(composeRunRequest(base({ workingPhase: column, persona: { ...PAUL, run: { ...RUN, maxTurns: 12 } } })));
-    expect(request.limits).toEqual({ maxTurns: 12, maxWorkMs: 30 * 60_000 });
+  it("the persona's ceilings ride key by key", () => {
+    const request = ok(composeRunRequest(base({ workingPhase: phase('build'), persona: { ...PAUL, run: { ...RUN, maxTurns: 12 } } })));
+    expect(request.limits).toEqual({ maxTurns: 12 });
   });
 
-  it('a record without ceilings leaves the column in charge, and none at all carries none', () => {
-    const column = phase('build', { handover: 'agent build-default', maxTurns: 40, maxWorkMin: null });
-    expect(ok(composeRunRequest(base({ workingPhase: column, persona: { ...PAUL, run: RUN } }))).limits).toEqual({ maxTurns: 40 });
+  it('a record without ceilings carries none, and none at all carries none', () => {
+    const column = phase('build');
+    expect(ok(composeRunRequest(base({ workingPhase: column, persona: { ...PAUL, run: RUN } }))).limits).toBeUndefined();
     expect(ok(composeRunRequest(base({ persona: { ...PAUL, run: RUN } }))).limits).toBeUndefined();
   });
 });
@@ -53,7 +52,7 @@ describe('the persona ceilings (max-turns:, max-work:)', () => {
 describe('instructed read-only (readonly:)', () => {
   it('the brief carries the read-only rules; the session and the worktree stay as they are', () => {
     const tessa = { ...PAUL, id: 'tessa', role: 'tester', run: { ...RUN, readOnly: true } };
-    const request = ok(composeRunRequest(base({ workingPhase: phase('qa', { handover: 'agent qa-default' }), persona: tessa })));
+    const request = ok(composeRunRequest(base({ workingPhase: phase('qa'), persona: tessa })));
     expect(request.instruction).toContain('Read-only: the spec fixture');
     expect(request.instruction).not.toContain('Changing files: the spec fixture');
     expect(request.permissionMode).toBe('accept-edits');
@@ -89,15 +88,15 @@ describe('the leaving actions (leaving:, req-267)', () => {
   const BEN = { id: 'ben', role: 'builder', worker: 'claude-code', model: 'sonnet', prompt: '## Who Ben is\n\nBen builds.', memory: '', run: { ...RUN, leaving: ['sync-main'] as const } };
 
   it("a builder whose record lists sync-main carries it on the run's request", () => {
-    const request = ok(composeRunRequest(base({ workingPhase: phase('build', { handover: 'agent build-default' }), persona: BEN })));
+    const request = ok(composeRunRequest(base({ workingPhase: phase('build'), persona: BEN })));
     expect(request.leaving).toEqual(['sync-main']);
     expect(request.baseRef).toBe('main');
   });
 
   it('a persona without leaving actions carries none, and the commit never rides a run', () => {
-    const plain = ok(composeRunRequest(base({ workingPhase: phase('build', { handover: 'agent build-default' }), persona: { ...BEN, run: RUN } })));
+    const plain = ok(composeRunRequest(base({ workingPhase: phase('build'), persona: { ...BEN, run: RUN } })));
     expect(plain.leaving).toBeUndefined();
-    const committing = ok(composeRunRequest(base({ workingPhase: phase('build', { handover: 'agent build-default' }), persona: { ...BEN, run: { ...RUN, leaving: ['commit'] as const } } })));
+    const committing = ok(composeRunRequest(base({ workingPhase: phase('build'), persona: { ...BEN, run: { ...RUN, leaving: ['commit'] as const } } })));
     expect(committing.leaving).toBeUndefined();
   });
 
@@ -106,3 +105,5 @@ describe('the leaving actions (leaving:, req-267)', () => {
     expect(request.leaving).toBeUndefined();
   });
 });
+
+

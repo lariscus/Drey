@@ -11,7 +11,6 @@ import { loadCrewPrompts } from '../services/crew-prompts';
 import { MissionCrewBlock } from '../services/mission-crew-block';
 import { MissionEntryTurns } from '../services/mission-entry-turns';
 import { MissionPersonaPrompt } from '../services/mission-persona-prompt';
-import { PersonaPinReader } from '../services/persona-pin-reader';
 import { PersonaModelMigrator } from '../services/persona-model-migrator';
 import { PersonaProseMigrator } from '../services/persona-prose-migrator';
 import { ProjectMigrator } from '../services/project-migrator';
@@ -120,7 +119,7 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
   const personaRecords = new PersonaRecords({ board, host, git, log });
   const personaRunRecords = new PersonaRunRecords({ board, host, git });
   const { skills, library: skillLibrary } = composeSkills({ board, host, git, env: process.env, ...(opts.github === undefined ? {} : { github: opts.github }) });
-  const personaRemoval = new PersonaRemoveService({ board, fleet, host, git, pins: new PersonaPinReader(host, parts.crew.crewFiles) });
+  const personaRemoval = new PersonaRemoveService({ board, fleet, host, git });
   const probe = new FolderProbe({ git: (cwd, args) => git.run(cwd, args), isDirectory: (folder) => stat(folder).then((s) => s.isDirectory(), () => false) });
   const projects = new ProjectService({ board, host, git, probe, changed: () => board.announceChanged() });
   const startupWork = migrateOnce(log, {

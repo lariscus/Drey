@@ -86,9 +86,9 @@ describe('the holder plan (concept §9)', () => {
 });
 
 describe('the working column of a chain run', () => {
-  it('is the pipeline column, else a plain agent column of that id', () => {
-    const pipeline = [pipelinePhaseOf({ handover: 'agent', title: 'Building' }, 'building', [])];
+  it('is the pipeline column, else a plain column of that id', () => {
+    const pipeline = [pipelinePhaseOf({ title: 'Building' }, 'building', [])];
     expect(chainWorkingPhase(pipeline, 'building').title).toBe('Building');
-    expect(chainWorkingPhase(pipeline, 'active')).toMatchObject({ id: 'active', title: 'Active', handover: 'agent', claim: true });
+    expect(chainWorkingPhase(pipeline, 'active')).toEqual({ id: 'active', title: 'Active', color: null });
   });
 });

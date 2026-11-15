@@ -132,7 +132,7 @@ export class Dispatcher {
       busy: occupied.busy,
       poolSize: this.deps.pools.sizes(config, this.sessionsOf()),
       liveByPool: occupied.liveByPool,
-      poolOf: (card) => pools.poolOf(card, chainWorkingPhase(snap.pipeline, card.phase)),
+      poolOf: (card) => pools.poolOf(card),
     });
     state.phases = snap.pipeline;
     await this.deps.pipelineRead();
@@ -184,7 +184,7 @@ export class Dispatcher {
   /** The class request first (a wait queues it), then the start; a granted ticket's ledger cards resolve. */
   private async askAndStart(config: ChainConfig, snap: BoardSnapshot, item: PlanItem, pass: Pass): Promise<DispatchOutcome | 'queued'> {
     const persona = pass.personas.get(item.card.id) ?? null;
-    const asked = pass.pools.asksPool(item.card) ? this.ask(snap, item, persona) : null;
+    const asked = pass.pools.asksPool(item.card) ? this.ask(item, persona) : null;
     // req-257: a persona below its `min:` starts even when the pool has no room — an overrun on purpose.
     if (asked !== null && asked.wait !== null && !item.overrun) {
       await this.queued(config, item, asked.request, asked.wait);
@@ -198,13 +198,12 @@ export class Dispatcher {
   }
 
   /** The class request of a persona's dispatch and the pool's answer; null when it cannot be built. */
-  private ask(snap: BoardSnapshot, item: PlanItem, entry: TicketPersona | null): Asked | null {
-    const phase = chainWorkingPhase(snap.pipeline, item.workingPhase);
+  private ask(item: PlanItem, entry: TicketPersona | null): Asked | null {
     const persona = entry?.persona ?? null;
     if (this.classes === null || this.deps.pool === undefined || persona === null) {
       return null;
     }
-    const request = this.classes.build({ card: item.card, phase, persona, prefer: this.lastSlotOf(item.card.id) });
+    const request = this.classes.build({ card: item.card, persona, prefer: this.lastSlotOf(item.card.id) });
     const decision = this.deps.pool.classes.choose(request);
     return decision.kind === 'grant' ? { request, grant: { request, decision }, wait: null } : { request, grant: null, wait: decision };
   }

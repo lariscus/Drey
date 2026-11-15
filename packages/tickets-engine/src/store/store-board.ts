@@ -8,8 +8,7 @@ import { assembleBoard, type AssembleInput, type BoardFile } from '../core/ticke
 import { recentDoneOf } from '../core/done-listing';
 import { statusLinesOfComments } from '../core/status-comment';
 import { openStatusItems } from '../core/status-log';
-import { chainColumnOf, placementColumnsOf, type PlacementColumns } from '../core/chain-placement';
-import { crewLookupOf, type PersonaLookup } from '../core/chain-holder';
+import { chainColumnOf } from '../core/chain-placement';
 import { parseTicketChainFields } from '../core/ticket-chain-fields';
 
 /**
@@ -54,17 +53,6 @@ export interface RecordsBoardInput extends Omit<AssembleInput, 'files'> {
   readonly records: readonly TicketDetail[];
   /** The tickets' comments by id (the read of `comments/` is the caller's): the source of the snapshot's `openStatus` (D-12). */
   readonly comments?: ReadonlyMap<string, readonly { readonly at: string; readonly text: string }[]>;
-  /**
-   * req-257: the crew's persona kinds, so the column of an `active` / `running` ticket follows its
-   * holder ({@link resolvePhase}). Absent = every named persona counts as readable.
-   */
-  readonly crew?: ReadonlyMap<string, 'agent' | 'human' | 'mission'>;
-}
-
-/** What {@link resolvePhase} needs to place a chain ticket by its holder (req-257). */
-export interface HolderPlacement {
-  readonly columns: PlacementColumns;
-  readonly lookup: PersonaLookup;
 }
 
 export interface PhaseResolution {
@@ -78,33 +66,34 @@ export interface PhaseResolution {
  *
  *  1. a lifecycle edge stage (`inbox`, `prioritized`, `done`) that is a pipeline
  *     phase: that column — the edges never take a pin (req-265);
- *  2. an `active` / `running` ticket with a readable chain: the column of its
- *     holder (req-257, `core/chain-placement.ts`) — the cursor `x-at`; a pipeline
- *     with no column for the holder shows the stage itself (one "active" column);
+ *  2. an `active` / `running` ticket with a readable chain: a finished chain
+ *     stands in the terminal column (req-257, `core/chain-placement.ts`); a
+ *     live one shows the stage itself (one "active" column the lanes draw);
  *  3. the stage itself when it is a pipeline phase id;
- *  4. by role: `active` / `running` -> the first claiming column,
+ *  4. by role: `active` / `running` -> the column before the terminal one,
  *     `open` / `blocked` -> the capture column, `done` / `cancelled` -> the terminal column;
  *  5. otherwise the raw stage: the board shows it as an unknown column with a
  *     warning, exactly like a stray directory.
  */
-export function resolvePhase(record: TicketDetail, phases: readonly PipelinePhase[], placement?: HolderPlacement): PhaseResolution {
+export function resolvePhase(record: TicketDetail, phases: readonly PipelinePhase[]): PhaseResolution {
   const ids = phases.map((p) => p.id);
+  const terminal = ids[ids.length - 1] ?? null;
   if (EDGE_STAGES.includes(record.stage) && ids.includes(record.stage)) {
     return { phase: record.stage, unmapped: false };
   }
-  const held = holderColumnOf(record, placement ?? { columns: placementColumnsOf(phases), lookup: crewLookupOf(undefined) });
+  const held = holderColumnOf(record, terminal);
   if (held !== undefined) {
     return held === null ? { phase: record.stage, unmapped: true } : { phase: held, unmapped: false };
   }
   if (ids.includes(record.stage)) {
     return { phase: record.stage, unmapped: false };
   }
-  const role = roleColumn(record.stage, phases);
+  const role = roleColumn(record.stage, ids);
   return role === undefined ? { phase: record.stage, unmapped: true } : { phase: role, unmapped: false };
 }
 
-/** The holder's column of an `active` / `running` record with a readable chain (null = none in this pipeline); undefined = no chain ticket. */
-function holderColumnOf(record: TicketDetail, placement: HolderPlacement): string | null | undefined {
+/** The terminal column of an `active` / `running` record with a readable chain (null = the stage's own column); undefined = no chain ticket. */
+function holderColumnOf(record: TicketDetail, terminal: string | null): string | null | undefined {
   if (record.stage !== ACTIVE_STAGE && record.stage !== RUNNING_STAGE) {
     return undefined;
   }
@@ -113,17 +102,16 @@ function holderColumnOf(record: TicketDetail, placement: HolderPlacement): strin
   if (fields.chain === undefined) {
     return undefined;
   }
-  return chainColumnOf({ stage: record.stage, chain: fields.chain, at: fields.at, awaiting: x['x-awaiting'] }, placement.lookup, placement.columns);
+  return chainColumnOf({ chain: fields.chain, at: fields.at }, terminal);
 }
 
 /** The column a stage that is no pipeline phase stands for, by its role; undefined = none. */
-function roleColumn(stage: string, phases: readonly PipelinePhase[]): string | undefined {
-  const ids = phases.map((p) => p.id);
+function roleColumn(stage: string, ids: readonly string[]): string | undefined {
   if (CAPTURE_ROLES.includes(stage)) {
     return ids[0];
   }
   if (CLAIM_ROLES.includes(stage)) {
-    return phases.find((p) => p.claim)?.id ?? ids[1];
+    return ids[1];
   }
   if (TERMINAL_ROLES.includes(stage)) {
     return ids[ids.length - 1];
@@ -231,9 +219,8 @@ export function assembleBoardFromRecords(input: RecordsBoardInput): BoardSnapsho
   // An accepted (archived) ticket is off the board, like a file in tickets/archive/ (E14-4b: the archive is a label);
   // so is an import placeholder, which only keeps a legacy number free (shadow run, E14-2 follow-up).
   const onBoard = input.records.filter((record) => !record.labels.includes(ARCHIVED_LABEL) && !record.labels.includes(PLACEHOLDER_LABEL));
-  const placement: HolderPlacement = { columns: placementColumnsOf(probe.pipeline), lookup: crewLookupOf(input.crew) };
   const files = onBoard.map((record) => {
-    const { phase } = resolvePhase(record, probe.pipeline, placement);
+    const { phase } = resolvePhase(record, probe.pipeline);
     return recordToBoardFile(record, phase);
   });
   // Done this week (E13-21): the archive is a label here, so the same window the files

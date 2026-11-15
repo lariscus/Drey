@@ -1,4 +1,4 @@
-import { parsePersonaFile, personaModelGuess, resolvePersona, type Persona, type PersonaResolution } from '../core/persona';
+import { parsePersonaFile, personaModelGuess, type Persona, type PersonaResolution } from '../core/persona';
 
 /**
  * The persona loader (ADR-0088, E3): the services read personas from the
@@ -40,18 +40,17 @@ export interface ResolvedPersona {
 }
 
 /**
- * Who works the ticket plus the load (req-257): the chain's holder when the board runs on chains,
- * else the column's persona; null persona when nothing resolves or the file is gone.
+ * Who works the ticket plus the load (req-257): the chain's holder; null
+ * persona when nothing resolves or the file is gone.
  */
 export async function resolvePersonaForTicket(
   loader: PersonaLoader,
   input: {
     readonly chainPersona?: string | null;
-    readonly phasePersona: string | null;
   },
 ): Promise<ResolvedPersona> {
   const chain = input.chainPersona ?? null;
-  const resolution: PersonaResolution = chain !== null ? { persona: chain, source: 'chain' } : resolvePersona({ phasePersona: input.phasePersona });
+  const resolution: PersonaResolution = chain !== null ? { persona: chain, source: 'chain' } : { persona: null, source: 'none' };
   if (resolution.persona === null) {
     return { persona: null, resolution };
   }

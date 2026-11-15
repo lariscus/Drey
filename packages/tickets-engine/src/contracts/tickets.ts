@@ -12,7 +12,7 @@
  */
 import type { ChainEntry, TicketChainFields } from './chain';
 import type { PersonaBoardFields, TicketHoldField } from './persona-board';
-import type { PhasePoolMeta, TicketPoolMeta } from './ticket-pool-meta';
+import type { TicketPoolMeta } from './ticket-pool-meta';
 import type { BoardProjects, TicketProjectField } from './projects';
 import type { RepoRef } from './repo-ref';
 import type { PriorityConfig, TicketPriority } from './ticket-priority';
@@ -40,38 +40,7 @@ export function stripPhasePrefix(dir: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// The pipeline's handover spec (`_meta/pipeline.md`, ADR-0076):
-// `manual | agent <prompt-ref>[@<worker>] | ci | none`. Parsed here so
-// the board, the fleet run start and the specs share one grammar.
-
-export type HandoverMode = 'manual' | 'agent' | 'ci' | 'none';
-
-export interface HandoverSpec {
-  readonly mode: HandoverMode;
-  /** The prompt the fleet runs (`agent build-default`); null unless agent. */
-  readonly promptRef: string | null;
-  /** The worker pin (`@opencode`) on the handover, when present. */
-  readonly worker: string | null;
-}
-
-/** Reads a handover spec; anything unreadable degrades to `manual` (the
- *  asymmetric-tolerance rule: forgive, never guess). */
-export function parseHandover(spec: string): HandoverSpec {
-  const text = spec.trim();
-  if (text === 'manual' || text === 'ci' || text === 'none') {
-    return { mode: text, promptRef: null, worker: null };
-  }
-  if (text === '' || text === 'agent') {
-    return { mode: 'agent', promptRef: null, worker: null };
-  }
-  const match = /^agent\s+(\S+?)(?:@(\S+))?$/.exec(text);
-  if (match !== null) {
-    return { mode: 'agent', promptRef: match[1]!, worker: match[2] ?? null };
-  }
-  return { mode: 'manual', promptRef: null, worker: null };
-}
-
-/** The deterministic work-branch rule — `t/` + the id, both directions. */
+// The deterministic work-branch rule — `t/` + the id, both directions.
 export function branchForTicket(id: string): string {
   return `t/${id}`;
 }
@@ -225,71 +194,10 @@ export interface TicketCard extends TicketHoldField {
   readonly issues: readonly TicketIssue[];
 }
 
-/** One pipeline phase from `tickets/_meta/pipeline.md`. */
-export interface PipelinePhase extends PhasePoolMeta {
+/** One pipeline phase from `tickets/_meta/pipeline.md`: a column the board draws. */
+export interface PipelinePhase {
   readonly id: string;
   readonly title: string;
-  readonly wip: number | null;
-  readonly claim: boolean;
-  /** Raw handover spec (`manual | agent <ref>[@<worker>] | ci | none`). */
-  readonly handover: string;
-  /**
-   * The column's worker pin (`worker: opencode`, M85) — the assignment
-   * ring's column level; unset on a hand-edited manual column.
-   */
-  readonly worker: string | null;
-  /** The column's model pin (`model: zai/glm-5.3`, M85); null = unset. */
-  readonly model: string | null;
-  /** Explicit prompt ref override (`prompt: plan-heavy`, M85); null = handover ref. */
-  readonly prompt: string | null;
-  /**
-   * The interactive dialog's prompt ref (`interactive: plan-interview`,
-   * req-65) — the brief an interactive run in this column gets; null =
-   * the shipped default (`plan-interactive-default`).
-   */
-  readonly interactive: string | null;
-  /**
-   * The phase's persona (`persona: paul`, ADR-0088 E3) — the ladder's
-   * middle level; null = the ticket pin or the default decides.
-   */
-  readonly persona: string | null;
-  /**
-   * The circuit breaker's threshold (`max-red:`, M85): consecutive red
-   * gates the column tolerates before it trips. Default 3.
-   */
-  readonly maxRed: number | null;
-  /**
-   * The column's daily token budget (`token-budget:`, M85); null = off.
-   * Summed over the runs the pool settles per day.
-   */
-  readonly tokenBudget: number | null;
-  /**
-   * The most model turns one run of the column may take (`max-turns:`);
-   * null = the runner's default ceiling.
-   */
-  readonly maxTurns: number | null;
-  /**
-   * The most working minutes one run of the column may take (`max-work:`,
-   * busy time only — a wait for the owner does not count); null = the
-   * runner's default ceiling.
-   */
-  readonly maxWorkMin: number | null;
-  /**
-   * The ci handover's check command (`ci:`, M85): a green run moves the
-   * ticket one column right — the machine gate in the work repo.
-   */
-  readonly ci: string | null;
-  /**
-   * The sampling audit's fraction (`audit:`, M85, 0–1; default off): a
-   * green step is sampled and a second worker reviews it before the
-   * move. The live trial decides whether the rung stays.
-   */
-  readonly audit: number | null;
-  /**
-   * The semantic gate (`semantic: true`, M85; default off): every green
-   * step in the column gets a second worker's review before it moves.
-   */
-  readonly semantic: boolean;
   /**
    * The Work panel's phase chip colour (`color:`, T-0084) — `#rrggbb`;
    * null = the curated default palette colours by board position.
@@ -297,43 +205,18 @@ export interface PipelinePhase extends PhasePoolMeta {
   readonly color: string | null;
 }
 
-/** The default for a phase entry that omits the M85 pool keys —
- *  explicit values win over the defaults. */
-export function phaseWithoutPoolKeys(
-  phase: Partial<PipelinePhase> & Pick<PipelinePhase, 'id' | 'title' | 'wip' | 'claim' | 'handover'>,
-): PipelinePhase {
-  return {
-    worker: null,
-    model: null,
-    prompt: null,
-    interactive: null,
-    persona: null,
-    maxRed: null,
-    tokenBudget: null,
-    maxTurns: null,
-    maxWorkMin: null,
-    ci: null,
-    audit: null,
-    semantic: false,
-    color: null,
-    ...phase,
-  };
-}
-
 /**
  * The display-grade worker resolution for a card (M84): the ticket's
- * pin wins, then the phase handover's pin, then the repo default, then
- * the plugin's configured default. The run start re-resolves strictly
- * (unreadable pins refuse there) — this one only picks what a card
- * shows.
+ * pin wins, then the repo default, then the plugin's configured default.
+ * The run start re-resolves strictly (unreadable pins refuse there) —
+ * this one only picks what a card shows.
  */
 export function resolveCardWorker(
   ticketWorker: string | null,
-  handover: string | null,
   repoWorker: string | null,
   defaultWorker: string,
 ): string {
-  for (const value of [ticketWorker, handover === null ? null : parseHandover(handover).worker, repoWorker]) {
+  for (const value of [ticketWorker, repoWorker]) {
     if (value !== null && value.trim() !== '') {
       return value;
     }

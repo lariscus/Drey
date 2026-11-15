@@ -197,18 +197,9 @@ describe('DreyTicketsPort', () => {
     expect((await bare.personaAvatar('ben')).ok).toBe(false);
   });
 
-  it('carries the persona’s phase assignment and the chain’s pause state (U4)', async () => {
+  it('carries the chain’s pause state (U4)', async () => {
     const { board, fleet } = fakes();
     vi.mocked(board.listPersonas).mockResolvedValue([fakePersona('pia', 'Pia'), fakePersona('ben', 'Ben')]);
-    vi.mocked(board.snapshot).mockResolvedValue({
-      columns: [],
-      checkpoints: [],
-      pipeline: [
-        { id: 'plan', persona: 'pia' },
-        { id: 'review', persona: 'pia' },
-        { id: 'build', persona: null },
-      ],
-    } as unknown as BoardSnapshot);
     vi.mocked(fleet.chainStatus).mockResolvedValue({
       configured: true,
       master: 'run',
@@ -219,10 +210,8 @@ describe('DreyTicketsPort', () => {
     const views = await port.personas();
     const pia = views.find((v) => v.id === 'pia');
     const ben = views.find((v) => v.id === 'ben');
-    expect(pia?.phases).toEqual(['plan', 'review']);
     expect(pia?.paused).toBe(true);
     expect(ben?.paused).toBe(false);
-    expect(ben?.phases).toBeUndefined(); // no pipeline entry names Ben
     // The runner is down: the pause state is unknown — absent, never a fake false.
     vi.mocked(fleet.chainStatus).mockResolvedValue(null);
     const down = await (port.personas() as Promise<readonly { id: string; paused?: boolean }[]>);

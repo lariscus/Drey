@@ -2,8 +2,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DreyPluginApi } from '../../../shared/plugin-api/renderer';
 import type { RunInfo } from '../../../packages/tickets-engine/src/fleet/protocol';
+import type { TicketHold } from '../../../packages/tickets-engine/src/contracts/persona-board';
 import {
-  phaseWithoutPoolKeys,
   type BoardColumn,
   type BoardSnapshot,
   type PipelinePhase,
@@ -13,24 +13,18 @@ import {
 import { i18n } from '../../../shared/i18n';
 import { createGroupFoldStore, workListLivePaint, workListNode } from './work-panel';
 
-/** req-75 W1b: the Work list's DOM over the default eight-phase pipeline —
- *  the canvas's five groups, the rows' chips and the fold store. */
+/** req-75 W1b: the Work list's DOM — the groups, the rows' chips and the fold store. */
 
-const phase = (id: string, handover: string): PipelinePhase =>
-  phaseWithoutPoolKeys({ id, title: id[0]!.toUpperCase() + id.slice(1), wip: null, claim: false, handover });
+const phase = (id: string): PipelinePhase => ({ id, title: id[0]!.toUpperCase() + id.slice(1), color: null });
 
 const PIPELINE: readonly PipelinePhase[] = [
-  phase('inbox', 'manual'),
-  phase('prioritized', 'manual'),
-  phase('plan', 'agent plan-default'),
-  phase('plan-review', 'manual'),
-  phase('build', 'agent build-default'),
-  phase('review', 'manual'),
-  phase('commit', 'agent commit-default'),
-  phase('done', 'none'),
+  phase('inbox'),
+  phase('prioritized'),
+  phase('active'),
+  phase('done'),
 ];
 
-const card = (id: string, at: string, opts: { track?: 'auto' | 'shape' | null; interactive?: boolean } = {}): TicketCard =>
+const card = (id: string, at: string, opts: { track?: 'auto' | 'shape' | null; interactive?: boolean; hold?: TicketHold } = {}): TicketCard =>
   ({
     id,
     path: `tickets/${at}/${id}.md`,
@@ -48,15 +42,31 @@ const card = (id: string, at: string, opts: { track?: 'auto' | 'shape' | null; i
     blocked: [],
     blocks: [],
     issues: [],
+    ...(opts.hold === undefined ? {} : { hold: opts.hold }),
   }) as unknown as TicketCard;
+
+/** An active card's hold: `holder` at `position` of a chain of `length`. */
+const hold = (holder: string, position = 1, length = 2): TicketHold => ({
+  holder,
+  why: 'entry',
+  position,
+  length,
+  chain: Array.from({ length }, (_, i) => (i === position - 1 ? holder : i === length - 1 ? 'you' : 'ben')),
+  mode: null,
+  named: null,
+  claimed: false,
+  sentBack: null,
+  questions: 0,
+});
 
 const board = (
   placed: Record<string, readonly TicketCard[]>,
   recentDone: BoardSnapshot['recentDone'] = [],
 ): BoardSnapshot =>
   ({
-    columns: PIPELINE.map((p): BoardColumn => ({ phase: p, unknown: false, tickets: placed[p.id] ?? [] })),
-    checkpoints: ['plan-review', 'review', 'done'],
+    pipeline: PIPELINE,
+    columns: [...PIPELINE.map((p): BoardColumn => ({ phase: p, unknown: false, tickets: placed[p.id] ?? [] }))],
+    checkpoints: [],
     recentDone,
   }) as unknown as BoardSnapshot;
 
@@ -84,30 +94,30 @@ const titles = (list: HTMLElement): string[] =>
   [...list.querySelectorAll('.work-group-title')].map((n) => n.textContent ?? '');
 
 describe('workListNode', () => {
-  it('draws the fleet alerts above every group; Resume plays the column', () => {
+  it('draws the fleet alerts above every group; Run starts the chain', () => {
     const onAlertAction = vi.fn();
-    const action = { kind: 'play-column' as const, phase: 'build', label: 'Resume' };
+    const action = { kind: 'run-chain' as const, label: 'Run' };
     const list = workListNode(
       {
         ...deps(),
-        alerts: [{ kind: 'breaker', key: 'breaker:build:', title: 'Build stopped by the circuit breaker', text: '3 red gates in a row', action }],
+        alerts: [{ kind: 'quota', key: 'quota:opencode:', title: 'OpenCode is out of quota', text: 'No new run before 16:00', action }],
         onAlertAction,
       },
-      board({ build: [card('T-0002', 'build')] }),
+      board({ inbox: [card('T-0002', 'inbox')] }),
       [],
       createGroupFoldStore(null),
       () => undefined,
     );
     expect(list.firstElementChild?.classList.contains('work-alerts')).toBe(true);
     const alert = list.querySelector<HTMLElement>('.work-alert')!;
-    expect(alert.dataset['kind']).toBe('breaker');
-    expect(alert.querySelector('.work-alert-title')?.textContent).toBe('Build stopped by the circuit breaker');
+    expect(alert.dataset['kind']).toBe('quota');
+    expect(alert.querySelector('.work-alert-title')?.textContent).toBe('OpenCode is out of quota');
     alert.querySelector<HTMLButtonElement>('.work-alert-action')!.click();
     expect(onAlertAction).toHaveBeenCalledWith(action);
   });
 
-  it('shows Running before Ideas, hides Needs you and Shaping while empty', () => {
-    const list = workListNode(deps(), board({ inbox: [card('T-0001', 'inbox')], build: [card('T-0002', 'build')] }), [], createGroupFoldStore(null), () => undefined);
+  it('shows Running before Ideas, hides Needs you while empty', () => {
+    const list = workListNode(deps(), board({ inbox: [card('T-0001', 'inbox')], active: [card('T-0002', 'active', { hold: hold('ben') })] }), [], createGroupFoldStore(null), () => undefined);
     expect(titles(list)).toEqual(['Running', 'Inbox']);
     expect(list.querySelectorAll('.work-row')).toHaveLength(2);
   });
@@ -124,7 +134,7 @@ describe('workListNode', () => {
     } as unknown as RunInfo;
     const list = workListNode(
       deps(),
-      board({ inbox: [card('T-0001', 'inbox')], build: [card('T-0002', 'build'), card('T-0003', 'build')] }),
+      board({ inbox: [card('T-0001', 'inbox')], active: [card('T-0002', 'active', { hold: hold('ben') }), card('T-0003', 'active', { hold: hold('ben') })] }),
       [runA],
       createGroupFoldStore(null),
       () => undefined,
@@ -135,10 +145,10 @@ describe('workListNode', () => {
   });
 
   it('renders the phase as plain grey words inside the one meta line (E12-11)', () => {
-    const list = workListNode(deps(), board({ build: [card('T-0002', 'build')] }), [], createGroupFoldStore(null), () => undefined);
+    const list = workListNode(deps(), board({ active: [card('T-0002', 'active', { hold: hold('ben') })] }), [], createGroupFoldStore(null), () => undefined);
     const phase = list.querySelector<HTMLElement>('.work-row .work-row-meta .work-meta-phase')!;
-    expect(phase.title).toBe('Build');
-    expect(phase.textContent).toBe('Build');
+    expect(phase.title).toBe('Active');
+    expect(phase.textContent).toBe('Active');
     expect(list.querySelector('.work-phase-dot, .work-phase-chip')).toBeNull();
   });
 
@@ -163,7 +173,7 @@ describe('workListNode', () => {
       [],
       createGroupFoldStore(null),
       () => undefined,
-      { phases: ['build'], statuses: [] },
+      { phases: ['active'], statuses: [] },
     );
     const marker = hidden.querySelector<HTMLButtonElement>('.work-group-ideas .work-hidden-by-filter')!;
     expect(marker.textContent).toBe('Hidden by the filter — clear');
@@ -174,7 +184,7 @@ describe('workListNode', () => {
 
   it('a finished ticket sits under Needs you with its kind chip — the buttons live in the thread now', () => {
     const d = deps();
-    const list = workListNode(d, board({ done: [card('T-0003', 'done')] }), [], createGroupFoldStore(null), () => undefined);
+    const list = workListNode(d, board({ done: [card('T-0003', 'done', { hold: hold('you') })] }), [], createGroupFoldStore(null), () => undefined);
     expect(titles(list)[0]).toBe('Needs you');
     const row = list.querySelector<HTMLElement>('.work-group-needs .work-row')!;
     expect(row.querySelector('.work-kind')?.textContent).toBe('ready to try');
@@ -182,36 +192,10 @@ describe('workListNode', () => {
     expect(row.querySelector('button.work-action')).toBeNull();
   });
 
-  it('a checkpoint after the plan column reads as a plan to accept', () => {
-    const list = workListNode(deps(), board({ 'plan-review': [card('T-0004', 'plan-review')] }), [], createGroupFoldStore(null), () => undefined);
+  it("a ticket that waits at You reads as review", () => {
+    const list = workListNode(deps(), board({ active: [card('T-0004', 'active', { hold: hold('you') })] }), [], createGroupFoldStore(null), () => undefined);
     const row = list.querySelector<HTMLElement>('.work-group-needs .work-row')!;
-    expect(row.querySelector('.work-kind')?.textContent).toBe('plan to accept');
-  });
-
-  it('an interactive ticket shapes: the group shows, with the dialog not started', () => {
-    const list = workListNode(deps(), board({ inbox: [card('T-0005', 'inbox', { interactive: true })] }), [], createGroupFoldStore(null), () => undefined);
-    expect(titles(list)).toEqual(['Running', 'Shaping', 'Inbox']);
-    // The sub line leads with the phase chip (T-0084), the dialog text follows.
-    const sub = list.querySelector('.work-group-shaping .work-row-sub')!;
-    expect(sub.querySelector('.work-meta-phase')?.textContent).toBe('Inbox');
-    expect(sub.querySelector('.work-row-line')?.textContent).toBe('Dialog not started');
-  });
-
-  it('a ticket that only sits in the Shaping stage has its group, without a dialog pulse (fidelity ruling O2)', () => {
-    const six = {
-      columns: ['inbox', 'shaping', 'prioritized', 'building', 'done'].map((id) => ({
-        phase: phase(id, id === 'building' ? 'agent build-default' : 'manual'),
-        unknown: false,
-        tickets: id === 'shaping' ? [card('T-0119', 'shaping')] : [],
-      })),
-      checkpoints: [],
-      recentDone: [],
-    } as unknown as BoardSnapshot;
-    const list = workListNode(deps(), six, [], createGroupFoldStore(null), () => undefined);
-    const sub = list.querySelector('.work-group-shaping .work-row-sub')!;
-    expect(sub.querySelector('.work-meta-phase')?.textContent).toBe('Shaping');
-    expect(sub.querySelector<HTMLElement>('.work-row-line')?.hidden).toBe(true);
-    expect(list.querySelector('.work-group-prioritized')).toBeNull();
+    expect(row.querySelector('.work-kind')?.textContent).toBe('review');
   });
 
   it('lists the queued ideas under Prioritized with the id at the right end; an Inbox row is its title alone (board 7a)', () => {
@@ -231,8 +215,8 @@ describe('workListNode', () => {
   });
 
   it('a rich row carries its cost grey at the right end; nothing is invented without one (E13-8, board 7a)', () => {
-    const withCost = (id: string, at: string, cost: number | null, persona: string | null): TicketCard => {
-      const base = card(id, at);
+    const withCost = (id: string, at: string, cost: number | null, persona: string | null, ticketHold?: TicketHold): TicketCard => {
+      const base = card(id, at, ticketHold === undefined ? {} : { hold: ticketHold });
       return {
         ...base,
         meta: { ...base.meta, persona },
@@ -245,7 +229,7 @@ describe('workListNode', () => {
       board({
         inbox: [withCost('T-0001', 'inbox', null, null)],
         prioritized: [withCost('T-0002', 'prioritized', 0.5, 'ben')],
-        build: [withCost('T-0003', 'build', 1.2, 'ben')],
+        active: [withCost('T-0003', 'active', 1.2, 'ben', hold('ben'))],
       }),
       [],
       createGroupFoldStore(null),
@@ -290,22 +274,22 @@ describe('workListNode', () => {
       gateFailure: null,
       activity: 'edit electron/capture-hotkey.ts',
     } as unknown as RunInfo;
-    const list = workListNode(deps(), board({ build: [card('T-0009', 'build')] }), [run], createGroupFoldStore(null), () => undefined);
+    const list = workListNode(deps(), board({ active: [card('T-0009', 'active', { hold: hold('ben') })] }), [run], createGroupFoldStore(null), () => undefined);
     const row = list.querySelector<HTMLElement>('.work-group-running .work-row')!;
-    expect(row.querySelector('.work-run-step')?.textContent).toBe('Building');
+    expect(row.querySelector('.work-run-step')?.textContent).toBe('Active');
     expect(row.querySelector('.work-row-id')?.textContent).toBe('T-0009');
     expect(row.querySelector('.work-run-line')).toBeNull();
   });
 
   it('words the pool holding a ticket back on its Running row and turns the cost orange near the allowance (req-186)', () => {
-    const queued = { ...card('T-0011', 'build'), usage: { cost: 2.05 } } as unknown as TicketCard;
+    const queued = { ...card('T-0011', 'active', { hold: hold('ben') }), usage: { cost: 2.05 } } as unknown as TicketCard;
     const d = {
       ...deps(),
       api: { ui: { icon: () => document.createElement('span') }, i18n } as unknown as DreyPluginApi,
       queueWords: (id: string) => (id === 'T-0011' ? 'queued · waits for a B slot · 2nd' : null),
       allowanceOf: () => 2.5,
     };
-    const list = workListNode(d, board({ build: [queued] }), [], createGroupFoldStore(null), () => undefined);
+    const list = workListNode(d, board({ active: [queued] }), [], createGroupFoldStore(null), () => undefined);
     const row = list.querySelector<HTMLElement>('.work-group-running .work-row')!;
     expect(row.querySelector('.work-run-step')?.textContent).toBe('queued · waits for a B slot · 2nd');
     const cost = row.querySelector<HTMLElement>('.work-row-cost')!;
@@ -316,7 +300,7 @@ describe('workListNode', () => {
   it('keeps the cost grey below 70 % and draws it red once the allowance is used up (req-186)', () => {
     const paint = (cost: number): HTMLElement => {
       const d = { ...deps(), api: { ui: { icon: () => document.createElement('span') }, i18n } as unknown as DreyPluginApi, allowanceOf: () => 2.5 };
-      const list = workListNode(d, board({ build: [{ ...card('T-0012', 'build'), usage: { cost } } as unknown as TicketCard] }), [], createGroupFoldStore(null), () => undefined);
+      const list = workListNode(d, board({ active: [{ ...card('T-0012', 'active', { hold: hold('ben') }), usage: { cost } } as unknown as TicketCard] }), [], createGroupFoldStore(null), () => undefined);
       return list.querySelector<HTMLElement>('.work-group-running .work-row-cost')!;
     };
     expect(paint(1).className).toBe('work-row-cost');
@@ -360,7 +344,7 @@ describe('workListNode', () => {
       tokensOut: 0,
       waiting: { kind: 'question', text: 'Which file?', since: '2026-10-30T10:05:00Z' },
     } as unknown as RunInfo;
-    const list = workListNode(deps(), board({ build: [card('T-0012', 'build')] }), [run], createGroupFoldStore(null), () => undefined);
+    const list = workListNode(deps(), board({ active: [card('T-0012', 'active', { hold: hold('ben') })] }), [run], createGroupFoldStore(null), () => undefined);
     const row = list.querySelector<HTMLElement>('.work-group-needs .work-row')!;
     expect(row.querySelector('.work-kind')?.textContent).toBe('question');
   });
@@ -395,7 +379,7 @@ describe('workListNode', () => {
         },
       },
     } as unknown as RunInfo;
-    const list = workListNode(deps(), board({ build: [card('T-0013', 'build')] }), [run], createGroupFoldStore(null), () => undefined);
+    const list = workListNode(deps(), board({ active: [card('T-0013', 'active', { hold: hold('ben') })] }), [run], createGroupFoldStore(null), () => undefined);
     const row = list.querySelector<HTMLElement>('.work-group-needs .work-row')!;
     expect(row.querySelector('.work-kind')?.textContent).toBe('question');
     expect(row.querySelectorAll('.tickets-pill')).toHaveLength(0);
@@ -500,14 +484,14 @@ describe('workListNode', () => {
     const snap = board(
       {
         inbox: [card('T-0001', 'inbox'), card('T-0005', 'inbox', { interactive: true })],
-        build: [card('T-0002', 'build')],
+        active: [card('T-0002', 'active', { hold: hold('ben') })],
         done: [card('T-0003', 'done')],
       },
       [{ id: 'T-0016', title: 'Ledger sync', at: new Date().toISOString() }],
     );
     const list = workListNode(deps(), snap, [run], folds, () => undefined);
     const rows = [...list.querySelectorAll<HTMLElement>('.work-row, .work-done-row')];
-    expect(rows.length).toBe(5); // one shaped, one needing, one running, one idea, one done
+    expect(rows.length).toBe(4); // one running, two ideas, one done
     for (const row of rows) {
       const id = row.querySelector<HTMLElement>('.work-row-id');
       const title = row.querySelector<HTMLElement>('.work-row-title, .work-done-title')!;
@@ -536,28 +520,48 @@ describe('workListLivePaint — text in place, the bones untouched (T-0086)', ()
       ...patch,
     }) as unknown as RunInfo;
 
-  it('changes a run\'s step and an age in place — same elements, new text', () => {
+  it('changes a done row\'s age in place — same element, new text', () => {
     vi.useFakeTimers();
     vi.setSystemTime(Date.parse('2026-10-31T12:00:00Z'));
     try {
-      const snap = board({ build: [card('T-0021', 'build')] });
-      const list = workListNode(deps(), snap, [liveRun()], createGroupFoldStore(null), () => undefined);
-      const row = list.querySelector<HTMLElement>('[data-id="T-0021"]')!;
-      const step = row.querySelector<HTMLElement>('.work-run-step')!;
-      const age = row.querySelector<HTMLElement>('.work-row-age')!;
+      const folds = createGroupFoldStore(memoryStorage());
+      folds.setFolded('done', false);
+      const snap = board(
+        { active: [card('T-0021', 'active', { hold: hold('ben') })] },
+        [{ id: 'T-0030', title: 'Done thing', at: '2026-10-31T11:59:30Z' }],
+      );
+      const list = workListNode(deps(), snap, [liveRun()], folds, () => undefined);
+      const doneRow = list.querySelector<HTMLElement>('[data-id="T-0030"]')!;
+      const age = doneRow.querySelector<HTMLElement>('.work-row-age')!;
       expect(age.textContent).toBe('now');
       vi.setSystemTime(Date.parse('2026-10-31T12:02:00Z'));
       workListLivePaint(list, deps(), snap, [liveRun({ activity: 'editing b.ts' })]);
-      expect(list.querySelector('[data-id="T-0021"]')).toBe(row);
-      expect(row.querySelector('.work-run-step')).toBe(step);
+      expect(list.querySelector('[data-id="T-0030"]')).toBe(doneRow);
+      expect(doneRow.querySelector('.work-row-age')).toBe(age);
       expect(age.textContent).toBe('2 min');
     } finally {
       vi.useRealTimers();
     }
   });
 
+  it('a held running row keeps its text — the holder and position are all it shows', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.parse('2026-10-31T12:00:00Z'));
+    try {
+      const snap = board({ active: [card('T-0021', 'active', { hold: hold('ben') })] });
+      const list = workListNode(deps(), snap, [liveRun()], createGroupFoldStore(null), () => undefined);
+      const row = list.querySelector<HTMLElement>('[data-id="T-0021"]')!;
+      const before = row.querySelector<HTMLElement>('.work-run-step')?.textContent ?? null;
+      workListLivePaint(list, deps(), snap, [liveRun({ activity: 'editing b.ts' })]);
+      expect(list.querySelector('[data-id="T-0021"]')).toBe(row);
+      expect(row.querySelector<HTMLElement>('.work-run-step')?.textContent ?? null).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('skips a row whose card is gone from the snapshot — stale bones wait for the re-render', () => {
-    const snap = board({ build: [card('T-0022', 'build')] });
+    const snap = board({ active: [card('T-0022', 'active', { hold: hold('ben') })] });
     const list = workListNode(deps(), snap, [liveRun({ id: 'b', ticketId: 'T-0022' })], createGroupFoldStore(null), () => undefined);
     const row = list.querySelector<HTMLElement>('[data-id="T-0022"]')!;
     const age = row.querySelector<HTMLElement>('.work-row-age')!;
@@ -567,3 +571,7 @@ describe('workListLivePaint — text in place, the bones untouched (T-0086)', ()
     expect(age.textContent).toBe(before);
   });
 });
+
+
+
+

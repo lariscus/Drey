@@ -8,7 +8,6 @@ import { TicketsGit } from '../core/tickets-git';
 import { newTicketFileText } from '../core/ticket-files';
 import type { LedgerWrite } from '../core/ledger';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from '../fleet/protocol';
-import { parseHandover } from '../contracts/tickets';
 import { PersonaAvatars } from './persona-avatars';
 import { SHIPPED_PERSONAS_DIR } from './shipped-crew-files';
 
@@ -444,8 +443,6 @@ describe('EngineBoardService default pipeline (req-99a)', () => {
       ['prioritized', 'Prioritized'],
       ['done', 'Done'],
     ]);
-    expect(snap.pipeline.map((p) => parseHandover(p.handover).mode)).toEqual(['manual', 'manual', 'none']);
-    expect(snap.pipeline.filter((p) => p.claim)).toEqual([]);
     expect(snap.flow?.map((e) => e.persona)).toEqual(['paul', 'ben', 'ralf', 'tessa', 'you']);
     // The human persona exists from the first minute, titled You.
     const personaFile = await fsp.readFile(path.join(vaultDir, 'tickets', '_meta', 'personas', 'you', 'persona.md'), 'utf8');
@@ -487,12 +484,10 @@ describe('EngineBoardService default pipeline (req-99a)', () => {
   });
 
   it('an existing board gets the human persona created on first sight and keeps its columns', async () => {
-    // The shared board of this suite predates the pins: its columns carry none.
-    const snap = await serviceOf().snapshot();
-    expect(snap.pipeline.every((p) => p.persona === null)).toBe(true);
+    const before = (await serviceOf().snapshot()).pipeline.map((p) => p.id);
     await serviceOf().ensureHumanPersona();
     expect((await serviceOf().listPersonas()).some((p) => p.kind === 'human' && p.title === 'You')).toBe(true);
-    expect((await serviceOf().snapshot()).pipeline.every((p) => p.persona === null)).toBe(true);
+    expect((await serviceOf().snapshot()).pipeline.map((p) => p.id)).toEqual(before);
   });
 
   it('leaves a board with the old default pipeline exactly as it is', async () => {
@@ -532,3 +527,4 @@ describe('EngineBoardService default pipeline (req-99a)', () => {
     expect(snap.pipeline.map((p) => p.title)).toEqual(['Inbox', 'Done']);
   });
 });
+

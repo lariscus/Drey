@@ -24,9 +24,9 @@ specs/ticket-schema.md. Edit freely; the board follows on refresh.
 /** The `_meta/pipeline.md` "Initialize board" writes: the lifecycle columns and the standard flow. */
 export const DEFAULT_PIPELINE_TEXT = `---
 phases:
-  - { id: inbox, title: Inbox, handover: manual }
-  - { id: prioritized, title: Prioritized, handover: manual }
-  - { id: done, title: Done, handover: none }
+  - { id: inbox, title: Inbox }
+  - { id: prioritized, title: Prioritized }
+  - { id: done, title: Done }
 flow: ${STANDARD_FLOW_LINE}
 ---
 ${LIFECYCLE_PIPELINE_PROSE}`;

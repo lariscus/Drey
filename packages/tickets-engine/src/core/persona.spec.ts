@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_PERSONA_SETTINGS } from './persona-settings';
 import { entryWorkOf } from './chain-entry-work';
-import { inPipelineOrder, isAgentPersona, isHumanPersona, isMissionPersona, MISSION_PERSONA_ID, parsePersonaFile, personaFileText, personaRef, resolvePersona, splitPoolEntry } from './persona';
+import { inPipelineOrder, isAgentPersona, isHumanPersona, isMissionPersona, MISSION_PERSONA_ID, parsePersonaFile, personaFileText, personaRef, splitPoolEntry } from './persona';
 
 const PIA = `---
 title: Pia
@@ -198,14 +198,6 @@ describe('budget — the daily spend limit (concept §4.3)', () => {
     const poor = parsePersonaFile('pia', `---\ntitle: Pia\n---\n`);
     expect(personaFileText(poor)).not.toContain('budget');
     expect(parsePersonaFile('pia', personaFileText(poor))).toEqual(poor);
-  });
-});
-
-describe('resolvePersona', () => {
-  it('on the phase board only the column decides (req-257: the ticket pin and the default retired)', () => {
-    expect(resolvePersona({ phasePersona: 'pia' })).toEqual({ persona: 'pia', source: 'phase' });
-    expect(resolvePersona({ phasePersona: '  ' })).toEqual({ persona: null, source: 'none' });
-    expect(resolvePersona({ phasePersona: null })).toEqual({ persona: null, source: 'none' });
   });
 });
 

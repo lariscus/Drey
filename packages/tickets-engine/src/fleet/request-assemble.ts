@@ -84,7 +84,7 @@ function moveParts(plan: RunPlan): MoveParts {
 /** The keys a request carries only when they are set. */
 function optionalParts(plan: RunPlan): OptionalParts {
   const { input } = plan;
-  const limits = limitsOf(input.workingPhase, input.persona?.run ?? null);
+  const limits = limitsOf(input.persona?.run ?? null);
   return {
     ...(limits !== null ? { limits } : {}),
     ...(input.workerChoice !== null ? { recordWorker: input.workerChoice } : {}),
@@ -119,12 +119,10 @@ function closingParts(signals: readonly ClosingSignal[] | undefined, gateFailure
   return { closing: { signals: signals ?? DEFAULT_CLOSING_SPEC.signals, retry: gateFailure !== null } };
 }
 
-const firstSet = (own: number | null | undefined, column: number | null | undefined): number | null => own ?? column ?? null;
-
-/** The run ceilings as the request carries them — the persona's where its record sets one (req-258), else the column's; null when neither does. */
-function limitsOf(phase: PipelinePhase | null, persona: Pick<PersonaRunSettings, 'maxTurns' | 'maxWorkMin'> | null): { maxTurns?: number; maxWorkMs?: number } | null {
-  const maxTurns = firstSet(persona?.maxTurns, phase?.maxTurns);
-  const maxWorkMin = firstSet(persona?.maxWorkMin, phase?.maxWorkMin);
+/** The run ceilings as the request carries them — the persona's where its record sets one (req-258); null when it sets none. */
+function limitsOf(persona: Pick<PersonaRunSettings, 'maxTurns' | 'maxWorkMin'> | null): { maxTurns?: number; maxWorkMs?: number } | null {
+  const maxTurns = persona?.maxTurns ?? null;
+  const maxWorkMin = persona?.maxWorkMin ?? null;
   if (maxTurns === null && maxWorkMin === null) {
     return null;
   }

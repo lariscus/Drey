@@ -64,10 +64,10 @@ describe('resolvePhase', () => {
     expect(at('cancelled')).toBe('done');
   });
 
-  it('an active or running ticket without a chain stands in the first claiming column', () => {
+  it('an active or running ticket without a chain stands in the second column', () => {
     const at = (stage: string): string => resolvePhase(det({ id: 'T-0001', stage }), phases).phase;
-    expect(at('active')).toBe('build');
-    expect(at('running')).toBe('build');
+    expect(at('active')).toBe('prioritized');
+    expect(at('running')).toBe('prioritized');
   });
 
   it('req-265: the lifecycle edges are their own column', () => {

@@ -3,28 +3,23 @@ import { stepCardOf, type StepCardInput } from './step-card';
 
 const PIPELINE = [
   { id: 'inbox', title: 'Inbox' },
-  { id: 'plan', title: 'Plan' },
-  { id: 'plan-review', title: 'Plan review' },
-  { id: 'build', title: 'Build' },
-  { id: 'review', title: 'Review' },
-  { id: 'commit', title: 'Commit' },
+  { id: 'prioritized', title: 'Prioritized' },
   { id: 'done', title: 'Done' },
 ];
 
 const base: StepCardInput = {
   pipeline: PIPELINE,
-  phaseId: 'review',
+  phaseId: 'prioritized',
   atCheckpoint: true,
-  planGate: false,
   hasReport: true,
   launchable: true,
 };
 
 describe('stepCardOf', () => {
-  it('a human gate behind an automatic column is a gate card with the next column in its move', () => {
+  it('a checkpoint the owner waits at is a gate card with the next column in its move', () => {
     expect(stepCardOf(base)).toEqual({
       kind: 'gate',
-      acceptLabel: 'Move to Commit',
+      acceptLabel: 'Move to Done',
       canLaunch: true,
       canSendBack: true,
     });
@@ -48,25 +43,10 @@ describe('stepCardOf', () => {
   });
 
   it('a ticket an agent works (no checkpoint) shows no card, report or not', () => {
-    expect(stepCardOf({ ...base, phaseId: 'commit', atCheckpoint: false }).kind).toBe('none');
-  });
-
-  it('the plan gate keeps its own approval UI', () => {
-    expect(stepCardOf({ ...base, phaseId: 'plan-review', planGate: true }).kind).toBe('none');
+    expect(stepCardOf({ ...base, phaseId: 'prioritized', atCheckpoint: false }).kind).toBe('none');
   });
 
   it('an unknown phase shows no card', () => {
     expect(stepCardOf({ ...base, phaseId: 'ghost' }).kind).toBe('none');
-  });
-});
-
-describe('Ready to try (req-99b)', () => {
-  it('offers Accept, not a move to Done', () => {
-    const pipeline = [
-      { id: 'building', title: 'Building' },
-      { id: 'ready', title: 'Ready to try' },
-      { id: 'done', title: 'Done' },
-    ];
-    expect(stepCardOf({ ...base, pipeline, phaseId: 'ready' }).acceptLabel).toBe('Accept');
   });
 });
