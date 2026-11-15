@@ -64,7 +64,7 @@ export function cardQuestionOf(need: CardNeed): Question {
 
 function metaOf(since: string | null, now: Date, f: PersonaCardFormat): string {
   const at = since === null ? Number.NaN : Date.parse(since);
-  return f.t('checkpoint.meta', { time: f.time(Number.isNaN(at) ? now : new Date(at)) });
+  return f.t('card.meta', { time: f.time(Number.isNaN(at) ? now : new Date(at)) });
 }
 
 const button = (id: PersonaCardActionId, label: string, primary: boolean, answer?: string): PersonaCardAction =>

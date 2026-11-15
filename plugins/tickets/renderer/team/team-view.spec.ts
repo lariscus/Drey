@@ -8,7 +8,6 @@ import type { BoardSnapshot, TicketCard } from '../../shared/tickets';
 import type { DeskDeps } from '../desk-deps';
 import { mountBoard } from '../board/board-view';
 import { bandHeaderStatusOf, bandStatusOf } from './capacity-model';
-import { trancheNodes } from './capacity-view';
 import { poolChipNode } from '../board/pool-chip';
 import type { TeamStore } from './team-store';
 import { mountTeam } from './team-view';
@@ -260,7 +259,7 @@ describe('the run counts the Crew tab and the pool chip read', () => {
   });
 });
 
-describe("the pool chip's popover: slots, tranche and queue (board 7e v2, req-271)", () => {
+describe("the pool chip's popover: slots and queue (board 7e v2, req-271)", () => {
   const inThreeDays = new Date(Date.now() + 3 * 86_400_000);
   inThreeDays.setHours(9, 0, 0, 0);
   const monday = inThreeDays.toISOString();
@@ -309,13 +308,12 @@ describe("the pool chip's popover: slots, tranche and queue (board 7e v2, req-27
     expect(login!.querySelector('.desk-slot-bar')).toBeNull();
   });
 
-  it("names the head of the pool's queue with its class and place, and leaves the tranche part out without one", () => {
+  it("names the head of the pool's queue with its class and place", () => {
     chain = { ...slotsChain(), queue: [{ ticket: 'T-0129', persona: 'ralf', class: 'B', reason: 'capacity', line: 'waits for a B slot', detail: '', position: 1, since: '' }] } as unknown as ChainStatus;
     const host = document.body.appendChild(poolChipNode(deps(), [], true, vi.fn()));
     expect(host.querySelector('.pb-pool-chip')!.textContent).toBe('1/5 · 1 queued');
     expect(host.querySelector('.pb-pool-sub')!.textContent).toBe('1 of 5 sessions · 1 queued');
     expect(host.querySelector('.pb-pool-queue-text')!.textContent).toBe('T-0129 queued · waits for a B slot · 1st');
-    expect(host.querySelector('.desk-tranche-text')).toBeNull();
   });
 
   it('shows a minimum overrun and opens the Service window', () => {
@@ -328,25 +326,6 @@ describe("the pool chip's popover: slots, tranche and queue (board 7e v2, req-27
     host.querySelector<HTMLButtonElement>('.pb-pool-link')!.click();
     expect(toggle).toHaveBeenCalledWith(false);
     expect(invoked).toContainEqual(['serviceControl', { target: 'window', action: 'open' }]);
-  });
-
-  it('draws the tranche part as board 7e does once the chain carries a tranche', () => {
-    const full = { index: 1, runs: 4, size: 10, cost: 4.1, budget: 15, runsLeft: 6, msLeft: 2 * 3_600_000 + 10 * 60_000, progress: 0.4 };
-    const nodes = trancheNodes(full, i18n);
-    expect(nodes[0]!.textContent).toBe('Tranche 4 of 10 runs · $4.10 of $15 · checkpoint in 6 runs or 2 h 10 min');
-    expect(nodes[1]!.querySelector<HTMLElement>('.desk-tranche-fill')!.style.width).toBe('40%');
-  });
-
-  it('says the shorter forms when the tranche lacks a limit', () => {
-    const base = { index: 2, runs: 3, size: 10, cost: 4.1, budget: 15, runsLeft: 7, msLeft: 45 * 60_000, progress: 0.3 };
-    const line = (patch: object): string | null => trancheNodes({ ...base, ...patch }, i18n)[0]!.textContent;
-    expect(line({ msLeft: null })).toBe('Tranche 3 of 10 runs · $4.10 of $15 · checkpoint in 7 runs');
-    expect(line({ budget: null })).toBe('Tranche 3 of 10 runs · $4.10 · checkpoint in 7 runs or 45 min');
-    expect(line({ budget: null, msLeft: null })).toBe('Tranche 3 of 10 runs · $4.10 · checkpoint in 7 runs');
-    expect(line({ size: null, runsLeft: null })).toBe('Tranche 2 · 3 runs · $4.10 of $15 · checkpoint in 45 min');
-    expect(line({ size: null, runsLeft: null, msLeft: null })).toBe('Tranche 2 · 3 runs · $4.10 of $15');
-    expect(line({ size: null, runsLeft: null, budget: null })).toBe('Tranche 2 · 3 runs · $4.10 · checkpoint in 45 min');
-    expect(line({ size: null, runsLeft: null, budget: null, msLeft: null })).toBe('Tranche 2 · 3 runs · $4.10');
   });
 
   it('draws no queue part while nothing is queued, and no popover while closed', () => {

@@ -252,7 +252,7 @@ export function mountBoard(deps: DeskDeps, store: TeamStore, host: HTMLElement):
       root.replaceChildren(head, h('div', 'desk-note', snap === null ? 'Loading…' : 'No tickets repository yet - set one up in the Work panel.'));
       return;
     }
-    // req-271: the big pool's chip on the phase board too (the Capacity band is gone); its popover holds slots, tranche, queue.
+    // req-271: the big pool's chip on the phase board too (the Capacity band is gone); its popover holds slots, queue.
     head.append(
       poolChipNode(deps, [], personaState.poolOpen, (open) => {
         personaState.poolOpen = open;

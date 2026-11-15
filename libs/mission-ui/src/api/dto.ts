@@ -8,7 +8,6 @@
  */
 import { autopilotSwitchViewOf, autopilotViewOf, type AutopilotView } from '../../../../shared/autopilot';
 import { burnRateHoldOf, type BurnRateHoldView } from '../../../../shared/burn-rate';
-import { trancheViewOf, type TrancheView } from '../../../../shared/tranche';
 import { maskFences } from '../../../../shared/markdown/fences';
 import { projectsOf, type McProject } from '../work/projects';
 
@@ -334,8 +333,6 @@ export interface TeamView {
   readonly chainMaster?: 'run' | 'halted' | null;
   /** The Autopilot off the chain block (req-95b); absent while the desk reports no chain. */
   readonly autopilot?: AutopilotView;
-  /** The chain block's tranche (req-179): chips, progress and the waiting checkpoint's report; absent without one. */
-  readonly tranche?: TrancheView;
   /** The chain block's burn-rate hold (req-181): nothing new starts until the day turns; absent while nothing holds. */
   readonly hold?: BurnRateHoldView;
   /** The persona ids the owner paused in the chain; `[]` when the desk sends none. */
@@ -1347,7 +1344,6 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
   // req-110) reads as Off, so the switch stays usable; a snapshot without the
   // field at all leaves the Autopilot unknown.
   const autopilot = chain === null ? (fleet['chain'] === null ? autopilotSwitchViewOf(true, null) : null) : autopilotViewOf(chain);
-  const tranche = trancheViewOf(chain);
   const hold = burnRateHoldOf(chain);
   const pausedPersonas = strArray(fleet['pausedPersonas']);
   const capacity = capacityOf(chain, runs);
@@ -1402,7 +1398,6 @@ export function parseTeam(personasJson: unknown, fleetJson: unknown): TeamView {
     ...(waits !== null ? { waits } : {}),
     ...(chainMaster !== null ? { chainMaster } : {}),
     ...(autopilot !== null ? { autopilot } : {}),
-    ...(tranche !== null ? { tranche } : {}),
     ...(hold !== null ? { hold } : {}),
     ...(pausedPersonas.length > 0 ? { pausedPersonas } : {}),
     ...(capacity.length > 0 ? { capacity } : {}),

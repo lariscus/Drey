@@ -27,7 +27,6 @@ function provide(autopilot: AutopilotView, hold: unknown, opts: { reply?: McAuto
   });
   const state: McAutopilotState = {
     autopilot: signal<AutopilotView | null>(autopilot),
-    tranche: signal(null),
     readOnly: signal(opts.readOnly ?? false),
     set: async () => ({ ok: true }),
     stopAll: async () => ({ ok: true }),

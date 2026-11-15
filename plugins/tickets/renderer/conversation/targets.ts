@@ -20,7 +20,6 @@ import type {
 import type { PersonaView } from '../../shared/remote-protocol';
 import { BURN_RATE_CARD_PREFIX, burnRateCardOf, type BurnRateCard, type BurnRateFormat, type BurnRateHoldView } from '../../../../shared/burn-rate';
 import { PERSONA_CARD_PREFIX } from '../../../../shared/persona-cards';
-import { trancheCardOf, type TrancheCard, type TrancheFormat, type TrancheView } from '../../../../shared/tranche';
 import type { ShapeTarget } from '../ticket-document/shape';
 import {
   EMPTY_THREAD,
@@ -29,8 +28,7 @@ import {
   burnRateMessageOf,
   personaCardMessageOf,
   ASSIGN_PREFIX,
-  trancheMessageOf,
-  withTrancheMessage,
+  withCardMessage,
   historyOfSessions,
   threadOfSession,
 } from './map';
@@ -54,8 +52,6 @@ export interface ConversationDeps {
   subscribePersonas(listener: () => void): () => void;
   /** The ticket document in focus, when there is one to shape (E13-9); absent = Mission Control never shapes. */
   shape?: ShapeBinding;
-  /** The waiting checkpoint (req-179); absent = Mission Control carries no checkpoint card. */
-  tranche?: TrancheBinding;
   /** The burn rate's hold (req-181); absent = Mission Control carries no burn-rate card. */
   hold?: HoldBinding;
   /** req-273: the persona board's four cards (no persona, a question, sent back twice, a merge conflict); absent = Mission Control carries none. */
@@ -80,23 +76,6 @@ export interface HoldBinding {
   /** Fires on every chain status; returns the unsubscribe. */
   subscribe(listener: () => void): () => void;
 }
-
-/** What Mission Control needs of the tranche: the chain's block, the words, and the two things its card can do. */
-export interface TrancheBinding {
-  view(): TrancheView | null;
-  format(): TrancheFormat;
-  /** The locale's time of day (`api.i18n.formatTime`). */
-  formatTime(date: Date): string;
-  /** Autopilot On; resolves the words of a refusal, or null when it went through. */
-  release(): Promise<string | null>;
-  /** Settings → Tickets. */
-  adjust(): void;
-  /** Fires on every chain status; returns the unsubscribe. */
-  subscribe(listener: () => void): () => void;
-}
-
-/** The id prefix of the checkpoint card (`tranche-<index>-<at>`): its buttons are the plugin's, not the engine chat's. */
-const TRANCHE_CARD_PREFIX = 'tranche-';
 
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -126,8 +105,6 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
   let fileTicket: string | null = null;
   /** A failed turn is not part of the session file; it hangs on the thread until the next send. */
   let lastError: ReturnType<typeof errorMessageOf> | null = null;
-  /** The checkpoint whose "Open report" was pressed (an early stop shows its figures then). */
-  let reportOpenFor: string | null = null;
   /** The burn-rate card the owner answered with "Wait" (one per day: its id carries the resume time). */
   let holdDismissed: string | null = null;
   /** The persona card whose Assign… picker is open. */
@@ -139,23 +116,14 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
     return card === null || card.id === holdDismissed ? null : card;
   };
 
-  const trancheCard = (): TrancheCard | null => {
-    const binding = deps.tranche;
-    const view = binding?.view() ?? null;
-    if (binding === undefined || view === null) {
-      return null;
-    }
-    const first = trancheCardOf(view, binding.format());
-    return first !== null && reportOpenFor === first.id ? trancheCardOf(view, binding.format(), true) : first;
-  };
   const withHold = (thread: ConversationThread): ConversationThread => {
     const card = holdCard();
     if (card === null || deps.hold === undefined) {
       return thread;
     }
     const f = deps.hold.format();
-    const meta = card.at === null ? '' : f.t('checkpoint.meta', { time: f.time(new Date(card.at)) });
-    return withTrancheMessage(thread, burnRateMessageOf(card, meta));
+    const meta = card.at === null ? '' : f.t('card.meta', { time: f.time(new Date(card.at)) });
+    return withCardMessage(thread, burnRateMessageOf(card, meta));
   };
   /** The persona board's cards close the thread after the hold; the Assign… picker is open on at most one. */
   const withPersonaCards = (thread: ConversationThread): ConversationThread => {
@@ -167,16 +135,7 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
     const messages = binding.cards().map((card) => personaCardMessageOf(card, card.id === assigning ? agents : null));
     return messages.length === 0 ? thread : { ...thread, messages: [...thread.messages, ...messages] };
   };
-  const decorated = (thread: ConversationThread): ConversationThread => withPersonaCards(decoratedBase(thread));
-  const decoratedBase = (thread: ConversationThread): ConversationThread => {
-    const binding = deps.tranche;
-    const card = trancheCard();
-    if (binding === undefined || card === null) {
-      return withHold(thread);
-    }
-    const time = binding.formatTime(new Date(card.at));
-    return withHold(withTrancheMessage(thread, trancheMessageOf(card, binding.format().t('checkpoint.meta', { time }))));
-  };
+  const decorated = (thread: ConversationThread): ConversationThread => withPersonaCards(withHold(thread));
 
   const attachedTo = (thread: ConversationThread, shape: ShapeTarget | null): ConversationThread =>
     shape === null ? thread : { ...thread, attached: [`${shape.label} attached`] };
@@ -243,25 +202,6 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
     } catch (error) {
       return { ...EMPTY_THREAD, messages: [errorMessageOf(undefined, messageOf(error))] };
     }
-  };
-
-  /** A button of the checkpoint card: Release (and "Release anyway") writes the Autopilot On, Adjust opens Settings, Open report adds the figures. */
-  const actOnCheckpoint = async (cardId: string, actionId: string): Promise<ConversationThread> => {
-    const binding = deps.tranche;
-    if (binding === undefined) {
-      return read();
-    }
-    if (actionId === 'adjust') {
-      binding.adjust();
-    } else if (actionId === 'open_report') {
-      reportOpenFor = cardId;
-    } else if (actionId === 'release' || actionId === 'release_anyway') {
-      const words = await binding.release();
-      if (words !== null) {
-        lastError = errorMessageOf(undefined, words);
-      }
-    }
-    return read();
   };
 
   /** A button of the burn-rate card: Wait dismisses it for the day, Allow today once lifts the hold. */
@@ -353,9 +293,6 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
     },
     act: async (cardId, actionId) => {
       lastError = null;
-      if (cardId.startsWith(TRANCHE_CARD_PREFIX)) {
-        return decorated(await actOnCheckpoint(cardId, actionId));
-      }
       if (cardId.startsWith(PERSONA_CARD_PREFIX)) {
         return decorated(await actOnPersonaCard(cardId, actionId));
       }
@@ -402,14 +339,13 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
       lastError = null;
       return open(id, null);
     },
-    ...(deps.shape === undefined && deps.tranche === undefined && deps.hold === undefined && deps.personaCards === undefined
+    ...(deps.shape === undefined && deps.hold === undefined && deps.personaCards === undefined
       ? {}
       : {
-          // The thread changes with the ticket in focus, the checkpoint that waits and the burn rate's hold.
+          // The thread changes with the ticket in focus and the burn rate's hold.
           onThreadChange: (listener: () => void) => {
-            const { shape, tranche, hold, personaCards } = deps;
+            const { shape, hold, personaCards } = deps;
             let seenShape = shape?.current()?.id ?? null;
-            let seenCard = trancheCard()?.id ?? null;
             let seenHold = holdCard()?.id ?? null;
             const personaSignature = (): string => (personaCards?.cards() ?? []).map((card) => card.id).join();
             let seenPersona = personaSignature();
@@ -418,13 +354,6 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
                 const now = shape.current()?.id ?? null;
                 if (now !== seenShape) {
                   seenShape = now;
-                  listener();
-                }
-              }),
-              tranche?.subscribe(() => {
-                const now = trancheCard()?.id ?? null;
-                if (now !== seenCard) {
-                  seenCard = now;
                   listener();
                 }
               }),

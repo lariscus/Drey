@@ -36,22 +36,13 @@ describe('the Autopilot item', () => {
     expect(autopilotSlotOf(null, t).text).toBe('');
   });
 
-  it('names the tranche in the tooltip when it has a run limit (board 10t), the text unchanged', () => {
-    expect(autopilotSlotOf('on', t, { done: 4, total: 10 })).toEqual({
-      text: 'Autopilot · On',
-      tooltip: 'Autopilot: On · tranche 4 of 10 (Mod+Alt+P)',
-      dot: 'positive',
-    });
-    expect(autopilotSlotOf('on', t, { done: 4, total: null }).tooltip).toBe('Autopilot: On (Mod+Alt+P)');
-  });
-
   it('says the burn rate hold in the tooltip while one holds (req-181), the text and dot unchanged', () => {
-    expect(autopilotSlotOf('on', t, { done: 4, total: 10 }, '00:00')).toEqual({
+    expect(autopilotSlotOf('on', t, '00:00')).toEqual({
       text: 'Autopilot · On',
       tooltip: 'Autopilot: On · Burn rate reached · resumes at 00:00 (Mod+Alt+P)',
       dot: 'positive',
     });
-    expect(autopilotSlotOf('off', t, null, '00:00').tooltip).toBe('Autopilot: Off (Mod+Alt+P)');
+    expect(autopilotSlotOf('off', t, '00:00').tooltip).toBe('Autopilot: Off (Mod+Alt+P)');
   });
 });
 

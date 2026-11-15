@@ -41,7 +41,7 @@ export class McBurnRate {
   /** `Mission Control · 22:40`, the card's meta line; null when the desk did not say when the hold rose. */
   readonly meta = computed((): string | null => {
     const at = this.card()?.at ?? null;
-    return at === null ? null : this.i18n.t('checkpoint.meta', { time: this.i18n.formatTime(new Date(at)) });
+    return at === null ? null : this.i18n.t('card.meta', { time: this.i18n.formatTime(new Date(at)) });
   });
 
   /** True on a read-only device: the lift is refused there, Wait still dismisses. */

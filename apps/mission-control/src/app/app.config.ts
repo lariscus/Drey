@@ -47,7 +47,6 @@ export const appConfig: ApplicationConfig = {
         const state = inject(McState);
         return {
           autopilot: computed(() => state.team().autopilot ?? null),
-          tranche: computed(() => state.team().tranche ?? null),
           hold: computed(() => state.team().hold ?? null),
           readOnly: state.readOnly,
           set: (record) => state.setAutopilot(record),

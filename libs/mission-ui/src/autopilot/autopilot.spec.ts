@@ -26,7 +26,7 @@ function provide(initial: AutopilotView | null, opts: { readOnly?: boolean; repl
     return reply;
   });
   const stopAll = vi.fn(async (): Promise<McAutopilotReply> => opts.reply ?? { ok: true });
-  const state: McAutopilotState = { autopilot, tranche: signal(null), readOnly, set, stopAll };
+  const state: McAutopilotState = { autopilot, readOnly, set, stopAll };
   TestBed.configureTestingModule({ providers: [{ provide: MC_AUTOPILOT, useValue: state }] });
   return { autopilot, readOnly, set, stopAll };
 }

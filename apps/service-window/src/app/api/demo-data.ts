@@ -242,6 +242,6 @@ export function demoLog(): readonly LogLine[] {
     line('08:33:09', 'route T-0121 → claude-a/sonnet: class B, q 1.4, est $0.40'),
     line('08:33:10', 'mcp: vault_write refused — ben may not write vault "notes" (allowed: read)', 'error', 'service'),
     line('08:35:02', 'governor: heavy seat granted to T-0126 tests · 1 of 2', 'info', 'service'),
-    line('08:36:40', 'tranche 4 of 10 runs · checkpoint in 6 runs'),
+    line('08:36:40', 'pool 3 of 5 sessions · 1 queued'),
   ];
 }

@@ -12,7 +12,6 @@ import type {
 } from '../../../../shared/plugin-api/renderer';
 import type { BurnRateCard } from '../../../../shared/burn-rate';
 import type { PersonaCard } from '../../../../shared/persona-cards';
-import type { TrancheCard } from '../../../../shared/tranche';
 import type { ChatModelFailure, ChatProposal, ChatSession, ChatSessionMeta } from '../../../../packages/tickets-engine/src/contracts/chat';
 
 /** The chip on a persona's words: the persona speaks, Mission Control relays. */
@@ -110,12 +109,20 @@ export function threadOfSession(session: ChatSession): ConversationThread {
 }
 
 /**
- * The checkpoint card (board 10u parts 1 and 6) as the agent message that closes
- * the Mission Control thread while a checkpoint waits: the shared card model
- * mapped onto the SDK's content-agnostic card fields (SDK 1.55). `meta` is the
- * catalog's "Mission Control · 14:02" with the locale time of the checkpoint.
+ * An attached card (the burn rate's hold, a persona card) as the agent
+ * message that closes the Mission Control thread: the SDK's content-agnostic
+ * card fields (SDK 1.55) over a message of no text.
  */
-export function trancheMessageOf(card: TrancheCard, meta: string): ConversationMessage {
+export function cardMessageOf(card: {
+  readonly id: string;
+  readonly title: string;
+  readonly tone: 'attention' | 'negative';
+  readonly body: string;
+  readonly metrics?: readonly { readonly label: string; readonly value: string; readonly sub?: string; readonly inline?: boolean }[];
+  readonly rows?: readonly { readonly text: string; readonly dot: 'attention' | 'negative' }[];
+  readonly summary: string | null;
+  readonly actions: readonly { readonly id: string; readonly label: string; readonly primary: boolean }[];
+}, meta: string): ConversationMessage {
   return {
     id: card.id,
     role: 'agent',
@@ -126,11 +133,11 @@ export function trancheMessageOf(card: TrancheCard, meta: string): ConversationM
         kind: 'card',
         title: card.title,
         dot: card.tone,
-        text: card.body ?? '',
-        ...(card.metrics.length > 0
-          ? { metrics: card.metrics.map((m) => ({ label: m.label, value: m.value, ...(m.sub === '' ? {} : { sub: m.sub, inline: m.inline }) })) }
+        text: card.body,
+        ...(card.metrics !== undefined && card.metrics.length > 0
+          ? { metrics: card.metrics.map((m) => ({ label: m.label, value: m.value, ...(m.sub === '' || m.sub === undefined ? {} : { sub: m.sub, inline: m.inline ?? false }) })) }
           : {}),
-        ...(card.rows.length > 0 ? { rows: card.rows.map((text) => ({ text, dot: 'negative' as const })) } : {}),
+        ...(card.rows !== undefined && card.rows.length > 0 ? { rows: card.rows } : {}),
         ...(card.summary === null ? {} : { note: card.summary }),
         actions: card.actions.map((action) => ({ id: action.id, label: action.label, tone: action.primary ? ('primary' as const) : ('quiet' as const) })),
         meta,
@@ -139,8 +146,8 @@ export function trancheMessageOf(card: TrancheCard, meta: string): ConversationM
   };
 }
 
-/** The thread with the checkpoint card at its end; the thread itself when none waits. */
-export function withTrancheMessage(thread: ConversationThread, message: ConversationMessage | null): ConversationThread {
+/** The thread with the card at its end; the thread itself when there is none. */
+export function withCardMessage(thread: ConversationThread, message: ConversationMessage | null): ConversationThread {
   return message === null ? thread : { ...thread, messages: [...thread.messages, message] };
 }
 
