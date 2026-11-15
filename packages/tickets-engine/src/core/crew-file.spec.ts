@@ -27,13 +27,12 @@ describe('crew.md (req-173, the vault layer)', () => {
   it('maps every key to its kebab path and its legacy flat key', () => {
     const byKey = Object.fromEntries(CREW_FIELDS.map((f) => [f.key, f]));
     expect(byKey['caps.gateFailureLines']).toMatchObject({ path: ['caps', 'gate-failure-lines'], legacy: 'fleet.cap.gateFailureLines', kind: 'count' });
-    expect(byKey['tranche.earlyStop.minRuns']).toMatchObject({ path: ['tranche', 'early-stop', 'min-runs'], legacy: 'autopilot.earlyStop.minRuns', kind: 'limit' });
     expect(byKey['handover.resumePauseTtlMin']!.legacy).toBe('fleet.resumePauseTtlMin');
     expect(byKey['defaultPersona']!.legacy).toBe('personas.default');
     expect(byKey['permissionMode']!.legacy).toBe('autoPermissionMode');
   });
 
-  it('reads the keys it knows, off as null, and the overrides', () => {
+  it('reads the keys it knows, ignores retired ones, and takes the overrides', () => {
     const { config, error, warnings } = parseCrewFile(FILE);
     expect(error).toBeNull();
     expect(warnings).toEqual(['crew.md: default-persona is retired (req-257) — it is read and never used; a chain entry says who works a ticket']);
@@ -43,8 +42,6 @@ describe('crew.md (req-173, the vault layer)', () => {
       permissionMode: 'bypass',
       'caps.gateFailureLines': 20,
       'handover.resumePauseTtlMin': 12,
-      'tranche.runs': null,
-      'tranche.earlyStop.redGates': 4,
     });
     expect(config.overrides.compactAboveTokensBy).toEqual({ 'claude-code': 90000 });
   });
@@ -64,16 +61,16 @@ describe('crew.md (req-173, the vault layer)', () => {
     const out = patchCrewFile(FILE, [
       { key: 'defaultWorker', value: 'kimi' },
       { key: 'caps.gateFailureLines', value: undefined },
-      { key: 'tranche.minutes', value: null },
     ]);
     expect(out.ok).toBe(true);
     const text = out.ok ? out.text : '';
     expect(text).toContain('memory:\n  signals: [ red-gate, retry ]');
     expect(text.endsWith('Our notes.\n')).toBe(true);
     expect(text).not.toContain('caps:');
+    // The retired tranche block (req-309) is nobody's key: it stays, and the parser ignores it.
+    expect(text).toContain('tranche:');
     const parsed = parseCrewFile(text).config.values;
     expect(parsed.defaultWorker).toBe('kimi');
-    expect(parsed['tranche.minutes']).toBeNull();
     expect(parsed['caps.gateFailureLines']).toBeUndefined();
   });
 

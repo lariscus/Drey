@@ -63,7 +63,6 @@ describe('CrewConfigMigrator (req-173)', () => {
       'fleet.cap.gateFailureLines': 40, // the default: not written
       'fleet.resumePauseTtlMin': '12',
       'fleet.compactAboveTokens.kimi': 50000,
-      'autopilot.tranche.runs': 'off',
       'engine.token': 'secret',
     };
     const crew = await w.service().effective(VAULT);
@@ -73,11 +72,9 @@ describe('CrewConfigMigrator (req-173)', () => {
       permissionMode: 'bypass',
       'caps.diffStatLines': 80,
       'handover.resumePauseTtlMin': 12,
-      'tranche.runs': null,
     });
     expect(parseCrewFile(w.files.get(CREW_FILE)!).config.overrides.compactAboveTokensBy).toEqual({ kimi: 50000 });
     expect(crew.defaultWorker).toBe('claude-code');
-    expect(crew.tranche.runs).toBeNull();
     expect(w.commits).toEqual(['tickets: crew settings move into _meta/crew.md (req-173)']);
     expect(w.logs.some((l) => l === 'crew.md: defaultWorker = claude-code (moved from config.json defaultWorker)')).toBe(true);
     expect(w.config[CREW_MIGRATED_KEY]).toEqual({ [vaultKeyOf(VAULT.path)]: '2026-11-09T10:00:00.000Z' });
@@ -87,9 +84,9 @@ describe('CrewConfigMigrator (req-173)', () => {
   it('the old chain.json config fills what config.json lacks', async () => {
     const w = new FakeWorld();
     w.config = { defaultWorker: 'kimi' };
-    w.chain = { defaultWorker: 'opencode', defaultPersona: 'paul', caps: { diffStatBytes: 9000 }, handover: { contextCapTokensOverrides: { opencode: 64000 } }, tranche: { minutes: 90 } };
+    w.chain = { defaultWorker: 'opencode', defaultPersona: 'paul', caps: { diffStatBytes: 9000 }, handover: { contextCapTokensOverrides: { opencode: 64000 } } };
     await w.service().effective(VAULT);
-    expect(w.crew()).toEqual({ defaultWorker: 'kimi', defaultPersona: 'paul', 'caps.diffStatBytes': 9000, 'tranche.minutes': 90 });
+    expect(w.crew()).toEqual({ defaultWorker: 'kimi', defaultPersona: 'paul', 'caps.diffStatBytes': 9000 });
     expect(parseCrewFile(w.files.get(CREW_FILE)!).config.overrides.contextCapTokensBy).toEqual({ opencode: 64000 });
   });
 

@@ -24,8 +24,7 @@ export function vaultKeyOf(vaultPath: string): string {
  * The one-time key migration of req-173 (R13): the vault keys that sat in
  * `~/.drey-engine/config.json` (`defaultWorker`, `autoPermissionMode`,
  * `personas.default`, `fleet.cap.*`, `fleet.compactAboveTokens*`,
- * `fleet.resumePauseTtlMin`, `fleet.contextCapTokens*`,
- * `autopilot.tranche.*`, `autopilot.earlyStop.*`) and in the old
+ * `fleet.resumePauseTtlMin`, `fleet.contextCapTokens*`) and in the old
  * `chain.json`'s `config` move into `_meta/crew.md` — one commit, every
  * move logged. Once per vault and device: the marker in `config.json`
  * (`crew.migrated`) keeps it from running again, and the plan itself only

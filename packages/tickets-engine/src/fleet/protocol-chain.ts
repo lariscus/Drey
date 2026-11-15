@@ -3,7 +3,6 @@ import type { PermissionMode } from './protocol';
 import type { PoolLoad, QueueEntry } from './protocol-pool';
 import type { BurnRateBasis } from './protocol-routing';
 import type { SlotSummary } from './protocol-slots';
-import type { TrancheConfig, TrancheStatus } from './protocol-tranche';
 
 // ---------------------------------------------------------------------------
 // The chain (M85, ADR-0077): the orchestrator's configuration and control
@@ -18,14 +17,10 @@ export type ChainMaster = 'run' | 'halted';
 /** The Autopilot (req-95, concept §6.1): the owner's switch the master is derived from. */
 export type AutopilotState = 'on' | 'paused' | 'off';
 
-/** Why the Autopilot is Paused when the runner paused it itself (req-179: a tranche ended or stopped early). */
-export type AutopilotReason = 'checkpoint';
-
-/** What `chain.json` and the chain status carry; `resumeAt` (ISO) and `reason` only ever on `paused`. */
+/** What `chain.json` and the chain status carry; `resumeAt` (ISO) only ever on `paused`. */
 export interface AutopilotRecord {
   readonly state: AutopilotState;
   readonly resumeAt?: string;
-  readonly reason?: AutopilotReason;
 }
 
 /** A refused Autopilot write or stop-now: the code is what a client maps to its catalog. */
@@ -75,8 +70,6 @@ export interface ChainConfig {
   readonly pools?: FleetPools;
   /** The handover thresholds (T-0049); absent = `DEFAULT_FLEET_HANDOVER`. */
   readonly handover?: FleetHandoverConfig;
-  /** req-179: the tranche size and the early-stop thresholds; absent = `DEFAULT_TRANCHE`. */
-  readonly tranche?: TrancheConfig;
 }
 
 /** The store settings of a request body (the chain config, the release-leftovers action); null when it names no store. */
@@ -151,8 +144,6 @@ export interface ChainStatus {
   readonly pool?: PoolLoad;
   /** req-170: the tasks waiting for the pool, in the order they are served (the card's `queued · waits for a B slot`). Absent on older runners. */
   readonly queue?: readonly QueueEntry[];
-  /** req-179: the current tranche — runs, spend, end, a waiting checkpoint and its report; absent on older runners or with tranches off. */
-  readonly tranche?: TrancheStatus;
   /** req-181: why no new run starts although the Autopilot is On (the burn rate); null = nothing holds. Absent on older runners. */
   readonly hold?: ChainHold | null;
 }

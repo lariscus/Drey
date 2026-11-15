@@ -5,7 +5,6 @@ import type { ChainTrip, ColumnMode } from '../protocol';
 import { locatorOf, type ChainFile, type ChainState, type ChainVaultLocator, type HoldMark, type OwnerHold, type TicketFailure } from './chain-state';
 import { ChainStatePaths } from './chain-state-paths';
 import { PreVaultChainMove } from './pre-vault-chain-move';
-import { restoreTranche } from './tranche/tranche-record';
 
 /** How fresh a retiring runner's handover stamp must be for its successor to keep the master. */
 export const HANDOVER_MASTER_MS = 5 * 60_000;
@@ -138,7 +137,6 @@ export class ChainStateStore {
       }
       const moving = this.restoreAutopilot(state, parsed);
       restoreMaps(state, parsed);
-      state.tranche = restoreTranche(parsed.tranche); // req-179: a restart continues the same tranche
       return moving;
     } catch {
       return false; // a torn chain.json is noise; the board re-configures on its next round

@@ -4,9 +4,9 @@ import { parseCrewPatches, parseFreeSessionAsk } from './session-payloads';
 
 describe('the req-173 invoke payloads', () => {
   it('crew patches: known keys only; a patch without a value removes the key', () => {
-    expect(parseCrewPatches([{ key: 'defaultWorker', value: 'kimi' }, { key: 'nope', value: 1 }, { key: 'tranche.runs', value: null }, { key: 'caps.diffStatLines' }, { key: 'defaultPersona', value: {} }])).toEqual([
+    expect(parseCrewPatches([{ key: 'defaultWorker', value: 'kimi' }, { key: 'nope', value: 1 }, { key: 'handover.resumePauseTtlMin', value: null }, { key: 'caps.diffStatLines' }, { key: 'defaultPersona', value: {} }])).toEqual([
       { key: 'defaultWorker', value: 'kimi' },
-      { key: 'tranche.runs', value: null },
+      { key: 'handover.resumePauseTtlMin', value: null },
       { key: 'caps.diffStatLines', value: undefined },
     ]);
     expect(parseCrewPatches({ patches: [{ key: 'permissionMode', value: 'bypass' }] })).toEqual([{ key: 'permissionMode', value: 'bypass' }]);

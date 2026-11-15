@@ -27,7 +27,6 @@ export class ChainConfigRestorer {
       permissionMode: crew.permissionMode,
       caps: crew.caps,
       handover: crew.handover,
-      tranche: crew.tranche,
     };
   }
 }

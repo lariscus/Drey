@@ -13,7 +13,7 @@
  */
 import { AUTOPILOT_OFF, autopilotOfMaster, resumeDue } from './autopilot';
 import type { Clock } from './ports/clock';
-import { WORKER_PROVIDERS, type AutopilotRecord, type ChainConfig, type ChainMaster, type ChainStatus, type ColumnMode, type RunInfo, type SlotSummary, type TrancheStatus } from './protocol';
+import { WORKER_PROVIDERS, type AutopilotRecord, type ChainConfig, type ChainMaster, type ChainStatus, type ColumnMode, type RunInfo, type SlotSummary } from './protocol';
 import type { DispatchPool } from './orchestrate/dispatch-pool';
 import { LIVE_RUN_STATES } from './run/run-state';
 import type { ChainState, ChainVaultLocator } from './orchestrate/chain-state';
@@ -46,19 +46,10 @@ export interface OrchestratorParts {
   readonly migratePools?: (config: ChainConfig) => Promise<void>;
   /** req-173: the config of a vault resolved from its `_meta/crew.md` at boot, before the board sends one. */
   readonly restoreConfig?: (vault: ChainVaultLocator) => Promise<ChainConfig | null>;
-  /** req-179: the tranche — its status, the owner's release, the settled runs' facts. */
-  readonly tranches?: TrancheSource;
-  /** The write of `chain.json` with what follows it (the tranche's event); absent = the store's write alone. */
+  /** The write of `chain.json`; absent = the store's write alone. */
   readonly persist?: () => Promise<void>;
   /** req-181: the burn rate's hold — on the status, and lifted for the day by the owner. */
   readonly hold?: StartHold;
-}
-
-/** The tranche as the orchestrator asks it (`orchestrate/tranche`'s `Tranches` satisfies it). */
-export interface TrancheSource {
-  status(): TrancheStatus | null;
-  onAutopilot(next: AutopilotRecord): AutopilotRecord;
-  settled(info: RunInfo): Promise<boolean>;
 }
 
 /** Where the chain status reads the slots from (`fleet/routing`'s registry satisfies it). */
@@ -91,9 +82,7 @@ export class Orchestrator {
     const status = this.parts.state.status({ quotaPausedUntil: this.parts.pools.quotaPausedUntil(), poolSize: this.poolSizes() });
     const pool = this.parts.pool;
     const withSlots = this.parts.slots === undefined ? status : { ...status, slots: this.parts.slots.summary() };
-    const tranche = this.parts.tranches?.status() ?? null;
-    const withTranche = tranche === null ? withSlots : { ...withSlots, tranche };
-    const withHold = this.parts.hold === undefined ? withTranche : { ...withTranche, hold: this.parts.hold.current() };
+    const withHold = this.parts.hold === undefined ? withSlots : { ...withSlots, hold: this.parts.hold.current() };
     return pool === undefined ? withHold : { ...withHold, pool: pool.load(), queue: pool.queue.list() };
   }
 
@@ -120,13 +109,12 @@ export class Orchestrator {
   /** The Autopilot switch (req-95): On dispatches at once, Paused and Off start nothing new and leave running work alone. */
   async setAutopilot(asked: AutopilotRecord): Promise<ChainStatus> {
     const was = this.parts.state.autopilot;
-    const record = this.parts.tranches?.onAutopilot(asked) ?? asked; // req-179: On releases a tranche
-    if (record.state !== was.state || record.resumeAt !== was.resumeAt) {
-      this.parts.log(`autopilot: ${record.state}${record.resumeAt === undefined ? '' : ` until ${record.resumeAt}`}`);
+    if (asked.state !== was.state || asked.resumeAt !== was.resumeAt) {
+      this.parts.log(`autopilot: ${asked.state}${asked.resumeAt === undefined ? '' : ` until ${asked.resumeAt}`}`);
     }
-    this.parts.state.autopilot = record;
+    this.parts.state.autopilot = asked;
     await this.persist();
-    if (record.resumeAt !== undefined) {
+    if (asked.resumeAt !== undefined) {
       this.startTimer();
     }
     if (this.parts.state.master === 'run') {
@@ -213,9 +201,6 @@ export class Orchestrator {
   /** The supervisors' run-settled hook (M85): the books, then a fresh pass — the slot is free. */
   async onRunSettled(info: RunInfo): Promise<void> {
     await this.parts.settled.onSettled(info);
-    if ((await this.parts.tranches?.settled(info)) === true) {
-      await this.persist(); // req-179: the run's fact, maybe a checkpoint
-    }
     await this.parts.dispatcher.pass();
   }
 

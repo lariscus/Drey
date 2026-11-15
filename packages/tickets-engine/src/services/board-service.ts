@@ -93,7 +93,6 @@ import { GitWorktreeRemover } from '../fleet/git-worktree-remover';
 import { removeDoneWorktrees } from './finished-ticket-worktrees';
 import { reservedIgnoreEntries, withIgnoreEntries } from './reserved-ignore';
 import { dkTargetFor } from '../fleet/dk-target';
-import { trancheConfigOf } from './tranche-config';
 import { type ChainConfig, type ChainStoreConfig, FleetCaps, FleetHandoverConfig, HandoverMode, InteractiveMode, PermissionMode, RunCursor, RunDkTarget, RunInfo, FleetPools } from '../fleet/protocol';
 import { type EngineHost, type EngineVaultChangeEvent, EngineVault, FleetPort } from './host';
 import { handoverFromConfig, handoverOverrideKeys } from './handover-config';
@@ -251,7 +250,7 @@ export interface BoardServiceOptions {
   readonly events?: LedgerEvents;
   /**
    * req-173 (R13): the vault layer — `_meta/crew.md` resolved. Present (the engine), the default
-   * worker, the permission mode, the caps, the handover thresholds, the tranche and the default
+   * worker, the permission mode, the caps, the handover thresholds and the default
    * persona come from it, never from a device's config; absent (older specs), the constructor's
    * values and the config keys stand.
    */
@@ -634,7 +633,6 @@ export class EngineBoardService {
             caps: this.caps,
             pools: this.pools,
             handover: this.handover,
-            tranche: this.crew?.tranche ?? (await trancheConfigOf(this.host)), // req-179; req-173: the vault layer's
           }
         : null;
     const json = chain === null ? null : JSON.stringify(chain);
