@@ -57,6 +57,28 @@ describe('WorkspaceScopeService (SDK 1.59, req-285)', () => {
     expect(JSON.parse(localStorage.getItem('drey.views.scope') ?? '{}')).toEqual({ views: {} });
   });
 
+  it('without an all-choice (SDK 1.61) the first option is in effect, for a new view and for a choice whose option went away', () => {
+    const handle = scope.register('tickets', { label: 'Project filter' });
+    handle.setOptions([DREY, LARISCUS]);
+    expect(scope.active()?.id).toBe('drey');
+    scope.pick('lariscus');
+    expect(scope.active()?.id).toBe('lariscus');
+    // The option goes away: the kept id reads as the first option until it comes back.
+    handle.setOptions([DREY]);
+    expect(scope.chosenId()).toBe('lariscus');
+    expect(scope.active()?.id).toBe('drey');
+    // A second view with no stored choice of its own starts on the first option too.
+    const other = views.saveCurrentAs('Second');
+    views.switchTo(other);
+    expect(scope.active()?.id).toBe('drey');
+  });
+
+  it('without an all-choice and without options there is no choice in effect', () => {
+    const handle = scope.register('tickets', { label: 'Project filter' });
+    handle.setOptions([]);
+    expect(scope.active()).toBeNull();
+  });
+
   it('refuses a second registration and drops a deleted view’s choice', async () => {
     const handle = scope.register('tickets', CONTRIB);
     const second = scope.register('other', { label: 'x', allLabel: 'y' });

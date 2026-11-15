@@ -445,8 +445,12 @@ export interface WorkspaceScopeOption {
 export interface WorkspaceScopeContrib {
   /** The control's tooltip and accessible name ("Project filter"). */
   readonly label: string;
-  /** The first row, the choice that filters nothing ("All projects"). */
-  readonly allLabel: string;
+  /**
+   * The first row, the choice that filters nothing ("All projects"). Absent
+   * (SDK 1.61) = no all-choice: one of the options is always in effect, and
+   * a view without a stored choice shows the first option.
+   */
+  readonly allLabel?: string;
   /** A last row under a separator that opens where the choices are kept ("Manage projects…"). */
   readonly manageLabel?: string;
   manage?(): void;

@@ -1,5 +1,5 @@
 <!-- i18n: catalog -->
-@if (scope.contrib(); as contrib) {
+@if (shown(); as contrib) {
   <div class="sf-group">
     <button
       type="button"
@@ -22,15 +22,17 @@
     @if (open()) {
       <div class="sf-backdrop" appOverlayGuard (click)="open.set(false)" (contextmenu)="$event.preventDefault(); open.set(false)"></div>
       <div class="sf-menu" role="menu" [attr.aria-label]="contrib.label">
-        <button type="button" role="menuitemradio" class="sf-item" [attr.aria-checked]="scope.active() === null" (click)="pick(null)">
-          <span class="sf-check" aria-hidden="true">
-            @if (scope.active() === null) {
-              <app-icon name="check" [size]="14" />
-            }
-          </span>
-          <span class="sf-dot sf-dot-10" [style.background]="allDot()" aria-hidden="true"></span>
-          <span class="sf-name">{{ contrib.allLabel }}</span>
-        </button>
+        @if (contrib.allLabel; as allLabel) {
+          <button type="button" role="menuitemradio" class="sf-item" [attr.aria-checked]="scope.active() === null" (click)="pick(null)">
+            <span class="sf-check" aria-hidden="true">
+              @if (scope.active() === null) {
+                <app-icon name="check" [size]="14" />
+              }
+            </span>
+            <span class="sf-dot sf-dot-10" [style.background]="allDot()" aria-hidden="true"></span>
+            <span class="sf-name">{{ allLabel }}</span>
+          </button>
+        }
         @for (option of scope.choices(); track option.id) {
           <button
             type="button"

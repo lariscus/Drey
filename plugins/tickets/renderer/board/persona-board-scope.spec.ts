@@ -52,9 +52,8 @@ describe('the persona board under a project filter (req-285)', () => {
     expect(model.lanes.find((lane) => lane.lane.persona === 'ben')?.cards.map((c) => c.id)).toEqual(['T-3']);
   });
 
-  it('puts the chip the filter gives on each card', () => {
-    const model = personaBoardModelOf(snap, { ...live, chip: (c) => ({ label: c.meta.project ?? '', color: '#000000' }) }, false);
-    expect(model.inbox.map((c) => c.project?.label)).toEqual(['drey', 'lariscus']);
-    expect(personaBoardModelOf(snap, live, false).inbox[0]!.project).toBeNull();
+  it('carries no project chip (req-308: one project is always active, a card names nothing)', () => {
+    const model = personaBoardModelOf(snap, { ...live, shows: () => true }, false);
+    expect(model.inbox.every((c) => (c as unknown as { project?: unknown }).project === undefined)).toBe(true);
   });
 });

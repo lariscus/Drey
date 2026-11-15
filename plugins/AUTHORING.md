@@ -138,6 +138,9 @@ leaves the app on the previous build. Verify with
   is refused, logged); the base keeps the choice per view (ADR-0089 later change). Every plugin reads it with
   `ui.workspaceScope()` and `ui.onWorkspaceScopeChange`. `FindQuery.scope` gains `'project'` (a find mode restricts itself
   to the choice's vaults).
+  1.61 (req-308, one active project) makes `WorkspaceScopeContrib.allLabel` optional: absent, the
+  filter has no all-choice — one of the options is always in effect, and a view without a stored
+  choice shows the first option. A contrib that sets `allLabel` keeps the old all/not-all choice.
   1.60 (req-297, default layouts per view) adds `PluginWidgetContrib.order`: the panel's place in its default dock on a
   fresh layout and after `View → Reset layout` (lower first; the built-ins use steps of ten — Calendar 10, Files 20, Open
   windows 50; Find 30, Templates 40, Source control 60, Tickets 70 on the left, Assistant 10, Outline 20, Backlinks 30 on the

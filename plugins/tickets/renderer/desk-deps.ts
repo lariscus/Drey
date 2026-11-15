@@ -7,7 +7,6 @@
 import type { DreyPluginApi } from '../../../shared/plugin-api/renderer';
 import type { ChainStatus, RunInfo } from '../../../packages/tickets-engine/src/fleet/protocol';
 import type { BoardSnapshot, MutationResult, TicketCard } from '../shared/tickets';
-import type { ProjectChip } from './projects/project-scope';
 
 export interface DeskDeps {
   readonly api: DreyPluginApi;
@@ -31,16 +30,15 @@ export interface DeskDeps {
   newIdea(): void;
   /** The board's title for a ticket id; null = unknown. */
   titleOf(ticketId: string): string | null;
-  /** req-285: the title bar's project filter as the board applies it; absent or null = all, no chips. */
+  /** req-285: the title bar's project filter as the board applies it; absent = fewer than two projects, nothing narrowed. */
   scope?(): BoardScope | null;
 }
 
-/** What the project filter does to a board view (req-285): the cards it shows, the chip a card carries. */
+/** What the project filter does to a board view (req-285, req-308): the cards it shows. */
 export interface BoardScope {
-  /** True while one project (or Unassigned) is chosen: the column loads then say they count every project. */
+  /** True while one project is chosen: the column loads then say they count every project. */
   readonly filtered: boolean;
   shows(card: TicketCard): boolean;
-  chip(card: TicketCard): ProjectChip | null;
 }
 
 /** A DOM element factory shared by the desk views. */

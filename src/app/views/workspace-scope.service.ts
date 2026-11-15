@@ -17,7 +17,9 @@ const KEY = 'drey.views.scope';
  * per-machine window state, like the views list) and is written as it is
  * picked: it is part of the view, not of its saved layout (D-6) — a filter
  * is a lens, not an arrangement. A choice whose option went away (a deleted
- * project) reads as "all" and is kept, in case it comes back.
+ * project) reads as "all" and is kept, in case it comes back — or, when the
+ * plugin registered no all-choice (SDK 1.61), as the first option: one of
+ * the choices is then always in effect.
  */
 @Injectable({ providedIn: 'root' })
 export class WorkspaceScopeService {
@@ -31,13 +33,19 @@ export class WorkspaceScopeService {
   /** The registered filter, or null (no control in the title bar). */
   readonly contrib = computed(() => this.registration()?.contrib ?? null);
   readonly choices = this.options.asReadonly();
-  /** The active view's choice; null = all. */
+  /** The active view's choice; null = all (or: no options and no all-choice). */
   readonly active = computed<WorkspaceScopeOption | null>(() => {
-    if (this.registration() === null) {
+    const contrib = this.registration()?.contrib ?? null;
+    if (contrib === null) {
       return null;
     }
     const id = this.chosen()[this.views.activeId()];
-    return id === undefined ? null : (this.options().find((o) => o.id === id) ?? null);
+    const chosen = id === undefined ? null : (this.options().find((o) => o.id === id) ?? null);
+    if (chosen !== null) {
+      return chosen;
+    }
+    // No all-choice (SDK 1.61): the first option is the choice in effect.
+    return contrib.allLabel === undefined ? (this.options()[0] ?? null) : null;
   });
 
   private readonly listeners = new Set<() => void>();

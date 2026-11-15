@@ -6345,12 +6345,13 @@ A failed clone keeps the picker open with the reason (auth, offline, an
 existing folder, no such repository, no git); *Cancel* kills git and removes
 the folder it began.
 
-## 6.135 The project filter: a choice per view, followed by Files, the board and Find (req-285, milestone 267)
+## 6.135 The project filter: one active project, a choice per view, followed by Files, the board and Find (req-285, milestone 267; req-308)
 
-The tickets plugin registers the filter once and hands it the projects after
-every board read; the base keeps which choice each view shows. A pick (or a
-view switch) fires one change, and every follower repaints from
-`ui.workspaceScope()`.
+The tickets plugin registers the filter once — no all-choice since req-308 —
+and hands it the projects after every board read (nothing on a board with
+fewer than two projects); the base keeps which choice each view shows, and a
+view without one shows the first project. A pick (or a view switch) fires one
+change, and every follower repaints from `ui.workspaceScope()`.
 
 ```mermaid
 sequenceDiagram
@@ -6361,16 +6362,16 @@ sequenceDiagram
     participant P as Files panel
     participant B as Board / Tickets panel
     participant S as Find (tags plugin)
-    T->>W: registerWorkspaceScope({label, allLabel, manageLabel, manage})
-    T->>W: setOptions(projects + Unassigned) after each board read
+    T->>W: registerWorkspaceScope({label, manageLabel, manage}) — no allLabel
+    T->>W: setOptions(projects) after each board read, from two on
     F->>W: pick(id) for the active view
     W->>W: drey.views.scope[viewId] = id (persisted)
-    V-->>W: switchTo(view) → active() reads that view's choice
+    V-->>W: switchTo(view) → active() reads that view's choice, else the first
     W-->>P: active() → list the sources' vaults (read tag) and folders
     W-->>T: onWorkspaceScopeChange → notifyViews
-    T-->>B: shows(card) / chip(card); load and folding from every project
+    T-->>B: shows(card); load and folding from every project
     W-->>S: onWorkspaceScopeChange → This project re-runs over the project's vaults
-    B->>T: New idea → create {…, project: the filtered project}
+    B->>T: New idea → create {…, project: the active project}
 ```
 
 ## 6.136 The engine's start migrates the personas to class and model; a picture upload and removal (req-288, D-67)
@@ -6499,13 +6500,15 @@ sequenceDiagram
     Note over V: modified() = working layout vs saved, by content
 ```
 
-## 6.139 Mission Control's own project filter, and Pia's project of a new ticket (req-298, milestone 271)
+## 6.139 Mission Control's own project filter, and Pia's project of a new ticket (req-298, milestone 271; req-308)
 
 The filter is the device's own: `McState.projectFilter` (localStorage
 `mc.project-filter`) is read by the Work list, which builds its groups for
-every project first and narrows the rows after, and by the chat, which
-sends the filter's project with each turn. The engine lists the board's
-projects for Pia and settles her card's project before the owner sees it.
+every project first and narrows the rows after, and by the chat, which sends
+the active project with each turn. One project is always active: a device
+without a stored choice shows the board's first, and a stored id the board
+no longer has falls back to it. The engine lists the board's projects for
+Pia and settles her card's project before the owner sees it.
 
 ```mermaid
 sequenceDiagram
