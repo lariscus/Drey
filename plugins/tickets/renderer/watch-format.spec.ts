@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { NormalizedEvent } from '../../../packages/tickets-engine/src/fleet/harness/contract';
-import { clockTime, formatWatch, parseStreamEvents, renderWatchMarkdown } from './watch-format';
+import { clockTime, formatWatch, parseStreamEvents } from './watch-format';
 
 const ev = (event: Partial<NormalizedEvent> & { kind: NormalizedEvent['kind'] }): NormalizedEvent => ({
   ts: '2026-10-19T22:00:00Z',
@@ -159,19 +159,6 @@ describe('formatWatch', () => {
     expect(formatWatch([]).blocks).toEqual([]);
     expect(formatWatch([]).elapsedMs).toBe(0);
     expect(formatWatch([]).lastUsage).toBeUndefined();
-  });
-});
-
-describe('renderWatchMarkdown', () => {
-  it('keeps a run of steps on shared lines and separates the rest', () => {
-    const md = renderWatchMarkdown(
-      formatWatch([
-        ev({ kind: 'tool', tool: 'read', text: 'read src/a.ts' }),
-        ev({ kind: 'tool', tool: 'shell', text: 'shell git status' }),
-        ev({ kind: 'text', text: 'Now I know the layout.' }),
-      ]),
-    );
-    expect(md).toBe('● **Read** `src/a.ts`  \n● **Shell** `git status`\n\nNow I know the layout.');
   });
 });
 

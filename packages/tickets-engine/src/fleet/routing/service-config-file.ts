@@ -12,8 +12,7 @@ export const FRESH_SERVICE_CONFIG = { slots: [] as unknown[] };
  * `service.json` in the service home (`~/.drey-engine/`, ADR-0092 R13): the
  * machine scope of the configuration. req-177 owns its `slots` and `quota`
  * keys, req-170 the pool's `models`, `capacity` and `ledgers`; every write
- * keeps the keys it does not know. The schema of every root key and its
- * owner: `service-config-schema.ts` (req-173 — the machine layer of R13). A file that does not
+ * keeps the keys it does not know. A file that does not
  * parse is never overwritten — the owner's text stays, the read says why.
  */
 export class ServiceConfigFile {

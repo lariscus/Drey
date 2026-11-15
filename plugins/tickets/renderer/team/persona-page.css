@@ -753,30 +753,6 @@
   border-bottom: 1px solid var(--bg-hover, var(--border));
 }
 
-.persona-confirm {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.persona-confirm-row {
-  display: inline-flex;
-  gap: 8px;
-}
-
-
-.persona-skill-path {
-  display: block;
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.persona-skill-meta {
-  font-size: 12px;
-}
-
 .persona-switch {
   position: relative;
   width: 32px;
@@ -820,17 +796,6 @@
 .persona-card-buttons {
   display: flex;
   gap: 8px;
-}
-
-.persona-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 14px;
-}
-
-.persona-links .persona-link {
-  height: 24px;
 }
 
 .persona-foot {

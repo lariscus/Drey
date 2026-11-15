@@ -669,29 +669,8 @@
 .tickets-takeover-wait[hidden],
 .tickets-takeover-wait-text[hidden],
 .tickets-takeover-wait-questions[hidden],
-.tickets-takeover-wait-actions[hidden],
-.tickets-takeover-endmoves[hidden] {
+.tickets-takeover-wait-actions[hidden] {
   display: none;
-}
-
-/* The dialog's end moves (req-65): the owner move that closes an
- * interactive run — stop (if it lives), then the transition. */
-.tickets-takeover-endmoves {
-  flex: none;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin: 0 16px 8px;
-  padding: 8px 12px;
-  border-left: 3px solid var(--accent);
-  border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--accent) 10%, var(--bg-dock));
-}
-
-.tickets-takeover-endmoves-label {
-  font-size: 12px;
-  color: var(--text-2);
 }
 
 .tickets-takeover-wait-questions {
@@ -752,8 +731,7 @@
   flex: 1;
 }
 
-.tickets-takeover-controls,
-.tickets-thread-controls {
+.tickets-takeover-controls {
   flex: none;
   display: inline-flex;
   gap: 6px;
@@ -874,14 +852,6 @@
   margin: 12px 0 6px;
   font-weight: 600;
   color: var(--text-heading);
-}
-
-.tickets-tx-h1 {
-  font-size: 1.05rem;
-}
-
-.tickets-tx-h2 {
-  font-size: 0.96rem;
 }
 
 .tickets-tx-code {
@@ -1857,18 +1827,6 @@ details[open] > summary > .tickets-tx-think-preview {
   }
 }
 
-.tickets-takeover-btn-stop {
-  background: var(--status-deleted);
-  border-color: var(--status-deleted);
-  color: #1b1a19;
-  font-weight: 600;
-}
-
-.tickets-takeover-btn-stop:hover:not(:disabled) {
-  background: var(--status-deleted);
-  filter: brightness(1.12);
-}
-
 .tickets-takeover-btn[hidden],
 .tickets-takeover-btn-primary[hidden] {
   display: none;
@@ -2247,28 +2205,8 @@ details[open] > summary > .tickets-tx-think-preview {
   color: var(--status-deleted);
 }
 
-.work-run-dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-}
-
-.work-run-dot-queued {
-  background: var(--text-5);
-}
-
 .work-run-step {
   flex: none;
-}
-
-.work-run-line {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
 }
 
 .work-row-more {
@@ -2326,27 +2264,6 @@ details[open] > summary > .tickets-tx-think-preview {
   background: var(--hover-bg);
 }
 
-/* The triage chip: Auto (accent), Shape (the accent's soft pink), Triage muted. */
-.work-track {
-  flex: none;
-  padding: 0 6px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-chip);
-  color: var(--text-5);
-  font-size: 12px;
-  line-height: 16px;
-}
-
-.work-track-auto {
-  border-color: var(--accent);
-  color: var(--accent-fg);
-}
-
-.work-track-shape {
-  border-color: var(--accent-pink);
-  color: var(--accent-fg);
-}
-
 .work-ideas-more {
   display: flex;
   align-items: center;
@@ -2385,16 +2302,6 @@ details[open] > summary > .tickets-tx-think-preview {
   white-space: nowrap;
   font-size: 14px;
   color: var(--text-primary);
-}
-
-.work-row-queued {
-  flex: none;
-  padding: 0 6px;
-  border-radius: var(--radius-chip);
-  background: var(--accent-surface);
-  color: var(--accent-text, var(--accent));
-  font-size: 0.75rem;
-  line-height: 18px;
 }
 
 .work-row-issues {
@@ -2725,22 +2632,6 @@ details[open] > summary > .tickets-tx-think-preview {
 
 .tickets-thread-pending[hidden] {
   display: none;
-}
-
-.tickets-thread-filelink {
-  flex: none;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  color: var(--accent-fg);
-  font: inherit;
-  font-size: 12px;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.tickets-thread-filelink:hover {
-  color: var(--text-heading);
 }
 
 .tickets-thread-iconbtn {
@@ -3728,8 +3619,7 @@ details[open] > summary > .tickets-tx-think-preview {
   flex: none;
 }
 
-.work-row-meta > .work-row-line,
-.work-row-meta > .work-run-line {
+.work-row-meta > .work-row-line {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -3739,11 +3629,6 @@ details[open] > summary > .tickets-tx-think-preview {
 .work-row-meta > :not([hidden]) ~ :not([hidden])::before {
   content: '·';
   margin: 0 5px;
-}
-
-.work-row-persona {
-  color: var(--text-4);
-  font-size: 12px;
 }
 
 /* The footer's crew line (E12-11): a button — one click opens the Crew tab. */
@@ -3763,16 +3648,6 @@ button.tickets-statusbar-fleet:hover {
 button.tickets-statusbar-fleet:focus-visible {
   outline: 2px solid var(--accent-ring, var(--accent));
   outline-offset: 2px;
-}
-
-.tickets-faces-host {
-  display: flex;
-  flex-direction: column;
-}
-
-.tickets-review-body {
-  flex: 1;
-  min-height: 0;
 }
 
 /* E13-21: a Done row opens its ticket; "Show older" brings the archive's tail with a search field. */

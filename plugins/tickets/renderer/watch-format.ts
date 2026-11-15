@@ -463,22 +463,3 @@ export function formatWatch(events: readonly NormalizedEvent[]): WatchView {
     elapsedMs: firstTs === null ? 0 : Math.max(0, lastTs - firstTs),
   };
 }
-
-/**
- * The view model as one Markdown document (the takeover tab's transcript
- * is this, rendered by the host's Markdown view): blocks separated by a
- * blank line, a run of tool steps kept together on shared lines.
- */
-export function renderWatchMarkdown(view: WatchView): string {
-  let out = '';
-  let afterStep = false;
-  for (const block of view.blocks) {
-    if (out === '') {
-      out = block.markdown;
-    } else {
-      out += (afterStep && block.kind === 'step' ? '  \n' : '\n\n') + block.markdown;
-    }
-    afterStep = block.kind === 'step';
-  }
-  return out;
-}

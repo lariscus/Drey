@@ -31,12 +31,6 @@
   flex-wrap: wrap;
 }
 
-.desk-head-title {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
 .desk-h {
   margin: 0;
   font-size: 16px;
@@ -46,9 +40,6 @@
 
 .desk-head-sub,
 .desk-note,
-.desk-today-label,
-.desk-card-line,
-.desk-run-age,
 .desk-msg-at {
   color: var(--text-3);
 }
@@ -61,33 +52,17 @@
   color: var(--status-deleted);
 }
 
-.desk-head-controls,
-.desk-composer,
-.desk-run-controls,
-.desk-cap-tail,
-.desk-cap-lead {
+.desk-composer {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.desk-today {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-right: 6px;
-}
-
-.desk-today-cost,
 .desk-card-cost,
 .desk-col-cost {
   font-variant-numeric: tabular-nums;
   color: var(--text-1, var(--text-2));
-}
-
-.desk-today-budget {
-  color: var(--text-3);
 }
 
 /* buttons */
@@ -139,14 +114,6 @@
   color: var(--accent-fg, var(--accent));
 }
 
-/* chips */
-.desk-chips {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.desk-chip,
 .desk-persona-chip,
 .desk-card-kind {
   padding: 1px 8px;
@@ -155,11 +122,6 @@
   color: var(--text-2);
   font-size: 12px;
   white-space: nowrap;
-}
-
-.desk-chip-full {
-  color: var(--status-modified);
-  background: color-mix(in srgb, var(--status-modified) 14%, transparent);
 }
 
 .desk-persona-chip {
@@ -182,18 +144,6 @@
   border: 2px solid var(--persona-color, var(--border));
   color: var(--text-1, var(--text-2));
   font-weight: 600;
-}
-
-.desk-avatar-sm {
-  width: 28px;
-  height: 28px;
-  font-size: 12px;
-}
-
-.desk-avatar-lg {
-  width: 36px;
-  height: 36px;
-  font-size: 13px;
 }
 
 /*
@@ -237,10 +187,6 @@
   line-height: 22px;
   font-weight: 700;
   color: var(--text-primary);
-}
-
-.desk-head-title {
-  display: contents;
 }
 
 .desk-head-sub {
@@ -782,12 +728,6 @@
   border: 0;
   color: var(--on-pastel);
   font-weight: 700;
-}
-
-.desk-avatar-lg {
-  width: 28px;
-  height: 28px;
-  font-size: 13px;
 }
 
 .desk-pane-title {
