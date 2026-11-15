@@ -149,6 +149,21 @@ export class DricketTicketStore implements TicketStore {
   }
 
   /**
+   * Discards the checkout's uncommitted changes (`dk restore tickets`, run in
+   * the checkout): the healing of the engine's own half-written puts — a
+   * service that stopped mid-put leaves the file written but uncommitted, and
+   * every further `put` refuses with "local checkout changes would be
+   * overwritten" until the checkout is clean again, whatever ticket it is
+   * for. The engine is the checkout's single writer, so every uncommitted
+   * byte is an orphan of an own interrupted write; the caller re-puts the
+   * document it derived from the very checkout that carried the leftover, so
+   * nothing visible is lost.
+   */
+  async restore(checkout: string, call: CallOptions = {}): Promise<void> {
+    await this.dk.call(['restore', 'tickets'], { write: true, cwd: checkout, ...signalOf(call) });
+  }
+
+  /**
    * Creates an unclaimed ticket (`dk add --unclaimed`): dk allocates the number and
    * writes a valid stub (title, priority, parent, depends); the caller fills the
    * rest with one `put` at rev 0. The stub is already a complete, linked ticket, so

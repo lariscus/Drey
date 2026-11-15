@@ -162,6 +162,11 @@ class RepoQueue {
     return next;
   }
 
+  /** Resolves when every queued and in-flight write has settled (the service is shutting down). */
+  idle(): Promise<void> {
+    return this.writeTail.then(() => undefined, () => undefined);
+  }
+
   async read<T>(op: () => Promise<T>): Promise<T> {
     if (this.activeReads >= this.readLimit) {
       await new Promise<void>((resolve) => this.waiting.push(resolve));
@@ -178,6 +183,16 @@ class RepoQueue {
 
 /** One queue per repository, shared by every wrapper instance in this process. */
 const QUEUES = new Map<string, RepoQueue>();
+
+/**
+ * Resolves when every write of every store's queue has settled (idle
+ * dk processes included). The service's shutdown awaits this — a put that is
+ * still running when the process exits leaves the checkout half-written (the
+ * file written, the git commit gone), and every later write then conflicts.
+ */
+export function idleDkWrites(): Promise<void> {
+  return Promise.allSettled([...QUEUES.values()].map((queue) => queue.idle())).then(() => undefined);
+}
 
 function queueFor(key: string, readLimit: number): RepoQueue {
   let queue = QUEUES.get(key);

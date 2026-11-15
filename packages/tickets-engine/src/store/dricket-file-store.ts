@@ -27,6 +27,9 @@ export type WriteOutcome =
   | { readonly ok: true; readonly result: PutResult }
   | { readonly ok: false; readonly conflict: { readonly current: TicketDetail } };
 
+/** dk's refusal when the checkout itself is dirty — the engine's own half-written put, not a rev conflict. */
+const CHECKOUT_CONFLICT = /local checkout changes would be overwritten/i;
+
 /**
  * The E14-4 store: reads come from the files of the store's checkout
  * ({@link FileStoreReader}, read-only), every write goes through `dk`
@@ -85,6 +88,14 @@ export class DricketFileStore implements TicketStore {
    * Replaces a ticket with `text`, made on `options.expectedRev`. Exit 12 (the
    * ticket moved on) is not an error here: the ticket is re-read and handed back
    * so the caller can ask the user. Every other failure throws.
+   *
+   * The checkout-conflict flavour of exit 12 ("local checkout changes would be
+   * overwritten") heals in place: an uncommitted leftover of the engine's own
+   * put — a service that stopped mid-put, the git commit never landing — blocks
+   * every further write. The record was read from that very checkout, so `text`
+   * already carries the leftover; the half-write is discarded (`dk restore`)
+   * and the same document is put once more. A retry that still conflicts comes
+   * back as the ordinary changed-in-the-meantime answer.
    */
   async write(id: string, text: string, options: PutOptions, call?: CallOptions): Promise<WriteOutcome> {
     try {
@@ -93,6 +104,12 @@ export class DricketFileStore implements TicketStore {
       return { ok: true, result };
     } catch (error) {
       if (error instanceof TicketStoreError && error.kind === 'conflict') {
+        if (CHECKOUT_CONFLICT.test(error.message)) {
+          await this.dk.restore(this.checkout, call);
+          const result = await this.dk.put(id, text, options, call);
+          await this.waitForCheckout(id, result.rev, call);
+          return { ok: true, result };
+        }
         return { ok: false, conflict: { current: await this.reader.show(id, call) } };
       }
       throw error;

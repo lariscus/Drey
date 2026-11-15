@@ -122,6 +122,20 @@ describe.skipIf(!found.ok)('DricketFileStore over a real dk store', { timeout: 1
     }
   });
 
+  it('heals a half-written put: the uncommitted leftover is discarded and the same document lands', async () => {
+    const current = await files.show('T-0001');
+    // The orphan of a service stop mid-put: dk wrote the file, the git commit never landed.
+    const doc = path.join(storeDir, 'tickets', 't', '0000', 't-1', 'ticket.md');
+    writeFileSync(doc, current.text.replace('title: Third', 'title: Orphaned half-write'), 'utf8');
+    // The next write derives from that very checkout, so it carries the leftover's content;
+    // the heal discards the half-write and puts the same document — nothing visible is lost.
+    const carried = current.text.replace('title: Third', 'title: Orphaned half-write, healed').replace('priority: high', 'priority: critical');
+    const outcome = await files.write('T-0001', carried, { expectedRev: current.rev! });
+    expect(outcome).toMatchObject({ ok: true, result: { rev: current.rev! + 1 } });
+    const after = await files.show('T-0001');
+    expect(after).toMatchObject({ title: 'Orphaned half-write, healed', priority: 'critical' });
+  });
+
   describe('change detection against a real watcher and a foreign dk (E14-8)', () => {
     const settingsOf = (): StoreSettings => ({ dkPath: bin === 'dk' ? '' : bin, dkStore: storeDir, dkDataDir: path.join(root, 'data'), dkCheckout: '', dkSyncSeconds: 30 });
     const makeSource = (onChange: () => void, extra: Partial<ConstructorParameters<typeof StoreBoardSource>[2]> = {}): StoreBoardSource =>
