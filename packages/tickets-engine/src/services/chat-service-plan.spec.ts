@@ -91,6 +91,7 @@ function boot(): ChatService {
   } as unknown as ChatBridge;
   const git = { locate: async (p: string) => ({ root: p, prefix: '' }), commitPaths: async () => undefined } as unknown as TicketsGit;
   return new ChatService({
+    personas: async () => [],
     host,
     board,
     bridge,

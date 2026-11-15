@@ -7,10 +7,13 @@ import { ChatVoices } from '../services/chat-voices';
 import { serviceModelTable } from '../services/compose-crew-sessions';
 import type { ServiceModelTable } from '../services/service-model-table';
 import { composePersonaSessions } from '../services/compose-persona-sessions';
-import { loadCrewPrompts } from '../services/crew-prompts';
+import { loadCrewPrompts, type CrewPrompts } from '../services/crew-prompts';
 import { MissionCrewBlock } from '../services/mission-crew-block';
+import { MissionCrewSettings } from '../services/mission-crew-settings';
 import { MissionEntryTurns } from '../services/mission-entry-turns';
+import { MissionOwnerBlock } from '../services/mission-owner-block';
 import { MissionPersonaPrompt } from '../services/mission-persona-prompt';
+import { MissionTools } from '../services/mission-tools';
 import { PersonaModelMigrator } from '../services/persona-model-migrator';
 import { PersonaProseMigrator } from '../services/persona-prose-migrator';
 import { ProjectMigrator } from '../services/project-migrator';
@@ -75,25 +78,7 @@ export async function composeSessionParts(opts: EngineOptions, config: FileConfi
   const missionPrompt = new MissionPersonaPrompt(board, host);
   // req-257: Pia's entry in a ticket's chain — set once the chat exists, the chat's confirm reaches it late-bound.
   let missionEntries: MissionEntryTurns | null = null;
-  const chat = new ChatService({
-    board,
-    host,
-    git,
-    // req-269: Mission Control speaks with its persona's prompt (Pia), read on every turn.
-    // req-293/294/296: her memory and skills ride the prompt, her `model:` pins the model of her own turns.
-    bridge: opts.chatBridge ?? createChatBridge({ config, crew, missionPersona: () => missionPrompt.text(), model: () => missionPrompt.model() }),
-    sessions: parts.freeSessions, // req-173: Pia's startSession card
-    // req-306: the crew on her turn, the owner by name (the `you` persona's title, else the git user).
-    crewBlock: new MissionCrewBlock(() => board.listPersonas(), () => gitUserOf(board, git)),
-    shadows: new FilePlanShadowStore(path.join(opts.home, 'plan-shadow.json')),
-    modelName: () => config.get<string>('chat.model'),
-    // req-272: Shape and Flow chat speak as the persona of the chain's entries, the crew read on every turn.
-    voices: new ChatVoices(board, host),
-    actor: `chat@${hostname().toLowerCase()}`,
-    log,
-    onEvent: (file, event) => hub.emit('chat', { file, event }),
-    onConfirmed: (title) => missionEntries?.confirmed(title) ?? Promise.resolve(),
-  });
+  const chat = composeChat({ opts, config, parts, crew, missionPrompt, log, onConfirmed: (title) => missionEntries?.confirmed(title) ?? Promise.resolve() });
   missionEntries = new MissionEntryTurns(board, chat, (message, level) => log(message, level ?? 'info'));
   const entries = missionEntries;
   hub.subscribe((what) => {
@@ -143,6 +128,51 @@ interface StartupMigrators {
   readonly projects: ProjectMigrator | null;
   /** req-288: `worker:` / `models:` onto `class:` and `model:`; null = `seedDefaultCrew: false`. */
   readonly models: PersonaModelMigrator | null;
+}
+
+/** The chat's wiring (req-269/306/315): the deps object composed once; `onConfirmed` reaches it late-bound (Pia's chain entries). */
+interface ChatWiring {
+  readonly opts: EngineOptions;
+  readonly config: FileConfigStore;
+  readonly parts: BoardParts;
+  readonly crew: CrewPrompts;
+  readonly missionPrompt: MissionPersonaPrompt;
+  readonly log: Log;
+  readonly onConfirmed: (sessionTitle: string) => Promise<void>;
+}
+
+/** The Mission Control chat (E5a): the persona prompt read every turn, the crew and settings blocks, Pia's tools. */
+function composeChat(wiring: ChatWiring): ChatService {
+  const { opts, config, parts, crew, missionPrompt, log, onConfirmed } = wiring;
+  const { board, host, git, hub } = parts;
+  return new ChatService({
+    board,
+    host,
+    git,
+    // req-269: Mission Control speaks with its persona's prompt (Pia), read on every turn.
+    // req-293/294/296: her memory and skills ride the prompt, her `model:` pins the model of her own turns.
+    bridge: opts.chatBridge ?? createChatBridge({ config, crew, missionPersona: () => missionPrompt.text(), model: () => missionPrompt.model() }),
+    sessions: parts.freeSessions, // req-173: Pia's startSession card
+    // req-306: the crew on her turn, the owner by name (the `you` persona's title, else the git user).
+    crewBlock: new MissionCrewBlock(() => board.listPersonas(), () => gitUserOf(board, git)),
+    // req-315: the fields a patchPersona card may set with their values, the owner's instructions, the read tools.
+    personaContext: new MissionCrewSettings(() => board.listPersonas()),
+    ownerBlock: new MissionOwnerBlock(board, host),
+    tools: new MissionTools({
+      host,
+      vaultId: async () => (await board.snapshot()).vaultId ?? null,
+      readTicket: (board.readAnyTicket ?? board.readTicket)?.bind(board),
+    }),
+    personas: () => board.listPersonas(),
+    shadows: new FilePlanShadowStore(path.join(opts.home, 'plan-shadow.json')),
+    modelName: () => config.get<string>('chat.model'),
+    // req-272: Shape and Flow chat speak as the persona of the chain's entries, the crew read on every turn.
+    voices: new ChatVoices(board, host),
+    actor: `chat@${hostname().toLowerCase()}`,
+    log,
+    onEvent: (file, event) => hub.emit('chat', { file, event }),
+    onConfirmed,
+  });
 }
 
 /** The migrations that run behind startup: failures are logged, never fatal. */

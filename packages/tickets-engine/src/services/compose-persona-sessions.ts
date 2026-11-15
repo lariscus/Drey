@@ -34,7 +34,12 @@ export function composePersonaSessions(wiring: PersonaSessionsWiring): PersonaSe
     board,
     fleet,
     files: new PersonaSessionFiles({ host, git, log }),
-    context: new PersonaSessionContext({ host, runs: () => fleet.runs(), tools: wiring.tools ?? NO_TOOLS }),
+    context: new PersonaSessionContext({
+      host,
+      runs: () => fleet.runs(),
+      ...(board.listPersonas === undefined ? {} : { personas: () => board.listPersonas!() }),
+      tools: wiring.tools ?? NO_TOOLS,
+    }),
     watcher: new PersonaTurnWatcher(fleet, wiring.fleetChanges),
     bridge: bridgeTurnRunner(wiring.bridge),
     onChanged: wiring.changed,

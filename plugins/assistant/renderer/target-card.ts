@@ -85,6 +85,9 @@ export function proposalNode(targets: CardActions, card: ConversationCard): HTML
   if (card.note !== undefined) {
     box.appendChild(el('p', 'target-card-note', card.note));
   }
+  if (card.diff !== undefined && card.diff !== '') {
+    box.appendChild(el('pre', 'target-card-diff', card.diff));
+  }
   if ((card.actions ?? []).length > 0) {
     const row = el('div', 'target-card-actions');
     for (const action of card.actions ?? []) {

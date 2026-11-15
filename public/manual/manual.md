@@ -503,10 +503,22 @@ speech bubble (**Model**), a rocket (**Mission Control**) and two heads
   *Same as the assistant* by default, one of the models that endpoint lists,
   or **Other model…** to type one. Her **1:1** tab is a conversation to shape
   her, like every persona's. She runs through no harness — no session, no
-  slot, no tools: she proposes, you confirm — has no budget and cannot be
-  deleted. In Mission Control her tile leads the Crew and opens the same
+  slot: she proposes, you confirm — has no budget and cannot be deleted. In Mission Control her tile leads the Crew and opens the same
   three parts (Chat, Memory, Setup — Setup holds her model, her skills and
   her instructions, with **Discard** and **Save**).
+  **Pia changes persona settings on your word.** Ask her to retitle a
+  persona, re-pin its model, raise its budget, switch a right, retune its
+  run pool or rewrite its instructions, and she proposes a card that shows
+  every field old → new — a rewritten instruction set comes with its diff.
+  What she may set is exactly what the Persona page edits (the file-only
+  run keys — needs, ceilings, gate — stay edited in the file); the confirm
+  writes through the same single path the page uses. Before she touches a
+  persona's instructions she reads them first, and she reads on demand
+  besides: a persona's files, one ticket's whole file, and your notes
+  (search and read, every registered vault, never write) — each read shows
+  in her thinking trace. What she should know about you sits in **your own
+  persona's Instructions** (the Crew tab's *You* page): she reads them with
+  every message and in her 1:1, whatever the persona is called.
 - **1:1** opens a menu of the crew's agent personas: a conversation with
   that persona, answered by the persona itself — see [The 1:1](#one-on-one).
 

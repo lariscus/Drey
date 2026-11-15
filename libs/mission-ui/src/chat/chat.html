@@ -130,6 +130,9 @@
                           <span class="ph-change-id">{{ id }}</span>
                         }
                         <span class="ph-change-line">{{ changeOf(proposal).text }}</span>
+                        @if (proposal.diff; as diff) {
+                          <pre class="planedit-diff">{{ diff }}</pre>
+                        }
                         @if (proposalProjectOf(proposal); as chip) {
                           <span class="ph-change-proj"><i [style.background]="chip.color" aria-hidden="true"></i>{{ chip.label }}</span>
                         }
@@ -540,6 +543,9 @@
 
 <!-- The proposal cards' rich body, shared by the pending, done and dismissed faces. -->
 <ng-template #richBody let-proposal>
+  @if (proposal.diff; as diff) {
+    <pre class="planedit-diff">{{ diff }}</pre>
+  }
   @if (chainCompareFor(proposal); as compare) {
     <div class="chain-compare" aria-label="The chain before and after">
       <div class="cmp-label">Before</div>

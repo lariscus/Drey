@@ -92,7 +92,7 @@ function boot(): ChatService {
   } as unknown as ChatBridge;
   const git = { locate: async (p: string) => ({ root: p, prefix: '' }), commitPaths: async () => undefined } as unknown as TicketsGit;
   let clock = Date.parse('2026-11-14T09:00:00Z');
-  return new ChatService({ host, board, bridge, actor: 'owner@desk', log: () => undefined, onEvent: () => undefined, now: () => new Date((clock += 1000)), git });
+  return new ChatService({ personas: async () => [], host, board, bridge, actor: 'owner@desk', log: () => undefined, onEvent: () => undefined, now: () => new Date((clock += 1000)), git });
 }
 
 describe("Pia's project of a new ticket (req-298)", () => {

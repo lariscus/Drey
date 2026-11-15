@@ -45,6 +45,7 @@ import { withCommandProject, withProjectsBlock } from '../core/chat/chat-project
 import { parsePlanParts } from '../core/plan/plan-parts';
 import { ticketRefsOf } from '../core/chat/chat-ticket-refs';
 import { changedLinesOf, editsSummary, planDelta, planDeltaForModel, planSectionOf } from '../core/plan/plan-delta';
+import type { PersonaPatchFields } from './persona-patch';
 import type { PlanShadowStore } from './plan-shadow';
 import {
   appendMission,
@@ -62,7 +63,11 @@ import {
   parseSessionFile,
 } from '../core/chat/chat-session';
 import { TicketsGit } from '../core/git/tickets-git';
+import { PERSONAS_DIR, type Persona } from '../core/persona/persona';
+import { chatPatchRefusalOf } from './persona-patch';
+import { personaPatchPartsOf } from './persona-patch-summary';
 import type { ChatVoiceSource } from './chat-voices';
+import type { ChatToolSeam } from '../contracts/chat';
 import type { EngineHost, EngineVault } from './host';
 import type { MissionCrewSource } from './mission-crew-block';
 
@@ -137,6 +142,8 @@ export interface ChatBoardPort {
   setStandardFlow(input: { readonly chain: readonly string[] }): Promise<ChatMutationResult>;
   /** T-0050: the whole `blocked-by:` list replacement (empty = cleared). */
   setBlockedBy(input: { readonly id: string; readonly blockedBy: readonly string[]; readonly actor?: string }): Promise<ChatMutationResult>;
+  /** req-315: the crew's records, read fresh — a patchPersona card's summary and refusal are set against them. */
+  personaPatch(input: { readonly id: string } & PersonaPatchFields): Promise<ChatMutationResult>;
 }
 
 export interface ChatServiceDeps {
@@ -163,6 +170,14 @@ export interface ChatServiceDeps {
   readonly voices?: ChatVoiceSource;
   /** req-306: the `## Crew` block of a mission turn — every persona, the owner by name; absent = none. */
   readonly crewBlock?: MissionCrewSource;
+  /** req-315: the `## Crew settings` block — the fields a patchPersona card may set, with their current values; absent = none. */
+  readonly personaContext?: MissionCrewSource;
+  /** req-315: the `## The owner` block — the human persona's instructions, read fresh; absent or without a file = none. */
+  readonly ownerBlock?: MissionCrewSource;
+  /** req-315: the read-only tools of an ordinary mission turn; absent = the turn answers from the system message alone. */
+  readonly tools?: ChatToolSeam;
+  /** req-315: the crew's records, read fresh per turn — a patchPersona card's summary and refusal are set against them. */
+  readonly personas: () => Promise<readonly Persona[]>;
   /** req-173: the free sessions Pia's startSession card starts once confirmed; absent = the card refuses. */
   readonly sessions?: {
     start(ask: { persona: string; directory: string; poolClass?: ClassName | null; firstLine?: string }, origin: string): Promise<{ ok: true; runId: string } | { ok: false; error: string }>;
@@ -194,6 +209,9 @@ function summaryOf(command: ChatCommand): string {
         : `Block ${command.id} by ${command.blockedBy.join(', ')}`;
     case 'startSession':
       return `Start a session of ${command.persona} in ${command.directory}${command.poolClass === null ? '' : ` (class ${command.poolClass})`}`;
+    case 'patchPersona':
+      // A patchPersona card's summary is personaCardOf's (the record's old → new); this fallback stands for direct calls.
+      return `Patch ${command.persona} — ${Object.keys(command.patch).join(', ')}`;
   }
 }
 
@@ -439,6 +457,8 @@ export class ChatService implements ChatServicePort {
         ...(shape === undefined ? {} : { shape }),
         ...(voice === undefined ? {} : { voice }),
         ...(missionTicket === undefined ? {} : { missionTicket }),
+        // req-315: an ordinary mission turn carries its read-only tools; a shape turn reads its repository instead.
+        ...(shape === undefined && this.deps.tools !== undefined ? { tools: this.deps.tools } : {}),
         ...(signal === undefined ? {} : { signal }),
         emit: (event) => this.deps.onEvent(file, event),
       });
@@ -472,11 +492,14 @@ export class ChatService implements ChatServicePort {
         }
       }
       proposals = [];
+      // req-315: a patchPersona card's summary is set against the crew's records, read fresh for this turn.
+      const needsPersonas = reply.commands.some((command) => command.kind === 'patchPersona');
+      const crew = needsPersonas ? await this.deps.personas().catch(() => [] as readonly Persona[]) : [];
       for (const proposed of reply.commands) {
         // req-298: a create names a project the board knows — the filter's, the only one, or none.
         const command = withCommandProject(proposed, snap.projects ?? [], project);
-        const summary = summaryOf(command);
-        const appended = appendProposal(block, stamp, summary, command);
+        const [summary, diff] = command.kind === 'patchPersona' ? await this.personaCardOf(command, crew, vault) : [summaryOf(command), null];
+        const appended = appendProposal(block, stamp, summary, command, diff);
         block = appended.text;
         proposals.push({
           id: appended.id,
@@ -486,6 +509,7 @@ export class ChatService implements ChatServicePort {
           at: stamp.toISOString(),
           decidedAt: null,
           outcome: null,
+          ...(diff === null ? {} : { diff }),
         });
       }
     } catch (error) {
@@ -756,8 +780,35 @@ export class ChatService implements ChatServicePort {
   }
 
   /**
+   * req-315: a patchPersona card's summary and its prompt diff, set against
+   * the persona's record read just now — the summary carries every sent
+   * field as `field: old → new`, the diff the instructions' before/after. A
+   * persona the board does not know (deleted between the turn and the cards)
+   * degrades to the field names alone.
+   */
+  private async personaCardOf(command: Extract<ChatCommand, { readonly kind: 'patchPersona' }>, crew: readonly Persona[], vault: EngineVault): Promise<readonly [string, string | null]> {
+    const persona = crew.find((candidate) => candidate.id === command.persona) ?? null;
+    if (persona === null) {
+      const fields = Object.keys(command.patch).join(', ');
+      return [`Patch ${command.persona} — ${fields}`, null];
+    }
+    const parts = [...personaPatchPartsOf(persona, command.patch)];
+    let diff: string | null = null;
+    if (command.patch.prompt !== undefined) {
+      const before = await this.deps.host
+        .read(vault.id, `${PERSONAS_DIR}/${persona.id}/prompt.md`)
+        .then((text) => text.replace(/\r\n/g, '\n'))
+        .catch(() => '');
+      const delta = planDelta(before, command.patch.prompt);
+      diff = delta?.diff ?? null;
+      parts.push(delta === null ? 'instructions: unchanged' : `instructions: ${delta.summary}`);
+    }
+    return [`Patch ${persona.title} — ${parts.join('; ')}`, diff];
+  }
+
+  /**
    * The confirm's execution — the iron rule in code: the typed command
-   * reaches the board ONLY through these five methods, always with the
+   * reaches the board ONLY through these board methods, always with the
    * acting owner. The outcome line records what happened: a transition's
    * moved path, a create's minted id, `ok` otherwise. A create lands in
    * the pipeline's first phase (the board's capture target); when the
@@ -824,14 +875,30 @@ export class ChatService implements ChatServicePort {
         const result = await this.deps.sessions.start(ask, "chat (Pia's card)");
         return result.ok ? { ok: true, outcome: result.runId } : { ok: false, error: result.error };
       }
+      case 'patchPersona': {
+        // req-315: the crew read fresh — a persona deleted since the card stays a refusal, never a guess.
+        const crew = await this.deps.personas();
+        const persona = crew.find((candidate) => candidate.id === command.persona);
+        if (persona === undefined) {
+          return { ok: false, error: `there is no persona "${command.persona}"` };
+        }
+        const refusal = chatPatchRefusalOf(persona, command.patch);
+        if (refusal !== null) {
+          return { ok: false, error: refusal };
+        }
+        const result = await this.deps.board.personaPatch({ id: command.persona, ...command.patch });
+        return result.ok ? { ok: true, outcome: 'ok' } : { ok: false, error: result.error };
+      }
     }
   }
 
-  /** req-173 / req-306: the digest plus the crew (the owner by name) and the personas and folders a startSession card may name. */
+  /** req-173 / req-306 / req-315: the digest plus the crew, the fields a patch may set, the owner's instructions and the sessions a card may start. */
   private async withSessions(digest: string): Promise<string> {
     const crew = (await this.deps.crewBlock?.text().catch(() => null)) ?? null;
+    const settings = (await this.deps.personaContext?.text().catch(() => null)) ?? null;
+    const owner = (await this.deps.ownerBlock?.text().catch(() => null)) ?? null;
     const sessions = (await this.deps.sessions?.promptContext().catch(() => null)) ?? null;
-    return [digest, crew, sessions].filter((block): block is string => block !== null).join('\n\n');
+    return [digest, crew, settings, owner, sessions].filter((block): block is string => block !== null).join('\n\n');
   }
 
   // --- the host plumbing ----------------------------------------------------

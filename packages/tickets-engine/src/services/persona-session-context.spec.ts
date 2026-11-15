@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Persona } from '../core/persona/persona';
+import { humanPersona, type Persona } from '../core/persona/persona';
 import { ONE_ON_ONE_VAULT_TOOLS, type OneOnOneSeat, type OneOnOneToolSeam } from '../fleet/session/one-on-one-toolset';
 import type { EngineHost, EngineVault } from './host';
 import { PersonaSessionContext } from './persona-session-context';
@@ -41,5 +41,33 @@ describe('PersonaSessionContext tools (req-217)', () => {
 
   it('names no tool without a seam', async () => {
     expect(await context().brief(VAULT, persona('opencode'), [])).not.toContain('## Tools');
+  });
+});
+
+describe('PersonaSessionContext owner section (req-315)', () => {
+  const you = humanPersona('Henrik');
+  const hostWithPrompt = {
+    read: async (_v: string, p: string) => (p === 'tickets/_meta/personas/you/prompt.md' ? 'Answer in German.' : null),
+  } as unknown as EngineHost;
+  const mission = { id: 'pia', title: 'Pia', kind: 'mission', role: 'custom', skills: [] } as unknown as Persona;
+  const ben = { id: 'ben', title: 'Ben', role: 'builder', skills: [] } as unknown as Persona;
+
+  function contextWith(personas: () => Promise<readonly Persona[]>, host: EngineHost = hostWithPrompt): PersonaSessionContext {
+    return new PersonaSessionContext({ host, runs: async () => [], personas });
+  }
+
+  it('the mission persona\'s brief carries the owner\'s instructions; an agent\'s does not', async () => {
+    const brief = await contextWith(async () => [mission, you]).brief(VAULT, mission, []);
+    expect(brief).toContain('## The owner');
+    expect(brief).toContain('Henrik is the owner');
+    expect(brief).toContain('Answer in German.');
+    const agents = await contextWith(async () => [ben, you]).brief(VAULT, ben, []);
+    expect(agents).not.toContain('## The owner');
+  });
+
+  it('is absent when the board cannot list the crew or the owner wrote nothing', async () => {
+    expect(await contextWith(async () => [mission, you], host).brief(VAULT, mission, [])).not.toContain('## The owner');
+    const empty = new PersonaSessionContext({ host: hostWithPrompt, runs: async () => [], personas: async () => [mission] });
+    expect(await empty.brief(VAULT, mission, [])).not.toContain('## The owner');
   });
 });

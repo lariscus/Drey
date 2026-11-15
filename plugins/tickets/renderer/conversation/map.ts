@@ -35,6 +35,8 @@ function proposalCard(proposal: ChatProposal): ConversationCard {
     kind: 'card',
     text: proposal.summary,
     ...(note !== undefined ? { note } : {}),
+    // req-315: a prompt patch's before/after — the card shows it before the owner confirms.
+    ...(proposal.diff ? { diff: proposal.diff } : {}),
     actions: pending
       ? [
           { id: 'confirm', label: 'Confirm', tone: 'primary' },

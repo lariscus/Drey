@@ -1313,6 +1313,20 @@
   font-size: 11.5px;
 }
 
+.target-card-diff {
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--bg-bar);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre;
+}
+
 .target-card-actions,
 .target-tray-choices {
   display: flex;
