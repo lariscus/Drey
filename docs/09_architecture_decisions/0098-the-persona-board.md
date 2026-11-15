@@ -198,7 +198,7 @@ pipeline still has one; a tripped persona is held until the owner plays it). Dis
 priority class, then the **later cursor position first**, then rank. The
 Capacity band is merged into the board: persona load in the column head
 (`Ben · 2/2 · 1 waiting`), the big pool as one chip `4/5 · 1 queued` whose
-popover holds the slots, the tranche, the queue head and a minimum overrun.
+popover holds the slots, the queue head and a minimum overrun.
 
 ### Metrics
 

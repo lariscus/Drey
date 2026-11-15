@@ -258,11 +258,13 @@ and `fleet/runs/` are read where they are.
 first board read of a tickets vault moves the vault keys of `config.json`
 (`defaultWorker`, `autoPermissionMode`, `personas.default`, `fleet.cap.*`,
 `fleet.compactAboveTokens*`, `fleet.resumePauseTtlMin`,
-`fleet.contextCapTokens*`, `autopilot.tranche.*`, `autopilot.earlyStop.*`)
+`fleet.contextCapTokens*`)
 and of the old `chain.json`'s `config` into `tickets/_meta/crew.md` — only
 keys the file lacks, only values that differ from the defaults, one commit,
 one log line per key — and sets `crew.migrated` in `config.json`. The old
-keys are left in place and read by nothing. The runner's first boot moves
+keys are left in place and read by nothing; the retired tranche keys
+(`autopilot.tranche.*`, `autopilot.earlyStop.*`, req-179) are not moved and
+read by nothing since req-309 (owner 2026-11-15). The runner's first boot moves
 the machine-wide `fleet/chain.json` into its vault's
 `fleet/chains/<vault key>/chain.json` and keeps the original as
 `fleet/chain.legacy.json`.

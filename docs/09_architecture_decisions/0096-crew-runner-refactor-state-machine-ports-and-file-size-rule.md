@@ -54,6 +54,11 @@ packages/tickets-engine/src/fleet/
   runner.ts     the composition root, the only module that knows every adapter
 ```
 
+(The plan sketched a `TranchePolicy` beside the Dispatcher; it landed as
+`orchestrate/tranche/` in 2026-11's req-179 and was retired again with
+req-309, 2026-11-15 — the Autopilot is on/off and the Dispatcher stays the
+one start gate.)
+
 **Rules of the structure.**
 
 - Interfaces live at the consumer and stay small; adapters satisfy them
