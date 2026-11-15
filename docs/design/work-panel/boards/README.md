@@ -37,6 +37,14 @@ canvas version `1794596137-e214` (their own bottom row, title *Mission Control o
 card*). **Accepted by the owner on 2026-11-13** (*"Yes, build it"*). The boards draw every circle as the silhouette; the app
 paints the persona pictures (milestone 253).
 
+The concept-apply boards (`ConceptLiveEdit`, `ConceptManualEdit`, `ConceptApply`, `ConceptDecompose`,
+`ConceptStageReview`, `ConceptRedirect`) were drawn on their own canvas *Concept apply flow* (artifact
+`VAwwDRZRbT9qb8ABF7J7TZ`, version `1794765488-63f7`, 2026-11-15) from
+[../concept-apply-draft.md](../concept-apply-draft.md): the start of the Crew in a concept note, Apply on the delta, stages
+reviewed one after another. **Accepted by the owner on 2026-11-15** (*"Passt"*, after his correction that the concept is
+written in the standard editor with live edit). The canvas keeps its own `canvas.json`; no PNGs were exported yet — open
+the canvas to see them.
+
 A session that builds or changes a screen reads the board's HTML for the exact
 measures, colours, spacing and strings, opens the PNG to see it, and compares
 its own screenshot against the PNG before it reports done (see
@@ -146,6 +154,12 @@ above.
 | 8c · Settings → Background service: status, start with Windows, keep running, components, load, logs (req-165) — **built, milestone 216** | `DeskServiceSettings` | 1440×900 | desktop |
 | 10u · Mission Control cards of the Lead: checkpoint report, merge conflict, budget and quota stop, queued, early stop — desktop and phone — parts 1, 6 and 7 **built** milestone 221 (req-179), **parts 1 and 6 (checkpoint, early stop) retired 2026-11-15** (req-309); the burn-rate card (no part of its own: part 4's layout, desktop and phone) milestone 224 (req-181); 2–5, 8, 9 open | `MCCards` | 1480×1160 | parts |
 | 10u v2 · Mission Control cards of the persona board: no persona for a position, sent back twice, a run's question, merge conflict at Ben — desktop and phone — **req-264, canvas `1794411563-4786`** | `MCCardsV2` | 1640×1040 | parts |
+| 7s · Concept note, live edit: the Assistant writes in the standard editor, the Mermaid diagram updates, your input waits (meta bar *Assistant is editing*, Stop); the Outline shows each section's apply status — **req-310, req-311** | `ConceptLiveEdit` | 1440×900 | desktop |
+| 7t · Concept note, your hand edits: marked in the editor, the composer chip *n edits of yours go along* waits for your next message (nothing triggers; the *You edited the note* card appears on send) — **req-310**, revised 2026-11-15 (canvas `1794767289-54a0`) | `ConceptManualEdit` | 1440×900 | desktop |
+| 7u · Apply: the sections changed since the last apply (M / A), the diff per section, *n sections to apply* and Decompose — **req-311** | `ConceptApply` | 1440×900 | desktop |
+| 7v · Decompose: the parent ticket with its concept link, stages only for the delta with *covers*, the brief of a stage, Run stage 1 only — **req-312** | `ConceptDecompose` | 1440×900 | desktop |
+| 7w · Stage 1 at you: gate, change, handover, the parent's stages (S2 waits for S1), Drop remaining stages; the Outline marks the section *at you* — **req-313** | `ConceptStageReview` | 1440×900 | desktop |
+| 7x · Change of direction: remaining stages dropped, the parent closed, the concept rewritten, Apply shows only the new delta — **req-313** | `ConceptRedirect` | 1440×900 | desktop |
 
 The older boards one folder up (`Home`, `Ticket`, `Workers`, `Ready`,
 `Shaping`, `Orchestrator`, `Phone*` of 2026-10-31) are superseded by the

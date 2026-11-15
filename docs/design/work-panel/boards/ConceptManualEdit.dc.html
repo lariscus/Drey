@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Your edits reach the Assistant</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{cursor:default;font:inherit}
+.vt{height:26px;padding:0 12px;display:flex;align-items:center;background:transparent;border:0;border-radius:4px;color:#b3b7bc;font-size:14px}
+.vt[aria-selected="true"]{background:#2c2d31;color:#f4f5f6;font-weight:600}
+.btn{height:28px;padding:0 12px;border:1px solid #747980;border-radius:8px;background:transparent;color:#f4f5f6;font-size:13px}
+.pri{background:#8ecbef;border-color:#8ecbef;color:#101113;font-weight:600}
+.ol{display:flex;align-items:center;gap:8px;height:28px;padding:0 12px 0 16px;font-size:13px}
+.chip{margin-left:auto;font-size:12px;line-height:18px;padding:0 6px;border-radius:4px;border:1px solid #3b3d42;color:#b3b7bc;white-space:nowrap}
+.ok{color:#93c47f;border-color:#3f5a35}
+.chg{color:#e0bb6e;border-color:#5c4b27}
+.new{color:#8ecbef;border-color:#2f4f63}
+h2{font-size:19px;line-height:26px;margin:20px 0 6px;font-weight:600}
+p{margin:0 0 8px}
+.nd{border:1px solid #747980;border-radius:6px;padding:8px 12px;font-size:13px;line-height:18px;background:#222326;text-align:center;min-width:96px}
+.ar{display:flex;flex-direction:column;align-items:center;font-size:12px;color:#b3b7bc;min-width:92px}
+.ar i{display:block;width:100%;height:1px;background:#b3b7bc;margin-top:4px}
+.you{background:#2a2519;box-shadow:inset 0 -1px 0 #e0bb6e}
+.cur{display:inline-block;width:2px;height:18px;background:#f4f5f6;vertical-align:-3px;margin-left:1px}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; flex-direction: column; background: #18191b; color: #f4f5f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif; font-size: 13px; line-height: 18px; overflow: hidden">
+<header style="height: 40px; flex-shrink: 0; display: flex; align-items: center; gap: 4px; padding: 0 8px; background: #222326; border-bottom: 1px solid #3b3d42">
+<span aria-hidden="true" style="width: 22px; height: 22px; border-radius: 4px; background: #8ecbef; color: #101113; display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 8px">D</span>
+<span style="font-size: 14px; padding: 0 8px">File</span><span style="font-size: 14px; padding: 0 8px">Edit</span><span style="font-size: 14px; padding: 0 8px">View</span><span style="font-size: 14px; padding: 0 8px">Help</span>
+<div role="tablist" aria-label="Views" style="display: flex; gap: 2px; margin-left: 24px; padding: 2px; border: 1px solid #3b3d42; border-radius: 6px"><button type="button" class="vt" role="tab" aria-selected="true">Notes</button><button type="button" class="vt" role="tab" aria-selected="false">Work</button><button type="button" class="vt" role="tab" aria-selected="false">Crew</button></div>
+<span style="margin-left: 12px; height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid #3b3d42; border-radius: 6px"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #8ecbef"></span>Drey</span>
+</header>
+<div style="flex: 1; display: flex; min-height: 0">
+<aside style="width: 300px; flex-shrink: 0; background: #222326; border-right: 1px solid #3b3d42; display: flex; flex-direction: column">
+<div style="height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 12px; margin-top: 8px"><span style="font-weight: 600">Files</span><span style="color: #b3b7bc">Drey notes</span></div>
+<div style="padding: 0 0 8px 0">
+<div class="ol" style="color: #b3b7bc">docs</div>
+<div class="ol" style="padding-left: 28px; color: #b3b7bc">concepts</div>
+<div class="ol" style="padding-left: 44px; background: #2c2d31; box-shadow: inset 2px 0 0 #8ecbef">runner-event-stream.md</div>
+<div class="ol" style="padding-left: 44px">voice-capture.md</div>
+<div class="ol" style="padding-left: 28px; color: #b3b7bc">adr</div>
+</div>
+<div style="border-top: 1px solid #3b3d42; padding-top: 8px">
+<div style="height: 28px; display: flex; align-items: center; padding: 0 12px; font-weight: 600">Outline</div>
+<div class="ol">Goal<span class="chip ok">applied</span></div>
+<div class="ol">Architecture<span class="chip chg">changed</span></div>
+<div class="ol">Event kinds<span class="chip chg">changed</span></div>
+<div class="ol">Clients subscribe through the engine<span class="chip new">new</span></div>
+<div class="ol">Reconnect and replay<span class="chip new">new</span></div>
+<div class="ol">Out of scope<span class="chip ok">applied</span></div>
+</div>
+</aside>
+<main style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<div style="height: 36px; display: flex; align-items: center; border-bottom: 1px solid #3b3d42; background: #222326"><span style="height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-right: 1px solid #3b3d42; background: #18191b"><span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 50%; background: #f4f5f6"></span>runner-event-stream.md</span></div>
+<div style="height: 40px; display: flex; align-items: center; gap: 12px; padding: 0 12px 0 20px; border-bottom: 1px solid #3b3d42">
+<span style="font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #b3b7bc">docs/concepts/runner-event-stream.md</span>
+<span style="margin-left: auto; color: #b3b7bc">Last applied 14 Nov · 4 sections changed</span>
+<button type="button" class="btn pri">Apply</button>
+</div>
+<article style="flex: 1; overflow: hidden; padding: 20px 64px 0 34px; font-size: 15px; line-height: 23px; max-width: 800px">
+<h1 style="font-size: 28px; line-height: 36px; margin: 0 0 8px; font-weight: 600">Runner event stream</h1>
+<h2>Goal</h2>
+<p>The runner reports what happens in a run as it happens, so no client polls for status.</p>
+<h2>Architecture</h2>
+<figure role="img" aria-label="Runner streams events to the engine, which relays them to Drey, Mission Control and the phone client" style="margin: 6px 0 4px; padding: 18px 16px; border: 1px solid #3b3d42; border-radius: 8px; display: flex; align-items: center; gap: 8px">
+<div class="nd">Runner</div>
+<div class="ar"><span>SSE</span><i></i></div>
+<div class="nd">Engine</div>
+<div class="ar"><span>/api/events</span><i></i></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><div class="nd">Drey</div><div class="nd">Mission Control</div><div class="nd you">Phone client</div></div>
+</figure>
+<h2>Event kinds</h2>
+<p>started, tool call, silent for N minutes, gate red, done, and <strong>quota</strong>: a slot's remaining share and reset time after every turn. <span class="you">A quota event is sent at most once a minute per slot.</span><span class="cur" aria-hidden="true"></span></p>
+<h2>Clients subscribe through the engine</h2>
+<p>Drey, Mission Control and the phone client never open the runner's stream. The engine subscribes once and relays the events on its own <code style="font-size: 13px">/api/events</code>.</p>
+</article>
+</main>
+<aside style="width: 380px; flex-shrink: 0; background: #222326; border-left: 1px solid #3b3d42; display: flex; flex-direction: column">
+<div style="height: 36px; display: flex; align-items: center; padding: 0 12px; font-weight: 600">Assistant</div>
+<div style="flex: 1; padding: 8px 16px; display: flex; flex-direction: column; gap: 14px; font-size: 14px; line-height: 21px">
+<div style="align-self: flex-end; max-width: 300px; background: #2c2d31; border-radius: 8px; padding: 10px 12px">Clients should not talk to the runner directly. Route them through the engine and update the diagram.</div>
+<div style="display: flex; align-items: center; gap: 8px; color: #b3b7bc"><span aria-hidden="true" style="color: #93c47f">✓</span>Edited 3 sections · diagram updated</div>
+</div>
+<div style="margin: 12px; border: 1px solid #747980; border-radius: 12px; padding: 10px 12px">
+<div style="display: flex; gap: 6px; flex-wrap: wrap"><span style="display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; background: #1d2a33; color: #8ecbef; border-radius: 4px; font-size: 13px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>Live edit</span><span style="display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; background: #2a2519; color: #e0bb6e; border-radius: 4px; font-size: 13px">2 edits of yours go along<button type="button" aria-label="Leave out your edits" style="border: 0; background: transparent; color: inherit; padding: 0">×</button></span></div>
+<input type="text" aria-label="Message" value="Rate-limit the quota event like I wrote, and say so in the diagram." style="display: block; width: 100%; box-sizing: border-box; margin-top: 8px; height: 28px; background: transparent; border: 0; color: #f4f5f6; font-size: 14px">
+</div>
+</aside>
+</div>
+<footer style="height: 28px; flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: 0 12px; background: #222326; border-top: 1px solid #3b3d42; color: #b3b7bc"><span>311 words</span><span style="margin-left: auto">Autopilot · On</span><span>Settings</span></footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
