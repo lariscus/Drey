@@ -37,8 +37,8 @@ describe('RunReaper — the hang watchdog, the run limits and the context cap', 
     await sup.idle();
     expect(settles).toEqual([id]);
     // req-176: the one hand-back is the store's release (it was the ticket commit), and only one:
-    // refused in the claim stage, retreated, written back (R-31).
-    expect(store.of('release').map((c) => c.stage)).toEqual(['plan', 'prioritized']);
+    // refused in the claim stage, back where the ticket sat — a lifecycle stage (R-31).
+    expect(store.of('release').map((c) => c.stage)).toEqual(['plan', 'active']);
     expect(store.of('comment').filter((c) => (c.text ?? '').startsWith('failed:'))).toHaveLength(1);
     expect((await runnerNotes(dirs.fleet, id)).some((line) => line.startsWith('hung:'))).toBe(true);
   });

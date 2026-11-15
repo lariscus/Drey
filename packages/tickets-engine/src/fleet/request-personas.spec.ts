@@ -12,7 +12,6 @@ describe('persona dispatch (E3, ADR-0088)', () => {
     const result = composeRunRequest(
       base({
         workingPhase: phase('plan', { handover: 'agent plan-default', worker: 'opencode', model: 'zai/glm-5.3' }),
-        promptText: 'Phase template.',
         persona: PIA,
       }),
     );
@@ -24,7 +23,6 @@ describe('persona dispatch (E3, ADR-0088)', () => {
     expect(result.persona).toBe('pia');
     expect(result.request.recordWorker).toBeUndefined(); // a persona is configuration, never a ticket worker pin
     expect(result.request.instruction).toContain('You are Pia.');
-    expect(result.request.instruction).not.toContain('Phase template.');
   });
 
   it('a persona with a harness the fleet cannot run leaves the ring in charge', () => {
@@ -42,12 +40,13 @@ describe('persona dispatch (E3, ADR-0088)', () => {
     expect(result.persona).toBe('pia'); // the persona still dispatched — prompt, memory, stamp
   });
 
-  it('a persona without a prompt keeps the phase template as the instruction base', () => {
-    const result = composeRunRequest(base({ promptText: 'Phase template.', persona: { ...PIA, prompt: null } }));
+  it('a persona without a prompt carries no instruction base (req-307: the persona prompt is the only one) and still dispatches', () => {
+    const result = composeRunRequest(base({ persona: { ...PIA, prompt: null } }));
     if (!result.ok) {
       throw new Error(result.error);
     }
-    expect(result.request.instruction).toContain('Phase template.');
+    expect(result.request.instruction).not.toContain('You are Pia.');
+    expect(result.request.instruction).toContain('Completion discipline');
     expect(result.persona).toBe('pia');
   });
 
@@ -72,12 +71,12 @@ describe('persona dispatch (E3, ADR-0088)', () => {
     expect(instruction).toContain('- lesson 6'); // oldest of the last 20
     expect(instruction).not.toContain('- lesson 5'); // the line cap drops it
     // persona-less bytes stay identical — no memory, no section
-    const bare = composeRunRequest(base({ promptText: 'Phase template.' }));
+    const bare = composeRunRequest(base({}));
     if (!bare.ok) {
       throw new Error(bare.error);
     }
     expect(bare.request.instruction).not.toContain('## Memory');
-    const again = composeRunRequest(base({ promptText: 'Phase template.' }));
+    const again = composeRunRequest(base({}));
     if (!again.ok) {
       throw new Error(again.error);
     }
@@ -121,10 +120,9 @@ describe('scout runs (E8, concept §5.6)', () => {
       base({
         card: scoutCard(),
         ticketText: NO_CRITERIA,
-        workingPhase: phase('prioritized', { handover: 'agent plan-default' }),
-        nextPhaseId: 'plan',
-        nextPhaseClaims: true,
-        dispatchedBy: 'prioritized',
+        workingPhase: phase('active', { handover: 'agent plan-default' }),
+        cursor: { at: 1, length: 2 },
+        dispatchedBy: 'active',
       }),
     );
     if (!result.ok) {
@@ -133,13 +131,11 @@ describe('scout runs (E8, concept §5.6)', () => {
     expect(result.request.form).toBe('scout');
     expect(result.request.gate).toBe('none');
     expect(result.request.acceptance).toEqual([]);
-    expect(result.request.nextPhase).toBeNull(); // the ticket stays where it sits
-    expect(result.request.nextPhaseDir).toBeNull();
-    expect(result.request.claimIdentity).toBeNull();
+    expect(result.request.cursor).toBeUndefined(); // the ticket stays where it sits: no cursor rides a scout
     expect(result.request.worktreePath).toBe('W:/drey'); // the read ground, no worktree path
     expect(result.request.repoPath).toBe('W:/drey');
     expect(result.request.baseRef).toBeNull();
-    expect(result.request.column).toBe('prioritized');
+    expect(result.request.column).toBe('active');
     expect(result.request.instruction).toContain('Scout discipline');
     expect(result.request.instruction).toContain('Read ground: W:/drey (the "drey" checkout)');
     expect(result.request.instruction).not.toContain('Completion discipline');
@@ -177,7 +173,7 @@ describe('scout runs (E8, concept §5.6)', () => {
 
   it('a persona scout signs the report and rides provider, model, prompt and memory', () => {
     const PIA = { id: 'pia', worker: 'claude-code', model: 'sonnet', prompt: 'You are Pia.', memory: '# Memory\n\n- lesson\n' };
-    const result = composeRunRequest(base({ card: scoutCard(), ticketText: NO_CRITERIA, promptText: 'Phase template.', persona: PIA }));
+    const result = composeRunRequest(base({ card: scoutCard(), ticketText: NO_CRITERIA, persona: PIA }));
     if (!result.ok) {
       throw new Error(result.error);
     }
@@ -186,7 +182,6 @@ describe('scout runs (E8, concept §5.6)', () => {
     expect(result.persona).toBe('pia');
     expect(result.request.instruction).toContain('by pia.');
     expect(result.request.instruction).toContain('You are Pia.');
-    expect(result.request.instruction).not.toContain('Phase template.'); // the persona's prompt is the base
     expect(result.request.instruction).toContain('## Memory');
   });
 

@@ -12,8 +12,8 @@ import type { StartOutcome, SupervisorRecord } from './run/run-record';
 
 /**
  * E14-5b against a REAL `dk` and a real checkout: the chain reads its board from the store's
- * files, dispatches a ticket with the dk target, and moves a ci-green ticket with one real
- * `dk put` (legacy patch -> bridge -> document, validated by dk itself). Skipped when `dk` is missing.
+ * files and dispatches an `active` ticket by its chain holder with the dk target, leaving the
+ * ticket a human claimed alone; dk's own validation accepts every commit. Skipped when `dk` is missing.
  */
 const bin = process.env['DREY_DK_BIN'] ?? 'dk';
 
@@ -36,12 +36,9 @@ const PIPELINE = [
   'phases:',
   '  - { id: inbox, title: Inbox, handover: manual }',
   '  - { id: prioritized, title: Prioritized, handover: manual }',
-  '  - { id: plan, title: Plan, handover: agent plan-default, worker: opencode }',
-  '  - { id: plan-review, title: Plan review, handover: ci, ci: npm run check }',
-  '  - { id: build, title: Build, handover: agent build-default, claim: true }',
-  '  - { id: commit, title: Commit, claim: true, handover: manual }',
   '  - { id: done, title: Done, handover: none }',
   'priorities: [urgent, high, normal, low]',
+  'flow: ben; you',
   '---',
   'Prose.',
   '',
@@ -62,9 +59,9 @@ describe.skipIf(!found.ok)('the chain over a real dk store (E14-5b)', { timeout:
     execFileSync('git', args, { cwd: storeDir, env, windowsHide: true, stdio: 'pipe' });
   };
 
-  /** A ticket with Drey's description and acceptance chapters, moved into `stage`. */
+  /** A ticket with Drey's description and acceptance chapters, moved into `stage` with the chain `ben; you` standing at Ben. */
   const ticket = (title: string, stage: string): string => {
-    dk(['add', '--unclaimed', '-m', title, '--set', 'x-rank=5000']);
+    dk(['add', '--unclaimed', '-m', title, '--set', 'x-rank=5000', '--set', 'x-chain=ben;you', '--set', 'x-at=1']);
     const n = Number(/t-(\d+)/.exec(dk(['ls']).split('\n').filter((l) => l.startsWith('t-')).at(-1) ?? '')?.[1]);
     const id = `t-${n}`;
     const shown = dk(['show', id]);
@@ -109,18 +106,20 @@ describe.skipIf(!found.ok)('the chain over a real dk store (E14-5b)', { timeout:
       .replace('values = ["critical", "high", "normal", "low"]', 'values = ["urgent", "high", "normal", "low"]');
     writeFileSync(
       tomlPath,
-      `${toml}\n[stages]\nvalues = ["inbox", "prioritized", "plan", "plan-review", "build", "commit", "done"]\ninitial = "inbox"\nterminal = ["done"]\nclaim = ["plan", "build", "commit"]\ncancelled = "cancelled"\n`,
+      `${toml}\n[stages]\nvalues = ["inbox", "prioritized", "active", "running", "done"]\ninitial = "inbox"\nterminal = ["done"]\nclaim = ["running"]\ncancelled = "cancelled"\n`,
     );
     git(['commit', '-q', '-am', 'stages']);
     git(['checkout', '-q', 'tickets']);
     env = { ...env, DK_STORE: storeDir };
     process.env['DK_STORE'] = storeDir;
 
-    mkdirSync(path.join(metaDir, 'tickets', '_meta', 'prompts'), { recursive: true });
+    mkdirSync(path.join(metaDir, 'tickets', '_meta', 'personas', 'ben'), { recursive: true });
+    mkdirSync(path.join(metaDir, 'tickets', '_meta', 'personas', 'you'), { recursive: true });
     writeFileSync(path.join(metaDir, 'tickets', '_meta', 'pipeline.md'), PIPELINE);
     writeFileSync(path.join(metaDir, 'tickets', '_meta', 'repos.md'), REPOS);
-    writeFileSync(path.join(metaDir, 'tickets', '_meta', 'prompts', 'plan-default.md'), 'Work the plan step.');
-    writeFileSync(path.join(metaDir, 'tickets', '_meta', 'prompts', 'build-default.md'), 'Build it.');
+    writeFileSync(path.join(metaDir, 'tickets', '_meta', 'personas', 'ben', 'persona.md'), ['---', 'title: ben', 'role: builder', 'worker: opencode', 'models:', '  default: opus', '  pool: [opus]', 'skills: []', '---', ''].join('\n'));
+    writeFileSync(path.join(metaDir, 'tickets', '_meta', 'personas', 'ben', 'prompt.md'), 'Build it.');
+    writeFileSync(path.join(metaDir, 'tickets', '_meta', 'personas', 'you', 'persona.md'), ['---', 'title: You', 'kind: human', 'role: custom', 'worker: opencode', '---', ''].join('\n'));
     mkdirSync(fleetRoot, { recursive: true });
     store = { dkPath: bin === 'dk' ? '' : bin, dkStore: storeDir, dkDataDir: path.join(root, 'data'), dkCheckout: '', trailers: false };
   }, 120_000);
@@ -144,11 +143,10 @@ describe.skipIf(!found.ok)('the chain over a real dk store (E14-5b)', { timeout:
     return { port, requests };
   }
 
-  it('dispatches a plan ticket from the checkout with the dk target, then moves a ci-green ticket with one real put', async () => {
-    const planTicket = ticket('Plan me', 'plan');
-    const heldTicket = ticket('Held by a human', 'plan');
+  it('dispatches an active ticket by its chain holder from the checkout with the dk target, and leaves the one a human claimed', async () => {
+    const freeTicket = ticket('Build me', 'active');
+    const heldTicket = ticket('Held by a human', 'active');
     dk(['claim', '--size', 'S', heldTicket], 'henrik');
-    const ciTicket = ticket('Check me', 'plan-review');
 
     const fleet = fakePort();
     const log = (): void => undefined;
@@ -171,21 +169,20 @@ describe.skipIf(!found.ok)('the chain over a real dk store (E14-5b)', { timeout:
       pools: normalizeFleetPools({ opencode: { size: 2 } }),
     });
     await orch.setMaster('run');
-    await vi.waitFor(() => expect(dk(['show', ciTicket])).toMatch(/^stage: build$/m), { timeout: 30_000 });
+    await vi.waitFor(() => expect(fleet.requests.length).toBeGreaterThan(0), { timeout: 30_000 });
     orch.dispose();
 
-    // The dispatch: only the free plan ticket, with what the store holds.
+    // The dispatch: only the free ticket, with what the store holds and the persona's prompt.
     const number = (id: string): number => Number(id.slice(2));
     const display = (id: string): string => `T-${String(number(id)).padStart(4, '0')}`;
-    expect(fleet.requests.map((r) => r.ticketId)).toEqual([display(planTicket)]);
-    expect(fleet.requests[0]).toMatchObject({ column: 'plan', nextPhase: 'plan-review', acceptance: ['npm run verify:unit'] });
-    expect(fleet.requests[0]!.dk).toMatchObject({ store: storeDir, retreatStage: 'prioritized' });
+    expect(fleet.requests.map((r) => r.ticketId)).toEqual([display(freeTicket)]);
+    expect(fleet.requests[0]).toMatchObject({ column: 'active', cursor: { at: 1, length: 2 }, acceptance: ['npm run verify:unit'] });
+    expect(fleet.requests[0]!.instruction).toContain('Build it.');
+    expect(fleet.requests[0]!.dk).toMatchObject({ store: storeDir });
 
-    // The ci move: one real put - the stage changed, the claim fields are dk's own (nobody holds it), the Log line is in the body.
-    const moved = dk(['show', ciTicket]);
-    expect(moved).toMatch(/^stage: build$/m);
-    expect(moved).toMatch(/^owner: *$/m);
-    expect(moved).toContain('ci check passed');
+    // The chain moved nothing itself: the claimed ticket is still the human's, the free one still waits for its run's claim.
+    expect(dk(['show', heldTicket])).toMatch(/^owner: henrik$/m);
+    expect(dk(['show', freeTicket])).toMatch(/^stage: active$/m);
     expect(() => dk(['validate'])).not.toThrow(); // dk's own validation (history replay included) accepts every commit the chain made
   });
 });

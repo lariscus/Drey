@@ -78,6 +78,6 @@ describe('RunStarter worktree wiring', () => {
     expect((started as { error: string }).error).toContain('is locked');
     expect(sup.list()).toHaveLength(0);
     expect(adapter.handles).toHaveLength(0);
-    expect(store.of('release').map((c) => c.stage)).toEqual(['plan', 'prioritized']); // back where it sat, else one stage back
+    expect(store.of('release').map((c) => c.stage)).toEqual(['plan', 'active']); // back where it sat (refused in the claim stage), else active
   });
 });

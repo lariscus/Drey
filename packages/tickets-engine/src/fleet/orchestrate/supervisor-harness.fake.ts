@@ -81,10 +81,10 @@ export function fakeAdapter(id: ProviderAdapter['id'] = 'opencode'): FakeAdapter
 /** The fake store's target; its stages are the phases the requests below move through. */
 export const DK_TARGET: RunDkTarget = { bin: 'dk', store: 'E:/store', dataDir: '', checkout: '', parkStage: null, trailers: false };
 
-/** A store that holds T-0001 in `plan` (the claim stage) and takes releases into the pipeline's stages. */
+/** A store that holds T-0001 in `plan` (the claim stage) and takes releases into the pipeline's stages; `active` is where a run that moved nothing hands the ticket back (req-307). */
 export function planStore(): FakeTicketStore {
   const store = new FakeTicketStore();
-  store.stages = ['inbox', 'prioritized', 'plan', 'build', 'review', 'commit', 'done'];
+  store.stages = ['inbox', 'prioritized', 'plan', 'build', 'review', 'commit', 'active', 'done'];
   store.stage = 'plan';
   store.claimStage = 'plan';
   return store;

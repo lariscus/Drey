@@ -103,7 +103,7 @@ export function fakePort(): FakeFleet {
 export function failedRecord(ticket: string, failure: string): SupervisorRecord {
   const info = runInfo(`R-old-${ticket}`, { ticketId: ticket, provider: 'opencode', branch: `t/${ticket}` });
   return {
-    info: { ...info, state: 'failed', pid: null, startedAt: '2026-10-18T11:00:00Z', endedAt: '2026-10-18T11:20:00Z', lastActivity: '2026-10-18T11:20:00Z', gateFailure: failure },
+    info: { ...info, state: 'failed', pid: null, startedAt: '2026-10-18T11:00:00Z', endedAt: '2026-10-18T11:20:00Z', lastActivity: '2026-10-18T11:20:00Z', gateFailure: failure, chainPosition: { at: 1, length: 2 } },
     request: { ticketId: ticket, column: 'active', cursor: { at: 1, length: 2 } } as RunRequest,
   };
 }

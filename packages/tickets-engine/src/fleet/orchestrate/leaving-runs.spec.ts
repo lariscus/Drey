@@ -34,20 +34,20 @@ const BEHIND = [
   { when: 'merge-base --is-ancestor', fail: 'not an ancestor' },
 ];
 
-const STAY_PUT = ['plan', 'prioritized'];
+const STAY_PUT = ['plan', 'active'];
 
 describe("the builder's sync-main at a run's green end (req-267)", () => {
   const dirs = useTempDirs();
   const request = (over: Partial<RunRequest> = {}): RunRequest => runRequest(dirs.vault, { baseRef: 'main', leaving: ['sync-main'], ...over });
 
-  it('merges main into the branch after the gate, then the ticket moves on', async () => {
+  it('merges main into the branch after the gate, then the ticket is handed on by its cursor', async () => {
     const git = scriptedGit([...BEHIND, { when: 'merge --no-ff', out: '' }, { when: 'rev-parse --verify HEAD', out: 'merge000000\n' }]);
     const { sup, adapter, store } = harness(dirs.fleet, { ticketsGit: git });
-    const id = await startRun(sup, request());
+    const id = await startRun(sup, request({ cursor: { at: 1, length: 2 } }));
     endTurn(adapter.handles[0]!);
     await settled(sup, id, 'done');
     expect(git.calls.some((c) => c.startsWith('merge --no-ff --no-edit -m Merge main into t/T-0001 (sync-main, T-0001)'))).toBe(true);
-    expect(store.of('release').map((c) => c.stage)).toEqual(['build']);
+    expect(store.of('release').map((c) => c.stage)).toEqual(['active']);
     expect((await runnerNotes(dirs.fleet, id)).join('\n')).toContain('sync-main: merged main');
   });
 

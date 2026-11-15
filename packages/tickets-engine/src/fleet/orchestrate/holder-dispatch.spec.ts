@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { LedgerWrite } from '../../core/ledger';
-import { ChainHarness, ONE, STORE } from './chain-harness.fake';
+import { ChainHarness, ONE } from './chain-harness.fake';
 
 /**
- * req-257: the runner on persona chains — on a lifecycle store the holder
+ * req-257: the runner on persona chains — the holder
  * (the chain's entry at the cursor) is who runs, through the real
  * composition over the fake store: the cursor rides the request, a `:shape`
  * entry, a You entry and a missing persona start nothing (each says why),
@@ -11,10 +11,9 @@ import { ChainHarness, ONE, STORE } from './chain-harness.fake';
  */
 
 let h: ChainHarness;
-const LIFECYCLE = { ...STORE, lifecycle: true };
 const STANDARD = ['paul:shape', 'paul', 'ben', 'you'];
 
-describe('the holder dispatch on a lifecycle store (req-257)', () => {
+describe('the holder dispatch (req-257)', () => {
   beforeEach(async () => {
     h = new ChainHarness();
     await h.setUp();
@@ -30,7 +29,7 @@ describe('the holder dispatch on a lifecycle store (req-257)', () => {
   it("dispatches the holder's run with its cursor — no next column, the persona of the entry", async () => {
     h.io.seed('T-0300', 'active', { chain: STANDARD, extensions: { at: '3' } });
     const { orch, fleet } = h.build();
-    await orch.configure(h.config({ store: LIFECYCLE }));
+    await orch.configure(h.config());
     await orch.setMaster('run');
 
     expect(fleet.records.map((r) => r.request.ticketId)).toEqual(['T-0300']);
@@ -38,8 +37,6 @@ describe('the holder dispatch on a lifecycle store (req-257)', () => {
     expect(request.cursor).toMatchObject({ at: 3, length: 4, entries: STANDARD, crew: { personas: expect.arrayContaining(['paul', 'ben', 'you']) as unknown } });
     expect(request.instruction).toContain('3. ben — you, now');
     expect(request.instruction).toContain('SEND-BACK: <position>');
-    expect(request.nextPhase).toBeNull();
-    expect(request.dk?.lifecycle).toBe(true);
     expect(fleet.start.mock.calls[0]![1]).toEqual({ persona: 'ben' });
   });
 
@@ -48,7 +45,7 @@ describe('the holder dispatch on a lifecycle store (req-257)', () => {
     h.io.seed('T-0302', 'active', { chain: STANDARD, extensions: { at: '4' } });
     h.io.seed('T-0303', 'active', { chain: ['paul', 'bob', 'you'], extensions: { at: '2' } });
     const { orch, fleet, logs } = h.build();
-    await orch.configure(h.config({ store: LIFECYCLE }));
+    await orch.configure(h.config());
     await orch.setMaster('run');
 
     expect(fleet.records).toEqual([]);
@@ -62,7 +59,7 @@ describe('the holder dispatch on a lifecycle store (req-257)', () => {
     h.io.seed('T-0310', 'active', { chain: STANDARD, extensions: { at: '3' } });
     h.io.seed('T-0311', 'active', { chain: STANDARD, extensions: { at: '3' } });
     const { orch, fleet, logs } = h.build();
-    await orch.configure(h.config({ store: LIFECYCLE }));
+    await orch.configure(h.config());
     await orch.setMaster('run');
 
     expect(fleet.records).toHaveLength(1);
@@ -76,7 +73,7 @@ describe('the holder dispatch on a lifecycle store (req-257)', () => {
     h.io.seed('T-0320', 'active', { chain: STANDARD, rank: 1, extensions: { at: '2' } });
     h.io.seed('T-0321', 'active', { chain: STANDARD, rank: 2, extensions: { at: '3' } });
     const { orch, fleet } = h.build();
-    await orch.configure(h.config({ store: LIFECYCLE, pools: ONE }));
+    await orch.configure(h.config({ pools: ONE }));
     await orch.setMaster('run');
 
     expect(fleet.records.map((r) => r.request.ticketId)).toEqual(['T-0321']);
@@ -87,14 +84,14 @@ describe('the holder dispatch on a lifecycle store (req-257)', () => {
   it('req-148: the queue is empty while the Autopilot is off', async () => {
     h.io.seed('T-0322', 'active', { chain: STANDARD, extensions: { at: '3' } });
     const { orch } = h.build();
-    await orch.configure(h.config({ store: LIFECYCLE, pools: ONE }));
+    await orch.configure(h.config({ pools: ONE }));
     expect(orch.status().queued).toEqual([]);
   });
 
   it("req-78: a red gate's target runs with the loop on its cursor and the failure in its brief", async () => {
     h.io.seed('T-0323', 'active', { chain: ['paul', 'ben', 'tessa(on-red paul)', 'you'], extensions: { at: '1', 'return-to': '3', 'red-backs': '1' } });
     const { orch, fleet } = h.build();
-    await orch.configure(h.config({ store: LIFECYCLE }));
+    await orch.configure(h.config());
     await orch.setMaster('run');
 
     const request = fleet.records[0]!.request;
@@ -105,7 +102,7 @@ describe('the holder dispatch on a lifecycle store (req-257)', () => {
   it('a held persona starts nothing — the owner paused it', async () => {
     h.io.seed('T-0330', 'active', { chain: STANDARD, extensions: { at: '3' } });
     const { orch, fleet, logs } = h.build();
-    await orch.configure(h.config({ store: LIFECYCLE }));
+    await orch.configure(h.config());
     await orch.setPersonaPaused('ben', true);
     await orch.setMaster('run');
 
@@ -119,7 +116,7 @@ describe('the holder dispatch on a lifecycle store (req-257)', () => {
     h.io.seed('T-0332', 'inbox', { chain: STANDARD });
     const lines: LedgerWrite[] = [];
     const { orch } = h.build({ events: { ledger: (write) => lines.push(write) } });
-    await orch.configure(h.config({ store: LIFECYCLE }));
+    await orch.configure(h.config());
 
     expect(lines.filter((l) => l.kind === 'hold')).toEqual([
       { kind: 'hold', ticket: 'T-0330', persona: 'ben', position: 3, length: 4 },

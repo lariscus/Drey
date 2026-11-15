@@ -137,10 +137,10 @@ describe('RunnerHandover — a retiring runner leaves its runs to the successor'
     // req-176: the runner log says so (it was a ticket Log line).
     expect(second.logs).toContain(`run ${id}: resumed in place after a runner handover`);
 
-    // and it ends like any run: agent done, gate green, the ticket moves
+    // and it ends like any run: agent done, gate green, the ticket is released
     endTurn(second.adapter.handles[0]!);
     await settled(second.sup, id, 'done');
-    expect(store.of('release').map((c) => c.stage)).toEqual(['build']);
+    expect(store.of('release').map((c) => c.stage)).toEqual(['plan', 'active']); // no cursor: the green end releases the ticket where it sat (req-307)
   });
 
   it("keeps a resumed session's usage base across the handover, so the run's counts go on from its own (req-53)", async () => {

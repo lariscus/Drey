@@ -8,20 +8,20 @@ import { endTurn, harness, runnerNotes, runRequest, startRun, storedRecord, stre
 
 /**
  * What a worker's exit does to its run (ADR-0077). Since req-176 the
- * ticket is written only through the claim: a move is the release into the
- * next stage, every other end releases where the ticket sat (in the claim
- * stage `plan`: refused, retreated, written back — R-31).
+ * ticket is written only through the claim: a green end with a cursor hands on by it
+ * (one release into `active`, req-257), every other end releases where the ticket sat
+ * (req-307: in the claim stage `plan` the release to it is refused, so `active`).
  */
-const STAY_PUT = ['plan', 'prioritized'];
+const STAY_PUT = ['plan', 'active'];
 
 describe('RunCompletion — the gate, the move and the other ends', () => {
   const dirs = useTempDirs();
   const request = (over: Partial<RunRequest> = {}): RunRequest => runRequest(dirs.vault, over);
   const notes = (runId: string): Promise<string[]> => runnerNotes(dirs.fleet, runId);
 
-  it('a green worker passes the gate and moves the ticket on (one release)', async () => {
+  it('a green worker with a cursor passes the gate and hands the ticket on by it (one release into active)', async () => {
     const { sup, adapter, gate, store } = harness(dirs.fleet);
-    const id = await startRun(sup, request());
+    const id = await startRun(sup, request({ cursor: { at: 1, length: 3 } }));
     expect(sup.get(id)?.state).toBe('running');
     // The ticket carries the live run now: the run's own claim.
     expect(store.of('claim')[0]?.actor).toContain(id.toLowerCase());
@@ -32,11 +32,22 @@ describe('RunCompletion — the gate, the move and the other ends', () => {
 
     // The gate ran exactly the ticket's commands, in the worktree.
     expect(gate[0]).toEqual(['npm run verify:unit']);
-    // The ticket moved to the next phase, in exactly one release.
-    expect(store.of('release').map((c) => c.stage)).toEqual(['build']);
-    expect(store.stage).toBe('build');
-    expect(store.of('comment').at(-1)?.text).toContain('moving to build');
+    // The ticket was handed on by the cursor, in exactly one release.
+    expect(store.of('release').map((c) => c.stage)).toEqual(['active']);
+    expect(store.stage).toBe('active');
+    expect(store.of('comment').at(-1)?.text).toContain('handed over at position 1 of 3');
     expect(await fsp.readdir(dirs.vault).then((names) => names.filter((n) => n !== '_worktrees' && n !== '_workcopy'))).toEqual([]);
+  });
+
+  it('a green worker without a cursor passes the gate and moves nothing: the ticket goes back where it sat (one release)', async () => {
+    const { sup, adapter, gate, store } = harness(dirs.fleet);
+    const id = await startRun(sup, request());
+    endTurn(adapter.handles[0]!);
+    await settled(sup, id, 'done');
+    expect(gate[0]).toEqual(['npm run verify:unit']);
+    expect(sup.get(id)?.gateResult).toBe('green');
+    expect(store.of('release').map((c) => c.stage)).toEqual(STAY_PUT);
+    expect(store.of('comment').map((c) => c.text).join(' ')).not.toContain('handed over');
   });
 
   it('a run is `done` in memory before its settle has written the ticket — only onRunSettled marks the end (D-4)', async () => {
@@ -124,7 +135,7 @@ describe('RunCompletion — the gate, the move and the other ends', () => {
     expect(sup.get(id)?.gateResult).toBeNull();
     expect(sup.get(id)?.blocked).toBe('merge conflict in specs/changelog.md — not resolvable');
     // The ticket stays where it sat; no move was performed.
-    expect(store.of('release').map((c) => c.stage)).not.toContain('build');
+    expect(store.of('release').map((c) => c.stage)).toEqual(STAY_PUT);
     expect(store.of('comment').at(-1)?.text).toMatch(/^blocked: /);
     // The record is durable: run.json carries the reason.
     expect((await storedRecord(dirs.fleet, id)).info.blocked).toBe('merge conflict in specs/changelog.md — not resolvable');
@@ -157,7 +168,7 @@ describe('RunCompletion — the gate, the move and the other ends', () => {
 
     it('a structural run passes when the plan produced acceptance criteria', async () => {
       const { sup, adapter, gate, store } = harness(dirs.fleet);
-      const id = await startRun(sup, request({ acceptance: [], gate: 'structural' }));
+      const id = await startRun(sup, request({ acceptance: [], gate: 'structural', cursor: { at: 1, length: 2 } }));
 
       // The plan's deliverable: acceptance criteria appear in the worker's copy of the ticket…
       const copy = ticketCopyPathFor(dirs.vault, 'T-0001');
@@ -168,7 +179,7 @@ describe('RunCompletion — the gate, the move and the other ends', () => {
       endTurn(adapter.handles[0]!);
       await settled(sup, id, 'done');
       expect(gate).toEqual([]);
-      expect(store.of('release').map((c) => c.stage)).toEqual(['build']);
+      expect(store.of('release').map((c) => c.stage)).toEqual(['active']); // handed on by the cursor
     });
   });
 });

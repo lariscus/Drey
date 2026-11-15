@@ -22,12 +22,13 @@ describe('SettledRuns', () => {
   });
 
   it('a run that ends done but blocked holds its ticket — no re-dispatch into the same wall', async () => {
-    h.io.seed('T-0001', 'plan');
+    h.seedRun('T-0001');
     const { orch, fleet } = h.build();
     await orch.configure(h.config());
     await orch.setMaster('run');
     expect(fleet.records).toHaveLength(1);
 
+    const before = h.io.textOf('T-0001');
     await orch.onRunSettled(fleet.end(fleet.records[0]!, { state: 'done', blocked: 'merge conflict in specs/changelog.md' }));
 
     // The ticket waits for the owner: a pass triggered afresh (the
@@ -35,11 +36,12 @@ describe('SettledRuns', () => {
     await orch.setMaster('halted');
     await orch.setMaster('run');
     expect(fleet.records).toHaveLength(1); // held like an owner-stopped run
-    expect(h.io.writes).toEqual([]); // the blocked comment is the run's own release, not the chain's
+    expect(h.io.comments).toEqual([]); // the blocked comment is the run's own release, not the chain's
+    expect(h.io.textOf('T-0001')).toBe(before);
   });
 
   it('a run the owner stopped is not re-dispatched while the ticket stays where it is', async () => {
-    h.io.seed('T-0001', 'plan');
+    h.seedRun('T-0001');
     const { orch, fleet } = h.build({ now: () => new Date('2026-10-18T12:00:00Z') });
     await orch.configure(h.config());
     await orch.setMaster('run');
@@ -53,19 +55,20 @@ describe('SettledRuns', () => {
 
   describe('the E7 ledger', () => {
     it('a dispatch writes the ledger dispatched line', async () => {
-      h.io.seed('T-0001', 'plan');
+      h.seedRun('T-0001');
       const events = { ledger: vi.fn() };
       const { orch, fleet } = h.build({ events });
       await orch.configure(h.config());
       await orch.setMaster('run');
 
       expect(fleet.records).toHaveLength(1);
-      expect(events.ledger).toHaveBeenCalledTimes(1);
-      expect(events.ledger).toHaveBeenCalledWith({ kind: 'dispatched', ticket: 'T-0001', persona: null, model: 'zai/glm-5.3' });
+      const lines = events.ledger.mock.calls.map(([line]) => line as { readonly kind: string });
+      expect(lines.filter((line) => line.kind === 'dispatched')).toHaveLength(1); // the holder pass also writes its own hold line (req-274)
+      expect(events.ledger).toHaveBeenCalledWith({ kind: 'dispatched', ticket: 'T-0001', persona: 'ben', model: 'opus' });
     });
 
     it('a settled run with usage writes the run_settled ledger line; an empty one writes nothing', async () => {
-      h.io.seed('T-0001', 'plan');
+      h.seedRun('T-0001');
       const events = { ledger: vi.fn() };
       const { orch, fleet } = h.build({ events });
       await orch.configure(h.config());

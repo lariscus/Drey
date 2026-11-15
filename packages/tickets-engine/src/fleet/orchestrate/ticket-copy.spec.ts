@@ -34,7 +34,7 @@ describe('TicketCopy — the worker’s working copy of a store ticket', () => {
     await fsp.writeFile(copyPath(), t.store.text.replace('## Log', '## Plan\n\n### Acceptance criteria\n\n- [ ] `echo ok`\n\n## Log'), 'utf8');
     endTurn(t.adapter.handles[0]!);
     await settled(t.sup, id, 'done');
-    expect(t.store.of('release').map((c) => c.stage)).toEqual(['commit']);
+    expect(t.store.of('release').map((c) => c.stage)).toEqual(['prioritized']); // no cursor: a green end releases the ticket where it sat (req-307)
   });
 
   it('a stopped run still hands back what the worker wrote (D-30)', async () => {

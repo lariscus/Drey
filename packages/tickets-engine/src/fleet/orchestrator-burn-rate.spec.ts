@@ -14,8 +14,6 @@ import { BurnRateRig, slotView, week } from './routing/burn-rate.fake';
  * the owner's lift dispatches at once, the day turning releases the chain.
  */
 
-const PIPELINE = ['---', 'phases:', '  - { id: inbox, title: Inbox, handover: manual }', '  - { id: plan, title: Plan, handover: agent plan-default, worker: opencode }', '  - { id: done, title: Done, handover: none }', '---', ''].join('\n');
-
 const EVENING = new Date('2026-11-09T22:00:00Z');
 
 let h: ChainHarness;
@@ -49,9 +47,11 @@ async function settle(b: Built): Promise<void> {
 describe('the burn rate holds new starts (req-181)', () => {
   beforeEach(async () => {
     h = new ChainHarness();
-    await h.setUp(PIPELINE);
+    await h.setUp();
+    // One step at a time (the persona's own `parallel:`): with the capacity pool wired, a persona's card counts against no provider pool.
+    await h.write('tickets/_meta/personas/ben/persona.md', ['---', 'title: ben', 'role: builder', 'worker: opencode', 'models:', '  default: opus', '  pool: [opus]', 'parallel: 1', '---', ''].join('\n'));
     for (const id of ['T-0001', 'T-0002', 'T-0003']) {
-      h.io.seed(id, 'plan');
+      h.seedRun(id);
     }
   });
 

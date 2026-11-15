@@ -13,29 +13,33 @@ describe('composeRunRequest — the owner\'s columns (D-29)', () => {
 
   it('refuses a run from a manual column: the fleet takes nothing from it, whoever asks', () => {
     for (const asked of [{}, { workerChoice: 'opencode' }, { handover: 'fresh' as const }, { dispatchedBy: 'inbox' }]) {
-      const result = composeRunRequest(base({ workingPhase: inbox, nextPhaseId: 'shaping', ...asked }));
+      const result = composeRunRequest(base({ workingPhase: inbox, ...asked }));
       expect(result.ok).toBe(false);
-      expect(result.ok ? '' : result.error).toBe("T-0001 sits in Inbox, the owner's column: the fleet takes nothing from it. Move it into an agent column to run it.");
+      expect(result.ok ? '' : result.error).toBe("T-0001 sits in Inbox, the owner's column: the fleet takes nothing from it. Start its chain to run it.");
     }
   });
 
-  it('refuses a column with no handover at all (Done) the same way', () => {
-    const result = composeRunRequest(base({ workingPhase: phase('done', { title: 'Done', handover: 'none' }), nextPhaseId: null }));
-    expect(result.ok).toBe(false);
+  it('refuses the other edge columns (Prioritized, Done) the same way', () => {
+    for (const edge of ['prioritized', 'done']) {
+      const result = composeRunRequest(base({ workingPhase: phase(edge, { title: edge, handover: 'none' }) }));
+      expect(result.ok).toBe(false);
+      expect(result.ok ? '' : result.error).toContain("the owner's column: the fleet takes nothing from it. Start its chain to run it.");
+    }
   });
 
   it('the owner\'s own dialog and Accept\'s commit step stay: neither takes a ticket for the fleet', () => {
     expect(composeRunRequest(base({ workingPhase: inbox, interactive: 'plan' })).ok).toBe(true);
-    expect(composeRunRequest(base({ workingPhase: phase('ready', { handover: 'manual' }), nextPhaseId: null, commitStep: true })).ok).toBe(true);
+    expect(composeRunRequest(base({ workingPhase: phase('done', { handover: 'manual' }), commitStep: true })).ok).toBe(true);
   });
 
-  it('an agent column still runs', () => {
-    expect(composeRunRequest(base({ workingPhase: phase('building', { handover: 'agent build-default' }), nextPhaseId: 'ready' })).ok).toBe(true);
+  it('a working column still runs, whatever its handover says (req-307: the holder dispatches)', () => {
+    expect(composeRunRequest(base({ workingPhase: phase('building', { handover: 'agent build-default' }) })).ok).toBe(true);
+    expect(composeRunRequest(base({ workingPhase: phase('active', { handover: 'manual' }) })).ok).toBe(true);
   });
 });
 
 describe('composeRunRequest — a store ticket has no file (D-30)', () => {
-  const dk = { bin: 'dk', store: 'S:/board', dataDir: '', checkout: '', parkStage: null, retreatStage: null, trailers: false };
+  const dk = { bin: 'dk', store: 'S:/board', dataDir: '', checkout: '', parkStage: null, trailers: false };
 
   it('the brief names the working copy, never the virtual path that exists on no disk', () => {
     const result = composeRunRequest(base({ dk }));
@@ -118,11 +122,10 @@ describe('composeRunRequest — a persona\'s skills ride along (D-46)', () => {
 });
 
 describe('composeRunRequest', () => {
-  it('builds a dispatched run: the pull stays in its phase, the move follows the working column', () => {
+  it('builds a dispatched run: the pull stays in its phase, the pool is the working column', () => {
     const result = composeRunRequest(
       base({
         workingPhase: phase('plan', { handover: 'agent plan-default', worker: 'opencode', model: 'zai/glm-5.3' }),
-        nextPhaseId: 'plan-review',
         dispatchedBy: 'plan',
       }),
     );
@@ -131,26 +134,24 @@ describe('composeRunRequest', () => {
     }
     expect(result.request.phase).toBe('prioritized'); // where the file sits
     expect(result.request.column).toBe('plan'); // the pool whose slot it takes
-    expect(result.request.nextPhase).toBe('plan-review');
     expect(result.request.provider).toBe('opencode');
     expect(result.request.model).toBe('zai/glm-5.3');
-    expect(result.request.claimIdentity).toBeNull();
     expect(result.request.recordWorker).toBeUndefined(); // the orchestrator never re-pins
     expect(result.request.instruction).toContain('Completion discipline');
     expect(result.request.instruction).toContain('It should work.');
   });
 
-  it('a claim-flagged move target stamps the agent identity', () => {
-    const result = composeRunRequest(base({ nextPhaseId: 'build', nextPhaseClaims: true }));
-    if (!result.ok) {
-      throw new Error(result.error);
-    }
-    expect(result.request.claimIdentity).toMatch(/^agent@/);
+  it('a run with a cursor carries it (a green end hands on by it); a run without one carries none', () => {
+    const cursor = { at: 1, length: 3 };
+    const chained = composeRunRequest(base({ workingPhase: phase('active', { handover: 'manual' }), cursor }));
+    const alone = composeRunRequest(base({ workingPhase: phase('active', { handover: 'manual' }) }));
+    expect(chained.ok && chained.request.cursor).toEqual(cursor);
+    expect(alone.ok && alone.request.cursor).toBeUndefined();
   });
 
   it('an owner run records the dialog choice and carries no column', () => {
     const result = composeRunRequest(
-      base({ workingPhase: phase('build', { handover: 'agent build-default' }), nextPhaseId: 'review', workerChoice: 'claude-code/sonnet' }),
+      base({ workingPhase: phase('build', { handover: 'agent build-default' }), workerChoice: 'claude-code/sonnet' }),
     );
     if (!result.ok) {
       throw new Error(result.error);
@@ -177,8 +178,7 @@ describe('composeRunRequest', () => {
       base({
         ticketText: noCriteria,
         workingPhase: phase('plan', { handover: 'agent plan-default', interactive: 'plan-interactive-default' }),
-        nextPhaseId: 'plan-review',
-        nextPhaseDir: '20-plan-review',
+        cursor: { at: 1, length: 3 },
         interactive: 'plan',
       }),
     );
@@ -186,9 +186,7 @@ describe('composeRunRequest', () => {
       throw new Error(result.error);
     }
     expect(result.request.interactive).toBe('plan');
-    expect(result.request.nextPhase).toBeNull(); // the owner moves the ticket
-    expect(result.request.nextPhaseDir).toBeNull();
-    expect(result.request.claimIdentity).toBeNull();
+    expect(result.request.cursor).toBeUndefined(); // the owner moves the ticket: no cursor rides a dialog
     expect(result.request.instruction).toContain('Dialog discipline');
     expect(result.request.instruction).not.toContain('Completion discipline');
     expect(result.request.instruction).toContain('QUESTION:'); // the asking protocol rides the dialog too
@@ -318,9 +316,9 @@ describe('composeRunRequest — the ticket\'s project (req-282)', () => {
   const building = phase('building', { handover: 'agent build-default' });
 
   it('the purpose reaches the instruction and changes the brief digest; an Unassigned ticket composes as before', () => {
-    const plain = composeRunRequest(base({ workingPhase: building, nextPhaseId: 'ready' }));
-    const withProject = composeRunRequest(base({ workingPhase: building, nextPhaseId: 'ready', project: { name: 'Drey', purpose: 'The note app.' } }));
-    const unassigned = composeRunRequest(base({ workingPhase: building, nextPhaseId: 'ready', project: null }));
+    const plain = composeRunRequest(base({ workingPhase: building }));
+    const withProject = composeRunRequest(base({ workingPhase: building, project: { name: 'Drey', purpose: 'The note app.' } }));
+    const unassigned = composeRunRequest(base({ workingPhase: building, project: null }));
     if (!plain.ok || !withProject.ok || !unassigned.ok) {
       throw new Error('expected three composed requests');
     }
@@ -330,8 +328,8 @@ describe('composeRunRequest — the ticket\'s project (req-282)', () => {
   });
 
   it("req-283: the project's id rides the request as projectId (the worker's vault reach), outside the brief", () => {
-    const named = composeRunRequest(base({ workingPhase: building, nextPhaseId: 'ready', project: { id: 'drey', name: 'Drey', purpose: 'The note app.' } }));
-    const anonymous = composeRunRequest(base({ workingPhase: building, nextPhaseId: 'ready', project: { name: 'Drey', purpose: 'The note app.' } }));
+    const named = composeRunRequest(base({ workingPhase: building, project: { id: 'drey', name: 'Drey', purpose: 'The note app.' } }));
+    const anonymous = composeRunRequest(base({ workingPhase: building, project: { name: 'Drey', purpose: 'The note app.' } }));
     if (!named.ok || !anonymous.ok) {
       throw new Error('expected two composed requests');
     }

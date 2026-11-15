@@ -1,7 +1,6 @@
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { TicketStoreError } from '../../ports/ticket-store';
 import type { RunSupervisorDeps } from '../compose-supervisor';
 import type { RunRequest } from '../protocol';
 import { FakeTicketStore } from '../store/ticket-store.fake';
@@ -52,6 +51,20 @@ describe('ClaimRelease — release is the one door', () => {
       expect(t.store.of('put')).toHaveLength(1);
       expect(t.store.text).toMatch(/^x-at: 4$/m);
       expect(t.store.of('comment')[0]?.text).toContain('handed over at position 3 of 6');
+      expect(t.store.of('comment')[0]?.text).toMatch(/^done: /); // E14-6: the keyed status verb leads
+      expect(t.store.calls.map((c) => c.op)).not.toContain('extend');
+      expect((await fsp.readdir(dirs.vault)).filter((name) => name !== '_worktrees' && name !== '_workcopy')).toEqual([]); // not a single ticket file or commit (D-30)
+      expect(await fsp.readdir(path.join(dirs.vault, '_workcopy')).catch(() => [])).toEqual([]); // the working copy went with the run
+      expect(t.timers.armed).toBeNull(); // the keep-alive ended with the release
+    });
+
+    it('a green end of a run without a cursor (a dialog, a commit step) hands the ticket back where it sat, moving nothing', async () => {
+      const t = lifecycleSetup();
+      const id = await startRun(t.sup, request());
+      endTurn(t.adapter.handles[0]!);
+      await settled(t.sup, id, 'done');
+      expect(t.store.of('release').map((c) => c.stage)).toEqual(['active']);
+      expect(t.store.text).toMatch(/^x-at: 3$/m); // no cursor, so nothing was written to it
     });
 
     it('req-257: a send-back to an earlier position moves the cursor there, marks x-sent-back and writes the invalidation — no gate', async () => {
@@ -70,7 +83,7 @@ describe('ClaimRelease — release is the one door', () => {
       const id = await startRun(t.sup, request({ cursor: { at: 3, length: 4, entries: ['paul:shape', 'paul', 'ben', 'you'], sentBack: { from: 4, to: 3 } } }));
       endTurnSaying(t.adapter.handles[0]!, 'SEND-BACK: 1 start over');
       await settled(t.sup, id, 'done');
-      expect(t.store.text).not.toMatch(/^x-at:/m);
+      expect(t.store.text).toMatch(/^x-at: 3$/m); // the cursor stays where it stood
       expect(t.store.text).toMatch(/^x-awaiting: you$/m);
       expect(t.store.of('comment')[0]?.text).toMatch(/^needs-decision: \[second-send-back\] a second send-back from position 3: start over/);
     });
@@ -110,7 +123,7 @@ describe('ClaimRelease — release is the one door', () => {
         const id = await startRun(t.sup, request({ cursor: { at: 4, length: 5, entries: ENTRIES, redBacks: 2, maxRed: 3 } }));
         endTurn(t.adapter.handles[0]!);
         await settled(t.sup, id, 'failed');
-        expect(t.store.text).not.toMatch(/^x-at:/m);
+        expect(t.store.text).toMatch(/^x-at: 3$/m); // the cursor is not moved
         expect(t.store.of('comment')[0]?.text).toMatch(/^failed: /);
         expect(t.sup.get(id)?.redBackTo).toBeUndefined();
       });

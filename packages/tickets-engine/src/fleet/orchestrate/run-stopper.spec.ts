@@ -28,7 +28,7 @@ describe('RunStopper — the owner stops a run', () => {
     const stopped = await sup.stop(id, 'wrong direction');
     expect(stopped.ok).toBe(true);
     expect(adapter.handles[0]!.stop).toHaveBeenCalled();
-    await waitFor(() => expect(store.of('release').map((c) => c.stage)).toEqual(['plan', 'prioritized']));
+    await waitFor(() => expect(store.of('release').map((c) => c.stage)).toEqual(['plan', 'active']));
     expect(sup.get(id)?.state).toBe('stopped');
     expect(store.of('comment').at(-1)?.text).toContain('stopped by the owner — wrong direction');
   });

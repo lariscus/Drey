@@ -68,21 +68,20 @@ describe('instructed read-only (readonly:)', () => {
 });
 
 describe('the interactive mode wrapper', () => {
-  const SHAPE = '<!-- drey-prompt-version: 3 -->\nInterview first, propose second, write last.';
+  const SHAPE = 'Interview first, propose second, write last.';
 
-  it("a dialog run gets the column's interactive prompt after the persona's own", () => {
+  it("a dialog run gets the dialog protocol after the persona's own", () => {
     const request = ok(composeRunRequest(base({ promptText: SHAPE, interactive: 'plan', persona: PAUL })));
     const who = request.instruction.indexOf('Paul plans.');
     const dialog = request.instruction.indexOf('Interview first, propose second, write last.');
     expect(who).toBeGreaterThanOrEqual(0);
     expect(dialog).toBeGreaterThan(who);
-    expect(request.instruction).not.toContain('drey-prompt-version');
   });
 
-  it('an ordinary run keeps the persona prompt alone (the persona IS the instruction)', () => {
-    const request = ok(composeRunRequest(base({ promptText: 'Phase template.', persona: PAUL })));
+  it('an ordinary run keeps the persona prompt alone (the persona IS the instruction; the dialog text joins only a dialog)', () => {
+    const request = ok(composeRunRequest(base({ promptText: SHAPE, persona: PAUL })));
     expect(request.instruction).toContain('Paul plans.');
-    expect(request.instruction).not.toContain('Phase template.');
+    expect(request.instruction).not.toContain(SHAPE);
   });
 });
 

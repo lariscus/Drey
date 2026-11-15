@@ -25,7 +25,7 @@ describe('RunClaims — the lease of a run', () => {
 
   it('exit 13 on the release (taken over during the gate) is a failed move, never a second write', async () => {
     const t = setup();
-    const id = await startRun(t.sup, request());
+    const id = await startRun(t.sup, request({ cursor: { at: 1, length: 2 } })); // the green end hands on by the cursor — the move that fails
     t.adapter.handles[0]!.result();
     t.store.loseClaim();
     t.adapter.handles[0]!.fail(0);
