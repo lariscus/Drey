@@ -4,10 +4,9 @@ import type { I18n } from '../../../shared/i18n/types';
 /**
  * Settings -> Tickets as sections (E13-22, SDK 1.46): the entries listed
  * under the category in Settings, in page order. The page marks the first
- * element of each part `data-settings-section="<id>"`. The first four are
- * the headings board 7g shows (Crew, Flow, Autopilot, Budget and runners,
- * Walkthrough videos, Devices); the store and the pipeline are the
- * parts the board no longer shows but the page still has.
+ * element of each part `data-settings-section="<id>"`. The headings are
+ * board 7g's (Crew, Flow, Autopilot, Budget and runners, Walkthrough
+ * videos, Devices); the store part closes the page.
  */
 export const TICKETS_SECTIONS: readonly PluginSettingsSection[] = [
   { id: 'crew', label: 'Crew' },
@@ -17,7 +16,6 @@ export const TICKETS_SECTIONS: readonly PluginSettingsSection[] = [
   { id: 'videos', label: 'Walkthrough videos' },
   { id: 'devices', label: 'Devices' },
   { id: 'store', label: 'Store and Git' },
-  { id: 'pipeline', label: 'Pipeline and prompts' },
 ];
 
 /** The sections above, plus Models (board 7l, req-186): its words come from the catalog, so it joins through `ticketsSections` / `ticketsEntries`. */
@@ -52,8 +50,6 @@ export const TICKETS_ENTRIES: readonly PluginSettingsEntry[] = [
   e('store', 'dk.checkout', 'Ticket store checkout', 'Working copy of the ticket branch'),
   e('store', 'dk.syncSeconds', 'Sync interval', 'Seconds, remote stores only'),
   e('store', 'repositories', 'Repositories', 'Launch command, default branch, found repositories'),
-  e('pipeline', 'pipeline', 'Pipeline', 'Columns, handover mode, worker per column'),
-  e('pipeline', 'prompts', 'Prompts', 'Prompt files of the agent columns'),
 ];
 
 /** The page's sections in order: Models sits after Autopilot, as board 7l's nav has it, and the Skills library after Models (board 7o). */

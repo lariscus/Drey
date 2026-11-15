@@ -137,7 +137,6 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     const kt = path.join(root, 'kt');
     mkdirSync(kt);
     const meta = path.join(vaultDir, 'tickets', '_meta');
-    await fsp.mkdir(path.join(meta, 'prompts'), { recursive: true });
     await fsp.writeFile(path.join(meta, 'pipeline.md'), DEFAULT_PIPELINE_TEXT, 'utf8');
     await fsp.writeFile(path.join(meta, 'repos.md'), `---\nrepos:\n  kt:\n    url: https://example.test/kt.git\n    path: '${kt.split(path.sep).join('/')}'\n    branch: main\n---\n`, 'utf8');
     for (const [id, text] of [['ben', PERSONA('agent')], ['pia', PERSONA('mission')], ['ralf', PERSONA('agent')], ['you', PERSONA('human', 'leaving: [commit]\n')]] as const) {

@@ -18,7 +18,7 @@ import type { RepoRef } from './repo-ref';
 import type { PriorityConfig, TicketPriority } from './ticket-priority';
 import type { TicketRun } from './ticket-run';
 export type { TicketRun } from './ticket-run';
-export type { FolderStatus } from './folder-status';
+export { DEFAULT_PRIORITY_CONFIG, TICKET_PRIORITIES, parsePriorityConfig, priorityClass, priorityWeight } from './ticket-priority';
 
 /** `T-` + at least four digits (`T-0042`). Grammar of ids AND file stems. */
 export const TICKET_ID_PATTERN = /^T-\d{4,}$/;
@@ -342,7 +342,6 @@ export function resolveCardWorker(
 }
 
 export type { RepoRef } from './repo-ref';
-export { DEFAULT_PRIORITY_CONFIG, TICKET_PRIORITIES, parsePriorityConfig, priorityClass, priorityWeight } from './ticket-priority';
 export type { PriorityConfig, TicketPriority } from './ticket-priority';
 
 export interface BoardColumn {
@@ -377,6 +376,8 @@ export interface RecentDone {
 export interface BoardSnapshot extends PersonaBoardFields, BoardProjects {
   readonly vaultId: string | null;
   readonly vaultName: string | null;
+  /** The tickets vault's absolute path (absent without a vault) — the Settings page's header. */
+  readonly vaultPath?: string | null;
   /** Display name of the active vault — the empty state's initialize hint. */
   readonly activeVaultName: string | null;
   /** False when the tickets vault is not a git repo (transitions unversioned). */
@@ -421,38 +422,19 @@ export interface BoardSnapshot extends PersonaBoardFields, BoardProjects {
   readonly recentDone: readonly RecentDone[];
 }
 
-/** Result of every mutation IPC call (`create` / `transition` / `reorder` /
- *  `claim` / `initialize`): `ok` with an optional warning line the panel
+/** Result of every mutation IPC call (`create` / `transition` /
+ *  `initialize`): `ok` with an optional warning line the panel
  *  shows, or a refusal with the reason. */
 export interface MutationResult {
   readonly ok: boolean;
   readonly error?: string;
   readonly warning?: string;
-  /** Reorder / "Number folders" (req-50): how many folders were renamed. */
-  readonly moved?: number;
   /**
    * A move's final vault-relative path (`transition` / `archive` /
    * `unarchive`, T-0042): the Files panel re-keys open tabs to it when
    * the plugin performed the move as a structured action.
    */
   readonly path?: string;
-}
-
-/** One file of `tickets/_meta/prompts/` as it is on disk (req-50). */
-export interface PromptEntry {
-  readonly ref: string;
-  readonly text: string;
-  /** Drey ships a prompt of this name, so "Reset to the shipped version" applies. */
-  readonly shipped: boolean;
-}
-
-/** The settings page's prompt list: the folder's files and nothing else. */
-export interface PromptListing {
-  /** Absolute path of `tickets/_meta/prompts/`; null without a tickets vault. */
-  readonly folder: string | null;
-  readonly entries: readonly PromptEntry[];
-  /** Every prompt name Drey ships (the "Add Drey's prompts" offer). */
-  readonly shipped: readonly string[];
 }
 
 /** One work repo a folder scan found (req-72): the "Add from folder" seed. */

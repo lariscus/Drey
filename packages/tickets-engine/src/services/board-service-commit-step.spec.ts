@@ -138,7 +138,6 @@ describe.skipIf(!found.ok)('Accept on a store on the lifecycle stages (real dk)'
     vaultDir = path.join(root, 'meta');
     const kt = path.join(root, 'kt');
     mkdirSync(kt);
-    await fsp.mkdir(path.join(vaultDir, 'tickets', '_meta', 'prompts'), { recursive: true });
     await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'pipeline.md'), DEFAULT_PIPELINE_TEXT, 'utf8');
     await fsp.writeFile(path.join(vaultDir, 'tickets', '_meta', 'repos.md'), REPOS(kt.split(path.sep).join('/')), 'utf8');
     await fsp.mkdir(path.join(vaultDir, 'tickets', '_meta', 'personas', 'you'), { recursive: true });

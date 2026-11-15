@@ -1,13 +1,10 @@
 import type { DreyPluginApi, PluginSettingsPageContrib } from '../../../shared/plugin-api/renderer';
 import type { ChainStatus } from '../../../packages/tickets-engine/src/fleet/protocol';
-import { parseHandover, type BoardSnapshot, type FolderStatus, type PromptListing, type ReposListing } from '../shared/tickets';
-import { createColumnsSection, effectivePrompt } from './settings-columns';
+import type { BoardSnapshot, ReposListing } from '../shared/tickets';
 import { parseWorkerValue } from '../../../packages/tickets-engine/src/fleet/assignment';
 import { el, iconButton, kv, mutate, numberConfig, selectConfig, textConfig } from './settings-dom';
-import { createPromptsSection } from './settings-prompts';
 import { createRemoteSection } from './settings-remote';
 import { createReposSection } from './settings-repos';
-import { missingShippedPrompts } from './settings/desk-model';
 import { createDeskSettings, type DeskSettingsHooks } from './settings/desk-settings';
 import { ticketsEntries, ticketsSections, type TicketsSectionId } from './settings-sections';
 import { createModelsSection } from './settings/models-section';
@@ -22,14 +19,11 @@ function anchored<T extends HTMLElement>(element: T, id: TicketsSectionId): T {
 }
 
 /**
- * Settings — Tickets (M85, req-46, reworked in req-50 after the Claude
- * Design mockup): the tickets repository's path, the pipeline as one
- * sortable table (settings-columns.ts), the prompt files as a list with
- * the host's Markdown editor (settings-prompts.ts), then the fleet's own
- * settings — the shared ones, then each CLI runner's behind a switch
- * (settings-workers.ts, req-71). Everything shown is read from the tickets vault on every
- * refresh — `pipeline.md`, the phase folders, `_meta/prompts/` — and the
- * page follows the board's change events, so it never shows a copy that
+ * Settings — Tickets (M85, req-46, reworked in req-50): the tickets
+ * repository's path, then the fleet's own settings — the shared ones,
+ * then each CLI runner's behind a switch (settings-workers.ts, req-71).
+ * Everything shown is read from the board on every refresh, and the page
+ * follows the board's change events, so it never shows a copy that
  * drifted from disk.
  */
 export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSettingsHooks, 'openTeam' | 'openFlow' | 'openAutopilot'>): PluginSettingsPageContrib {
@@ -45,49 +39,25 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
       const repo = el('div', 'tset-repo');
       const repoPath = el('span', 'tset-repo-path');
       const openRepo = iconButton(api, 'folder', 'Open the tickets folder');
-      openRepo.addEventListener('click', () => void mutate(api, 'openFolder', { which: 'tickets' }));
+      openRepo.addEventListener('click', () => void mutate(api, 'openFolder'));
       repo.append(el('span', 'tset-muted', 'Tickets repository'), repoPath, openRepo);
 
       let disposed = false;
-      let seededPrompts = false;
       // req-173: the vault layer (tickets/_meta/crew.md) behind the default worker, the permissions and the thresholds.
       const crew = new CrewSettings(api);
       let timer: ReturnType<typeof setTimeout> | null = null;
       const load = async (): Promise<void> => {
-        const [snap, folders, firstListing, reposListing, configured] = await Promise.all([
+        const [snap, reposListing, configured] = await Promise.all([
           api.backend.invoke('board') as Promise<BoardSnapshot>,
-          api.backend.invoke('folders') as Promise<FolderStatus>,
-          api.backend.invoke('prompts') as Promise<PromptListing>,
           api.backend.invoke('reposListing') as Promise<ReposListing>,
           crew.resolved('defaultWorker').then((value) => (typeof value === 'string' ? value : undefined)),
         ]);
         if (disposed) {
           return;
         }
-        // A column names a prompt Drey ships and the vault lacks: add it once (D-17), never overwriting.
-        let listing = firstListing;
-        if (!seededPrompts && missingShippedPrompts(snap.pipeline, firstListing).length > 0) {
-          seededPrompts = true;
-          await mutate(api, 'promptRestore');
-          listing = (await api.backend.invoke('prompts')) as PromptListing;
-        }
-        repoPath.textContent = folders.root ?? 'No tickets vault detected';
-        openRepo.disabled = folders.root === null;
-        const usage = new Map<string, string[]>();
-        for (const phase of snap.pipeline) {
-          const ref = parseHandover(phase.handover).mode === 'agent' ? effectivePrompt(phase) : null;
-          if (ref !== null) {
-            usage.set(ref, [...(usage.get(ref) ?? []), phase.title]);
-          }
-        }
+        repoPath.textContent = snap.vaultPath ?? 'No tickets vault detected';
+        openRepo.disabled = snap.vaultPath === undefined;
         desk.update(snap);
-        columns.update({
-          pipeline: snap.pipeline,
-          folders,
-          promptRefs: listing.entries.map((e) => e.ref),
-          defaultWorker: (configured ?? '') || 'opencode',
-        });
-        prompts.update(listing, usage);
         void models.refresh();
         void skillsLibrary.refresh();
         repos.update(reposListing);
@@ -98,8 +68,6 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
       };
       const reload = (): Promise<void> => load().catch(() => undefined);
 
-      const columns = createColumnsSection(api, reload);
-      const prompts = createPromptsSection(api, reload);
       const repos = createReposSection(api, reload);
       // Opens on the default worker's runner once the first load knows it.
       const workers = createWorkersSection(api, 'opencode', crew);
@@ -119,7 +87,6 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
       });
       // One scrolling page; the sections of TICKETS_SECTIONS in this order.
       anchored(repo, 'store');
-      anchored(columns.root, 'pipeline');
       anchored(remote.root, 'devices');
       body.append(
         desk.root,
@@ -130,8 +97,6 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
         repo,
         storeSection(api),
         repos.root,
-        columns.root,
-        prompts.root,
       );
 
       // The board's change events cover every write here and the runner's.
@@ -157,7 +122,6 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
         if (timer !== null) {
           clearTimeout(timer);
         }
-        prompts.dispose();
         remote.dispose();
         models.dispose();
         skillsLibrary.dispose();

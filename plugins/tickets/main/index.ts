@@ -437,45 +437,7 @@ const plugin: MainPluginModule = {
     });
 
     // The settings dialog's writer: one phase's pool keys, one commit (M85).
-    ctx.ipc.handle('columns', async (payload) => {
-      const p = payload as {
-        phase?: unknown;
-        worker?: unknown;
-        model?: unknown;
-        prompt?: unknown;
-      };
-      if (typeof p.phase !== 'string' || p.phase.trim() === '') {
-        return { ok: false, error: 'bad columns payload' };
-      }
-      return board.setColumnConfig({
-        phase: p.phase,
-        ...(p.worker !== undefined ? { worker: typeof p.worker === 'string' ? p.worker : null } : {}),
-        ...(p.model !== undefined ? { model: typeof p.model === 'string' ? p.model : null } : {}),
-        ...(p.prompt !== undefined ? { prompt: typeof p.prompt === 'string' ? p.prompt : null } : {}),
-      });
-    });
-
-    // The prompts the columns name, editable from the settings page (req-46).
-    ctx.ipc.handle('prompts', () => board.listPrompts());
-    ctx.ipc.handle('promptSave', async (payload) => {
-      const p = payload as { ref?: unknown; text?: unknown; reset?: unknown };
-      if (typeof p.ref !== 'string') {
-        return { ok: false, error: 'bad prompt payload' };
-      }
-      if (p.reset !== true && typeof p.text !== 'string') {
-        return { ok: false, error: 'bad prompt payload' };
-      }
-      return board.savePrompt({
-        ref: p.ref,
-        ...(typeof p.text === 'string' ? { text: p.text } : {}),
-        ...(p.reset === true ? { reset: true } : {}),
-      });
-    });
-    ctx.ipc.handle('promptRestore', () => board.restoreShippedPrompts());
-    ctx.ipc.handle('openFolder', async (payload) => {
-      const p = payload as { which?: unknown };
-      return board.openTicketsFolder(p.which === 'prompts' ? 'prompts' : 'tickets');
-    });
+    ctx.ipc.handle('openFolder', () => board.openTicketsFolder());
 
     // The repositories registry, edited from the settings page (req-72):
     // the listing, its structured save, the folder picker and the scan
@@ -534,29 +496,6 @@ const plugin: MainPluginModule = {
       return board.switchProject(p.id);
     });
 
-    // Sortable columns (req-50); the folders route only names the tickets folder now.
-    ctx.ipc.handle('folders', () => board.folderStatus());
-    ctx.ipc.handle('reorderPhases', async (payload) => {
-      const p = payload as { order?: unknown };
-      if (!Array.isArray(p.order) || !p.order.every((id): id is string => typeof id === 'string')) {
-        return { ok: false, error: 'bad reorder payload' };
-      }
-      return board.reorderPhases(p.order);
-    });
-
-    ctx.ipc.handle('editPhase', async (payload) => {
-      const p = payload as { op?: unknown; title?: unknown; phase?: unknown; afterId?: unknown };
-      if (p.op === 'add' && typeof p.title === 'string') {
-        return board.editPhase({ op: 'add', title: p.title, afterId: typeof p.afterId === 'string' ? p.afterId : null });
-      }
-      if (p.op === 'rename' && typeof p.phase === 'string' && typeof p.title === 'string') {
-        return board.editPhase({ op: 'rename', phase: p.phase, title: p.title });
-      }
-      if (p.op === 'remove' && typeof p.phase === 'string') {
-        return board.editPhase({ op: 'remove', phase: p.phase });
-      }
-      return { ok: false, error: 'bad phase edit payload' };
-    });
 
     // The model picker's list: what the worker CLI offers (req-46).
     ctx.ipc.handle('models', async (payload) => {

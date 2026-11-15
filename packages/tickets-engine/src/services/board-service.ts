@@ -11,7 +11,7 @@ import type { ClassName } from '../contracts/capability-class';
 import { randomBytes } from 'node:crypto';
 import { promises as fsp, existsSync } from 'node:fs';
 import * as path from 'node:path';
-import { TICKETS_ARCHIVE_DIR, TICKET_ID_PATTERN, type BoardColumn, type BoardSnapshot, type RecentDone, FolderStatus, PipelinePhase, ProjectRef, PromptEntry, PromptListing, RepoCandidate, RepoRef, ReposListing, TicketCard, TicketForm, TicketPriority, TicketTrack } from '../contracts/tickets';
+import { TICKETS_ARCHIVE_DIR, TICKET_ID_PATTERN, type BoardColumn, type BoardSnapshot, type RecentDone, PipelinePhase, ProjectRef, RepoCandidate, RepoRef, ReposListing, TicketCard, TicketForm, TicketPriority, TicketTrack } from '../contracts/tickets';
 import { PROJECTS_DIR, ticketProject, type ProjectRecord } from '../contracts/projects';
 import { parseProjects } from '../core/project-record';
 import { parseChanges, parseResult, planApprovedOf, storyOf, type ChangesReply } from '../contracts/changes';
@@ -19,7 +19,7 @@ import { type RefineReply, TicketReply, AttachmentReply, type DocumentSaveReply,
 import { documentRelPath, idOfDocumentPath } from '../store/document-paths';
 import type { DkHealth } from '../store/dk-health';
 import { detailFromContent } from '../store/dricket-ticket-store';
-import { assembleBoard, parseRepos, addPipelinePhase, patchPipelinePhase, removePipelinePhase, renamePipelinePhase, parsePipeline, reorderPipelinePhases, reposFileText, reposProse } from '../core/ticket-board';
+import { assembleBoard, parseRepos, parsePipeline, reposFileText, reposProse } from '../core/ticket-board';
 import { newTicketFileText, parseTicketFile, patchTicketFile, patchBlockedBy, patchChain, patchClass, patchForm, patchTrack, ticketPathParts, withLogLine } from '../core/ticket-files';
 import { withPlanSection } from '../core/plan-section';
 import { parsePlanChain } from '../core/plan-chain';
@@ -72,7 +72,6 @@ import { StoreBoardSource, type LegacyWrite } from '../store/store-board-source'
 import { isLifecycleStore } from '../store/store-stages';
 import type { StorePathChange } from '../store/store-path-report';
 import { storeFooterLine } from '../store/store-footer';
-import { loadShippedPrompts } from '../core/default-prompts';
 import { type AttachmentCommand, RefineCommand } from '../core/commands';
 import { nextImprovementId, parseImprovements, renderImprovements, type FrictionLine, type ImprovementDraft, type ImprovementProposal } from '../core/improvements';
 import { ownerLessonLine } from '../core/memory-line';
@@ -95,7 +94,7 @@ import { removeDoneWorktrees } from './finished-ticket-worktrees';
 import { reservedIgnoreEntries, withIgnoreEntries } from './reserved-ignore';
 import { dkTargetFor } from '../fleet/dk-target';
 import { trancheConfigOf } from './tranche-config';
-import { isWorkerProvider, WORKER_PROVIDERS, type ChainConfig, type ChainStoreConfig, FleetCaps, FleetHandoverConfig, HandoverMode, InteractiveMode, PermissionMode, RunCursor, RunDkTarget, RunInfo, FleetPools } from '../fleet/protocol';
+import { type ChainConfig, type ChainStoreConfig, FleetCaps, FleetHandoverConfig, HandoverMode, InteractiveMode, PermissionMode, RunCursor, RunDkTarget, RunInfo, FleetPools } from '../fleet/protocol';
 import { type EngineHost, type EngineVaultChangeEvent, EngineVault, FleetPort } from './host';
 import { handoverFromConfig, handoverOverrideKeys } from './handover-config';
 import type { EffectiveCrew } from '../fleet/config/layered-config-resolver';
@@ -112,8 +111,6 @@ const REPOS_PATH = 'tickets/_meta/repos.md';
 const ATTACHMENTS_DIR = 'tickets/attachments';
 /** Names a shape turn's repository read never opens: git internals, dependency folders, secrets. */
 const REPO_READ_DENIED = /^(\.git|node_modules|\.env.*|\.ssh|.*\.(pem|key))$/i;
-const PROMPTS_DIR = 'tickets/_meta/prompts';
-const PROMPT_REF = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 /** What a snapshot of a store that is not on the lifecycle stages says (req-307: the owner creates a new store). */
 export const NOT_LIFECYCLE_STORE = 'the store is not on the lifecycle stages — create a new store';
 const DEFAULT_REPOS = `---
@@ -473,7 +470,8 @@ export class EngineBoardService {
     // req-257). Cheap and idempotent — the runner re-reads the vault on every dispatch pass anyway.
     await this.refreshHandover(snapshot);
     await this.syncChainConfig(vault, snapshot.lanes !== undefined);
-    return snapshot;
+    // The vault's absolute path (the Settings page's header); absent without a vault.
+    return { ...snapshot, vaultPath: vault.path };
   }
 
   /**
@@ -3368,180 +3366,6 @@ export class EngineBoardService {
     return failed?.gateFailure ?? null;
   }
 
-  /**
-   * Writes one phase's pool keys in `_meta/pipeline.md` (M85, the
-   * settings dialog's writer): setting a worker writes the matching
-   * `agent <prompt-ref>` handover, clearing it writes `manual`. One
-   * commit per change (`tickets: columns <phase> <what>`).
-   */
-  setColumnConfig(input: {
-    phase: string;
-    worker?: string | null;
-    model?: string | null;
-    prompt?: string | null;
-    color?: string | null;
-  }): Promise<BoardMutationResult> {
-    return this.enqueue(async () => {
-      const vault = await this.detect();
-      if (vault === null) {
-        return { ok: false, error: 'no tickets vault detected' };
-      }
-      const text = await this.readOptional(vault.id, PIPELINE_PATH);
-      if (text === null) {
-        return { ok: false, error: 'tickets/_meta/pipeline.md is missing' };
-      }
-      if (
-        input.worker === undefined &&
-        input.model === undefined &&
-        input.prompt === undefined &&
-        input.color === undefined
-      ) {
-        return { ok: true }; // nothing to change (e.g. the handover-pin display state)
-      }
-      if (input.worker !== undefined) {
-        const worker = input.worker?.trim() ?? '';
-        if (worker !== '' && !isWorkerProvider(worker)) {
-          return { ok: false, error: `the worker is one of ${WORKER_PROVIDERS.map((p) => `"${p}"`).join(', ')}` };
-        }
-      }
-      if (input.color !== undefined) {
-        const color = input.color?.trim() ?? '';
-        if (color !== '' && !/^#[0-9a-f]{6}$/i.test(color)) {
-          return { ok: false, error: 'the color is a #rrggbb hex value' };
-        }
-      }
-      let patched: string;
-      try {
-        patched = patchPipelinePhase(text, input.phase, {
-          ...(input.worker !== undefined ? { worker: input.worker } : {}),
-          ...(input.model !== undefined ? { model: input.model } : {}),
-          ...(input.prompt !== undefined ? { prompt: input.prompt } : {}),
-          ...(input.color !== undefined ? { color: input.color } : {}),
-        });
-      } catch (error) {
-        return { ok: false, error: messageOf(error) };
-      }
-      try {
-        await this.host.write(vault.id, PIPELINE_PATH, patched);
-      } catch (error) {
-        return { ok: false, error: `write failed: ${messageOf(error)}` };
-      }
-      const what: string[] = [];
-      if (input.worker !== undefined) {
-        what.push(input.worker === null || input.worker.trim() === '' ? 'manual' : `worker ${input.worker.trim()}`);
-      }
-      if (input.model !== undefined) {
-        what.push(`model ${input.model === null || input.model.trim() === '' ? '(none)' : input.model.trim()}`);
-      }
-      if (input.prompt !== undefined) {
-        what.push(`prompt ${input.prompt === null || input.prompt.trim() === '' ? '(default)' : input.prompt.trim()}`);
-      }
-      if (input.color !== undefined) {
-        what.push(`color ${input.color === null || input.color.trim() === '' ? 'default' : input.color.trim()}`);
-      }
-      const warning = await this.commit(vault, [PIPELINE_PATH], `tickets: columns ${input.phase} ${what.join(', ')}`);
-      this.host.announceChanges(vault.id, [PIPELINE_PATH]);
-      this.announceChanged();
-      return { ok: true, ...(warning === null ? {} : { warning }) };
-    });
-  }
-
-  /**
-   * The prompt files under `_meta/prompts/`, exactly as they are on disk
-   * (req-50: the settings page shows nothing else — no rows for shipped
-   * prompts the vault lacks, no comparison with code). `shipped` marks a
-   * name Drey ships a file for, where "Reset to the shipped version" means
-   * something. `folder` is the absolute folder for display and "Open".
-   */
-  async listPrompts(): Promise<PromptListing> {
-    const vault = await this.detect();
-    if (vault === null) {
-      return { folder: null, entries: [], shipped: [] };
-    }
-    const shipped = await loadShippedPrompts();
-    const dir = this.host.resolveAssetPath(vault.id, PROMPTS_DIR);
-    if (dir === null) {
-      return { folder: null, entries: [], shipped: [...shipped.keys()] };
-    }
-    const names = (await fsp.readdir(dir).catch(() => [] as string[]))
-      .filter((n) => n.endsWith('.md') && PROMPT_REF.test(n.slice(0, -3)))
-      .sort();
-    const entries: PromptEntry[] = [];
-    for (const name of names) {
-      const ref = name.slice(0, -3);
-      const text = await this.readOptional(vault.id, `${PROMPTS_DIR}/${name}`);
-      if (text !== null) {
-        entries.push({ ref, text, shipped: shipped.has(ref) });
-      }
-    }
-    return { folder: dir, entries, shipped: [...shipped.keys()] };
-  }
-
-  /** Writes one prompt file (create, replace or reset to the shipped file); one commit per save. */
-  savePrompt(input: { ref: string; text?: string; reset?: boolean }): Promise<BoardMutationResult> {
-    return this.enqueue(async () => {
-      if (!PROMPT_REF.test(input.ref)) {
-        return { ok: false, error: 'a prompt name is letters, digits, dot, dash and underscore' };
-      }
-      const vault = await this.detect();
-      if (vault === null) {
-        return { ok: false, error: 'no tickets vault detected' };
-      }
-      const file = `${PROMPTS_DIR}/${input.ref}.md`;
-      let text = input.text ?? '';
-      if (input.reset === true) {
-        const shipped = (await loadShippedPrompts()).get(input.ref);
-        if (shipped === undefined) {
-          return { ok: false, error: `Drey ships no prompt "${input.ref}"` };
-        }
-        text = shipped;
-      }
-      const before = await this.readOptional(vault.id, file);
-      if (before === text) {
-        return { ok: true };
-      }
-      try {
-        await this.host.write(vault.id, file, text);
-      } catch (error) {
-        return { ok: false, error: `write failed: ${messageOf(error)}` };
-      }
-      const verb = input.reset === true ? 'reset' : before === null ? 'add' : 'edit';
-      const warning = await this.commit(vault, [file], `tickets: prompt ${input.ref} ${verb}`);
-      this.host.announceChanges(vault.id, [file]);
-      this.announceChanged();
-      return { ok: true, ...(warning === null ? {} : { warning }) };
-    });
-  }
-
-  /** Adds the shipped prompts the vault lacks (never overwrites one); one commit. */
-  restoreShippedPrompts(): Promise<BoardMutationResult> {
-    return this.enqueue(async () => {
-      const vault = await this.detect();
-      if (vault === null) {
-        return { ok: false, error: 'no tickets vault detected' };
-      }
-      const added: string[] = [];
-      try {
-        for (const [ref, text] of await loadShippedPrompts()) {
-          const file = `${PROMPTS_DIR}/${ref}.md`;
-          if ((await this.readOptional(vault.id, file)) === null) {
-            await this.host.write(vault.id, file, text);
-            added.push(file);
-          }
-        }
-      } catch (error) {
-        return { ok: false, error: `write failed: ${messageOf(error)}` };
-      }
-      if (added.length === 0) {
-        return { ok: true };
-      }
-      const warning = await this.commit(vault, added, 'tickets: prompts add the shipped defaults');
-      this.host.announceChanges(vault.id, added);
-      this.announceChanged();
-      return { ok: true, ...(warning === null ? {} : { warning }) };
-    });
-  }
-
   // --- personas (ADR-0088, E3) ----------------------------------------
 
   /** The loader over the detected vault's host reads — one seam for every persona read. */
@@ -4262,121 +4086,19 @@ export class EngineBoardService {
     });
   }
 
-  /** Opens `_meta/prompts/` (or the tickets folder) in the OS file manager. */
-  async openTicketsFolder(which: 'tickets' | 'prompts'): Promise<BoardMutationResult> {
+  /** Opens the tickets folder in the OS file manager. */
+  async openTicketsFolder(): Promise<BoardMutationResult> {
     const vault = await this.detect();
     if (vault === null) {
       return { ok: false, error: 'no tickets vault detected' };
     }
-    const dir = this.host.resolveAssetPath(vault.id, which === 'prompts' ? PROMPTS_DIR : 'tickets');
+    const dir = this.host.resolveAssetPath(vault.id, 'tickets');
     if (dir === null) {
       return { ok: false, error: 'the folder is outside the vault' };
     }
     await fsp.mkdir(dir, { recursive: true }).catch(() => undefined);
     const failure = await this.host.revealPath(dir);
     return failure === '' ? { ok: true } : { ok: false, error: failure };
-  }
-
-  /**
-   * The tickets folder for the settings page's header. A store has no phase
-   * folders, so there is never a renumbering to offer (`moves` stays empty;
-   * the Settings pipeline page that reads it goes with req-307's step 6).
-   */
-  async folderStatus(): Promise<FolderStatus> {
-    const vault = await this.detect();
-    return { root: vault === null ? null : this.host.resolveAssetPath(vault.id, 'tickets'), moves: [] };
-  }
-
-  /**
-   * The settings page's sortable columns (req-50): pipeline.md takes the
-   * new order — one commit.
-   */
-  reorderPhases(order: readonly string[]): Promise<BoardMutationResult> {
-    return this.enqueue(async () => {
-      const vault = await this.detect();
-      if (vault === null) {
-        return { ok: false, error: 'no tickets vault detected' };
-      }
-      const text = await this.readOptional(vault.id, PIPELINE_PATH);
-      if (text === null) {
-        return { ok: false, error: 'tickets/_meta/pipeline.md is missing' };
-      }
-      let reordered: string;
-      try {
-        reordered = reorderPipelinePhases(text, order);
-      } catch (error) {
-        return { ok: false, error: messageOf(error) };
-      }
-      if (reordered === text) {
-        return { ok: true };
-      }
-      return this.writePipeline(vault, reordered, `tickets: reorder phases ${order.join(' ')}`);
-    });
-  }
-
-  /**
-   * The settings page's column editor: add, rename or remove a phase in
-   * `_meta/pipeline.md`, one commit each. A rename changes the title only
-   * (the id, the folder and every ticket stay); an add writes a manual
-   * phase whose folder appears on first use; a remove is refused while
-   * tickets sit in the phase, so none is orphaned.
-   */
-  editPhase(
-    input:
-      | { op: 'add'; title: string; afterId?: string | null }
-      | { op: 'rename'; phase: string; title: string }
-      | { op: 'remove'; phase: string },
-  ): Promise<BoardMutationResult> {
-    return this.enqueue(async () => {
-      const vault = await this.detect();
-      if (vault === null) {
-        return { ok: false, error: 'no tickets vault detected' };
-      }
-      const text = await this.readOptional(vault.id, PIPELINE_PATH);
-      if (text === null) {
-        return { ok: false, error: 'tickets/_meta/pipeline.md is missing' };
-      }
-      const snap = await this.snapshot();
-      let patched: string;
-      let message: string;
-      try {
-        if (input.op === 'add') {
-          const added = addPipelinePhase(text, { title: input.title, afterId: input.afterId ?? null });
-          patched = added.text;
-          message = `tickets: add phase ${added.id}`;
-        } else if (input.op === 'rename') {
-          patched = renamePipelinePhase(text, input.phase, input.title);
-          message = `tickets: rename phase ${input.phase}`;
-        } else {
-          const column = snap.columns.find((c) => c.phase.id === input.phase);
-          const count = column?.tickets.length ?? 0;
-          if (count > 0) {
-            return {
-              ok: false,
-              error: `${count} ticket${count === 1 ? '' : 's'} still in "${column?.phase.title ?? input.phase}" — move ${count === 1 ? 'it' : 'them'} to another column first`,
-            };
-          }
-          patched = removePipelinePhase(text, input.phase);
-          message = `tickets: remove phase ${input.phase}`;
-        }
-      } catch (error) {
-        return { ok: false, error: messageOf(error) };
-      }
-      return this.writePipeline(vault, patched, message);
-    });
-  }
-
-  /** One commit for a new `pipeline.md` text; runs inside the queue. */
-  private async writePipeline(vault: EngineVault, text: string, message: string): Promise<BoardMutationResult> {
-    try {
-      await this.host.write(vault.id, PIPELINE_PATH, text);
-    } catch (error) {
-      return { ok: false, error: `write failed: ${messageOf(error)}` };
-    }
-    const warning = await this.commit(vault, [PIPELINE_PATH], message);
-    this.host.announceChanges(vault.id, [PIPELINE_PATH]);
-    this.announceChanged();
-    return warning === null ? { ok: true } : { ok: true, warning };
   }
 
   initialize(vaultId: string | null): Promise<BoardMutationResult> {
@@ -4392,16 +4114,11 @@ export class EngineBoardService {
       if (await this.readOptional(target.id, PIPELINE_PATH) !== null) {
         return { ok: false, error: `vault "${target.name}" already has a tickets board` };
       }
-      const shipped = await loadShippedPrompts();
-      const promptPaths = [...shipped.keys()].map((ref) => `${PROMPTS_DIR}/${ref}.md`);
       const humanPersonaPath = `${PERSONAS_DIR}/${HUMAN_PERSONA_ID}/persona.md`;
       try {
         await this.host.write(target.id, PIPELINE_PATH, DEFAULT_PIPELINE_TEXT);
         await this.host.write(target.id, REPOS_PATH, DEFAULT_REPOS);
         await this.host.write(target.id, humanPersonaPath, personaFileText(humanPersona(await this.humanNameOfConfig())));
-        for (const [ref, text] of shipped) {
-          await this.host.write(target.id, `${PROMPTS_DIR}/${ref}.md`, text);
-        }
       } catch (error) {
         return { ok: false, error: `write failed: ${messageOf(error)}` };
       }
@@ -4411,10 +4128,10 @@ export class EngineBoardService {
       await this.ensureWorktreesIgnored(target);
       const warning = await this.commit(
         target,
-        [PIPELINE_PATH, REPOS_PATH, ...humanPaths, ...promptPaths],
+        [PIPELINE_PATH, REPOS_PATH, ...humanPaths],
         'tickets: initialize board',
       );
-      this.host.announceChanges(target.id, [PIPELINE_PATH, REPOS_PATH, ...humanPaths, ...promptPaths]);
+      this.host.announceChanges(target.id, [PIPELINE_PATH, REPOS_PATH, ...humanPaths]);
       // req-256: Paul, Ben, Ralf and Tessa follow the pipeline and the prompts, in a commit of their own (never throws).
       await this.options.crewSeeder?.seed(target);
       this.announceChanged();
