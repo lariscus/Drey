@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ChainEntry } from '../contracts/chain';
 import type { TicketCard } from '../contracts/tickets';
-import { crewLookupOf } from '../core/chain-holder';
-import { parseChainItems } from '../core/chain-list';
+import { crewLookupOf } from '../core/pipeline/chain-holder';
+import { parseChainItems } from '../core/pipeline/chain-list';
 import type { OwnerChainContext } from './chain-owner-moves';
 import { ownerAcceptOf, ownerSendBackOf } from './chain-owner-moves';
 

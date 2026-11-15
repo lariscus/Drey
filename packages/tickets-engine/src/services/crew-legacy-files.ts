@@ -1,6 +1,6 @@
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
-import { LEGACY_CHAIN_FILE, PRE_VAULT_CHAIN_FILE } from '../fleet/orchestrate/chain-state-paths';
+import { LEGACY_CHAIN_FILE, PRE_VAULT_CHAIN_FILE } from '../fleet/chain/chain-state-paths';
 import { CREW_MIGRATED_KEY, type CrewLegacyPort } from './crew-config-migrator';
 
 /** The engine's config store as the migration needs it (`FileConfigStore` fits). */

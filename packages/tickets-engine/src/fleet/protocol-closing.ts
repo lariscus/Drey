@@ -1,4 +1,4 @@
-import { ALL_CLOSING_SIGNALS, type ClosingSignal } from '../core/closing-signals';
+import { ALL_CLOSING_SIGNALS, type ClosingSignal } from '../core/pipeline/closing-signals';
 
 /**
  * What a run's closing round needs to know at dispatch (R14, req-169): the

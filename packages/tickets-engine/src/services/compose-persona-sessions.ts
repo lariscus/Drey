@@ -1,6 +1,6 @@
 import type { ChatBridge } from '../contracts/chat';
-import type { TicketsGit } from '../core/tickets-git';
-import { NO_TOOLS, type OneOnOneToolSeam } from '../fleet/one-on-one-toolset';
+import type { TicketsGit } from '../core/git/tickets-git';
+import { NO_TOOLS, type OneOnOneToolSeam } from '../fleet/session/one-on-one-toolset';
 import { bridgeTurnRunner } from './api-persona-turn';
 import type { EngineHost } from './host';
 import { PersonaSessionContext } from './persona-session-context';

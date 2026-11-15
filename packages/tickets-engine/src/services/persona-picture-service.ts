@@ -1,8 +1,8 @@
 import { CREW_FILE } from '../contracts/crew-config';
 import type { PersonaPictureRemove, PersonaPictureReply, PersonaPictureSet } from '../contracts/persona-picture';
-import { SEEDED_PICTURES_KEY, seededListOf, withSeededList } from '../core/crew-seed-marker';
-import { personaRef } from '../core/persona';
-import type { TicketsGit } from '../core/tickets-git';
+import { SEEDED_PICTURES_KEY, seededListOf, withSeededList } from '../core/persona/crew-seed-marker';
+import { personaRef } from '../core/persona/persona';
+import type { TicketsGit } from '../core/git/tickets-git';
 import type { CrewConfigFiles } from './crew-config-files';
 import type { EngineHost, EngineVault } from './host';
 import { AVATAR_MAX_BYTES, avatarPathOf, PNG_SIGNATURE, SHIPPED_AVATAR_IDS } from './persona-avatars';

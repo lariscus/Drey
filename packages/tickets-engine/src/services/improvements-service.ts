@@ -23,13 +23,13 @@
  * bridge's envelope reader wants an object and dropped every array.
  */
 import type { ChatBridge, ChatStreamEvent } from '../contracts/chat';
-import { applyPromptEdits, parsePromptEdits } from '../core/prompt-edits';
+import { applyPromptEdits, parsePromptEdits } from '../core/config/prompt-edits';
 import {
   IMPROVEMENTS_THRESHOLD,
   validateDraft,
   type FrictionLine,
   type ImprovementDraft,
-} from '../core/improvements';
+} from '../core/persona/improvements';
 
 /** A repeat aggregation waits for this many settled runs after the last one. */
 const SETTLED_RUNS_THRESHOLD = 5;

@@ -1,7 +1,7 @@
 import type { PersonaMessage, PersonaProposalCommand, PersonaProposalDecision, PersonaThreadReply } from '../contracts/persona-session';
-import { isMissionPersona, personaRef, type Persona } from '../core/persona';
-import { OneOnOneRequestBuilder } from '../fleet/one-on-one-request';
-import { personaHarnessOf } from '../fleet/persona-harness';
+import { isMissionPersona, personaRef, type Persona } from '../core/persona/persona';
+import { OneOnOneRequestBuilder } from '../fleet/session/one-on-one-request';
+import { personaHarnessOf } from '../fleet/session/persona-harness';
 import type { ModelRow, ModelsReply, RunInfo, RunRequest } from '../fleet/protocol';
 import type { ModelTablePort } from './service-model-table';
 import type { ApiTurnRunner } from './api-persona-turn';

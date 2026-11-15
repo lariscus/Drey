@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parsePersonaFile } from '../core/persona';
-import { estimateTokens } from '../core/token-count';
-import { composeInstruction } from '../fleet/instruction';
-import { previewInstructionInput } from '../fleet/prompt-preview-input';
-import { loadDisciplineTexts } from '../fleet/discipline-texts';
+import { parsePersonaFile } from '../core/persona/persona';
+import { estimateTokens } from '../core/config/token-count';
+import { composeInstruction } from '../fleet/runner/instruction';
+import { previewInstructionInput } from '../fleet/runner/prompt-preview-input';
+import { loadDisciplineTexts } from '../fleet/runner/discipline-texts';
 import { loadCrewPrompts } from './crew-prompts';
 import { PromptPreview } from './prompt-preview';
 import { MemorySkillFileSystem } from './skill-file-system.fake';

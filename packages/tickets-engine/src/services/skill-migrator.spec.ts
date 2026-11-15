@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { parseSkillMarkdown } from '../core/skill';
+import { parseSkillMarkdown } from '../core/skills/skill';
 import type { EngineVault } from './host';
 import { SkillCommitter } from './skill-committer';
 import { MemorySkillFileSystem } from './skill-file-system.fake';

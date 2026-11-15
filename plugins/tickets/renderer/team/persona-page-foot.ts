@@ -4,7 +4,7 @@
  * and Save. The page tells it what the buttons may do after every change.
  * A persona that is never deleted (Mission Control's, req-269) gets no Delete.
  */
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import { outlineButton, type Translate } from './persona-dom';
 
 export interface FootActions {

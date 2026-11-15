@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { estimateTokens } from '../../../../packages/tickets-engine/src/core/token-count';
+import { estimateTokens } from '../../../../packages/tickets-engine/src/core/config/token-count';
 import { atStartTokensOf, partLinesOf, previewRequestOf } from './persona-preview-model';
 import type { PromptPreview } from './persona-seams';
 

@@ -9,9 +9,9 @@
  */
 import type { ChatVoice } from '../contracts/chat';
 import type { BoardSnapshot } from '../contracts/tickets';
-import { shapeSpeakerOf } from '../core/chat-speaker';
-import { stripPromptVersion } from '../core/default-prompts';
-import { PERSONAS_DIR, type Persona } from '../core/persona';
+import { shapeSpeakerOf } from '../core/chat/chat-speaker';
+import { stripPromptVersion } from '../core/config/default-prompts';
+import { PERSONAS_DIR, type Persona } from '../core/persona/persona';
 import { crewRosterOf } from './crew-roster';
 import type { EngineHost, EngineVault } from './host';
 

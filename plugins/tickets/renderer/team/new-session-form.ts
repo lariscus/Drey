@@ -8,7 +8,7 @@
  */
 import type { NewSessionClass, NewSessionOptionsReply, NewSessionPermission, NewSessionReply } from '../../../../shared/service-window/contract';
 import { askOf, draftOf, PERMISSIONS, type NewSessionDraft, type NewSessionOptions } from '../../../../shared/new-session-form';
-import { h, textButton, type DeskDeps } from '../desk-deps';
+import { h, textButton, type DeskDeps } from '../board/desk-deps';
 
 export interface NewSessionFormHandle {
   readonly node: HTMLElement;

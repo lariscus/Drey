@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ProjectDraft } from '../contracts/project-commands';
-import { parseProjectFile } from '../core/project-record';
-import { parseRepos } from '../core/repos-file';
+import { parseProjectFile } from '../core/projects/project-record';
+import { parseRepos } from '../core/projects/repos-file';
 import type { FolderProbeResult } from './folder-probe';
 import type { EngineVault } from './host';
 import { ProjectService } from './project-service';

@@ -1,4 +1,4 @@
-import type { JournalEntry } from '../core/persona-journal';
+import type { JournalEntry } from '../core/persona/persona-journal';
 
 /**
  * The Memory tab's two lists (R14, req-169) as the routes carry them.
@@ -41,4 +41,4 @@ export interface PersonaJournalRemove {
   readonly at: string;
 }
 
-export type { JournalEntry, JournalFinding, JournalGate, FindingCause } from '../core/persona-journal';
+export type { JournalEntry, JournalFinding, JournalGate, FindingCause } from '../core/persona/persona-journal';

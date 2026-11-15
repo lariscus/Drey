@@ -2,7 +2,7 @@ import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { SEEDED_PICTURES_KEY, seededListOf } from '../core/crew-seed-marker';
+import { SEEDED_PICTURES_KEY, seededListOf } from '../core/persona/crew-seed-marker';
 import { CrewConfigFiles } from './crew-config-files';
 import { CREW_PICTURES_COMMIT, CrewPictures } from './crew-pictures';
 import type { EngineHost, EngineVault } from './host';

@@ -1,6 +1,6 @@
-import { PERSONAS_DIR } from '../core/persona';
-import { proseMigrationOf } from '../core/persona-prose';
-import { TicketsGit } from '../core/tickets-git';
+import { PERSONAS_DIR } from '../core/persona/persona';
+import { proseMigrationOf } from '../core/persona/persona-prose';
+import { TicketsGit } from '../core/git/tickets-git';
 import type { EngineHost, EngineVault } from './host';
 import type { PersonaRecordsBoard } from './persona-records';
 

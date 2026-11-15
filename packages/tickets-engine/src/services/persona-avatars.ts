@@ -1,7 +1,7 @@
 import { promises as fsp } from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_CREW_IDS } from '../core/default-crew';
-import { HUMAN_PERSONA_ID, PERSONAS_DIR } from '../core/persona';
+import { DEFAULT_CREW_IDS } from '../core/persona/default-crew';
+import { HUMAN_PERSONA_ID, PERSONAS_DIR } from '../core/persona/persona';
 import type { EngineHost, EngineVault } from './host';
 import { SHIPPED_PERSONAS_DIR } from './shipped-crew-files';
 

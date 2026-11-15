@@ -4,7 +4,7 @@
  * − N + stepper, a select and the Add / Cancel buttons. Plain DOM, no state.
  */
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
-import { el } from '../settings-dom';
+import { el } from './dom.ts/settings-dom';
 
 const GLYPH = {
   terminal: '<rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M7 10l3 2-3 2M12 15h5"></path>',

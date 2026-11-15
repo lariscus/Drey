@@ -1,9 +1,9 @@
 import type { ChainEntry } from '../contracts/chain';
 import type { PersonaBoardMove } from '../contracts/persona-board';
 import type { TicketCard } from '../contracts/tickets';
-import type { PersonaLookup } from '../core/chain-holder';
-import { renderChainEntry } from '../core/chain-list';
-import { EDGE_STAGES } from '../core/lifecycle-stages';
+import type { PersonaLookup } from '../core/pipeline/chain-holder';
+import { renderChainEntry } from '../core/pipeline/chain-list';
+import { EDGE_STAGES } from '../core/pipeline/lifecycle-stages';
 
 /**
  * The owner's moves on a persona board (req-270, the persona board concept

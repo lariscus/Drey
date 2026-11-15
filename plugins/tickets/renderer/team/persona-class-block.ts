@@ -7,7 +7,7 @@
  * from the model. A class change drops a pin that is not a model of the new
  * class. The draft's `modelClass` and `pinnedModel` go with the page's Save.
  */
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { classChoicesOf, classCountsOf, classModelsOf, pinFitsClass, pinnedModelOf } from './persona-class-model';
 import { listboxOf, pickerField, segmented, type ListOption } from './persona-controls';

@@ -1,5 +1,5 @@
 import type { SkillSourceRef } from '../contracts/skills';
-import { parseSkillSources, recordId, SKILL_SOURCES_FILE, skillSourcesText, type SkillSourceRecord, type SkillSourcesParse } from '../core/skill-sources-file';
+import { parseSkillSources, recordId, SKILL_SOURCES_FILE, skillSourcesText, type SkillSourceRecord, type SkillSourcesParse } from '../core/skills/skill-sources-file';
 import type { SkillFileSystem } from './skill-file-system';
 
 /**

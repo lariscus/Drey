@@ -14,7 +14,7 @@ import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
 import type { SlotView } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { PersonaView } from '../../shared/remote-protocol';
 import type { BoardSnapshot } from '../../shared/tickets';
-import { el, textButton } from '../settings-dom';
+import { el, textButton } from './dom.ts/settings-dom';
 import { budgetLineOf, defaultFlowLine, maxMbOf, parseDeskVideos, type DeskVideos } from './desk-model';
 import { STANDARD_FLOW_ID } from '../../../../packages/tickets-engine/src/contracts/flow';
 import { slotSessionsLine } from './models-model';

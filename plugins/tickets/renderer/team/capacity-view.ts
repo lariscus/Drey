@@ -7,7 +7,7 @@
  * reset, then the queue. The same model as the Team tab
  * (`team-model.ts`); the band is the glance, the tab the detail.
  */
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import { resetTextOf, type SlotChipModel } from './capacity-model';
 import type { I18n } from '../../../../shared/i18n/types';
 

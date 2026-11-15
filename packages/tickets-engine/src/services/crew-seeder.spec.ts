@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { crewOrderOf } from '../core/crew-order';
-import { SEEDED_PICTURES_KEY, seededCrewOf, seededListOf } from '../core/crew-seed-marker';
-import { DEFAULT_CREW_IDS } from '../core/default-crew';
-import { parsePersonaFile } from '../core/persona';
+import { crewOrderOf } from '../core/persona/crew-order';
+import { SEEDED_PICTURES_KEY, seededCrewOf, seededListOf } from '../core/persona/crew-seed-marker';
+import { DEFAULT_CREW_IDS } from '../core/persona/default-crew';
+import { parsePersonaFile } from '../core/persona/persona';
 import { CREW_SEED_COMMIT } from './crew-seeder';
 import { CrewSeederRig } from './crew-seeder-rig.fake';
 

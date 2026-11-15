@@ -13,7 +13,7 @@ import { StoreConfigCache } from './store-config-cache';
 import { StoreReader } from './store-reader';
 import { checkoutOf, createDricketStore, type StoreSettings } from './store-settings';
 import type { StoreStageSet } from './store-stages';
-import { stageOfPhase } from '../core/lifecycle-stages';
+import { stageOfPhase } from '../core/pipeline/lifecycle-stages';
 
 /** The seams of the file path (E14-4); specs replace them, the engine leaves them out. */
 export interface StoreBoardSourceOptions {

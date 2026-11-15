@@ -5,7 +5,7 @@
  */
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
 import type { MessageKey } from '../../../../shared/i18n/types';
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { Choice } from './persona-allowed-model';
 import { personaPictures } from './persona-pictures';
 import { initialsOf } from './team-model';

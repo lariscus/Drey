@@ -6,7 +6,7 @@
  * Mission Control's persona has the dot and the word only. The facts follow
  * the engine's events without a repaint of the page (`sync`).
  */
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { iconButton } from './persona-dom';
 import { usd, type PersonaCardModel } from './team-model';

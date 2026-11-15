@@ -1,5 +1,5 @@
 import type { SkillRemoveCommand, SkillToggleCommand, SkillUploadCommand } from '../contracts/skills';
-import type { Parsed } from '../core/commands';
+import type { Parsed } from '../core/ticket/commands';
 
 /**
  * The skill routes' request bodies (req-172): shape only — the persona id is

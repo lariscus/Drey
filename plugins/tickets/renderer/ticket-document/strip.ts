@@ -8,14 +8,14 @@
  * them and the owner never waits on the header.
  */
 import type { EditorView } from '@codemirror/view';
-import { parseVerlaufEntries } from '../../../../packages/tickets-engine/src/core/verlauf';
-import type { RunEstimate } from '../../../../packages/tickets-engine/src/core/estimate';
+import { parseVerlaufEntries } from '../../../../packages/tickets-engine/src/core/chapters/history-chapter';
+import type { RunEstimate } from '../../../../packages/tickets-engine/src/core/plan/estimate';
 import type { BoardSnapshot, TicketCard, TicketIssue, TicketMeta } from '../../shared/tickets';
-import type { WorkRow } from '../work-groups';
+import type { WorkRow } from '../work/work-groups';
 import { cardNode, type CardFacts } from './dom';
 import { estimateInlineText, noEstimateText } from '../../../../shared/cost-text';
 import type { I18n } from '../../../../shared/i18n/types';
-import { cardOfDocument } from '../ticket-header';
+import { cardOfDocument } from './ticket-header';
 import { actionBarOf, chainOf, costSummary, flowItemsOf, pageShapeOf, statusOf, titleCase, workerOf, type PersonaName } from './model';
 import { hasOpenParts } from './parts-model';
 import { cardStartOf } from './start-model';

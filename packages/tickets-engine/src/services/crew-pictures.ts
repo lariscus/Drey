@@ -1,7 +1,7 @@
 import { CREW_FILE } from '../contracts/crew-config';
-import { SEEDED_PICTURES_KEY, seededCrewOf, seededListOf, withSeededList } from '../core/crew-seed-marker';
-import { HUMAN_PERSONA_ID } from '../core/persona';
-import type { TicketsGit } from '../core/tickets-git';
+import { SEEDED_PICTURES_KEY, seededCrewOf, seededListOf, withSeededList } from '../core/persona/crew-seed-marker';
+import { HUMAN_PERSONA_ID } from '../core/persona/persona';
+import type { TicketsGit } from '../core/git/tickets-git';
 import type { CrewConfigFiles } from './crew-config-files';
 import type { EngineHost, EngineVault } from './host';
 import { avatarPathOf, type PersonaAvatarWriter } from './persona-avatars';

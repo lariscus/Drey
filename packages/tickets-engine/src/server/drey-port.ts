@@ -17,11 +17,11 @@ import type {
   StopRunCommand,
   TicketIdCommand,
   TransitionCommand,
-} from '../core/commands';
-import { chainResult } from '../core/commands';
+} from '../core/ticket/commands';
+import { chainResult } from '../core/ticket/commands';
 import type { PersonaAllowedPatch } from '../contracts/persona-allowed';
 import type { PersonaSettingsPatch } from '../contracts/persona-settings-patch';
-import { personaReadOnly } from '../core/persona-settings';
+import { personaReadOnly } from '../core/persona/persona-settings';
 import type { FleetSnapshot } from '../services/fleet-client';
 import type { BoardAvatarsPort } from '../services/board-avatars';
 import type { ChatModelsReply } from '../contracts/chat-models';
@@ -67,20 +67,20 @@ export interface PersonaSessionPort {
 }
 import type { BoardSnapshot, CreateResult, MutationResult, RecentDone } from '../contracts/tickets';
 import type { PersonaBoardMove } from '../contracts/persona-board';
-import type { EstimateKey, RunEstimate } from '../core/estimate';
+import type { EstimateKey, RunEstimate } from '../core/plan/estimate';
 import type { PromptPreviewCommand, PromptPreviewReply, SkillListReply, SkillRemoveCommand, SkillsPort, SkillToggleCommand, SkillUploadCommand, SkillUploadReply } from '../contracts/skills';
 import type { PlanPartsEdit, PlanPartsReply, PlanReleaseReply, PlanReleaseScope } from '../contracts/plan-approval';
 import type { PersonaRemoveCommand, PersonaRemovePort, PersonaRemoveReply } from '../contracts/persona-remove';
 import type { PersonaPictureRemove, PersonaPictureReply, PersonaPictureSet } from '../contracts/persona-picture';
 import type { FlowOp, FlowReply, FlowSaveReply, FlowTarget } from '../contracts/flow';
-import type { ReviewComment } from '../core/review-feedback';
-import type { TicketDiff, TicketFileReply, WorktreeFile } from '../core/worktree-changes';
+import type { ReviewComment } from '../core/ticket/review-feedback';
+import type { TicketDiff, TicketFileReply, WorktreeFile } from '../core/git/worktree-changes';
 import type { ChatDecisionResult, ChatServicePort, ChatShapeResult, ChatSplitChoice, ChatSession, ChatSessionMeta, ChatTurnResult, PlanStatus } from '../contracts/chat';
-import { IMPROVEMENTS_THRESHOLD } from '../core/improvements';
-import { openStatusItems } from '../core/status-log';
-import type { StatusLine } from '../core/status-log';
-import { parseScoutReportSection } from '../core/scout';
-import { parseLedger, personaDailyCosts } from '../core/ledger';
+import { IMPROVEMENTS_THRESHOLD } from '../core/persona/improvements';
+import { openStatusItems } from '../core/pipeline/status-log';
+import type { StatusLine } from '../core/pipeline/status-log';
+import { parseScoutReportSection } from '../core/chapters/scout';
+import { parseLedger, personaDailyCosts } from '../core/pipeline/ledger';
 import { needsOf, notifyNeedsOf, reportNeedOf, statusNeedOf, STATUS_NEEDS_CAP } from './needs';
 
 /** The board service's part the remote uses (`BoardService` fits it). */
@@ -97,7 +97,7 @@ export interface RemoteBoard {
   archive(input: TicketIdCommand & { actor?: string }): Promise<MutationResult>;
   startRun(input: StartRunCommand): Promise<RunReply>;
   /** The Team tab's cards (E5b). */
-  listPersonas(): Promise<readonly import('../core/persona').Persona[]>;
+  listPersonas(): Promise<readonly import('../core/persona/persona').Persona[]>;
   /** Creates the owner's own persona on first sight (E10-6); a fake without it is fine. */
   ensureHumanPersona?(): Promise<void>;
   /** The fleet ledger's raw text (`tickets/_meta/ledger.jsonl`); null without a vault or ledger. */

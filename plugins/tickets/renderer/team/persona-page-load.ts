@@ -10,7 +10,7 @@ import type { ChatModelsReply } from '../../../../packages/tickets-engine/src/co
 import type { ModelsReply } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { SlotView } from '../../../../packages/tickets-engine/src/fleet/protocol-slots';
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
-import type { DeskDeps } from '../desk-deps';
+import type { DeskDeps } from '../board/desk-deps';
 import type { PageExtras } from './persona-block-context';
 import { isMissingFileError } from './persona-model';
 

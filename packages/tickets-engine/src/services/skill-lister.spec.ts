@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { estimateTokens, tokenizerFor } from '../core/token-count';
-import { skillsSection } from '../fleet/skills-section';
+import { estimateTokens, tokenizerFor } from '../core/config/token-count';
+import { skillsSection } from '../fleet/runner/skills-section';
 import { MemorySkillFileSystem } from './skill-file-system.fake';
 import { SkillFolderReader } from './skill-folder-reader';
 import { SkillLister } from './skill-lister';

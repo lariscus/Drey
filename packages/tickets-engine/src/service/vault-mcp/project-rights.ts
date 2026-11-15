@@ -10,7 +10,7 @@
  */
 import type { VaultWriteGrant } from '../../../../../shared/vault-tools';
 import type { ProjectRecord } from '../../contracts/projects';
-import type { VaultScope } from '../../fleet/orchestrate/worker-vault';
+import type { VaultScope } from '../../fleet/runner/worker-vault';
 import type { VaultSite } from './disk-tool-vault';
 import { folderSiteIds, projectAccess, reachedVaults, writableVaults } from './project-reach';
 import type { VaultDisk } from './vault-disk';

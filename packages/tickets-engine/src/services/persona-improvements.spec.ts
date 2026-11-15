@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { EngineBoardService } from './board-service';
 import type { EngineHost, EngineVault } from './host';
 import type { FleetPort } from './host';
-import { TicketsGit } from '../core/tickets-git';
+import { TicketsGit } from '../core/git/tickets-git';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools, type RunInfo } from '../fleet/protocol';
 import {
   parseImprovements,
   renderImprovements,
   type ImprovementProposal,
-} from '../core/improvements';
-import type { ImprovementDraft } from '../core/improvements';
+} from '../core/persona/improvements';
+import type { ImprovementDraft } from '../core/persona/improvements';
 
 /**
  * E6: the self-improvement loop's board-service write paths — the

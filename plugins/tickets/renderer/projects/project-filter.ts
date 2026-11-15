@@ -14,7 +14,7 @@
  */
 import type { DreyPluginApi, Unsubscribe, WorkspaceScopeOption } from '../../../../shared/plugin-api/renderer';
 import type { BoardSnapshot } from '../../shared/tickets';
-import type { BoardScope } from '../desk-deps';
+import type { BoardScope } from '../board/desk-deps';
 import { captureProjectOf, inScope, scopeOptionsOf } from './project-scope';
 
 export interface ProjectFilter {

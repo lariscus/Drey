@@ -7,7 +7,7 @@
  * draws the strip and mounts a pane.
  */
 import type { PersonaView } from '../../shared/remote-protocol';
-import { h, type DeskDeps } from '../desk-deps';
+import { h, type DeskDeps } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { mountMemoryPane } from './memory-pane';
 import { mountOneOnOnePane } from './one-on-one-pane';

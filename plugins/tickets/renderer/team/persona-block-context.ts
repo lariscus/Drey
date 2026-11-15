@@ -9,7 +9,7 @@ import type { ModelsReply } from '../../../../packages/tickets-engine/src/fleet/
 import type { SlotView } from '../../../../packages/tickets-engine/src/fleet/protocol-slots';
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
 import type { PersonaView } from '../../shared/remote-protocol';
-import type { DeskDeps } from '../desk-deps';
+import type { DeskDeps } from '../board/desk-deps';
 import type { Translate } from './persona-dom';
 import type { PersonaDraft, personaPathsOf } from './persona-model';
 import type { PersonaPreviewState } from './persona-preview-state';

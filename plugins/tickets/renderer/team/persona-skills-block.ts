@@ -12,7 +12,7 @@
  * Skills library (req-289). Built once per load, it repaints itself from
  * `PersonaSkillsState`.
  */
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { listboxOf } from './persona-controls';
 import { blockHead, outlineButton } from './persona-dom';

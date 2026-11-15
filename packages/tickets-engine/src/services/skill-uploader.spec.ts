@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseSkillMarkdown } from '../core/skill';
+import { parseSkillMarkdown } from '../core/skills/skill';
 import { MemorySkillFileSystem } from './skill-file-system.fake';
 import { SkillUploader } from './skill-uploader';
 import { buildZip } from './skill-zip.fake';

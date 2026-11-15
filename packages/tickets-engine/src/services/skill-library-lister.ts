@@ -1,8 +1,8 @@
 import type { SkillLibraryData, SkillLibraryRow, SkillSourceView, SkillUser } from '../contracts/skill-library';
-import type { Persona } from '../core/persona';
-import { ownSkillsDir, SHARED_SKILLS_DIR } from '../core/skill';
-import { recordId, type SkillSourceRecord } from '../core/skill-sources-file';
-import { tokenizerFor } from '../core/token-count';
+import type { Persona } from '../core/persona/persona';
+import { ownSkillsDir, SHARED_SKILLS_DIR } from '../core/skills/skill';
+import { recordId, type SkillSourceRecord } from '../core/skills/skill-sources-file';
+import { tokenizerFor } from '../core/config/token-count';
 import type { SkillKit } from './skill-kit';
 import type { SkillRecord } from './skill-folder-reader';
 import { sourceRefOf } from './skill-source-store';

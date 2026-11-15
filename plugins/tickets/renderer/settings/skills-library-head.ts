@@ -6,7 +6,7 @@
  * Path, Ref, Fetch and Cancel — and the one line under it for a refusal or
  * what a fetch skipped.
  */
-import { el } from '../settings-dom';
+import { el } from './dom.ts/settings-dom';
 import { pickedOf } from '../team/persona-skill-add';
 import { labelled, onEnterEscape, textButton, textField } from './models-dom';
 import { glyphTextButton, menuOf } from './skills-library-dom';

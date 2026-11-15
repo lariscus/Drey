@@ -8,7 +8,7 @@
  * rule (`core/token-count.ts`), so it follows every keystroke and is still
  * an estimate (`≈`). DOM-free.
  */
-import { estimateTokens } from '../../../../packages/tickets-engine/src/core/token-count';
+import { estimateTokens } from '../../../../packages/tickets-engine/src/core/config/token-count';
 import type { MessageKey } from '../../../../shared/i18n/types';
 import type { PromptPreview } from './persona-seams';
 

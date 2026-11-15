@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseSkillSources } from '../core/skill-sources-file';
+import { parseSkillSources } from '../core/skills/skill-sources-file';
 import { GithubError } from './github-client';
 import { C14, C15, libraryWorld, MAIN, SHARED, SOURCES, skillText } from './skill-library.fixture';
 

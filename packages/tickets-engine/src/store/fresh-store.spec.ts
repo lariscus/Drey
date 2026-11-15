@@ -3,7 +3,7 @@ import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { TicketsGit } from '../core/tickets-git';
+import { TicketsGit } from '../core/git/tickets-git';
 import { assertDkVersion, MIN_DK_VERSION } from './dk-process';
 import { isLifecycleStore, parseStoreStages } from './store-stages';
 import { defaultStorePathOf, initLifecycleStore, lifecycleStoreToml } from './fresh-store';

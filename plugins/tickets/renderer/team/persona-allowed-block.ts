@@ -9,7 +9,7 @@
  * allowance are enforced by the engine; the commands and network choices are
  * recorded in `allowed:` and not yet read by the runner (req-142's remainder).
  */
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { COMMAND_CHOICES } from './persona-allowed-model';
 import { switchButton } from './persona-controls';

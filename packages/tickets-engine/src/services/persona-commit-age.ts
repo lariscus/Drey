@@ -1,5 +1,5 @@
-import { PERSONAS_DIR, personaRef } from '../core/persona';
-import type { RepoLocation, TicketsGit } from '../core/tickets-git';
+import { PERSONAS_DIR, personaRef } from '../core/persona/persona';
+import type { RepoLocation, TicketsGit } from '../core/git/tickets-git';
 import type { EngineVault } from './host';
 
 /** The board as the commit ages need it: where the tickets vault is. */

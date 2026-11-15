@@ -16,7 +16,7 @@ import type { CapabilityClass, PoolGrantRecord, RunLedgerInput } from './protoco
 import type { RouteRecord } from './protocol-routing';
 import type { ModelNeeds } from '../contracts/ticket-pool-meta';
 import type { ShapedQuestion } from '../contracts/question-shape';
-import type { FollowupDraft } from '../core/followups';
+import type { FollowupDraft } from '../core/ticket/followups';
 import type { TicketForm } from '../contracts/tickets';
 import type { SessionKind, SessionSpec } from './protocol-session';
 import type { ClosingRoundSpec } from './protocol-closing';

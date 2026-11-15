@@ -1,6 +1,6 @@
-import { MAX_ATTACHMENT_BYTES } from '../orchestrate/attachment-store';
-import type { RunSupervisor } from '../orchestrate/run-supervisor';
-import type { SupervisorSet } from '../orchestrate/supervisor-set';
+import { MAX_ATTACHMENT_BYTES } from '../runner/attachment-store';
+import type { RunSupervisor } from '../runner/run-supervisor';
+import type { SupervisorSet } from '../runner/supervisor-set';
 import { questionAnswersOf, type RunRequest } from '../protocol';
 import type { RouteContext, RouteGroup } from './route-context';
 

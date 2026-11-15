@@ -78,7 +78,7 @@ folder at the path would poison the next prepare.
 - **After the merge or Done (req-185, milestone 273, ADR-0099):** a
   finished ticket's worktrees go by themselves — `git worktree remove`
   without `--force` for the ticket's repo and each further repo
-  (`orchestrate/finished-worktrees.ts`), the branch stays. The commit run
+  (`worktrees/finished-worktrees.ts`), the branch stays. The commit run
   (You's `commit` leaving action) removes them at its green end and notes
   each outcome on the run (`worktree removed: <path> (the branch t/<id>
   stays)` / `worktree kept: <path> — it has uncommitted changes`); the
@@ -384,7 +384,7 @@ resumed run appends `resumed`).
 How a run's context reaches its worker. `RunRequest.handover` rides the
 start: the dialog sends the owner's explicit choice, the dispatcher
 sends `auto`, an older sender's absence means `fresh`. One resolver —
-`packages/tickets-engine/src/fleet/handover.ts`, pure — decides:
+`packages/tickets-engine/src/fleet/runner/handover.ts`, pure — decides:
 
 - The **review phase always resolves fresh** (an independent worker
   judges the step) — and since req-183 it judges it in its own
@@ -495,7 +495,7 @@ A persona's `persona.md` carries `class:` and an optional pinned `model:`
 model table, so the next free model of the class runs, and the harness
 follows from the model. A pinned model runs alone — no step up — while nothing
 raised the class. The 1:1 and the free session
-(`fleet/persona-harness.ts`) use the pinned model's harness, else the first
+(`fleet/session/persona-harness.ts`) use the pinned model's harness, else the first
 enabled model of the persona's class in the table; no harness, no session.
 
 The caps are the plugin config keys `fleet.cap.gateFailureLines` /
@@ -508,12 +508,12 @@ tail and 50/4096 head). Each application is logged:
 
 `<fleet root>/chains/<vault key>/chain.json` — the key is the vault
 folder's name and a hash of its normalized path (`drey-tickets-1a2b3c4d`,
-`orchestrate/chain-state-paths.ts`), so two vaults never share a master,
+`chain/chain-state-paths.ts`), so two vaults never share a master,
 an Autopilot or a breaker. **Runtime state only — no configuration:** the
 board sends the resolved chain config (`_meta/crew.md` over the defaults,
 the three layers below) and the runner holds it in memory; a runner that
 boots with a vault in `chain-vault.json` resolves that vault's
-`_meta/crew.md` itself (`config/chain-config-restorer.ts`), so a handover
+`_meta/crew.md` itself (`chain/chain-config-restorer.ts`), so a handover
 keeps working with Drey closed. When the board points the chain at another
 vault, the current state is written to its file, the state emptied, and
 the other vault's file loaded under the boot rule (Off unless a fresh
@@ -571,7 +571,7 @@ opening lines (`slot: Claude A`). Req-290 retired the `profile` a slot
 (and a repository) once carried: every slot may serve every repository —
 an old `profile` key in `service.json` or `repos.md` is read and silently
 ignored, and no write emits it again. Code: `packages/tickets-engine/src/fleet/routing/`,
-wired in `fleet/compose-routing.ts`.
+wired in `fleet/runner/compose-routing.ts`.
 
 ### `service.json` — where the slots are configured
 
@@ -662,7 +662,7 @@ No model is typed in (board 7l v3). The runner asks each harness on the
 machine what it offers and keeps the answer; Settings → Models shows it
 and writes the model table from it. Code: `fleet/harness/probe-*.ts` (one
 probe per harness), `fleet/routing/model-discovery.ts` (`ModelDiscovery`),
-`fleet/compose-discovery.ts`, the routes in `fleet/api/discovery-routes.ts`.
+`fleet/runner/compose-discovery.ts`, the routes in `fleet/api/discovery-routes.ts`.
 
 | Harness | How it is asked | Signed in | Models |
 |---|---|---|---|
@@ -702,8 +702,8 @@ class.** Code: `fleet/routing/` (`ModelTable`, `CapacityCap`, `Ledgers`,
 `ClassOrder` / `classesOf` and `ClassMigration`; req-178's
 `SlotFit`, `CapabilityFilter`, `ReserveGuard`, `SurplusChoice`, `StepUp`,
 `RouteRecorder`, `CostEstimate`, `RunShareTracker`, `ModelsDevImport`),
-wired in `fleet/compose-routing.ts` and `fleet/compose-pool.ts`; the chain asks it through
-`orchestrate/dispatch-pool.ts`, every start through `slot-binder.ts`.
+wired in `fleet/runner/compose-routing.ts` and `fleet/runner/compose-pool.ts`; the chain asks it through
+`chain/dispatch-pool.ts`, every start through `runner/slot-binder.ts`.
 
 ### `service.json` — the pool keys
 
@@ -1091,7 +1091,7 @@ A persona's 1:1 is a run record with `kind: '1:1'` (`fleet/protocol-session.ts`)
 ## The closing round (req-169, ADR-0093)
 
 After the gate verdict of a ticket run — red: before the settle; green:
-before the move — `ClosingRound` (`fleet/orchestrate/closing-round.ts`)
+before the move — `ClosingRound` (`fleet/runner/closing-round.ts`)
 looks at the run once:
 
 - **The signals** (`ClosingSignalRule`): `red-gate`, `retry`
@@ -1210,12 +1210,12 @@ the format, the order, the upload rules and the migration.
 
 On a **lifecycle store** (stages `inbox prioritized active running done`,
 claim `running` — after the owner's Migrate) the runner dispatches by the
-**holder**, not by the column (`orchestrate/holder-pass.ts`,
-`fleet/holder-plan.ts`). The files backend and a store still on phase stages
+**holder**, not by the column (`runner/holder-pass.ts`,
+`fleet/chain/holder-plan.ts`). The files backend and a store still on phase stages
 keep the column dispatch (and its ring run) as before.
 
 - **Who runs.** The holder is derived from the ticket's chain and cursor
-  (`x-chain`, `x-at`; `core/chain-holder.ts`): the persona of the entry at
+  (`x-chain`, `x-at`; `core/pipeline/chain-holder.ts`): the persona of the entry at
   the cursor. An agent entry runs — with that persona, nothing else: the
   ticket pin `x-persona`, the crew's `default-persona` and the ring run are
   retired. A `:shape` entry waits for the owner's Shape chat, a You entry
@@ -1306,14 +1306,14 @@ window, the Crew tab and Pia's confirmed `startSession` card all call it):
   existing local absolute folder; **the tickets vault itself is allowed**;
   refused are a relative path, a network share, a folder inside `.git` and
   the worktree of a live ticket run.
-- **The request** — `fleet/free-session-request.ts`: the persona's harness;
+- **The request** — `fleet/session/free-session-request.ts`: the persona's harness;
   the model and class from the layers (the session's pin and class over the
   persona's model; no class asked = the model table's class of that
   model); `permissionMode` the session's override over the vault's
   `permission-mode` (the 1:1's read-only rule does not apply); `ticketId`
   the marker `free`, `worktreePath` = `repoPath` = the folder, `gate:
   'none'`, `ledger.noTicket`. The brief
-  (`fleet/free-session-brief.ts`, `specs/classifier-spec.md` "The free
+  (`fleet/session/free-session-brief.ts`, `specs/classifier-spec.md` "The free
   session brief"): who the persona is, the folder, what the mode allows,
   and — in the tickets vault — that its ticket files are the board's.
 - **The start** — `HeldSessionStarter` (kind `FreeSessionKind`): the pool's
@@ -1332,11 +1332,11 @@ window, the Crew tab and Pia's confirmed `startSession` card all call it):
 
 | Layer | Where | Holds |
 |---|---|---|
-| Machine | `service.json` in the service home (`fleet/routing/service-config-schema.ts`, read and written only through `ServiceConfigFile`), and for now the engine's `config.json` for Drey's mirrored device settings (`service.*`, `remote.*`, `chat.*`, `gitPath`, `dk.*` — req-231 folds them in) | the model table, the capacity cap, slots, providers and keys, paths, autostart |
+| Machine | `service.json` in the service home (`fleet/routing/service-config-file.ts` — `ServiceConfigFile`, read and written only through `ServiceConfigFile`), and for now the engine's `config.json` for Drey's mirrored device settings (`service.*`, `remote.*`, `chat.*`, `gitPath`, `dk.*` — req-231 folds them in) | the model table, the capacity cap, slots, providers and keys, paths, autostart |
 | Vault | `tickets/_meta/crew.md` (`specs/ticket-schema.md`), beside `pipeline.md`, `personas/` and `repos.md` | default persona, default worker, permission mode, caps, handover thresholds |
 | Session | the session record (`RunRequest` / `RunInfo`) | directory, class, model pin, handover mode, permission override |
 
-Precedence, enforced by `fleet/config/layered-config-resolver.ts`:
+Precedence, enforced by `fleet/chain/layered-config-resolver.ts`:
 **session > vault > built-in default**; a machine key is set only in the
 machine layer and never overridden. The one-time migration of the vault
 keys from `config.json` and the old `chain.json`: `specs/ticket-schema.md`
@@ -1442,10 +1442,10 @@ keys from `config.json` and the old `chain.json`: `specs/ticket-schema.md`
 
 - Code: `packages/tickets-engine/src/service/runner-component.ts` (the runner
   as a service component, req-164), `packages/tickets-engine/src/fleet/`
-  (`runner.ts` — the composition root, `runner-lifecycle.ts` — when the runner may sleep, req-110;
-  `run/` — the run state machine; `orchestrate/` — the supervisor's and the chain's parts, the one
-  ticket writer `RunBookkeeper`; `api/` — the HTTP routes; `store/` — the ticket store port;
-  `harness/` — the adapter contract, the Claude Code adapter and the one ACP adapter with its opencode, Kimi and Copilot CLI launch descriptions; `orchestrator.ts`, `chain.ts`, `protocol.ts`; ADR-0096), client side
+  (`runner/runner.ts` — the composition root, `runner/runner-lifecycle.ts` — when the runner may sleep, req-110;
+  `runner/` — the run machinery with the pure run core (`run-state.ts` …) and the one
+  ticket writer `RunBookkeeper`; `api/` — the HTTP routes; `lease/` — the claims and the store;
+  `harness/` — the adapter contract, the Claude Code adapter and the one ACP adapter with its opencode, Kimi and Copilot CLI launch descriptions; `chain/` — the daemon (`orchestrator.ts`, `chain.ts`); `protocol.ts` — the wire contract; ADR-0096), client side
   `packages/tickets-engine/src/services/fleet-client.ts`; the Drey-gone
   signal `packages/tickets-engine/src/server/drey-presence.ts`
 - Specs: `specs/ticket-schema.md` (tickets, gates, agent lane rules),

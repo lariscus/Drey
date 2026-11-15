@@ -1,5 +1,5 @@
-import { personaMemorySection } from '../fleet/context-pack';
-import { skillsSection, type SkillBody } from '../fleet/skills-section';
+import { personaMemorySection } from '../fleet/telemetry/context-pack';
+import { skillsSection, type SkillBody } from '../fleet/runner/skills-section';
 
 /** What of Mission Control's persona rides her turns (req-269, req-294, req-296). */
 export interface MissionPersonaParts {

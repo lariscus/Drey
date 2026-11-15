@@ -7,7 +7,7 @@
  * follows from it. "Tell me when" is not drawn: nothing records or reads it
  * yet (req-236).
  */
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { blockHead, labelled, textInput } from './persona-dom';
 import { workSettingsNodes } from './persona-work-settings';

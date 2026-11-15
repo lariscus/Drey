@@ -7,7 +7,7 @@
  */
 import { PERSONA_RUN_METHODS, type RunRecordReply } from '../../contracts/persona-run-records';
 import type { ProjectRecord } from '../../contracts/projects';
-import type { Persona } from '../../core/persona';
+import type { Persona } from '../../core/persona/persona';
 import { PersonaRecordTools, type PersonaRecordsPort } from './persona-record-tools';
 import { ProjectRights, type RightsSource } from './project-rights';
 import { RegisteredVaults, type VaultsConfig } from './registered-vaults';

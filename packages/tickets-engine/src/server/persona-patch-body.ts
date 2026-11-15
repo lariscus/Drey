@@ -1,6 +1,6 @@
 import type { PersonaAllowedPatch } from '../contracts/persona-allowed';
 import type { PersonaSettingsPatch } from '../contracts/persona-settings-patch';
-import type { Parsed } from '../core/commands';
+import type { Parsed } from '../core/ticket/commands';
 
 /**
  * The persona setup's PATCH body (U4, concept §4.5): only the listed keys

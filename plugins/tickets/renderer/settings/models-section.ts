@@ -11,7 +11,7 @@
  */
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
 import type { ChainStatus } from '../../../../packages/tickets-engine/src/fleet/protocol';
-import { el } from '../settings-dom';
+import { el } from './dom.ts/settings-dom';
 import { createAccountsPart } from './models-accounts';
 import { createClassesPart } from './models-classes';
 import { createHeadPart } from './models-head';

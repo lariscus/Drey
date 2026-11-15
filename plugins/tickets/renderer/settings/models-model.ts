@@ -21,7 +21,7 @@ import type {
 } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { classNameOf } from '../../../../packages/tickets-engine/src/contracts/capability-class';
 import type { I18n } from '../../../../shared/i18n/types';
-import { RUNNER_LABEL } from '../settings-workers';
+import { RUNNER_LABEL } from './workers.ts/settings-workers';
 
 export const trimmedNumber = (i18n: I18n, value: number): string => i18n.formatNumber(value, { maximumFractionDigits: 2 });
 

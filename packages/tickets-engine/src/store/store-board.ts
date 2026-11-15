@@ -1,15 +1,15 @@
 import { EXTENSION_KEYS } from './extension-keys';
-import { ACTIVE_STAGE, EDGE_STAGES, RUNNING_STAGE } from '../core/lifecycle-stages';
+import { ACTIVE_STAGE, EDGE_STAGES, RUNNING_STAGE } from '../core/pipeline/lifecycle-stages';
 import { stringify } from 'yaml';
 import { TICKETS_ARCHIVE_DIR, type BoardSnapshot, type PipelinePhase } from '../contracts/tickets';
 import type { TicketDetail } from '../ports/ticket-store';
 import { ARCHIVED_LABEL, PLACEHOLDER_LABEL } from './legacy-bridge';
-import { assembleBoard, type AssembleInput, type BoardFile } from '../core/ticket-board';
-import { recentDoneOf } from '../core/done-listing';
-import { statusLinesOfComments } from '../core/status-comment';
-import { openStatusItems } from '../core/status-log';
-import { chainColumnOf } from '../core/chain-placement';
-import { parseTicketChainFields } from '../core/ticket-chain-fields';
+import { assembleBoard, type AssembleInput, type BoardFile } from '../core/ticket/ticket-board';
+import { recentDoneOf } from '../core/ticket/done-listing';
+import { statusLinesOfComments } from '../core/pipeline/status-comment';
+import { openStatusItems } from '../core/pipeline/status-log';
+import { chainColumnOf } from '../core/pipeline/chain-placement';
+import { parseTicketChainFields } from '../core/ticket/ticket-chain-fields';
 
 /**
  * The board over a store's `TicketDetail[]` instead of ticket files (E14-2,

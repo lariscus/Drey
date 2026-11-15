@@ -3,8 +3,8 @@ import { promises as fsp, mkdirSync, mkdtempSync, rmSync, writeFileSync } from '
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { DEFAULT_PIPELINE_TEXT } from '../core/pipeline-states';
-import { TicketsGit } from '../core/tickets-git';
+import { DEFAULT_PIPELINE_TEXT } from '../core/pipeline/pipeline-states';
+import { TicketsGit } from '../core/git/tickets-git';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools } from '../fleet/protocol';
 import { assertDkVersion, MIN_DK_VERSION } from '../store/dk-process';
 import { toDricketId } from '../store/ids';

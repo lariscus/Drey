@@ -1,7 +1,7 @@
 import { splitFrontmatter } from '../../../../shared/frontmatter';
-import { parsePersonaFile, personaFileText, PERSONAS_DIR, type Persona } from '../core/persona';
-import { migratedModelOf, shippedClassRank, type MigrationClassTable } from '../core/persona-model-migration';
-import { TicketsGit } from '../core/tickets-git';
+import { parsePersonaFile, personaFileText, PERSONAS_DIR, type Persona } from '../core/persona/persona';
+import { migratedModelOf, shippedClassRank, type MigrationClassTable } from '../core/persona/persona-model-migration';
+import { TicketsGit } from '../core/git/tickets-git';
 import type { ModelRow } from '../fleet/protocol';
 import type { EngineHost, EngineVault } from './host';
 import type { PersonaRecordsBoard } from './persona-records';

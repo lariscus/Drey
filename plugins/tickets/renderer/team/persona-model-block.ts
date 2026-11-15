@@ -7,7 +7,7 @@
  * model…` typed — the id stays hand-enterable, the list may be empty. The
  * draft's `chatModel` is '' for the first choice; a Save sends null for it.
  */
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { blockHead, labelled, outlineButton, selectOf, textInput } from './persona-dom';
 

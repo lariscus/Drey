@@ -5,7 +5,7 @@
  * Reserve per window, Burn rate) and the three ledger defaults. Every field
  * writes as it is left, through `poolModelsConfig`; a refusal shows under it.
  */
-import { el } from '../settings-dom';
+import { el } from './dom.ts/settings-dom';
 import { glyph, groupHead, textField } from './models-dom';
 import {
   ledgerPayload,

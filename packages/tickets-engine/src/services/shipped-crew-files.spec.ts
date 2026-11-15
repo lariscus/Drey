@@ -2,7 +2,7 @@ import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { DEFAULT_CREW_IDS } from '../core/default-crew';
+import { DEFAULT_CREW_IDS } from '../core/persona/default-crew';
 import { ShippedCrewFiles, SHIPPED_PERSONAS_DIR } from './shipped-crew-files';
 
 describe('ShippedCrewFiles', () => {

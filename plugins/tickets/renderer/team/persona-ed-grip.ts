@@ -8,7 +8,7 @@
  * fills whatever room the column has, and the dragged height only makes
  * it taller than that (the column then scrolls).
  */
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 
 export const INSTRUCTIONS_HEIGHT_KEY = 'drey.tickets.personaInstructionsHeight';
 /** The editor never gets smaller than this, by drag or by key. */

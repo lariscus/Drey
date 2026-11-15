@@ -1,5 +1,5 @@
-import { isVersionRef, newerVersionRef, parseGithubRepo } from '../core/skill-source';
-import { recordId, type SkillSourceRecord } from '../core/skill-sources-file';
+import { isVersionRef, newerVersionRef, parseGithubRepo } from '../core/skills/skill-source';
+import { recordId, type SkillSourceRecord } from '../core/skills/skill-sources-file';
 import type { GithubClient } from './github-client';
 
 /** What the last look found for one source. */

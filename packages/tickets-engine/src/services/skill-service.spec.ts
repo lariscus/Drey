@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { parsePersonaFile, type Persona } from '../core/persona';
+import { parsePersonaFile, type Persona } from '../core/persona/persona';
 import type { EngineVault } from './host';
 import { MemorySkillFileSystem } from './skill-file-system.fake';
 import { SkillService, type SkillsBoard } from './skill-service';

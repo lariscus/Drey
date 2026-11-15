@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { nodeSpawnFn } from '../procs';
+import { nodeSpawnFn } from '../runner/procs';
 import type { NormalizedEvent, ProviderAdapter, ProviderStart, WorkerHandle } from './contract';
 import { copilotAdapter } from './copilot';
 import { opencodeAdapter } from './opencode';

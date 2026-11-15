@@ -2,7 +2,7 @@
 /** Small DOM pieces of Settings → Projects (req-284): buttons, the colour dot, the segmented access control. */
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
 import type { ProjectVaultAccess } from '../../../../packages/tickets-engine/src/contracts/projects';
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 
 export function iconBtn(api: DreyPluginApi, icon: string, label: string, onClick: () => void, size = 16): HTMLButtonElement {
   const button = h('button', 'prj-ib');

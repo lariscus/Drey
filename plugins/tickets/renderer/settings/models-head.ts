@@ -4,7 +4,7 @@
  * the harnesses were last asked and Find models again, the global cap with the
  * live load, and the Harnesses group — one row per harness on this machine.
  */
-import { el } from '../settings-dom';
+import { el } from './dom.ts/settings-dom';
 import { checkedWords, harnessViewsOf, stepOf, capacityPayload, trimmedNumber, type HarnessView } from './models-model';
 import { glyph, groupHead, iconButton, stepper, textButton } from './models-dom';
 import type { ModelsState } from './models-state';

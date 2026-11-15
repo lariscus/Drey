@@ -4,7 +4,7 @@
  * since req-183, the workers' ticket copies in `_workcopy/`. Pure — the
  * board service reads and writes the file.
  */
-import { WORKCOPY_DIR, WORKTREES_DIR } from '../fleet/worktree-home';
+import { WORKCOPY_DIR, WORKTREES_DIR } from '../fleet/worktrees/worktree-home';
 
 /** The entries for a tickets repo at `prefix` (`''` at the git root, else `sub/dir/`). */
 export function reservedIgnoreEntries(prefix: string): readonly string[] {

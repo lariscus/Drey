@@ -10,8 +10,8 @@
 import type { MarkdownFormatAction, MarkdownViewHandle } from '../../../../shared/plugin-api/renderer';
 import type { MessageKey } from '../../../../shared/i18n/types';
 import type { ProjectRecord } from '../../../../packages/tickets-engine/src/contracts/projects';
-import { estimateTokens, tokenizerFor } from '../../../../packages/tickets-engine/src/core/token-count';
-import { h } from '../desk-deps';
+import { estimateTokens, tokenizerFor } from '../../../../packages/tickets-engine/src/core/config/token-count';
+import { h } from '../board/desk-deps';
 import { accessControl, dot, iconBtn, tag } from './projects-dom';
 import { colorOf, PROJECT_COLOR_PRESETS, presetOf, vaultRowsOf, withVaultAccess } from './projects-model';
 import type { ProjectsContext } from './projects-context';

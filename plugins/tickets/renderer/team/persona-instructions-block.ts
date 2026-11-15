@@ -10,15 +10,15 @@
  * editor (`persona-preview-panel.ts`).
  */
 import type { MarkdownFormatAction, MarkdownViewHandle } from '../../../../shared/plugin-api/renderer';
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { iconButton, outlineButton } from './persona-dom';
-import { splitPoolEntry } from '../../../../packages/tickets-engine/src/core/pool-entry';
+import { splitPoolEntry } from '../../../../packages/tickets-engine/src/core/config/pool-entry';
 import { classModelsOf } from './persona-class-model';
 import { createEditorGrip } from './persona-ed-grip';
 import { createPreviewPanel, type PreviewPanel } from './persona-preview-panel';
 import { atStartTokensOf } from './persona-preview-model';
-import { estimateTokens, tokenizerFor } from '../../../../packages/tickets-engine/src/core/token-count';
+import { estimateTokens, tokenizerFor } from '../../../../packages/tickets-engine/src/core/config/token-count';
 import { failureTextOf } from './persona-skills-model';
 
 const STRIP: readonly { readonly action: MarkdownFormatAction; readonly icon: string; readonly label: 'persona.format.bold' | 'persona.format.italic' | 'persona.format.heading' | 'persona.format.bullet' | 'persona.format.task' | 'persona.format.code' }[] = [

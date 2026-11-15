@@ -1,6 +1,6 @@
 import type { SkillErrorCode, SkillUploadCommand } from '../contracts/skills';
-import { frontmatterBroken, isSkillName, parseSkillMarkdown, SKILL_FILE, migratedSkillText } from '../core/skill';
-import { MAX_SKILL_BYTES, MAX_SKILL_TEXT_BYTES, validateSkillBundle, type SkillBundleFile } from '../core/skill-bundle';
+import { frontmatterBroken, isSkillName, parseSkillMarkdown, SKILL_FILE, migratedSkillText } from '../core/skills/skill';
+import { MAX_SKILL_BYTES, MAX_SKILL_TEXT_BYTES, validateSkillBundle, type SkillBundleFile } from '../core/skills/skill-bundle';
 import type { SkillFileSystem } from './skill-file-system';
 import { readSkillZip } from './skill-zip';
 

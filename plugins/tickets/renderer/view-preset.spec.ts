@@ -3,7 +3,7 @@ import type { DreyPluginApi, PluginDocKindContrib } from '../../../shared/plugin
 import { registerFlowKind } from './flow/register';
 import { MISSION_CONTROL_TARGET } from './conversation/targets';
 import { BOARD_KEY, BOARD_KIND, CREW_VIEW_ID, TEAM_KEY, TEAM_KIND, WORK_VIEW_ID, createCrewPreset, createWorkPreset, registerWorkView } from './view-preset';
-import type { DeskDeps } from './desk-deps';
+import type { DeskDeps } from './board/desk-deps';
 
 describe('the Work preset (board 7q DeskViewWorkMC, req-297)', () => {
   it('opens the Board, Mission Control open in the right dock, Tickets in the folded left dock, nothing below', () => {

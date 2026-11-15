@@ -5,7 +5,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FleetClient, type RunnerLocator } from './fleet-client';
-import { formatStamp } from '../fleet/build-stamp';
+import { formatStamp } from '../fleet/runner/build-stamp';
 import type { RunnerDescriptor } from '../fleet/protocol';
 import { RunnerComponent } from '../service/runner-component';
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { DeskDeps } from '../desk-deps';
+import type { DeskDeps } from '../board/desk-deps';
 import { createTeamStore } from './team-store';
 
 function fakeDeps(reply: () => Promise<unknown>) {

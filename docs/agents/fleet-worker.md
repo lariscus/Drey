@@ -126,3 +126,22 @@ same branch: the table under `CLAUDE.md` § "The spec files and who they
 belong to" says which file covers what, and the manual covers what the
 user sees. Name every spec or doc you changed — or deliberately left —
 in your Log line.
+
+**A ticket that changes `specs/` carries the spec check as an acceptance
+command.** Writing the plan: when a step touches a file under `specs/`,
+add this line to the ticket's acceptance criteria, so the machine gate
+runs it (it takes under a second):
+
+```
+- [ ] `.tools\node\node.exe .claude\skills\drey-milestone-done\check-specs.mjs`
+```
+
+Building: run the same command before you finish. Each `ERROR` line names
+one inconsistency (a duplicate id, a shipped item still on the roadmap, a
+broken link between the specs); `specs/digest.md: stale` means a heading,
+a principle or a decision entry changed — regenerate it with
+`.tools\node\node.exe scripts\gen-spec-digest.mjs` and commit the result.
+Never edit `specs/digest.md` by hand. The gate runs in the worktree
+through `cmd.exe` without the portable Node on `PATH`, hence the explicit
+path; it needs the worktree's `.tools/` link (the brief's "Toolchain"
+line).

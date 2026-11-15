@@ -6,7 +6,7 @@
  * Crew. The Save and Discard sit in the footer.
  */
 import type { I18n } from '../../../../shared/i18n/types';
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { avatarNode, outlineButton } from './persona-dom';
 import { headFacts, type HeadFacts } from './persona-head-facts';

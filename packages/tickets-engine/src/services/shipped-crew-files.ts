@@ -1,6 +1,6 @@
 import { promises as fsp } from 'node:fs';
 import path from 'node:path';
-import { DEFAULT_CREW_IDS, shippedPersonaOf, type ShippedPersona } from '../core/default-crew';
+import { DEFAULT_CREW_IDS, shippedPersonaOf, type ShippedPersona } from '../core/persona/default-crew';
 
 /** `packages/tickets-engine/personas/` from the source tree and from `dist-electron/packages/tickets-engine/`. */
 export const SHIPPED_PERSONAS_DIR = path.join(__dirname, '..', '..', 'personas');

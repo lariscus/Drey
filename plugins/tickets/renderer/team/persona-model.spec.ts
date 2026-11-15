@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PersonaView } from '../../shared/remote-protocol';
-import { EMPTY_PERSONA_SETTINGS } from '../../../../packages/tickets-engine/src/core/persona-settings';
+import { EMPTY_PERSONA_SETTINGS } from '../../../../packages/tickets-engine/src/core/persona/persona-settings';
 import { budgetOf, draftOf, isDirty, isMissingFileError, patchOf, personaIdOfKey, personaKeyOf, personaPathsOf, savedBaseOf, wordsOf } from './persona-model';
 
 const view: PersonaView = { id: 'ben', title: 'Ben', role: 'builder', class: 'heavy', model: '', color: '#8ecbef', budget: 5 };

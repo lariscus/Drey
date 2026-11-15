@@ -1,5 +1,5 @@
 import { promises as fsp } from 'node:fs';
-import { PERSONAS_DIR } from '../core/persona';
+import { PERSONAS_DIR } from '../core/persona/persona';
 import type { EngineHost, EngineVault } from './host';
 
 /** Whether a persona's folder is there (what the seeder must never touch). */

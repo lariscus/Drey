@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readSkillZip } from '../../../../packages/tickets-engine/src/services/skill-zip';
-import { validateSkillBundle } from '../../../../packages/tickets-engine/src/core/skill-bundle';
-import { MAX_SKILL_BYTES, MAX_SKILL_FILES, MAX_SKILL_TEXT_BYTES } from '../../../../packages/tickets-engine/src/core/skill-limits';
+import { validateSkillBundle } from '../../../../packages/tickets-engine/src/core/skills/skill-bundle';
+import { MAX_SKILL_BYTES, MAX_SKILL_FILES, MAX_SKILL_TEXT_BYTES } from '../../../../packages/tickets-engine/src/core/skills/skill-limits';
 import { bytesToBase64, uploadPlanOf, zipStored, type PickedFile } from './skill-upload-model';
 
 const encode = (text: string): Uint8Array => new TextEncoder().encode(text);

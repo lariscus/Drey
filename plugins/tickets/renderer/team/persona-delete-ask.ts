@@ -8,7 +8,7 @@
  * way keeps still: nothing closes it until the engine has answered.
  */
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
-import { h } from '../desk-deps';
+import { h } from '../board/desk-deps';
 import type { PersonaDeleteAsk } from './persona-delete-state';
 import { labelled, outlineButton, textInput, type Translate } from './persona-dom';
 

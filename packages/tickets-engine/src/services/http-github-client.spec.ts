@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { parseGithubRepo } from '../core/skill-source';
+import { parseGithubRepo } from '../core/skills/skill-source';
 import { GithubError } from './github-client';
 import { HttpGithubClient } from './http-github-client';
 

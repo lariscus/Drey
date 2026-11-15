@@ -6,9 +6,9 @@
  * session and ask the page to repaint through the environment the page
  * hands them; no DOM here.
  */
-import type { ImprovementProposal } from '../../../../packages/tickets-engine/src/core/improvements';
+import type { ImprovementProposal } from '../../../../packages/tickets-engine/src/core/persona/improvements';
 import type { PersonaImprovementsReply } from '../../shared/remote-protocol';
-import type { DeskDeps } from '../desk-deps';
+import type { DeskDeps } from '../board/desk-deps';
 import type { Translate } from './persona-dom';
 import { patchOf, savedBaseOf } from './persona-model';
 import type { PromptRead } from './persona-page-load';

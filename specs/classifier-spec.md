@@ -418,7 +418,7 @@ create as a `raw capture:` Log line (ticket-schema).
   cancelled."* (code `cancelled`); the stream's `text` / `thought` events
   are the progress. The Cancel control is req-157.
 - **The fleet's step prompts and the run brief's persona line**
-  (`packages/tickets-engine/prompts/*.md`, `fleet/assignment.ts`; milestone
+  (`packages/tickets-engine/prompts/*.md`, `fleet/runner/assignment.ts`; milestone
   212, D-60 / D-61; req-280). How a brief is composed from the step prompt
   and the disciplines is the section *The run brief's composition* below.
   The brief — ship and scout alike — names the persona right after the
@@ -441,7 +441,7 @@ v4; `commit-default` was removed by req-267 — the commit is the human
 persona's machine leaving action, no prompt and no model) carries its **role only**: inputs, outputs, its own
 guardrails and one closing **"Done when …"**. Everything several steps share
 is a discipline file the composer appends by run kind
-(`fleet/instruction.ts` `ruleParts` / `closingParts`,
+(`fleet/runner/instruction.ts` `ruleParts` / `closingParts`,
 `fleet/scout-instruction.ts`), one meaning per file — the texts live in
 `prompts/disciplines/`, each opening with its label:
 
@@ -590,7 +590,7 @@ commands in its brief: the runner judges its hand-over structurally.
 ## The worker's follow-up proposals (req-299)
 
 `prompts/disciplines/followups.md` (version 1) rides every dispatched run's
-brief except a scout and a dialog (the table above; `fleet/instruction.ts`
+brief except a scout and a dialog (the table above; `fleet/runner/instruction.ts`
 `followupsPart`). **Decided with req-299:** every persona and every chain
 position is told — the reviewer and the tester find out-of-scope defects as
 often as the builder — and the cases left out are those whose final message
@@ -700,7 +700,7 @@ The shipped `persona.md` of each carries the `summary:` the crew cards draw (`Pl
 
 A fleet worker asks the owner in a fixed shape so a question can be
 answered cold after a context switch. The instruction every dispatched
-run carries (`ASKING` in `plugins/tickets/main/fleet/assignment.ts`,
+run carries (`ASKING` in `plugins/tickets/main/fleet/runner/assignment.ts`,
 verbatim):
 
 > Asking the owner: if you cannot go on without a decision only the

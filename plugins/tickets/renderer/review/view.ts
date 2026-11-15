@@ -8,14 +8,14 @@
  * comments through two document events (`events.ts`). Plain DOM over `ReviewDeps`.
  */
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
-import type { ReviewComment } from '../../../../packages/tickets-engine/src/core/review-feedback';
-import type { TicketDiff, TicketFileReply } from '../../../../packages/tickets-engine/src/core/worktree-changes';
-import { parseVerlaufEntries } from '../../../../packages/tickets-engine/src/core/verlauf';
+import type { ReviewComment } from '../../../../packages/tickets-engine/src/core/ticket/review-feedback';
+import type { TicketDiff, TicketFileReply } from '../../../../packages/tickets-engine/src/core/git/worktree-changes';
+import { parseVerlaufEntries } from '../../../../packages/tickets-engine/src/core/chapters/history-chapter';
 import type { RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import type { BoardSnapshot, MutationResult, TicketCard } from '../../shared/tickets';
 import { decisionLinkNode, pillNode } from '../ticket-document/dom';
 import { actionBarOf, assetUrl, offsetWords, proofOfText, titleCase, type ProofView } from '../ticket-document/model';
-import type { WorkRow } from '../work-groups';
+import type { WorkRow } from '../work/work-groups';
 import { REVIEW_ACCEPT, REVIEW_SEND_BACK, announceReviewComments, type ReviewAcceptDetail, type ReviewSendBackDetail } from './events';
 import {
   EMPTY_MARKS,

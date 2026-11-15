@@ -47,7 +47,7 @@ Open work only. Everything implemented lives in
 lives in [`decisions.md`](decisions.md). When an item ships, move it to the
 changelog and delete it here — no shipped history on this page.
 
-**Status (2026-11-15):** version 0.8.1, milestones 1–283 built (1–21 in `docs/milestones-done.md`; 109–111 recorded by the convergence audit backfill), plus the requirements the changelog records without a milestone number (req-95a, req-95b, req-96, req-97, req-98, req-99a, req-99b, req-101, req-102, req-104, req-110, req-126 among them). Milestones 1–83 are
+**Status (2026-11-15):** version 0.8.1, milestones 1-284 built (1-21 in `docs/milestones-done.md`; 109-111 recorded by the convergence audit backfill), plus the requirements the changelog records without a milestone number (req-95a, req-95b, req-96, req-97, req-98, req-99a, req-99b, req-101, req-102, req-104, req-110, req-126 among them). Milestones 1–83 are
 owner-verified (the round for 1–81 closed 2026-10-17; 82, the auto-update, and 83, the tickets foundation, on real use). From milestone 84 on, the changelog marks each entry that still awaits the owner's round — nearly all of them; that round is finish line step 6 below. Milestone and requirement ids are assigned when work starts; the next free ones follow from the top of `changelog.md`. Of the architectural cleanup, A1–A6 and A10–A12 shipped; A7–A9 remain.
 
 ### Finish line (owner, 2026-11-12)
@@ -330,9 +330,8 @@ _Added by the owner on 2026-11-15 (the start of the Crew in a concept note, owne
 - **req-313 — Stages: applied on accept, drop the rest** (concept §1.5, §1.6, boards 7w, 7x). A section enters the snapshot when its stage reaches Done (accepted at You), never on release; `dropRemaining` (a `PlanPartsEdit`) cancels every released stage that has not started; the parent closes when each stage is done or dropped (E10-4b's *parent leaves needs shaping* folds in); the Outline shows *building* and *at you*.
 
 
-_Rebuilt from the cloud session of 2026-11-14 (owner: "Ja, so") — its four commits sat on the milestone-209 base and were recorded with `merge -s ours`; their content is rebuilt on the current tree (req-309, the tranche retirement, shipped with the same session):_
+_Rebuilt from the cloud session of 2026-11-14 (owner: "Ja, so") - its four commits sat on the milestone-209 base and were recorded with `merge -s ours`; their content is rebuilt on the current tree (req-300 shipped as milestone 284):_
 
-- **req-300 — Sort the tickets plugin and the engine into domain folders** (owner, 2026-11-14; was the cloud's "req-179" – "req-181", commits c88a8411, e69b201a, e102d146 on the milestone-209 base). The plugin's `renderer/` and `main/`, the engine's `core/` and `fleet/` sorted into domain folders, imports and docs updated, behaviour unchanged. Redo it on the current tree **as the last code change before the merge into `main`**, when no other session works in the engine, with the cloud commits as the reference for the folder names; ADR-0096's import boundaries and `eslint.size-baseline.mjs` follow the moves.
 _Added by the owner on 2026-11-14 (crew management and the flow, before the merge into `main`):_
 
 

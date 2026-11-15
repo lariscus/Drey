@@ -1,7 +1,7 @@
 import type { SkippedSkill } from '../contracts/skill-library';
 import type { SkillErrorCode } from '../contracts/skills';
-import { MAX_SKILL_BYTES, MAX_SKILL_FILES, validateSkillBundle, type SkillBundleFile } from '../core/skill-bundle';
-import { skillsInTree, type FoundSkill, type GithubRepo } from '../core/skill-source';
+import { MAX_SKILL_BYTES, MAX_SKILL_FILES, validateSkillBundle, type SkillBundleFile } from '../core/skills/skill-bundle';
+import { skillsInTree, type FoundSkill, type GithubRepo } from '../core/skills/skill-source';
 import { GithubError, type GithubClient } from './github-client';
 
 /** One skill folder read from the repository, validated like an upload: its name and its files, relative to the folder. */

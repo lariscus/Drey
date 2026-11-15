@@ -7,8 +7,8 @@
  * Model, Skills | the same tabs. The page owns
  * the state and the repaint; this only assembles.
  */
-import type { ImprovementProposal } from '../../../../packages/tickets-engine/src/core/improvements';
-import { h } from '../desk-deps';
+import type { ImprovementProposal } from '../../../../packages/tickets-engine/src/core/persona/improvements';
+import { h } from '../board/desk-deps';
 import { allowedBlock } from './persona-allowed-block';
 import type { BlockContext } from './persona-block-context';
 import { classModelBlock } from './persona-class-block';

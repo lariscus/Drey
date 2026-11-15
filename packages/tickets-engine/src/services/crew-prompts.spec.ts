@@ -2,7 +2,7 @@ import { promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { SHIPPED_PROMPTS_DIR } from '../core/default-prompts';
+import { SHIPPED_PROMPTS_DIR } from '../core/config/default-prompts';
 import { loadCrewPrompts, loadDialogPrompt } from './crew-prompts';
 
 /**

@@ -10,7 +10,7 @@
  * look when the page opens, which asks whether the sources have newer refs.
  */
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
-import { el } from '../settings-dom';
+import { el } from './dom.ts/settings-dom';
 import { createHeadPart } from './skills-library-head';
 import { createSkillsPart } from './skills-library-skills';
 import { createSourcesPart } from './skills-library-sources';

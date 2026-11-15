@@ -7,7 +7,7 @@
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import type { NoteEntry } from '../contracts/notes';
-import { isNoteFileName, isServedChild, isServedPath } from '../core/note-path';
+import { isNoteFileName, isServedChild, isServedPath } from '../core/ticket/note-path';
 
 const isMissing = (error: unknown): boolean => {
   const code = (error as NodeJS.ErrnoException | null)?.code;

@@ -12,7 +12,7 @@
  * repaint, `persona-page-actions.ts` the Save and the decisions.
  */
 import type { PersonaImprovementsReply, PersonaView } from '../../shared/remote-protocol';
-import { h, type DeskDeps } from '../desk-deps';
+import { h, type DeskDeps } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { askPersonaDelete } from './persona-delete-action';
 import { personaHead, savedTextOf, type PersonaHead } from './persona-head';

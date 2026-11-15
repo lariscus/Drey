@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Persona } from '../core/persona';
-import { ONE_ON_ONE_VAULT_TOOLS, type OneOnOneSeat, type OneOnOneToolSeam } from '../fleet/one-on-one-toolset';
+import type { Persona } from '../core/persona/persona';
+import { ONE_ON_ONE_VAULT_TOOLS, type OneOnOneSeat, type OneOnOneToolSeam } from '../fleet/session/one-on-one-toolset';
 import type { EngineHost, EngineVault } from './host';
 import { PersonaSessionContext } from './persona-session-context';
 

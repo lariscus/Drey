@@ -1,6 +1,6 @@
 import type { ChatBridge } from '../contracts/chat';
 import type { ChatChangePayload } from '../contracts/remote-protocol';
-import type { OneOnOneToolSeam } from '../fleet/one-on-one-toolset';
+import type { OneOnOneToolSeam } from '../fleet/session/one-on-one-toolset';
 import type { GithubClient } from '../services/github-client';
 import type { RunnerLocator } from '../services/fleet-client';
 import type { PathsChange } from './drey-port';

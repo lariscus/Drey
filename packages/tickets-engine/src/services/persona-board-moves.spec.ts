@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { ChainEntry } from '../contracts/chain';
 import type { TicketHold } from '../contracts/persona-board';
 import type { TicketCard } from '../contracts/tickets';
-import { crewLookupOf } from '../core/chain-holder';
-import { parseChainItems } from '../core/chain-list';
+import { crewLookupOf } from '../core/pipeline/chain-holder';
+import { parseChainItems } from '../core/pipeline/chain-list';
 import { personaMoveOf } from './persona-board-moves';
 
 function chain(line: string): ChainEntry[] {

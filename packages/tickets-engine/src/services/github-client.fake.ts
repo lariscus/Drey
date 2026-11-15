@@ -1,4 +1,4 @@
-import type { GithubRepo, TreeEntry } from '../core/skill-source';
+import type { GithubRepo, TreeEntry } from '../core/skills/skill-source';
 import { GithubError, type GithubClient } from './github-client';
 
 interface FakeRepo {

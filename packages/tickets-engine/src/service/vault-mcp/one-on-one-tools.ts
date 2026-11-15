@@ -1,5 +1,5 @@
 import { harnessTakesMcp } from '../../fleet/harness/mcp-support';
-import { ONE_ON_ONE_VAULT_TOOLS, type OneOnOneSeat, type OneOnOneToolSeam } from '../../fleet/one-on-one-toolset';
+import { ONE_ON_ONE_VAULT_TOOLS, type OneOnOneSeat, type OneOnOneToolSeam } from '../../fleet/session/one-on-one-toolset';
 import type { WorkerProviderId } from '../../fleet/protocol';
 
 export interface OneOnOneToolsDeps {

@@ -1,4 +1,4 @@
-import type { GithubRepo, TreeEntry } from '../core/skill-source';
+import type { GithubRepo, TreeEntry } from '../core/skills/skill-source';
 
 /**
  * What the skills library asks of GitHub (req-289): a ref's commit, the

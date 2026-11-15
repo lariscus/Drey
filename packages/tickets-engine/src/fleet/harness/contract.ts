@@ -115,16 +115,6 @@ export interface UsageTotals {
 
 export const ZERO_USAGE: UsageTotals = { tokensIn: 0, tokensOut: 0, cacheReadTokens: 0, costUsd: null };
 
-/** The session's totals as this run's own: minus the base, never below zero. */
-export function usageSince(total: UsageTotals, base: UsageTotals): UsageTotals {
-  return {
-    tokensIn: Math.max(0, total.tokensIn - base.tokensIn),
-    tokensOut: Math.max(0, total.tokensOut - base.tokensOut),
-    cacheReadTokens: Math.max(0, total.cacheReadTokens - base.cacheReadTokens),
-    costUsd: total.costUsd === null ? null : Math.max(0, total.costUsd - (base.costUsd ?? 0)),
-  };
-}
-
 /** What a booted server reports for a later take-back. */
 export interface ServerInfo {
   readonly address: string;

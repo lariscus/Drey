@@ -7,8 +7,8 @@
  * column and without the links to Memory and the 1:1 — those are the page's
  * own tabs; with no open proposal there is no block.
  */
-import type { ImprovementProposal } from '../../../../packages/tickets-engine/src/core/improvements';
-import { h } from '../desk-deps';
+import type { ImprovementProposal } from '../../../../packages/tickets-engine/src/core/persona/improvements';
+import { h } from '../board/desk-deps';
 import type { BlockContext } from './persona-block-context';
 import { blockHead, outlineButton } from './persona-dom';
 import type { PersonaTab } from './persona-tabs';

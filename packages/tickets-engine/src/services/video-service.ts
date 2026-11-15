@@ -12,7 +12,7 @@
  */
 import { promises as fsp } from 'node:fs';
 import * as path from 'node:path';
-import { TicketsGit } from '../core/tickets-git';
+import { TicketsGit } from '../core/git/tickets-git';
 import { normalizeVideoSettings, SETTINGS_KEYS } from '../server/settings';
 import type { EngineBoardService } from './board-service';
 import type { EngineHost } from './host';

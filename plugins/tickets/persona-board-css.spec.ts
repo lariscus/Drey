@@ -5,12 +5,12 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 /**
  * What only the stylesheet decides about the persona board's columns,
- * against the real `renderer/desk.css`. Beside the renderer: its specs may
+ * against the real `renderer/board/desk.css`. Beside the renderer: its specs may
  * not read files (lint). jsdom lays nothing out, so the e2e
  * `view-default-layouts` measures the scroll in the running app.
  */
 describe('the persona board keeps its column width and scrolls sideways (board 7q, req-297)', () => {
-  const css = readFileSync(path.join(__dirname, 'renderer', 'desk.css'), 'utf8');
+  const css = readFileSync(path.join(__dirname, 'renderer', 'board', 'desk.css'), 'utf8');
 
   beforeAll(() => {
     const style = document.createElement('style');

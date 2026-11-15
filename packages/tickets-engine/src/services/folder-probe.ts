@@ -6,7 +6,7 @@
  * there is missing.
  */
 import * as path from 'node:path';
-import type { RepoSeed } from '../core/repo-entry';
+import type { RepoSeed } from '../core/projects/repo-entry';
 
 /** The git seam — `TicketsGit.run` (one queue per working directory). */
 export type FolderProbeGit = (cwd: string, args: readonly string[]) => Promise<string>;

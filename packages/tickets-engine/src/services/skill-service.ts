@@ -11,9 +11,9 @@ import type {
   SkillUploadCommand,
   SkillUploadReply,
 } from '../contracts/skills';
-import { personaModelGuess, personaRef, type Persona } from '../core/persona';
-import { isSkillName, ownSkillsDir, SHARED_SKILLS_DIR } from '../core/skill';
-import { tokenizerFor } from '../core/token-count';
+import { personaModelGuess, personaRef, type Persona } from '../core/persona/persona';
+import { isSkillName, ownSkillsDir, SHARED_SKILLS_DIR } from '../core/skills/skill';
+import { tokenizerFor } from '../core/config/token-count';
 import type { EngineVault } from './host';
 import { NodeSkillFileSystem, type SkillFileSystem } from './skill-file-system';
 import { buildSkillKit, type SkillKit, type SkillKitGit, type SkillKitHost } from './skill-kit';

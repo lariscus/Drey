@@ -7,7 +7,7 @@
  * personas use it: req-245's confirmed deletion of a shared skill).
  */
 import type { SkillLibraryRow } from '../../../../packages/tickets-engine/src/contracts/skill-library';
-import { el } from '../settings-dom';
+import { el } from './dom.ts/settings-dom';
 import { skillTitleOf } from '../team/persona-skills-model';
 import { groupHead } from './models-dom';
 import { confirmRow, menuOf, skillGlyph, skillIconButton, userCircle } from './skills-library-dom';

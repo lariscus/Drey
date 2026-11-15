@@ -7,8 +7,8 @@ import type { ChainEntry } from '../contracts/chain';
 import type { FlowPersona, FlowStepView } from '../contracts/flow';
 import type { PartFlowStep } from '../contracts/plan-approval';
 import type { BoardSnapshot, TicketCard } from '../contracts/tickets';
-import { chainCursor, chainLifeOf, chainSteps, lockedCount } from '../core/chain-list';
-import { isAgentPersona, isHumanPersona, type Persona } from '../core/persona';
+import { chainCursor, chainLifeOf, chainSteps, lockedCount } from '../core/pipeline/chain-list';
+import { isAgentPersona, isHumanPersona, type Persona } from '../core/persona/persona';
 import { deriveWorkerModel } from './persona-loader';
 
 function modelOf(persona: Persona | undefined): string | null {

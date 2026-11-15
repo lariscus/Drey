@@ -1,9 +1,9 @@
 import { promises as fsp } from 'node:fs';
 import type { PersonaJournalRemove, PersonaJournalReply, PersonaMemoryRemove, PersonaMemoryReply } from '../contracts/persona-records';
-import { PERSONAS_DIR, personaRef, type Persona } from '../core/persona';
-import { JOURNAL_FILE } from '../core/persona-journal';
-import { journalFromFriction, parseJournal, withJournalEntries, withoutJournalEntry } from '../core/persona-journal-file';
-import { TicketsGit } from '../core/tickets-git';
+import { PERSONAS_DIR, personaRef, type Persona } from '../core/persona/persona';
+import { JOURNAL_FILE } from '../core/persona/persona-journal';
+import { journalFromFriction, parseJournal, withJournalEntries, withoutJournalEntry } from '../core/persona/persona-journal-file';
+import { TicketsGit } from '../core/git/tickets-git';
 import type { EngineHost, EngineVault } from './host';
 import { PersonaCommitAges } from './persona-commit-age';
 import { describeMemoryEntries, memoryPathFor, removeMemoryEntry } from './persona-store';
