@@ -1,4 +1,4 @@
-import { promises as fsp } from 'node:fs';
+import { existsSync, promises as fsp } from 'node:fs';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
 import { NOTES_VAULT_KEY } from '../../../../packages/tickets-engine/src/contracts/notes';
@@ -29,8 +29,33 @@ import { UnconfiguredTicketsError, type TicketsVaultRef } from '../engine/unconf
  */
 
 const SERVICE_HOME = (): string => path.join(homedir(), '.drey-engine');
-const SERVICE_ENTRY = (): string =>
-  path.join(__dirname, '..', '..', '..', 'packages', 'tickets-engine', 'src', 'service', SERVICE_ENTRY_NAME);
+
+/**
+ * The built service entry, found from this module's folder upward (the
+ * walk's seams are injectable for the spec). Since the req-300 domain
+ * folders the compiled plugin lives in
+ * `dist-electron/plugins/tickets/main/service/` — four levels up to the
+ * engine at `dist-electron/packages/tickets-engine/…`; before it lived
+ * flat in `dist-electron/plugins/tickets/main/` — three levels; and a
+ * source-loader layout resolves the same way at the repository root.
+ * Milestone 284's folder move left the fixed three-level join pointing at
+ * `dist-electron/plugins/packages/…`, which exists nowhere — the setup
+ * (D-74) was the first flow to expose it. Nothing found: the old join, so
+ * the spawn's own failure names the layout.
+ */
+export function serviceEntryOf(from: string, exists: (candidate: string) => boolean = existsSync): string {
+  const rel = path.join('packages', 'tickets-engine', 'src', 'service', SERVICE_ENTRY_NAME);
+  let dir = from;
+  for (let up = 0; up < 6; up += 1) {
+    const candidate = path.join(dir, rel);
+    if (exists(candidate)) {
+      return candidate;
+    }
+    dir = path.dirname(dir);
+  }
+  return path.join(from, '..', '..', '..', 'packages', 'tickets-engine', 'src', 'service', SERVICE_ENTRY_NAME);
+}
+const SERVICE_ENTRY = (): string => serviceEntryOf(__dirname);
 
 /** A live service's lock, or null. */
 async function liveLock(home: string): Promise<ServiceLock | null> {

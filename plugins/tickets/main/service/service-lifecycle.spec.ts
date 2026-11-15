@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { promises as fsp } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, promises as fsp, rmSync, writeFileSync } from 'node:fs';
 import * as http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -10,7 +10,8 @@ import { ServiceHost } from '../../../../packages/tickets-engine/src/service/ser
 import { writeServiceLock, type ServiceLock } from '../../../../packages/tickets-engine/src/service/service-lock';
 import { EngineClient } from '../engine/engine-client';
 import { UnconfiguredTicketsError } from '../engine/unconfigured-error';
-import { ensureService, mirrorConfig, syncChatConfig, syncConfig, syncNotesVault, syncVaultRegistry } from './service-lifecycle';
+import { ensureService, mirrorConfig, serviceEntryOf, syncChatConfig, syncConfig, syncNotesVault, syncVaultRegistry } from './service-lifecycle';
+import { SERVICE_ENTRY_NAME } from '../../../../packages/tickets-engine/src/service/launch';
 
 /**
  * The activation/adoption config sync (E5a): the assistant LLM settings
@@ -390,6 +391,49 @@ describe('ensureService: the unconfigured state (D-74)', () => {
  * Only a service OLDER than this build is asked to hand over; one that
  * refuses (a run in its gate) keeps serving, and Drey adopts it.
  */
+describe('serviceEntryOf: the service entry across the dist layouts (D-74 follow-up)', () => {
+  const entry = (...parts: string[]): string => path.join(...parts, 'packages', 'tickets-engine', 'src', 'service', SERVICE_ENTRY_NAME);
+
+  it('walks up to the engine of the req-300 nested dist layout (four levels)', () => {
+    const base = mkdtempSync(path.join(tmpdir(), 'entry-nested-'));
+    try {
+      const mod = path.join(base, 'dist-electron', 'plugins', 'tickets', 'main', 'service');
+      const built = entry(base, 'dist-electron');
+      mkdirSync(mod, { recursive: true });
+      mkdirSync(path.dirname(built), { recursive: true });
+      writeFileSync(built, '', 'utf8');
+      expect(serviceEntryOf(mod, existsSync)).toBe(built);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it('walks up to the engine of the pre-req-300 flat dist layout (three levels)', () => {
+    const base = mkdtempSync(path.join(tmpdir(), 'entry-flat-'));
+    try {
+      const mod = path.join(base, 'dist-electron', 'plugins', 'tickets', 'main');
+      const built = entry(base, 'dist-electron');
+      mkdirSync(mod, { recursive: true });
+      mkdirSync(path.dirname(built), { recursive: true });
+      writeFileSync(built, '', 'utf8');
+      expect(serviceEntryOf(mod, existsSync)).toBe(built);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the old join as the answer when nothing exists (the spawn names the layout)', () => {
+    const base = mkdtempSync(path.join(tmpdir(), 'entry-none-'));
+    try {
+      const mod = path.join(base, 'dist-electron', 'plugins', 'tickets', 'main', 'service');
+      mkdirSync(mod, { recursive: true });
+      expect(serviceEntryOf(mod, () => false)).toBe(path.join(mod, '..', '..', '..', 'packages', 'tickets-engine', 'src', 'service', SERVICE_ENTRY_NAME));
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('ensureService: adopt, or hand an older build over', () => {
   let root = '';
   let server: http.Server;
