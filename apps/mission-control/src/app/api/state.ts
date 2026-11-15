@@ -167,9 +167,10 @@ export class McState {
   readonly pairingView = signal<McPairingView | null>(null);
   readonly work = signal<WorkView>({ groups: [], priorities: DEFAULT_PRIORITY_CONFIG, projects: [] });
   /**
-   * req-298: this device's project filter — a project id, `_unassigned`, or
-   * null for all projects. Device-local (localStorage), never the desktop
-   * view's: the Work list follows it, and Pia's new tickets go to its project.
+   * req-298: this device's project filter — a project id (req-308: always
+   * exactly one active project; null only on a board without projects).
+   * Device-local (localStorage), never the desktop view's: the Work list
+   * follows it, and Pia's new tickets go to its project.
    */
   readonly projectFilter = signal<McProjectFilter>(storedProjectFilter(filterStorage()));
   readonly needs = signal<readonly NeedView[]>([]);
@@ -572,13 +573,13 @@ export class McState {
     }
   }
 
-  /** req-298: picks the project filter on this device. */
-  setProjectFilter(filter: McProjectFilter): void {
-    this.projectFilter.set(filter);
-    storeProjectFilter(filterStorage(), filter);
+  /** req-298: picks the active project on this device (req-308: exactly one is always active). */
+  setProjectFilter(project: string): void {
+    this.projectFilter.set(project);
+    storeProjectFilter(filterStorage(), project);
   }
 
-  /** req-298: the project Pia's new tickets go to — the filter's project on this board; none under all (she asks). */
+  /** req-298: the project Pia's new tickets go to — the active project on this board; none on a board without projects (she asks). */
   private chatProject(): { project?: string } {
     const project = chatProjectOf(filterInEffectOf(this.projectFilter(), this.work().projects));
     return project === undefined ? {} : { project };

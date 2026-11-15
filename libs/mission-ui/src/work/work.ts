@@ -11,8 +11,8 @@ import { personaDeskGroupsOf } from './holder-desk';
 import { holderGroupsOf } from './holder-rows';
 import { phoneGroupsFiltered, phoneGroupsOf, todayCostTextOf, type PhoneWorkGroup, type PhoneWorkRow } from './phone-rows';
 import { ProjectFilter } from './project-filter';
-import { scopedDoneOf, scopedPhoneGroupsOf, scopedWorkGroupsOf, ticketChipOf, workProjectChoicesOf, workProjectScopeOf } from './project-scope';
-import { filterShownOf, type McProjectChip, type McProjectFilter } from './projects';
+import { scopedDoneOf, scopedPhoneGroupsOf, scopedWorkGroupsOf, workProjectChoicesOf, workProjectScopeOf } from './project-scope';
+import { filterShownOf } from './projects';
 import { McI18n } from '../i18n/i18n.service';
 import {
   MC_WORK_STATE,
@@ -105,28 +105,25 @@ export class Work {
   /** True when the filter is drawn: a board with two projects or more, and a state that can keep the choice. */
   protected readonly projectFilterShown = computed(() => this.state?.setProjectFilter !== undefined && filterShownOf(this.projectScope().projects));
 
-  protected readonly projectChoices = computed(() => workProjectChoicesOf(this.projectScope(), this.i18n.t('projects.filter.unassigned')));
+  protected readonly projectChoices = computed(() => workProjectChoicesOf(this.projectScope()));
 
-  protected pickProject(filter: McProjectFilter): void {
-    this.state?.setProjectFilter?.(filter);
+  protected pickProject(project: string): void {
+    this.state?.setProjectFilter?.(project);
   }
 
-  /** The chip a ticket's row or card carries under *All projects*; null = none. */
-  protected projectChip(id: string | null | undefined): McProjectChip | null {
-    return ticketChipOf(this.projectScope(), id);
-  }
-
-  /** A holder group's head tooltip: its load, and under a project filter that it counts every project. */
+  /** A holder group's head tooltip: its load, and under the project filter that it counts every project. */
   protected loadTitleOf(load: string | undefined): string | null {
     if (load === undefined) {
       return null;
     }
-    return this.projectScope().filter === null ? load : [load, this.i18n.t('board.load.every_project')].join('\n');
+    const scope = this.projectScope();
+    return scope.filter === null || !filterShownOf(scope.projects) ? load : [load, this.i18n.t('board.load.every_project')].join('\n');
   }
 
-  /** The desk's group head under a project filter: a holder's load counts every project. */
+  /** The desk's group head under the project filter: a holder's load counts every project. */
   protected everyProjectNote(key: string): string | null {
-    return this.projectScope().filter !== null && key.startsWith('lane:') ? this.i18n.t('board.load.every_project') : null;
+    const scope = this.projectScope();
+    return scope.filter !== null && filterShownOf(scope.projects) && key.startsWith('lane:') ? this.i18n.t('board.load.every_project') : null;
   }
 
   /** req-273: a held ticket's row words without the id (`3/6 · merging main`), for the desk's cards. */

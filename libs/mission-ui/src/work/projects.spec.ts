@@ -2,15 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { McI18n } from '../i18n/i18n.service';
 import { holderGroupsOf } from './holder-rows';
 import { lanesOf, type McLane } from './hold';
-import { scopedDoneOf, scopedPhoneGroupsOf, scopedWorkGroupsOf, showsTicket, ticketChipOf, workProjectChoicesOf, workProjectScopeOf } from './project-scope';
+import { scopedDoneOf, scopedPhoneGroupsOf, scopedWorkGroupsOf, showsTicket, workProjectChoicesOf, workProjectScopeOf } from './project-scope';
 import {
   DEFAULT_PROJECT_COLOR,
-  UNASSIGNED_FILTER,
-  allProjectsDotOf,
   chatProjectOf,
   filterInEffectOf,
   inProjectFilter,
-  projectChipOf,
   projectsOf,
   storeProjectFilter,
   storedProjectFilter,
@@ -28,7 +25,7 @@ const PROJECTS = [
   { id: 'home-lab', name: 'Home lab', color: '#bfe3cd' },
 ];
 
-describe('the board projects (req-298)', () => {
+describe('the board projects (req-298, one active project since req-308)', () => {
   it('reads the snapshot projects tolerantly: a name falls back to the id, a bad colour to the default, junk drops out', () => {
     const board = { projects: [{ id: 'drey', name: 'Drey', color: '#8ecbef' }, { id: 'x', color: 'blue' }, { id: 'Bad Id' }, 'junk', { id: 'drey', name: 'Twice' }] };
     expect(projectsOf(board)).toEqual([
@@ -39,44 +36,34 @@ describe('the board projects (req-298)', () => {
     expect(projectsOf(null)).toEqual([]);
   });
 
-  it("a ticket's project: its own, else the board's only one, else Unassigned (the engine's ticketProjectId)", () => {
+  it("a ticket's project: its own, else the board's only one, else none (the engine's ticketProjectId)", () => {
     expect(ticketProjectIdOf('lariscus', PROJECTS)).toBe('lariscus');
     expect(ticketProjectIdOf(undefined, [PROJECTS[0]!])).toBe('drey');
     expect(ticketProjectIdOf(' ', PROJECTS)).toBeNull();
   });
 
-  it('a choice whose project went away, or a board with fewer than two projects, reads as all', () => {
+  it("the choice in effect is the stored project, else the board's first; null only on a board without projects", () => {
     expect(filterInEffectOf('drey', PROJECTS)).toBe('drey');
-    expect(filterInEffectOf(UNASSIGNED_FILTER, PROJECTS)).toBe(UNASSIGNED_FILTER);
-    expect(filterInEffectOf('gone', PROJECTS)).toBeNull();
-    expect(filterInEffectOf('drey', [PROJECTS[0]!])).toBeNull();
+    expect(filterInEffectOf(null, PROJECTS)).toBe('drey');
+    expect(filterInEffectOf('gone', PROJECTS)).toBe('drey');
+    expect(filterInEffectOf(null, [PROJECTS[1]!])).toBe('lariscus');
+    expect(filterInEffectOf('drey', [])).toBeNull();
   });
 
-  it('shows a ticket under its project, Unassigned under Unassigned, everything under all', () => {
+  it('shows a ticket under its project only; a ticket without one, or of an unknown project, shows under none', () => {
     expect(inProjectFilter('drey', 'drey', PROJECTS)).toBe(true);
     expect(inProjectFilter('lariscus', 'drey', PROJECTS)).toBe(false);
-    expect(inProjectFilter(null, UNASSIGNED_FILTER, PROJECTS)).toBe(true);
-    expect(inProjectFilter('drey', UNASSIGNED_FILTER, PROJECTS)).toBe(false);
+    expect(inProjectFilter(null, 'drey', PROJECTS)).toBe(false);
+    expect(inProjectFilter('gone', 'drey', PROJECTS)).toBe(false);
     expect(inProjectFilter('lariscus', null, PROJECTS)).toBe(true);
   });
 
-  it('carries a chip only under all projects, on a board with two or more, for a known project', () => {
-    expect(projectChipOf('home-lab', null, PROJECTS)).toEqual({ label: 'Home lab', color: '#bfe3cd' });
-    expect(projectChipOf('home-lab', 'home-lab', PROJECTS)).toBeNull();
-    expect(projectChipOf('drey', null, [PROJECTS[0]!])).toBeNull();
-    expect(projectChipOf('gone', null, PROJECTS)).toBeNull();
-    expect(projectChipOf(null, null, PROJECTS)).toBeNull();
-  });
-
-  it("draws all projects' dot as a wheel of the first three colours, and Pia's project is the filtered one", () => {
-    expect(allProjectsDotOf(PROJECTS)).toBe('conic-gradient(#8ecbef 0 33%, #f2cfae 0 67%, #bfe3cd 0 100%)');
-    expect(allProjectsDotOf([])).toBe('var(--text-3)');
+  it("Pia's project is the choice in effect; on a board without projects she asks", () => {
     expect(chatProjectOf('drey')).toBe('drey');
-    expect(chatProjectOf(UNASSIGNED_FILTER)).toBeUndefined();
     expect(chatProjectOf(null)).toBeUndefined();
   });
 
-  it('keeps the choice on this device; a blocked storage or junk reads as all', () => {
+  it('keeps the choice on this device; a blocked storage or junk (an old _unassigned among it) reads as none', () => {
     const store = new Map<string, string>();
     const storage: FilterStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => void store.set(k, v), removeItem: (k) => void store.delete(k) };
     expect(storedProjectFilter(storage)).toBeNull();
@@ -85,6 +72,8 @@ describe('the board projects (req-298)', () => {
     storeProjectFilter(storage, null);
     expect(store.size).toBe(0);
     store.set('mc.project-filter', '../evil');
+    expect(storedProjectFilter(storage)).toBeNull();
+    store.set('mc.project-filter', '_unassigned');
     expect(storedProjectFilter(storage)).toBeNull();
     const blocked: FilterStorage = {
       getItem: () => {
@@ -159,11 +148,13 @@ describe("the Work list under Mission Control's project filter (req-298)", () =>
     expect(scoped.find((group) => group.key === 'done')!.rows.map((row) => row.ticketId)).toEqual(['T-0100']);
   });
 
-  it('Unassigned shows the tickets without a project; all shows everything unchanged', () => {
+  it('no stored choice reads as the first project; a ticket without a project shows under none', () => {
     const { groups } = holders();
-    const unassigned = scopedPhoneGroupsOf(groups, workProjectScopeOf(BOARD, UNASSIGNED_FILTER));
-    expect(unassigned.flatMap((group) => group.rows.map((row) => row.ticketId))).toEqual(['T-0141']);
-    expect(scopedPhoneGroupsOf(groups, workProjectScopeOf(BOARD, null))).toBe(groups);
+    const stored = scopedPhoneGroupsOf(groups, workProjectScopeOf(BOARD, null));
+    expect(stored.find((group) => group.key === 'phase:inbox')!.rows.map((row) => row.ticketId)).toEqual(['T-0140']);
+    const lariscus = scopedPhoneGroupsOf(groups, workProjectScopeOf(BOARD, 'lariscus'));
+    expect(lariscus.map((group) => group.key)).toEqual(['needs', 'lane:ben', 'done']);
+    expect(lariscus.flatMap((group) => group.rows.map((row) => row.ticketId))).toEqual(['T-0132', 'T-0131', 'T-0101']);
   });
 
   it("the desk's need cards, cards and Done this week follow the filter", () => {
@@ -182,20 +173,13 @@ describe("the Work list under Mission Control's project filter (req-298)", () =>
     expect(showsTicket(scope, 'T-0131')).toBe(false);
   });
 
-  it('under all projects a row names its project; under a project none does', () => {
-    expect(ticketChipOf(workProjectScopeOf(BOARD, null), 'T-0131')).toEqual({ label: 'Lariscus', color: '#f2cfae' });
-    expect(ticketChipOf(workProjectScopeOf(BOARD, null), 'T-0141')).toBeNull();
-    expect(ticketChipOf(workProjectScopeOf(BOARD, 'lariscus'), 'T-0131')).toBeNull();
-  });
-
-  it("offers each project, then Unassigned counting the open tickets without one; a stale choice reads as all", () => {
+  it("offers each project in the board's order; a stale choice reads as the first project", () => {
     const scope = workProjectScopeOf(BOARD, 'gone');
-    expect(scope.filter).toBeNull();
-    expect(workProjectChoicesOf(scope, 'Unassigned')).toEqual([
+    expect(scope.filter).toBe('drey');
+    expect(workProjectChoicesOf(scope)).toEqual([
       { id: 'drey', label: 'Drey', color: '#8ecbef' },
       { id: 'lariscus', label: 'Lariscus', color: '#f2cfae' },
       { id: 'home-lab', label: 'Home lab', color: '#bfe3cd' },
-      { id: UNASSIGNED_FILTER, label: 'Unassigned', color: '', count: 1 },
     ]);
   });
 });

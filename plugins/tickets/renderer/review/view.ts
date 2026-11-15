@@ -190,7 +190,7 @@ export function mountReview(deps: ReviewDeps, host: HTMLElement, ticketId: strin
     const row = el('div', 'tickets-review-head-row');
     row.append(el('span', 'tickets-review-id', ticketId), el('b', 'tickets-review-title', current?.meta.title ?? ''));
     // req-285: the ticket's project, on a board with more than one (the tab is one ticket; the filter hides nothing in it).
-    const project = current === null ? null : chipOf(current, null, snapshot?.projects ?? []);
+    const project = current === null ? null : chipOf(current, snapshot?.projects ?? []);
     if (project !== null) {
       const chip = el('span', 'pb-project', project.label);
       const dot = el('span', 'pb-project-dot');

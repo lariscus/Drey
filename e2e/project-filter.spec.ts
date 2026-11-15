@@ -9,14 +9,15 @@ import { SEEDS, byTitle, dkIdOf, fieldOf, liveRun, seedStore, seedVaultOf, type 
 /**
  * req-285: the title bar's project filter (board 7n `DeskProjectFilter`) in
  * the running app over the real engine, on a scratch dricket store whose
- * tickets carry `x-project` and a meta vault with three projects. Drey is
- * picked in the Work view: the board shows only Drey's cards, every persona
- * column stays with its load (`Counts every project`), the Files panel lists
- * Drey's vaults and folder, a capture lands in Drey; Notes keeps All
- * projects, where a card carries its project chip. Screenshot
- * `test-results/fidelity/DeskProjectFilter.png` (1440×900, the menu open).
- * Everything lives under a temp dir with a home of its own. Skipped when `dk`
- * is missing.
+ * tickets carry `x-project` and a meta vault with three projects; req-308:
+ * one project is always active — no *All projects*, no *Unassigned*, a view
+ * without a stored choice shows the board's first project. Drey is active in
+ * the Work view: the board shows only Drey's cards, every persona column
+ * stays with its load (`Counts every project`), the Files panel lists Drey's
+ * vaults and folder, a capture lands in Drey, and Notes starts on the first
+ * project of its own. Screenshot `test-results/fidelity/DeskProjectFilter.png`
+ * (1440×900, the menu open). Everything lives under a temp dir with a home of
+ * its own. Skipped when `dk` is missing.
  */
 const bin = process.env['DREY_DK_BIN'] ?? 'dk';
 
@@ -166,7 +167,7 @@ async function arrange(page: Page): Promise<void> {
   });
 }
 
-test('req-285: the project filter narrows Files and the board, keeps the columns, captures into the project (board 7n)', async ({ page, electronApp }) => {
+test('req-285/req-308: the project filter always has one active project, narrows Files and the board, captures into it (board 7n)', async ({ page, electronApp }) => {
   test.setTimeout(300_000);
   fs.mkdirSync(OUT, { recursive: true });
   await sizeWindow(electronApp);
@@ -181,11 +182,12 @@ test('req-285: the project filter narrows Files and the board, keeps the columns
   await expect(tabs.filter({ hasText: 'Work' })).toHaveAttribute('aria-selected', 'true');
   await pushFleet(electronApp);
 
-  // The filter sits right of the view switcher: All projects, then the three projects and Unassigned (4).
+  // The filter sits right of the view switcher: one project is always active —
+  // a fresh view shows the board's first, and the menu lists the projects and Manage.
   const filter = page.locator('app-scope-filter .sf-btn');
-  await expect(filter).toHaveText('All projects', { timeout: 60_000 });
+  await expect(filter).toHaveText('Drey', { timeout: 60_000 });
   await filter.click();
-  await expect(page.locator('app-scope-filter .sf-item')).toHaveText(['All projects', 'Drey', 'Home lab', 'Lariscus', /^Unassigned\s*4$/, 'Manage projects…']);
+  await expect(page.locator('app-scope-filter .sf-item')).toHaveText(['Drey', 'Home lab', 'Lariscus', 'Manage projects…']);
   await page.locator('app-scope-filter .sf-item', { hasText: 'Drey' }).click();
   await expect(filter).toHaveText('Drey');
 
@@ -238,12 +240,37 @@ test('req-285: the project filter narrows Files and the board, keeps the columns
   await expect.poll(() => fieldOfNext('x-project'), { timeout: 20_000 }).toBe('drey');
   expect(fieldOfNext('title')).toBe('Captured under Drey');
 
-  // The choice is the view's: Notes shows All projects, Work comes back on Drey; under All a card names its project.
+  // The choice is the view's: Notes starts on the first project of its own, Work comes back on Drey.
   await tabs.filter({ hasText: 'Notes' }).click();
-  await expect(filter).toHaveText('All projects');
+  await expect(filter).toHaveText('Drey');
   await tabs.filter({ hasText: 'Work' }).click();
   await expect(filter).toHaveText('Drey');
+  // Home lab narrows the board to its one card.
+  await page.keyboard.press('Control+p');
+  await page.locator('.palette input').fill('>Open the Board');
+  await page.waitForTimeout(300);
+  await page.keyboard.press('Enter');
+  const boardAgain = page.locator('.desk-board.desk-pboard').filter({ visible: true });
+  await expect(boardAgain).toBeVisible({ timeout: 20_000 });
   await filter.click();
-  await page.locator('app-scope-filter .sf-item', { hasText: 'All projects' }).click();
-  await expect(board.locator(`.pb-card[data-id="${byTitle('Sync status in the title bar')}"] .pb-project`)).toHaveText('Drey');
+  await page.locator('app-scope-filter .sf-item', { hasText: 'Home lab' }).click();
+  await expect(filter).toHaveText('Home lab');
+  const homeLabCard = boardAgain.locator(`.pb-card[data-id="${byTitle('Spell-check the commit message')}"]`);
+  await expect(homeLabCard).toBeVisible({ timeout: 20_000 });
+  const shownAgain = await boardAgain.locator('.pb-card').evaluateAll((nodes) => nodes.map((n) => (n as HTMLElement).dataset['id'] ?? ''));
+  const homeLabIds = SEEDS.map((_, i) => i).filter((i) => PROJECT_OF[i] === 'home-lab').map((i) => `T-${String(i + 1).padStart(4, '0')}`);
+  expect(shownAgain.filter((id) => id !== '' && !homeLabIds.includes(id))).toEqual([]);
+  // A capture under Home lab lands in Home lab — the active project, whatever it is.
+  await boardAgain.locator('.pb-btn-primary').click();
+  await page.locator('.tickets-form-title').fill('Captured under Home lab');
+  await page.locator('.tickets-form-create').click();
+  const fieldOfNext2 = (key: string): string | null => {
+    try {
+      return field(dkIdOf(SEEDS.length + 1), key);
+    } catch {
+      return null;
+    }
+  };
+  await expect.poll(() => fieldOfNext2('x-project'), { timeout: 20_000 }).toBe('home-lab');
+  expect(fieldOfNext2('title')).toBe('Captured under Home lab');
 });

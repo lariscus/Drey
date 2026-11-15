@@ -6,10 +6,12 @@ import { WorkspaceScopeService } from '../views';
 /**
  * The title bar's scope filter (SDK 1.59, req-285, board 7n): a dot, the
  * active view's choice (or the plugin's "all" label) and a chevron, right of
- * the view switcher. Its menu: all · each choice (a check on the picked one,
- * a count where the plugin gives one) · a separator · the plugin's manage
- * row. Draws nothing while no plugin has registered a filter. The words are
- * the plugin's (its catalog); the base has none of its own here.
+ * the view switcher. Its menu: all (only when the plugin registered an
+ * all-choice) · each choice (a check on the picked one, a count where the
+ * plugin gives one) · a separator · the plugin's manage row. Draws nothing
+ * while no plugin has registered a filter, and nothing while a filter
+ * without an all-choice has no choice in effect (no options yet). The words
+ * are the plugin's (its catalog); the base has none of its own here.
  */
 @Component({
   selector: 'app-scope-filter',
@@ -22,7 +24,16 @@ export class ScopeFilter {
   protected readonly scope = inject(WorkspaceScopeService);
   protected readonly open = signal(false);
 
-  protected readonly label = computed(() => this.scope.active()?.label ?? this.scope.contrib()?.allLabel ?? '');
+  /** The contrib while the control is worth drawing: a choice is in effect, or an all-choice exists. */
+  protected readonly shown = computed(() => {
+    const contrib = this.scope.contrib();
+    if (contrib === null) {
+      return null;
+    }
+    return this.scope.active() !== null || contrib.allLabel !== undefined ? contrib : null;
+  });
+
+  protected readonly label = computed(() => this.scope.active()?.label ?? this.shown()?.allLabel ?? '');
   /** The "all" dot: the first three choices' colours as one wheel. */
   protected readonly allDot = computed(() => {
     const colors = this.scope

@@ -56,4 +56,27 @@ describe('ScopeFilter (req-285, board 7n)', () => {
     [...el.querySelectorAll<HTMLButtonElement>('.sf-item')].at(-1)!.click();
     expect(managed).toBe(1);
   });
+
+  it('without an all-choice (SDK 1.61) the first option is in effect and the menu has no all row', () => {
+    const handle = scope.register('tickets', { label: 'Project filter', manageLabel: 'Manage projects…', manage: () => (managed += 1) });
+    // No options yet: nothing to show, no choice in effect.
+    expect(render().querySelector('.sf-btn')).toBeNull();
+    handle.setOptions([
+      { id: 'drey', label: 'Drey', color: '#8ecbef', sources: { vaults: [], folders: [] } },
+      { id: 'lariscus', label: 'Lariscus', color: '#f2cfae', sources: { vaults: [], folders: [] } },
+    ]);
+    const fixture = TestBed.createComponent(ScopeFilter);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.sf-btn')?.textContent?.trim()).toBe('Drey');
+    el.querySelector<HTMLButtonElement>('.sf-btn')!.click();
+    fixture.detectChanges();
+    const rows = [...el.querySelectorAll<HTMLButtonElement>('.sf-item')];
+    expect(rows.map((r) => r.textContent?.replace(/\s+/g, ' ').trim())).toEqual(['Drey', 'Lariscus', 'Manage projects…']);
+    expect(rows[0]!.getAttribute('aria-checked')).toBe('true');
+    rows[1]!.click();
+    fixture.detectChanges();
+    expect(scope.active()?.id).toBe('lariscus');
+    expect(el.querySelector('.sf-btn')?.textContent?.trim()).toBe('Lariscus');
+  });
 });

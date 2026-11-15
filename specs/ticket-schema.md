@@ -2033,11 +2033,13 @@ tree is killed and the folder it began is removed), then asks the engine to
 register the checkout like any picked folder: one commit in the tickets
 vault, none for the clone itself.
 
-**Capture into a project** (req-285): a create (`create` on the invoke
+**Capture into a project** (req-285; req-308): a create (`create` on the invoke
 channel, `POST /api/tickets`) may carry `project: <id>`; the new ticket is
-written with `project:` (`x-project` on a store). Drey sends the title
-bar filter's project; under *All projects* or *Unassigned* it sends none and
-the ticket starts Unassigned. A value that is not a project id is dropped.
+written with `project:` (`x-project` on a store). Drey sends the active
+project of the title bar filter (req-308: exactly one is always active once
+the board has two projects or more; on a board with fewer, none — the
+ticket resolves to the board's only project or starts Unassigned). A value
+that is not a project id is dropped.
 
 **The first project (migration at the engine's start).** A board whose
 `_meta/projects/` holds no file gets one project, written by the engine

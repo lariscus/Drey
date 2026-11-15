@@ -89,9 +89,6 @@
         <span class="ph-ttitle ph-ellipsis">{{ row.title }}</span>
         <span class="ph-tmeta"
           ><span class="ph-tline ph-ellipsis">{{ row.padMeta }}</span>
-          @if (projectChip(row.ticketId); as chip) {
-            <span class="ph-tproj"><i [style.background]="chip.color" aria-hidden="true"></i>{{ chip.label }}</span>
-          }
         </span>
       </span>
       @if (row.need !== null) {
@@ -102,9 +99,6 @@
       <span class="ph-ttitle ph-ellipsis">{{ row.title }}</span>
       <span class="ph-tmeta">
         <span class="ph-tline ph-ellipsis">{{ row.meta }}</span>
-        @if (projectChip(row.ticketId); as chip) {
-          <span class="ph-tproj"><i [style.background]="chip.color" aria-hidden="true"></i>{{ chip.label }}</span>
-        }
         @if (row.cost !== null) {
           <span class="ph-tcost" [attr.title]="soFar">{{ row.cost }}</span>
         }
@@ -389,11 +383,8 @@
                   {{ detail }}
                 </p>
               }
-              @if (vm.persona || vm.ctxPercent !== null || vm.costLabel !== null || vm.tokensLabel !== null || projectChip(vm.id) !== null) {
+              @if (vm.persona || vm.ctxPercent !== null || vm.costLabel !== null || vm.tokensLabel !== null) {
                 <div class="meta">
-                  @if (projectChip(vm.id); as chip) {
-                    <span class="projchip"><i [style.background]="chip.color" aria-hidden="true"></i>{{ chip.label }}</span>
-                  }
                   @if (vm.persona) {
                     <span class="pchip">
                       <i aria-hidden="true" [style.background-color]="vm.persona.color">{{

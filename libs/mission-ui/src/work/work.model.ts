@@ -290,10 +290,10 @@ export interface McWorkState {
   readonly waits?: McChainWaits | null;
   /** req-273: the personas the owner paused (a held card says so); absent = none known. */
   readonly pausedPersonas?: readonly string[];
-  /** req-298: this device's project filter — a project id, `_unassigned`, null = all; absent = no filter. */
+  /** req-298: this device's active project (req-308: exactly one is always active); absent = no filter. */
   readonly projectFilter?: McProjectFilter;
-  /** req-298: picks the filter on this device. */
-  setProjectFilter?(filter: McProjectFilter): void;
+  /** req-298: picks the active project on this device. */
+  setProjectFilter?(project: string): void;
   moveTicket(ticketId: string, phaseId: string): Promise<McMoveResult>;
   /** The archive of any age, newest first, for "Show older" (E13-21); absent = no such list. */
   loadArchive?(): Promise<readonly McDoneEntry[]>;

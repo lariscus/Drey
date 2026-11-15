@@ -736,7 +736,7 @@ describe('chat', () => {
   });
 });
 
-describe("Mission Control's project filter (req-298)", () => {
+describe("Mission Control's project filter (req-298; req-308: one project is always active)", () => {
   afterEach(() => localStorage.removeItem('mc.project-filter'));
 
   const TWO = [
@@ -744,7 +744,7 @@ describe("Mission Control's project filter (req-298)", () => {
     { id: 'lariscus', name: 'Lariscus', color: '#f2cfae' },
   ];
 
-  it("keeps the choice on this device, and Pia's new tickets go to the filter's project", async () => {
+  it("keeps the choice on this device, and Pia's new tickets go to the active project", async () => {
     const { desk, data } = makeDesk();
     data.board = { columns: [{ phase: { id: 'inbox', title: 'Inbox' }, tickets: [] }], projects: TWO };
     desk.on('POST', '/api/chat/sessions', () => ({ ok: true, file: FILE_A, say: 'Asked', proposals: [] }));
@@ -753,23 +753,18 @@ describe("Mission Control's project filter (req-298)", () => {
     await state.boot({ pairCode: null, token: 'tok' });
     await waitFor(() => expect(state.work().projects.map((project) => project.id)).toEqual(['drey', 'lariscus']));
 
-    await state.newSession('capture under all projects');
-    expect(desk.callsOf('POST', '/api/chat/sessions')[0]!.body).toEqual({ text: 'capture under all projects' });
+    // No stored choice: the board's first project is the one in effect, and Pia's capture carries it.
+    await state.newSession('capture');
+    expect(desk.callsOf('POST', '/api/chat/sessions')[0]!.body).toEqual({ text: 'capture', project: 'drey' });
 
     state.setProjectFilter('lariscus');
     expect(localStorage.getItem('mc.project-filter')).toBe('lariscus');
     expect(makeState(desk).projectFilter()).toBe('lariscus');
     await state.send('capture it');
     expect(desk.callsOf('POST', `/api/chat/sessions/${enc(FILE_A)}/messages`).at(-1)!.body).toEqual({ text: 'capture it', project: 'lariscus' });
-
-    state.setProjectFilter('_unassigned');
-    await state.send('and this');
-    expect(desk.callsOf('POST', `/api/chat/sessions/${enc(FILE_A)}/messages`).at(-1)!.body).toEqual({ text: 'and this' });
-    state.setProjectFilter(null);
-    expect(localStorage.getItem('mc.project-filter')).toBeNull();
   });
 
-  it('a stored project the board no longer has sends nothing', async () => {
+  it('a stored project the board no longer has falls back to the first project', async () => {
     localStorage.setItem('mc.project-filter', 'gone');
     const { desk, data } = makeDesk();
     data.board = { columns: [{ phase: { id: 'inbox', title: 'Inbox' }, tickets: [] }], projects: TWO };
@@ -778,7 +773,19 @@ describe("Mission Control's project filter (req-298)", () => {
     await state.boot({ pairCode: null, token: 'tok' });
     await waitFor(() => expect(state.work().projects).toHaveLength(2));
     await state.newSession('capture');
-    expect(desk.callsOf('POST', '/api/chat/sessions')[0]!.body).toEqual({ text: 'capture' });
+    expect(desk.callsOf('POST', '/api/chat/sessions')[0]!.body).toEqual({ text: 'capture', project: 'drey' });
+  });
+
+  it('an old _unassigned choice stored before req-308 reads as none and falls back to the first project', async () => {
+    localStorage.setItem('mc.project-filter', '_unassigned');
+    const { desk, data } = makeDesk();
+    data.board = { columns: [{ phase: { id: 'inbox', title: 'Inbox' }, tickets: [] }], projects: TWO };
+    desk.on('POST', '/api/chat/sessions', () => ({ ok: true, file: FILE_A, say: 'Asked', proposals: [] }));
+    const state = makeState(desk);
+    await state.boot({ pairCode: null, token: 'tok' });
+    await waitFor(() => expect(state.work().projects).toHaveLength(2));
+    await state.newSession('capture');
+    expect(desk.callsOf('POST', '/api/chat/sessions')[0]!.body).toEqual({ text: 'capture', project: 'drey' });
   });
 });
 

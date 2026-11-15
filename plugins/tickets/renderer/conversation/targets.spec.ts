@@ -69,7 +69,7 @@ describe('the Mission Control target', () => {
     expect(calls.some((c) => c.method === 'mcStart' && (c.payload as { text: string }).text === 'Fresh')).toBe(true);
   });
 
-  it("sends the title bar's project with the turn, nothing under all projects (req-298)", async () => {
+  it("sends the title bar's project with the turn, none when the dep names none (req-298, req-308)", async () => {
     let project: string | undefined = 'drey';
     const { deps: d, calls } = deps({ project: () => project });
     const mission = createConversationProvider(d).targets()[0]!;

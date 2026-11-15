@@ -27,7 +27,6 @@ import {
 import type { ChainStatus, RunInfo } from '../../../../packages/tickets-engine/src/fleet/protocol';
 import { DEFAULT_PRIORITY_CONFIG, priorityWeight, type BoardSnapshot, type TicketCard } from '../../shared/tickets';
 import { liveRunOf } from '../work-groups';
-import type { ProjectChip } from '../projects/project-scope';
 
 /** One position of a card's chain: the persona's initials and how far the chain is. */
 export interface ChainCellModel {
@@ -66,8 +65,6 @@ export interface PersonaCardModel {
   readonly shaping: boolean;
   /** The personas that worked a done ticket (`Ralf · Ben · Tessa`). */
   readonly workedBy: readonly string[];
-  /** req-285: the project chip under *All projects*; null = none. */
-  readonly project: ProjectChip | null;
 }
 
 export interface PersonaLaneModel {
@@ -117,11 +114,10 @@ export interface BoardLive {
   readonly now: number;
   /**
    * req-285, the title bar's project filter: which tickets the board shows
-   * (absent = all) and the chip a card carries (absent = none). Columns,
-   * their load and their folding count every project.
+   * (absent = fewer than two projects, everything shows). Columns, their
+   * load and their folding count every project.
    */
   readonly shows?: (card: TicketCard) => boolean;
-  readonly chip?: (card: TicketCard) => ProjectChip | null;
 }
 
 interface Crew {
@@ -202,7 +198,6 @@ export function personaCardOf(card: TicketCard, snap: BoardSnapshot, live: Board
     decide: hold !== null && hold.holder === YOU_LANE && hold.why === 'entry',
     shaping: hold !== null && hold.holder !== YOU_LANE && hold.why === 'entry' && hold.mode === 'shape' && !hold.claimed,
     workedBy: [...new Set(cells.filter((cell) => crew.kindOf(cell.persona) === 'agent').map((cell) => cell.name))],
-    project: live.chip?.(card) ?? null,
   };
 }
 

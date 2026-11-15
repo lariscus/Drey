@@ -2,14 +2,14 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, describe, expect, it } from 'vitest';
 import { TOUCH_FACE_QUERY } from '../phone/phone';
 import { ProjectFilter } from './project-filter';
-import { UNASSIGNED_FILTER, type McProjectFilter } from './projects';
 import { Work } from './work';
 import { MC_WORK_STATE, type McBoard, type McWorkState } from './work.model';
 
 /**
  * req-298: Mission Control's own project filter in the running components —
  * the control (board 7n's look) and the Work list it narrows, on the desk's
- * wide list and on the phone's.
+ * wide list and on the phone's. req-308: one project is always active — no
+ * *All projects*, no *Unassigned*.
  */
 
 const PROJECTS = [
@@ -31,7 +31,7 @@ const BOARD = {
   ],
 } as unknown as McBoard;
 
-function stateWith(filter: McProjectFilter, picks: McProjectFilter[] = []): McWorkState {
+function stateWith(filter: string | null, picks: string[] = []): McWorkState {
   return {
     needs: [],
     board: BOARD,
@@ -67,42 +67,36 @@ function phoneFace(): void {
 }
 
 describe("the desk's Work list under the project filter (req-298)", () => {
-  it('shows only the chosen project\'s cards and Done this week, no chips', () => {
+  it('shows only the chosen project\'s cards and Done this week', () => {
     const el = render(stateWith('drey'));
     expect([...el.querySelectorAll('button.ticket-card:not(.done-card) .tid')].map((n) => n.textContent)).toEqual(['T-0001']);
     expect([...el.querySelectorAll('button.done-card .tid')].map((n) => n.textContent)).toEqual(['T-0100']);
-    expect(el.querySelector('.projchip')).toBeNull();
   });
 
-  it('Unassigned shows the ticket without a project', () => {
-    const el = render(stateWith(UNASSIGNED_FILTER));
-    expect([...el.querySelectorAll('button.ticket-card:not(.done-card) .tid')].map((n) => n.textContent)).toEqual(['T-0003']);
-  });
-
-  it('under all projects every card shows and a card of a known project carries its chip', () => {
-    const el = render(stateWith(null));
-    expect([...el.querySelectorAll('button.ticket-card:not(.done-card) .tid')].map((n) => n.textContent)).toEqual(['T-0001', 'T-0002', 'T-0003']);
-    expect([...el.querySelectorAll('.projchip')].map((n) => n.textContent?.trim())).toEqual(['Drey', 'Lariscus']);
+  it('no stored choice reads as the board\'s first project; a ticket without a project shows under none', () => {
+    expect([...render(stateWith(null)).querySelectorAll('button.ticket-card:not(.done-card) .tid')].map((n) => n.textContent)).toEqual(['T-0001']);
+    const el = render(stateWith('lariscus'));
+    expect([...el.querySelectorAll('button.ticket-card:not(.done-card) .tid')].map((n) => n.textContent)).toEqual(['T-0002']);
+    expect([...el.querySelectorAll('button.done-card .tid')].map((n) => n.textContent)).toEqual(['T-0101']);
   });
 });
 
 describe("the phone's Work list under the project filter (req-298)", () => {
   it('draws the filter at the end of the cost strip and picks a project on this device', () => {
     phoneFace();
-    const picks: McProjectFilter[] = [];
+    const picks: string[] = [];
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [{ provide: MC_WORK_STATE, useValue: stateWith(null, picks) }] });
     const fixture = TestBed.createComponent(Work);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
     const filter = el.querySelector<HTMLElement>('.ph-today mc-project-filter')!;
-    expect(filter.querySelector('.pf-label')?.textContent).toBe('All projects');
-    expect([...el.querySelectorAll('.ph-trow .ph-tproj')].map((n) => n.textContent?.trim())).toEqual(['Drey', 'Lariscus']);
+    // No stored choice: the board's first project is the one in effect.
+    expect(filter.querySelector('.pf-label')?.textContent).toBe('Drey');
     filter.querySelector<HTMLButtonElement>('.pf-btn')!.click();
     fixture.detectChanges();
     const menu = el.querySelector<HTMLElement>('.pf-menu')!;
-    expect([...menu.querySelectorAll('.pf-name')].map((n) => n.textContent)).toEqual(['All projects', 'Drey', 'Lariscus', 'Unassigned']);
-    expect(menu.querySelector('.pf-count')?.textContent).toBe('1');
+    expect([...menu.querySelectorAll('.pf-name')].map((n) => n.textContent)).toEqual(['Drey', 'Lariscus']);
     menu.querySelector<HTMLButtonElement>('[data-project="lariscus"]')!.click();
     expect(picks).toEqual(['lariscus']);
   });
@@ -123,14 +117,14 @@ describe("the phone's Work list under the project filter (req-298)", () => {
 });
 
 describe('the filter control (req-298, board 7n)', () => {
-  it('shows the choice with its dot, emits a new pick only, and closes', () => {
+  it('shows the choice with its dot, offers one row per project, and picks once', () => {
     TestBed.resetTestingModule();
     const fixture = TestBed.createComponent(ProjectFilter);
     fixture.componentRef.setInput('face', 'pad');
     fixture.componentRef.setInput('projects', PROJECTS);
-    fixture.componentRef.setInput('choices', [...PROJECTS.map((p) => ({ id: p.id, label: p.name, color: p.color })), { id: UNASSIGNED_FILTER, label: 'Unassigned', color: '', count: 2 }]);
+    fixture.componentRef.setInput('choices', PROJECTS.map((p) => ({ id: p.id, label: p.name, color: p.color })));
     fixture.componentRef.setInput('value', 'drey');
-    const picked: McProjectFilter[] = [];
+    const picked: string[] = [];
     fixture.componentInstance.pick.subscribe((value) => picked.push(value));
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
@@ -139,15 +133,15 @@ describe('the filter control (req-298, board 7n)', () => {
     expect(el.querySelector('.pf-btn')?.getAttribute('aria-label')).toBe('Project filter: Drey');
     el.querySelector<HTMLButtonElement>('.pf-btn')!.click();
     fixture.detectChanges();
+    expect([...el.querySelectorAll('.pf-item')]).toHaveLength(2);
     expect(el.querySelector('[data-project="drey"]')?.getAttribute('aria-checked')).toBe('true');
-    expect(el.querySelector(`[data-project="${UNASSIGNED_FILTER}"] .pf-dot`)?.classList).toContain('none');
     el.querySelector<HTMLButtonElement>('[data-project="drey"]')!.click();
     fixture.detectChanges();
     expect(picked).toEqual([]);
     expect(el.querySelector('.pf-menu')).toBeNull();
     el.querySelector<HTMLButtonElement>('.pf-btn')!.click();
     fixture.detectChanges();
-    el.querySelector<HTMLButtonElement>('.pf-item')!.click();
-    expect(picked).toEqual([null]);
+    el.querySelector<HTMLButtonElement>('[data-project="lariscus"]')!.click();
+    expect(picked).toEqual(['lariscus']);
   });
 });

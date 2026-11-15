@@ -8,21 +8,25 @@ import { test, expect } from './fixtures/drey';
 import { SEEDS, demoChainWaits, demoFleetRuns, dkIdOf, fieldOf, seedStore, seedVaultOf, type Seed } from './fixtures/persona-board-seed';
 
 /**
- * req-298: Mission Control's own project filter, over the REAL engine. Drey
- * starts Drey Service in a temp home; the gateway serves the built Mission
- * Control on a loopback port with one device paired up front; a stock
- * Chromium opens it at iPad (1194×834) and phone (390×844) sizes. The store is
- * the persona board's demo with each ticket in a project (Drey, Lariscus,
- * Home lab or none — the desktop filter's e2e seeding), the meta vault has the
- * three project records and one Mission Control chat whose last card is Pia's
- * createTicket naming Home lab. Checked: the filter in the iPad header and on
- * the phone's cost strip, the rows it shows, the chip under All projects, the
- * holder's load counting every project, the choice kept on the device, the
- * filter's project riding Pia's turn, and her card creating the ticket in its
- * project. Only the fleet's live runs are patched into `/api/fleet`.
- * Screenshots: test-results/fidelity/MPadWorkV2.project-filter*.png and
+ * req-298: Mission Control's own project filter, over the REAL engine; req-308:
+ * one project is always active — no *All projects*, no *Unassigned*, a device
+ * without a stored choice shows the board's first project, and a ticket
+ * without one shows under none. Drey starts Drey Service in a temp home; the
+ * gateway serves the built Mission Control on a loopback port with one device
+ * paired up front; a stock Chromium opens it at iPad (1194×834) and phone
+ * (390×844) sizes. The store is the persona board's demo with each ticket in
+ * a project (Drey, Lariscus, Home lab or none — the desktop filter's e2e
+ * seeding), the meta vault has the three project records and one Mission
+ * Control chat whose last card is Pia's createTicket naming Home lab.
+ * Checked: the filter in the iPad header and on the phone's cost strip, the
+ * rows it shows, the first project as the default choice, the holder's load
+ * counting every project, the choice kept on the device, the active project
+ * riding Pia's turn, and her card creating the ticket in its project. Only
+ * the fleet's live runs are patched into `/api/fleet`. Screenshots:
+ * test-results/fidelity/MPadWorkV2.project-filter*.png and
  * MPhoneWorkV2.project-filter*.png. The owner's `~/.drey-engine` and stores
- * are never touched. Skipped when `dk` is missing. Prerequisite: `npm run build`.
+ * are never touched. Skipped when `dk` is missing. Prerequisite:
+ * `npm run build`.
  */
 const bin = process.env['DREY_DK_BIN'] ?? 'dk';
 
@@ -210,24 +214,25 @@ test('iPad: the filter beside the area switch, the rows it shows, the load count
   const { context, page } = await openDevice(browser, 'pad');
   try {
     const filter = page.locator('mc-shell-header mc-project-filter');
-    await expect(filter.locator('.pf-label')).toHaveText('All projects', { timeout: 30_000 });
-    await expect(heads(page)).toHaveText(['Needs you', 'Paul', 'Ben', 'Ralf', 'Tessa', 'Prioritized', 'Inbox', 'Done this week']);
-    // Under All projects a row names its project.
-    await expect(row(page, 'Weekly security audit run').locator('.ph-tproj')).toHaveText('Lariscus');
-    await expect(row(page, 'Theme picker in the status bar').locator('.ph-tproj')).toHaveCount(0);
-
-    await filter.locator('.pf-btn').click();
-    const menu = filter.locator('.pf-menu');
-    await expect(menu.locator('.pf-name')).toHaveText(['All projects', 'Drey', 'Home lab', 'Lariscus', 'Unassigned']);
-    await expect(menu.locator(`[data-project="_unassigned"] .pf-count`)).toHaveText('4');
-    await shot(page, 'MPadWorkV2.project-filter-menu');
-
-    await menu.locator('[data-project="drey"]').click();
-    await expect(filter.locator('.pf-label')).toHaveText('Drey');
+    // No stored choice on a fresh device: the board's first project is in effect.
+    await expect(filter.locator('.pf-label')).toHaveText('Drey', { timeout: 30_000 });
     await expect(heads(page)).toHaveText(['Needs you', 'Paul', 'Ben', 'Tessa', 'Prioritized', 'Inbox', 'Done this week']);
+    // One project is always active: no chips, and a ticket without a project shows under none.
     await expect(row(page, 'Weekly security audit run')).toHaveCount(0);
     await expect(row(page, 'Voice capture for tickets')).toHaveCount(1);
     await expect(page.locator('mc-work .ph-tproj')).toHaveCount(0);
+
+    await filter.locator('.pf-btn').click();
+    const menu = filter.locator('.pf-menu');
+    await expect(menu.locator('.pf-name')).toHaveText(['Drey', 'Home lab', 'Lariscus']);
+    await shot(page, 'MPadWorkV2.project-filter-menu');
+
+    await menu.locator('[data-project="lariscus"]').click();
+    await expect(filter.locator('.pf-label')).toHaveText('Lariscus');
+    await expect(row(page, 'Weekly security audit run')).toHaveCount(1);
+    await expect(row(page, 'Voice capture for tickets')).toHaveCount(0);
+    await expect(page.locator('mc-work .ph-ghead[data-holder="ben"]')).toHaveCount(0);
+    await expect(page.locator('mc-work .ph-ghead[data-holder="ralf"]')).toHaveCount(1);
     // Paul's only running ticket is Lariscus's audit: his load still counts it.
     await expect(page.locator('mc-work .ph-ghead[data-holder="paul"]')).toHaveAttribute('title', 'Paul · 1/1\nCounts every project');
     await shot(page, 'MPadWorkV2.project-filter');
@@ -245,8 +250,8 @@ test("phone: the filter on the cost strip, kept on the device; Pia's turn carrie
   try {
     await page.locator('mc-menu .places .row', { hasText: 'Work' }).click();
     const filter = page.locator('mc-work .ph-today mc-project-filter');
-    await expect(filter.locator('.pf-label')).toHaveText('All projects', { timeout: 30_000 });
-    await shot(page, 'MPhoneWorkV2.project-filter-all');
+    await expect(filter.locator('.pf-label')).toHaveText('Drey', { timeout: 30_000 });
+    await shot(page, 'MPhoneWorkV2.project-filter-first');
     await filter.locator('.pf-btn').click();
     await shot(page, 'MPhoneWorkV2.project-filter-menu');
     await filter.locator('[data-project="lariscus"]').click();
@@ -285,18 +290,20 @@ test("phone: the filter on the cost strip, kept on the device; Pia's turn carrie
   }
 });
 
-test("desk: the filter beside the top nav's tabs narrows the wide list; a card under All projects names its project", async ({ electronApp, browser }) => {
+test('desk: the filter beside the top nav\'s tabs narrows the wide list; one project is always active', async ({ electronApp, browser }) => {
   test.setTimeout(240_000);
   void electronApp;
   await gatewayUp();
   const { context, page } = await openDevice(browser, 'desk');
   try {
     const filter = page.locator('.topnav mc-project-filter');
-    await expect(filter.locator('.pf-label')).toHaveText('All projects', { timeout: 30_000 });
+    // No stored choice: the board's first project. A ticket without a project shows under none.
+    await expect(filter.locator('.pf-label')).toHaveText('Drey', { timeout: 30_000 });
     const card = (title: string) => page.locator('mc-work button.ticket-card', { hasText: title });
-    await expect(card('Weekly security audit run').locator('.projchip')).toHaveText('Lariscus');
+    await expect(card('Weekly security audit run')).toHaveCount(0);
+    await expect(card('Spell-check the commit message')).toHaveCount(0);
     await filter.locator('.pf-btn').click();
-    await filter.locator('[data-project="home-lab"]').click();
+    await page.locator('.topnav mc-project-filter [data-project="home-lab"]').click();
     await expect(filter.locator('.pf-label')).toHaveText('Home lab');
     await expect(card('Weekly security audit run')).toHaveCount(0);
     await expect(card('Spell-check the commit message')).toHaveCount(1);

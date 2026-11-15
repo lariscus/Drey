@@ -1,9 +1,10 @@
 /**
- * Mission Control's own project filter (req-298, board 7n's look): the
+ * Mission Control's own project filter (req-298, board 7n's look; req-308:
+ * one project is always active — no *All projects*, no *Unassigned*): the
  * board's projects as `/api/board` sends them (`projects`, milestone 263),
- * the choices the filter offers, which tickets a choice shows, the chip a
- * card carries under *All projects*, and the device-local choice itself
- * (localStorage — this device's lens, not the desktop view's).
+ * the choice in effect (a board without projects is the only null), which
+ * tickets a choice shows, and the device-local choice itself (localStorage
+ * — this device's lens, not the desktop view's).
  *
  * `ticketProjectIdOf` is a local copy of the engine's `ticketProjectId`
  * (`packages/tickets-engine/src/contracts/projects.ts`; the lib imports
@@ -14,9 +15,6 @@
 /** The default colour a project without one is drawn in (the desktop's first preset). */
 export const DEFAULT_PROJECT_COLOR = '#8ecbef';
 
-/** The *Unassigned* choice's id; a project id never starts with an underscore. */
-export const UNASSIGNED_FILTER = '_unassigned';
-
 /** A project as the filter and the chip draw it. */
 export interface McProject {
   readonly id: string;
@@ -25,17 +23,17 @@ export interface McProject {
   readonly color: string;
 }
 
-/** The filter's choice: a project id, {@link UNASSIGNED_FILTER}, or null for all projects. */
+/**
+ * The filter's choice: a project id; null only while the board has no
+ * projects at all (a choice is then not in effect — the filter is not drawn).
+ */
 export type McProjectFilter = string | null;
 
-/** One row of the filter's menu after *All projects*. */
+/** One row of the filter's menu. */
 export interface McProjectChoice {
   readonly id: string;
   readonly label: string;
-  /** '' = the dashed dot (*Unassigned*). */
   readonly color: string;
-  /** Only *Unassigned* counts its tickets (board 7n). */
-  readonly count?: number;
 }
 
 /** A card's project chip. */
@@ -72,8 +70,8 @@ export function projectsOf(board: { readonly projects?: unknown } | null | undef
 
 /**
  * The project a ticket belongs to: its own `project:`; with none, the board's
- * only project while there is exactly one; else null (Unassigned). The
- * engine's `ticketProjectId`, restated.
+ * only project while there is exactly one; else null. The engine's
+ * `ticketProjectId`, restated.
  */
 export function ticketProjectIdOf(named: string | null | undefined, projects: readonly Pick<McProject, 'id'>[]): string | null {
   const id = named?.trim() ?? '';
@@ -88,53 +86,34 @@ export function filterShownOf(projects: readonly McProject[]): boolean {
   return projects.length >= 2;
 }
 
-/** The choice in effect: a project that went away (or a board with fewer than two projects) reads as all. */
+/**
+ * The choice in effect: the stored project while the board knows it, else
+ * the board's first project — one of them is always active; null only on a
+ * board without projects.
+ */
 export function filterInEffectOf(filter: McProjectFilter, projects: readonly McProject[]): McProjectFilter {
-  if (filter === null || !filterShownOf(projects)) {
+  if (projects.length === 0) {
     return null;
   }
-  return filter === UNASSIGNED_FILTER || projects.some((project) => project.id === filter) ? filter : null;
+  return projects.some((project) => project.id === filter) ? filter : projects[0]!.id;
 }
 
-/** The menu's rows after *All projects*: each project, then *Unassigned* with its count. */
-export function projectChoicesOf(projects: readonly McProject[], named: readonly (string | null | undefined)[], unassignedLabel: string): readonly McProjectChoice[] {
-  const choices: McProjectChoice[] = projects.map((project) => ({ id: project.id, label: project.name, color: project.color }));
-  const count = named.filter((project) => ticketProjectIdOf(project, projects) === null).length;
-  return [...choices, { id: UNASSIGNED_FILTER, label: unassignedLabel, color: '', count }];
+/** The menu's rows: each project, in the board's order. */
+export function projectChoicesOf(projects: readonly McProject[]): readonly McProjectChoice[] {
+  return projects.map((project) => ({ id: project.id, label: project.name, color: project.color }));
 }
 
-/** True when a ticket (its own `project:`) shows under the choice in effect. */
+/** True when a ticket (its own `project:`) shows under the choice; a ticket of a project the board does not have shows under none. */
 export function inProjectFilter(named: string | null | undefined, filter: McProjectFilter, projects: readonly McProject[]): boolean {
   if (filter === null) {
     return true;
   }
-  const id = ticketProjectIdOf(named, projects);
-  return filter === UNASSIGNED_FILTER ? id === null : id === filter;
+  return ticketProjectIdOf(named, projects) === filter;
 }
 
-/** A card's chip: only under *All projects*, on a board with two projects or more, for a ticket of a known project. */
-export function projectChipOf(named: string | null | undefined, filter: McProjectFilter, projects: readonly McProject[]): McProjectChip | null {
-  if (filter !== null || !filterShownOf(projects)) {
-    return null;
-  }
-  const id = ticketProjectIdOf(named, projects);
-  const project = projects.find((known) => known.id === id);
-  return project === undefined ? null : { label: project.name, color: project.color };
-}
-
-/** The filter button's dot under *All projects*: a wheel of the first three colours (board 7n). */
-export function allProjectsDotOf(projects: readonly McProject[]): string {
-  const colors = projects.map((project) => project.color).slice(0, 3);
-  if (colors.length === 0) {
-    return 'var(--text-3)';
-  }
-  const step = 100 / colors.length;
-  return `conic-gradient(${colors.map((color, i) => `${color} 0 ${Math.round(step * (i + 1))}%`).join(', ')})`;
-}
-
-/** The project Pia's new tickets go to: the filtered project; none under all or *Unassigned* (she asks). */
+/** The project Pia's new tickets go to: the choice in effect; undefined on a board without projects (she asks). */
 export function chatProjectOf(filter: McProjectFilter): string | undefined {
-  return filter === null || filter === UNASSIGNED_FILTER ? undefined : filter;
+  return filter ?? undefined;
 }
 
 /**
@@ -156,7 +135,7 @@ export function ticketProjectsOf(board: unknown): ReadonlyMap<string, string | n
   return out;
 }
 
-/** The open columns' cards, each once, with its own `project:` (what *Unassigned* counts). */
+/** The open columns' cards, each once, with its own `project:`. */
 export function openTicketProjectsOf(board: unknown): ReadonlyMap<string, string | null> {
   const out = new Map<string, string | null>();
   const body = rec(board);
@@ -188,11 +167,11 @@ export interface FilterStorage {
   removeItem(key: string): void;
 }
 
-/** This device's last choice; null (all) when none is stored or the storage is blocked. */
+/** This device's last choice; null when none is stored, the storage is blocked, or the stored id is no project id. */
 export function storedProjectFilter(storage: FilterStorage | null): McProjectFilter {
   try {
     const raw = storage?.getItem(STORAGE_KEY) ?? null;
-    return raw !== null && (raw === UNASSIGNED_FILTER || PROJECT_ID.test(raw)) ? raw : null;
+    return raw !== null && PROJECT_ID.test(raw) ? raw : null;
   } catch {
     return null;
   }

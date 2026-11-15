@@ -2,47 +2,42 @@ import type { PhoneWorkGroup } from './phone-rows';
 import {
   filterInEffectOf,
   inProjectFilter,
-  openTicketProjectsOf,
-  projectChipOf,
   projectChoicesOf,
   projectsOf,
   ticketProjectsOf,
   type McProject,
-  type McProjectChip,
   type McProjectChoice,
   type McProjectFilter,
 } from './projects';
 import type { McDoneEntry, WorkGroup } from './work.model';
 
 /**
- * The project filter applied to Mission Control's Work list (req-298): which
- * rows a choice shows and the chip a row carries under *All projects*. The
- * list is built for every project first — so a holder group's load (and the
- * fleet chip, the capacity, the pool) counts every project, as on the desktop
- * board — and the rows are narrowed afterwards; a group left without rows
- * leaves, as an empty group always does on Mission Control's list. A row is
- * matched by its ticket id; a row without one (a need of no ticket) and a
- * ticket the board does not hold stay under every choice.
+ * The project filter applied to Mission Control's Work list (req-298; req-308:
+ * one project is always active): which rows a choice shows. The list is built
+ * for every project first — so a holder group's load (and the fleet chip, the
+ * capacity, the pool) counts every project, as on the desktop board — and the
+ * rows are narrowed afterwards; a group left without rows leaves, as an empty
+ * group always does on Mission Control's list. A row is matched by its ticket
+ * id; a row without one (a need of no ticket) and a ticket the board does not
+ * hold stay under every choice.
  */
 export interface WorkProjectScope {
   readonly projects: readonly McProject[];
-  /** The choice in effect (a project that went away reads as all). */
+  /** The choice in effect (a project that went away reads as the board's first); null = a board without projects. */
   readonly filter: McProjectFilter;
   /** Ticket id → its own `project:` (the open columns and Done this week). */
   readonly byTicket: ReadonlyMap<string, string | null>;
-  /** The open columns' tickets → their own `project:` (what *Unassigned* counts). */
-  readonly open: ReadonlyMap<string, string | null>;
 }
 
 /** The scope of one board read and this device's choice. */
 export function workProjectScopeOf(board: unknown, filter: McProjectFilter | undefined): WorkProjectScope {
   const projects = projectsOf(board as { readonly projects?: unknown } | null);
-  return { projects, filter: filterInEffectOf(filter ?? null, projects), byTicket: ticketProjectsOf(board), open: openTicketProjectsOf(board) };
+  return { projects, filter: filterInEffectOf(filter ?? null, projects), byTicket: ticketProjectsOf(board) };
 }
 
-/** The filter's menu rows for this board: the projects, then *Unassigned* counting the open tickets without one. */
-export function workProjectChoicesOf(scope: WorkProjectScope, unassignedLabel: string): readonly McProjectChoice[] {
-  return projectChoicesOf(scope.projects, [...scope.open.values()], unassignedLabel);
+/** The filter's menu rows for this board: the projects, in the board's order. */
+export function workProjectChoicesOf(scope: WorkProjectScope): readonly McProjectChoice[] {
+  return projectChoicesOf(scope.projects);
 }
 
 /** True when the ticket's row shows under the choice; a row of no ticket, or a ticket the board does not hold, always does. */
@@ -51,14 +46,6 @@ export function showsTicket(scope: WorkProjectScope, id: string | null | undefin
     return true;
   }
   return inProjectFilter(scope.byTicket.get(id), scope.filter, scope.projects);
-}
-
-/** The chip a ticket's row carries: only under *All projects*, on a board with two projects or more. */
-export function ticketChipOf(scope: WorkProjectScope, id: string | null | undefined): McProjectChip | null {
-  if (id === null || id === undefined || !scope.byTicket.has(id)) {
-    return null;
-  }
-  return projectChipOf(scope.byTicket.get(id), scope.filter, scope.projects);
 }
 
 /** The phone's and the iPad's groups narrowed to the choice; the loads stay as computed over every project. */

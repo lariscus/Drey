@@ -97,12 +97,6 @@
   height: 10px;
 }
 
-.pf-dot.none {
-  box-sizing: border-box;
-  background: transparent;
-  border: 1.5px dashed var(--control-border);
-}
-
 .pf-backdrop {
   position: fixed;
   inset: 0;
@@ -172,11 +166,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.pf-count {
-  font-size: var(--ph-15, 15px);
-  color: var(--text-3);
 }
 
 /* The iPad upright (board MPadPortrait's header): the room between the switch and the Autopilot chip is short. */

@@ -195,7 +195,7 @@ export function personaBoardNodes(ctx: PersonaBoardContext, snap: BoardSnapshot)
   const scope = deps.scope?.() ?? null;
   const model = personaBoardModelOf(
     snap,
-    { runs: deps.runs(), chain, queueWords: (id) => queueWordsFor(chain?.queue, id, i18n)?.short ?? null, now: Date.now(), ...(scope === null ? {} : { shows: (card) => scope.shows(card), chip: (card) => scope.chip(card) }) },
+    { runs: deps.runs(), chain, queueWords: (id) => queueWordsFor(chain?.queue, id, i18n)?.short ?? null, now: Date.now(), ...(scope === null ? {} : { shows: (card) => scope.shows(card) }) },
     state.unfolded,
   );
   const lanes = snap.lanes ?? [];

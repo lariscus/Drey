@@ -1117,7 +1117,7 @@ function openCreateModal(api: DreyPluginApi, snap: BoardSnapshot, opts?: { dicta
           // The raw words behind a tidied capture (req-75 W5c) — only
           // when Tidy up actually changed the fields.
           ...(rawCapture !== null ? { raw: rawCapture } : {}),
-          // req-285: a capture lands in the filtered project (none under All projects or Unassigned).
+          // req-285: a capture lands in the active project (req-308: exactly one is always active).
           ...(projectFilter?.captureProject() !== undefined ? { project: projectFilter.captureProject() } : {}),
         }),
       ).then((result) => {

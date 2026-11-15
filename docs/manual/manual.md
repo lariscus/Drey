@@ -927,31 +927,35 @@ project after asking — its tickets keep the name and show as an unknown
 project.
 
 **The project filter.** Right of the view switcher in the title bar sits
-the project filter: *All projects*, each project, *Unassigned* (with how
-many tickets have no project) and *Manage projects…* (Settings →
-Projects). Pick a project and the window follows it: the Files panel lists
-only that project's vaults and folders (a `read` tag on the ones its runs
-may only read, and a line like *Drey · 2 vaults, 1 folder* under the
-header), the Board and the Tickets panel show only its tickets, Find offers
-*This project* among the places to look, and a new idea lands in it. The
-persona columns, their load and the capacity chip still count every
-project — the Crew and its quotas are shared. Under *All projects* each
-card names its project. Every view remembers its own choice, so a view you
-save while a project is picked opens filtered.
+the project filter — it appears once your board has two projects or more
+(so does Mission Control's), because one project is always active and a
+board with one needs no switch. Its menu lists each project and *Manage
+projects…* (Settings → Projects); one project is always picked — a view
+without a choice of its own shows the first. Pick a project and the window
+follows it: the Files panel lists only that project's vaults and folders (a
+`read` tag on the ones its runs may only read, and a line like *Drey · 2
+vaults, 1 folder* under the header), the Board and the Tickets panel show
+only its tickets, Find offers *This project* among the places to look, and
+a new idea lands in it. The persona columns, their load and the capacity
+chip still count every project — the Crew and its quotas are shared. Every
+view remembers its own choice, so a view you save while a project is picked
+opens filtered. A ticket without a project — and a ticket of a deleted
+project, which keeps the name — shows in no project's view until it gains
+one; the board flags it, and Settings → Projects is where it gets one.
 
 **Mission Control has a project filter of its own.** On the iPad it sits
 right of *Notes · Work · Crew* in the header, on the desk right of the tabs,
-on the phone at the end of the cost line above the Work list. It offers the
-same choices (without *Manage projects…*) and belongs to that device alone:
-picking Drey on the phone leaves the desktop's choice, and every other
-device's, as it was, and the phone remembers it. The Work list follows it —
-Needs you, the persona groups, Prioritized, Inbox and Done this week — while
-a persona's load (*Paul · 1/1*, in the group's tooltip) still counts every
-project. Under *All projects* each row names its project. **Pia names the
-project of every ticket she creates:** her card shows it before you confirm
-(*Home lab* under the title on the phone, `project:` in the card on the
-desk). With a project picked she puts new tickets there; under *All
-projects* she asks which project first, unless you said it. The desktop's
+on the phone at the end of the cost line above the Work list — shown once
+the board has two projects or more. It offers the same projects (without
+*Manage projects…*) and belongs to that device alone: picking Drey on the
+phone leaves the desktop's choice, and every other device's, as it was, and
+the phone remembers it. One project is always active — a device without a
+choice shows the board's first. The Work list follows it — Needs you, the
+persona groups, Prioritized, Inbox and Done this week — while a persona's
+load (*Paul · 1/1*, in the group's tooltip) still counts every project.
+**Pia names the project of every ticket she creates:** her card shows it
+before you confirm (*Home lab* under the title on the phone, `project:` in
+the card on the desk); new tickets go to the active project. The desktop's
 Mission Control conversation does the same with the title bar's choice.
 
 **The crew a new board starts with.** The same step adds **Pia** (Mission
