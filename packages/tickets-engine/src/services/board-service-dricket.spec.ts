@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { EngineBoardService } from './board-service';
 import type { EngineHost, EngineVault, FleetPort } from './host';
+import { writeLifecycleStages } from './lifecycle-store.fake';
 import { TicketsGit } from '../core/tickets-git';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools, type ChainConfig, type RunRequest } from '../fleet/protocol';
 import { assertDkVersion, MIN_DK_VERSION } from '../store/dk-process';
@@ -38,9 +39,9 @@ if (!found.ok) {
 const PIPELINE = `---
 phases:
   - { id: inbox, title: Inbox, handover: manual }
-  - { id: build, title: Build, claim: true, handover: agent build-default }
-  - { id: commit, title: Commit, claim: true, handover: manual }
+  - { id: prioritized, title: Prioritized, handover: manual }
   - { id: done, title: Done, handover: none }
+flow: ben; you
 priorities: [urgent, high, normal, low]
 ---
 The pipeline.
@@ -138,20 +139,7 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
       envSet(k, v);
     }
     dk(['init', storeDir, 't']);
-    const git = (args: string[]): void => {
-      execFileSync('git', args, { cwd: storeDir, windowsHide: true, stdio: 'pipe' });
-    };
-    git(['checkout', '-q', 'main']);
-    const tomlPath = path.join(storeDir, 'dricket.toml');
-    const toml = readFileSync(tomlPath, 'utf8')
-      .replace(/\[transitions\.agent\][\s\S]*?(?=\n\[|$)/, '')
-      .replace('values = ["critical", "high", "normal", "low"]', 'values = ["urgent", "high", "normal", "low"]');
-    writeFileSync(
-      tomlPath,
-      `${toml}\n[stages]\nvalues = ["inbox", "build", "commit", "done"]\ninitial = "inbox"\nterminal = ["done"]\nclaim = ["build", "commit"]\ncancelled = "cancelled"\n`,
-    );
-    git(['commit', '-q', '-am', 'stages and priorities']);
-    git(['checkout', '-q', 'tickets']);
+    writeLifecycleStages(storeDir);
     envSet('DK_STORE', storeDir);
 
     vaultDir = path.join(root, 'meta');
@@ -166,6 +154,8 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
         'utf8',
       );
     }
+    await fsp.mkdir(abs('tickets/_meta/personas/you'), { recursive: true });
+    await fsp.writeFile(abs('tickets/_meta/personas/you/persona.md'), '---\ntitle: You\nkind: human\nrole: custom\n---\n', 'utf8');
     Object.assign(config, { 'dk.path': bin === 'dk' ? '' : bin, 'dk.store': storeDir, 'dk.dataDir': path.join(root, 'data') });
     const git2 = new TicketsGit(() => 'git', async () => {
       throw new Error('no git in the spec');
@@ -274,19 +264,17 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
   });
 
   it('moves a card, accepts it into the terminal column and archives it; unarchive brings it back', async () => {
-    expect(await service.transition({ id: 'T-0001', from: 'inbox', to: 'build' })).toMatchObject({ ok: true });
-    expect(field('t-1', 'stage')).toBe('build');
-    expect(field('t-1', 'x-entered-build')).not.toBe('');
-    expect(dkShow('t-1')).toContain('inbox -> build');
-    expect(await phaseOf('T-0001')).toBe('build');
+    expect(await service.transition({ id: 'T-0001', from: 'inbox', to: 'prioritized' })).toMatchObject({ ok: true });
+    expect(field('t-1', 'stage')).toBe('prioritized');
+    expect(field('t-1', 'x-entered-prioritized')).not.toBe('');
+    expect(dkShow('t-1')).toContain('inbox -> prioritized');
+    expect(await phaseOf('T-0001')).toBe('prioritized');
 
-    expect(await service.transition({ id: 'T-0001', from: 'build', to: 'commit' })).toMatchObject({ ok: true });
-    const sent = await service.sendBack({ id: 'T-0001', note: 'tests missing' });
-    expect(sent).toMatchObject({ ok: true });
-    expect(field('t-1', 'stage')).toBe('build');
-    expect(dkShow('t-1')).toContain('sent back: tests missing');
+    // A ticket in a column of its own has no earlier agent position to go back to.
+    expect(await service.sendBack({ id: 'T-0001', note: 'tests missing' })).toMatchObject({ ok: false, error: 'there is no agent phase before "prioritized" to send T-0001 back to' });
+    expect(field('t-1', 'stage')).toBe('prioritized');
 
-    expect(await service.transition({ id: 'T-0001', from: 'build', to: 'done' })).toMatchObject({ ok: true });
+    expect(await service.transition({ id: 'T-0001', from: 'prioritized', to: 'done' })).toMatchObject({ ok: true });
     expect(await service.acceptTicket({ id: 'T-0001' })).toMatchObject({ ok: true });
     expect(field('t-1', 'labels')).toContain('archived');
     expect(field('t-1', 'stage')).toBe('done');
@@ -314,7 +302,7 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
     const first = await service.releasePlan({ id: 'T-0001', scope: 'first' });
     expect(first).toMatchObject({ ok: true, tickets: ['T-0002'] });
     expect(field('t-2', 'parent')).toBe('t-1');
-    expect(field('t-2', 'stage')).toBe('build');
+    expect(field('t-2', 'stage')).toBe('prioritized'); // the build queue is the pipeline's second column
     expect(field('t-2', 'x-persona')).toBe('ben');
     expect(dkShow('t-1')).toContain('plan released');
 
@@ -324,7 +312,7 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
     const rest = await service.releasePlan({ id: 'T-0001', scope: 'all' });
     expect(rest).toMatchObject({ ok: true, tickets: ['T-0003', 'T-0004'] });
     expect(dkShow('t-3')).not.toContain('(no description)');
-    expect(field('t-3', 'stage')).toBe('build');
+    expect(field('t-3', 'stage')).toBe('prioritized');
     expect(field('t-3', 'depends')).toBe('t-2');
     expect(field('t-4', 'depends')).toBe('t-3');
     expect(field('t-4', 'x-persona')).toBe('paul');
@@ -363,7 +351,7 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
       const reply = await runner.startRun({ origin: 'spec', ticketId: 'T-0002', workerChoice: null, permissionMode: 'accept-edits', handover: null, interactive: null });
       expect(reply).toMatchObject({ ok: false, error: 'stub: not spawning' });
       expect(started).toHaveLength(1);
-      expect(started[0]!.dk).toMatchObject({ store: storeDir, trailers: false, parkStage: null, retreatStage: 'inbox' });
+      expect(started[0]!.dk).toMatchObject({ store: storeDir, trailers: false, parkStage: null });
       expect(started[0]!.ticketId).toBe('T-0002');
       expect(started[0]!.origin).toBe('spec'); // D-41: who asked rides to the runner
 
@@ -386,8 +374,7 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
     dk(['put', 't-2', '-F', writeTemp(text), '--claim', '--if-version', String(rev('t-2'))]);
     await fsp.mkdir(abs('tickets/_meta/prompts'), { recursive: true });
     await fsp.writeFile(abs('tickets/_meta/prompts/build-default.md'), 'Build the ticket.\n', 'utf8');
-    // req-257: the ticket pin is retired — the column's persona works the build
-    await fsp.writeFile(abs('tickets/_meta/pipeline.md'), PIPELINE.replace('handover: agent build-default }', 'handover: agent build-default, persona: ben }'), 'utf8');
+    // the persona that works the ticket is the one its part pinned (`x-persona: ben`, the release above)
     const ben = abs('tickets/_meta/personas/ben');
     await fsp.mkdir(path.join(ben, 'skills'), { recursive: true });
     await fsp.writeFile(
@@ -442,24 +429,29 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
     const id = (created as unknown as { id: string }).id;
     const dkId = toDricketId(id)!;
     ledgerWrites.length = 0;
-    expect(await service.transition({ id, from: 'inbox', to: 'build' })).toMatchObject({ ok: true });
-    expect(await service.transition({ id, from: 'build', to: 'commit' })).toMatchObject({ ok: true });
+    expect(await service.transition({ id, from: 'inbox', to: 'prioritized' })).toMatchObject({ ok: true });
+    // The ticket goes on as a chain ticket at You's entry (the owner's sign-off position).
+    const header = dkShow(dkId).replace(/^x-(chain|at): .*\n/gm, '').replace(/^stage: .*$/m, 'stage: active\nx-chain: ben;you\nx-at: 2');
+    dk(['put', dkId, '-F', writeTemp(header), '--claim', '--if-version', String(rev(dkId))]);
     expect(ledgerWrites).not.toContain('phase');
 
     // The send-back note, whole, is a comment.
     const note = 'tests are missing for the empty case, and the button still misaligns';
     expect(await service.sendBack({ id, note })).toMatchObject({ ok: true });
     const afterSend = await service.ticketComments(id);
-    expect(afterSend.map((c) => c.text)).toEqual([`sent back: ${note}`]);
-    expect(afterSend[0]!.verb).toBeNull();
+    // The cursor's own status line (a chain move) sits beside the note; the note itself is one whole, plain comment.
+    expect(afterSend.map((c) => c.text)).toHaveLength(2);
+    expect(afterSend.map((c) => c.text)).toContain(`sent back: ${note}`);
+    expect(afterSend.find((c) => c.text === `sent back: ${note}`)!.verb).toBeNull();
+    expect(afterSend.map((c) => c.text)).toContain(`done: sent back to position 1 (ben): ${note}`);
 
     // A decision asked as a keyed comment shows in the status read and the ticket view; working is not persisted.
     dk(['comment', dkId, '-m', 'needs-decision: [palette] Which shortcut should open the palette?']);
     const lines = await service.statusOf(id);
     expect(openStatusItems(lines).map((i) => [i.verb, i.key])).toEqual([['needs-decision', 'palette']]);
     const view = await service.readTicket(id);
-    // dk orders comment files by second then author, so the two comments of one second come in either order.
-    expect(view.ok && view.comments?.map((c) => c.verb)).toHaveLength(2);
+    // dk orders comment files by second then author, so comments of one second come in either order.
+    expect(view.ok && view.comments?.map((c) => c.verb)).toHaveLength(3);
     expect(view.ok && view.comments?.map((c) => c.verb)).toEqual(expect.arrayContaining([null, 'needs-decision']));
 
     // The answer closes the key (the only open one is the default) and carries the text.

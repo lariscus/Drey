@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { DEFAULT_PIPELINE_TEXT } from '../core/pipeline-states';
+import { PIPELINE_PROSE, STANDARD_FLOW_LINE } from '../core/pipeline-states';
 import { TicketsGit } from '../core/tickets-git';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools, type ChainConfig, type RunInfo, type RunRequest } from '../fleet/protocol';
 import { assertDkVersion, MIN_DK_VERSION } from '../store/dk-process';
@@ -22,6 +22,8 @@ import type { EngineHost, EngineVault, FleetPort } from './host';
 
 const bin = process.env['DREY_DK_BIN'] ?? 'dk';
 const PERSONA = (kind: string, extra = ''): string => `---\ntitle: P\nkind: ${kind}\nrole: custom\nworker: opencode\n${extra}---\n`;
+/** The phase-board pipeline of the shipped meta vault before the migration (pinned here: nothing writes it any more, only the migration reads it). */
+const OLD_PHASE_PIPELINE = `---\nphases:\n  - { id: inbox, title: Inbox, handover: manual, persona: you }\n  - { id: shaping, title: Shaping, handover: manual, persona: you }\n  - { id: prioritized, title: Prioritized, handover: manual, persona: you }\n  - { id: building, title: Building, wip: 3, claim: true, handover: agent build-default }\n  - { id: ready, title: Ready to try, handover: manual, persona: you }\n  - { id: done, title: Done, handover: none }\nflow: ${STANDARD_FLOW_LINE}\n---\n${PIPELINE_PROSE}`;
 
 function probe(): { ok: true } | { ok: false; reason: string } {
   try {
@@ -138,7 +140,7 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     mkdirSync(kt);
     const meta = path.join(vaultDir, 'tickets', '_meta');
     await fsp.mkdir(path.join(meta, 'prompts'), { recursive: true });
-    await fsp.writeFile(path.join(meta, 'pipeline.md'), DEFAULT_PIPELINE_TEXT, 'utf8');
+    await fsp.writeFile(path.join(meta, 'pipeline.md'), OLD_PHASE_PIPELINE, 'utf8');
     await fsp.writeFile(path.join(meta, 'repos.md'), `---\nrepos:\n  kt:\n    url: https://example.test/kt.git\n    path: '${kt.split(path.sep).join('/')}'\n    branch: main\n---\n`, 'utf8');
     for (const [id, text] of [['ben', PERSONA('agent')], ['pia', PERSONA('mission')], ['ralf', PERSONA('agent')], ['you', PERSONA('human', 'leaving: [commit]\n')]] as const) {
       await fsp.mkdir(path.join(meta, 'personas', id), { recursive: true });
@@ -243,13 +245,6 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     expect(field(dkId, 'x-sent-back')).toBeNull();
   });
 
-  it("an owner's move into a working column moves the cursor to the position that stands there", async () => {
-    const { id, dkId } = chained('Moved', 'ben;you;ralf;you', 2);
-    expect(await service.transition({ id, from: 'ready', to: 'building' })).toMatchObject({ ok: true });
-    expect(field(dkId, 'x-at')).toBe('3');
-    expect(field(dkId, 'x-phase')).toBeNull();
-  });
-
   it('a chain an agent finished (the cursor past the last entry) is moved to done by the engine', async () => {
     const { id, dkId } = chained('Through', 'ben;ralf', 3);
     expect(await columnOf(id)).toBe('done');
@@ -328,7 +323,7 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     configured.length = 0;
     await service.snapshot();
     expect(configured).toHaveLength(1);
-    expect(configured[0]).toMatchObject({ store: { lifecycle: true } });
+    expect(configured[0]).toMatchObject({ store: { dkStore: storeDir } });
   });
 
   it('sends the config again with the next snapshot while no runner was reachable (the Autopilot starts it later)', async () => {

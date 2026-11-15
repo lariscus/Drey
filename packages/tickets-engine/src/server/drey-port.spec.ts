@@ -213,8 +213,6 @@ describe('DreyTicketsPort', () => {
       configured: true,
       master: 'run',
       columns: {},
-      redStreak: {},
-      cooldownUntil: {},
       pausedPersonas: ['pia'],
     });
     const port = new DreyTicketsPort(board, fleet, new ChangeHub(), { allowBypass: () => false });
@@ -238,8 +236,6 @@ describe('DreyTicketsPort', () => {
       configured: true,
       master: 'run',
       columns: {},
-      redStreak: {},
-      cooldownUntil: {},
       pausedPersonas: ['pia'],
     });
     await expect(port.chainPersonaPause({ persona: 'pia', paused: true })).resolves.toEqual({ ok: true, persona: 'pia', paused: true });

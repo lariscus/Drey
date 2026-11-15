@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { promises as fsp, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { writeLifecycleStages } from './lifecycle-store.fake';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -36,8 +37,7 @@ if (!found.ok) {
 const PIPELINE = `---
 phases:
   - { id: inbox, title: Inbox, handover: manual }
-  - { id: build, title: Build, claim: true, handover: agent build-default }
-  - { id: commit, title: Commit, claim: true, handover: manual }
+  - { id: prioritized, title: Prioritized, handover: manual }
   - { id: done, title: Done, handover: none }
 ---
 The pipeline: no priorities of its own, so the files vocabulary would apply.
@@ -110,16 +110,8 @@ describe.skipIf(!found.ok)('the sweep defects on a scratch dk store', { timeout:
       envSet(k, v);
     }
     dk(['init', storeDir, 't']);
-    const git = (args: string[]): void => {
-      execFileSync('git', args, { cwd: storeDir, windowsHide: true, stdio: 'pipe' });
-    };
-    // dk's own vocabulary stays (critical, high, normal, low); only the stages are the board's.
-    git(['checkout', '-q', 'main']);
-    const tomlPath = path.join(storeDir, 'dricket.toml');
-    const toml = readFileSync(tomlPath, 'utf8').replace(/\[transitions\.agent\][\s\S]*?(?=\n\[|$)/, '');
-    writeFileSync(tomlPath, `${toml}\n[stages]\nvalues = ["inbox", "build", "commit", "done"]\ninitial = "inbox"\nterminal = ["done"]\nclaim = ["build", "commit"]\ncancelled = "cancelled"\n`);
-    git(['commit', '-q', '-am', 'stages']);
-    git(['checkout', '-q', 'tickets']);
+    // dk's own vocabulary stays (critical, high, normal, low); only the stages are the board's (the lifecycle ones, req-307).
+    writeLifecycleStages(storeDir, { urgentPriorities: false });
     envSet('DK_STORE', storeDir);
 
     vaultDir = path.join(root, 'meta');
@@ -231,9 +223,8 @@ describe.skipIf(!found.ok)('the sweep defects on a scratch dk store', { timeout:
       const move = async (from: string, to: string): Promise<void> => {
         expect(await service.transition({ id: 'T-0003', from, to })).toMatchObject({ ok: true });
       };
-      await move('inbox', 'build');
-      await move('build', 'commit');
-      await move('commit', 'done');
+      await move('inbox', 'prioritized');
+      await move('prioritized', 'done');
       dk(['comment', 't-3', '-m', 'Worked for me.']);
       expect(await service.archive({ id: 'T-0003' })).toMatchObject({ ok: true });
 

@@ -35,9 +35,6 @@ const chain = (patch: Partial<ChainStatus>): ChainStatus => ({
   configured: true,
   master: 'run',
   columns: {},
-  redStreak: {},
-  cooldownUntil: {},
-  tripped: {},
   quotaPausedUntil: {},
   ...patch,
 });
@@ -45,31 +42,6 @@ const chain = (patch: Partial<ChainStatus>): ChainStatus => ({
 const NOW = Date.parse('2026-10-31T14:00:00Z');
 
 describe('chainAlertsOf', () => {
-  it('a tripped breaker is an alert with Resume, naming why and what waits', () => {
-    const alerts = chainAlertsOf(
-      chain({
-        columns: { build: 'held' },
-        redStreak: { build: 3 },
-        tripped: { build: { reason: '3 red gates in a row', at: '2026-10-31T11:48:08Z' } },
-      }),
-      board({ build: [card('T-0084', 'build'), card('T-0085', 'build')] }),
-      [],
-      NOW,
-    );
-    expect(alerts).toHaveLength(1);
-    expect(alerts[0]!.kind).toBe('breaker');
-    expect(alerts[0]!.title).toBe('Build stopped by the circuit breaker');
-    expect(alerts[0]!.text).toContain('3 red gates in a row');
-    expect(alerts[0]!.text).toContain('2 tickets wait (T-0084, T-0085)');
-    expect(alerts[0]!.action).toEqual({ kind: 'play-column', phase: 'build', label: 'Resume' });
-  });
-
-  it('an older runner without trips: a hold with a full red streak still reads as the breaker', () => {
-    const { tripped: _t, ...old } = chain({ columns: { build: 'held' }, redStreak: { build: 3 } });
-    const alerts = chainAlertsOf(old, board({}), [], NOW);
-    expect(alerts.map((a) => a.kind)).toEqual(['breaker']);
-  });
-
   it('a plain hold alerts only while tickets wait there without a run', () => {
     const held = chain({ columns: { build: 'held' } });
     expect(chainAlertsOf(held, board({}), [], NOW)).toEqual([]);
@@ -107,11 +79,10 @@ describe('chainAlertsOf', () => {
 });
 
 describe('newChainAlerts', () => {
-  it('announces a breaker trip and a quota pause once each, never a hold', () => {
+  it('announces a quota pause once, never a hold', () => {
     const alerts = chainAlertsOf(
       chain({
         columns: { build: 'held', plan: 'held' },
-        tripped: { build: { reason: '3 red gates in a row', at: '2026-10-31T11:48:08Z' } },
         quotaPausedUntil: { opencode: '2026-10-31T14:30:00Z' },
       }),
       board({ plan: [card('T-0006', 'plan')] }),
@@ -119,7 +90,7 @@ describe('newChainAlerts', () => {
       NOW,
     );
     const seen = new Set<string>();
-    expect(newChainAlerts(alerts, seen).map((a) => a.kind)).toEqual(['breaker', 'quota']);
+    expect(newChainAlerts(alerts, seen).map((a) => a.kind)).toEqual(['quota']);
     expect(newChainAlerts(alerts, seen)).toEqual([]);
   });
 });

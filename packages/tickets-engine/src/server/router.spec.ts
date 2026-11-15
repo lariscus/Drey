@@ -644,7 +644,7 @@ describe('route', () => {
 
     vi.mocked(remote.fleet).mockResolvedValue({
       runs: [],
-      chain: { configured: true, master: 'halted', autopilot: { state: 'paused' }, columns: {}, redStreak: {}, cooldownUntil: {} },
+      chain: { configured: true, master: 'halted', autopilot: { state: 'paused' }, columns: {} },
     });
     const read = await route(req({ path: '/api/fleet', authorization: auth }), deps);
     expect(read.status).toBe(200);

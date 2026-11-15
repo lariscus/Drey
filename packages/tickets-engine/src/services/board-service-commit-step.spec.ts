@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { promises as fsp, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { promises as fsp, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -10,12 +10,13 @@ import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools, type R
 import { assertDkVersion, MIN_DK_VERSION } from '../store/dk-process';
 import { EngineBoardService } from './board-service';
 import type { EngineHost, EngineVault, FleetPort } from './host';
+import { writeLifecycleStages } from './lifecycle-store.fake';
 
 /**
- * Accept on Ready to try (req-99a, build plan Q8): the commit step on the target
- * repository — since req-267 You's `commit` leaving action, a machine run — and
- * Done as its bookkeeping result, over a REAL `dk` and a scratch store with the
- * six stages (skipped, with the reason, when `dk` is missing), because dk's own rule
+ * Accept on You's last chain entry (req-99a, build plan Q8): the commit step on the
+ * target repository — since req-267 You's `commit` leaving action, a machine run — and
+ * Done as its bookkeeping result, over a REAL `dk` and a scratch store on the
+ * lifecycle stages (skipped, with the reason, when `dk` is missing), because dk's own rule
  * shapes this: an agent never releases into the terminal stage.
  */
 
@@ -85,7 +86,7 @@ if (!found.ok) {
   console.warn(`[commit step on a store] SKIPPED: ${found.reason}`);
 }
 
-describe.skipIf(!found.ok)('Accept on a store with the six stages (real dk)', { timeout: 240_000 }, () => {
+describe.skipIf(!found.ok)('Accept on a store on the lifecycle stages (real dk)', { timeout: 240_000 }, () => {
   let root = '';
   let storeDir = '';
   let vaultDir = '';
@@ -104,7 +105,7 @@ describe.skipIf(!found.ok)('Accept on a store with the six stages (real dk)', { 
     execFileSync(bin, args, { windowsHide: true, encoding: 'utf8', stdio: 'pipe', env: { ...process.env, ...(owner === undefined ? {} : { DK_OWNER: owner }) } });
   const stageOf = (id: string): string => /^stage: (.*)$/m.exec((JSON.parse(dk(['show', id, '--json'])) as { data: { content: string } }).data.content)?.[1]?.trim() ?? '';
 
-  /** The way a run works the ticket: an agent's claim (dk moves it into Building), then its stay-put release. */
+  /** The way a run works the ticket: an agent's claim (dk moves it into `running`), then its stay-put release. */
   function agentRun(id: string, runId: string): void {
     dk(['--json', 'claim', id, '--size', 'S', '--kind', 'agent'], `agent-${runId}@test`);
   }
@@ -131,18 +132,7 @@ describe.skipIf(!found.ok)('Accept on a store with the six stages (real dk)', { 
       envSet(k, v);
     }
     dk(['init', storeDir, 't']);
-    const git = (args: string[]): void => {
-      execFileSync('git', args, { cwd: storeDir, windowsHide: true, stdio: 'pipe' });
-    };
-    git(['config', 'core.autocrlf', 'false']);
-    git(['checkout', '-q', 'main']);
-    const tomlPath = path.join(storeDir, 'dricket.toml');
-    const toml = readFileSync(tomlPath, 'utf8')
-      .replace(/\[transitions\.agent\][\s\S]*?(?=\n\[|$)/, '')
-      .replace('values = ["critical", "high", "normal", "low"]', 'values = ["urgent", "high", "normal", "low"]');
-    writeFileSync(tomlPath, `${toml}\n[stages]\nvalues = ["inbox", "shaping", "prioritized", "building", "ready", "done"]\ninitial = "inbox"\nterminal = ["done"]\nclaim = ["building"]\ncancelled = "cancelled"\n`);
-    git(['commit', '-q', '-am', 'the six stages']);
-    git(['checkout', '-q', 'tickets']);
+    writeLifecycleStages(storeDir);
     envSet('DK_STORE', storeDir);
 
     vaultDir = path.join(root, 'meta');
@@ -179,11 +169,12 @@ describe.skipIf(!found.ok)('Accept on a store with the six stages (real dk)', { 
     rmSync(root, { recursive: true, force: true });
   });
 
+  /** An `active` ticket whose only chain entry is You: Accept there is the sign-off, You's `commit` runs. */
   async function readyTicket(title: string): Promise<{ id: string; dkId: string }> {
     const dkId = dk(['add', '--unclaimed', '-m', title]).trim();
     const text = (JSON.parse(dk(['show', dkId, '--json'])) as { data: { content: string; rev?: number } }).data.content;
     const file = path.join(root, `${dkId}.md`);
-    writeFileSync(file, `${text.replace(/^stage: .*$/m, 'stage: ready').replace(/^repos:.*$/m, 'repos: kt').replace(/\s*$/, '\n')}\n## Plan\n\n### Acceptance criteria\n\n- [ ] \`echo ok\`\n`);
+    writeFileSync(file, `${text.replace(/^stage: .*$/m, 'stage: active\nx-chain: you\nx-at: 1').replace(/^repos:.*$/m, 'repos: kt').replace(/\s*$/, '\n')}\n## Plan\n\n### Acceptance criteria\n\n- [ ] \`echo ok\`\n`);
     const rev = /^rev: (\d+)$/m.exec(text)?.[1] ?? '1';
     dk(['put', dkId, '-F', file, '--claim', '--if-version', rev]);
     return { id: `T-${dkId.slice(2).padStart(4, '0')}`, dkId };
@@ -192,10 +183,10 @@ describe.skipIf(!found.ok)('Accept on a store with the six stages (real dk)', { 
   it('dk itself forbids the short way: an agent may not release into Done', async () => {
     const { dkId } = await readyTicket('Rule check');
     agentRun(dkId, 'probe');
-    expect(stageOf(dkId)).toBe('building');
+    expect(stageOf(dkId)).toBe('running');
     expect(() => dk(['--json', 'release', '--stage', 'done', '-m', 'x', dkId], 'agent-probe@test')).toThrow(/may not release/);
-    dk(['--json', 'release', '--stage', 'ready', '-m', 'x', dkId], 'agent-probe@test');
-    expect(stageOf(dkId)).toBe('ready');
+    dk(['--json', 'release', '--stage', 'active', '-m', 'x', dkId], 'agent-probe@test');
+    expect(stageOf(dkId)).toBe('active');
   });
 
   it('a green commit step leaves the ticket for the bookkeeping move, which lands it in Done', async () => {
@@ -203,18 +194,18 @@ describe.skipIf(!found.ok)('Accept on a store with the six stages (real dk)', { 
     const accepted = await service.acceptTicket({ id });
     expect(accepted).toMatchObject({ ok: true });
     const request = started[started.length - 1]!;
-    expect(request).toMatchObject({ ticketId: id, nextPhase: null, machine: { action: 'commit', persona: 'you' } });
-    expect(request.dk).toMatchObject({ store: storeDir, retreatStage: 'building' });
+    expect(request).toMatchObject({ ticketId: id, machine: { action: 'commit', persona: 'you' } });
+    expect(request.dk).toMatchObject({ store: storeDir });
     const runId = (accepted as { runId?: string }).runId!;
 
     // Still running: nothing moves.
     runs = [runInfo(runId, id, 'running')];
     await service.settleCommitSteps();
-    expect(stageOf(dkId)).toBe('ready');
+    expect(stageOf(dkId)).toBe('active');
 
     // The run claims, works and hands back as the runner does when it moved nothing.
     agentRun(dkId, 'green');
-    dk(['--json', 'release', '--stage', 'ready', '-m', 'merged', dkId], 'agent-green@test');
+    dk(['--json', 'release', '--stage', 'active', '-m', 'merged', dkId], 'agent-green@test');
     runs = [runInfo(runId, id, 'done', { gateResult: 'green' })];
     await service.settleCommitSteps();
     expect(stageOf(dkId)).toBe('done');
@@ -229,29 +220,29 @@ describe.skipIf(!found.ok)('Accept on a store with the six stages (real dk)', { 
     const { id, dkId } = await readyTicket('Late release');
     const accepted = (await service.acceptTicket({ id })) as { runId?: string };
     const runId = accepted.runId!;
-    // The runner's record says done + green, but its claim is not released yet: the ticket is still in Building.
+    // The runner's record says done + green, but its claim is not released yet: the ticket is still in `running`.
     agentRun(dkId, 'late');
     runs = [runInfo(runId, id, 'done', { gateResult: 'green' })];
     await service.settleCommitSteps();
-    expect(stageOf(dkId)).toBe('building');
+    expect(stageOf(dkId)).toBe('running');
     // The release a moment later: the next settle books the move.
-    dk(['--json', 'release', '--stage', 'ready', '-m', 'merged', dkId], 'agent-late@test');
+    dk(['--json', 'release', '--stage', 'active', '-m', 'merged', dkId], 'agent-late@test');
     await service.settleCommitSteps();
     expect(stageOf(dkId)).toBe('done');
   });
 
-  it('a blocked or failed commit step leaves the ticket on Ready to try', async () => {
+  it('a blocked or failed commit step leaves the ticket where Accept found it', async () => {
     const blocked = await readyTicket('Blocked');
     const a = (await service.acceptTicket({ id: blocked.id })) as { runId?: string };
     runs = [runInfo(a.runId!, blocked.id, 'done', { blocked: 'the policy merge awaits the owner' })];
     await service.settleCommitSteps();
-    expect(stageOf(blocked.dkId)).toBe('ready');
+    expect(stageOf(blocked.dkId)).toBe('active');
 
     const failed = await readyTicket('Failed');
     const b = (await service.acceptTicket({ id: failed.id })) as { runId?: string };
     runs = [runInfo(b.runId!, failed.id, 'failed')];
     await service.settleCommitSteps();
-    expect(stageOf(failed.dkId)).toBe('ready');
+    expect(stageOf(failed.dkId)).toBe('active');
   });
 
   it('reading the board settles a finished step', async () => {
