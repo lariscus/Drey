@@ -1,5 +1,5 @@
 import { newTicketFileText } from '../../core/ticket-files';
-import type { PutOptions, TicketDetail } from '../../ports/ticket-store';
+import type { TicketDetail } from '../../ports/ticket-store';
 import { detailFromContent } from '../../store/dricket-ticket-store';
 import { toDricketId } from '../../store/ids';
 import type { ChainStoreIo } from '../store-chain-board';
@@ -23,13 +23,6 @@ export interface SeedOptions {
   readonly chain?: readonly string[];
   /** Further `x-` keys (`{ size: 'S' }` → `x-size: S`). */
   readonly extensions?: Readonly<Record<string, string>>;
-}
-
-/** One `put` the chain made. */
-export interface IoWrite {
-  readonly id: string;
-  readonly text: string;
-  readonly options: PutOptions;
 }
 
 /** One `dk comment` the chain made. */
@@ -97,14 +90,11 @@ export function ticketDocument(id: string, stage: string, rev: number, options: 
 
 /**
  * The chain's store door for the specs (E14-5b, req-176): dricket documents
- * in memory, built from Drey's legacy ticket template. A `write` answers like
- * `dk put --if-version` (a stale rev is "changed in the meantime"), every
- * `put` and comment is recorded. What `dk` itself validates is
- * `chain-store-dk.spec.ts`'s business.
+ * in memory, built from Drey's legacy ticket template; every comment is recorded.
+ * What `dk` itself validates is `chain-store-dk.spec.ts`'s business.
  */
 export class FakeChainIo implements ChainStoreIo {
   readonly docs = new Map<string, string>();
-  readonly writes: IoWrite[] = [];
   readonly comments: IoComment[] = [];
 
   /** Seeds (or replaces) a ticket in `stage`. */
@@ -128,10 +118,6 @@ export class FakeChainIo implements ChainStoreIo {
     return this.docOf(id);
   }
 
-  writesTo(id: string): readonly IoWrite[] {
-    return this.writes.filter((w) => w.id === id);
-  }
-
   commentsOn(id: string): readonly IoComment[] {
     return this.comments.filter((c) => c.id === id);
   }
@@ -143,17 +129,6 @@ export class FakeChainIo implements ChainStoreIo {
   show(id: string): Promise<TicketDetail> {
     const text = this.docs.get(id);
     return text === undefined ? Promise.reject(new Error(`no ${id}`)) : Promise.resolve(detailFromContent(text));
-  }
-
-  write(id: string, text: string, options: PutOptions): ReturnType<ChainStoreIo['write']> {
-    const current = detailFromContent(this.docOf(id));
-    if (options.expectedRev !== undefined && options.expectedRev !== current.rev) {
-      return Promise.resolve({ ok: false, conflict: { current } });
-    }
-    this.writes.push({ id, text, options });
-    const rev = (current.rev ?? 0) + 1;
-    this.docs.set(id, text.replace(/^rev: .*$/m, `rev: ${rev}`));
-    return Promise.resolve({ ok: true, result: { id, rev, commit: null, changedFields: ['stage'] } });
   }
 
   comment(id: string, text: string, options: { readonly actor: string }): Promise<void> {

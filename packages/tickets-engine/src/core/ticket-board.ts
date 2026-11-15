@@ -26,7 +26,6 @@ import {
   type TicketPriority,
   type TicketUsage,
 } from '../contracts/tickets';
-import { checkpointPhaseIds } from '../fleet/chain';
 import { withTerminalTickets } from './done-listing';
 import { READY_STATE } from './pipeline-states';
 import { runDependencyPass } from './blocked';
@@ -689,7 +688,7 @@ export function assembleBoard(input: AssembleInput): BoardSnapshot {
     ...(projectsParse.projects.length > 0 ? { projects: projectsParse.projects } : {}),
     columns,
     issues,
-    checkpoints: [...checkpointPhaseIds(columns)],
+    checkpoints: [], // the persona board has no owner checkpoint column (req-307); the field stays on the contract
     // With a Ready to try stage, Done asks nothing and no other group lists it: without this a ticket
     // accepted there vanishes (D-13). Without that stage its terminal column is a Needs-you row.
     recentDone: phaseIds.has(READY_STATE)

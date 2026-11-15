@@ -33,20 +33,13 @@ function copyValid<T>(source: Readonly<Record<string, unknown>> | undefined, tar
   }
 }
 
-/** Every map of a parsed file, each entry checked; a trip holds only for a column that still holds. */
+/** Every map of a parsed file, each entry checked; a persona's trip holds only while the persona is paused. */
 function restoreMaps(state: ChainState, parsed: ChainFile): void {
   copyValid(parsed.columns, state.columns, isMode);
-  copyValid(parsed.redStreak, state.redStreak, isCount);
-  copyValid(parsed.tokensUsed, state.tokensUsed, isCount);
-  copyValid(parsed.tokensDay, state.tokensDay, isText);
-  copyValid(parsed.cooldownUntil, state.cooldownUntil, isStamp);
-  copyValid(parsed.ciBackoff, state.ciBackoff, isStamp);
   copyValid(parsed.ticketFailures, state.ticketFailures, isFailure, (f) => ({ count: f.count, until: f.until }));
   copyValid(parsed.ownerHold, state.ownerHold, isHold, (h) => ({ phase: h.phase, at: h.at }));
   copyValid(parsed.ledgerCards, state.ledgerCards, isKeys, (keys) => [...keys]);
   copyValid(parsed.holds, state.holds, isHoldMark, (h) => ({ persona: h.persona, position: h.position, length: h.length }));
-  const held = Object.fromEntries(Object.entries(parsed.tripped ?? {}).filter(([phase]) => state.columns[phase] === 'held'));
-  copyValid(held, state.tripped, isTrip, (t) => ({ reason: t.reason, at: t.at }));
   for (const persona of (parsed.pausedPersonas ?? []).filter((p) => typeof p === 'string' && p.trim() !== '')) {
     state.pausedPersonas.add(persona.trim());
   }

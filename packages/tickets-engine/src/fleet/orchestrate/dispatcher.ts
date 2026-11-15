@@ -1,16 +1,14 @@
-import type { BoardColumn, BoardSnapshot, PipelinePhase } from '../../contracts/tickets';
-import { planDispatch, type PlannedDispatch as PlanItem } from '../chain';
-import { chainWorkingPhase } from '../holder-plan';
+import type { BoardColumn, BoardSnapshot } from '../../contracts/tickets';
+import { chainWorkingPhase, type PlannedHolderDispatch as PlanItem } from '../holder-plan';
 import type { Clock } from '../ports/clock';
-import { normalizeFleetPools, type ChainConfig, type ClassRequest, type ColumnMode, type PoolWaitDecision, type WorkerProviderId } from '../protocol';
+import { normalizeFleetPools, type ChainConfig, type ClassRequest, type PoolWaitDecision, type WorkerProviderId } from '../protocol';
 import { BLOCKING_RUN_STATES, LIVE_RUN_STATES } from '../run/run-state';
-import type { BoardPersonas, TicketPersona } from './board-personas';
+import type { TicketPersona } from './board-personas';
 import type { ChainBoard } from './chain-board';
 import type { ChainState } from './chain-state';
 import { ClassRequestBuilder } from './class-request-builder';
 import type { DispatchPool } from './dispatch-pool';
 import type { HolderPass, HolderPassView } from './holder-pass';
-import type { HumanGates } from './human-gates';
 import type { LedgerCards } from './ledger-cards';
 import { messageOf } from './live-run';
 import { PassPools } from './pass-pools';
@@ -19,7 +17,6 @@ import { reportQueue } from './queue-report';
 import type { StartHold } from './start-hold';
 import type { SupervisorDirectory } from './supervisor-directory';
 import type { DispatchOutcome, PoolGrantFor, TicketDispatch } from './ticket-dispatch';
-import type { WaitContext } from './wait-lines';
 import type { WaitNotes } from './wait-notes';
 
 export interface DispatcherDeps {
@@ -27,8 +24,6 @@ export interface DispatcherDeps {
   readonly board: ChainBoard;
   readonly directory: SupervisorDirectory;
   readonly pools: PoolCapacity;
-  readonly personas: BoardPersonas;
-  readonly humanGates: HumanGates;
   readonly dispatch: TicketDispatch;
   readonly notes: WaitNotes;
   readonly clock: Clock;
@@ -44,8 +39,8 @@ export interface DispatcherDeps {
   readonly tranches?: TrancheGate;
   /** req-181: the burn rate's hold over every new start; absent = nothing holds. */
   readonly hold?: StartHold;
-  /** req-257: the chain's pass on a lifecycle store (dispatch by holder); absent = every board dispatches by column. */
-  readonly holders?: HolderPass;
+  /** req-257: the chain's pass — the dispatch by holder. */
+  readonly holders: HolderPass;
 }
 
 /** The tranche as the dispatch sees it (req-179): may a start go, count one, raise a checkpoint the clock reached. */
@@ -78,10 +73,10 @@ interface Asked {
 }
 
 /**
- * One dispatch round (M85, ADR-0077): read the board, count the pools,
- * resolve the personas, park the human's gates, plan with the pure rules of
- * `chain.ts`, ask the capacity pool for each persona's class (req-170),
- * start what it grants, and say why the rest waits.
+ * One dispatch round (M85, ADR-0077, req-257): read the board, count the
+ * pools, resolve the holders, plan with the pure rules of `holder-plan.ts`,
+ * ask the capacity pool for each persona's class (req-170), start what it
+ * grants, and say why the rest waits.
  */
 export class Dispatcher {
   private passing = false;
@@ -110,65 +105,25 @@ export class Dispatcher {
     }
   }
 
-  /** What every pass counts first: the occupancy, the holds, the column modes, the probes, a due tranche checkpoint. */
-  private async prepare(config: ChainConfig, snap: BoardSnapshot): Promise<{ readonly occupied: Occupancy; readonly modes: Record<string, ColumnMode> }> {
+  /** What every pass counts first: the occupancy, the holds, the probes, a due tranche checkpoint. */
+  private async prepare(config: ChainConfig, snap: BoardSnapshot): Promise<Occupancy> {
     const occupied = this.occupancy();
     this.holdFailingAndStopped(snap.columns, occupied.busy);
-    const modes = this.modesWithBudget(snap.pipeline);
     await this.deps.pools.refreshProbes(config.pools ?? normalizeFleetPools(undefined));
     if (this.deps.tranches?.review() === true) {
       await this.deps.persist(); // req-179: the time span ran out — the checkpoint pauses the Autopilot before planning
     }
-    return { occupied, modes };
-  }
-
-  private async run(config: ChainConfig, snap: BoardSnapshot): Promise<void> {
-    const { state } = this.deps;
-    const { occupied, modes } = await this.prepare(config, snap);
-    if (config.store?.lifecycle === true && this.deps.holders !== undefined) {
-      return this.runHolders(config, snap, occupied);
-    }
-    const running = state.master === 'run';
-    const personas = running ? await this.deps.personas.resolve(config, snap) : new Map<string, TicketPersona>();
-    const paused = [...personas].filter(([, entry]) => entry.resolution.persona !== null && state.pausedPersonas.has(entry.resolution.persona));
-    paused.forEach(([cardId]) => occupied.busy.add(cardId)); // U4: a paused persona's ticket is busy for this pass
-    if (running) {
-      await this.deps.humanGates.park(config, { snap, resolved: personas, busy: occupied.busy, modes });
-    }
-    const pools = new PassPools(config, snap, personas, this.deps.pool !== undefined);
-    const plan = planDispatch({
-      master: state.master,
-      columns: snap.columns,
-      modes,
-      poolSize: this.deps.pools.sizes(config, this.sessionsOf()),
-      liveByPool: occupied.liveByPool,
-      poolOf: pools.poolOf,
-      busyTickets: occupied.busy,
-      cooldownUntil: state.cooldownUntil,
-      nowMs: this.deps.clock.now().getTime(),
-      priorities: snap.priorities, // the dispatch classes split at the vault's own vocabulary
-    });
-    state.phases = snap.pipeline;
-    await this.deps.pipelineRead();
-    this.deps.notes.beginPass();
-    for (const [cardId, entry] of paused) {
-      this.deps.notes.skip(cardId, `dispatch holds ${cardId}: persona "${entry.resolution.persona}" is paused — play the persona again to release its tickets`);
-    }
-    const held = running && (this.deps.hold?.current() ?? null) !== null; // req-181: asked once per pass, before any start
-    const refusedByColumn = await this.dispatchPlan(config, snap, { plan, personas, pools, held });
-    this.noteWaits(snap, pools, { busy: occupied.busy, dispatched: new Set(plan.map((item) => item.card.id)), refusedByColumn });
-    reportQueue(state, this.deps, { order: [], waits: new Map() }); // req-148: the pool's queue
-    this.deps.notes.endPass();
+    return occupied;
   }
 
   /**
-   * req-257: the pass on a lifecycle store — the holders instead of the columns: the chain's plan
-   * (position order, the persona's pool, its min overrun), the same starts through the pool and the
-   * tranche, and the holders' wait lines. No human gate parks here: a You entry is the owner's in Needs you.
+   * req-257: the pass — the holders: the chain's plan (position order, the persona's pool, its min
+   * overrun), the starts through the pool and the tranche, and the holders' wait lines. No human gate
+   * parks here: a You entry is the owner's in Needs you.
    */
-  private async runHolders(config: ChainConfig, snap: BoardSnapshot, occupied: Occupancy): Promise<void> {
-    const { state } = this.deps;
-    const holders = this.deps.holders!;
+  private async run(config: ChainConfig, snap: BoardSnapshot): Promise<void> {
+    const { state, holders } = this.deps;
+    const occupied = await this.prepare(config, snap);
     const running = state.master === 'run';
     const view: HolderPassView = running ? await holders.resolve(config, snap) : { held: new Map(), entries: new Map() };
     await holders.recordHolds(config, snap, running ? view : null); // req-274: the cursor's moves as `hold` lines
@@ -201,17 +156,12 @@ export class Dispatcher {
   }
 
   /** Starts what the plan holds, in its order; a persona's class request waits when the pool has no room (no process). */
-  private async dispatchPlan(config: ChainConfig, snap: BoardSnapshot, pass: Pass): Promise<Map<string, string>> {
-    const refusedByColumn = new Map<string, string>();
+  private async dispatchPlan(config: ChainConfig, snap: BoardSnapshot, pass: Pass): Promise<void> {
     this.deps.pool?.queue.begin();
     for (const item of pass.plan) {
-      const outcome = await this.dispatchOne(config, snap, item, pass);
-      if (outcome === 'refused' && !refusedByColumn.has(item.workingPhase)) {
-        refusedByColumn.set(item.workingPhase, item.card.id);
-      }
+      await this.dispatchOne(config, snap, item, pass);
     }
     this.deps.pool?.queue.end();
-    return refusedByColumn;
   }
 
   /** One plan item through the burn rate's hold (req-181) and the tranche's release gate (req-179); a start counts against the tranche. */
@@ -236,8 +186,7 @@ export class Dispatcher {
     const persona = pass.personas.get(item.card.id) ?? null;
     const asked = pass.pools.asksPool(item.card) ? this.ask(snap, item, persona) : null;
     // req-257: a persona below its `min:` starts even when the pool has no room — an overrun on purpose.
-    const overrun = (item as { readonly overrun?: boolean }).overrun === true;
-    if (asked !== null && asked.wait !== null && !overrun) {
+    if (asked !== null && asked.wait !== null && !item.overrun) {
       await this.queued(config, item, asked.request, asked.wait);
       return 'queued';
     }
@@ -250,22 +199,14 @@ export class Dispatcher {
 
   /** The class request of a persona's dispatch and the pool's answer; null when it cannot be built. */
   private ask(snap: BoardSnapshot, item: PlanItem, entry: TicketPersona | null): Asked | null {
-    const phase = this.workingPhaseOf(snap, item.workingPhase);
+    const phase = chainWorkingPhase(snap.pipeline, item.workingPhase);
     const persona = entry?.persona ?? null;
-    if (this.classes === null || this.deps.pool === undefined || phase === null || persona === null) {
+    if (this.classes === null || this.deps.pool === undefined || persona === null) {
       return null;
     }
     const request = this.classes.build({ card: item.card, phase, persona, prefer: this.lastSlotOf(item.card.id) });
     const decision = this.deps.pool.classes.choose(request);
     return decision.kind === 'grant' ? { request, grant: { request, decision }, wait: null } : { request, grant: null, wait: decision };
-  }
-
-  /** The working column's phase: the pipeline's; on a chain board a plain agent column where the pipeline has none (req-257). */
-  private workingPhaseOf(snap: BoardSnapshot, id: string): PipelinePhase | null {
-    if (this.deps.state.config?.store?.lifecycle === true) {
-      return chainWorkingPhase(snap.pipeline, id);
-    }
-    return snap.pipeline.find((p) => p.id === id) ?? null;
   }
 
   /** req-178: the slot of the ticket's latest run — the start's gate prefers it too, so a resumable session stays on its account. */
@@ -303,16 +244,6 @@ export class Dispatcher {
     return { liveByPool, busy };
   }
 
-  private noteWaits(snap: BoardSnapshot, pools: PassPools, pass: Pick<WaitContext, 'busy' | 'dispatched' | 'refusedByColumn'>): void {
-    if (this.deps.state.master !== 'run') {
-      this.deps.pool?.queue.clear();
-      return; // the chain is off — silence is the honest state
-    }
-    const detached = new Set(this.deps.directory.all().filter((r) => r.info.state === 'detached').map((r) => r.info.ticketId));
-    const ownerHeld = new Set(Object.keys(this.deps.state.ownerHold));
-    this.deps.notes.waits(snap, (phaseId) => this.deps.state.modeOf(phaseId), { ...pass, detached, ownerHeld, poolOf: pools.poolOf });
-  }
-
   /** Tickets backing off after failed runs, and those whose run the owner stopped (released once moved or restarted). */
   private holdFailingAndStopped(columns: readonly BoardColumn[], busy: Set<string>): void {
     const { state } = this.deps;
@@ -336,22 +267,5 @@ export class Dispatcher {
     if (released) {
       void this.deps.persist();
     }
-  }
-
-  /** A spent daily token budget reads as held at dispatch — it used to be checked only after a red gate. */
-  private modesWithBudget(pipeline: readonly PipelinePhase[]): Record<string, ColumnMode> {
-    const { state } = this.deps;
-    const modes: Record<string, ColumnMode> = { ...state.columns };
-    const day = this.deps.clock.now().toISOString().slice(0, 10);
-    for (const phase of pipeline) {
-      const budget = phase.tokenBudget ?? 0;
-      if (budget > 0 && state.tokensDay[phase.id] === day && (state.tokensUsed[phase.id] ?? 0) > budget) {
-        if (state.modeOf(phase.id) === 'playing') {
-          this.deps.notes.budget(`${phase.id} holds: the daily token budget is spent (${state.tokensUsed[phase.id]} of ${budget})`);
-        }
-        modes[phase.id] = 'held';
-      }
-    }
-    return modes;
   }
 }

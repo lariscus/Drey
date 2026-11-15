@@ -1,4 +1,4 @@
-import type { BoardSnapshot, PipelinePhase, TicketCard } from '../../contracts/tickets';
+import type { BoardSnapshot, TicketCard } from '../../contracts/tickets';
 import type { ChainConfig, ChainStoreConfig } from '../protocol';
 import type { StoreChainBoard } from '../store-chain-board';
 import { messageOf } from './live-run';
@@ -7,7 +7,7 @@ export interface ChainBoardDeps {
   /** The store door of a chain config (production: the checkout's files + `dk`). */
   readonly doorFor: (store: ChainStoreConfig) => StoreChainBoard;
   /** Gives up the claims no live run holds, once per runner life and store, before its first dispatch. */
-  readonly releaseLeftovers?: (store: ChainStoreConfig, pipeline: readonly PipelinePhase[]) => Promise<void>;
+  readonly releaseLeftovers?: (store: ChainStoreConfig) => Promise<void>;
   readonly log: (message: string) => void;
 }
 
@@ -44,7 +44,7 @@ export class ChainBoard {
     if (door === null) {
       if (!this.noStoreSaid) {
         this.noStoreSaid = true;
-        this.deps.log('the chain runs on a dricket store only (req-176) — this board has no store (tickets.backend), so nothing is dispatched');
+        this.deps.log('the chain runs on a dricket store only (req-176) — this board has no store (tickets.dk.store), so nothing is dispatched');
       }
       return null;
     }
@@ -59,14 +59,8 @@ export class ChainBoard {
       return snap;
     }
     this.leftoverKey = key;
-    await this.deps.releaseLeftovers(config.store, snap.pipeline).catch((error) => this.deps.log(`releasing leftover claims failed: ${messageOf(error)}`));
+    await this.deps.releaseLeftovers(config.store).catch((error) => this.deps.log(`releasing leftover claims failed: ${messageOf(error)}`));
     return (await this.read(config)) ?? snap;
-  }
-
-  /** True when the ticket is no longer where the snapshot saw it. */
-  async moved(config: ChainConfig, card: TicketCard): Promise<boolean> {
-    const door = this.door(config);
-    return door === null ? true : door.moved(card);
   }
 
   /** The card's text in the shape the composer reads; null when the store cannot give it. */

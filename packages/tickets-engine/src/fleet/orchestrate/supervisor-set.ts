@@ -80,8 +80,8 @@ export class SupervisorSet {
   }
 
   /** E14-5b: one pass over all supervisors — a live run of another provider's supervisor is no leftover. */
-  releaseLeftoverClaims(target: RunDkTarget, retreat: Readonly<Record<string, string | null>>): Promise<LeftoverClaimsReport> {
+  releaseLeftoverClaims(target: RunDkTarget): Promise<LeftoverClaimsReport> {
     const live = new Set(this.all().flatMap((s) => [...s.liveTickets()]));
-    return this.forProvider('opencode').releaseLeftoverClaims(target, retreat, live);
+    return this.forProvider('opencode').releaseLeftoverClaims(target, live);
   }
 }

@@ -28,7 +28,7 @@ import { resolveProofMode } from '../core/proof-mode';
 import { parseVerificationSection, renderVerificationSection, upsertVerificationSection } from '../core/verification';
 import { acceptanceCommands, withLogLine } from '../core/ticket-files';
 import { TicketsGit } from '../core/tickets-git';
-import { nextPhaseIdOf } from '../fleet/chain';
+import { columnAfter } from '../core/board-columns';
 import { worktreePathFor } from '../fleet/worktree-home';
 import type { EngineBoardService, LedgerEvents } from './board-service';
 import type { EngineHost, EngineVault } from './host';
@@ -257,7 +257,7 @@ export class VerifyService {
     this.deps.host.announceChanges(vaultId, [card.path, ...shotPaths]);
     this.setStatus(id, 'done', report, null);
 
-    const next = nextPhaseIdOf(snap.columns, card.phase);
+    const next = columnAfter(snap.columns, card.phase);
     if (next !== null) {
       const moved = await this.deps.board.transition({ id, from: card.phase, to: next, actor: this.deps.actor });
       if (!moved.ok) {

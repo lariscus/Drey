@@ -54,12 +54,6 @@ export interface ChainStoreConfig {
   readonly dkCheckout: string;
   /** Commit trailers + `dk validate --trailers` in the gate (`tickets.dk.trailers`). */
   readonly trailers: boolean;
-  /**
-   * req-265: the store is on the lifecycle stages (`inbox prioritized active running done`, claim
-   * `running`): a column is `active` + the pin `x-phase`, a run ends with one release into `active`.
-   * Absent or false = a store still on phase stages (stage = column id).
-   */
-  readonly lifecycle?: boolean;
 }
 
 export interface ChainConfig {
@@ -109,8 +103,6 @@ export function normalizeChainStore(value: unknown): ChainStoreConfig | null {
     dkDataDir: text('dkDataDir', 'dataDir'),
     dkCheckout: text('dkCheckout', 'checkout'),
     trailers: v['trailers'] === true,
-    // req-78 found it: dropped here, a lifecycle store reached the runner as a phase-stage store and nothing dispatched by holder.
-    ...(v['lifecycle'] === true ? { lifecycle: true } : {}),
   };
 }
 
@@ -123,17 +115,6 @@ export interface ChainStatus {
   readonly autopilot?: AutopilotRecord;
   /** Per working column mode; a phase absent here is `playing`. */
   readonly columns: Readonly<Record<string, ColumnMode>>;
-  /** Consecutive red gates per column (the circuit breaker's counter). */
-  readonly redStreak: Readonly<Record<string, number>>;
-  /** Columns in cooldown — the ISO instant dispatching resumes after a red gate. */
-  readonly cooldownUntil: Readonly<Record<string, string>>;
-  /**
-   * Columns the circuit breaker holds: why and since when. Cleared when
-   * the owner plays the column again. Absent on runners before the
-   * chain alerts fix — the board then reads a hold with a full red
-   * streak as a trip.
-   */
-  readonly tripped?: Readonly<Record<string, ChainTrip>>;
   /** Per provider: its quota is spent, no new run before this ISO instant (absent on older runners). */
   readonly quotaPausedUntil?: Readonly<Record<string, string>>;
   /**

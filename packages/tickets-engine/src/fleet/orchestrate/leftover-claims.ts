@@ -13,10 +13,8 @@ export interface LeftoverClaimsReport {
  * Gives up the claims no live run of this runner holds (E14-5b (4)): a
  * runner killed with a run in flight leaves its `agent-<run>@<host>` claim
  * on the ticket until the lease ends. Every ticket owned by an agent
- * identity of THIS host that no live run holds is released as that owner:
- * on a lifecycle store into `active` (req-265, one release), on a store still
- * on phase stages where it sat when dk takes that, else one stage back.
- * Never touches another host's claims or a human's.
+ * identity of THIS host that no live run holds is released as that owner,
+ * into `active` (req-265, one release). Never touches another host's claims or a human's.
  */
 export class LeftoverClaims {
   constructor(
@@ -24,7 +22,7 @@ export class LeftoverClaims {
     private readonly log: (message: string) => void,
   ) {}
 
-  async release(target: RunDkTarget, retreatByStage: Readonly<Record<string, string | null>>, live: ReadonlySet<string>): Promise<LeftoverClaimsReport> {
+  async release(target: RunDkTarget, live: ReadonlySet<string>): Promise<LeftoverClaimsReport> {
     const store = this.storeFor(target);
     const released: string[] = [];
     const skipped: { id: string; reason: string }[] = [];
@@ -36,8 +34,7 @@ export class LeftoverClaims {
       }
       const lease = new RunLease({ store, ticketId: record.id, actor: owner, runId: 'leftover', size: 'S', log: this.log, onLost: () => undefined });
       lease.preStage = record.stage;
-      const stages = target.lifecycle === true ? stayPutStagesOf(record.stage) : [record.stage, retreatByStage[record.stage] ?? null];
-      const result = await lease.release(stages, 'the claim of a run that no longer exists, released');
+      const result = await lease.release(stayPutStagesOf(record.stage), 'the claim of a run that no longer exists, released');
       if (result.ok) {
         released.push(record.id);
         this.log(`released the leftover claim of ${owner} on ${record.id} (now in ${result.stage})`);

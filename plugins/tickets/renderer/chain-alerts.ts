@@ -1,20 +1,17 @@
 /**
  * The chain's alerts (fix, owner request 2026-10-31): what stops the
  * fleet from working the board, as rows the Work panel puts on top —
- * a tripped circuit breaker, a held machine column with tickets in it,
- * a halted chain with work waiting, a provider out of quota. The
- * kanban drew the column brakes; the Work panel (ADR-0087) dropped
- * them, so a breaker trip went unseen. Pure — the panel and the
- * notifications share it, the spec pins it.
+ * a held machine column with tickets in it, a halted chain with work
+ * waiting, a provider out of quota. (The circuit breaker is the
+ * persona's since req-257, req-307: a tripped persona shows on its own
+ * card, not as a column alert.) Pure — the panel and the notifications
+ * share it, the spec pins it.
  */
 import type { ChainStatus, RunInfo, RunState } from '../../../packages/tickets-engine/src/fleet/protocol';
 import type { BoardSnapshot } from '../shared/tickets';
 import { isMachinePhase } from './work-groups';
 
 const LIVE: ReadonlySet<RunState> = new Set(['starting', 'running', 'stopping', 'detached']);
-
-/** The breaker's threshold when a phase names none (the runner's DEFAULT_MAX_RED). */
-const DEFAULT_MAX_RED = 3;
 
 export type ChainAlertKind = 'breaker' | 'held' | 'halted' | 'quota';
 
@@ -76,20 +73,7 @@ export function chainAlertsOf(
     }
     const waiting = waitingIn(id);
     const play = { kind: 'play-column' as const, phase: id, label: 'Resume' };
-    const trip = chain.tripped?.[id] ?? null;
-    // A runner before the fix reports no trips: a hold with a full red streak is one.
-    const maxRed = column.phase.maxRed ?? DEFAULT_MAX_RED;
-    const tripped = trip !== null || (chain.tripped === undefined && (chain.redStreak[id] ?? 0) >= maxRed);
-    if (tripped) {
-      const reason = trip?.reason ?? `${chain.redStreak[id] ?? maxRed} red gates in a row`;
-      alerts.push({
-        kind: 'breaker',
-        key: `breaker:${id}:${trip?.at ?? ''}`,
-        title: `${column.phase.title} stopped by the circuit breaker`,
-        text: `${reason}${trip === null ? '' : ` at ${clock(trip.at)}`} — ${waitingLine(waiting)}. Resume once the cause is fixed.`,
-        action: play,
-      });
-    } else if (waiting.length > 0) {
+    if (waiting.length > 0) {
       alerts.push({
         kind: 'held',
         key: `held:${id}`,

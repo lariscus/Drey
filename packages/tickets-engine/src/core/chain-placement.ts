@@ -23,8 +23,7 @@
  * position ({@link cursorForPin}).
  */
 import type { ChainEntry } from '../contracts/chain';
-import type { PipelinePhase } from '../contracts/tickets';
-import { checkpointPhaseIds, isAutoPhase } from '../fleet/chain';
+import { parseHandover, type PipelinePhase } from '../contracts/tickets';
 import { holderOf, type HolderInput, type PersonaLookup, type TicketHolder } from './chain-holder';
 import { EDGE_STAGES } from './lifecycle-stages';
 
@@ -44,10 +43,29 @@ export interface PlacementColumns {
   readonly agents: readonly { readonly id: string; readonly persona: string | null }[];
 }
 
+/**
+ * True when the column's handover hands tickets to an agent pool. Left for the board migration's
+ * column -> cursor rule (`cursorForPin`, req-307 step 5): on a lifecycle-only pipeline no column is one.
+ */
+function isAutoPhase(phase: PipelinePhase): boolean {
+  return parseHandover(phase.handover).mode === 'agent';
+}
+
+/** The owner's checkpoint columns: manual columns whose predecessor is automatic, or a checkpoint (see {@link isAutoPhase}). */
+function checkpointPhaseIds(pipeline: readonly PipelinePhase[]): ReadonlySet<string> {
+  const checkpoints = new Set<string>();
+  for (let i = 1; i < pipeline.length; i++) {
+    const phase = pipeline[i]!;
+    if (!isAutoPhase(phase) && (isAutoPhase(pipeline[i - 1]!) || checkpoints.has(pipeline[i - 1]!.id))) {
+      checkpoints.add(phase.id);
+    }
+  }
+  return checkpoints;
+}
+
 /** The placement columns of a pipeline. */
 export function placementColumnsOf(pipeline: readonly PipelinePhase[]): PlacementColumns {
-  const columns = pipeline.map((phase) => ({ phase, tickets: [], unknown: false }));
-  const checkpoints = checkpointPhaseIds(columns);
+  const checkpoints = checkpointPhaseIds(pipeline);
   const terminal = pipeline.length > 0 ? pipeline[pipeline.length - 1]!.id : null;
   const firstCheckpoint = pipeline.find((p) => checkpoints.has(p.id) && p.id !== terminal)?.id ?? null;
   const beforeTerminal = pipeline.length >= 2 ? pipeline[pipeline.length - 2]!.id : null;

@@ -24,6 +24,15 @@ export interface CrewPrompts {
 
 const CREW_FILES: readonly (keyof CrewPrompts)[] = ['mission', 'shape', 'aggregator'];
 
+/**
+ * The interview-first protocol of a dialog run (the owner plans or refines a ticket in a conversation):
+ * `crew/dialog.md`, which follows the persona's prompt (req-307: no vault copy, no version drift).
+ */
+export async function loadDialogPrompt(dir: string = SHIPPED_PROMPTS_DIR): Promise<string> {
+  const fragments = await loadPromptFragments(dir);
+  return expandFragments(await readPromptFile(dir, path.join('crew', 'dialog.md'), 'crew prompt'), fragments);
+}
+
 /** Every crew prompt, from the shipped prompts dir by default, its fragments expanded. */
 export async function loadCrewPrompts(dir: string = SHIPPED_PROMPTS_DIR): Promise<CrewPrompts> {
   const prompts: Record<keyof CrewPrompts, string> = { mission: '', shape: '', aggregator: '' };

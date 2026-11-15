@@ -74,20 +74,14 @@ export class ChainRoutes implements RouteGroup {
 
   /** E14-5b (4): the owner's "release leftover claims" — agent claims of this host with no live run. */
   private async releaseLeftovers(ctx: RouteContext): Promise<boolean> {
-    const body = (await ctx.body()) as { dk?: unknown; retreat?: unknown };
+    const body = (await ctx.body()) as { dk?: unknown };
     const store = normalizeChainStore(body.dk);
     if (store === null) {
       ctx.respond(422, { ok: false, error: 'release-leftovers needs the dricket store (dk)' });
       return true;
     }
-    const retreat: Record<string, string | null> = {};
-    if (body.retreat !== null && typeof body.retreat === 'object') {
-      for (const [stage, before] of Object.entries(body.retreat as Record<string, unknown>)) {
-        retreat[stage] = typeof before === 'string' ? before : null;
-      }
-    }
     try {
-      ctx.respond(200, { ok: true, ...(await this.supervisors.releaseLeftoverClaims(dkTargetFor(store, [], ''), retreat)) });
+      ctx.respond(200, { ok: true, ...(await this.supervisors.releaseLeftoverClaims(dkTargetFor(store, []))) });
     } catch (error) {
       ctx.respond(200, { ok: false, error: error instanceof Error ? error.message : String(error) });
     }

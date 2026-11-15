@@ -1,10 +1,8 @@
-import type { TicketCard } from '../../contracts/tickets';
 import { renderStatusComment, slugStatusKey } from '../../core/status-comment';
 import type { Clock } from '../ports/clock';
 import type { RunRequest } from '../protocol';
 import type { TerminalRunState } from '../run/run-state';
 import { usageSummary } from '../run/run-summary';
-import type { ChainCardPatch } from '../store-chain-board';
 import type { ClaimRelease, RedBackWrite, SendBackWrite, WriteResult } from './claim-release';
 import type { LiveRun } from './live-run';
 import type { RunStreams } from './run-streams';
@@ -13,7 +11,6 @@ import type { WaitClaim } from './wait-claim';
 
 /** The chain's door to a store ticket that no run holds (the orchestrator's writes). */
 export interface ChainCardDoor {
-  patch(card: TicketCard, patch: ChainCardPatch, actor: string): Promise<boolean>;
   comment(id: string, text: string, actor: string): Promise<void>;
 }
 
@@ -51,14 +48,6 @@ export class RunBookkeeper {
     }
   }
 
-  /** The success transition: the release into the next stage. */
-  async moveOnSuccess(run: LiveRun, nextPhase: string): Promise<WriteResult> {
-    if (run.request.dk === undefined) {
-      return this.predatesStore(run, 'moved');
-    }
-    return this.parts.release.move(run, nextPhase);
-  }
-
   /** req-257: the success transition of a chain run — the cursor's next position inside the claim, one release into `active`. */
   async advanceOnSuccess(run: LiveRun): Promise<WriteResult> {
     if (run.request.dk === undefined) {
@@ -81,19 +70,6 @@ export class RunBookkeeper {
       return this.predatesStore(run, 'moved');
     }
     return this.parts.release.redBack(run, back);
-  }
-
-  /** E10-6: a manual step follows the green gate — the ticket waits where it is, parked for the human persona. */
-  async parkOnSuccess(run: LiveRun, personaId: string): Promise<WriteResult> {
-    if (run.request.dk === undefined) {
-      return this.predatesStore(run, 'parked');
-    }
-    const comment = renderStatusComment({
-      verb: 'done',
-      text: `handed over on ${run.currentPhase} - a manual step waits for ${personaId}`,
-      detail: `run ${run.info.id} is done - gate green; parked for ${personaId} (manual step)`,
-    });
-    return this.parts.release.park(run, comment ?? personaId);
   }
 
   /** A blocked end (ADR-0077): the claim goes, the worker's words as the comment, the ticket stays put. */
@@ -138,36 +114,6 @@ export class RunBookkeeper {
   }
 
   // --- the chain's writes to tickets no run holds ------------------------------------
-
-  /** A Log line on the ticket (one `put`). */
-  async logCard(door: ChainCardDoor, card: TicketCard, what: string): Promise<void> {
-    await door.patch(card, { now: this.parts.clock.now(), actor: this.parts.actor, action: what }, this.parts.actor);
-  }
-
-  /** A machine move (the ci handover): stage + Log line, one `put`. */
-  moveCard(door: ChainCardDoor, card: TicketCard, toStage: string, action: string): Promise<boolean> {
-    return door.patch(card, { toStage, now: this.parts.clock.now(), actor: this.parts.actor, action }, this.parts.actor);
-  }
-
-  /** The circuit breaker's park in inbox, with a `paused:` comment. */
-  async parkCard(door: ChainCardDoor, card: TicketCard, column: string, reason: string): Promise<boolean> {
-    const actor = this.parts.actor;
-    const parked = await door.patch(card, { toStage: 'inbox', now: this.parts.clock.now(), actor, action: `parked by the circuit breaker (${column}) - ${reason}`, park: reason }, actor);
-    if (parked) {
-      await door.comment(card.id, renderStatusComment({ verb: 'paused', text: `parked by the circuit breaker (${column})`, detail: reason }) ?? reason, actor);
-    }
-    return parked;
-  }
-
-  /** E10-6: `awaiting:` where the ticket sits, with a `paused:` comment. */
-  async parkInPlace(door: ChainCardDoor, card: TicketCard, personaId: string, what: string): Promise<boolean> {
-    const actor = this.parts.actor;
-    const parked = await door.patch(card, { now: this.parts.clock.now(), actor, action: what, setAwaiting: personaId }, actor);
-    if (parked) {
-      await door.comment(card.id, renderStatusComment({ verb: 'paused', text: what }) ?? what, actor);
-    }
-    return parked;
-  }
 
   /** req-170: a full ledger's Needs-you card (a keyed `blocked:` comment), or its `resolved:` once the pool grants again. */
   async ledgerCard(door: ChainCardDoor, ticketId: string, card: { readonly key: string; readonly text: string | null }): Promise<void> {

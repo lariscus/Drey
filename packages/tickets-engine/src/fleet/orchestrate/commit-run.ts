@@ -151,16 +151,9 @@ export class CommitRun {
     }
   }
 
-  /** Green. On the files backend the run moves the ticket into Done itself; on a store the engine does (dk forbids an agent the terminal stage). */
+  /** Green. The engine moves the ticket into Done (dk forbids an agent the terminal stage). */
   private async landed(run: LiveRun): Promise<void> {
     run.info = { ...run.info, gateResult: 'green' };
-    if (run.request.nextPhase !== null) {
-      const moved = await this.deps.bookkeeper.moveOnSuccess(run, run.request.nextPhase);
-      if (!moved.ok) {
-        await this.deps.bookkeeper.note(run, `the commit landed but the move failed — ${moved.error}`);
-        return this.deps.settler.finish(run, 'failed');
-      }
-    }
     await this.removeWorktrees(run);
     return this.deps.settler.finish(run, 'done');
   }

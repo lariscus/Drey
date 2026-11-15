@@ -7,12 +7,11 @@ import { isQuotaError } from './pool-sizes';
 
 /**
  * The circuit breaker per persona (req-257, the persona board concept §9):
- * on a chain board a red gate counts against the PERSONA that ran, not the
- * column — a red gate raises its streak and cools it down; past the
+ * a red gate counts against the PERSONA that ran — a red gate raises its streak and cools it down; past the
  * threshold the persona is held the way the owner's pause holds it (its
  * tickets wait, a live run finishes), with the trip's reason beside it.
  * Playing the persona again resets it. A green end resets the streak.
- * The per-ticket back-off is the column breaker's, unchanged.
+ * The per-ticket back-off is part of it.
  */
 export class PersonaBreaker {
   constructor(
@@ -25,7 +24,7 @@ export class PersonaBreaker {
     this.state.personaRedStreak[persona] = 0;
   }
 
-  /** A failed chain run of `persona`: the ticket's back-off, the persona's streak, its trip. `maxRed` = the threshold (the column's `max-red`, else 3). */
+  /** A failed run of `persona`: the ticket's back-off, the persona's streak, its trip at {@link DEFAULT_MAX_RED} red gates in a row. */
   async failed(info: RunInfo, persona: string, maxRed: number = DEFAULT_MAX_RED): Promise<void> {
     if (isQuotaError(info.lastError)) {
       return this.env.persist(); // a spent quota is the pool's pause, not the persona's fault

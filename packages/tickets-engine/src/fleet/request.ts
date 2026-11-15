@@ -33,22 +33,11 @@ export interface ComposeRunInput {
   readonly ticketText: string;
   /** Absolute path of the tickets vault. */
   readonly vaultPath: string;
-  /** The working column's phase config (for an owner run: the phase the
+  /** The working column's phase (for an owner run: the column the
    *  ticket sits in — the two are the same there). */
   readonly workingPhase: PipelinePhase | null;
-  /** The move target on a green gate, or null to end the run in place. */
-  readonly nextPhaseId: string | null;
-  /** The directory the green move writes into (T-0041: resolved against
-   *  the dirs on disk, `resolvePhaseDir`); null = the bare phase id. */
-  readonly nextPhaseDir: string | null;
-  /** pipeline.md's `push:` remote (T-0041); null = never push. */
-  readonly pushRemote: string | null;
-  /** E10-6: park the ticket for this human persona after a green gate instead of moving it on. */
-  readonly parkFor?: string | null;
-  /** req-257: the chain entry the run works (a lifecycle store); a green end advances the cursor instead of moving. */
+  /** req-257: the chain entry the run works; a green end advances the cursor. */
   readonly cursor?: RunCursor;
-  /** Whether `nextPhaseId` claims (claim: true) — stamps the agent identity. */
-  readonly nextPhaseClaims: boolean;
   readonly repo: RepoRef | null;
   /**
    * The ticket's further work repos (req-72), already resolved and
@@ -57,7 +46,7 @@ export interface ComposeRunInput {
    * primary's.
    */
   readonly extraRepos?: readonly RepoRef[];
-  /** The prompt file's text, when the assignment names one (read by the caller). */
+  /** The dialog protocol's text (`prompts/crew/dialog.md`) on an interactive run, read by the caller; null otherwise. */
   readonly promptText: string | null;
   readonly defaultWorker: string;
   readonly permissionMode: PermissionMode;
@@ -76,13 +65,6 @@ export interface ComposeRunInput {
   readonly gateFailure: string | null;
   /** The instruction output caps (T-0048); absent = `DEFAULT_FLEET_CAPS`. */
   readonly caps?: FleetCaps;
-  /**
-   * Set by the orchestrator for the pipeline's first worker column: a
-   * ticket entering there carries no acceptance criteria yet (writing
-   * them is the plan's job), so the run gates structurally — the gate
-   * then checks the criteria came into existence — instead of refusing.
-   */
-  readonly structuralGateAllowed?: boolean;
   /** Set when the orchestrator dispatches — the pool whose slot this run occupies. */
   readonly dispatchedBy?: string;
   /**

@@ -66,6 +66,5 @@ export interface FleetPort {
   /** E14-5b: the runner releases the agent claims of this host that no live run holds. */
   releaseLeftoverClaims?(
     store: ChainStoreConfig,
-    retreat: Readonly<Record<string, string | null>>,
   ): Promise<{ readonly ok: true; readonly released: readonly string[]; readonly skipped: readonly { readonly id: string; readonly reason: string }[] } | { readonly ok: false; readonly error: string }>;
 }

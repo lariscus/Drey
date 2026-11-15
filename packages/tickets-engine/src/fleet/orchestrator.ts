@@ -2,7 +2,7 @@
  * The chain orchestrator (M85, ADR-0077, ADR-0096): the runner-side loop
  * that turns a configured pipeline into running workers. The board comes
  * from the dricket store the chain config names; the next dispatches are
- * planned by the pure rules of `chain.ts` and started through the
+ * planned by the pure rules of `holder-plan.ts` and started through the
  * per-provider supervisors. The control state persists per tickets vault in
  * `<root>/chains/<vault key>/chain.json` (req-173); the tickets repo never sees it (ADR-0076).
  *
@@ -13,12 +13,11 @@
  */
 import { AUTOPILOT_OFF, autopilotOfMaster, resumeDue } from './autopilot';
 import type { Clock } from './ports/clock';
-import { WORKER_PROVIDERS, type AutopilotRecord, type ChainConfig, type ChainMaster, type ChainStatus, type ColumnMode, type RunInfo, type RunRequest, type SlotSummary, type TrancheStatus } from './protocol';
+import { WORKER_PROVIDERS, type AutopilotRecord, type ChainConfig, type ChainMaster, type ChainStatus, type ColumnMode, type RunInfo, type SlotSummary, type TrancheStatus } from './protocol';
 import type { DispatchPool } from './orchestrate/dispatch-pool';
 import { LIVE_RUN_STATES } from './run/run-state';
 import type { ChainState, ChainVaultLocator } from './orchestrate/chain-state';
 import type { ChainStateStore } from './orchestrate/chain-state-store';
-import type { CiSweep } from './orchestrate/ci-sweep';
 import type { Dispatcher } from './orchestrate/dispatcher';
 import type { PoolCapacity } from './orchestrate/pool-capacity';
 import type { StartHold } from './orchestrate/start-hold';
@@ -28,18 +27,6 @@ import type { SupervisorDirectory } from './orchestrate/supervisor-directory';
 /** The E7 event sink the runner and the engine wire (concept §3.3). */
 export type FleetEvents = FleetLedger;
 
-/** The sampling audit's brief — a fresh second worker reviews the step. */
-export const AUDIT_BRIEF =
-  'You are the sampling auditor — a fresh second worker. Before this step may move on, review the work the branch ' +
-  "contains against the ticket: correctness first, then the repo's conventions, then leftovers. Fix what you find; " +
-  'the machine gate must stay green when you end.';
-
-/** The semantic gate's brief — does the branch do the thing, and only the thing. */
-export const SEMANTIC_BRIEF =
-  "You are the semantic gate — a fresh second worker. Judge the step's result against what the ticket actually asked " +
-  'for: does the branch do the thing, does it do only the thing, would the owner accept it? Fix what falls short; the ' +
-  'machine gate must stay green when you end.';
-
 export interface OrchestratorParts {
   readonly state: ChainState;
   readonly store: ChainStateStore;
@@ -47,7 +34,6 @@ export interface OrchestratorParts {
   readonly pools: PoolCapacity;
   readonly settled: SettledRuns;
   readonly dispatcher: Dispatcher;
-  readonly ci: CiSweep;
   readonly clock: Clock;
   readonly log: (message: string) => void;
   /** The safety-net rescan interval. */
@@ -173,10 +159,6 @@ export class Orchestrator {
   async setColumn(phaseId: string, mode: ColumnMode): Promise<ChainStatus> {
     const { state } = this.parts;
     state.columns[phaseId] = mode;
-    if (mode === 'playing') {
-      delete state.tripped[phaseId]; // the owner's play is a fresh start: the old streak would trip again at once
-      state.redStreak[phaseId] = 0;
-    }
     await this.persist();
     if (mode === 'playing') {
       await this.parts.dispatcher.pass();
@@ -247,20 +229,6 @@ export class Orchestrator {
     return this.parts.directory.reapAll();
   }
 
-  /**
-   * The quality rungs' decision (M85, flagged off): a run in a column with
-   * `audit:` (sampled) or `semantic: true` (always) gets a second worker
-   * before its move — the brief prefixes the run's own instruction.
-   */
-  async secondOpinion(request: RunRequest): Promise<string | null> {
-    const phase = this.parts.state.phases.find((p) => p.id === (request.column ?? null));
-    const sampled = phase !== undefined && phase.audit !== null && Math.random() < phase.audit;
-    if (phase === undefined || (!sampled && phase.semantic !== true)) {
-      return null;
-    }
-    return `${phase.semantic === true ? SEMANTIC_BRIEF : AUDIT_BRIEF}\n\n---\n\n${request.instruction}`;
-  }
-
   dispose(): void {
     if (this.timer !== null) {
       clearInterval(this.timer);
@@ -295,9 +263,6 @@ export class Orchestrator {
     }
     this.timer = setInterval(() => {
       void this.resumeIfDue();
-      if (this.parts.state.config !== null) {
-        void this.parts.ci.sweep();
-      }
       if (this.active) {
         void this.parts.dispatcher.pass();
       }

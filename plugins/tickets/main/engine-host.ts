@@ -95,5 +95,5 @@ export class FleetClientPort implements FleetPort {
 
   configureChain = (config: Parameters<FleetClient['configureChain']>[0]) => this.fleet.configureChain(config);
 
-  releaseLeftoverClaims = (store: Parameters<FleetClient['releaseLeftoverClaims']>[0], retreat: Parameters<FleetClient['releaseLeftoverClaims']>[1]) => this.fleet.releaseLeftoverClaims(store, retreat);
+  releaseLeftoverClaims = (store: Parameters<FleetClient['releaseLeftoverClaims']>[0]) => this.fleet.releaseLeftoverClaims(store);
 }
