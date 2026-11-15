@@ -12,7 +12,7 @@ import { SEEDS, byTitle, dkIdOf, fieldOf, idOf, liveRun, seedStore, seedVaultOf 
  * the persona board (pipeline Inbox · Prioritized · Done with `flow:`, the
  * crew's `order:`). Seeded like board 7e v2 (DeskBoardV2): the cards' chains,
  * cursors, a send-back once and twice, a question, no persona for position 4,
- * You's Accept; the live runs, the pool, the tranche and the queue are pushed
+ * You's Accept; the live runs, the pool and the queue are pushed
  * as the fleet's status. Screenshots: the board, the pool chip's popover, the
  * Tickets panel (board 7a v2). Then one drag between persona columns and an
  * Accept land in the store. Everything lives under a temp dir with a home of
@@ -106,7 +106,7 @@ function nextMonday(): string {
   return reset.toISOString();
 }
 
-/** The fleet's status as the engine would push it: four live runs, the pool, the slots, the tranche, the queue, a persona wait. */
+/** The fleet's status as the engine would push it: four live runs, the pool, the slots, the queue, a persona wait. */
 async function pushFleet(app: ElectronApplication): Promise<void> {
   const resetsAt = nextMonday();
   const slot = (id: string, label: string, busy: number, total: number, extra: Record<string, unknown>): Record<string, unknown> => ({ id, label, profile: 'private', state: busy > 0 ? 'busy' : 'ready', busy, total, remaining: null, reliability: 'unknown', q: null, resetsAt: null, ...extra });
@@ -135,7 +135,6 @@ async function pushFleet(app: ElectronApplication): Promise<void> {
           poolSize: { opencode: 2, 'claude-code': 3 },
           personaWaits: { [byTitle('Win+H dictation hand-off')]: 'ben' },
           queue: [{ ticket: byTitle('Settings search across plugins'), persona: 'ralf', class: 'B', reason: 'capacity', line: 'waits for a B slot', detail: '', position: 1, since: now.toISOString() }],
-          tranche: { index: 1, of: null, done: 4, total: 10, spent: 6.4, budget: 15, startedAt: now.toISOString(), endsAt: new Date(Date.now() + (2 * 60 + 10) * 60_000 + 30_000).toISOString(), checkpoint: null, report: null },
           slots: [
             slot('claude-a', 'Claude A', 2, 2, { remaining: 0.62, reliability: 'measured', q: 1.4, resetsAt }),
             slot('claude-b', 'Claude B', 1, 1, { remaining: 0.31, reliability: 'measured', q: 0.8, resetsAt }),
@@ -213,14 +212,13 @@ test('the persona board: columns by holder, the pool chip, drag and Accept (req-
   await shoot(page, 'DeskBoardV2');
   await page.screenshot({ path: testInfo.outputPath('persona-board.png') });
 
-  // The pool chip's popover: slots, tranche, the queue's head, the Service window.
+  // The pool chip's popover: slots, the queue's head, the Service window.
   await board.locator('.pb-pool-chip').click();
   const pop = board.locator('.pb-pool-pop');
   await expect(pop).toBeVisible();
   await expect(pop.locator('.pb-pool-sub')).toHaveText('4 of 5 sessions · 1 queued');
   await expect(pop.locator('.desk-slot')).toHaveCount(4);
   await expect(pop.locator('.pb-pool-queue-text')).toHaveText(`${byTitle('Settings search across plugins')} queued · waits for a B slot · 1st`);
-  await expect(pop.locator('.desk-tranche-text')).toContainText('Tranche 4 of 10 runs · $6.40 of $15');
   await shoot(page, 'DeskBoardV2.pool');
   await page.screenshot({ path: testInfo.outputPath('persona-board-pool.png') });
   await page.keyboard.press('Escape');
