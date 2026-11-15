@@ -335,8 +335,6 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
       .replace(/^repos:.*/m, 'repos: kt')
       .replace('## Log', '## Plan\n\n### Acceptance criteria\n\n- [ ] `echo ok`\n\n## Log');
     dk(['put', 't-2', '-F', writeTemp(text), '--claim', '--if-version', String(rev('t-2'))]);
-    await fsp.mkdir(abs('tickets/_meta/prompts'), { recursive: true });
-    await fsp.writeFile(abs('tickets/_meta/prompts/build-default.md'), 'Build the ticket.\n', 'utf8');
     const started: RunRequest[] = [];
     const fleet: FleetPort = {
       runs: async () => [],
@@ -372,8 +370,6 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
       .replace(/^repos:.*/m, 'repos: kt')
       .replace('## Log', '## Plan\n\n### Acceptance criteria\n\n- [ ] `echo ok`\n\n## Log');
     dk(['put', 't-2', '-F', writeTemp(text), '--claim', '--if-version', String(rev('t-2'))]);
-    await fsp.mkdir(abs('tickets/_meta/prompts'), { recursive: true });
-    await fsp.writeFile(abs('tickets/_meta/prompts/build-default.md'), 'Build the ticket.\n', 'utf8');
     // the persona that works the ticket is the one its part pinned (`x-persona: ben`, the release above)
     const ben = abs('tickets/_meta/personas/ben');
     await fsp.mkdir(path.join(ben, 'skills'), { recursive: true });

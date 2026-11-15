@@ -73,15 +73,15 @@ describe('the engine seeds the default crew at its start (req-256)', () => {
   });
 
   it('leaves the owner\'s own personas and pipeline as they are — but moves a v2 record onto class and model once (req-288)', async () => {
-    await fsp.mkdir(path.join(vault, PERSONAS, 'build-default'), { recursive: true });
-    const own = "---\ntitle: Build default\nrole: builder\nworker: kimi\nmodels:\n  default: owner-model\n  pool: [owner-model]\ncolor: '#123456'\nskills: []\n---\n";
-    await fsp.writeFile(path.join(vault, PERSONAS, 'build-default/persona.md'), own, 'utf8');
+    await fsp.mkdir(path.join(vault, PERSONAS, 'mina'), { recursive: true });
+    const own = "---\ntitle: Mina\nrole: builder\nworker: kimi\nmodels:\n  default: owner-model\n  pool: [owner-model]\ncolor: '#123456'\nskills: []\n---\n";
+    await fsp.writeFile(path.join(vault, PERSONAS, 'mina/persona.md'), own, 'utf8');
     await git(['add', '-A']);
     await git(['commit', '-m', 'owner persona']);
     const engine = await start();
     await engine.ready;
-    const migrated = (await read(`${PERSONAS}/build-default/persona.md`))!;
-    expect(parsePersonaFile('build-default', migrated)).toMatchObject({ title: 'Build default', class: 'heavy', model: 'kimi/owner-model', color: '#123456' });
+    const migrated = (await read(`${PERSONAS}/mina/persona.md`))!;
+    expect(parsePersonaFile('mina', migrated)).toMatchObject({ title: 'Mina', class: 'heavy', model: 'kimi/owner-model', color: '#123456' });
     expect(migrated).not.toMatch(/^(worker|models):/m);
     expect((await git(['log', '--format=%s'])).trim().split('\n')).toContain('personas: class and model replace worker and models (req-288)');
     expect(await read('tickets/_meta/pipeline.md')).toBe(PIPELINE);

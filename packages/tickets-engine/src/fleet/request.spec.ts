@@ -82,7 +82,7 @@ describe('composeRunRequest — a refusal says what the gate counts (D-31)', () 
 });
 
 describe('composeRunRequest — a persona\'s skills ride along (D-46)', () => {
-  const persona = { id: 'build-default', worker: 'opencode', model: 'm', prompt: 'You build.', memory: '' };
+  const persona = { id: 'finn', worker: 'opencode', model: 'm', prompt: 'You build.', memory: '' };
   const skills = [
     { name: 'angular-tests', text: 'Run the suite with --include.' },
     { name: 'commits', text: 'One change per commit.' },
