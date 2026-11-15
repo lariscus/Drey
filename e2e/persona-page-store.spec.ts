@@ -73,7 +73,7 @@ test.beforeEach(({ userDataDir, vaultDir }) => {
   execFileSync('git', ['init', '-q'], { cwd: vaultDir, windowsHide: true });
   const dir = path.join(userDataDir, 'plugins', 'tickets');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ backend: 'dricket', 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0 }, null, 2));
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0 }, null, 2));
 });
 
 test('reads and writes prompt.md in the checkout vault', async ({ page, vaultDir }) => {

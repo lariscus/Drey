@@ -11,7 +11,7 @@ import type { ClassName } from '../contracts/capability-class';
 import { randomBytes } from 'node:crypto';
 import { promises as fsp, existsSync } from 'node:fs';
 import * as path from 'node:path';
-import { archivedTicketIds, nextTicketId, TICKETS_ARCHIVE_DIR, TICKET_ID_PATTERN, type BoardSnapshot, type RecentDone, type StoreStageMigrationOffer, type StoreStageMigrationResult, FolderStatus, PipelinePhase, ProjectRef, PromptEntry, PromptListing, RepoCandidate, RepoRef, ReposListing, TicketCard, TicketForm, TicketPriority, TicketTrack } from '../contracts/tickets';
+import { TICKETS_ARCHIVE_DIR, TICKET_ID_PATTERN, type BoardSnapshot, type RecentDone, type StoreStageMigrationOffer, type StoreStageMigrationResult, FolderStatus, PipelinePhase, ProjectRef, PromptEntry, PromptListing, RepoCandidate, RepoRef, ReposListing, TicketCard, TicketForm, TicketPriority, TicketTrack } from '../contracts/tickets';
 import { PROJECTS_DIR, ticketProject, type ProjectRecord } from '../contracts/projects';
 import { parseProjects } from '../core/project-record';
 import { parseChanges, parseResult, planApprovedOf, storyOf, type ChangesReply } from '../contracts/changes';
@@ -974,7 +974,7 @@ export class EngineBoardService {
       if (found === null) {
         return { ok: false, error: `${input.id} is not on the board` };
       }
-      const { vault, card, text } = found;
+      const { card, text } = found;
       if (revisionOf(text) !== input.baseRevision) {
         return { ok: false, conflict: true, error: 'The ticket changed since you opened it. Reload it and edit again.' };
       }
@@ -1014,7 +1014,7 @@ export class EngineBoardService {
       if (found === null) {
         return { ok: false, error: `${input.id} is not on the board` };
       }
-      const { vault, card, text } = found;
+      const { card, text } = found;
       if (input.baseRevision !== undefined && revisionOf(text) !== input.baseRevision) {
         return { ok: false, conflict: true, error: 'The ticket changed since you opened it. Reload it and edit again.' };
       }
@@ -1142,7 +1142,7 @@ export class EngineBoardService {
       if (found === null) {
         return { ok: false, error: `${input.id} is not on the board` };
       }
-      const { vault, card, text } = found;
+      const { card, text } = found;
       // The vocabulary is the vault's (`priorities:` in pipeline.md) — an
       // id outside it refuses through the patcher's guard.
       const snap = await this.snapshot();
@@ -1176,7 +1176,7 @@ export class EngineBoardService {
       if (found === null) {
         return { ok: false, error: `${input.id} is not on the board` };
       }
-      const { vault, card, text } = found;
+      const { card, text } = found;
       if (card.meta.track === input.track) {
         return { ok: true };
       }
@@ -1206,7 +1206,7 @@ export class EngineBoardService {
       if (found === null) {
         return { ok: false, error: `${input.id} is not on the board` };
       }
-      const { vault, card, text } = found;
+      const { card, text } = found;
       if ((card.meta.class ?? null) === input.class) {
         return { ok: true };
       }
@@ -1235,7 +1235,7 @@ export class EngineBoardService {
       if (found === null) {
         return { ok: false, error: `${input.id} is not on the board` };
       }
-      const { vault, card, text } = found;
+      const { card, text } = found;
       if ((card.meta.form ?? 'ship') === input.form) {
         return { ok: true };
       }
@@ -1268,7 +1268,7 @@ export class EngineBoardService {
       if (found === null) {
         return { ok: false, error: `${input.id} is not on the board` };
       }
-      const { vault, card, text } = found;
+      const { card, text } = found;
       if (card.meta.run !== null) {
         return { ok: false, error: 'A run is live on this ticket. Change the plan when the run has ended.' };
       }
@@ -1372,7 +1372,7 @@ export class EngineBoardService {
       if (found === null) {
         return { ok: false, error: `${input.id} is not on the board` };
       }
-      const { vault, card, text } = found;
+      const { card, text } = found;
       const snap = await this.snapshot();
       const parsed = parseChainItems(input.chain);
       if (!parsed.ok) {
@@ -1420,7 +1420,7 @@ export class EngineBoardService {
       if (found === null) {
         return { ok: false, error: `${input.id} is not on the board` };
       }
-      const { vault, card, text } = found;
+      const { card, text } = found;
       for (const id of input.blockedBy) {
         if (!TICKET_ID_PATTERN.test(id)) {
           return { ok: false, error: `blocked-by: "${id}" is not a ticket id` };
@@ -1440,7 +1440,6 @@ export class EngineBoardService {
       } catch (error) {
         return { ok: false, error: messageOf(error) };
       }
-      const value = input.blockedBy.length === 0 ? 'none' : `${input.blockedBy.length} ${input.blockedBy.length === 1 ? 'id' : 'ids'}`;
       this.announceChanged();
       return { ok: true };
     });
@@ -1534,7 +1533,7 @@ export class EngineBoardService {
       if (found === null) {
         return { ok: false, error: `${input.id} is not on the board` };
       }
-      const { vault, card, text } = found;
+      const { card, text } = found;
       if (card.meta.run !== null) {
         return { ok: false, error: 'A run is live on this ticket. Change the parts when the run has ended.' };
       }
@@ -1812,7 +1811,7 @@ export class EngineBoardService {
    * queue: `parent:` the plan's ticket, the builder's `persona:` pin, the
    * part's own `chain:` delta, `blocked-by:` the part before it (so part
    * 2 waits until part 1 reaches the terminal phase). Everything is
-   * checked first and written in one commit `tickets: <id> plan released`;
+   * checked first and written part by part (see {@link releaseInStore});
    * the parent gets one Log line and keeps the plan.
    */
   releasePlan(input: { id: string; scope: PlanReleaseScope; actor?: string }): Promise<PlanReleaseReply> {
@@ -1821,7 +1820,7 @@ export class EngineBoardService {
       if (found === null) {
         return { ok: false, error: `${input.id} is not on the board` };
       }
-      const { vault, card, text } = found;
+      const { card, text } = found;
       const snap = await this.snapshot();
       const build = this.buildPhaseOf(snap);
       if (build === null || snap.pipeline.length < 2) {
@@ -1859,7 +1858,7 @@ export class EngineBoardService {
           return { ok: false, error: `Part ${index + 1}: ${refusal}` };
         }
       }
-      return this.releaseInStore(store, { vault, card, text }, snap, build, parts, matches, mint, input);
+      return this.releaseInStore(store, { card, text }, snap, build, parts, matches, mint, input);
     });
   }
 
@@ -1872,7 +1871,7 @@ export class EngineBoardService {
    */
   private async releaseInStore(
     store: StoreSettings,
-    found: { vault: EngineVault; card: TicketCard; text: string },
+    found: { card: TicketCard; text: string },
     snap: BoardSnapshot,
     build: PipelinePhase,
     parts: readonly PlanPart[],
@@ -1880,7 +1879,7 @@ export class EngineBoardService {
     mint: readonly number[],
     input: { id: string; actor?: string },
   ): Promise<PlanReleaseReply> {
-    const { vault, card, text } = found;
+    const { card, text } = found;
     const ids = new Map<number, string>();
     matches.forEach((m, i) => {
       if (m !== null) {

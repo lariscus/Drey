@@ -103,7 +103,7 @@ test.beforeEach(({ userDataDir }) => {
   dk(['put', 't-1', '-F', file, '--claim', '--if-version', rev]);
   const dir = path.join(userDataDir, 'plugins', 'tickets');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ backend: 'dricket', 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0 }, null, 2));
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0 }, null, 2));
 });
 
 test('a store on the old stages offers Migrate; one click moves it to the lifecycle stages and the card keeps its column', async ({ page }, testInfo) => {

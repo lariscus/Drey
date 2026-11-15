@@ -116,7 +116,7 @@ test.beforeEach(({ userDataDir }) => {
   }
   const dir = path.join(userDataDir, 'plugins', 'tickets');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ backend: 'dricket', 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0 }, null, 2));
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0 }, null, 2));
 });
 
 test('the sweep defects on the store', async ({ page, electronApp }, testInfo) => {

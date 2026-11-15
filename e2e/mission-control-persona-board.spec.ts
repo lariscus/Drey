@@ -121,7 +121,7 @@ test.use({
 test.beforeEach(({ userDataDir }) => {
   const dir = path.join(userDataDir, 'plugins', 'tickets');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ backend: 'dricket', 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0, ...REMOTE }, null, 2));
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0, ...REMOTE }, null, 2));
 });
 
 /** Waits until the gateway answers the paired device (the service started and synced its settings). */

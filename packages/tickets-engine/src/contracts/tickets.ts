@@ -40,11 +40,6 @@ export function stripPhasePrefix(dir: string): string {
   return dir.replace(/^\d+-/, '');
 }
 
-/** `(1-based pipeline position) * 10` + '-' + id → '10-inbox' … '80-done'. */
-export function phaseDirectoryName(position1: number, id: string): string {
-  return `${String(position1 * 10).padStart(2, '0')}-${id}`;
-}
-
 // ---------------------------------------------------------------------------
 // The pipeline's handover spec (`_meta/pipeline.md`, ADR-0076):
 // `manual | agent <prompt-ref>[@<worker>] | ci | none`. Parsed here so
@@ -427,32 +422,6 @@ export interface BoardSnapshot extends PersonaBoardFields, BoardProjects {
   readonly checkpoints: readonly string[];
   /** Tickets archived within the last 7 days, newest first (req-75 W1b). */
   readonly recentDone: readonly RecentDone[];
-}
-
-/** `true` when the id parses AND matches the file stem it came from. */
-export function isValidTicketFile(name: string): boolean {
-  return /^T-\d{4,}\.md$/.test(name);
-}
-
-/** Next free id: max existing + 1 — ids are never reused (burned in git). */
-export function nextTicketId(existing: readonly string[]): string {
-  let max = 0;
-  for (const id of existing) {
-    const match = /^T-(\d+)$/.exec(id);
-    if (match !== null) {
-      max = Math.max(max, Number(match[1]));
-    }
-  }
-  return `T-${String(max + 1).padStart(4, '0')}`;
-}
-
-/** The ids of the archived tickets among vault-relative paths — minting
- *  counts them, so an archived id is never handed out again. */
-export function archivedTicketIds(paths: readonly string[]): string[] {
-  const prefix = `${TICKETS_ARCHIVE_DIR}/`;
-  return paths
-    .filter((p) => p.startsWith(prefix) && p.endsWith('.md') && !p.slice(prefix.length).includes('/'))
-    .map((p) => p.slice(prefix.length, -'.md'.length));
 }
 
 /** Result of every mutation IPC call (`create` / `transition` / `reorder` /

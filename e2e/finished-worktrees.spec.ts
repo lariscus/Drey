@@ -130,7 +130,7 @@ test.beforeEach(({ userDataDir }) => {
   const dir = path.join(userDataDir, 'plugins', 'tickets');
   fs.mkdirSync(dir, { recursive: true });
   // The commit takes a heavy governor seat: no CPU reserve, so a busy machine does not hold the test.
-  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ backend: 'dricket', 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0, 'service.load.reserve': 0 }, null, 2));
+  fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0, 'service.load.reserve': 0 }, null, 2));
 });
 
 test("the sign-off merges the branch, then the ticket's worktree goes and its branch stays (req-185)", async ({ page }) => {

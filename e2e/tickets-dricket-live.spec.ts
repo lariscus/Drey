@@ -119,8 +119,8 @@ test.beforeEach(({ userDataDir }, testInfo) => {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify(
     testInfo.title.includes('remote')
-      ? { backend: 'dricket', 'dk.store': `${bareDir}#tickets`, 'dk.dataDir': path.join(root, 'ed'), 'dk.checkout': cloneDir, 'dk.syncSeconds': 2 }
-      : { backend: 'dricket', 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0 },
+      ? { 'dk.store': `${bareDir}#tickets`, 'dk.dataDir': path.join(root, 'ed'), 'dk.checkout': cloneDir, 'dk.syncSeconds': 2 }
+      : { 'dk.store': storeDir, 'dk.dataDir': dataDir, 'dk.syncSeconds': 0 },
     null,
     2,
   ));

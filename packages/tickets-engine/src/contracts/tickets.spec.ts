@@ -3,11 +3,8 @@ import {
   DEFAULT_PRIORITY_CONFIG,
   ageOf,
   branchForTicket,
-  archivedTicketIds,
-  nextTicketId,
   openTicketCount,
   parsePriorityConfig,
-  phaseDirectoryName,
   priorityClass,
   priorityWeight,
   stripPhasePrefix,
@@ -34,35 +31,6 @@ describe('numbered phase folders (T-0041)', () => {
     expect(stripPhasePrefix('inbox')).toBe('inbox');
     expect(stripPhasePrefix('_meta')).toBe('_meta');
     expect(stripPhasePrefix('archive')).toBe('archive');
-  });
-
-  it('phaseDirectoryName derives the pipeline position × 10, two digits', () => {
-    expect(phaseDirectoryName(1, 'inbox')).toBe('10-inbox');
-    expect(phaseDirectoryName(4, 'plan-review')).toBe('40-plan-review');
-    expect(phaseDirectoryName(8, 'done')).toBe('80-done');
-    expect(phaseDirectoryName(10, 'extra')).toBe('100-extra');
-  });
-});
-
-describe('nextTicketId', () => {
-  it('mints max + 1, zero-padded to four digits', () => {
-    expect(nextTicketId([])).toBe('T-0001');
-    expect(nextTicketId(['T-0003', 'T-0007'])).toBe('T-0008');
-  });
-
-  it('never reuses a burned id and grows past four digits', () => {
-    expect(nextTicketId(['T-9999'])).toBe('T-10000');
-    expect(nextTicketId(['T-0002', 'T-10000'])).toBe('T-10001');
-  });
-
-  it('ignores non-id strings', () => {
-    expect(nextTicketId(['readme', 'T-0001'])).toBe('T-0002');
-  });
-
-  it('counts archived ids, so an archived id is never minted again', () => {
-    const archived = archivedTicketIds(['tickets/archive/T-0053.md', 'tickets/10-inbox/T-0050.md', 'tickets/archive/x/T-0099.md', 'notes/T-0060.md']);
-    expect(archived).toEqual(['T-0053']);
-    expect(nextTicketId(['T-0050', ...archived])).toBe('T-0054');
   });
 });
 
