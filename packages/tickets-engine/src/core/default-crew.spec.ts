@@ -1,8 +1,7 @@
 import { promises as fsp } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadShippedPrompts } from './default-prompts';
-import { CREW_STEPS, DEFAULT_CREW_IDS, seededPersonaText, seededPromptText, shippedPersonaOf } from './default-crew';
+import { DEFAULT_CREW_IDS, seededPersonaText, seededPromptText, shippedPersonaOf } from './default-crew';
 import { parsePersonaFile } from './persona';
 
 const DIR = path.join(__dirname, '..', '..', 'personas');
@@ -92,9 +91,9 @@ describe('Pia, Mission Control\'s persona (req-269)', () => {
     expect(text).not.toContain('drey-prompt-version');
   });
 
-  it('is seeded as shipped: no step below her prompt, no class and no model in her record', async () => {
+  it('is seeded as shipped: no class and no model in her record', async () => {
     const pia = shippedPersonaOf('pia', await file('pia', 'persona.md'), await file('pia', 'prompt.md')) as Shipped;
-    expect(seededPromptText(pia, await loadShippedPrompts())).toEqual({ text: pia.who, stepMissing: false });
+    expect(seededPromptText(pia)).toBe(pia.who);
     const record = seededPersonaText(pia);
     expect(record).toContain('kind: mission');
     expect(record).not.toMatch(/^(worker|models|class|model):/m);
@@ -118,22 +117,12 @@ describe('what is seeded from them', () => {
     }
   });
 
-  it('puts the role\'s shipped step under the character, one prompt that works as the run\'s instruction base', async () => {
-    const steps = await loadShippedPrompts();
+  it('seeds the prompt.md as shipped — the persona is the instruction base of its runs', async () => {
     for (const id of AGENT_IDS) {
-      const shipped = shippedPersonaOf(id, await file(id, 'persona.md'), await file(id, 'prompt.md')) as Exclude<ReturnType<typeof shippedPersonaOf>, string>;
-      const step = CREW_STEPS[shipped.persona.role]!;
-      const out = seededPromptText(shipped, steps);
-      expect(out.stepMissing).toBe(false);
-      expect(out.text.startsWith(shipped.who)).toBe(true);
-      expect(out.text).toContain(`## The ${step.name} step\n\n`);
-      expect(out.text).toContain(steps.get(step.ref)!.split('\n').slice(1).join('\n').trim());
-      expect(out.text.endsWith('\n')).toBe(true);
+      const shipped = shippedPersonaOf(id, await file(id, 'persona.md'), await file(id, 'prompt.md')) as Shipped;
+      const out = seededPromptText(shipped);
+      expect(out.startsWith(shipped.who)).toBe(true);
+      expect(out.endsWith('\n')).toBe(true);
     }
-  });
-
-  it('seeds the character alone, and says so, when the package holds no step prompt for the role', async () => {
-    const paul = shippedPersonaOf('paul', await file('paul', 'persona.md'), await file('paul', 'prompt.md')) as Exclude<ReturnType<typeof shippedPersonaOf>, string>;
-    expect(seededPromptText(paul, new Map())).toEqual({ text: paul.who, stepMissing: true });
   });
 });

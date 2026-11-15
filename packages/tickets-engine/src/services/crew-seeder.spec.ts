@@ -58,17 +58,16 @@ describe('CrewSeeder — the default crew Pia, Paul, Ben, Ralf, Tessa (req-256, 
       expect((await settingsOf('ben')).readOnly).toBeNull();
     });
 
-    it('gives each persona its role, a distinct colour and the role\'s step below its character', async () => {
+    it('gives each persona its role, a distinct colour and its prompt as shipped', async () => {
       await rig.seeder.seed(rig.vault);
       const personas = await Promise.all(DEFAULT_CREW_IDS.map(async (id) => parsePersonaFile(id, (await rig.read(`${DIR}/${id}/persona.md`))!)));
       expect(personas.map((p) => p.role)).toEqual(['custom', 'planner', 'builder', 'reviewer', 'tester']);
       expect(new Set(personas.map((p) => p.color)).size).toBe(5);
       const ben = (await rig.read(`${DIR}/ben/prompt.md`))!;
       expect(ben.startsWith('## Who Ben is\n')).toBe(true);
-      expect(ben).toContain('## The build step');
-      expect(ben).toContain('**What changed for you:**');
+      expect(ben).toContain('## How Ben works');
       expect(ben).not.toContain('drey-prompt-version');
-      expect((await rig.read(`${DIR}/paul/prompt.md`))!).toContain('## The planning step');
+      expect((await rig.read(`${DIR}/paul/prompt.md`))!).toContain('## How Paul works');
     });
 
     it('req-269: seeds Pia as Mission Control\'s persona — her prompt as shipped, no worker, no models, no step', async () => {

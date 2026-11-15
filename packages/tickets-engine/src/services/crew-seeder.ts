@@ -138,13 +138,9 @@ export class CrewSeeder {
     const written: string[] = [];
     const pictured: string[] = [];
     for (const persona of personas) {
-      const prompt = seededPromptText(persona, run.shipped.steps);
-      if (prompt.stepMissing) {
-        this.deps.log(`crew: the package holds no step prompt for ${persona.id}'s role — it is seeded with its character alone`, 'warn');
-      }
       const promptPath = `${PERSONAS_DIR}/${persona.id}/prompt.md`;
       const personaPath = `${PERSONAS_DIR}/${persona.id}/persona.md`;
-      await this.deps.host.write(vault.id, promptPath, prompt.text);
+      await this.deps.host.write(vault.id, promptPath, seededPromptText(persona));
       await this.deps.host.write(vault.id, personaPath, seededPersonaText(persona));
       written.push(personaPath, promptPath);
       const avatarPath = await this.deps.avatars.copyShipped(vault, persona.id);
