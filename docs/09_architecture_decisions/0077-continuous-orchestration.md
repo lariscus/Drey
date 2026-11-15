@@ -183,9 +183,28 @@ The owner's Grobkonzept "Drey crew" (2026-11-08) adds **checkpoints in tranches*
 
 **Considered and not taken.** A separate `POST /chain/tranche/release` (the Autopilot write already says it); counting runs at their end (a tranche of 10 would release 10 + the pool's width); the change size from the branch's diff against its base (cumulative per ticket, so a repeated ticket would count its earlier work again); a prompt-written summary on the card (the concept asks for deterministic numbers). Recorded in `specs/decisions.md`.
 
+## Later change (2026-11-15 — req-309): tranches retired
+
+The owner pulled the second brake out: his workflow is the board itself — tickets into the Inbox, prioritized into
+a queue, worked off by the crew, reviewed by him at each chain's end — and the starts were already guarded by the
+pool and caps, the provider ledger's day budget (ADR-0095), the burn-rate hold (ADR-0095), the per-ticket and
+per-persona breakers and the red gate's send-back. A batch brake on top only paused work and, with an empty queue,
+raised empty checkpoints. **The Autopilot is on/off**: it starts work from *Prioritized* in order whenever pool,
+caps, day budget, burn-rate hold and breakers allow; each ticket ends with You (`specs/decisions.md`).
+
+Everything of the 2026-11-09 change above is removed with no backward compatibility (nothing released): the
+batching (runs / budget share / minutes), the checkpoint pause and report, the early-stop rules, `ChainStatus.tranche`
+and `ChainConfig.tranche`, the `tranche` field in `chain.json`, the `event: tranche` on `/events`, the
+`paused` reason `checkpoint` (the Autopilot record is `{state, resumeAt?}` again), `fleet/orchestrate/tranche/` and
+`fleet/protocol-tranche.ts`, the plugin keys `autopilot.tranche.*` / `autopilot.earlyStop.*` and the crew.md
+`tranche:` block (a leftover block is ignored, not an error), and the tranche parts of the desktop popover, the pool
+chip, Mission Control's panel and cards. The board's checkpoint column (the owner's review, req-81) is a different
+"checkpoint" and stays. This ADR's circuit breaker remains the safety net beneath an on/off Autopilot.
+
 ## Later change (2026-11-09, as built — milestone 230, req-173, R13): `chain.json` is runtime state, one per tickets vault
 
-`chain.json` keeps **runtime state only** — the Autopilot, the column states, the breaker, the streaks, the holds, the tranche — and no configuration: the board sends the resolved chain config (`tickets/_meta/crew.md` over the defaults) and the runner holds it in memory. It is **one file per tickets vault**, `<fleet root>/chains/<vault key>/chain.json` (the folder name plus a hash of the path, `orchestrate/chain-state-paths.ts`), with `chain-vault.json` naming the vault served last; the file's `vault` field is the locator (path, store, git — how this machine reaches it). A config for another vault writes the current state away, empties it and loads that vault's file **under the boot rule** — so two vaults never share a master and a switch never carries an On Autopilot over. At boot the runner resolves the last vault's `crew.md` itself (`config/chain-config-restorer.ts`, the board's resolver), so the handover rule (*the chain keeps running across a handover moments ago*) works with Drey closed. A machine-wide `chain.json` from before is moved into its vault's file once (its `config` dropped) and kept as `chain.legacy.json` for the key migration.
+`chain.json` keeps **runtime state only** — the Autopilot, the column states, the breaker, the streaks, the holds
+(the tranche of the retired req-179 change above is gone since req-309) — and no configuration: the board sends the resolved chain config (`tickets/_meta/crew.md` over the defaults) and the runner holds it in memory. It is **one file per tickets vault**, `<fleet root>/chains/<vault key>/chain.json` (the folder name plus a hash of the path, `orchestrate/chain-state-paths.ts`), with `chain-vault.json` naming the vault served last; the file's `vault` field is the locator (path, store, git — how this machine reaches it). A config for another vault writes the current state away, empties it and loads that vault's file **under the boot rule** — so two vaults never share a master and a switch never carries an On Autopilot over. At boot the runner resolves the last vault's `crew.md` itself (`config/chain-config-restorer.ts`, the board's resolver), so the handover rule (*the chain keeps running across a handover moments ago*) works with Drey closed. A machine-wide `chain.json` from before is moved into its vault's file once (its `config` dropped) and kept as `chain.legacy.json` for the key migration.
 
 ## Later change — the chain's control model on the persona board (ADR-0098, milestones 247 – 248)
 

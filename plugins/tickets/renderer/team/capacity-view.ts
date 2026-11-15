@@ -1,17 +1,15 @@
 // i18n: catalog
 /**
- * The Capacity band (E13-8, board 7e; the Slots and Tranche-and-queue rows
+ * The Capacity band (E13-8, board 7e; the Slots and queue rows
  * milestone 218): a dock panel in the bottom dock - what each persona is
  * doing right now, today's cost against the budget, Pause all and "Open
  * Team", then one chip per slot (account) with its busy dots, quota and
- * reset, then the tranche and the queue. The same model as the Team tab
+ * reset, then the queue. The same model as the Team tab
  * (`team-model.ts`); the band is the glance, the tab the detail.
  */
 import { h } from '../desk-deps';
-import { resetTextOf, type SlotChipModel, type TrancheModel } from './capacity-model';
-import { usd, usdBudget } from './team-model';
+import { resetTextOf, type SlotChipModel } from './capacity-model';
 import type { I18n } from '../../../../shared/i18n/types';
-import { spanText } from '../../../../shared/tranche';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -104,31 +102,6 @@ export function slotChipNode(chip: SlotChipModel, i18n: I18n, now: Date): HTMLEl
     node.append(when);
   }
   return node;
-}
-
-/** The tranche's one line and its progress bar (the row's left part). */
-export function trancheNodes(tranche: TrancheModel, i18n: I18n): readonly HTMLElement[] {
-  const t = i18n.t as (key: string, params?: Record<string, string | number>) => string;
-  const params = {
-    index: tranche.index,
-    n: tranche.runs,
-    total: tranche.size ?? 0,
-    cost: usd(tranche.cost),
-    budget: usdBudget(tranche.budget ?? 0),
-    runs: tranche.runsLeft ?? 0,
-    time: tranche.msLeft === null ? '' : spanText(tranche.msLeft, (key, p) => i18n.t(key, p)),
-  };
-  const shape = (tranche.size === null ? '' : 'r') + (tranche.budget === null ? '' : 'b') + (tranche.msLeft === null ? '' : 't');
-  const text = h(
-    'span',
-    'desk-tranche-text',
-    shape === 'rbt' ? t('capacity.tranche.line', params) : t('capacity.tranche.line_short', { ...params, shape }),
-  );
-  const bar = h('span', 'desk-tranche-bar');
-  const fill = h('span', 'desk-tranche-fill');
-  fill.style.width = `${Math.round(tranche.progress * 100)}%`;
-  bar.append(fill);
-  return [text, bar];
 }
 
 /** The clock the pool popover's queue line starts with (the board's own shape; the base icon set has none). */

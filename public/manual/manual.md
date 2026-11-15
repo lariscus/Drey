@@ -1412,9 +1412,11 @@ busy and waiting time).
 
 ### The Autopilot switch
 
-**Autopilot** says whether the crew works by itself: **On** — workers pick up
-tickets on their own; **Paused** — the running step finishes, nothing new
-starts, optionally until a time you set (*Resume at*); **Off** — you start
+**Autopilot** says whether the crew works by itself: **On** — the crew picks
+up tickets from *Prioritized* in order, as far as the slots, the day's budget
+and the burn rate allow; each ticket walks its chain and ends with you.
+**Paused** — the running step finishes, nothing new starts, optionally until
+a time you set (*Resume at*); **Off** — nothing new starts, and you start
 every step. It reads the same everywhere: a status-bar item *● Autopilot · On*
 left of today's cost (click it or press `Mod+Alt+P`), the chip in the iPad
 header, the icon in the phone's app bar (Work, Crew and the chat; it draws the
@@ -1606,46 +1608,6 @@ repository") and she answers with a card — *Start a session of ben in …*.
 Nothing starts until you **Confirm**; Pia never chooses the permission (the
 crew's setting applies).
 
-### Tranches and the checkpoint report
-
-**On** never lets the crew run open-ended: it releases one **tranche** — up to
-a number of runs (10 by default), a share of the day's budget (a third) or a
-time span (4 hours), whichever ends first. While On, the popover shows where
-the tranche stands: *Tranche 4 of 10 runs*, today's cost, *2 h 10 min left*, a
-thin bar, and *Pauses with a checkpoint report after the tranche.* The status
-item's tooltip says the same (*Autopilot: On · tranche 4 of 10*), and the
-Board's pool chip has a line for it in its popover (*Tranche 4 of 10 runs ·
-$4.10 of $15 · checkpoint in 6 runs or 2 h 10 min*).
-
-When the tranche is used up, the Autopilot **pauses itself**: running steps
-finish, nothing new starts. The popover then reads *Paused at a checkpoint.*
-with a peach chip *Checkpoint report waiting*, and Mission Control (the
-Assistant's Mission Control conversation on the desktop, the chat on the phone
-and iPad) shows the **checkpoint report**: *Checkpoint · tranche 1 of 3 done*
-with four numbers — **Gate rate** (*7 of 8* green), **Change size** (the median
-lines added and removed per run), **Cost per run** (median and the most
-expensive) and **Repeated** (a ticket that ran twice or more) — and a line such
-as *Autopilot paused · 10 runs · $4.10 · 2 h 10 min*. The numbers are counted,
-not written by a model. **Release next tranche** (on the card, in the popover
-or on the phone's Autopilot sheet) starts the next tranche; **Adjust…** opens
-Settings → Tickets (on the phone and iPad: the Settings tab). A resume time set on the pause releases the next
-tranche when it comes.
-
-A tranche can also **stop early**, with a red card: *Stopped early · gate rate
-fell* (three of the last six gates red), *the same ticket failed again* (one
-ticket red twice), *changes grew* (a run changed far more lines than the
-tranche's median) or *a run cost far more* (three times the median). The card
-says what happened and lists the red tickets (*T-0119 · build · Ben · red
-twice*). **Open report** shows the tranche's four numbers; **Release anyway**
-goes on with the same tranche.
-
-The counts survive a restart: after one, the Autopilot is Off as always, the
-popover still shows the tranche (and a waiting report), and the next On goes on
-with it. The sizes and the early-stop limits are the tickets plugin's settings
-`autopilot.tranche.runs`, `.budgetShare`, `.minutes` and
-`autopilot.earlyStop.*`; `0` switches one off, and with all three sizes off
-the Autopilot runs without tranches.
-
 ### The burn rate
 
 The **burn rate** keeps the crew from using up a week's quota in a day: at
@@ -1763,7 +1725,7 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   crew's order — the same order as the Crew tab's. In the board's head the
   **pool chip** — `4/5 · 1 queued`, the running sessions over what the pools
   carry and what waits for a slot — opens **Capacity**: a chip per account (see
-  *Accounts and their quota*), the tranche, the ticket next in the pool's
+  *Accounts and their quota*), the ticket next in the pool's
   queue with its class and place, runs beyond the pool on a persona's minimum,
   **Pause all** and **Open in Service window**.
   A card shows the

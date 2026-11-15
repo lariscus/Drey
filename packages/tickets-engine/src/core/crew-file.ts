@@ -30,8 +30,7 @@ const isEntry = (value: unknown): value is Entry => typeof value === 'object' &&
 
 /**
  * A raw value checked against its kind; `undefined` = not readable. A
- * limit reads `off`, `false` and `0` as switched off (null), like the
- * tranche's config always did.
+ * `count` reads a non-negative number; a file's unknown keys are ignored.
  */
 export function crewValueOf(field: Pick<CrewField, 'kind'>, raw: unknown): CrewValue | undefined {
   switch (field.kind) {
@@ -41,14 +40,7 @@ export function crewValueOf(field: Pick<CrewField, 'kind'>, raw: unknown): CrewV
       return raw === 'accept-edits' || raw === 'bypass' ? raw : undefined;
     case 'count':
       return numberOf(raw, 0);
-    case 'limit':
-      return limitOf(raw);
   }
-}
-
-/** A limit: `off` / `false` / `0` is switched off (null), else a positive number. */
-function limitOf(raw: unknown): CrewValue | undefined {
-  return raw === false || raw === 'off' || raw === 0 || raw === '0' ? null : numberOf(raw, Number.MIN_VALUE);
 }
 
 function numberOf(raw: unknown, min: number): number | undefined {

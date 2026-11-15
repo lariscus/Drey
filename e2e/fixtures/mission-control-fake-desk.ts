@@ -127,38 +127,7 @@ const ROUTES: Record<string, () => unknown> = {
   '/api/settings': () => ({ ok: true }),
 };
 
-/** The tranche samples of boards 10t and 10u: a running tranche, a waiting checkpoint, an early stop. */
-export type FakeTranche = 'running' | 'checkpoint' | 'early';
-
-const TRANCHE_BASE = new Date(2026, 10, 7, 14, 10);
-const minutesFrom = (min: number): string => new Date(TRANCHE_BASE.getTime() + min * 60_000).toISOString();
-
-/** Board 10t: 4 of 10 runs, $4.10 of $15, 2 h 10 min left; the report is 10u part 1 (7 of 8 green, T-0119 twice), resume 18:00. */
-function trancheBlock(kind: FakeTranche): Record<string, unknown> {
-  const running = { index: 4, of: null, done: 4, total: 10, spent: 4.1, budget: 15, startedAt: minutesFrom(-87), endsAt: minutesFrom(130), checkpoint: null, report: null };
-  if (kind === 'running') {
-    return running;
-  }
-  const report = {
-    kind: 'end',
-    at: minutesFrom(-8),
-    endedBy: 'runs',
-    runs: 10,
-    spent: 4.1,
-    minutes: 130,
-    gates: { green: 7, total: 8 },
-    change: { added: 212, removed: 40 },
-    cost: { median: 0.41, max: 1.2 },
-    repeated: { ticket: 'T-0119', runs: 2 },
-    earlyStop: null,
-  };
-  const early = { ...report, kind: 'early', at: minutesFrom(-6), earlyStop: { rule: 'gate_rate', red: 3, window: 6, runsLeft: 6, ticket: null, value: null, median: null, tickets: [{ ticket: 'T-0119', phase: 'build', persona: 'ben', red: 2 }, { ticket: 'T-0124', phase: 'test', persona: 'tessa', red: 1 }, { ticket: 'T-0125', phase: 'review', persona: 'ralf', red: 1 }] } };
-  return { ...running, index: 1, of: 3, done: 10, checkpoint: 'waiting', report: kind === 'early' ? early : report };
-}
-
 export interface FakeDeskOptions {
-  /** Carries a tranche on the chain block (req-179); a waiting checkpoint or early stop starts the Autopilot Paused, resume 18:00. */
-  readonly tranche?: FakeTranche;
   /** Carries the burn rate's hold on the chain block (req-181): 21 % of 20 % today, resumes at the next UTC midnight. */
   readonly hold?: boolean;
   /** The device `/api/me` describes (default: writable). */
@@ -268,17 +237,13 @@ export async function startFakeDesk(
     NOTES_FIXTURE.vault = 'Main vault';
   }
   const autopilotWrites: unknown[] = [];
-  const waiting = options.tranche === 'checkpoint' || options.tranche === 'early';
-  const trancheExtras = (): Record<string, unknown> => ({
-    ...(options.tranche === undefined ? {} : { tranche: chain['tranche'] }),
+  const chainExtras = (): Record<string, unknown> => ({
     ...(options.hold === true ? { hold: chain['hold'] ?? null } : {}),
   });
   const holdLifts: unknown[] = [];
   const chain: Record<string, unknown> = {
     ...fleet.chain,
-    autopilot: waiting ? { state: 'paused', resumeAt: minutesFrom(230) } : { state: 'on' },
-    ...(options.tranche === undefined ? {} : { tranche: trancheBlock(options.tranche) }),
-    ...(waiting ? { autopilotSet: true } : {}),
+    autopilot: { state: 'on' },
     ...(options.hold === true
       ? {
           hold: {
@@ -287,7 +252,7 @@ export async function startFakeDesk(
             limit: 0.2,
             resumesAt: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate() + 1)).toISOString(),
             basis: 'measured',
-            since: minutesFrom(-20),
+            since: new Date(new Date(2026, 10, 7, 14, 10).getTime() - 20 * 60_000).toISOString(),
           },
         }
       : {}),
@@ -306,7 +271,7 @@ export async function startFakeDesk(
       return;
     }
     if (options.boards === true && (req.method === 'GET' || req.method === 'HEAD')) {
-      const answer = url.pathname === '/api/fleet' ? { ...BOARDS.FLEET, chain: { ...BOARDS.FLEET.chain, ...(chain['autopilotSet'] === true ? { autopilot: chain['autopilot'] } : {}), ...trancheExtras() } } : boardsRoute(url.pathname, options.pad === true, options.mission === true);
+      const answer = url.pathname === '/api/fleet' ? { ...BOARDS.FLEET, chain: { ...BOARDS.FLEET.chain, ...(chain['autopilotSet'] === true ? { autopilot: chain['autopilot'] } : {}), ...chainExtras() } } : boardsRoute(url.pathname, options.pad === true, options.mission === true);
       if (answer !== undefined) {
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify(answer));
@@ -337,9 +302,6 @@ export async function startFakeDesk(
         }
         chain['autopilot'] = body;
         chain['autopilotSet'] = true;
-        if (options.tranche !== undefined && body.state === 'on') {
-          chain['tranche'] = trancheBlock('running');
-        }
         chain['master'] = body.state === 'on' ? 'run' : 'halted';
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ ok: true, status: chain }));

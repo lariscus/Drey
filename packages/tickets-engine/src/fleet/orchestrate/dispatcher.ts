@@ -35,19 +35,10 @@ export interface DispatcherDeps {
   readonly pool?: DispatchPool;
   /** req-170: the Needs-you card of a full ledger. */
   readonly ledgerCards?: LedgerCards;
-  /** req-179: the tranche's release gate; absent = every start is released. */
-  readonly tranches?: TrancheGate;
   /** req-181: the burn rate's hold over every new start; absent = nothing holds. */
   readonly hold?: StartHold;
   /** req-257: the chain's pass — the dispatch by holder. */
   readonly holders: HolderPass;
-}
-
-/** The tranche as the dispatch sees it (req-179): may a start go, count one, raise a checkpoint the clock reached. */
-export interface TrancheGate {
-  mayStart(): boolean;
-  started(ticket: string): void;
-  review(): boolean;
 }
 
 /** What a pass found occupied: the live runs per pool and the tickets the plan must leave alone. */
@@ -105,20 +96,17 @@ export class Dispatcher {
     }
   }
 
-  /** What every pass counts first: the occupancy, the holds, the probes, a due tranche checkpoint. */
+  /** What every pass counts first: the occupancy, the holds, the probes. */
   private async prepare(config: ChainConfig, snap: BoardSnapshot): Promise<Occupancy> {
     const occupied = this.occupancy();
     this.holdFailingAndStopped(snap.columns, occupied.busy);
     await this.deps.pools.refreshProbes(config.pools ?? normalizeFleetPools(undefined));
-    if (this.deps.tranches?.review() === true) {
-      await this.deps.persist(); // req-179: the time span ran out — the checkpoint pauses the Autopilot before planning
-    }
     return occupied;
   }
 
   /**
    * req-257: the pass — the holders: the chain's plan (position order, the persona's pool, its min
-   * overrun), the starts through the pool and the tranche, and the holders' wait lines. No human gate
+   * overrun), the starts through the pool, and the holders' wait lines. No human gate
    * parks here: a You entry is the owner's in Needs you.
    */
   private async run(config: ChainConfig, snap: BoardSnapshot): Promise<void> {
@@ -164,21 +152,12 @@ export class Dispatcher {
     this.deps.pool?.queue.end();
   }
 
-  /** One plan item through the burn rate's hold (req-181) and the tranche's release gate (req-179); a start counts against the tranche. */
+  /** One plan item through the burn rate's hold (req-181); the pool, caps, breakers and hold guard every start. */
   private async dispatchOne(config: ChainConfig, snap: BoardSnapshot, item: PlanItem, pass: Pass): Promise<DispatchOutcome | 'queued'> {
-    const tranches = this.deps.tranches;
     if (pass.held) {
       return 'skipped'; // req-181: the burn rate is reached — nothing new starts until the day turns
     }
-    if (tranches !== undefined && !tranches.mayStart()) {
-      return 'skipped'; // req-179: the tranche is spent or a checkpoint waits — nothing new starts
-    }
-    const outcome = await this.askAndStart(config, snap, item, pass);
-    if (outcome === 'dispatched' && tranches !== undefined) {
-      tranches.started(item.card.id);
-      await this.deps.persist();
-    }
-    return outcome;
+    return this.askAndStart(config, snap, item, pass);
   }
 
   /** The class request first (a wait queues it), then the start; a granted ticket's ledger cards resolve. */

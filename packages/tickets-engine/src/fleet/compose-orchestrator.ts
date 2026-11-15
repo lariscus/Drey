@@ -30,16 +30,7 @@ import { SupervisorDirectory, type SupervisorPort } from './orchestrate/supervis
 import { TicketDispatch } from './orchestrate/ticket-dispatch';
 import { WaitNotes } from './orchestrate/wait-notes';
 import { PublishedHold, type StartHold } from './orchestrate/start-hold';
-import { TicketsGit } from '../core/tickets-git';
 import type { EventSink } from './ports/event-sink';
-import { AnomalyDetector } from './orchestrate/tranche/anomaly-detector';
-import { CheckpointReporter } from './orchestrate/tranche/checkpoint-reporter';
-import { GitChangeSize } from './orchestrate/tranche/git-change-size';
-import { RunFacts, type ChangeSizeReader } from './orchestrate/tranche/run-facts';
-import { TrancheBudget, type DayBudget } from './orchestrate/tranche/tranche-budget';
-import { TrancheLedger } from './orchestrate/tranche/tranche-ledger';
-import { TranchePublisher } from './orchestrate/tranche/tranche-publisher';
-import { Tranches } from './orchestrate/tranche/tranches';
 
 export interface OrchestratorDeps {
   readonly root: string;
@@ -75,37 +66,13 @@ export interface OrchestratorDeps {
   readonly capacity?: PoolCapacity;
   /** req-170: moves `fleet.pool.<provider>.size` into `service.json` once, when a chain config arrives. */
   readonly migratePools?: (config: ChainConfig) => Promise<void>;
-  /** req-179: the day's budget a tranche takes its share of (the provider ledger over the slots); absent = none. */
-  readonly dayBudget?: DayBudget;
-  /** req-179: the runner's event stream — the tranche's changes go out as `tranche` events; absent = none. */
+  /** The runner's event stream — the burn-rate hold's changes go out as `hold` events; absent = none. */
   readonly sink?: EventSink;
-  /** req-179: what a settled run changed (default: git in its worktree); a spec passes its own. */
-  readonly changeSize?: ChangeSizeReader;
 }
 
 /** req-279: the discipline texts of the briefs — the shipped files by default, a spec's fixture over the deps. */
 function disciplinesOf(deps: OrchestratorDeps): () => Promise<DisciplineTexts> {
   return deps.disciplines ?? loadDisciplineTexts;
-}
-
-/** The tranche parts (req-179); their changes go out after each write of `chain.json`. */
-function composeTranches(deps: OrchestratorDeps, state: ChainState, clock: ReturnType<typeof clockOf>): Tranches {
-  const git =
-    deps.changeSize ??
-    new GitChangeSize(() => {
-      const runner = new TicketsGit(() => state.config?.git ?? 'git');
-      return (cwd, args) => runner.run(cwd, args);
-    });
-  return new Tranches({
-    state,
-    ledger: new TrancheLedger(state, clock),
-    budget: new TrancheBudget(deps.dayBudget ?? { limitUsd: () => null }, clock),
-    reporter: new CheckpointReporter(),
-    detector: new AnomalyDetector(),
-    facts: new RunFacts(git),
-    clock,
-    log: deps.log,
-  });
 }
 
 /** req-181: the pool's burn-rate hold, told on the event stream when there is one. */
@@ -132,11 +99,8 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
   const state = new ChainState();
   const fs = deps.fs ?? new NodeFileSystem();
   const store = new ChainStateStore(deps.root, fs, clock, log);
-  const tranches = composeTranches(deps, state, clock);
-  const published = deps.sink === undefined ? null : new TranchePublisher(deps.sink, () => tranches.status());
   const persist = async (): Promise<void> => {
     await store.persist(state);
-    published?.publish();
   };
   const pipelineRead = (): Promise<void> => orchestrator.pipelineRead();
   const board = new ChainBoard({
@@ -160,11 +124,10 @@ export function composeOrchestrator(deps: OrchestratorDeps): Orchestrator {
     directory,
     pools,
     settled: new SettledRuns({ state, directory, pools, personaBreaker, clock, persist, ...events }),
-    dispatcher: new Dispatcher({ state, board, directory, pools, dispatch, notes, clock, log, pipelineRead, persist, tranches, holders: new HolderPass({ state, personas, directory, notes, breaker: personaBreaker, holds: new HoldRecorder({ book: state, persist, ...events }) }), ...pool, ...hold }),
+    dispatcher: new Dispatcher({ state, board, directory, pools, dispatch, notes, clock, log, pipelineRead, persist, holders: new HolderPass({ state, personas, directory, notes, breaker: personaBreaker, holds: new HoldRecorder({ book: state, persist, ...events }) }), ...pool, ...hold }),
     clock,
     log,
     scanIntervalMs: deps.scanIntervalMs ?? 15_000,
-    tranches,
     persist,
     restoreConfig: (vault) => new ChainConfigRestorer(fs).restore(vault),
     ...hold,

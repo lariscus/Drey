@@ -126,7 +126,7 @@ Invoke-RestMethod "http://127.0.0.1:$($d.port)/health" -Headers $h
 | `GET /status` | all runs (newest info per run) |
 | `GET /status/<runId>` | one run: `{run, streamPath}` |
 | `GET /stream/<runId>` | the run's stream.jsonl tail (last ~200 KB, ndjson) |
-| `GET /events` | the runner's events as server-sent events (req-176): `event: run` with a run's record each time it is persisted, `event: line` with `{runId, event}` for each line of a run's stream, `event: slot` with a slot's view when its state, windows or busy count changed (req-177), `event: pool` with the pool's live load when it changed (req-170), `event: tranche` with the tranche's status (req-179), `event: hold` with the burn rate's hold when it rose, changed its percent or cleared (`null`, req-181); a `: ping` comment every 15 s, `retry: 3000` at the start. A read: it never keeps the runner awake, and it ends when the runner goes to sleep — reconnect then. `curl.exe -N -H "Authorization: Bearer …" http://127.0.0.1:<port>/events` |
+| `GET /events` | the runner's events as server-sent events (req-176): `event: run` with a run's record each time it is persisted, `event: line` with `{runId, event}` for each line of a run's stream, `event: slot` with a slot's view when its state, windows or busy count changed (req-177), `event: pool` with the pool's live load when it changed (req-170), `event: hold` with the burn rate's hold when it rose, changed its percent or cleared (`null`, req-181); a `: ping` comment every 15 s, `retry: 3000` at the start. A read: it never keeps the runner awake, and it ends when the runner goes to sleep — reconnect then. `curl.exe -N -H "Authorization: Bearer …" http://127.0.0.1:<port>/events` |
 | `GET /log?tail=N` | daemon log tail, plain text (default 300 lines, max 2000; daemon builds) |
 | `GET /chain` | chain state + config (daemon builds); `slots` carries the 7e summary per slot (req-177); `pool` the live load (`{used, global, slots: [{id, label, used, cap, derived}]}`) and `queue` the tasks waiting for the pool (req-170) |
 | `GET /slots` | every slot (req-177): `{ok, slots: [{id, label, provider, billing, quota, state, busy, total, windows: [{name, spanMs, remaining, resetsAt, reliability, fetchedAt, used?, limit?, unit?, rejected?}], q, reason, lastFetch, lastFetchError, implied}], configPath}` — see "Slots" below |
@@ -522,9 +522,8 @@ its vault's file on the first boot (its `config` dropped) and kept as
 `chain.legacy.json`.
 
 `vault` (the locator: tickets vault path, store, git — how this machine
-reaches the vault; not configuration) · `autopilot` (`{state: on | paused | off, resumeAt?, reason?}`,
-the owner's switch; the runner resumes a Paused at its time; `reason:
-checkpoint` when the runner paused it at a tranche's end) · `master`
+reaches the vault; not configuration) · `autopilot` (`{state: on | paused | off, resumeAt?}`,
+the owner's switch; the runner resumes a Paused at its time) · `master`
 (`run` / `halted`, derived from it: On runs, Paused and Off halt) · `columns`
 (per-phase `playing` / `held`) · `redStreak` · `cooldownUntil` (per
 column ISO instant) · `tokensDay` + `tokensUsed` (the per-column token
@@ -546,9 +545,7 @@ last pass, `{ticket, persona, why: slot | persona, position, since}` in
 dispatch order, the pool's queue and the holders left without a place, empty
 unless the Autopilot is On; the Crew cards' queued rows) · `ledgerCards`
 (per ticket the keys of the ledger cards the pool raised and has not
-resolved yet — req-170) · `tranche` (the current tranche's counters:
-`index`, `day`, `startedAt`, `started`, `pending`, `facts`, `anomalyFrom`,
-`checkpoint` — req-179, see *Tranches and the checkpoint report*) · `handoverAt`
+resolved yet — req-170) · `handoverAt`
 (written by a runner retiring for a newer build; a successor booting
 within five minutes keeps the Autopilot as it stood — any other boot
 ends as Off, also a Paused whose resume time has not passed).
@@ -557,9 +554,7 @@ ends as Off, also a Paused whose resume time has not passed).
 the ISO instant its quota pause ends — not persisted) and `slots` (per
 slot: busy/total, the longest window's remaining share, its reliability,
 `q` and reset — req-177), `pool` (the live load), `queue` (the tasks
-waiting for the pool — req-170) and `tranche` (`index`, `of`, `done`,
-`total`, `spent`, `budget`, `startedAt`, `endsAt`, `checkpoint: waiting |
-null`, `report` — req-179) and `hold` (req-181: `{reason: "burn-rate", spent,
+waiting for the pool — req-170) and `hold` (req-181: `{reason: "burn-rate", spent,
 limit, resumesAt, basis: measured | estimated | mixed, since}` while the
 burn rate holds new starts, else `null`). The Work panel
 draws both as alerts with a Resume button (chain alerts fix); a runner
@@ -842,7 +837,7 @@ it routed.
 
 At most `routing.burnRate` of the **weekly quota per day over all
 slots**. `BurnRateMeter` measures today's share (the UTC day, as the
-ledgers and the tranche count it):
+ledgers count it):
 
 - a slot that reads its **weekly window** (`7d` with a remaining share)
   counts every drop of that share since the day's first reading; a rise
@@ -943,60 +938,11 @@ tickets plugin itself (Settings → Tickets → Remote access, default port
 the runner's port and token stay on loopback and are never handed to a
 device. Its own log lines start with `remote:` in the plugin log.
 
-## Tranches and the checkpoint report (req-179)
-
-The Autopilot's **On releases one tranche** (ADR-0077 later change
-2026-11-09): up to `runs` starts, a `budgetShare` of the day's budget or
-`minutes` from the release — whichever ends first. Runs count at the start,
-the spend counts the settled runs' costs, the span runs on the wall clock.
-The day's budget is the provider ledger (`ledgers.providerPerDay` in
-`service.json`) times the number of slots; without one the budget limit is
-not in force. At the end the runner sets the Autopilot to `{state: paused,
-reason: checkpoint}` — running steps finish, nothing new starts — and the
-chain status carries `tranche.checkpoint: "waiting"` with `tranche.report`.
-
-**Config** — the tickets plugin's keys, sent in the chain config
-(`ChainConfig.tranche`, normalized per key; `0` / `off` switches a limit
-or a rule off; all three limits off = no tranches):
-
-| Key | Default | Meaning |
-|---|---|---|
-| `autopilot.tranche.runs` | 10 | runs one tranche releases |
-| `autopilot.tranche.budgetShare` | 0.33 | share (0–1] of the day's budget; `round(1/share)` tranches a day (`tranche 1 of 3`) |
-| `autopilot.tranche.minutes` | 240 | the span from the release |
-| `autopilot.earlyStop.redGates` / `gateWindow` | 3 / 6 | falling gate rate: this many red among the last N gates |
-| `autopilot.earlyStop.sameTicketRed` | 2 | the same ticket red this often in the tranche |
-| `autopilot.earlyStop.changeFactor` | 3 | a run's change above this × the tranche's median |
-| `autopilot.earlyStop.costFactor` | 3 | a run's cost above this × the tranche's median |
-| `autopilot.earlyStop.minRuns` | 3 | runs with a figure before the two median rules apply |
-
-**The report** (`tranche.report`): `kind` (`end` | `early`), `at`,
-`endedBy` (`runs` | `budget` | `time`), `runs`, `spent`, `minutes`, `gates
-{green, total}`, `change {added, removed}` (medians of the runs' own commits:
-`git log --since=<start> --numstat` in the worktree; null when none was
-read), `cost {median, max}`, `repeated {ticket, runs}`, `earlyStop {rule,
-red, window, runsLeft, ticket, value, median, tickets[]}`. Recomputed on
-every read from the facts `chain.json` keeps.
-
-**Release.** No endpoint of its own — `POST /chain/autopilot {state: on}`:
-after an end checkpoint (or with the tranche spent) the next tranche opens;
-after an early stop the same tranche goes on and the rules look past the
-anomaly; after a manual Pause, an Off or a restart the same tranche goes on
-while it has room. A restart boots Off (the boot rule) and keeps the
-tranche, a waiting checkpoint included.
-
-**Log lines** (one per tranche event, in the runner log):
-
-```
-tranche 2 released · up to 10 runs or $5.00 or until 2026-11-09T16:00:00.000Z
-tranche 4 of 10 runs · checkpoint in 6 runs
-checkpoint: tranche 1 of 3 done (runs released) — 10 runs · $4.10 · 130 min · 7 of 8 green — the autopilot pauses until the next tranche is released
-stopped early: 3 of the last 6 gates were red — the tranche had 6 runs left — nothing new starts until the owner releases it
-tranche 1 released again after the early stop — the rules look past it
-```
-
-`GET /events` sends `event: tranche` with the status (or `null`) after every
-change.
+The Autopilot has no batches: it is on/off and starts work from *Prioritized*
+whenever the pool, the caps, the day's budget (provider ledger), the
+burn-rate hold and the breakers allow (req-309 retired the tranches of
+req-179/milestone 221, owner 2026-11-15 — a leftover `tranche:` block in
+`crew.md` and an `autopilot.tranche.*` config key are read by nothing).
 
 ## The resource governor (req-180)
 
@@ -1387,7 +1333,7 @@ window, the Crew tab and Pia's confirmed `startSession` card all call it):
 | Layer | Where | Holds |
 |---|---|---|
 | Machine | `service.json` in the service home (`fleet/routing/service-config-schema.ts`, read and written only through `ServiceConfigFile`), and for now the engine's `config.json` for Drey's mirrored device settings (`service.*`, `remote.*`, `chat.*`, `gitPath`, `dk.*` — req-231 folds them in) | the model table, the capacity cap, slots, providers and keys, paths, autostart |
-| Vault | `tickets/_meta/crew.md` (`specs/ticket-schema.md`), beside `pipeline.md`, `personas/` and `repos.md` | default persona, default worker, permission mode, caps, handover thresholds, tranche |
+| Vault | `tickets/_meta/crew.md` (`specs/ticket-schema.md`), beside `pipeline.md`, `personas/` and `repos.md` | default persona, default worker, permission mode, caps, handover thresholds |
 | Session | the session record (`RunRequest` / `RunInfo`) | directory, class, model pin, handover mode, permission override |
 
 Precedence, enforced by `fleet/config/layered-config-resolver.ts`:

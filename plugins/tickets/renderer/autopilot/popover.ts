@@ -18,7 +18,6 @@ import {
   type AutopilotView,
 } from '../../../../shared/autopilot';
 import { burnRateLineOf, type BurnRateHoldView } from '../../../../shared/burn-rate';
-import { trancheChipsOf, trancheProgressOf, type TrancheView } from '../../../../shared/tranche';
 import type { Translate } from '../status-slot';
 import type { AutopilotOutcome } from './controller';
 
@@ -33,10 +32,6 @@ export interface AutopilotPopoverDeps {
   readonly chord: string;
   /** The status item's "$4.10 of $15 today"; null = nothing known (no chip). */
   readonly costText: () => string | null;
-  /** The chain's tranche (req-179, board 10t); null = the runner reports none, the popover stays as before. */
-  readonly tranche?: () => TrancheView | null;
-  /** "Adjust…" at a checkpoint: Settings → Tickets. */
-  readonly adjust?: () => void;
   /** req-181: the burn rate's hold; while one holds, the On / Paused line says so. */
   readonly hold?: () => BurnRateHoldView | null;
   /** The status item the popover sits above; null keeps the stylesheet's corner. */
@@ -213,21 +208,6 @@ export function openAutopilotPopover(deps: AutopilotPopoverDeps, onClosed: () =>
 
   const sentence = node('span', 'tickets-autopilot-sentence');
   const chips = node('div', 'tickets-autopilot-chips');
-  const bar = node('div', 'tickets-autopilot-bar');
-  const barFill = node('span', 'tickets-autopilot-bar-fill');
-  bar.append(barFill);
-  const trancheNote = node('span', 'tickets-autopilot-tranche-note', t('autopilot.tranche_note'));
-  const actions = node('div', 'tickets-autopilot-actions');
-  const release = node('button', 'tickets-autopilot-release', t('autopilot.release_next'));
-  release.type = 'button';
-  release.addEventListener('click', () => void deps.set({ state: 'on' }).then(settle));
-  const adjust = node('button', 'tickets-autopilot-adjust', t('autopilot.adjust'));
-  adjust.type = 'button';
-  adjust.addEventListener('click', () => {
-    close();
-    deps.adjust?.();
-  });
-  actions.append(release, adjust);
   const divider = node('div', 'tickets-autopilot-divider');
   const stopLabel = node('span', 'tickets-autopilot-stop-label');
   const stop = node('button', 'tickets-autopilot-stop');
@@ -248,7 +228,7 @@ export function openAutopilotPopover(deps: AutopilotPopoverDeps, onClosed: () =>
   });
   const note = node('p', 'tickets-autopilot-note');
   note.setAttribute('role', 'alert');
-  root.append(head, seg, sentence, chips, bar, trancheNote, actions, divider, stop, note);
+  root.append(head, seg, sentence, chips, divider, stop, note);
 
   /** Paused only: the engine takes no resume time on any other state. */
   const resumeChip = (view: AutopilotView): HTMLElement => {
@@ -278,16 +258,6 @@ export function openAutopilotPopover(deps: AutopilotPopoverDeps, onClosed: () =>
     return chip;
   };
 
-  /** The tranche to show: On while one runs (chips, bar, note) or a waiting checkpoint (Paused). */
-  const trancheShown = (view: AutopilotView): { readonly tranche: TrancheView; readonly checkpoint: boolean } | null => {
-    const tranche = deps.tranche?.() ?? null;
-    if (tranche === null) {
-      return null;
-    }
-    const checkpoint = view.state === 'paused' && tranche.checkpoint === 'waiting';
-    return checkpoint || (view.state === 'on' && tranche.checkpoint === null) ? { tranche, checkpoint } : null;
-  };
-
   const paintChips = (view: AutopilotView): void => {
     if (timeField !== null && view.state !== 'paused') {
       timeField = null;
@@ -296,16 +266,6 @@ export function openAutopilotPopover(deps: AutopilotPopoverDeps, onClosed: () =>
       return;
     }
     chips.replaceChildren();
-    const shown = trancheShown(view);
-    const now = (deps.now ?? (() => new Date()))();
-    const running = shown !== null && !shown.checkpoint;
-    const words = running ? trancheChipsOf(shown.tranche, now, t) : null;
-    if (shown?.checkpoint === true) {
-      chips.append(node('span', 'tickets-autopilot-chip tickets-autopilot-chip-attention', t('autopilot.checkpoint_waiting')));
-    }
-    if (words !== null) {
-      chips.append(node('span', 'tickets-autopilot-chip', words.runs));
-    }
     if (view.state === 'paused') {
       chips.append(resumeChip(view));
     }
@@ -313,16 +273,7 @@ export function openAutopilotPopover(deps: AutopilotPopoverDeps, onClosed: () =>
     if (cost !== null) {
       chips.append(node('span', 'tickets-autopilot-chip', cost));
     }
-    if (words?.left) {
-      chips.append(node('span', 'tickets-autopilot-chip', words.left));
-    }
     chips.hidden = chips.childElementCount === 0;
-    bar.hidden = !running;
-    trancheNote.hidden = !running;
-    actions.hidden = shown?.checkpoint !== true;
-    if (running) {
-      barFill.style.width = `${Math.round(trancheProgressOf(shown.tranche, now) * 100)}%`;
-    }
   };
 
   function paint(): void {
@@ -336,12 +287,8 @@ export function openAutopilotPopover(deps: AutopilotPopoverDeps, onClosed: () =>
       radio.setAttribute('aria-checked', String(checked));
       radio.tabIndex = checked ? 0 : -1;
     });
-    const checkpoint = trancheShown(view)?.checkpoint === true;
-    const hold = view.state === 'off' || checkpoint ? null : (deps.hold?.() ?? null);
-    sentence.textContent =
-      hold !== null
-        ? burnRateLineOf(hold, { t, time: deps.formatTime })
-        : t(checkpoint ? 'autopilot.sentence.checkpoint' : `autopilot.sentence.${view.state}`);
+    const hold = view.state === 'off' ? null : (deps.hold?.() ?? null);
+    sentence.textContent = hold !== null ? burnRateLineOf(hold, { t, time: deps.formatTime }) : t(`autopilot.sentence.${view.state}`);
     paintChips(view);
     stop.classList.toggle('tickets-autopilot-armed', armed);
     stopLabel.textContent = t(armed ? 'autopilot.stop_all.confirm' : 'autopilot.stop_all');

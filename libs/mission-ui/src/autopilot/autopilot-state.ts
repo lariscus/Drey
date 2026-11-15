@@ -1,7 +1,6 @@
 import { InjectionToken, type Signal } from '@angular/core';
 import { autopilotRefusalCodeOf, type AutopilotRefusalCode, type AutopilotView } from '../../../../shared/autopilot';
 import type { BurnRateHoldView } from '../../../../shared/burn-rate';
-import type { TrancheView } from '../../../../shared/tranche';
 
 export type { AutopilotView };
 
@@ -19,8 +18,6 @@ export type McAutopilotReply =
 export interface McAutopilotState {
   /** The state and resume time; null = the desk has no chain config (every control hides). */
   readonly autopilot: Signal<AutopilotView | null>;
-  /** The running tranche (req-179), with the waiting checkpoint's report; null without one. */
-  readonly tranche: Signal<TrancheView | null>;
   /** A read-only device sees the state; every control is disabled. */
   readonly readOnly: Signal<boolean>;
   /** Switches the state (`POST /api/chain/autopilot`). */
@@ -36,19 +33,6 @@ export interface McAutopilotState {
 export const MC_AUTOPILOT = new InjectionToken<McAutopilotState | null>('mc-autopilot', {
   providedIn: 'root',
   factory: () => null,
-});
-
-/**
- * "Adjust…" on a checkpoint: the shell registers how it opens Settings
- * (where the Autopilot lives); null until it does.
- */
-export interface McAutopilotAdjust {
-  open: (() => void) | null;
-}
-
-export const MC_AUTOPILOT_ADJUST = new InjectionToken<McAutopilotAdjust>('mc-autopilot-adjust', {
-  providedIn: 'root',
-  factory: () => ({ open: null }),
 });
 
 /** A refused chain write as the surfaces read it: the engine's code when the body carried one, else the words it sent. */

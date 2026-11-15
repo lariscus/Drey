@@ -274,7 +274,6 @@ test.describe('Board, Team and the pool chip (E13-8, req-271)', () => {
     await expect(pop.locator('.desk-slot[data-slot="zai"] .desk-slot-fill-estimated')).toHaveCount(1);
     await expect(pop.locator('.desk-slot[data-slot="kimi"] .desk-slot-note')).toHaveText('unknown');
     await expect(pop.locator('.desk-slot[data-slot="kimi"] .desk-slot-bar')).toHaveCount(0);
-    await expect(pop.locator('.desk-tranche-text')).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('desk-pool-chip.png') });
     await page.keyboard.press('Escape');
     await expect(pop).toBeHidden();

@@ -4,8 +4,9 @@
  * so a second device reading the same `_meta/` sees the same crew. Its
  * frontmatter holds the crew's defaults and limits — the default persona,
  * the default worker, the permission mode of dispatched runs and the caps
- * (instruction output caps, handover thresholds, the Autopilot's tranche).
- * Every key is optional; an absent key is the built-in default.
+ * (instruction output caps, handover thresholds).
+ * Every key is optional; an absent key is the built-in default. A key of a
+ * retired feature (e.g. a leftover `tranche:` block) is ignored.
  *
  * The machine layer (`service.json`) and the session layer (the session
  * record) are elsewhere; `fleet/config/layered-config-resolver.ts` is the
@@ -23,9 +24,7 @@ export type CrewValueKind =
   /** `accept-edits` or `bypass` — the dispatched runs' mode (read-only is a session's, never a crew default). */
   | 'permission'
   /** A non-negative number (the caps, the handover thresholds). */
-  | 'count'
-  /** A positive number, or `off` for no limit (the tranche, its early stop). */
-  | 'limit';
+  | 'count';
 
 /** One key of the file: its camelCase id (the API's), its YAML path, its kind. */
 export interface CrewField {
@@ -47,15 +46,6 @@ export const CREW_KEYS = [
   'handover.compactAboveTokens',
   'handover.resumePauseTtlMin',
   'handover.contextCapTokens',
-  'tranche.runs',
-  'tranche.budgetShare',
-  'tranche.minutes',
-  'tranche.earlyStop.redGates',
-  'tranche.earlyStop.gateWindow',
-  'tranche.earlyStop.sameTicketRed',
-  'tranche.earlyStop.changeFactor',
-  'tranche.earlyStop.costFactor',
-  'tranche.earlyStop.minRuns',
 ] as const;
 
 export type CrewKey = (typeof CREW_KEYS)[number];
@@ -69,7 +59,7 @@ function kindOf(key: CrewKey): CrewValueKind {
   if (key === 'defaultPersona' || key === 'defaultWorker') {
     return 'text';
   }
-  return key.startsWith('tranche.') ? 'limit' : 'count';
+  return 'count';
 }
 
 function legacyOf(key: CrewKey): string {
@@ -83,13 +73,7 @@ function legacyOf(key: CrewKey): string {
   if (key.startsWith('caps.')) {
     return `fleet.cap.${leaf}`;
   }
-  if (key.startsWith('handover.')) {
-    return `fleet.${leaf}`;
-  }
-  if (key.startsWith('tranche.earlyStop.')) {
-    return `autopilot.earlyStop.${leaf}`;
-  }
-  return key.startsWith('tranche.') ? `autopilot.tranche.${leaf}` : key;
+  return key.startsWith('handover.') ? `fleet.${leaf}` : key;
 }
 
 /** Every key with its YAML path (`caps.gateFailureLines` → `caps / gate-failure-lines`) and its legacy key. */

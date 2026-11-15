@@ -25,8 +25,6 @@ export interface StatusSlotInput {
   readonly autopilot: AutopilotState | null;
   /** True while the Notes view is active: the needs-you item then says where. */
   readonly inNotesView: boolean;
-  /** The tranche's run count (req-179); its tooltip names it when the tranche has a run limit. */
-  readonly tranche?: { readonly done: number; readonly total: number | null } | null;
   /** req-181: the burn rate holds every new start until this time of day (`00:00`, the locale's); null = nothing holds. */
   readonly holdUntil?: string | null;
 }
@@ -73,12 +71,7 @@ export const AUTOPILOT_CHORD = 'Mod+Alt+P';
 export const AUTOPILOT_COMMAND_ID = 'tickets.autopilot';
 
 /** The Autopilot item (concept 6.1, board 10t): green dot On, orange Paused, grey (no dot) Off. */
-export function autopilotSlotOf(
-  autopilot: AutopilotState | null,
-  t: Translate,
-  tranche: StatusSlotInput['tranche'] = null,
-  holdUntil: string | null = null,
-): StatusSlotPatch {
+export function autopilotSlotOf(autopilot: AutopilotState | null, t: Translate, holdUntil: string | null = null): StatusSlotPatch {
   if (autopilot === null) {
     return HIDDEN;
   }
@@ -86,9 +79,7 @@ export function autopilotSlotOf(
   const tooltip =
     holdUntil !== null && autopilot !== 'off'
       ? t('status.autopilot.tooltip_burn_rate', { state, time: holdUntil, chord: AUTOPILOT_CHORD })
-      : tranche?.total == null
-        ? t('status.autopilot.tooltip', { state, chord: AUTOPILOT_CHORD })
-        : t('status.autopilot.tooltip_tranche', { state, done: tranche.done, total: tranche.total, chord: AUTOPILOT_CHORD });
+      : t('status.autopilot.tooltip', { state, chord: AUTOPILOT_CHORD });
   return {
     text: t('status.autopilot', { state }),
     tooltip,
@@ -100,7 +91,7 @@ export function statusSlotsOf(input: StatusSlotInput, t: Translate): StatusSlots
   return {
     cost: costSlotOf(input.cost, input.budget, t),
     needs: needsSlotOf(input.needsYou, input.inNotesView, t),
-    autopilot: autopilotSlotOf(input.autopilot, t, input.tranche, input.holdUntil ?? null),
+    autopilot: autopilotSlotOf(input.autopilot, t, input.holdUntil ?? null),
   };
 }
 

@@ -83,6 +83,6 @@ describe('Drey Service window', () => {
     root.querySelectorAll<HTMLButtonElement>('[role="tab"]')[2]?.click();
     await settle(fixture);
     expect(root.textContent).toContain('All components');
-    expect(root.textContent).toContain('tranche 4 of 10 runs');
+    expect(root.textContent).toContain('pool 3 of 5 sessions');
   });
 });

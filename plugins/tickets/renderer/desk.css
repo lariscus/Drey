@@ -563,28 +563,6 @@
   flex: none;
 }
 
-.desk-tranche-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.desk-tranche-bar {
-  flex: none;
-  width: 120px;
-  height: 4px;
-  border-radius: var(--radius-chip);
-  background: var(--bg-input);
-}
-
-.desk-tranche-fill {
-  display: block;
-  height: 4px;
-  border-radius: var(--radius-chip);
-  background: var(--accent);
-}
-
 /* A thin bar, shared by the Crew head and the band. */
 .desk-bar {
   display: block;
@@ -1044,7 +1022,6 @@
 }
 
 .pb-pool-sub,
-.pb-pool-tranche,
 .pb-pool-queue {
   color: var(--text-4);
 }
@@ -1058,20 +1035,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-
-.pb-pool-tranche {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.pb-pool-tranche .desk-tranche-text {
-  white-space: normal;
-}
-
-.pb-pool-tranche .desk-tranche-bar {
-  width: auto;
 }
 
 .pb-pool-queue {

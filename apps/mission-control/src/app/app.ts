@@ -9,7 +9,7 @@ import {
   type Signal,
 } from '@angular/core';
 import { McState, type McTab } from './api/state';
-import { MC_AUTOPILOT_ADJUST } from '@mission-ui/autopilot/autopilot-state';
+
 import { Empty } from '@mission-ui/empty';
 import { Toast } from '@mission-ui/toast';
 import { Pairing } from '@mission-ui/pairing/pairing';
@@ -250,7 +250,6 @@ export class App {
   protected readonly area = computed<ShellArea>(() => areaOf(this.tab()) ?? this.lastArea());
 
   constructor() {
-    inject(MC_AUTOPILOT_ADJUST).open = () => this.goTab('settings');
     // The menu is the phone's root screen; the wide layouts open on Work.
     if (this.isPhone() && this.tab() === 'work') {
       this.tab.set('menu');

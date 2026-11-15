@@ -4890,69 +4890,37 @@ The share a run takes is learned after it: `PoolGate` tells `RunShareTracker` th
 has ended, the first newer reading of the slot (a `slot` event) gives each window's drop, shared among the runs the
 slot carried at once, and becomes a sample for the ticket and the persona on that slot.
 
-## 6.104 Tranche end → checkpoint card → release (req-179, milestone 221, [ADR-0077](09_architecture_decisions/0077-continuous-orchestration.md) later change)
+## 6.104 Autopilot on → starts from Prioritized (req-309, [ADR-0077](09_architecture_decisions/0077-continuous-orchestration.md))
 
-The Autopilot's On releases one tranche. Each start passes the dispatcher's release gate and counts; each settled run
-of the tranche becomes a fact; a reached limit (runs, the budget share, the time span) or a fired early-stop rule
-raises the checkpoint: the runner pauses the Autopilot itself and the chain status carries the report. Every client
-draws the same card from it; the owner's *Release next tranche* is the Autopilot's On.
+The Autopilot is on/off (req-309 retired the tranches of req-179, owner
+2026-11-15): On starts work from *Prioritized* in order whenever the pool,
+the caps, the day's budget (provider ledger), the burn-rate hold and the
+breakers allow; each ticket walks its chain and ends with You. Off starts
+nothing new; running steps finish.
 
 ```mermaid
 sequenceDiagram
     actor O as Owner
-    participant C as Client (popover / Mission Control card)
+    participant C as Client (popover / Mission Control)
     participant OR as Orchestrator
-    participant T as Tranches
-    participant L as TrancheLedger
     participant D as Dispatcher
     participant S as Supervisor (run)
-    participant F as RunFacts (git log --numstat)
-    participant A as AnomalyDetector
-    participant B as TrancheBudget
-    participant J as chain.json
     O->>C: Autopilot On
     C->>OR: POST /chain/autopilot {state: on}
-    OR->>T: onAutopilot(on)
-    T->>L: open() — tranche n (index per UTC day)
-    OR->>J: persist (+ tranche event on GET /events)
+    OR->>J: persist
     loop each pass
-        D->>T: review() — has the span run out?
-        D->>T: mayStart()?
-        alt spent or a checkpoint waits
-            T-->>D: false — nothing new starts
+        D->>D: holders first, then the plan in order
+        alt the burn rate holds / the pool is full / a breaker is tripped
+            D-->>C: the wait lines (queued, waits for Ben)
         else room
             D->>S: start the plan item
-            D->>T: started(ticket) — counts; the N-th start raises the checkpoint at once
         end
     end
     S-->>OR: onRunSettled(info)
-    OR->>T: settled(info)
-    T->>F: of(info) — gate, cost, +added −removed of the run's own commits
-    T->>L: settled(fact) — only a ticket this tranche released
-    T->>A: check(facts since the last release)
-    alt a rule fires (gate rate, same ticket, change, cost)
-        T->>L: raise(early checkpoint)
-    else
-        T->>B: exhaustedBy() — runs, budget, time
-        B-->>T: runs / budget / time → raise(end checkpoint)
-    end
-    T->>OR: Autopilot := Paused, reason checkpoint (running steps finish)
-    OR->>J: persist (tranche.checkpoint, facts)
-    C->>OR: GET /chain (the fleet snapshot)
-    OR-->>C: tranche {checkpoint: waiting, report}
-    C->>C: trancheCardOf() — Checkpoint · tranche 1 of 3 done, 2×2 metrics
-    O->>C: Release next tranche (or Release anyway after an early stop)
-    C->>OR: POST /chain/autopilot {state: on}
-    OR->>T: onAutopilot(on)
-    alt end checkpoint
-        T->>L: open() — tranche n+1
-    else early stop
-        T->>L: continueAfterEarlyStop() — same tranche, the rules look past it
-    end
+    OR->>D: a fresh pass — the slot is free
 ```
 
-A restart boots Off (the boot rule) and restores the tranche from `chain.json`, a waiting checkpoint included; the
-next On continues the same tranche while it has room. The card goes away when the checkpoint clears.
+A restart boots Off (the boot rule).
 
 ## 6.105 Drey Service's tray and window: tray start → window open → component restart (req-165, milestone 222, [ADR-0092](09_architecture_decisions/0092-drey-service-the-shipped-background-process.md))
 
@@ -5095,7 +5063,7 @@ sequenceDiagram
         G->>M: reading() — mean over the counted slots: measured drops, else today's runs × RunShareTracker's share
         alt below the limit, lifted today, or burnRate 0
             G-->>HS: null
-            D->>D: start the plan items (tranche gate, class request …)
+            D->>D: start the plan items (class request …)
         else at or above the limit
             G-->>HS: {spent, limit, resumesAt: next UTC midnight, basis}
             HS->>HS: log once "route refused · burn rate 21 % of 20 % today · resumes 01:00"
@@ -5483,7 +5451,7 @@ sequenceDiagram
     participant Mach as service.json (machine)
     Board->>Crew: effective(vault) on every snapshot
     Crew->>Res: crew(_meta/crew.md)
-    Res-->>Board: default worker, permission mode, caps, handover, tranche, default persona (vault > default)
+    Res-->>Board: default worker, permission mode, caps, handover, default persona (vault > default)
     Board->>Run: configureChain(resolved config) — held in memory
     Run->>Run: switchTo(vault): chains/<vault key>/chain.json (runtime only)
     Run->>Mach: the pool's grant reads the model table, the cap, the slots (machine only)

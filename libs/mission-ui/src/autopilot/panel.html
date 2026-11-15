@@ -25,9 +25,6 @@
           </button>
         }
       </div>
-      @if (waiting()) {
-        <button type="button" class="ph-release" [disabled]="disabled()" (click)="release()">{{ 'autopilot.release_next' | t }}</button>
-      }
       <button type="button" class="ph-stop" [class.armed]="armed()" [disabled]="disabled()" (click)="stop()">
         <mc-ph-icon name="stop" [size]="18" />
         {{ (armed() ? 'autopilot.stop_all.confirm' : 'autopilot.stop_all') | t }}
@@ -54,12 +51,6 @@
     </div>
     <span class="pd-sentence">{{ holdLine() ?? (sentenceKey() | t) }}</span>
     <div class="pd-chips">
-      @if (waiting()) {
-        <span class="pd-chip pd-attention">{{ 'autopilot.checkpoint_waiting' | t }}</span>
-      }
-      @if (readout(); as tranche) {
-        <span class="pd-chip">{{ tranche.runs }}</span>
-      }
       @if (current.state === 'paused') {
         <label class="pd-chip pd-resume">
           <span>{{ resumeText() ?? ('autopilot.resume_time' | t) }}</span>
@@ -69,24 +60,7 @@
       @if (todayText(); as today) {
         <span class="pd-chip">{{ today }}</span>
       }
-      @if (readout(); as tranche) {
-        @if (tranche.left; as left) {
-          <span class="pd-chip">{{ left }}</span>
-        }
-      }
     </div>
-    @if (readout(); as tranche) {
-      <div class="pd-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="tranche.percent" [attr.aria-label]="tranche.runs">
-        <span class="pd-fill" [style.width.%]="tranche.percent"></span>
-      </div>
-      <span class="pd-note">{{ 'autopilot.tranche_note' | t }}</span>
-    }
-    @if (waiting()) {
-      <div class="pd-actions">
-        <button type="button" class="pd-release" [disabled]="disabled()" (click)="release()">{{ 'autopilot.release_next' | t }}</button>
-        <button type="button" class="pd-adjust" (click)="adjust()">{{ 'autopilot.adjust' | t }}</button>
-      </div>
-    }
     <div class="pd-rule"></div>
     <button type="button" class="pd-stop row stop" [class.armed]="armed()" [disabled]="disabled()" (click)="stop()">
       <mc-ph-icon name="stop" [size]="16" />

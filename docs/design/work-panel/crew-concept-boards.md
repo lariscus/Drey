@@ -27,7 +27,9 @@ build sessions know what the screens stand on):
   downgrade**: a session requests a capability class and gets exactly it or waits (R10).
 - **Tranches**: the Autopilot's On always releases one tranche (N runs, a budget share or a
   time span, whichever first); at its end the runner pauses and the Lead presents a
-  checkpoint report; anomalies stop early.
+  checkpoint report; anomalies stop early. **Retired 2026-11-15** (req-309): the
+  Autopilot is on/off; the boards' tranche parts (10t's chips and bar, 10u parts 1
+  and 6) stand in the files as history.
 - **Governor**: tasks take seats of a class (`light` = model runs, `heavy` = tests, builds,
   dev servers, browsers); 1–2 heavy at once, low process priority, a CPU/RAM reserve.
 - **The Lead is Pia** (Mission Control) with a fixed command set; her decisions reach the
@@ -48,7 +50,7 @@ build sessions know what the screens stand on):
 | **8c** (new) | `DeskServiceSettings` | 1440×900 | Settings → Background service: status and controls, background service on/off, start with Windows, keep running, taskbar icon, components, **Load** (heavy seats, reserve, low priority, quiet hours), logs | Schnittstelle; Begrenzungen → Lokale Last | req-165, ADR-0092 | `src/app/settings/**` (core category) |
 | **10u** (new) | `MCCards` | 1480×1160 | The Lead's decision cards at 1:1, desktop and phone: checkpoint report, merge conflict (runner stopped), budget stop (ticket allowance), quota stop (slot empty), queued explanation, early stop (anomaly) | Akteure (Lead); Kreislauf; Worktrees → Konflikte; Begrenzungen | ADR-0093 (Pia executes), ADR-0095 ledgers; new roadmap rows needed for tranche, governor, slots (see §4) | `plugins/tickets/renderer/conversation/**` (desktop Assistant cards), `libs/mission-ui/src/**` (phone) |
 
-**Build status (2026-11-09):** 8c built (milestone 216), 7e built (milestones 218 and 221 — the tranche part of row 3), 7l built (milestone 220), **10t built** (milestone 221, req-179: desktop On and the checkpoint state, iPad On and Paused at a checkpoint, the phone sheet) and **10u parts 1, 6 and 7 built** (milestone 221: the checkpoint and early-stop cards in the desktop Assistant's Mission Control thread, the phone/iPad chat card); 10u parts 2–5, 8, 9 wait for the rows that raise those cards; 8a / 8b with req-165 / 166 (milestone 222). Milestone 224 (req-181): 7l's **Routing group is wired** (the three fields read and store the engine's `routing`), and the **burn-rate card** — no part of its own — takes 10u's chrome laid out like part 4 (desktop) and part 9 (phone). Milestone numbers provisional until the integrator merges.
+**Build status (2026-11-09):** 8c built (milestone 216), 7e built (milestones 218 and 221 — the tranche part of row 3), 7l built (milestone 220), **10t built** (milestone 221, req-179: desktop On and the checkpoint state, iPad On and Paused at a checkpoint, the phone sheet) and **10u parts 1, 6 and 7 built** (milestone 221: the checkpoint and early-stop cards in the desktop Assistant's Mission Control thread, the phone/iPad chat card); 10u parts 2–5, 8, 9 wait for the rows that raise those cards; 8a / 8b with req-165 / 166 (milestone 222). Milestone 224 (req-181): 7l's **Routing group is wired** (the three fields read and store the engine's `routing`), and the **burn-rate card** — no part of its own — takes 10u's chrome laid out like part 4 (desktop) and part 9 (phone). Milestone numbers provisional until the integrator merges. **Retired 2026-11-15 (req-309):** 10t's tranche parts and 10u parts 1 and 6 (the checkpoint and early-stop cards) are gone from the product — the Autopilot is on/off; the burn-rate card (part 9's chrome) stays.
 
 Not changed, by decision: 7f Crew tab and 7k Persona page (req-171's mockup
 `crew-internals/persona-page-mockup.html` stands; the concept adds only the per-persona

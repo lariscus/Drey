@@ -218,9 +218,9 @@ the `DispatchPool` (`hold`) — the orchestration still imports no `routing/` cl
 
 **Decisions taken while building (routine, recorded here):**
 
-- **The day is the UTC date**, as the ledgers and the tranche count it — one "today" in the service. The owner's
+- **The day is the UTC date**, as the ledgers count it — one "today" in the service. The owner's
   local midnight differs by the zone (01:00 in Berlin's winter); every client writes the resume time in the reader's
-  zone, so the card says `resumes 01:00` there. A local day for all three is a roadmap follow-up.
+  zone, so the card says `resumes 01:00` there. A local day for the ledgers is a roadmap follow-up.
 - **Measured where a weekly window is read, estimated elsewhere.** A slot with a `7d` window and a remaining share
   counts every drop since the day's first reading (a rise — a rolling window letting old use go — is not spending; a
   window past its reset starts again from its new reading, so a weekly reset mid-day lowers the figure and can clear
@@ -234,11 +234,11 @@ the `DispatchPool` (`hold`) — the orchestration still imports no `routing/` cl
 - **Only the chain is held.** The dispatcher asks once per pass, before any start; the owner's own starts (Start on a
   ticket, a 1:1) are not held — the owner decides those.
 - **The lift is its own route**, `POST /chain/hold/lift` (paired devices `POST /api/chain/hold/lift`), not a flag on the
-  Autopilot write: On releases a tranche (req-179), and allowing the day is not switching the Autopilot. It lifts for
+  Autopilot write: allowing the day is not switching the Autopilot. It lifts for
   the rest of the UTC day and is stored in the day's book, so a restart keeps it.
 - **The day's book is persisted** (unlike `RunShareTracker`'s samples): a restart mid-day — a Drey update restarts the
   service — would otherwise forget the morning's spend and hand out the day again.
-- **The card is a chain-status fact** like the checkpoint (req-179): `ChainStatus.hold`, drawn by every client from
+- **The card is a chain-status fact**: `ChainStatus.hold`, drawn by every client from
   `shared/burn-rate.ts` with board 10u's chrome laid out like part 4 (the quota stop): peach dot, `Burn rate reached ·
   20 % of the week today`, `Nothing new starts until 00:00. Running steps finish.`, chips `spent 21 %` / `resumes
   00:00` (+ `estimated` / `partly estimated`), *Wait* (primary; dismisses that device's card for the day) and *Allow

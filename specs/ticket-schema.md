@@ -1857,17 +1857,6 @@ handover:                      # the handover thresholds (was fleet.compactAbove
     claude-code: 90000
   context-cap-tokens-by:
     opencode: 64000
-tranche:                       # the Autopilot's release unit (was autopilot.tranche.*)
-  runs: 10                     # a number, or off
-  budget-share: 0.33
-  minutes: 240
-  early-stop:                  # (was autopilot.earlyStop.*)
-    red-gates: 3
-    gate-window: 6
-    same-ticket-red: 2
-    change-factor: 3
-    cost-factor: 3
-    min-runs: 3
 ---
 Prose for humans.
 ```
@@ -1880,7 +1869,9 @@ written over — Settings refuses to save into it. `permission-mode` is a
 crew default only: `read-only` is a session's mode (a review, a 1:1, a
 free session the owner opens read-only), never the crew's. Keys of other
 features may sit beside these and are kept by every write (req-169's
-closing-round signals belong here). `seeded-crew:` is one of them (req-256): not a
+closing-round signals belong here) — the retired `tranche:` block of the
+Autopilot's batches (req-179, retired req-309) is one such key: read by
+nothing, never removed by a write. `seeded-crew:` is one of them (req-256): not a
 setting, the marker `CrewSeeder` writes — a list of the shipped default crew's persona ids
 (`paul`, `ben`, `ralf`, `tessa`) the board has been offered; a missing key means none
 yet (the next engine start seeds), and an id in it is never seeded again, whether its

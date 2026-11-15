@@ -8,7 +8,6 @@ import {
   type VaultCrewConfig,
 } from '../../contracts/crew-config';
 import { DEFAULT_FLEET_CAPS, DEFAULT_FLEET_HANDOVER, normalizeFleetCaps, normalizeFleetHandover, type FleetCaps, type FleetHandoverConfig } from '../protocol-fleet-config';
-import { DEFAULT_EARLY_STOP, DEFAULT_TRANCHE, normalizeTranche, type TrancheConfig } from '../protocol-tranche';
 import type { CapabilityClass } from '../protocol-pool';
 import type { PermissionMode } from '../protocol';
 
@@ -22,7 +21,6 @@ export interface EffectiveCrew {
   readonly permissionMode: PermissionMode;
   readonly caps: FleetCaps;
   readonly handover: FleetHandoverConfig;
-  readonly tranche: TrancheConfig;
   readonly values: Readonly<Record<CrewKey, CrewValue>>;
   readonly sources: Readonly<Record<CrewKey, CrewSource>>;
 }
@@ -48,8 +46,6 @@ export interface EffectiveSession {
 function builtIn(): Readonly<Record<CrewKey, CrewValue>> {
   const caps: Record<string, CrewValue> = { ...DEFAULT_FLEET_CAPS };
   const handover: Record<string, CrewValue> = { compactAboveTokens: DEFAULT_FLEET_HANDOVER.compactAboveTokens, resumePauseTtlMin: DEFAULT_FLEET_HANDOVER.resumePauseTtlMin, contextCapTokens: DEFAULT_FLEET_HANDOVER.contextCapTokens };
-  const tranche: Record<string, CrewValue> = { runs: DEFAULT_TRANCHE.runs, budgetShare: DEFAULT_TRANCHE.budgetShare, minutes: DEFAULT_TRANCHE.minutes };
-  const early: Record<string, CrewValue> = { ...DEFAULT_EARLY_STOP };
   const out = {} as Record<CrewKey, CrewValue>;
   for (const key of CREW_KEYS) {
     const leaf = key.split('.').pop() ?? key;
@@ -57,15 +53,11 @@ function builtIn(): Readonly<Record<CrewKey, CrewValue>> {
       ? caps[leaf]!
       : key.startsWith('handover.')
         ? handover[leaf]!
-        : key.startsWith('tranche.earlyStop.')
-          ? early[leaf]!
-          : key.startsWith('tranche.')
-            ? tranche[leaf]!
-            : key === 'defaultWorker'
-              ? BUILT_IN_WORKER
-              : key === 'permissionMode'
-                ? 'accept-edits'
-                : null;
+        : key === 'defaultWorker'
+          ? BUILT_IN_WORKER
+          : key === 'permissionMode'
+            ? 'accept-edits'
+            : null;
   }
   return out;
 }
@@ -110,7 +102,6 @@ export class LayeredConfigResolver {
       permissionMode: values.permissionMode === 'bypass' ? 'bypass' : 'accept-edits',
       caps: normalizeFleetCaps(group(values, 'caps.')),
       handover: this.handoverOf(values, file),
-      tranche: normalizeTranche({ ...group(values, 'tranche.'), earlyStop: group(values, 'tranche.earlyStop.') }),
       values,
       sources,
     };

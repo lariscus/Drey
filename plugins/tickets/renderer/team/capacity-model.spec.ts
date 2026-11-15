@@ -11,7 +11,6 @@ import {
   resetTextOf,
   sessionCapacityOf,
   slotChipsOf,
-  trancheOf,
 } from './capacity-model';
 
 const slot = (patch: Partial<SlotSummary>): SlotSummary => ({
@@ -103,7 +102,7 @@ describe('the header value', () => {
   });
 });
 
-describe('the queue and the tranche', () => {
+describe('the queue', () => {
   const card = (id: string, phase: string): TicketCard =>
     ({ id, path: `${phase}/${id}.md`, phase, meta: { title: id, persona: null, parent: null, entered: {}, priority: 'normal' }, blocked: [], blocks: [], issues: [] }) as unknown as TicketCard;
   const snapshot = {
@@ -136,19 +135,5 @@ describe('the queue and the tranche', () => {
       ],
     } as unknown as BoardSnapshot;
     expect(queuedIdsOf(two, [])).toEqual(['T-0125', 'T-0123', 'T-0124']);
-  });
-
-  it('has no tranche until the chain status carries one (req-179)', () => {
-    expect(trancheOf(null)).toBeNull();
-    expect(trancheOf({ master: 'run' } as unknown as ChainStatus)).toBeNull();
-  });
-
-  it('reads the tranche off the chain block, with the limits it has', () => {
-    const now = new Date('2026-11-09T12:00:00Z');
-    const chain = (tranche: object): ChainStatus => ({ master: 'run', tranche }) as unknown as ChainStatus;
-    const block = { index: 1, of: 3, done: 4, total: 10, spent: 4.1, budget: 15, startedAt: '2026-11-09T09:00:00Z', endsAt: '2026-11-09T14:10:00Z', checkpoint: null, report: null };
-    expect(trancheOf(chain(block), now)).toMatchObject({ runs: 4, size: 10, cost: 4.1, budget: 15, runsLeft: 6, msLeft: 130 * 60_000 });
-    expect(trancheOf(chain({ ...block, total: null, budget: null, endsAt: null }), now)).toMatchObject({ size: null, budget: null, runsLeft: null, msLeft: null });
-    expect(trancheOf(chain({ ...block, checkpoint: 'waiting' }), now)).toBeNull();
   });
 });

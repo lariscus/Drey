@@ -1,7 +1,6 @@
 import { AUTOPILOT_OFF, masterOf } from '../autopilot';
 import type { PipelinePhase } from '../../contracts/tickets';
 import type { AutopilotRecord, ChainConfig, ChainMaster, ChainStatus, ChainTrip, ColumnMode, QueuedTicket } from '../protocol';
-import type { TrancheRecord } from './tranche/tranche-record';
 
 /** Per ticket: consecutive failed runs and the instant the next attempt may start. */
 export interface TicketFailure {
@@ -68,8 +67,6 @@ export interface ChainFile {
   readonly ledgerCards?: Record<string, string[]>;
   /** req-274: per held ticket, the holder its last `hold` ledger line named (the recorder compares each pass against it). */
   readonly holds?: Record<string, HoldMark>;
-  /** req-179: the current tranche's counters, facts and checkpoint; absent before the first release. */
-  readonly tranche?: TrancheRecord;
 }
 
 /**
@@ -100,8 +97,6 @@ export class ChainState {
   readonly ledgerCards: Record<string, string[]> = {};
   /** req-274: per held ticket, the last recorded hold (see {@link ChainFile}). */
   readonly holds: Record<string, HoldMark> = {};
-  /** req-179: the current tranche; null before the first release (the tranche parts own it). */
-  tranche: TrancheRecord | null = null;
   /** The pipeline of the last pass — the breaker's thresholds and the quality rungs read it (not persisted). */
   phases: readonly PipelinePhase[] = [];
 
@@ -159,7 +154,6 @@ export class ChainState {
     }
     this.pausedPersonas.clear();
     this.queued = [];
-    this.tranche = null;
   }
 
   file(handoverAt?: string): ChainFile {
@@ -177,7 +171,6 @@ export class ChainState {
       personaTripped: { ...this.personaTripped },
       ledgerCards: Object.fromEntries(Object.entries(this.ledgerCards).map(([ticket, keys]) => [ticket, [...keys]])),
       holds: { ...this.holds },
-      ...(this.tranche !== null ? { tranche: this.tranche } : {}),
       ...(handoverAt !== undefined ? { handoverAt } : {}),
     };
   }

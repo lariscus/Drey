@@ -3,7 +3,7 @@
  * The big pool as one chip in the board's header (req-271, board 7e v2; the
  * Capacity band merged into the board, owner 2026-11-11): `4/5 · 1 queued`.
  * Its popover holds what the band's lower rows held — the slots per account
- * with their quota and upgrade mark, the tranche, the head of the pool's
+ * with their quota and upgrade mark, the head of the pool's
  * queue and a minimum overrun — with Pause all and a link to the Service
  * window. The persona rows of the band are the column heads' load now.
  */
@@ -12,8 +12,8 @@ import type { ChainStatus, RunInfo } from '../../../../packages/tickets-engine/s
 import type { I18n } from '../../../../shared/i18n/types';
 import { h, type DeskDeps } from '../desk-deps';
 import { queueWordsOf } from '../queue-line';
-import { sessionCapacityOf, slotChipsOf, trancheOf } from '../team/capacity-model';
-import { clockIconNode, slotChipNode, trancheNodes } from '../team/capacity-view';
+import { sessionCapacityOf, slotChipsOf } from '../team/capacity-model';
+import { clockIconNode, slotChipNode } from '../team/capacity-view';
 import { isLiveRun } from '../team/team-model';
 
 /** What the chip and the popover count. */
@@ -67,12 +67,6 @@ function popoverNode(deps: DeskDeps, figures: PoolFigures, close: () => void): H
     const slots = h('div', 'pb-pool-slots');
     slots.append(...chips.map((chip) => slotChipNode(chip, i18n, now)));
     pop.append(slots);
-  }
-  const tranche = trancheOf(chain, now);
-  if (tranche !== null) {
-    const box = h('div', 'pb-pool-tranche');
-    box.append(...trancheNodes(tranche, i18n));
-    pop.append(box);
   }
   const first = chain?.queue?.[0];
   if (first !== undefined) {
