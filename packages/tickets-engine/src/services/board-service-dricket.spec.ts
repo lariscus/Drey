@@ -1,7 +1,8 @@
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promises as fsp, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { promisify } from 'node:util';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { EngineBoardService } from './board-service';
 import type { EngineHost, EngineVault, FleetPort } from './host';
@@ -11,6 +12,9 @@ import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools, type C
 import { assertDkVersion, MIN_DK_VERSION } from '../store/dk-process';
 import { toDricketId } from '../store/ids';
 import { openStatusItems } from '../core/status-log';
+import { isLifecycleStore, parseStoreStages } from '../store/store-stages';
+import { NOT_LIFECYCLE_STORE } from './board-service';
+import { defaultStorePathOf } from '../store/fresh-store';
 
 /**
  * E14-4b: the board's write moves against a REAL `dk` and a SCRATCH store —
@@ -476,6 +480,85 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
     expect(await service.chainRefusal()).toBeNull();
     delete config['dk.checkout'];
     config['dk.store'] = kept;
+  });
+
+  it('a fresh install: "Initialize board" creates the store beside the vault and sets dk.store (E14-9b)', async () => {
+    const freshDir = path.join(root, 'meta-fresh');
+    const freshVault: EngineVault = { id: 'fresh', name: 'fresh', path: freshDir, exists: true, active: true };
+    const storeDir2 = defaultStorePathOf(freshDir);
+    const freshConfig: Record<string, string | undefined> = {
+      'dk.path': bin === 'dk' ? '' : bin,
+      'dk.dataDir': path.join(root, 'data'),
+    };
+    const setKeys: Array<[string, unknown]> = [];
+    const fAbs = (p: string): string => path.join(freshDir, ...p.split('/'));
+    const fleet: FleetPort = { runs: async () => [], start: async () => ({ ok: false, error: 'not in the spec' }), configureChain: async () => undefined };
+    const storeGit = new TicketsGit(() => 'git', async (_exe, args, cwd) => {
+      if (!cwd.startsWith(root)) {
+        throw new Error('no git in the spec'); // the fresh vault's own history stays untouched
+      }
+      const { stdout } = await promisify(execFile)('git', ['-c', 'core.quotepath=false', '--literal-pathspecs', ...args], {
+        cwd,
+        windowsHide: true,
+        encoding: 'utf8',
+        maxBuffer: 16 * 1024 * 1024,
+      });
+      return stdout;
+    });    const fresh = new EngineBoardService(
+      {
+        listVaults: async () => [freshVault],
+        read: async (_v, p) => fsp.readFile(fAbs(p), 'utf8'),
+        writeAnnounced: async (_v, p, text) => {
+          await fsp.mkdir(path.dirname(fAbs(p)), { recursive: true });
+          await fsp.writeFile(fAbs(p), text, 'utf8');
+        },
+        write: async (_v, p, text) => {
+          await fsp.mkdir(path.dirname(fAbs(p)), { recursive: true });
+          await fsp.writeFile(fAbs(p), text, 'utf8');
+        },
+        listMarkdownFiles: () => Promise.resolve([]),
+        resolveAssetPath: (_v, p) => fAbs(p),
+        announceChanges: () => undefined,
+        markManaged: () => undefined,
+        configGet: async <T>(key: string) => freshConfig[key] as T | undefined,
+        configSet: async (key, value) => {
+          freshConfig[key] = value as string;
+          setKeys.push([key, value]);
+        },
+        emitBoardChanged: () => undefined,
+        log: () => undefined,
+        pickFolder: async () => null,
+        revealPath: async () => '',
+        launchInConsole: () => undefined,
+      },
+      storeGit,
+      'opencode',
+      'accept-edits',
+      '',
+      fleet,
+      '/fleet',
+      normalizeFleetCaps({}),
+      normalizeFleetPools({}),
+      normalizeFleetHandover({}),
+      'owner@test',
+      {},
+    );
+    try {
+      expect(await fresh.initialize('fresh')).toMatchObject({ ok: true });
+      expect(freshConfig['dk.store']).toBe(storeDir2);
+      expect(setKeys).toContainEqual(['dk.store', storeDir2]);
+      // The toml lives on the store's main branch; the working copy is the tickets branch.
+      expect(isLifecycleStore(parseStoreStages(await storeGit.run(storeDir2, ['show', 'main:dricket.toml'])))).toBe(true);
+      // The board reads its new store: neither the unconfigured nor the wrong-stages error stands.
+      const messages = (await fresh.snapshot()).issues.map((issue) => issue.message).join('\n');
+      expect(messages).not.toContain('no dricket store configured');
+      expect(messages).not.toContain(NOT_LIFECYCLE_STORE);
+    } finally {
+      await fresh.dispose();
+      await fresh.idle();
+      await fsp.rm(freshDir, { recursive: true, force: true }).catch(() => undefined);
+      await fsp.rm(storeDir2, { recursive: true, force: true }).catch(() => undefined);
+    }
   });
 
   function writeTemp(text: string): string {

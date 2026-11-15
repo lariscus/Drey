@@ -68,7 +68,8 @@ import { lanesOf, withPersonaBoard } from '../core/persona-board';
 import type { TicketDetail } from '../ports/ticket-store';
 import { ARCHIVED_LABEL } from '../store/legacy-bridge';
 import { StoreBoardSource, type LegacyWrite } from '../store/store-board-source';
-import { isLifecycleStore } from '../store/store-stages';
+import { isLifecycleStore, parseStoreStages } from '../store/store-stages';
+import { defaultStorePathOf, initLifecycleStore } from '../store/fresh-store';
 import type { StorePathChange } from '../store/store-path-report';
 import { storeFooterLine } from '../store/store-footer';
 import { type AttachmentCommand, RefineCommand } from '../core/commands';
@@ -4098,6 +4099,43 @@ export class EngineBoardService {
     return failure === '' ? { ok: true } : { ok: false, error: failure };
   }
 
+  /**
+   * E14-9b item 6: with no store configured, one is created beside the meta
+   * vault — the engine's start calls this for an existing board, "Initialize
+   * board" for a fresh one. Idempotent: a configured store, and a leftover
+   * store of a half first start, are adopted; a foreign directory is named.
+   */
+  async ensureFreshStore(): Promise<{ ok: true; store: string } | { ok: false; error: string }> {
+    const vault = await this.detect();
+    if (vault === null) {
+      return { ok: false, error: 'no tickets board to create a store for' };
+    }
+    try {
+      const store = await this.createStoreBeside(vault);
+      this.announceChanged();
+      return { ok: true, store };
+    } catch (error) {
+      return { ok: false, error: messageOf(error) };
+    }
+  }
+
+  /** Creates the store beside `vault` and writes `dk.store`, unless one is configured already. */
+  private async createStoreBeside(vault: EngineVault): Promise<string> {
+    const settings = await this.refreshStore();
+    if (settings.dkStore !== '') {
+      return settings.dkStore;
+    }
+    const dir = defaultStorePathOf(vault.path);
+    const existing = await fsp.readFile(path.join(dir, 'dricket.toml'), 'utf8').catch(() => null);
+    if (existing === null) {
+      await initLifecycleStore(dir, { dkPath: settings.dkPath, git: (cwd, args) => this.git.run(cwd, args) });
+    } else if (!isLifecycleStore(parseStoreStages(existing))) {
+      throw new Error(`${dir} exists and is not a store on the lifecycle stages — set "dk.store" in the settings`);
+    }
+    await this.host.configSet('dk.store', dir);
+    return dir;
+  }
+
   initialize(vaultId: string | null): Promise<BoardMutationResult> {
     return this.enqueue(async () => {
       const vaults = await this.host.listVaults();
@@ -4129,10 +4167,19 @@ export class EngineBoardService {
         'tickets: initialize board',
       );
       this.host.announceChanges(target.id, [PIPELINE_PATH, REPOS_PATH, ...humanPaths]);
-      // req-256: Paul, Ben, Ralf and Tessa follow the pipeline and the prompts, in a commit of their own (never throws).
-      await this.options.crewSeeder?.seed(target);
+      // E14-9b item 6: "Initialize board" runs on dricket — the store beside the vault
+      // comes with the board; its failure does not keep the board from initializing.
+      let storeWarning: string | null = null;
+      try {
+        await this.createStoreBeside(target);
+      } catch (error) {
+        storeWarning = `the tickets store could not be created: ${messageOf(error)}`;
+      }
       this.announceChanged();
-      return { ok: true, ...(warning === null ? {} : { warning }) };
+      const notes = [warning, storeWarning].filter((part) => part !== null);
+      // req-256: Paul, Ben, Ralf and Tessa follow the pipeline, in a commit of their own (never throws).
+      await this.options.crewSeeder?.seed(target);
+      return { ok: true, ...(notes.length === 0 ? {} : { warning: notes.join(' ') }) };
     });
   }
 

@@ -138,7 +138,7 @@ interface StartupMigrators {
   readonly personaRecords: PersonaRecords;
   readonly skills: SkillService;
   readonly prose: PersonaProseMigrator;
-  readonly crew: { board: Pick<BoardParts['board'], 'detect'>; seeder: BoardParts['crewSeeder']; pictures: BoardParts['crewPictures'] };
+  readonly crew: { board: Pick<BoardParts['board'], 'detect' | 'ensureFreshStore'>; seeder: BoardParts['crewSeeder']; pictures: BoardParts['crewPictures'] };
   /** req-282: null = `migrateProjects: false`. */
   readonly projects: ProjectMigrator | null;
   /** req-288: `worker:` / `models:` onto `class:` and `model:`; null = `seedDefaultCrew: false`. */
@@ -160,6 +160,11 @@ function migrateOnce(log: Log, migrators: StartupMigrators): Promise<void> {
     .detect()
     .then(async (vault) => {
       if (vault !== null) {
+        // E14-9b item 6: a board without a configured store gets one beside the
+        // vault — before the crew, so the board's runs have their target.
+        await board
+          .ensureFreshStore()
+          .catch((error: unknown) => log(`the fresh-install store failed: ${messageOf(error)}`, 'warn'));
         await seeder?.seed(vault);
         await pictures?.backfill(vault);
       }

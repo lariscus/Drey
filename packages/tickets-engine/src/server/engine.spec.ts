@@ -47,7 +47,8 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await engine.close();
-  await fsp.rm(root, { recursive: true, force: true });
+  // A just-exited dk/git child can hold the fresh-install store's directory a moment on Windows.
+  await fsp.rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }).catch(() => undefined);
 });
 
 describe('createEngine', () => {

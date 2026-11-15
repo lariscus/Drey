@@ -907,7 +907,7 @@ function emptyState(
   button.addEventListener('click', () => {
     if (!armed) {
       armed = true;
-      button.textContent = `Creates tickets/_meta/{pipeline,repos}.md and the default prompts in ${target} — click again`;
+      button.textContent = `Creates the tickets board (pipeline, repos, the human persona) and a dricket store beside the vault in ${target} — click again`;
       button.classList.add('tickets-init-armed');
       return;
     }
