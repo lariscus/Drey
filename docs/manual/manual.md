@@ -962,14 +962,11 @@ worker and — when the machine's model table names models for that worker — t
 strongest of them first. A board you created earlier gets the crew once, the
 next time the service starts (Pia alone, when the four are already there); if you delete one of them it stays deleted, and
 nothing you have changed is touched. Seeding does not move any work to them
-by itself. On a board whose store runs on the new stages (after **Migrate**),
-a ticket's **chain** says who works it — whoever stands at the ticket's
-current step runs; change it on the **Flow** tab (click the step, choose Ben
-under *who works it*). On a board that has not migrated yet, a column runs
-with the persona it names: give it `persona: ben` in
-`tickets/_meta/pipeline.md`. A persona's prompt replaces the step's own prompt
-for the runs it takes — a click on its Crew card opens it (its first lines say who the
-persona is; below them stands the step it works).
+by itself. A ticket's **chain** says who works it — whoever stands at the
+ticket's current step runs; change it on the **Flow** tab (click the step,
+choose Ben under *who works it*). A persona's prompt is the run's own prompt
+for the runs it takes — a click on its Crew card opens it (its first lines
+say who the persona is).
 
 **The Work panel** (req-75) shows six groups, each folded or opened by
 its heading (remembered across restarts):
@@ -979,8 +976,7 @@ its heading (remembered across restarts):
   thread its options are one-tap pills, each with a leading dot and the
   recommended one's filled), an approval it wants
   (*Approval*), a red gate or a failed run (*Gate red*, *Run failed*),
-  a plan to accept (*Plan to accept*), a review (*Review*), and a
-  finished ticket (*Ready to try*). The buttons for the last three live
+  a review (*Review*), and a finished ticket (*Ready to try*). The buttons for the last three live
   in the ticket's thread, not on the row.
 - **Running** — everything on its way through the pipeline. The
   tickets a worker is on right now come first; then the queue in the
@@ -1058,28 +1054,14 @@ project. When the tickets vault is not a git repository, a one-line note at
 the foot says so — dismiss it with its ×. Errors and leftover worktree folders
 show there too; on a ticket store, the foot's tooltip names the store.
 
-**A ticket store on the old stages.** When the store still uses the old
-stages (Shaping, Building, Ready as stages of the store), a line at the top
-of the Tickets panel says so. **Migrate** moves the store to the new stages:
-two commits to the store's configuration and every ticket that stands in an
-old stage moved to *active*, keeping its column. It runs only when you click
-it, waits while a run holds a ticket, and picks up where it stopped if it was
-interrupted. When the store's configuration is not on this computer,
-**Copy stages** copies the stages to paste into its `dricket.toml`; Migrate
-then moves the tickets. From then on the Board draws one column per persona
-(see *Board, Crew and the pool*) and the Tickets panel groups by who holds a
+**A ticket store on the wrong stages.** When the store's stages are not the
+lifecycle (`inbox prioritized active running done`, claim `running`), a line
+at the top of the Tickets panel says so — and nothing migrates: the board
+stays empty until you point `dk.store` at a store on the lifecycle stages,
+or let Drey create one ("Initialize board", or the next start with the
+setting cleared). From the lifecycle stages on the Board draws one column
+per persona (see *Board, Crew and the pool*) and the Tickets panel groups by who holds a
 ticket.
-
-**The board on the new stages: three more steps.** Once the store runs on the
-new stages, the same line offers the rest of the move, one step at a time and
-only on your click: **step 3** — the pipeline keeps only Inbox, Prioritized and
-Done and gains the standard flow; what the old working column carried for its
-runs (the class floor, model needs, turn and work ceilings) moves to the
-builder, and its token budget stays a board key; **step 4** — the crew's order
-and the leaving actions (the builder's *sync-main*, your *commit*); **step 5** —
-deleting *build-default* and *commit-default*, one commit each (when a prompt
-differs from the builder's own, the step says so first). **Review…** lists
-what the step writes; **Migrate** runs it, **Cancel** folds the list away.
 
 **The step card** (req-75 W3, reworked in req-86). At the end of a
 step, the thread shows a card above the transcript that follows where the
@@ -1225,7 +1207,7 @@ Paul may write a chain into the plan (`### Chain`); when the shaped plan is
 saved it becomes the ticket's chain. A plan's parts carry their own; a part
 without one gets the standard flow.
 
-**How a ticket walks its chain** (on a migrated store; the whole picture is
+**How a ticket walks its chain** (the whole picture is
 *The persona board* below). The persona at the ticket's current step works it:
 when the run ends green, the ticket goes on to the next step and the next
 persona, and it stands in that persona's column on the Board. Your own steps
@@ -1348,8 +1330,7 @@ specified in the repo's `specs/ticket-schema.md`.
 
 ### The persona board {#persona-board}
 
-On a board whose ticket store has been migrated (**Migrate**, then the three
-board steps above) the board is organised by **who works a ticket**, not by
+The board is organised by **who works a ticket**, not by
 where it is in a pipeline. Everything the Board, the Tickets panel, Mission
 Control and the Crew tab show follows from a few rules.
 
@@ -1366,9 +1347,7 @@ Control and the Crew tab show follows from a few rules.
 - **The holder is the persona at the current step.** The Board's columns are
   the holders, in the crew's order. A ticket whose step names no persona that
   exists any more stands at *You* and says *no persona for position 4*; so
-  does a ticket that waits for your answer or your decision. **Name four
-  personas Plan, Build, Review and Test and the Board is the old phase board
-  again** — nothing else is switched.
+  does a ticket that waits for your answer or your decision.
 - **A persona's instructions are the step.** Its run starts from its
   `prompt.md` (the Persona page's Instructions); only the Shape dialog adds the
   question protocol, and a persona that is read-only is *told* so in its brief.
@@ -1426,10 +1405,6 @@ ticket on.
 ticket (`hold` lines), and the token report groups cost by persona — with red
 gates and the time its tickets were held — and by chain position (runs, cost,
 busy and waiting time).
-
-**A board that has not migrated** (the files backend, a store on the old
-stages) keeps the phase board: columns are phases, a column's persona runs it,
-**Move to** and **Send back…** work as before.
 
 ### The Autopilot switch
 
@@ -1752,15 +1727,15 @@ before it; hover it for the long form, click it to open the Crew tab.
 fleet's queue are their own group, **Prioritized**, between Shaping and
 Inbox; a row says whom it waits for (*waits for Ben*). Every row also carries
 the **persona** that works on it (the live run's, else the holder of the
-ticket's current step; on a board that has not migrated the column's) and the **cost** of the ticket so far, written as on the phone
+ticket's current step) and the **cost** of the ticket so far, written as on the phone
 (`$1.20`); a ticket without a known cost shows none.
 
 **Board, Crew and the pool.** Two more surfaces show the whole desk, from
 the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
 (*Open the Board*, *Open the Crew*):
 
-- **Board** (an editor tab). On a board on the new stages (after **Migrate**)
-  the columns are **Inbox**, **Prioritized**, one column **per persona** in the
+- **Board** (an editor tab). The columns are **Inbox**, **Prioritized**, one
+  column **per persona** in the
   crew's order — *You* among them — and **Done this week**. A card shows the
   ticket's id, its title, its chain as initials (the steps done grey, the
   current one filled, after a send-back the steps that run again dashed), who
@@ -1787,10 +1762,9 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   *Accounts and their quota*), the tranche, the ticket next in the pool's
   queue with its class and place, runs beyond the pool on a persona's minimum,
   **Pause all** and **Open in Service window**.
-  On a board that has not migrated (the files backend, a store on the old
-  stages) the Board is the pipeline as columns, with the same pool chip. A card shows the
+  A card shows the
   ticket's id, what it is doing (*Running*, *Waiting*, *Plan*), its persona,
-  its title and its cost; the head of a column shows the summed cost of its
+  its title and its cost; the head of a lane shows the summed cost of its
   tickets. A ticket that is a part of another hangs under it, and a plan's
   parts that are not tickets yet hang under the planning ticket as *P1*,
   *P2*. A click opens the ticket; **New idea** in the first column captures
@@ -1899,10 +1873,9 @@ the Work panel's **⋯** menu (*Board*, *Crew*) or the command palette
   included — and then removes the persona's folder (its prompt, memory, journal
   and own skills) as one commit. Tickets and their history and the 1:1's chat
   files stay. It is refused, with the reason in the same window, for *You*, for
-  a persona with a run, a 1:1 or a session open (stop it first) and for a
-  persona a column of the Work panel names, on a board that has not migrated
-  (the message lists the columns; unpin it first). Pia, Mission Control's persona,
-  has no **Delete persona…**. A crew member from a new board
+  Pia, Mission Control's persona, and for
+  a persona with a run, a 1:1 or a session open (stop it first); the typed
+  title must match. A crew member from a new board
   (Paul, Ben, Ralf or Tessa) stays deleted. The persona's tab stays open on a
   *No persona* note until you close it.
 
@@ -2357,80 +2330,33 @@ that are up. A waiting step says so on its row in the Work panel and on its
 board card — `waits for a heavy seat · 2 of 2 heavy seats busy` — and every
 grant, wait and refusal is a line in the log (`governor: …`).
 
-### The chain runs itself (milestone 85)
+### The board runs itself (milestone 85, the persona board)
 
-A column with a **worker** runs itself. Settings → *Tickets* shows the
-tickets repository's folder at the top (the folder button opens it) and
-the **Pipeline** as one table, a row per column in pipeline order: its
-folder number (`10`, `20`, …), name, a *Runs itself* or *Checkpoint*
-chip with the folder, then the **worker** (OpenCode, Claude Code, Kimi Code or Copilot CLI;
-*Manual* means a column only you move tickets through), the **model**
-and the **prompt**. A manual column shows dashes there. The model field is a
-picker: click it to see what the worker offers (OpenCode lists its own
-`provider/model` ids, Claude Code its aliases, Kimi Code the models of its
-configuration; Copilot CLI lists none — type the model id), type to filter, or type
-an id the list does not know. The prompt is chosen from the files in
-`tickets/_meta/prompts/`. Every change is one commit; the Work panel follows.
+The board's columns are the lifecycle edges — **Inbox**, **Prioritized**,
+**Done** — and the working area: every ticket a chain holds stands in
+**Active**, and each row's lane names the persona that holds it. Settings →
+*Tickets* shows the tickets store's folder at the top and the store settings
+(checkout and sync for a remote store); the pipeline itself is
+`tickets/_meta/pipeline.md` — the two edges, Done, the standard flow and the
+crew's defaults, which you can edit as plain Markdown.
 
-**Reordering columns.** Drag a row by its grip, or focus a row and press
-Alt+↑ / Alt+↓. The first column (the Inbox, where new tickets land) and Done stay first and
-last. A move rewrites `pipeline.md` and renames the phase folders to
-their new numbers in one commit; the line under the table says what
-moved, with **Undo**. A column whose tickets are being worked on right
-now cannot be renumbered — stop or finish the run first.
+The crew works by **holders**: a ticket's chain (Paul plans, Ben builds,
+Ralf reviews, Tessa tests, You decides) is a list of personas, and the
+persona at the cursor is who runs now. The run ceilings, class floor and
+model needs live on the persona (the Crew tab), not on a column.
 
-**Adding, renaming and removing columns.** Below the table, *New
-column* adds a checkpoint after the column you pick (by default just
-before Done); give it a worker to make it run itself. The pencil next to
-a column's name renames it in place — only the name changes, its folder
-and tickets stay. The bin removes a column after a second click, and
-only while it holds no tickets (move them first). The first column and Done cannot
-be removed.
-
-**Defaults and Advanced.** In Settings → Tickets a field you left empty
-shows the value in use as grey text; clearing a field resets it. The
-rarely needed settings (git executable, resume pause, context cap, and
-a repository's policy, worktrees base, launch command, agent
-instructions and link folders) sit under **Advanced**.
-
-**Number folders.** Phase folders carry their column number
-(`10-inbox`, `20-plan`, …). A repository from before that — or one
-with a folder you numbered by hand — shows a banner; **Number folders**
-renames every folder to its number in one commit. Tickets keep their
-columns.
-
-**Prompts** lists the files in `tickets/_meta/prompts/` exactly as they
-are on disk; the buttons in its header create a prompt, open the folder
-and reload it. Pick one on the left and edit it on the right, in the same
-Markdown editor as your notes. It is saved and committed when you leave
-the editor or press **Save**; the circular arrow discards unsaved
-changes, and the clock button resets a prompt Drey ships
-(`plan-default`, `build-default`, `review-default`) to
-Drey's version after you confirm — your text stays in the git history.
-If the file changes outside Drey while you have unsaved text, a notice
-offers **Load from disk**. An empty folder offers **Add Drey's
-prompts**. A changed prompt reaches the next run, not one that is
-already running.
-
-The **master switch** sits in the Work panel's header as one switch with
-two halves, the active one filled: **▷ run** runs the chain — every
-playing automatic column drains its queue; **❙❙ halt** halts gently
+**The master switch** sits in the Work panel's header as one switch with
+two halves, the active one filled: **▷ run** runs the chain — held tickets
+are worked one position at a time; **❙❙ halt** halts gently
 (running work finishes, nothing new starts). The **■ emergency stop**
 next to it aborts every live run and halts — it turns red when you
-point at it, one click. It survives restarts. (A single phase can
-still be held from a terminal — `POST /chain/column` on the runner,
-see `plugins/tickets/FLEET.md`; the panel no longer draws per-column
-brakes.)
+point at it, one click. It survives restarts.
 
 **When the fleet stops by itself, the panel says so.** Above every
 group the Work panel shows an alert row for what keeps the machine
-from working: a column **stopped by the circuit breaker** (why, since
-when, which tickets wait), a machine column **on hold** while tickets
-wait in it, a **halted chain** with work waiting, and a worker **out of
+from working: a **halted chain** with work waiting, and a worker **out of
 quota** (no new run until the time it names; the chain retries by
-itself). The breaker, hold and halt rows carry one button — **Resume**
-plays the column again (its red streak starts from zero), **Run** runs
-the chain. A breaker trip and a quota pause also raise a Windows
+itself). The quota row's notification raises a Windows
 notification, and the panel header's status chip turns amber and
 names the alert. The chip otherwise shows what the fleet does: the
 worst light, the states in words (`2 running · 1 standing`), the
@@ -2440,23 +2366,17 @@ tooltip.
 The machine asks the agent to decide its own step's completion — the
 brief ends with the completion discipline: run the acceptance commands
 yourself, end the turn only when they pass. The runner still re-runs
-the gate: green moves the ticket one column right, red parks it (the
-failure lands in the Log, the ticket waits). A column that goes red
-too often trips its **circuit breaker**: it holds, and its next ticket
-parks in the Inbox with a reason — re-prioritize it when you're ready, and
-press **Resume** on the panel's alert once the cause is fixed.
-After a red gate the column cools down for a minute before it fires
-again.
+the gate: green moves the ticket's cursor to the next step, red backs
+the ticket off (the failure lands in the Log, the ticket waits). A
+persona that goes red three times in a row is **held** — it cools down
+a minute and its next ticket waits with the reason; you pause and play
+a persona on its own (the Crew tab), and the panel's alert says when a
+worker is out of quota.
 
-Where a worker column meets your judgment, the pipeline stays yours: a
-column without a worker between two worker columns is your
-**checkpoint** — the machine never pulls across it; you review, edit,
-and move the ticket on, back a column, or back to the Inbox. The shipped
-default is **Inbox · Shaping · Prioritized · Building · Ready to try · Done**:
-Inbox, Shaping and Prioritized are your columns and the machine takes nothing
-from them; you move a ticket into **Building**, the one worker column. **Ready
-to try** is your checkpoint: *Send back* returns the ticket to Building with a
-note, and *Accept* is the sign-off. It starts the commit on the program's
+Where the chain meets your judgment, it stays yours: a **You** entry is
+your step — the machine never takes it; you review, edit, and hand the
+ticket on, send it back to an earlier position, or park it. **Accept at
+You is the sign-off.** It starts the commit on the program's
 repository (the ticket's branch is merged and pushed — see *Leaving actions*
 below), and when that is green the ticket lands in **Done**, which asks nothing
 more of you.
@@ -2471,12 +2391,12 @@ shows it while it runs.
   fetched first. If the merge conflicts, Drey undoes it and Ben's run ends red
   with the conflicting files as the reason; the next Ben run gets the conflict
   as its task. This does not count as a send-back.
-- **`commit`** (yours): *Accept* on Ready to try merges the ticket's branch
+- **`commit`** (yours): *Accept* at You merges the ticket's branch
   into `main` and pushes it — the card says *committing*. It never touches
   your own checkout of the repository. A protected repository (`policy:` in
   the repository settings) only gets the branch pushed and waits for your
   merge on the host. **A conflict is not resolved for you**: Drey undoes the
-  merge, the ticket stays on Ready to try with git's message, and you resolve
+  merge, the ticket stays at You with git's message, and you resolve
   it (or send the ticket back) and accept again.
 
 If your own persona does not list `commit`, *Accept* on a ticket with a
