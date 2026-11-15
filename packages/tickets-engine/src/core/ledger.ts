@@ -23,9 +23,8 @@
  * the ticket cards and the persona day budget — nothing else aggregates.
  * `phase`, `merged`, `archived` stay bare of persona/model/cost on
  * purpose: which persona "did" a merge is the chain's business, not a
- * fact the mover knows (a hand move would have to invent one). The
- * verify harness runs no model and no persona, so `proof_ready` stays
- * null there too.
+ * fact the mover knows (a hand move would have to invent one), and the
+ * same holds for `proof_ready` - a proof is no persona's doing.
  *
  * `hold` (req-274, the persona board concept §10): the chain's cursor moved
  * — from `ts` on the ticket is held by `persona` at chain `position` of

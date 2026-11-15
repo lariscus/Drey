@@ -1,6 +1,5 @@
 import type { ChatBridge } from '../contracts/chat';
 import type { ChatChangePayload } from '../contracts/remote-protocol';
-import type { VerifyHarness } from '../contracts/verify';
 import type { OneOnOneToolSeam } from '../fleet/one-on-one-toolset';
 import type { GithubClient } from '../services/github-client';
 import type { RunnerLocator } from '../services/fleet-client';
@@ -26,8 +25,6 @@ export interface EngineOptions {
   readonly log?: (message: string, level?: 'info' | 'warn' | 'error') => void;
   /** The invoke listener's port; 0 picks a free one. */
   readonly invokePort?: number;
-  /** The verify step's harness; the Playwright driver by default (the specs' seam). */
-  readonly verifyHarness?: VerifyHarness;
   /** The Mission Control chat's LLM bridge; `createChatBridge` by default (the specs' seam). */
   readonly chatBridge?: ChatBridge;
   /**

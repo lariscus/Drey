@@ -53,9 +53,9 @@ export function composeBoardParts(opts: EngineOptions, config: FileConfigStore, 
   const fleetRoot = path.join(opts.home, 'fleet');
   const fleet = new FleetClient({ root: fleetRoot, runner: opts.runner ?? ownRunner(fleetRoot, config, log), log, onFleetChanged: () => hub.emit('fleet') });
   const presence = new DreyPresence(() => retireWhenIdle(fleet, log), opts.dreyGoneGraceMs ?? 5_000);
-  // E7: one shared event writer for the engine process — the board stamps
-  // ledger phase/merged/archived lines, the verify service proof_ready
-  // lines; the append-only files ride the next regular commit.
+  // E7: one shared event writer for the engine process - the board stamps
+  // the ledger's phase/merged/archived lines; the append-only files ride
+  // the next regular commit.
   const events = new FleetEventWriter({ vaultPath: opts.vaultPath, log });
   // req-173 (R13): the vault layer of the configuration, `_meta/crew.md` — the board resolves its crew
   // keys from it; the first read of a vault moves the old keys of config.json and chain.json in once.

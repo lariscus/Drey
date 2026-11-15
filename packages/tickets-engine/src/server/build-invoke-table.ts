@@ -8,16 +8,14 @@ import { InvokeTable } from './invoke-table';
 
 /**
  * The invoke table: the service instances behind an explicit allowlist, in
- * the order that lets a later registration win — the board and verify
- * (which answers the two verify methods; register() picks exactly the names
- * an object carries), the fleet client, the remote service and port, then
- * the adapters of the remote and chat halves and the plugin's own calls.
+ * the order that lets a later registration win — the board, the fleet
+ * client, the remote service and port, then the adapters of the remote and
+ * chat halves and the plugin's own calls.
  */
 export function buildInvokeTable(parts: EngineParts): InvokeTable {
   const table = new InvokeTable();
   const { board, fleet, host } = parts.board;
   table.register(board, BOARD_METHODS);
-  table.register(parts.verify.verify, BOARD_METHODS);
   table.register(fleet, FLEET_METHODS);
   table.register(parts.remote.remoteService, REMOTE_METHODS);
   table.register(parts.remote.remotePort, TEAM_METHODS);

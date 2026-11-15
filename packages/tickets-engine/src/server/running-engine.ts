@@ -32,7 +32,7 @@ export class RunningEngine implements Engine {
     this.invokeUrl = deps.invokeUrl;
     this.token = deps.token;
     this.config = deps.config;
-    this.ready = Promise.all([deps.parts.verify.startupWork, deps.parts.sessions.startupWork]).then(() => undefined);
+    this.ready = deps.parts.sessions.startupWork;
   }
 
   invoke(method: string, payload?: unknown): Promise<unknown> {
@@ -64,16 +64,14 @@ export class RunningEngine implements Engine {
       return;
     }
     this.closed = true;
-    const { board, verify, remote, learning } = this.deps.parts;
+    const { board, remote, learning } = this.deps.parts;
     board.presence.dispose();
     board.fleet.dispose();
     learning.stopSettling();
     learning.stopFollowups();
     learning.improvements.dispose();
-    verify.verify.dispose();
     board.board.dispose();
     await remote.remoteService.stop();
-    await verify.startupWork;
     await this.deps.parts.sessions.startupWork;
     await board.board.idle();
     await board.git.idle();
