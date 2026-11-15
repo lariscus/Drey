@@ -19,17 +19,10 @@ export const LIFECYCLE_STAGE_IDS: readonly string[] = ['inbox', 'prioritized', A
 /** The only claim stage of a lifecycle store. */
 export const LIFECYCLE_CLAIM_STAGES: readonly string[] = [RUNNING_STAGE];
 
-/** The stages that are columns of their own at the board's edges: a ticket there carries no pin. */
+/** The stages that are columns of their own at the board's edges: a ticket there stands in its own column. */
 export const EDGE_STAGES: readonly string[] = ['inbox', 'prioritized', 'done'];
 
-/** dk's park stages: a store may list them beside the lifecycle; the migration keeps them. */
-export const PARK_STAGES: readonly string[] = ['blocked', 'needs-input'];
 
-/**
- * req-265's interim column pin of an `active` / `running` ticket. Nothing reads or writes it any more
- * (req-307); the constant stays only for the stage migration, which step 5 removes with it.
- */
-export const PHASE_PIN_KEY = 'x-phase';
 
 /**
  * The stage a write into pipeline column `phase` puts a ticket in: an edge column is its own stage,

@@ -4,7 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { PIPELINE_PROSE, STANDARD_FLOW_LINE } from '../core/pipeline-states';
+import { DEFAULT_PIPELINE_TEXT } from '../core/pipeline-states';
 import { TicketsGit } from '../core/tickets-git';
 import { normalizeFleetCaps, normalizeFleetHandover, normalizeFleetPools, type ChainConfig, type RunInfo, type RunRequest } from '../fleet/protocol';
 import { assertDkVersion, MIN_DK_VERSION } from '../store/dk-process';
@@ -22,8 +22,6 @@ import type { EngineHost, EngineVault, FleetPort } from './host';
 
 const bin = process.env['DREY_DK_BIN'] ?? 'dk';
 const PERSONA = (kind: string, extra = ''): string => `---\ntitle: P\nkind: ${kind}\nrole: custom\nworker: opencode\n${extra}---\n`;
-/** The phase-board pipeline of the shipped meta vault before the migration (pinned here: nothing writes it any more, only the migration reads it). */
-const OLD_PHASE_PIPELINE = `---\nphases:\n  - { id: inbox, title: Inbox, handover: manual, persona: you }\n  - { id: shaping, title: Shaping, handover: manual, persona: you }\n  - { id: prioritized, title: Prioritized, handover: manual, persona: you }\n  - { id: building, title: Building, wip: 3, claim: true, handover: agent build-default }\n  - { id: ready, title: Ready to try, handover: manual, persona: you }\n  - { id: done, title: Done, handover: none }\nflow: ${STANDARD_FLOW_LINE}\n---\n${PIPELINE_PROSE}`;
 
 function probe(): { ok: true } | { ok: false; reason: string } {
   try {
@@ -140,7 +138,7 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     mkdirSync(kt);
     const meta = path.join(vaultDir, 'tickets', '_meta');
     await fsp.mkdir(path.join(meta, 'prompts'), { recursive: true });
-    await fsp.writeFile(path.join(meta, 'pipeline.md'), OLD_PHASE_PIPELINE, 'utf8');
+    await fsp.writeFile(path.join(meta, 'pipeline.md'), DEFAULT_PIPELINE_TEXT, 'utf8');
     await fsp.writeFile(path.join(meta, 'repos.md'), `---\nrepos:\n  kt:\n    url: https://example.test/kt.git\n    path: '${kt.split(path.sep).join('/')}'\n    branch: main\n---\n`, 'utf8');
     for (const [id, text] of [['ben', PERSONA('agent')], ['pia', PERSONA('mission')], ['ralf', PERSONA('agent')], ['you', PERSONA('human', 'leaving: [commit]\n')]] as const) {
       await fsp.mkdir(path.join(meta, 'personas', id), { recursive: true });
@@ -210,11 +208,11 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     return snap.columns.find((c) => c.tickets.some((t) => t.id === id))?.phase.id ?? null;
   };
 
-  it("stands an active ticket in its holder's column: an agent in Building, You in Ready to try", async () => {
+  it("stands an active ticket in the active column: the hold names its holder (the lanes draw it)", async () => {
     const agent = chained('At Ben', 'ben;you;ralf;you', 1);
     const owner = chained('At You', 'ben;you;ralf;you', 2);
-    expect(await columnOf(agent.id)).toBe('building');
-    expect(await columnOf(owner.id)).toBe('ready');
+    expect(await columnOf(agent.id)).toBe('active');
+    expect(await columnOf(owner.id)).toBe('active');
   });
 
   it("Accept at a middle You entry moves the cursor on; at the last one it starts You's commit", async () => {
@@ -222,7 +220,7 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     expect(await service.acceptTicket({ id })).toMatchObject({ ok: true });
     expect(field(dkId, 'x-at')).toBe('3');
     expect(field(dkId, 'stage')).toBe('active');
-    expect(await columnOf(id)).toBe('building');
+    expect(await columnOf(id)).toBe('active');
 
     const last = chained('Last', 'ben;you;ralf;you', 4);
     expect(await service.acceptTicket({ id: last.id })).toMatchObject({ ok: true });
@@ -259,7 +257,7 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     expect(await service.waitForOwner({ id, key: 'pia-turn', text: 'P proposes 1 change', detail: 'her reply' })).toMatchObject({ ok: true });
     expect(field(dkId, 'x-awaiting')).toBe('you');
     expect((await service.missionEntries()).some((e) => e.id === id)).toBe(false); // waiting for the owner: no second turn
-    expect(await columnOf(id)).toBe('ready');
+    expect(await columnOf(id)).toBe('active');
 
     expect(await service.finishMissionEntry({ id, position: 2 })).toMatchObject({ ok: true });
     expect(field(dkId, 'x-at')).toBe('3');
@@ -296,29 +294,8 @@ describe.skipIf(!found.ok)('the chain on a lifecycle store (req-257, real dk)', 
     expect(await service.sendBack({ id, note: 'start over', position: 1 })).toMatchObject({ ok: true });
     expect(field(dkId, 'x-at')).toBe('1');
   });
-  // Last in the file: it rewrites the meta vault's pipeline.md and crew.md the cases above read.
-  it("migrates the meta vault on the owner's confirmation: step 3 the pipeline, step 4 the crew (req-268)", async () => {
-    const held = chained('Through the migration', 'ben;you;ralf;you', 3);
-    expect((await service.snapshot()).boardMigration).toMatchObject({ step: 'pipeline', removed: ['Shaping', 'Building', 'Ready to try'], flow: null });
-    expect(await service.migrateBoard({ step: 'crew' })).toMatchObject({ ok: false });
-
-    expect(await service.migrateBoard({ step: 'pipeline' })).toMatchObject({ ok: true });
-    const pipeline = readFileSync(path.join(root, 'meta', 'tickets', '_meta', 'pipeline.md'), 'utf8');
-    expect(pipeline).not.toContain('building');
-    const after = await service.snapshot();
-    expect(after.pipeline.map((p) => p.id)).toEqual(['inbox', 'prioritized', 'done']);
-    expect(after.columns.flatMap((c) => c.tickets).find((t) => t.id === held.id)?.hold).toMatchObject({ holder: 'ralf', position: 3 });
-    expect(after.issues.some((issue) => issue.message.includes('"active"'))).toBe(false);
-    expect(after.boardMigration).toEqual({ step: 'crew', order: ['pia', 'ben', 'ralf', 'you'], leaving: [{ persona: 'ben', action: 'sync-main' }] });
-
-    expect(await service.migrateBoard({ step: 'crew' })).toMatchObject({ ok: true });
-    expect(readFileSync(path.join(root, 'meta', 'tickets', '_meta', 'crew.md'), 'utf8')).toContain('order: [pia, ben, ralf, you]');
-    expect(readFileSync(path.join(root, 'meta', 'tickets', '_meta', 'personas', 'ben', 'persona.md'), 'utf8')).toContain('leaving: [sync-main]');
-    expect((await service.snapshot()).boardMigration).toBeUndefined();
-  });
-
   it('req-78 found it: a persona board with no agent column is still pointed at by the runner, again after the runner lost its config', async () => {
-    expect((await service.snapshot()).pipeline.map((p) => p.id)).toEqual(['inbox', 'prioritized', 'done']); // the migration spec above ran step 3
+    expect((await service.snapshot()).pipeline.map((p) => p.id)).toEqual(['inbox', 'prioritized', 'done']); // the seeded lifecycle pipeline
     (service as unknown as { lastChainConfig: string | null }).lastChainConfig = null; // a restarted runner knows nothing
     configured.length = 0;
     await service.snapshot();

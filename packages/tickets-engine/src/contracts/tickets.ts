@@ -18,7 +18,6 @@ import type { RepoRef } from './repo-ref';
 import type { PriorityConfig, TicketPriority } from './ticket-priority';
 import type { TicketRun } from './ticket-run';
 export type { TicketRun } from './ticket-run';
-export type { StoreStageMigrationOffer, StoreStageMigrationResult } from './store-stage-migration';
 export type { FolderStatus } from './folder-status';
 
 /** `T-` + at least four digits (`T-0042`). Grammar of ids AND file stems. */
@@ -384,8 +383,6 @@ export interface BoardSnapshot extends PersonaBoardFields, BoardProjects {
   readonly isGitRepo: boolean;
   /** On the dricket backend: where the tickets live (store, branch, head, sync) — the panel's footer line (D-9). */
   readonly storeLine?: string | null;
-  /** req-265: the store still uses the old phase stages; absent when it does not (or on the files backend). */
-  readonly storeMigration?: import('./store-stage-migration').StoreStageMigrationOffer | null;
   /** The configured default fleet worker (M84). */
   readonly defaultWorker: string;
   readonly pipeline: readonly PipelinePhase[];

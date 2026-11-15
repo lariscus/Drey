@@ -25,8 +25,7 @@ async function readStoreStages(checkout: string): Promise<StoreStageSet | null> 
 
 /**
  * What the board reads of a store's `dricket.toml`, re-read at most once a minute per checkout: the
- * priority vocabulary (D-11) and the stage vocabulary (req-265: which stages a write goes to). The
- * stage migration invalidates it after its config commits.
+ * priority vocabulary (D-11) and the stage vocabulary (req-265: which stages a write goes to).
  */
 export class StoreConfigCache {
   private readonly prioritiesByCheckout = new Map<string, Cached<PriorityConfig | null>>();
@@ -43,12 +42,6 @@ export class StoreConfigCache {
 
   stages(checkout: string): Promise<StoreStageSet | null> {
     return this.cached(this.stagesByCheckout, checkout, this.readers.stages ?? readStoreStages);
-  }
-
-  /** The next read asks git again (the config was just committed). */
-  invalidate(): void {
-    this.prioritiesByCheckout.clear();
-    this.stagesByCheckout.clear();
   }
 
   private async cached<T>(map: Map<string, Cached<T>>, checkout: string, read: (checkout: string) => Promise<T>): Promise<T> {

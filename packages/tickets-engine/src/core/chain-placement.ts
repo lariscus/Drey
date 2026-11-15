@@ -2,8 +2,7 @@
  * Where a chain ticket stands on today's board (req-257, the owner's ruling
  * of 2026-11-12 on the persona board's interim): the board's columns stay
  * the pipeline's until req-270/271 draw holder columns, and an `active` /
- * `running` ticket's column is DERIVED from its holder — never stored (the
- * interim pin `x-phase` of req-265 retires with it):
+ * `running` ticket's column is DERIVED from its holder — never stored:
  *
  * - the chain is through (the cursor past its last entry) -> the terminal
  *   column (the engine moves it to `done` right after);
@@ -14,13 +13,11 @@
  *   is no lifecycle edge (Shaping), when the pipeline has one;
  * - an agent or Mission Control persona -> the first agent column whose
  *   `persona:` names it, else the first agent column;
- * - none of these exists (a pipeline of lifecycle columns only, after the
- *   live migration) -> null: the reader shows the stage itself as one
- *   "active" column.
+ * - none of these exists (a pipeline of lifecycle columns only) -> null:
+ *   the reader shows the stage itself as one "active" column.
  *
  * The same rule maps an owner's column move back onto the cursor
- * ({@link cursorForColumn}) and a migrated ticket's old column pin onto a
- * position ({@link cursorForPin}).
+ * ({@link cursorForColumn}).
  */
 import type { ChainEntry } from '../contracts/chain';
 import { parseHandover, type PipelinePhase } from '../contracts/tickets';
@@ -44,8 +41,8 @@ export interface PlacementColumns {
 }
 
 /**
- * True when the column's handover hands tickets to an agent pool. Left for the board migration's
- * column -> cursor rule (`cursorForPin`, req-307 step 5): on a lifecycle-only pipeline no column is one.
+ * True when the column's handover hands tickets to an agent pool. On a lifecycle-only pipeline no
+ * column is one.
  */
 function isAutoPhase(phase: PipelinePhase): boolean {
   return parseHandover(phase.handover).mode === 'agent';
@@ -119,51 +116,4 @@ export function cursorForColumn(input: { readonly chain: readonly ChainEntry[]; 
     }
   }
   return null;
-}
-
-/**
- * The position a ticket's old column pin stands for (concept §12 step 2, the
- * pins becoming cursors): Shaping -> the `:shape` entry; the owner's
- * checkpoint (Ready to try) -> the chain's last position You holds; a
- * working column -> the first position after the planning (the leading
- * entries of the `:shape` entry's persona — on the phase board one run of
- * the column planned AND built, so the build is what is left) that stands
- * in that column, else the first position after the planning.
- */
-export function cursorForPin(chain: readonly ChainEntry[], pin: string, lookup: PersonaLookup, columns: PlacementColumns): number {
-  if (chain.length === 0) {
-    return 1;
-  }
-  const standsIn = (position: number): boolean => chainColumnOf({ stage: 'active', chain, at: position, awaiting: undefined }, lookup, columns) === pin;
-  if (pin === columns.shape) {
-    const shape = chain.findIndex((entry) => entry.mode === 'shape');
-    return shape < 0 ? 1 : shape + 1;
-  }
-  if (pin === columns.owner) {
-    for (let position = chain.length; position >= 1; position--) {
-      if (standsIn(position)) {
-        return position;
-      }
-    }
-  }
-  const afterPlan = firstAfterPlanning(chain);
-  for (let position = afterPlan; position <= chain.length; position++) {
-    if (standsIn(position)) {
-      return position;
-    }
-  }
-  return afterPlan;
-}
-
-/** The first position after the leading entries of the `:shape` entry's persona; 1 when the chain has no `:shape` entry. */
-function firstAfterPlanning(chain: readonly ChainEntry[]): number {
-  const shaper = chain.find((entry) => entry.mode === 'shape')?.persona ?? null;
-  if (shaper === null) {
-    return 1;
-  }
-  let position = 1;
-  while (position <= chain.length && chain[position - 1]!.persona === shaper) {
-    position += 1;
-  }
-  return Math.min(position, chain.length);
 }

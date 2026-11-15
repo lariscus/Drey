@@ -10,7 +10,6 @@ import { StoreChangeFeed, type StoreChangeFeedStats, type WatchFn } from './stor
 import { headFingerprint, remoteMovedProbe } from './store-git-probe';
 import { StorePathReporter, type StorePathChange } from './store-path-report';
 import { StoreConfigCache } from './store-config-cache';
-import { readStoreConfigText } from './store-config-text';
 import { StoreReader } from './store-reader';
 import { checkoutOf, createDricketStore, type StoreSettings } from './store-settings';
 import type { StoreStageSet } from './store-stages';
@@ -236,17 +235,6 @@ export class StoreBoardSource {
   async stages(settings: StoreSettings): Promise<StoreStageSet | null> {
     const checkout = checkoutOf(settings);
     return checkout === null ? null : this.config.stages(checkout);
-  }
-
-  /** The store's `dricket.toml` as it is now (uncached; the stage migration plans from it). */
-  async configText(settings: StoreSettings): Promise<{ readonly ref: string; readonly text: string } | null> {
-    const checkout = checkoutOf(settings);
-    return checkout === null ? null : readStoreConfigText(checkout);
-  }
-
-  /** The store's config was just committed: the next read asks git again. */
-  invalidateConfig(): void {
-    this.config.invalidate();
   }
 
   /** Creates an unclaimed ticket through `dk add`; dk allocates the number. */

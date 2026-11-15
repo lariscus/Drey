@@ -9,7 +9,7 @@
  * - `BoardSnapshot.lanes` — the holder columns in the crew's order
  *   (`order:` in `tickets/_meta/crew.md`), You included; present exactly
  *   when the board is a persona board (a lifecycle store). Absent = the
- *   phase board (the files backend, a store not yet migrated).
+ *   empty board with an issue (a store not on the lifecycle stages).
  * - `TicketCard.hold` — on an `active` / `running` ticket of a persona
  *   board: who holds it, its position n of m, the chain as persona ids, why
  *   it stands there and its one send-back.
@@ -25,7 +25,6 @@
  * it in from the fleet's runs and chain status. Wording is each surface's
  * (the i18n catalog) — the helpers here return kinds, never sentences.
  */
-import type { BoardMigrationOffer } from './board-migration';
 import type { ChainSendBack } from './chain';
 import type { BoardSnapshot, TicketCard } from './tickets';
 
@@ -93,8 +92,6 @@ export interface TicketHoldField {
 export interface PersonaBoardFields {
   /** req-270: the holder columns in the crew's order, You included — present exactly on a persona board (a lifecycle store). */
   readonly lanes?: readonly BoardLane[];
-  /** req-268: the next step of the live board migration the owner may confirm (steps 3–5); absent = none. */
-  readonly boardMigration?: BoardMigrationOffer;
 }
 
 /** True when the snapshot is a persona board (it carries holder lanes). */

@@ -800,17 +800,10 @@ const plugin: MainPluginModule = {
 
     // E14-5b: the owner's "release leftover claims" - agent claims a killed runner left on a dricket store.
     ctx.ipc.handle('chainReleaseLeftovers', async () => board.releaseLeftoverClaims());
-    // req-265: the owner's Migrate of a store still on the old phase stages.
-    ctx.ipc.handle('migrateStoreStages', async () => board.migrateStoreStages());
     // req-270: the persona board's drag moves (start, hand, park), checked here before the engine writes.
     ctx.ipc.handle('personaBoardMove', async (payload) => {
       const move = parsePersonaBoardMove(payload);
       return move === null ? { ok: false, error: 'bad persona board move' } : board.personaBoardMove(move);
-    });
-    // req-268: steps 3 and 4 of the live board migration, each on the owner's confirmation (step 5 is personaRemove).
-    ctx.ipc.handle('migrateBoard', async (payload) => {
-      const step = typeof payload === 'object' && payload !== null ? (payload as { step?: unknown }).step : undefined;
-      return step === 'pipeline' || step === 'crew' ? board.migrateBoard({ step }) : { ok: false, error: 'bad board migration step' };
     });
 
     // --- the team (E13-8, E12-4): the remote port's own reads and controls ---

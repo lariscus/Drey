@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isLifecycleStore, parseStoreStages, renderStageTable, withStageTable } from './store-stages';
+import { isLifecycleStore, parseStoreStages } from './store-stages';
 
 const OLD = [
   '# dricket.toml - the protected configuration of this ticket store.',
@@ -39,22 +39,5 @@ describe('the store stage vocabulary (req-265)', () => {
     expect(isLifecycleStore(parseStoreStages(OLD))).toBe(false);
     expect(isLifecycleStore(LIFECYCLE)).toBe(true);
     expect(isLifecycleStore(null)).toBe(false);
-  });
-
-  it('replaces the [stages] table and keeps every other line, the CRLF ending included', () => {
-    const next = withStageTable(OLD, LIFECYCLE);
-    expect(parseStoreStages(next)).toEqual(LIFECYCLE);
-    expect(next).toContain('# dricket.toml - the protected configuration');
-    expect(next).toContain('values = ["critical", "high", "normal", "low"]   # allowed');
-    expect(next).toContain('[security]\nadmins = []');
-    expect(next.endsWith('\n')).toBe(true);
-    const crlf = withStageTable(OLD.replace(/\n/g, '\r\n'), LIFECYCLE);
-    expect(crlf).toContain('[stages]\r\nvalues = ["inbox", "prioritized", "active", "running", "done"]\r\n');
-    expect(crlf.replace(/\r\n/g, '')).not.toContain('\n');
-  });
-
-  it('appends a table to a config that has none', () => {
-    const next = withStageTable('schema_version = 1\n', LIFECYCLE);
-    expect(next).toBe(`schema_version = 1\n\n${renderStageTable(LIFECYCLE)}\n`);
   });
 });

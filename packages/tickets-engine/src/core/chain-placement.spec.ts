@@ -3,7 +3,7 @@ import type { ChainEntry } from '../contracts/chain';
 import type { PipelinePhase } from '../contracts/tickets';
 import { crewLookupOf } from './chain-holder';
 import { parseChainItems } from './chain-list';
-import { chainColumnOf, chainFinished, cursorForColumn, cursorForPin, placementColumnsOf } from './chain-placement';
+import { chainColumnOf, chainFinished, cursorForColumn, placementColumnsOf } from './chain-placement';
 import { pipelinePhaseOf } from './pipeline-phase';
 
 function chain(line: string): ChainEntry[] {
@@ -35,7 +35,7 @@ describe('the placement columns of a pipeline', () => {
     expect(COLUMNS).toEqual({ terminal: 'done', owner: 'ready', shape: 'shaping', agents: [{ id: 'building', persona: 'build-default' }] });
   });
 
-  it('has nothing for a pipeline of lifecycle columns only (after the live migration)', () => {
+  it('has nothing for a pipeline of lifecycle columns only', () => {
     expect(placementColumnsOf([phase('inbox'), phase('prioritized'), phase('done')])).toEqual({ terminal: 'done', owner: null, shape: null, agents: [] });
   });
 });
@@ -81,21 +81,5 @@ describe("an owner's column move as a cursor move", () => {
 
   it('answers null for a column no position stands in', () => {
     expect(cursorForColumn({ chain: chain('ben; ralf'), at: 1, target: 'ready' }, CREW, COLUMNS)).toBeNull();
-  });
-});
-
-describe('the old column pin as a cursor (concept §12 step 2)', () => {
-  it('Shaping -> the shape entry, Building -> the build after the planning, Ready -> the last You entry', () => {
-    expect(cursorForPin(STANDARD, 'shaping', CREW, COLUMNS)).toBe(1);
-    expect(cursorForPin(STANDARD, 'building', CREW, COLUMNS)).toBe(3);
-    expect(cursorForPin(STANDARD, 'ready', CREW, COLUMNS)).toBe(6);
-  });
-
-  it('a chain without a shape entry starts at 1 in a working column', () => {
-    expect(cursorForPin(chain('ben; ralf; you'), 'building', CREW, COLUMNS)).toBe(1);
-  });
-
-  it('an unknown column falls back to the first position after the planning', () => {
-    expect(cursorForPin(STANDARD, 'review', CREW, COLUMNS)).toBe(3);
   });
 });
