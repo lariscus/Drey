@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { builderOf, crewMigrationOf, defaultsMigrationOf, flowOrderOf, LIFECYCLE_PIPELINE_PROSE, pipelineMigrationOf } from './board-migration';
+import { builderOf, crewMigrationOf, defaultsMigrationOf, flowOrderOf, pipelineMigrationOf } from './board-migration';
 import { parsePersonaFile, type Persona } from './persona';
-import { DEFAULT_PIPELINE_TEXT, STANDARD_FLOW_LINE } from './pipeline-states';
+import { DEFAULT_PIPELINE_TEXT, LIFECYCLE_PIPELINE_PROSE, STANDARD_FLOW_LINE } from './pipeline-states';
 import { parsePipeline } from './ticket-board';
 
 const persona = (id: string, extra = '', kind = 'agent'): Persona => parsePersonaFile(id, `---\ntitle: ${id === 'you' ? 'You' : id}\nkind: ${kind}\nrole: custom\nworker: opencode\n${extra}---\n`);

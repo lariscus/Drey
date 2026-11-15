@@ -62,7 +62,7 @@ import { ownerAcceptOf, ownerSendBackOf } from './chain-owner-moves';
 import { chainFinished } from '../core/chain-placement';
 import { cursorAfterGreen } from '../core/chain-red-gate';
 import { setDocumentField } from '../store/document-fields';
-import { ACTIVE_STAGE, EDGE_STAGES } from '../core/lifecycle-stages';
+import { ACTIVE_STAGE, EDGE_STAGES, stageOfPhase } from '../core/lifecycle-stages';
 import { cursorForPin, placementColumnsOf } from '../core/chain-placement';
 import { parseTicketChainFields } from '../core/ticket-chain-fields';
 import type { PinCursorOf } from '../store/stage-migration-plan';
@@ -2113,7 +2113,7 @@ export class EngineBoardService {
       if (input.mode === 'takeover') {
         await this.storeBoard.claim(store, input.id, { actor, kind: 'human', size: 'S' });
       } else {
-        await this.storeBoard.release(store, input.id, { actor, stage: await this.storeBoard.releaseStageOf(store, found.card.phase) });
+        await this.storeBoard.release(store, input.id, { actor, stage: stageOfPhase(found.card.phase) });
       }
     } catch (error) {
       return { ok: false, error: messageOf(error) };

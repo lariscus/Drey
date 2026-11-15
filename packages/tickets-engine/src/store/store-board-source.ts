@@ -13,8 +13,8 @@ import { StoreConfigCache } from './store-config-cache';
 import { readStoreConfigText } from './store-config-text';
 import { StoreReader } from './store-reader';
 import { checkoutOf, createDricketStore, type StoreSettings } from './store-settings';
-import { writePlacement, type StoreStageSet } from './store-stages';
-import { ACTIVE_STAGE, PHASE_PIN_KEY, RUNNING_STAGE } from '../core/lifecycle-stages';
+import type { StoreStageSet } from './store-stages';
+import { stageOfPhase } from '../core/lifecycle-stages';
 
 /** The seams of the file path (E14-4); specs replace them, the engine leaves them out. */
 export interface StoreBoardSourceOptions {
@@ -42,8 +42,8 @@ export interface StoreBoardSourceOptions {
 }
 
 /**
- * A board write: the column the ticket ends in (the store's stage and pin follow from it, req-265),
- * or `keepStage` for an edit that moves nothing (stage and pin stay as the document has them).
+ * A board write: the column the ticket ends in (the store's stage follows from it, req-265),
+ * or `keepStage` for an edit that moves nothing (the stage stays as the document has it).
  */
 export type LegacyWrite =
   | {
@@ -77,8 +77,6 @@ export class StoreBoardSource {
   private readonly feeds = new Set<StoreChangeFeed>();
   private readonly pathReporters = new Set<StorePathReporter>();
   private readonly config: StoreConfigCache;
-  /** req-257: an `active` ticket of the last board read still carries req-265's column pin. */
-  private pinned = false;
 
   constructor(
     private readonly log: (message: string, level?: 'info' | 'warn' | 'error') => void,
@@ -230,18 +228,8 @@ export class StoreBoardSource {
     }
     const bridge = 'keepStage' in target
       ? { stage: current.stage }
-      : { ...writePlacement(target.phase, await this.stages(settings), current.text), ...(target.archived === undefined ? {} : { archived: target.archived }) };
+      : { stage: stageOfPhase(target.phase), ...(target.archived === undefined ? {} : { archived: target.archived }) };
     return this.write(settings, current.id, legacyToDricketDocument(current.text, legacyText, bridge), { expectedRev: current.rev });
-  }
-
-  /** The stage a release from the board hands a ticket in column `phase` to (req-265: a lifecycle stage on a migrated store). */
-  async releaseStageOf(settings: StoreSettings, phase: string): Promise<string> {
-    return writePlacement(phase, await this.stages(settings), '').stage;
-  }
-
-  /** req-257: whether the last board read found an `active` ticket still carrying req-265's column pin (the migration converts it). */
-  pinsLeft(): boolean {
-    return this.pinned;
   }
 
   /** The store's `[stages]` (cached a minute); null without a checkout, a config or a table. */
@@ -306,7 +294,6 @@ export class StoreBoardSource {
   async board(settings: StoreSettings, input: Omit<RecordsBoardInput, 'records'>): Promise<BoardSnapshot> {
     try {
       const records = await this.records(settings);
-      this.pinned = records.some((r) => (r.stage === ACTIVE_STAGE || r.stage === RUNNING_STAGE) && (r.extensions[PHASE_PIN_KEY] ?? '') !== '');
       const [priorities, comments] = await Promise.all([this.prioritiesOf(settings), this.commentsByTicket(settings, records)]);
       return assembleBoardFromRecords({ ...input, records, comments, ...(priorities === null ? {} : { priorities }) });
     } catch (error) {

@@ -1,5 +1,5 @@
 import { EXTENSION_KEYS } from './extension-keys';
-import { ACTIVE_STAGE, EDGE_STAGES, PHASE_PIN_KEY, RUNNING_STAGE } from '../core/lifecycle-stages';
+import { ACTIVE_STAGE, EDGE_STAGES, RUNNING_STAGE } from '../core/lifecycle-stages';
 import { stringify } from 'yaml';
 import { TICKETS_ARCHIVE_DIR, type BoardSnapshot, type PipelinePhase } from '../contracts/tickets';
 import type { TicketDetail } from '../ports/ticket-store';
@@ -26,7 +26,7 @@ import { parseTicketChainFields } from '../core/ticket-chain-fields';
  * Field map (dricket -> Drey ticket key):
  *
  *   id, title, priority            -> same
- *   stage, x-chain, x-at           -> phase (see {@link resolvePhase}; `x-phase` only without a chain)
+ *   stage, x-chain, x-at           -> phase (see {@link resolvePhase})
  *   depends                        -> blocked-by   (blocked is derived, never stored)
  *   parent                         -> parent
  *   repos                          -> repos
@@ -78,30 +78,19 @@ export interface PhaseResolution {
  *
  *  1. a lifecycle edge stage (`inbox`, `prioritized`, `done`) that is a pipeline
  *     phase: that column — the edges never take a pin (req-265);
- *  2. `x-phase` when it names a pipeline phase: req-265's interim column pin on
- *     a ticket the stage migration has not turned into a cursor yet, and
- *     variant B of the migration plan (dricket's built-in stages with the
- *     phase kept beside them) — nothing writes the pin any more (req-257);
- *  3. an `active` / `running` ticket with a readable chain: the column of its
- *     holder (req-257, `core/chain-placement.ts`) — the cursor `x-at` took the
- *     pin's place; a pipeline with no column for the holder shows the stage
- *     itself (one "active" column);
- *  4. the stage itself when it is a pipeline phase id (variant A: `[stages]` in
- *     `dricket.toml` lists the phase ids — a store not yet migrated);
- *  5. by role: `active` / `running` / `in-progress` -> the first claiming column,
- *     `open` / `blocked` -> the capture column, `review` -> `commit` (else the
- *     column before the terminal one), `done` / `cancelled` -> the terminal column;
- *  6. otherwise the raw stage: the board shows it as an unknown column with a
+ *  2. an `active` / `running` ticket with a readable chain: the column of its
+ *     holder (req-257, `core/chain-placement.ts`) — the cursor `x-at`; a pipeline
+ *     with no column for the holder shows the stage itself (one "active" column);
+ *  3. the stage itself when it is a pipeline phase id;
+ *  4. by role: `active` / `running` -> the first claiming column,
+ *     `open` / `blocked` -> the capture column, `done` / `cancelled` -> the terminal column;
+ *  5. otherwise the raw stage: the board shows it as an unknown column with a
  *     warning, exactly like a stray directory.
  */
 export function resolvePhase(record: TicketDetail, phases: readonly PipelinePhase[], placement?: HolderPlacement): PhaseResolution {
   const ids = phases.map((p) => p.id);
   if (EDGE_STAGES.includes(record.stage) && ids.includes(record.stage)) {
     return { phase: record.stage, unmapped: false };
-  }
-  const pinned = record.extensions[PHASE_PIN_KEY];
-  if (pinned !== undefined && ids.includes(pinned)) {
-    return { phase: pinned, unmapped: false };
   }
   const held = holderColumnOf(record, placement ?? { columns: placementColumnsOf(phases), lookup: crewLookupOf(undefined) });
   if (held !== undefined) {
@@ -139,14 +128,11 @@ function roleColumn(stage: string, phases: readonly PipelinePhase[]): string | u
   if (TERMINAL_ROLES.includes(stage)) {
     return ids[ids.length - 1];
   }
-  if (stage !== 'review') {
-    return undefined;
-  }
-  return ids.includes('commit') ? 'commit' : ids.length >= 3 ? ids[ids.length - 2] : undefined;
+  return undefined;
 }
 
 const CAPTURE_ROLES: readonly string[] = ['open', 'blocked'];
-const CLAIM_ROLES: readonly string[] = [ACTIVE_STAGE, RUNNING_STAGE, 'in-progress'];
+const CLAIM_ROLES: readonly string[] = [ACTIVE_STAGE, RUNNING_STAGE];
 const TERMINAL_ROLES: readonly string[] = ['done', 'cancelled'];
 
 /** One record as the legacy ticket file the board reader understands. */

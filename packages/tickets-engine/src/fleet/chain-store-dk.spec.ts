@@ -161,7 +161,6 @@ describe.skipIf(!found.ok)('the chain over a real dk store (E14-5b)', { timeout:
       supervisorOf: () => fleet.port,
       bookkeeper: composeShared(storeFor, log).bookkeeper,
       scanIntervalMs: 50,
-      execShell: async () => undefined,
     });
     await orch.configure({
       ticketsVaultPath: metaDir,

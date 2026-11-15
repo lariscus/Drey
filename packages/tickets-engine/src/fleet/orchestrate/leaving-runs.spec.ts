@@ -88,7 +88,7 @@ describe("the builder's sync-main at a run's green end (req-267)", () => {
 describe("You's commit as a machine run (req-267)", () => {
   const dirs = useTempDirs();
   const commit = (over: Partial<RunRequest> = {}): RunRequest =>
-    runRequest(dirs.vault, { baseRef: 'main', nextPhase: null, nextPhaseDir: null, machine: { action: 'commit', persona: 'you', policy: null }, ...over });
+    runRequest(dirs.vault, { baseRef: 'main', machine: { action: 'commit', persona: 'you', policy: null }, ...over });
   const LOCAL = [
     { when: 'status --porcelain', out: '' },
     { when: 'rev-parse --verify refs/heads/t/T-0001', out: 'tip00000000\n' },

@@ -1,5 +1,4 @@
-import { isLifecycleStageSet, PHASE_PIN_KEY, placementOfPhase } from '../core/lifecycle-stages';
-import { documentField } from './document-fields';
+import { isLifecycleStageSet } from '../core/lifecycle-stages';
 import { tomlList, tomlString, tomlTable } from './store-config-text';
 
 /**
@@ -36,24 +35,6 @@ export function parseStoreStages(toml: string): StoreStageSet | null {
 /** True for a store on the lifecycle stages (`active`, `running`, `claim = ["running"]`). */
 export function isLifecycleStore(stages: StoreStageSet | null): boolean {
   return stages !== null && isLifecycleStageSet(stages.values, stages.claim);
-}
-
-/** What a board write of column `phase` puts on a document: stage and pin (`pin` absent = leave the document's). */
-export interface WritePlacement {
-  readonly stage: string;
-  readonly pin?: string | null;
-}
-
-/**
- * The stage and pin a write into column `phase` gets. A lifecycle store: the edge columns are their own
- * stage, every other column is `active` with the pin. A store still on phase stages (variant A): the
- * stage is the phase id, and a document that carries a pin (variant B) keeps it in step.
- */
-export function writePlacement(phase: string, stages: StoreStageSet | null, currentText: string): WritePlacement {
-  if (isLifecycleStore(stages)) {
-    return placementOfPhase(phase);
-  }
-  return documentField(currentText, PHASE_PIN_KEY) === null ? { stage: phase } : { stage: phase, pin: phase };
 }
 
 const list = (values: readonly string[]): string => `[${values.map((v) => `"${v}"`).join(', ')}]`;

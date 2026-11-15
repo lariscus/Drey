@@ -58,8 +58,8 @@ describe('RunCompletion — the gate, the move and the other ends', () => {
       }
       return storeRelease(ticket, options);
     };
-    // No next phase: the green run's one ticket write is the settle's release.
-    runId = await startRun(sup, request({ nextPhase: null, nextPhaseDir: null }));
+    // No cursor: the green run's one ticket write is the settle's release.
+    runId = await startRun(sup, request());
     endTurn(built.adapter.handles[0]!);
     await waitFor(() => expect(holding).toBe(1));
     // The settle is inside its release: `state` is terminal, the run is not settled.
@@ -68,28 +68,6 @@ describe('RunCompletion — the gate, the move and the other ends', () => {
     release();
     await settled(sup, runId, 'done');
     expect(built.store.of('release').map((c) => c.stage)).toEqual(STAY_PUT);
-  });
-
-  it('a manual step after the gate parks the ticket in place: the park comment, no move (E10-6)', async () => {
-    const { sup, adapter, store } = harness(dirs.fleet);
-    const id = await startRun(sup, request({ nextPhase: null, nextPhaseDir: null, parkFor: 'you' }));
-    endTurn(adapter.handles[0]!);
-    await settled(sup, id, 'done');
-    expect(store.of('release').map((c) => c.stage)).toEqual(STAY_PUT);
-    expect(store.stage).toBe('prioritized'); // a store still on phase stages retreats; the R-31 write-back is gone (req-265)
-    expect(store.of('comment').at(-1)?.text).toContain('parked for you (manual step)');
-  });
-
-  it('a pulled ticket moves into the working column and parks there (E10-6)', async () => {
-    const { sup, adapter, store } = harness(dirs.fleet);
-    store.stages = [...store.stages, 'qa'];
-    const id = await startRun(sup, request({ nextPhase: 'qa', nextPhaseDir: 'qa', parkFor: 'you' }));
-    endTurn(adapter.handles[0]!);
-    await settled(sup, id, 'done');
-    expect(store.of('release').map((c) => c.stage)).toEqual(['qa']);
-    const comment = store.of('comment').at(-1)?.text ?? '';
-    expect(comment).toContain('moving to qa');
-    expect(comment).toContain('parked for you (manual step)');
   });
 
   it('a red gate fails the run and the ticket stays put', async () => {
@@ -191,56 +169,6 @@ describe('RunCompletion — the gate, the move and the other ends', () => {
       await settled(sup, id, 'done');
       expect(gate).toEqual([]);
       expect(store.of('release').map((c) => c.stage)).toEqual(['build']);
-    });
-  });
-
-  describe('the second opinion (M85 quality rungs)', () => {
-    it('a second opinion re-runs the step before it moves — once', async () => {
-      let opinions = 0;
-      const { sup, adapter, store } = harness(dirs.fleet, {
-        secondOpinion: async () => {
-          opinions += 1;
-          return 'You are the sampling auditor — review the step.';
-        },
-      });
-      const id = await startRun(sup, request());
-
-      // The first worker's green gate hands the step to the auditor.
-      endTurn(adapter.handles[0]!);
-      await waitFor(() => expect(adapter.handles.length).toBe(2));
-      // The ticket has not moved yet — the audit round runs first.
-      expect(store.of('release')).toHaveLength(0);
-
-      // The auditor's green gate moves the ticket, and no third round starts.
-      endTurn(adapter.handles[1]!);
-      await settled(sup, id, 'done');
-      expect(store.of('release').map((c) => c.stage)).toEqual(['build']);
-      expect(opinions).toBe(1);
-      expect(adapter.handles).toHaveLength(2);
-      expect(await streamText(dirs.fleet, id)).toContain('second opinion');
-    });
-
-    it('a red gate in the audit round parks the ticket', async () => {
-      let gateCalls = 0;
-      const { sup, adapter, store } = harness(dirs.fleet, {
-        secondOpinion: async () => 'audit brief',
-        execShell: async () => {
-          // The first gate is green, the auditor's gate runs the same
-          // commands — fail from the second round on via the call count.
-          gateCalls += 1;
-          if (gateCalls > 1) {
-            throw new Error('exit 1\naudit gate red');
-          }
-        },
-      });
-      const id = await startRun(sup, request());
-      endTurn(adapter.handles[0]!);
-      await waitFor(() => expect(adapter.handles.length).toBe(2));
-      endTurn(adapter.handles[1]!);
-      await settled(sup, id, 'failed');
-      expect(store.of('release').map((c) => c.stage)).toEqual(STAY_PUT);
-      expect(sup.get(id)?.gateFailure).toContain('exit 1');
-      expect(sup.get(id)?.gateResult).toBe('red');
     });
   });
 });

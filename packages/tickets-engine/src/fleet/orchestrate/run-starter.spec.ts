@@ -9,7 +9,7 @@ import { gitRecorder } from './tickets-git.fake';
 describe('RunStarter — the rules, the claim first, then the worktree and the worker', () => {
   const dirs = useTempDirs();
   const request = (over: Partial<RunRequest> = {}): RunRequest => runRequest(dirs.vault, over);
-  const dialog = (): RunRequest => request({ acceptance: [], gate: 'structural', nextPhase: null, nextPhaseDir: null, interactive: 'plan' });
+  const dialog = (): RunRequest => request({ acceptance: [], gate: 'structural', interactive: 'plan' });
 
   it('refuses a second live run for the ticket', async () => {
     const { sup, adapter } = harness(dirs.fleet);

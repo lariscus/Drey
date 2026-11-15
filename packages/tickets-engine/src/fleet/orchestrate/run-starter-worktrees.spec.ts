@@ -46,7 +46,7 @@ describe('RunStarter worktree wiring', () => {
     await settled(sup, firstId, 'done');
 
     // Next phase, same ticket: the worktree already exists.
-    const second = await sup.start(request({ ticketRelPath: 'tickets/build/T-0001.md', phase: 'build', nextPhase: null }));
+    const second = await sup.start(request({ ticketRelPath: 'tickets/build/T-0001.md', phase: 'build' }));
     expect(second.ok).toBe(true);
     const info = (second as { run: RunInfo }).run;
     expect(info.worktree).toBe('reused');

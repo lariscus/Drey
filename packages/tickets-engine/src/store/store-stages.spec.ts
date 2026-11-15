@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isLifecycleStore, parseStoreStages, renderStageTable, withStageTable, writePlacement } from './store-stages';
+import { isLifecycleStore, parseStoreStages, renderStageTable, withStageTable } from './store-stages';
 
 const OLD = [
   '# dricket.toml - the protected configuration of this ticket store.',
@@ -56,12 +56,5 @@ describe('the store stage vocabulary (req-265)', () => {
   it('appends a table to a config that has none', () => {
     const next = withStageTable('schema_version = 1\n', LIFECYCLE);
     expect(next).toBe(`schema_version = 1\n\n${renderStageTable(LIFECYCLE)}\n`);
-  });
-
-  it('places a board write: lifecycle store by column, phase store by the phase id (a pin kept in step)', () => {
-    expect(writePlacement('building', LIFECYCLE, '')).toEqual({ stage: 'active', pin: null });
-    expect(writePlacement('prioritized', LIFECYCLE, '')).toEqual({ stage: 'prioritized', pin: null });
-    expect(writePlacement('building', parseStoreStages(OLD), '---\nstage: inbox\n---\n')).toEqual({ stage: 'building' });
-    expect(writePlacement('building', null, '---\nstage: open\nx-phase: inbox\n---\n')).toEqual({ stage: 'building', pin: 'building' });
   });
 });

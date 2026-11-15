@@ -1,5 +1,4 @@
 import { parse } from 'yaml';
-import { PHASE_PIN_KEY } from '../core/lifecycle-stages';
 import { EXTENSION_KEYS } from './extension-keys';
 import { toDricketId } from './ids';
 
@@ -26,13 +25,8 @@ export const ARCHIVED_LABEL = 'archived';
 export const PLACEHOLDER_LABEL = 'placeholder';
 
 export interface BridgeOptions {
-  /** The stage the document gets (a lifecycle stage, req-265; on a store still on phase stages, the phase id). */
+  /** The stage the document gets (a lifecycle stage, req-265). */
   readonly stage: string;
-  /**
-   * The interim column pin `x-phase` (req-265): a string sets it, null removes it, absent leaves
-   * whatever the current document has.
-   */
-  readonly pin?: string | null;
   /** `true` adds the `archived` label, `false` removes it, absent leaves the labels. */
   readonly archived?: boolean;
 }
@@ -68,11 +62,7 @@ function listOf(value: unknown): string[] {
 
 /** The dricket header values a legacy header implies. `null` = the key must not stay in the document. */
 function fieldsOf(legacy: Record<string, unknown>, options: BridgeOptions): Map<string, string | null> {
-  const out = new Map<string, string | null>([...typedFieldsOf(legacy, options.stage), ...extensionFieldsOf(legacy)]);
-  if (options.pin !== undefined) {
-    out.set(PHASE_PIN_KEY, options.pin);
-  }
-  return out;
+  return new Map<string, string | null>([...typedFieldsOf(legacy, options.stage), ...extensionFieldsOf(legacy)]);
 }
 
 /** dricket's own fields: stage, title, priority, repos, depends, parent. */

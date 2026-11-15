@@ -15,21 +15,13 @@ import { EDGE_STAGES } from './lifecycle-stages';
 import { HUMAN_PERSONA_ID, MISSION_PERSONA_ID, type Persona } from './persona';
 import { classNameOf, type ClassName } from '../contracts/capability-class';
 import { raisedToFloor } from './persona-model-migration';
-import { PIPELINE_PROSE, STANDARD_FLOW_LINE } from './pipeline-states';
+import { LIFECYCLE_PIPELINE_PROSE, PIPELINE_PROSE, STANDARD_FLOW_LINE } from './pipeline-states';
 
 /** The run keys a working column carried that move onto the builder's record (concept §5). */
 const MOVED_KEYS = ['min-class', 'needs', 'max-turns', 'max-work'] as const;
 
 /** Keys no ruling gives a home (§14 reading 9): they go with their column, named to the owner first. */
 const HOMELESS_KEYS: readonly string[] = ['ci', 'audit', 'semantic'];
-
-/** `pipeline.md`'s prose for a persona board (replaces the shipped phase-board prose only). */
-export const LIFECYCLE_PIPELINE_PROSE = `The pipeline of a persona board: Inbox, Prioritized and Done are the
-ticket's lifecycle columns; between them the board draws one column per
-persona of the crew, in the crew's order (\`order:\` in crew.md). What a ticket
-goes through is its chain, copied from \`flow:\` when it is created. See
-specs/ticket-schema.md. Edit freely; the board follows on refresh.
-`;
 
 /** The builder of a flow: the first persona after the shape persona's leading entries (Ben in the standard flow). */
 export function builderOf(flowLine: string, personas: readonly Pick<Persona, 'id' | 'kind'>[]): string | null {

@@ -47,7 +47,7 @@ describe('dispatchable', () => {
   it('skips busy, claimed and run-stamped tickets', () => {
     expect(dispatchable(card('T-0002'), new Set(['T-0002']))).toBe(false);
     expect(dispatchable(card('T-0003', { claimedBy: 'agent-r1@host' }), new Set())).toBe(false);
-    expect(dispatchable(card('T-0004', { run: 'r1' }), new Set())).toBe(false);
+    expect(dispatchable(card('T-0004', { run: { pid: 1, 'started-at': '2026-11-15T10:00:00Z', stream: 'runs/r1' } }), new Set())).toBe(false);
   });
 
   it('never takes a ticket the owner reserved for an interactive dialog (req-65)', () => {

@@ -8,7 +8,7 @@ import type { Orchestrator } from '../orchestrator';
 import { normalizeFleetPools, type ChainConfig, type ChainStoreConfig, type FleetPools, type RunInfo, type RunRequest } from '../protocol';
 import type { StartOutcome, StopOutcome, SupervisorRecord } from '../run/run-record';
 import { StoreChainBoard } from '../store-chain-board';
-import { FakeChainIo } from './chain-io.fake';
+import { FakeChainIo, type SeedOptions } from './chain-io.fake';
 import type { StartOptions } from './run-supervisor';
 import type { SupervisorPort } from './supervisor-directory';
 import { ChainStatePaths } from './chain-state-paths';
@@ -21,26 +21,18 @@ import { ChainStatePaths } from './chain-state-paths';
  * `tearDown` after (it disposes every orchestrator it built first).
  */
 
-export const PLAN_LINE = '  - { id: plan, title: Plan, handover: agent plan-default, worker: opencode, model: zai/glm-5.3 }';
-
+/** The persona board's pipeline (req-307): the lifecycle columns and the flow; who runs a ticket is its chain. */
 export const PIPELINE = [
   '---',
   'phases:',
   '  - { id: inbox, title: Inbox, handover: manual }',
   '  - { id: prioritized, title: Prioritized, handover: manual }',
-  PLAN_LINE,
-  '  - { id: plan-review, title: Plan review, handover: manual }',
-  '  - { id: build, title: Build, handover: agent build-default, claim: true }',
   '  - { id: done, title: Done, handover: none }',
+  'flow: ben; you',
   '---',
   'Prose.',
   '',
 ].join('\n');
-
-/** The pipeline with extra keys on the plan column (`persona: pia`). */
-export function pipelineWithPlan(extra: string): string {
-  return PIPELINE.replace(PLAN_LINE, `${PLAN_LINE.slice(0, -2)}, ${extra} }`);
-}
 
 export const REPOS = ['---', 'repos:', '  drey:', '    url: https://example.test/drey.git', '    branch: main', '    path: W:/drey', '---', 'Prose.', ''].join('\n');
 
@@ -107,13 +99,21 @@ export function fakePort(): FakeFleet {
   return { port, records, start, stop, end };
 }
 
-/** A failed run of `ticket` in the plan column whose gate failed with `failure` (T-0048's retry context). */
+/** A failed run of `ticket` at its first chain position whose gate failed with `failure` (T-0048's retry context). */
 export function failedRecord(ticket: string, failure: string): SupervisorRecord {
   const info = runInfo(`R-old-${ticket}`, { ticketId: ticket, provider: 'opencode', branch: `t/${ticket}` });
   return {
     info: { ...info, state: 'failed', pid: null, startedAt: '2026-10-18T11:00:00Z', endedAt: '2026-10-18T11:20:00Z', lastActivity: '2026-10-18T11:20:00Z', gateFailure: failure },
-    request: { ticketId: ticket, column: 'plan' } as RunRequest,
+    request: { ticketId: ticket, column: 'active', cursor: { at: 1, length: 2 } } as RunRequest,
   };
+}
+
+/** What a ticket the chain runs needs beyond the store's defaults: whose entry it stands at and where. */
+export interface RunSeed extends SeedOptions {
+  /** The persona of the first entry (default `ben`); the chain is `<persona>; you`. */
+  readonly persona?: string;
+  /** The cursor (default 1). */
+  readonly at?: number;
 }
 
 /** A persona file's knobs (`tickets/_meta/personas/<id>/`). */
@@ -125,6 +125,7 @@ export interface PersonaSeed {
   readonly model?: string;
   readonly pool?: readonly string[];
   readonly role?: string;
+  /** The persona's prompt.md; absent = a one-line default, `null` = no file at all. */
   readonly prompt?: string | null;
   readonly memory?: string;
   readonly skills?: readonly string[];
@@ -144,14 +145,20 @@ export class ChainHarness {
   readonly io = new FakeChainIo();
   private readonly built: Orchestrator[] = [];
 
-  /** Temp dirs plus the meta vault: the default pipeline, repos and the two column prompts. */
+  /** Temp dirs plus the meta vault: the persona board's pipeline, repos, the builder Ben (prompt "Build it.") and You. */
   async setUp(pipeline = PIPELINE): Promise<void> {
     this.vaultDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-meta-'));
     this.fleetRoot = await fsp.mkdtemp(path.join(os.tmpdir(), 'drey-fleet-'));
     await this.write('tickets/_meta/pipeline.md', pipeline);
     await this.write('tickets/_meta/repos.md', REPOS);
-    await this.write('tickets/_meta/prompts/plan-default.md', 'Work the plan step.');
-    await this.write('tickets/_meta/prompts/build-default.md', 'Build it.');
+    await this.writePersona('ben', { prompt: 'Build it.' });
+    await this.writeHuman();
+  }
+
+  /** Seeds an `active` ticket whose chain entry at the cursor is an agent persona's: the holder pass dispatches it. */
+  seedRun(id: string, over: RunSeed = {}): void {
+    const { persona = 'ben', at = 1, extensions, ...rest } = over;
+    this.io.seed(id, 'active', { chain: [persona, 'you'], ...rest, extensions: { at: String(at), ...extensions } });
   }
 
   async tearDown(): Promise<void> {
@@ -209,8 +216,8 @@ export class ChainHarness {
       : [`worker: ${over.worker ?? 'opencode'}`, 'models:', `  default: ${model}`, `  pool: [${(over.pool ?? [model]).join(', ')}]`];
     const lines = ['---', `title: ${id}`, `role: ${over.role ?? 'builder'}`, ...keys, "color: '#a78bfa'", `skills: [${(over.skills ?? []).join(', ')}]`, '---', ''];
     await this.write(`tickets/_meta/personas/${id}/persona.md`, lines.join('\n'));
-    if (over.prompt != null) {
-      await this.write(`tickets/_meta/personas/${id}/prompt.md`, over.prompt);
+    if (over.prompt !== null) {
+      await this.write(`tickets/_meta/personas/${id}/prompt.md`, over.prompt ?? `Work as ${id}.`); // null = a persona without a prompt.md
     }
     if (over.memory != null) {
       await this.write(`tickets/_meta/personas/${id}/memory.md`, over.memory);

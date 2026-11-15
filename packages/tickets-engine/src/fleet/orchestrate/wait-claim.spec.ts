@@ -8,7 +8,7 @@ import { buildRequest, DK_TARGET, harness, startRun, useTempDirs, type Harness }
 /** Q-03 (accepted 2026-11-05): a run that waits for the owner gives its claim up and re-claims on the answer. */
 describe('WaitClaim — the claim through a wait for the owner', () => {
   const dirs = useTempDirs();
-  const request = (over: Partial<RunRequest> = {}): RunRequest => buildRequest(dirs.vault, { nextPhase: null, nextPhaseDir: null, ...over });
+  const request = (over: Partial<RunRequest> = {}): RunRequest => buildRequest(dirs.vault, { ...over });
   const setup = (): Harness => harness(dirs.fleet, {}, new FakeTicketStore());
   const question = (text: string, label: string) =>
     ({ kind: 'question', text, requestId: 'q1', questions: [{ question: text, header: 'Key', options: [{ label, description: '' }] }] }) as never;

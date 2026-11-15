@@ -18,8 +18,6 @@ function oneOnOne(vault: string, over: Partial<RunRequest> = {}): RunRequest {
     branch: '',
     acceptance: [],
     gate: 'none',
-    nextPhase: null,
-    nextPhaseDir: null,
     permissionMode: 'read-only',
     instruction: 'You are Ben. The 1:1 brief.',
     column: null,
