@@ -248,12 +248,13 @@ The concept was approved with open readings; the code decided them.
 - **`wip` did not become `parallel`** on migration: step 3 moves only the
   class floor, needs and the run ceilings; `ci` / `audit` / `semantic`
   (no ruling) are named and go with the column.
-- **"Initialize board" still writes the phase pipeline.** The concept's
-  §12 "fresh board" (a five-stage `dricket.toml`, three lifecycle columns)
-  is not built: `DEFAULT_PIPELINE_TEXT` still writes the six phases plus
-  `flow:`, and the crew seeder writes Pia, Paul, Ben, Ralf, Tessa, You with
-  `order:` and the leaving actions. A store reaches the persona board
-  through Migrate; creating a store with the lifecycle stages is E14-9b.
+- **"Initialize board" writes the persona board's pipeline.** The concept's
+  §12 "fresh board" arrived with req-307 (E14-9b): `DEFAULT_PIPELINE_TEXT`
+  writes the three lifecycle edges plus `flow:`, the crew seeder writes Pia,
+  Paul, Ben, Ralf, Tessa, You with `order:` and the leaving actions, and with
+  no store configured Drey creates one on the lifecycle stages itself
+  ([ADR-0100](0100-drey-on-dricket-only.md)). The Migrate path this section
+  once described is gone — a store on other stages gets a fresh store.
 - **Active tickets stay in `columns`** too (in the stage's own column once
   the pipeline holds only lifecycle phases), so every reader of the columns
   keeps working; `lanes` and `hold` are additive.
