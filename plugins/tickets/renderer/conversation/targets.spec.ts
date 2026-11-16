@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- the spec stands in for the host, which owns the catalog at runtime
 import { i18n } from '../../../../shared/i18n';
 import { burnRateHoldOf } from '../../../../shared/burn-rate';
+import type { ChatStreamEvent } from '../../../../packages/tickets-engine/src/contracts/chat';
 import type { PersonaView } from '../../shared/remote-protocol';
 import {
   createConversationProvider,
@@ -238,5 +239,114 @@ describe('Mission Control: the burn rate card (req-181, board 10u chrome)', () =
     set(null);
     expect(listener).toHaveBeenCalledTimes(2);
     off();
+  });
+});
+
+describe('the live answer of a Mission Control turn (D-76)', () => {
+  type Live = { readonly file: string; readonly event: ChatStreamEvent };
+  const OTHER = 'tickets/_meta/chat/20261104-110000-other.md';
+
+  /** A target whose `mcSend` / `mcStart` hangs until `finish`, fed by an engine stream the spec drives. */
+  function streaming() {
+    const base = deps();
+    const listeners = new Set<(live: Live) => void>();
+    const turn: { finish: (value: unknown) => void; started: boolean } = { finish: () => undefined, started: false };
+    const { deps: d } = deps({
+      invoke: (method, payload) =>
+        method === 'mcSend' || method === 'mcStart'
+          ? new Promise((resolve) => {
+              turn.started = true;
+              turn.finish = resolve;
+            })
+          : base.deps.invoke(method, payload),
+      subscribeLive: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    });
+    const mission = createConversationProvider(d).targets()[0]!;
+    const emit = (event: ChatStreamEvent, file = FILE): void => listeners.forEach((listener) => listener({ file, event }));
+    return { mission, emit, turn, listeners };
+  }
+
+  it('shows the thought and the say while the model writes them, before the turn resolves', async () => {
+    const { mission, emit, turn } = streaming();
+    await mission.thread();
+    const painted = vi.fn();
+    mission.onLiveChange!(painted);
+    expect(mission.live!()).toBeNull();
+    const sending = mission.send('Queue both');
+    await vi.waitFor(() => expect(turn.started).toBe(true));
+    emit({ kind: 'thought', text: 'ticket_read T-1 … ' });
+    expect(painted).toHaveBeenCalledTimes(1);
+    expect(mission.live!()).toMatchObject({ role: 'agent', text: '', thought: 'ticket_read T-1 …' });
+    for (const delta of ['{"say": "On ', 'it.", "thought": "Ben is fr', 'ee']) {
+      emit({ kind: 'text', text: delta });
+    }
+    expect(mission.live!()).toMatchObject({ text: 'On it.', thought: 'ticket_read T-1 …\nBen is free' });
+    // Nothing resolved yet: the thread of the session still holds the old messages only.
+    expect(turn.started).toBe(true);
+    turn.finish({ ok: true, file: FILE });
+    await sending;
+  });
+
+  it('starts the next round clean: the tool step ends the text that came before it', async () => {
+    const { mission, emit, turn } = streaming();
+    await mission.thread();
+    mission.onLiveChange!(() => undefined);
+    const sending = mission.send('Go');
+    await vi.waitFor(() => expect(turn.started).toBe(true));
+    emit({ kind: 'text', text: 'let me look' });
+    emit({ kind: 'thought', text: 'vault_read a.md … ' });
+    emit({ kind: 'text', text: '{"say": "Done."}' });
+    expect(mission.live!()).toMatchObject({ text: 'Done.', thought: 'vault_read a.md …' });
+    turn.finish({ ok: true, file: FILE });
+    await sending;
+  });
+
+  it('ignores another session and anything outside a send', async () => {
+    const { mission, emit, turn } = streaming();
+    await mission.thread();
+    const painted = vi.fn();
+    mission.onLiveChange!(painted);
+    emit({ kind: 'text', text: '{"say": "before"}' });
+    expect(painted).not.toHaveBeenCalled();
+    const sending = mission.send('Go');
+    await vi.waitFor(() => expect(turn.started).toBe(true));
+    emit({ kind: 'text', text: '{"say": "phone talks"}' }, OTHER);
+    expect(painted).not.toHaveBeenCalled();
+    expect(mission.live!()).toBeNull();
+    turn.finish({ ok: true, file: FILE });
+    await sending;
+    painted.mockClear();
+    emit({ kind: 'text', text: '{"say": "after"}' });
+    expect(painted).not.toHaveBeenCalled();
+  });
+
+  it("adopts the session a first message's first event names and then holds to it", async () => {
+    const { mission, emit, turn } = streaming();
+    await mission.newThread();
+    mission.onLiveChange!(() => undefined);
+    const sending = mission.send('Fresh');
+    await vi.waitFor(() => expect(turn.started).toBe(true));
+    emit({ kind: 'text', text: '{"say": "mine"}' }, OTHER);
+    emit({ kind: 'text', text: '{"say": "not mine"}' }, FILE);
+    expect(mission.live!()).toMatchObject({ text: 'mine' });
+    turn.finish({ ok: true, file: OTHER });
+    await sending;
+  });
+
+  it('stops listening to the stream when the Assistant unsubscribes', async () => {
+    const { mission, listeners } = streaming();
+    const off = mission.onLiveChange!(() => undefined);
+    expect(listeners.size).toBe(1);
+    off();
+    expect(listeners.size).toBe(0);
+  });
+
+  it('offers no live answer to a plugin that wires no stream', () => {
+    const mission = createConversationProvider(deps().deps).targets()[0]!;
+    expect(mission.live).toBeUndefined();
+    expect(mission.onLiveChange).toBeUndefined();
   });
 });

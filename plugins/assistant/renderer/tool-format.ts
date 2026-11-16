@@ -115,30 +115,45 @@ export function runningToolLabel(tool: {
   argsJson: string;
   state: 'running' | 'done' | 'failed';
 }): string {
-  let args: unknown = tool.argsJson;
-  try {
-    args = JSON.parse(tool.argsJson);
-  } catch {
-    // The raw text is still a usable summary.
-  }
-  const call = `tool · ${toolDisplayName(tool.name)}(${summarizeArguments(args)})`;
+  const call = `tool · ${toolDisplayName(tool.name)}(${summarizeArguments(tool.argsJson)})`;
   return tool.state === 'running' ? `${call} …` : tool.state === 'failed' ? `${call} — failed` : call;
 }
 
-/** Compact argument summary for a call chip. */
+/** The most a call chip's argument summary shows: one short line, never the call's payload. */
+export const ARGUMENT_SUMMARY_MAX = 60;
+
+/** One line, whitespace collapsed, cut hard at {@link ARGUMENT_SUMMARY_MAX}. */
+function oneLine(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return flat.length > ARGUMENT_SUMMARY_MAX ? `${flat.slice(0, ARGUMENT_SUMMARY_MAX - 1)}…` : flat;
+}
+
+/**
+ * Compact argument summary for a call chip: the call's scalar arguments
+ * (`path: a.md, limit: 5`), never a nested value — the `edits` of a
+ * `vault_edit` are the payload and live in the expanded chip. A model's
+ * arguments reach the chip as the provider's raw JSON string (persisted
+ * as written, or still incomplete while a streamed round is in flight),
+ * so a string is parsed first; one that does not parse is the raw text.
+ * Whatever the shape, the result is one line of at most
+ * {@link ARGUMENT_SUMMARY_MAX} characters (D-77).
+ */
 export function summarizeArguments(args: unknown): string {
+  let value: unknown = args;
   if (typeof args === 'string') {
-    const cleaned = args.replace(/^\{|\}$/g, '').trim();
-    return cleaned === '' ? '' : cleaned;
+    try {
+      value = JSON.parse(args);
+    } catch {
+      return oneLine(args.replace(/^\{|\}$/g, ''));
+    }
   }
-  if (args !== null && typeof args === 'object') {
-    const parts = Object.entries(args as Record<string, unknown>).map(
-      ([key, value]) => `${key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`,
-    );
-    const joined = parts.join(', ');
-    return joined.length > 48 ? `${joined.slice(0, 48)}…` : joined;
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    const parts = Object.entries(value as Record<string, unknown>)
+      .filter(([, entry]) => ['string', 'number', 'boolean'].includes(typeof entry))
+      .map(([key, entry]) => `${key}: ${String(entry)}`);
+    return oneLine(parts.join(', '));
   }
-  return '';
+  return typeof value === 'string' ? oneLine(value) : '';
 }
 
 /** The full arguments of a call, pretty-printed for the expanded chip. */

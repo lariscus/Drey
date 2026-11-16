@@ -1,4 +1,5 @@
 import type { EngineBoardService } from '../../../../packages/tickets-engine/src/services/board-service';
+import type { ChatStreamEvent } from '../../../../packages/tickets-engine/src/contracts/chat';
 import type { FleetClient } from '../../../../packages/tickets-engine/src/services/fleet-client';
 import type { RemoteService } from '../../../../packages/tickets-engine/src/server/service';
 import { UnconfiguredTicketsError } from './unconfigured-error';
@@ -20,13 +21,41 @@ export interface EngineEndpoints {
 
 export class EngineError extends Error {}
 
-/** One SSE `data:` line: board / fleet / remote are debounced signals, `paths` is a payload. */
+/**
+ * One streamed unit of a Mission Control turn (D-76): the session file it
+ * belongs to and the thought / text delta, or the turn's end. A proposal
+ * event is not forwarded — the desktop reads the cards from the session
+ * file when the turn resolves.
+ */
+export interface ChatLiveEvent {
+  readonly file: string;
+  readonly event: Extract<ChatStreamEvent, { kind: 'thought' | 'text' | 'done' | 'error' }>;
+}
+
+/** The well-formed live event of a `chat` frame, or null. */
+function chatLiveOf(frame: { file?: unknown; event?: unknown }): ChatLiveEvent | null {
+  const event = frame.event;
+  if (typeof frame.file !== 'string' || typeof event !== 'object' || event === null) {
+    return null;
+  }
+  const { kind, text, message } = event as { kind?: unknown; text?: unknown; message?: unknown };
+  if ((kind === 'thought' || kind === 'text') && typeof text === 'string') {
+    return { file: frame.file, event: { kind, text } };
+  }
+  if (kind === 'done') {
+    return { file: frame.file, event: { kind } };
+  }
+  return kind === 'error' ? { file: frame.file, event: { kind, message: typeof message === 'string' ? message : '' } } : null;
+}
+
+/** One SSE `data:` line: board / fleet / remote are debounced signals, `paths` and `chat` are payloads. */
 export function dispatchFrame(
   json: string,
   fire: (what: 'board' | 'fleet' | 'remote') => void,
   onPaths?: (event: PathsEvent) => void,
+  onChat?: (event: ChatLiveEvent) => void,
 ): void {
-  let frame: { change?: string; vaultPath?: unknown; changed?: unknown; deleted?: unknown };
+  let frame: { change?: string; vaultPath?: unknown; changed?: unknown; deleted?: unknown; file?: unknown; event?: unknown };
   try {
     frame = JSON.parse(json) as typeof frame;
   } catch {
@@ -34,6 +63,11 @@ export function dispatchFrame(
   }
   if (frame.change === 'board' || frame.change === 'fleet' || frame.change === 'remote') {
     fire(frame.change);
+  } else if (frame.change === 'chat' && onChat !== undefined) {
+    const live = chatLiveOf(frame);
+    if (live !== null) {
+      onChat(live);
+    }
   } else if (frame.change === 'paths' && onPaths !== undefined && typeof frame.vaultPath === 'string') {
     const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []);
     onPaths({ vaultPath: frame.vaultPath, changed: strings(frame.changed), deleted: strings(frame.deleted) });
@@ -107,6 +141,8 @@ export class EngineClient {
     debounceMs = 200,
     /** The `paths` frames (D-3): undebounced -- the receiver batches. */
     onPaths?: (event: PathsEvent) => void,
+    /** The `chat` frames (D-76): a Mission Control turn's thought / text deltas, undebounced. */
+    onChat?: (event: ChatLiveEvent) => void,
   ): () => void {
     const endpoints = this.endpoints;
     if (endpoints === null) {
@@ -148,7 +184,7 @@ export class EngineClient {
             for (const frame of frames) {
               for (const line of frame.split('\n')) {
                 if (line.startsWith('data: ')) {
-                  dispatchFrame(line.slice(6), fire, onPaths);
+                  dispatchFrame(line.slice(6), fire, onPaths, onChat);
                 }
               }
             }

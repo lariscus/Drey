@@ -2828,6 +2828,8 @@ const plugin: { activate(api: DreyPluginApi): void } = {
           const offs = [api.backend.on('board-changed', () => listener('board')), api.backend.on('fleet-changed', () => listener('fleet'))];
           return () => offs.forEach((off) => off());
         },
+        // D-76: the engine's chat stream, so the Mission Control thread fills while the model writes.
+        subscribeLive: (listener) => api.backend.on('chat-live', (payload) => listener(payload as Parameters<typeof listener>[0])),
         hold: {
           view: () => burnRateHoldOf(chain),
           format: () => ({ t: (key, params) => api.i18n.t(key, params), time: (date) => api.i18n.formatTime(date) }),

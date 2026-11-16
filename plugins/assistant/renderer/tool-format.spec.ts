@@ -4,6 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  ARGUMENT_SUMMARY_MAX,
   firstLine,
   formatArguments,
   parseTasksResult,
@@ -105,14 +106,45 @@ describe('runningToolLabel', () => {
 });
 
 describe('summarizeArguments', () => {
-  it('strips the braces of a JSON string', () => {
-    expect(summarizeArguments('{"query":"x"}')).toBe('"query":"x"');
+  it('reads a JSON string as its key: value pairs', () => {
+    expect(summarizeArguments('{"query":"x"}')).toBe('query: x');
     expect(summarizeArguments('{}')).toBe('');
   });
 
-  it('lists an object as key: value pairs, cut at 48 characters', () => {
+  it('lists an object as key: value pairs, cut at 60 characters', () => {
     expect(summarizeArguments({ query: 'x', limit: 5 })).toBe('query: x, limit: 5');
-    expect(summarizeArguments({ query: 'y'.repeat(60) })).toHaveLength(49);
+    expect(summarizeArguments({ query: 'y'.repeat(80) })).toHaveLength(ARGUMENT_SUMMARY_MAX);
+  });
+
+  // D-77: the model's arguments are the provider's raw JSON string; the
+  // chip head used to print all of it (a vault_edit's whole edits).
+  const LONG_EDIT = {
+    path: 'tickets/t/0000/t-1/ticket.md',
+    edits: [
+      { old_text: 'To be filled in the plan phase.', new_text: '1. **Research:** ' + 'long paragraph. '.repeat(40) },
+      { old_text: 'x', new_text: 'y\nz' },
+    ],
+  };
+
+  it('keeps a long vault_edit call to its target on one line, as a string or an object', () => {
+    for (const args of [JSON.stringify(LONG_EDIT), LONG_EDIT]) {
+      expect(summarizeArguments(args)).toBe('path: tickets/t/0000/t-1/ticket.md');
+    }
+    expect(runningToolLabel({ name: 'vault_edit', argsJson: JSON.stringify(LONG_EDIT), state: 'done' })).toBe(
+      'tool · vault_edit(path: tickets/t/0000/t-1/ticket.md)',
+    );
+  });
+
+  it('cuts arguments that do not parse (a streamed round still in flight) hard and on one line', () => {
+    const partial = `{"path":"tickets/t/0000/t-1/ticket.md","edits":[{"old_text":"a\\nb","new_text":"${'w '.repeat(200)}`;
+    const head = summarizeArguments(partial);
+    expect(head.length).toBeLessThanOrEqual(ARGUMENT_SUMMARY_MAX);
+    expect(head).not.toContain('\n');
+    expect(head.startsWith('"path":"tickets/t/0000')).toBe(true);
+  });
+
+  it('leaves the full arguments to the expanded chip', () => {
+    expect(formatArguments(JSON.stringify(LONG_EDIT))).toContain('long paragraph.');
   });
 
   it('is empty for anything else', () => {

@@ -626,6 +626,16 @@ export interface ConversationTarget {
    * The Assistant reads `thread()` again. Returns the unsubscribe.
    */
   onThreadChange?(listener: () => void): Unsubscribe;
+  /**
+   * The answer being written while `send` is on its way (SDK 1.63): a target
+   * that streams returns the message so far — its `thought` and `text` fill
+   * — or null while nothing has arrived. The Assistant draws it after the
+   * thread and the owner's pending words, and drops it when `send` resolves
+   * with the thread that holds the finished answer.
+   */
+  live?(): ConversationMessage | null;
+  /** The live answer changed (SDK 1.63): the Assistant reads `live()` again. Returns the unsubscribe. */
+  onLiveChange?(listener: () => void): Unsubscribe;
 }
 
 /**

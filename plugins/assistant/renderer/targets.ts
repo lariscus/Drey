@@ -7,6 +7,7 @@
  */
 import type {
   ConversationCard,
+  ConversationMessage,
   ConversationTarget,
   ConversationThread,
   ConversationThreadMeta,
@@ -37,6 +38,9 @@ export interface TargetController {
   subscribe(listener: () => void): () => void;
   destroy(): void;
 }
+
+/** The most often the thread repaints for a streamed answer (the Model chat's streaming card does the same). */
+const LIVE_PAINT_MS = 100;
 
 /** How much of one attached file a target gets. */
 const ATTACHED_MAX_CHARS = 6_000;
@@ -138,6 +142,35 @@ export function createTargetController(api: DreyPluginApi): TargetController {
         watched.delete(id);
       }
     }
+    watchLive();
+  };
+
+  /**
+   * A streaming target's answer so far (SDK 1.63): the view repaints at most
+   * every ~100 ms while a send of that target is on its way — the deltas
+   * arrive per token. The answer itself is read from `live()` in `thread()`.
+   */
+  const liveWatched = new Map<string, () => void>();
+  let livePaint: ReturnType<typeof setTimeout> | null = null;
+  const watchLive = (): void => {
+    for (const target of targets()) {
+      if (target.onLiveChange === undefined || liveWatched.has(target.id)) {
+        continue;
+      }
+      const id = target.id;
+      liveWatched.set(
+        id,
+        target.onLiveChange(() => {
+          if (!working.has(id) || livePaint !== null) {
+            return;
+          }
+          livePaint = setTimeout(() => {
+            livePaint = null;
+            notify();
+          }, LIVE_PAINT_MS);
+        }),
+      );
+    }
   };
 
   const unsubTargets = api.conversations.onTargetsChange(() => {
@@ -186,9 +219,17 @@ export function createTargetController(api: DreyPluginApi): TargetController {
         return null;
       }
       const pending = working.get(active);
-      return pending === undefined || pending === ''
-        ? thread
-        : { ...thread, messages: [...thread.messages, { id: 'pending', role: 'user', text: pending }] };
+      if (pending === undefined) {
+        return thread;
+      }
+      // The words the owner just sent, then the answer the target is writing (SDK 1.63).
+      const answer = byId(active)?.live?.() ?? null;
+      const messages: ConversationMessage[] = [
+        ...thread.messages,
+        ...(pending === '' ? [] : [{ id: 'pending', role: 'user' as const, text: pending }]),
+        ...(answer === null ? [] : [answer]),
+      ];
+      return messages.length === thread.messages.length ? thread : { ...thread, messages };
     },
     busy: () => working.has(active),
     choices: () => {
@@ -271,6 +312,13 @@ export function createTargetController(api: DreyPluginApi): TargetController {
         off();
       }
       watched.clear();
+      for (const off of liveWatched.values()) {
+        off();
+      }
+      liveWatched.clear();
+      if (livePaint !== null) {
+        clearTimeout(livePaint);
+      }
       listeners.clear();
     },
   };
