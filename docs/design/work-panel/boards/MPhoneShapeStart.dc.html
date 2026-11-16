@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shape with Paul on the phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{cursor:default;font:inherit}
+.vt{height:26px;padding:0 12px;display:flex;align-items:center;background:transparent;border:0;border-radius:4px;color:#b3b7bc;font-size:14px}
+.vt[aria-selected="true"]{background:#2c2d31;color:#f4f5f6;font-weight:600}
+.btn{box-sizing:border-box;height:26px;padding:0 10px;border:1px solid #747980;border-radius:6px;background:transparent;color:#f4f5f6;font-size:12px;white-space:nowrap}
+.btn.l{height:28px;font-size:13px;padding:0 12px;border-radius:8px}
+.btn.pri{background:#8ecbef;border-color:#8ecbef;color:#101113;font-weight:600}
+.btn.off{opacity:.5}
+.btn.q{border-color:transparent;color:#b3b7bc}
+.ib{box-sizing:border-box;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:transparent;border:0;border-radius:4px;color:#b3b7bc;flex-shrink:0}
+.ib.hv{background:#3b3d42;color:#f4f5f6}
+.ib svg{display:block}
+.card{display:flex;flex-direction:column;gap:4px;padding:8px 10px;background:#2c2d31;border:1px solid #3b3d42;border-radius:8px;width:100%;box-sizing:border-box}
+.card.need{border-color:#747980}
+.cid{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#b3b7bc}
+.ctop{display:flex;align-items:center;gap:6px;min-width:0}
+.sp{flex-grow:1}
+.ct{font-weight:600;font-size:13px;line-height:17px}
+.chain{display:flex;gap:2px}
+.ch{font-size:10px;line-height:14px;font-weight:700;padding:0 3px;border-radius:3px;color:#b3b7bc}
+.ch.now{background:#f2cfae;color:#101113}
+.ch.miss{border:1px dashed #747980;color:#b3b7bc}
+.who{display:flex;align-items:center;gap:6px;font-size:12px;line-height:16px}
+.stl{display:flex;align-items:flex-start;gap:6px;color:#b3b7bc;font-size:12px;line-height:16px}
+.dot{width:7px;height:7px;margin-top:4px;flex-shrink:0;border-radius:50%;display:inline-block}
+.dot.run{background:#93c47f}
+.dot.need{background:#e8a25a;box-shadow:0 0 6px rgba(232,162,90,.7)}
+.dot.wait{background:transparent;border:1.5px solid #747980;box-sizing:border-box}
+.row{display:flex;gap:6px}
+.row .btn{flex:1 1 0}
+.lbl{font-size:12px;color:#b3b7bc;margin:0 0 6px}
+.cap{font-size:12px;line-height:16px;color:#b3b7bc;margin-top:6px}
+.sec{font-size:15px;font-weight:600;margin:0 0 12px}
+.menu{border:1px solid #3b3d42;border-radius:8px;background:#222326;padding:4px;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.mi{height:30px;padding:0 10px;display:flex;align-items:center;gap:8px;border-radius:4px;font-size:13px;color:#f4f5f6}
+.mi.sel{background:#3b3d42}
+.mi.dis{color:#747980}
+.mi small{margin-left:auto;color:#b3b7bc;font-size:12px}
+.msep{height:1px;background:#3b3d42;margin:4px 0}
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border:1px solid #3b3d42;border-radius:11px;font-size:12px;color:#f4f5f6;white-space:nowrap}
+.pill .dot{margin:0}
+.strip{border:1px solid #3b3d42;border-radius:8px;background:#222326;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box}
+.sg{display:grid;grid-template-columns:70px minmax(0,1fr);gap:4px 12px;font-size:13px}
+.sg span:nth-child(odd){color:#b3b7bc}
+.why{display:flex;align-items:center;gap:8px;font-size:13px;color:#f4f5f6}
+.why svg{flex-shrink:0}
+.toast{display:flex;align-items:center;gap:12px;border:1px solid #747980;border-radius:8px;background:#2c2d31;padding:8px 12px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.lr{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 12px;font-size:14px;line-height:18px;box-sizing:border-box}
+.lr small{display:block;color:#b3b7bc;font-size:13px}
+.gh{height:28px;display:flex;align-items:center;padding:8px 12px 0;font-weight:600;font-size:13px;gap:6px}
+.gh span{color:#b3b7bc;font-weight:400}
+</style>
+</helmet>
+<div style="width: 1310px; height: 904px; background: #18191b; color: #f4f5f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif; font-size: 13px; line-height: 18px; overflow: hidden; position: relative">
+<div style="position:absolute;left:30px;top:30px;width:390px;height:844px;background:#18191b;border:1px solid #3b3d42;border-radius:24px;overflow:hidden;display:flex;flex-direction:column"><div style="height:52px;flex-shrink:0;display:flex;align-items:center;padding-top:8px;background:#222326;border-bottom:1px solid #3b3d42"><span style="width:12px"></span><b style="font-size:17px">Work</b></div><div style="flex:1;overflow:hidden">
+<div class="gh" style="height:36px">Needs you <span>1</span></div>
+<div class="lr" style="min-height:56px;padding:6px 16px;border-bottom:1px solid #2c2d31;"><span class="dot need" style="margin:0"></span><span style="min-width:0;font-size:15px">Sync status in the title bar<small>T-0141 · Paul · 1/5 · waiting for you</small></span></div>
+<div class="gh" style="height:36px">Prioritized <span>1</span></div>
+<div class="lr" style="min-height:56px;padding:6px 16px;border-bottom:1px solid #2c2d31;"><span style="min-width:0;font-size:15px">Export the board as CSV<small>T-0138 · Paul next</small></span></div>
+<div class="gh" style="height:36px">Inbox <span>2</span></div>
+<div class="lr" style="min-height:56px;padding:6px 16px;border-bottom:1px solid #2c2d31;"><span style="min-width:0;font-size:15px">Keyboard shortcut for New idea<small>T-0142</small></span></div>
+<div class="lr" style="min-height:56px;padding:6px 16px;border-bottom:1px solid #2c2d31;"><span style="min-width:0;font-size:15px">Dark theme for the phone<small>T-0143</small></span></div>
+</div></div><div style="position:absolute;left:460px;top:30px;width:390px;height:844px;background:#18191b;border:1px solid #3b3d42;border-radius:24px;overflow:hidden;display:flex;flex-direction:column"><div style="height:52px;flex-shrink:0;display:flex;align-items:center;padding-top:8px;background:#222326;border-bottom:1px solid #3b3d42"><span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#b3b7bc">‹</span><b style="font-size:17px">T-0141</b></div><div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;gap:8px"><span class="cid" style="font-size:13px">T-0141</span><span class="sp"></span><span class="pill" style="height:26px;font-size:13px"><span class="dot wait"></span>Idea</span></div>
+<h1 style="margin:0;font-size:22px;line-height:28px;font-weight:600">Sync status in the title bar</h1>
+<div class="sg" style="font-size:14px;grid-template-columns:70px minmax(0,1fr)"><span>Flow</span><span>Paul → Ben → Ralf → Tessa → You</span><span>Holder</span><span>Paul</span></div>
+<div style="font-size:15px;line-height:22px;color:#f4f5f6">Show whether the vault is in sync next to the window controls, so a failed save is visible before the window closes.</div></div><div style="margin-top:auto;padding:12px 16px 20px;border-top:1px solid #3b3d42;display:flex;flex-direction:column;gap:8px">
+<span class="btn pri" style="display:flex;align-items:center;justify-content:center;height:44px;font-size:15px;border-radius:10px">Shape with Paul</span>
+<span class="btn" style="display:flex;align-items:center;justify-content:center;height:44px;font-size:15px;border-radius:10px">Change by chat</span></div></div><div style="position:absolute;left:890px;top:30px;width:390px;height:844px;background:#18191b;border:1px solid #3b3d42;border-radius:24px;overflow:hidden;display:flex;flex-direction:column"><div style="height:52px;flex-shrink:0;display:flex;align-items:center;padding-top:8px;background:#222326;border-bottom:1px solid #3b3d42"><span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#b3b7bc">‹</span><b style="font-size:17px">T-0141</b></div><div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;align-items:center;gap:8px"><span class="cid" style="font-size:13px">T-0141</span><span class="sp"></span><span class="pill" style="height:26px;font-size:13px"><span class="dot need"></span>Shaping with you</span></div>
+<h1 style="margin:0;font-size:22px;line-height:28px;font-weight:600">Sync status in the title bar</h1>
+<div class="sg" style="font-size:14px;grid-template-columns:70px minmax(0,1fr)"><span>Flow</span><span><b>Paul (1 of 5)</b> · Ben · Ralf · Tessa · You</span><span>Holder</span><span>Paul</span></div>
+<div style="font-size:15px;line-height:22px;color:#f4f5f6">Show whether the vault is in sync next to the window controls, so a failed save is visible before the window closes.</div></div><div style="margin-top:auto;padding:12px 16px 20px;border-top:1px solid #3b3d42;display:flex;flex-direction:column;gap:8px">
+<span class="btn pri" style="display:flex;align-items:center;justify-content:center;height:44px;font-size:15px;border-radius:10px">Shaping done</span>
+<span class="btn" style="display:flex;align-items:center;justify-content:center;height:44px;font-size:15px;border-radius:10px">Open chat</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1310,"height":904}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -45,6 +45,13 @@ reviewed one after another. **Accepted by the owner on 2026-11-15** (*"Passt"*, 
 written in the standard editor with live edit). The canvas keeps its own `canvas.json`; no PNGs were exported yet — open
 the canvas to see them.
 
+The ticket-to-Shape boards (`ShapeStart`, `ShapeFirst`, `ShapeBlocked`, `MPhoneShapeStart`) were drawn on 2026-11-16 from
+[../concept-ticket-to-shape.md](../concept-ticket-to-shape.md): how a ticket gets to Paul and what the card, the ticket and the
+chat say at every step, and what a control does when something is missing. **Proposed — awaiting the owner's decision**
+(rows req-318 – req-325). Unlike the canvas boards above they are drawn straight as HTML (generated, inline styles, the
+Anthrazit tokens of the boards they sit beside) and rendered to PNG with headless Edge at their own size; they are not on a
+canvas, so `canvas.json` and `notes.md` do not list them.
+
 A session that builds or changes a screen reads the board's HTML for the exact
 measures, colours, spacing and strings, opens the PNG to see it, and compares
 its own screenshot against the PNG before it reports done (see
@@ -160,6 +167,10 @@ above.
 | 7v · Decompose: the parent ticket with its concept link, stages only for the delta with *covers*, the brief of a stage, Run stage 1 only — **req-312** | `ConceptDecompose` | 1440×900 | desktop |
 | 7w · Stage 1 at you: gate, change, handover, the parent's stages (S2 waits for S1), Drop remaining stages; the Outline marks the section *at you* — **req-313** | `ConceptStageReview` | 1440×900 | desktop |
 | 7x · Change of direction: remaining stages dropped, the parent closed, the concept rewritten, Apply shows only the new delta — **req-313** | `ConceptRedirect` | 1440×900 | desktop |
+| 7y · Shape with Paul: the action on the card and the ticket, state by state — the card in Inbox, Prioritized and at Paul (waiting for you · Paul is shaping · your turn · Paul asks) and after (queued · plans), the card's menu with the primary action first, the drag-over column heads, the ticket pane's primary and pill per state, the Tickets panel's rows — **proposed 2026-11-16, req-320** | `ShapeStart` | 1480×1290 | desktop |
+| 7z · The first shaping: ticket open, the Assistant on Mission Control with *T-0141.md attached*, *Paul is shaping · 40 s*, the locked document (*Paul is editing · Stop*), the Tickets row under *Running*, the toast *Started T-0141 with Paul · Undo* — **proposed 2026-11-16, req-319/320** | `ShapeFirst` | 1440×900 | desktop |
+| 7aa · When something is missing the control explains and offers the fix: no Assistant model, Drey Service not running, no persona, Autopilot off, a run holds the ticket, a refused move, read-only, the empty board, the toast after *New idea* — **proposed 2026-11-16, req-322** | `ShapeBlocked` | 1480×930 | desktop |
+| 7ab · Shape with Paul on the phone: Work with *Needs you*, the idea's ticket with the full-width button, the ticket in the chat with *Shaping done* — **proposed 2026-11-16, req-320** | `MPhoneShapeStart` | 1310×904 (three 390×844 frames) | phone |
 
 The older boards one folder up (`Home`, `Ticket`, `Workers`, `Ready`,
 `Shaping`, `Orchestrator`, `Phone*` of 2026-10-31) are superseded by the
