@@ -24,6 +24,7 @@ import {
   searchSettings,
   type SettingsSearchEntry,
   type SettingsSearchHit,
+  type SettingsSection,
 } from './settings-model';
 
 /** Distance below the scrollport's top at which a section counts as reached. */
@@ -75,7 +76,12 @@ export class Settings implements OnDestroy {
   constructor() {
     // Focus the tab itself (no ring), so Escape and the keys reach it without a field being picked.
     afterNextRender(() => this.hostEl.focus({ preventScroll: true }), { injector: this.injector });
-    // Help -> About while the tab is already open names a page after the fact.
+    // The mounted page's sections (the nav's presence filter) — scanned after
+    // the render and on every change the page makes to its own DOM.
+    afterNextRender(() => {
+      this.scanPresentSections();
+      this.watchPresentSections();
+    }, { injector: this.injector });
     effect(() => {
       const wanted = this.settings.openCategory();
       if (wanted !== null && this.categories().some((category) => category.id === wanted)) {
@@ -87,6 +93,18 @@ export class Settings implements OnDestroy {
         });
       }
     });
+    // A category change swaps the page before the next render settles.
+    effect(() => {
+      this.selected();
+      this.afterRenderScan();
+    });
+  }
+
+  private afterRenderScan(): void {
+    afterNextRender(() => {
+      this.scanPresentSections();
+      this.watchPresentSections();
+    }, { injector: this.injector });
   }
 
   protected readonly selected = signal<string>(
@@ -106,6 +124,64 @@ export class Settings implements OnDestroy {
 
   private readonly injector = inject(Injector);
   private readonly detail = viewChild<ElementRef<HTMLElement>>('detail');
+
+  /**
+   * The section ids the mounted page actually renders (`data-settings-section`
+   * anchors — the spy reads the same elements). The nav under a selected
+   * category shows only these: a page's chapters are what the page carries,
+   * not what an older registration listed (the tickets page's setup block,
+   * D-74, is a chapter exactly while it shows).
+   */
+  protected readonly presentSections = signal<ReadonlySet<string>>(new Set());
+  private presentObserver: MutationObserver | null = null;
+  private presentTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private scanPresentSections(): void {
+    const root = this.detail()?.nativeElement;
+    if (!root) {
+      return;
+    }
+    const ids = new Set<string>();
+    for (const el of root.querySelectorAll<HTMLElement>('[data-settings-section]')) {
+      const id = el.dataset['settingsSection'];
+      if (id) {
+        ids.add(id);
+      }
+    }
+    this.presentSections.set(ids);
+  }
+
+  private watchPresentSections(): void {
+    this.presentObserver?.disconnect();
+    const root = this.detail()?.nativeElement;
+    if (!root) {
+      return;
+    }
+    this.presentObserver = new MutationObserver(() => {
+      if (this.presentTimer !== null) {
+        clearTimeout(this.presentTimer);
+      }
+      this.presentTimer = setTimeout(() => {
+        this.presentTimer = null;
+        this.scanPresentSections();
+      }, 120);
+    });
+    this.presentObserver.observe(root, { childList: true, subtree: true });
+  }
+
+  /** A selected category's chapters, filtered to the ones the page renders; every other category keeps its list. */
+  protected sectionsOf(category: { id: string; sections?: readonly SettingsSection[] }): readonly SettingsSection[] {
+    const sections = category.sections ?? [];
+    if (category.id !== this.selected()) {
+      return sections;
+    }
+    const present = this.presentSections();
+    if (present.size === 0) {
+      return sections;
+    }
+    const visible = sections.filter((section) => present.has(section.id));
+    return visible.length === 0 ? sections : visible;
+  }
 
   protected readonly query = signal('');
   protected readonly hits = computed<readonly SettingsSearchHit[]>(() =>
@@ -359,6 +435,10 @@ export class Settings implements OnDestroy {
 
   /** The tab went (closed, or another tab shown): save what is pending, end the session. */
   ngOnDestroy(): void {
+    if (this.presentTimer !== null) {
+      clearTimeout(this.presentTimer);
+    }
+    this.presentObserver?.disconnect();
     void this.settings.flush().finally(() => this.settings.closeScreen(this.session));
   }
 }

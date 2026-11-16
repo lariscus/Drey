@@ -1,3 +1,14 @@
+### Milestone 289 — D-75 closed: the settings' nested paths flatten, the setup is its own chapter, and the chapters follow the page
+
+**Not yet manually verified by the owner.** Owner 2026-11-16, on the merged `desktop-integration` build: the Tickets settings were broken — field labels ran into their descriptions (the pages' styles did not load), and the left chapter list did not match the page.
+
+- **D-75 repaired — one rename commit, as the defect's own plan has it**: the req-300 move's nested `directory/file` pairs flatten back to plain files (`settings.css/settings.css` → `settings.css`, `page.ts/settings-page.ts` → `settings-page.ts`, and twelve more), every import follows, and `plugin.json`'s css list names real files again — the settings styles load and the layout is whole. The `settings.css` move needed the temp-name dodge: on a case-insensitive filesystem the directory shadowed its own target. `shared/settings-width.spec.ts` reads the flat path.
+- **The setup never rides under a painted page**: the page's loads race on a start (the engine's first answer can be the honest null snapshot before the vault is hosted), and the stale one revealed the setup block over the live page. The loads are latest-wins now, and the page is one state at a time — the setup alone while unconfigured, the painted page while configured.
+- **The chapters are detected from the page**: the nav under a selected category shows only the sections the page actually renders (the `data-settings-section` anchors the scroll spy already reads). The setup block is the **Tickets repository** chapter exactly while it shows, and a chapter that leaves the page leaves the nav. The section registration gains the repository lead (`settings-sections.ts`).
+- **Specs**: `settings-sections.spec.ts` (the repository lead first, then board 7g's order), `settings.spec.ts` (the shell's presence filter green over its spy tests), the settings suites green over the flattening; `plugin.json`'s css list is checked as files.
+- **Gate**: (this machine, worktree `req-314-tickets-setup`): lint clean, the plugins/renderer/app typecheck configs clean, the settings suites (both runners) green, `test:plugins` recorded after the run below.
+
+
 ### Milestone 288 — req-316: the store belongs to the project — a fresh setup never leaks another project's tickets
 
 **Not yet manually verified by the owner.** Owner 2026-11-15, on the milestone-287 fresh-install setup: the new board pulled the tickets of his active project ("tickets aus einem repo auf das er gar keinen zugriff haben dürfte"). The store's reference was the last machine-wide piece of a project-scoped world: `dk.store` in the settings, and a fresh initialize adopted it ([ADR-0103](../docs/09_architecture_decisions/0103-store-belongs-to-the-project.md)).

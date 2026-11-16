@@ -42,7 +42,7 @@ import { checkpointControls, headerControls, liveStateWord, threadSteps, duratio
 import { stuckOf } from './thread/stuck';
 import type { WorktreeFile } from '../../../packages/tickets-engine/src/core/git/worktree-changes';
 import { createWorkFilterStore, filterPopover, isFilterActive, NO_WORK_FILTER, type WorkFilterState } from './work/work-filter';
-import { createTicketsSettingsPage } from './settings/page.ts/settings-page';
+import { createTicketsSettingsPage } from './settings/settings-page';
 import { createProjectsSettingsPage } from './projects/projects-page';
 import { createProjectFilter, type ProjectFilter } from './projects/project-filter';
 import { createTicketHeader, showsTicketDocument, ticketLogFold, ticketTabTitle } from './ticket-document/ticket-header';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { WORKER_PROVIDERS } from '../../../../../packages/tickets-engine/src/fleet/protocol';
-import { RUNNER_FIELDS, RUNNER_LABEL } from '../workers.ts/settings-workers';
+import { WORKER_PROVIDERS } from '../../../../packages/tickets-engine/src/fleet/protocol';
+import { RUNNER_FIELDS, RUNNER_LABEL } from './settings-workers';
 
 const keysOf = (provider: keyof typeof RUNNER_FIELDS): string[] => RUNNER_FIELDS[provider].map((f) => f.key);
 const fieldOf = (provider: keyof typeof RUNNER_FIELDS, kind: string) => RUNNER_FIELDS[provider].find((f) => f.kind === kind);

@@ -1,5 +1,5 @@
 import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
-import { el, mutate, textButton } from './dom.ts/settings-dom';
+import { el, mutate, textButton } from './settings-dom';
 
 /**
  * The settings page's setup block (D-74): what Settings → Tickets shows

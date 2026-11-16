@@ -1,6 +1,6 @@
-import { fleetSettingDefault } from '../../../shared/fleet-defaults';
-import type { DreyPluginApi } from '../../../../../shared/plugin-api/renderer';
-import type { MutationResult } from '../../../shared/tickets';
+import { fleetSettingDefault } from '../../shared/fleet-defaults';
+import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
+import type { MutationResult } from '../../shared/tickets';
 
 /** The settings page's one DOM helper: an element with a class and text. */
 export function el<K extends keyof HTMLElementTagNameMap>(

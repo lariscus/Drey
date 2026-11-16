@@ -6,7 +6,7 @@
  * its models. A model moves by dragging its row into another group or by its
  * class menu; a class is added in a row of its own and removed while empty.
  */
-import { el } from './dom.ts/settings-dom';
+import { el } from './settings-dom';
 import {
   classAdded,
   classGroupsOf,

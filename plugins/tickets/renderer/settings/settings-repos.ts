@@ -1,6 +1,6 @@
-import type { DreyPluginApi } from '../../../../../shared/plugin-api/renderer';
-import type { RepoCandidate, RepoRef, ReposListing } from '../../../shared/tickets';
-import { el, iconButton, mutate, textButton } from '../dom.ts/settings-dom';
+import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
+import type { RepoCandidate, RepoRef, ReposListing } from '../../shared/tickets';
+import { el, iconButton, mutate, textButton } from './settings-dom';
 
 /**
  * Settings → Tickets, the repositories (req-72): `_meta/repos.md`'s

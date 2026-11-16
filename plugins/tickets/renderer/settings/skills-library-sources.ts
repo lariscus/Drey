@@ -6,7 +6,7 @@
  * remove, which asks in the row first.
  */
 import type { SkillSourceView } from '../../../../packages/tickets-engine/src/contracts/skill-library';
-import { el } from './dom.ts/settings-dom';
+import { el } from './settings-dom';
 import { groupHead, textButton } from './models-dom';
 import { confirmRow, skillGlyph, skillIconButton } from './skills-library-dom';
 import { fetchedText, sourceLabel, sourceWords } from './skills-library-model';

@@ -7,6 +7,25 @@
   "author": "Drey",
   "main": "main/index.js",
   "renderer": "renderer/index.js",
-  "css": ["renderer/board/board.css", "renderer/settings/settings.css", "renderer/ticket-document/ticket-header.css", "renderer/ticket-document/ticket-document.css", "renderer/board/desk.css", "renderer/review/review.css", "renderer/flow/flow.css", "renderer/settings/desk.css", "renderer/settings/models.css", "renderer/settings/skills.css", "renderer/autopilot/autopilot.css", "renderer/team/persona-page.css", "renderer/projects/projects.css"],
-  "permissions": ["documents", "vault", "settings", "main-process"]
+  "css": [
+    "renderer/board/board.css",
+    "renderer/settings/settings.css",
+    "renderer/ticket-document/ticket-header.css",
+    "renderer/ticket-document/ticket-document.css",
+    "renderer/board/desk.css",
+    "renderer/review/review.css",
+    "renderer/flow/flow.css",
+    "renderer/settings/settings-desk.css",
+    "renderer/settings/settings-models.css",
+    "renderer/settings/settings-skills.css",
+    "renderer/autopilot/autopilot.css",
+    "renderer/team/persona-page.css",
+    "renderer/projects/projects.css"
+  ],
+  "permissions": [
+    "documents",
+    "vault",
+    "settings",
+    "main-process"
+  ]
 }

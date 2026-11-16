@@ -1,17 +1,17 @@
-import type { DreyPluginApi, PluginSettingsPageContrib } from '../../../../../shared/plugin-api/renderer';
-import type { ChainStatus } from '../../../../../packages/tickets-engine/src/fleet/protocol';
-import type { BoardSnapshot, ReposListing } from '../../../shared/tickets';
-import { parseWorkerValue } from '../../../../../packages/tickets-engine/src/fleet/runner/assignment';
-import { el, iconButton, kv, mutate, numberConfig, selectConfig, textConfig } from '../dom.ts/settings-dom';
-import { createRemoteSection } from '../remote.ts/settings-remote';
-import { createReposSection } from '../repos.ts/settings-repos';
-import { createDeskSettings, type DeskSettingsHooks } from '../desk-settings';
-import { ticketsEntries, ticketsSections, type TicketsSectionId } from '../sections.ts/settings-sections';
-import { createModelsSection } from '../models-section';
-import { createSkillsLibrarySection } from '../skills-library-section';
-import { createTicketsSetup } from '../setup';
-import { createWorkersSection } from '../workers.ts/settings-workers';
-import { CrewSettings } from '../crew.ts/settings-crew';
+import type { DreyPluginApi, PluginSettingsPageContrib } from '../../../../shared/plugin-api/renderer';
+import type { ChainStatus } from '../../../../packages/tickets-engine/src/fleet/protocol';
+import type { BoardSnapshot, ReposListing } from '../../shared/tickets';
+import { parseWorkerValue } from '../../../../packages/tickets-engine/src/fleet/runner/assignment';
+import { el, iconButton, kv, mutate, numberConfig, selectConfig, textConfig } from './settings-dom';
+import { createRemoteSection } from './settings-remote';
+import { createReposSection } from './settings-repos';
+import { createDeskSettings, type DeskSettingsHooks } from './desk-settings';
+import { ticketsEntries, ticketsSections, type TicketsSectionId } from './settings-sections';
+import { createModelsSection } from './models-section';
+import { createSkillsLibrarySection } from './skills-library-section';
+import { createTicketsSetup } from './setup';
+import { createWorkersSection } from './settings-workers';
+import { CrewSettings } from './settings-crew';
 
 /** Marks the first element of a part of the page (`data-settings-section`). */
 function anchored<T extends HTMLElement>(element: T, id: TicketsSectionId): T {
@@ -51,16 +51,24 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
       repo.append(el('span', 'tset-muted', 'Tickets repository'), repoPath, openRepo);
 
       let disposed = false;
+      let loadSeq = 0;
       // req-173: the vault layer (tickets/_meta/crew.md) behind the default worker, the permissions and the thresholds.
       const crew = new CrewSettings(api);
       let timer: ReturnType<typeof setTimeout> | null = null;
       const load = async (): Promise<void> => {
+        // Latest wins: two loads race on a start (the engine's first answer
+        // can be the honest null snapshot before the vault is hosted), and
+        // the stale one must not paint over the fresh one.
+        const seq = ++loadSeq;
         const snap = (await api.backend.invoke('board')) as BoardSnapshot;
-        if (disposed) {
+        if (disposed || seq !== loadSeq) {
           return;
         }
         const unconfigured = snap.vaultId === null;
         setup.root.hidden = !unconfigured;
+        // One state at a time: an unconfigured answer never rides under the
+        // painted page (and a configured one replaces the setup).
+        rest.hidden = unconfigured;
         if (!unconfigured && !restShown) {
           restShown = true;
           body.append(rest);
@@ -106,6 +114,9 @@ export function createTicketsSettingsPage(api: DreyPluginApi, hooks: Pick<DeskSe
         },
       });
       // One scrolling page; the sections of TICKETS_SECTIONS in this order.
+      // The setup block is the unconfigured page's own section (D-74): the
+      // nav chapter exists only while the setup shows.
+      anchored(setup.root, 'repository');
       anchored(repo, 'store');
       anchored(remote.root, 'devices');
       rest.append(
