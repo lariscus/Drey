@@ -1,3 +1,13 @@
+### Design — a ticket's way to Paul: the concept and the boards 7y – 7ab (2026-11-16, owner request, outside the list)
+
+**Not yet manually verified by the owner.** Design only, nothing built. Owner 2026-11-16: moving a ticket to Paul needs *Prioritized* and then a drag on the board, and then *nothing happens* ("the workflow is not coherent"). [`docs/design/work-panel/concept-ticket-to-shape.md`](../docs/design/work-panel/concept-ticket-to-shape.md) maps the flow from code, names why nothing happens, and proposes one next action per state on every surface.
+
+- **Why nothing happens (read from code, not reproduced):** a `paul:shape` entry holds the ticket for the owner's Shape chat and dispatches no run (`holder-pass.ts:76`, `:132`), yet the card's only control is *Shaping done* — the exit, enabled before a message exists; the Shape chat attaches only to an Inbox ticket (`ticket-document/shape.ts:36`), so a started ticket loses it (and Mission Control's *Shape with Paul*, `canShape`); the ticket waits under *Running*, not *Needs you*; Mission Control has `hand` but no `start`; the Autopilot starts nothing from *Prioritized* (`ownerColumnRefusal`) although the manual and `FLEET.md` say it does. Prioritized is not a gate in the engine — only the ticket pane's *Start with Paul* is hidden behind it.
+- **The concept:** one verb on every surface (*Shape with {name}* / *Start with {name}* / *Shaping done* / *Answer*) from one pure model; a click starts, opens the ticket and focuses the chat, with *Undo*; a Shape step is *Needs you* whenever it is the owner's turn; one end of shaping; every missing precondition is a disabled control with its reason and a fix button. Five decisions for the owner (concept §10), each with a recommendation.
+- **Boards** (`docs/design/work-panel/boards/`): 7y `ShapeStart`, 7z `ShapeFirst`, 7aa `ShapeBlocked`, 7ab `MPhoneShapeStart` (HTML + PNG, indexed in the README).
+- **Roadmap:** rows req-318 – req-325 added to finish line step 5, marked proposed and not started. `specs/decisions.md`, `specs/classifier-spec.md`, `specs/frontmatter-schema.md`, `specs/ticket-schema.md` and `CLAUDE.md` unchanged; the manual is corrected by req-323, not here.
+- **Gate:** docs only — `node .claude/skills/drey-milestone-done/check-specs.mjs` and `node scripts/gen-spec-digest.mjs --check` run after this change; no code, no test suite.
+
 ### Milestone 291 — D-76 and D-77 closed: Pia's thoughts fill live in the Assistant, and a tool chip's head is one short line
 
 **Not yet manually verified by the owner.**

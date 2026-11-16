@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shape with Paul: card and ticket actions</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{cursor:default;font:inherit}
+.vt{height:26px;padding:0 12px;display:flex;align-items:center;background:transparent;border:0;border-radius:4px;color:#b3b7bc;font-size:14px}
+.vt[aria-selected="true"]{background:#2c2d31;color:#f4f5f6;font-weight:600}
+.btn{box-sizing:border-box;height:26px;padding:0 10px;border:1px solid #747980;border-radius:6px;background:transparent;color:#f4f5f6;font-size:12px;white-space:nowrap}
+.btn.l{height:28px;font-size:13px;padding:0 12px;border-radius:8px}
+.btn.pri{background:#8ecbef;border-color:#8ecbef;color:#101113;font-weight:600}
+.btn.off{opacity:.5}
+.btn.q{border-color:transparent;color:#b3b7bc}
+.ib{box-sizing:border-box;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:transparent;border:0;border-radius:4px;color:#b3b7bc;flex-shrink:0}
+.ib.hv{background:#3b3d42;color:#f4f5f6}
+.ib svg{display:block}
+.card{display:flex;flex-direction:column;gap:4px;padding:8px 10px;background:#2c2d31;border:1px solid #3b3d42;border-radius:8px;width:100%;box-sizing:border-box}
+.card.need{border-color:#747980}
+.cid{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#b3b7bc}
+.ctop{display:flex;align-items:center;gap:6px;min-width:0}
+.sp{flex-grow:1}
+.ct{font-weight:600;font-size:13px;line-height:17px}
+.chain{display:flex;gap:2px}
+.ch{font-size:10px;line-height:14px;font-weight:700;padding:0 3px;border-radius:3px;color:#b3b7bc}
+.ch.now{background:#f2cfae;color:#101113}
+.ch.miss{border:1px dashed #747980;color:#b3b7bc}
+.who{display:flex;align-items:center;gap:6px;font-size:12px;line-height:16px}
+.stl{display:flex;align-items:flex-start;gap:6px;color:#b3b7bc;font-size:12px;line-height:16px}
+.dot{width:7px;height:7px;margin-top:4px;flex-shrink:0;border-radius:50%;display:inline-block}
+.dot.run{background:#93c47f}
+.dot.need{background:#e8a25a;box-shadow:0 0 6px rgba(232,162,90,.7)}
+.dot.wait{background:transparent;border:1.5px solid #747980;box-sizing:border-box}
+.row{display:flex;gap:6px}
+.row .btn{flex:1 1 0}
+.lbl{font-size:12px;color:#b3b7bc;margin:0 0 6px}
+.cap{font-size:12px;line-height:16px;color:#b3b7bc;margin-top:6px}
+.sec{font-size:15px;font-weight:600;margin:0 0 12px}
+.menu{border:1px solid #3b3d42;border-radius:8px;background:#222326;padding:4px;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.mi{height:30px;padding:0 10px;display:flex;align-items:center;gap:8px;border-radius:4px;font-size:13px;color:#f4f5f6}
+.mi.sel{background:#3b3d42}
+.mi.dis{color:#747980}
+.mi small{margin-left:auto;color:#b3b7bc;font-size:12px}
+.msep{height:1px;background:#3b3d42;margin:4px 0}
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border:1px solid #3b3d42;border-radius:11px;font-size:12px;color:#f4f5f6;white-space:nowrap}
+.pill .dot{margin:0}
+.strip{border:1px solid #3b3d42;border-radius:8px;background:#222326;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box}
+.sg{display:grid;grid-template-columns:70px minmax(0,1fr);gap:4px 12px;font-size:13px}
+.sg span:nth-child(odd){color:#b3b7bc}
+.why{display:flex;align-items:center;gap:8px;font-size:13px;color:#f4f5f6}
+.why svg{flex-shrink:0}
+.toast{display:flex;align-items:center;gap:12px;border:1px solid #747980;border-radius:8px;background:#2c2d31;padding:8px 12px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.lr{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 12px;font-size:14px;line-height:18px;box-sizing:border-box}
+.lr small{display:block;color:#b3b7bc;font-size:13px}
+.gh{height:28px;display:flex;align-items:center;padding:8px 12px 0;font-weight:600;font-size:13px;gap:6px}
+.gh span{color:#b3b7bc;font-weight:400}
+</style>
+</helmet>
+<div style="width: 1480px; height: 1290px; background: #18191b; color: #f4f5f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif; font-size: 13px; line-height: 18px; overflow: hidden; position: relative">
+<div style="position:absolute;left:30px;top:24px;right:30px">
+<div class="sec">Shape with Paul — the action on the card and the ticket, state by state</div>
+<div style="display:flex;gap:40px;align-items:flex-start"><div style="display:grid;grid-template-columns:repeat(4,220px);gap:22px 20px"><div style="width:220px"><div class="lbl">Inbox · pointer on the card</div><div class="card"><div class="ctop"><span class="cid">T-0141</span><span class="sp"></span><span class="ib hv" title="Shape with Paul" aria-label="Shape with Paul"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H10l-5 4v-4H4z"></path></svg></span><span class="ib" title="More actions" aria-label="More actions"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></span></div><div class="ct">Sync status in the title bar</div><span class="chain"><span class="ch now">PA</span><span class="ch">BE</span><span class="ch">RA</span><span class="ch">TE</span><span class="ch">YO</span></span></div><div class="cap">The same icon button on a Prioritized card. The ⋯ is always there.</div></div><div style="width:220px"><div class="lbl">Prioritized · pointer on the card</div><div class="card"><div class="ctop"><span class="cid">T-0138</span><span class="sp"></span><span class="ib hv" title="Shape with Paul" aria-label="Shape with Paul"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H10l-5 4v-4H4z"></path></svg></span><span class="ib" title="More actions" aria-label="More actions"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></span></div><div class="ct">Export the board as CSV</div><span class="chain"><span class="ch now">PA</span><span class="ch">BE</span><span class="ch">RA</span><span class="ch">TE</span><span class="ch">YO</span></span></div><div class="cap">Not a gate: the button works from Inbox and from here.</div></div><div style="width:220px"><div class="lbl">At Paul · nothing said yet</div><div class="card need"><div class="ctop"><span class="cid">T-0141</span><span class="sp"></span></div><div class="ct">Sync status in the title bar</div><span class="chain"><span class="ch now">PA</span><span class="ch">BE</span><span class="ch">RA</span><span class="ch">TE</span><span class="ch">YO</span></span><div class="who"><span>Paul · 1 of 5</span><span class="sp"></span><span style="color:#b3b7bc;font-variant-numeric:tabular-nums">$0.00</span></div><div class="stl"><span class="dot need" aria-hidden="true"></span><span>waiting for you</span></div><div class="row"><span class="btn pri" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Shape with Paul</span></div></div><div class="cap">The one control is the way in. No Shaping done yet.</div></div><div style="width:220px"><div class="lbl">At Paul · Paul is answering</div><div class="card"><div class="ctop"><span class="cid">T-0141</span><span class="sp"></span></div><div class="ct">Sync status in the title bar</div><span class="chain"><span class="ch now">PA</span><span class="ch">BE</span><span class="ch">RA</span><span class="ch">TE</span><span class="ch">YO</span></span><div class="who"><span>Paul · 1 of 5</span><span class="sp"></span><span style="color:#b3b7bc;font-variant-numeric:tabular-nums">$0.12</span></div><div class="stl"><span class="dot run" aria-hidden="true"></span><span>Paul is shaping · 40 s</span></div><div class="row"><span class="btn" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Open chat</span></div></div><div class="cap">Hand and Park wait; the chat shows the turn.</div></div><div style="width:220px"><div class="lbl">At Paul · your turn in the chat</div><div class="card need"><div class="ctop"><span class="cid">T-0141</span><span class="sp"></span></div><div class="ct">Sync status in the title bar</div><span class="chain"><span class="ch now">PA</span><span class="ch">BE</span><span class="ch">RA</span><span class="ch">TE</span><span class="ch">YO</span></span><div class="who"><span>Paul · 1 of 5</span><span class="sp"></span><span style="color:#b3b7bc;font-variant-numeric:tabular-nums">$0.18</span></div><div class="stl"><span class="dot need" aria-hidden="true"></span><span>shaping with you</span></div><div class="row"><span class="btn" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Open chat</span><span class="btn pri" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Shaping done</span></div></div><div class="cap">Shaping done appears once a message exists.</div></div><div style="width:220px"><div class="lbl">At Paul · Paul asks</div><div class="card need"><div class="ctop"><span class="cid">T-0141</span><span class="sp"></span><span style="color:#f2cfae;font-size:12px">Question</span></div><div class="ct">Sync status in the title bar</div><span class="chain"><span class="ch now">PA</span><span class="ch">BE</span><span class="ch">RA</span><span class="ch">TE</span><span class="ch">YO</span></span><div class="who"><span>Paul · 1 of 5</span><span class="sp"></span><span style="color:#b3b7bc;font-variant-numeric:tabular-nums">$0.18</span></div><div class="stl"><span class="dot need" aria-hidden="true"></span><span>Paul asks · 1 question</span></div><div class="row"><span class="btn pri" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Answer</span></div></div><div class="cap">The decision card is in the chat; Answer opens it.</div></div><div style="width:220px"><div class="lbl">Shaping done · waiting for the plan run</div><div class="card"><div class="ctop"><span class="cid">T-0141</span><span class="sp"></span></div><div class="ct">Sync status in the title bar</div><span class="chain"><span class="ch now">PA</span><span class="ch">BE</span><span class="ch">RA</span><span class="ch">TE</span><span class="ch">YO</span></span><div class="who"><span>Paul · 1 of 5</span><span class="sp"></span><span style="color:#b3b7bc;font-variant-numeric:tabular-nums">$0.18</span></div><div class="stl"><span class="dot wait" aria-hidden="true"></span><span>queued · waits for a B slot</span></div></div><div class="cap">The existing pool words.</div></div><div style="width:220px"><div class="lbl">Paul plans</div><div class="card"><div class="ctop"><span class="cid">T-0141</span><span class="sp"></span></div><div class="ct">Sync status in the title bar</div><span class="chain"><span class="ch now">PA</span><span class="ch">BE</span><span class="ch">RA</span><span class="ch">TE</span><span class="ch">YO</span></span><div class="who"><span>Paul · 1 of 5</span><span class="sp"></span><span style="color:#b3b7bc;font-variant-numeric:tabular-nums">$0.31</span></div><div class="stl"><span class="dot run" aria-hidden="true"></span><span>running · 2 min</span></div></div><div class="cap">Then the chain goes on: Ben, Ralf, Tessa, You.</div></div></div><div style="width:430px;display:flex;flex-direction:column;gap:18px">
+<div><div class="lbl">The card's menu · Inbox card (Shift+F10 or the ⋯)</div><div class="menu" style="width:230px">
+<div class="mi sel"><b style="font-weight:600">Shape with Paul</b></div>
+<div class="mi">Start with Ben</div><div class="mi">Start with Ralf</div><div class="mi">Start with Tessa</div><div class="mi">Start with You</div>
+<div class="msep"></div>
+<div class="mi">Move to Prioritized</div><div class="mi">Move to Done</div></div></div>
+<div><div class="lbl">The card's menu · at Paul</div><div class="menu" style="width:230px">
+<div class="mi sel"><b style="font-weight:600">Open chat</b></div><div class="mi">Shaping done</div>
+<div class="mi">Hand to Ben</div><div class="mi">Hand to Ralf</div>
+<div class="msep"></div>
+<div class="mi">Move to Prioritized</div><div class="mi">Move to Inbox</div><div class="mi">Move to Done</div></div></div>
+<div><div class="lbl">While a card is dragged · the column heads say what a drop does</div><div style="display:flex;gap:10px">
+<div style="width:150px;border:1px dashed #8ecbef;border-radius:8px;padding:6px 8px;background:#1d2a33">
+<div style="display:flex;align-items:center;gap:6px;height:28px"><span style="width:20px;height:20px;border-radius:50%;background:#8ecbef;color:#101113;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:9px">PA</span><b>Paul</b><span style="color:#b3b7bc">0</span></div>
+<div style="color:#8ecbef;font-size:12px;line-height:16px;padding:2px 0 14px">Drop to shape with Paul</div></div>
+<div style="width:150px;border:1px dashed #747980;border-radius:8px;padding:6px 8px">
+<div style="display:flex;align-items:center;gap:6px;height:28px"><span style="width:20px;height:20px;border-radius:50%;background:#8ecbef;color:#101113;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:9px">BE</span><b>Ben</b><span style="color:#b3b7bc">2</span></div>
+<div style="color:#b3b7bc;font-size:12px;line-height:16px;padding:2px 0 14px">Drop to start with Ben</div></div></div></div>
+</div></div>
+<div style="margin-top:26px;display:flex;gap:40px;align-items:flex-start"><div style="flex:1 1 auto"><div style="display:grid;grid-template-columns:520px 520px;gap:22px 20px"><div><div class="lbl">Ticket pane · idea in Inbox</div><div class="strip" style="width:520px"><div style="display:flex;align-items:center;gap:8px"><span class="cid">T-0141</span><b style="font-size:15px">Sync status in the title bar</b><span class="sp"></span><span class="pill"><span class="dot wait"></span>Idea</span></div>
+<div class="sg"><span>Flow</span><span>Paul → Ben → Ralf → Tessa → You</span><span>Holder</span><span>none yet</span></div>
+<div style="display:flex;gap:8px;justify-content:flex-end"><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Thread</span><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Change</span><span class="btn l pri" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Shape with Paul</span></div></div></div><div><div class="lbl">Ticket pane · Prioritized</div><div class="strip" style="width:520px"><div style="display:flex;align-items:center;gap:8px"><span class="cid">T-0141</span><b style="font-size:15px">Sync status in the title bar</b><span class="sp"></span><span class="pill"><span class="dot wait"></span>Prioritized</span></div>
+<div class="sg"><span>Flow</span><span>Paul → Ben → Ralf → Tessa → You</span><span>Holder</span><span>none yet</span></div>
+<div style="display:flex;gap:8px;justify-content:flex-end"><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Thread</span><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Change</span><span class="btn l pri" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Shape with Paul</span></div></div></div><div><div class="lbl">Ticket pane · at Paul, nothing said yet</div><div class="strip" style="width:520px"><div style="display:flex;align-items:center;gap:8px"><span class="cid">T-0141</span><b style="font-size:15px">Sync status in the title bar</b><span class="sp"></span><span class="pill"><span class="dot need"></span>Waiting for you</span></div>
+<div class="sg"><span>Flow</span><span><b>Paul (1 of 5)</b> · Ben · Ralf · Tessa · You</span><span>Holder</span><span>Paul</span></div>
+<div style="display:flex;gap:8px;justify-content:flex-end"><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Thread</span><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Change</span><span class="btn l pri" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Shape with Paul</span></div></div></div><div><div class="lbl">Ticket pane · your turn in the chat</div><div class="strip" style="width:520px"><div style="display:flex;align-items:center;gap:8px"><span class="cid">T-0141</span><b style="font-size:15px">Sync status in the title bar</b><span class="sp"></span><span class="pill"><span class="dot need"></span>Shaping with you</span></div>
+<div class="sg"><span>Flow</span><span><b>Paul (1 of 5)</b> · Ben · Ralf · Tessa · You</span><span>Holder</span><span>Paul</span></div>
+<div style="display:flex;gap:8px;justify-content:flex-end"><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Thread</span><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Change</span><span class="btn l pri" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Shaping done</span></div></div></div><div><div class="lbl">Ticket pane · a chain whose first step is Ben</div><div class="strip" style="width:520px"><div style="display:flex;align-items:center;gap:8px"><span class="cid">T-0141</span><b style="font-size:15px">Sync status in the title bar</b><span class="sp"></span><span class="pill"><span class="dot wait"></span>Prioritized</span></div>
+<div class="sg"><span>Flow</span><span>Ben → Ralf → Tessa → You</span><span>Holder</span><span>none yet</span></div>
+<div style="display:flex;gap:8px;justify-content:flex-end"><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Thread</span><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Change</span><span class="btn l pri" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Start with Ben</span></div></div></div><div><div class="lbl">Ticket pane · Paul is shaping (the document is locked)</div><div class="strip" style="width:520px"><div style="display:flex;align-items:center;gap:8px"><span class="cid">T-0141</span><b style="font-size:15px">Sync status in the title bar</b><span class="sp"></span><span class="pill"><span class="dot run"></span>Paul is shaping</span></div>
+<div class="sg"><span>Flow</span><span><b>Paul (1 of 5)</b> · Ben · Ralf · Tessa · You</span><span>Holder</span><span>Paul</span></div>
+<div style="display:flex;gap:8px;justify-content:flex-end"><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Thread</span><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Change</span><span class="btn l off" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Shaping done</span></div></div></div></div></div><div style="width:300px"><div class="lbl">Tickets panel · a ticket at Paul waits under Needs you; Inbox and Prioritized rows get the icon button beside the ⋯ (icon-only, title and aria-label)</div><div style="width:300px;background:#222326;border:1px solid #3b3d42;border-radius:8px;padding-bottom:8px">
+<div style="height:28px;display:flex;align-items:center;gap:6px;padding:8px 12px 0"><b>Tickets</b><span style="color:#b3b7bc">1 needs you</span></div>
+<div class="gh">Needs you</div>
+<div class="lr" style="box-shadow:inset 2px 0 0 #8ecbef;background:#2c2d31;"><span style="min-width:0">Sync status in the title bar<small>T-0141 · Paul · 1/5 · waiting for you</small></span><span class="sp"></span></div>
+<div class="gh">Prioritized</div>
+<div class="lr" style=""><span style="min-width:0">Export the board as CSV<small>T-0138 · Paul next</small></span><span class="sp"></span><span class="ib hv" title="Shape with Paul" aria-label="Shape with Paul"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H10l-5 4v-4H4z"></path></svg></span><span class="ib" title="More actions" aria-label="More actions"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></span></div>
+<div class="gh">Inbox <span>3</span></div>
+<div class="lr" style=""><span style="min-width:0">Keyboard shortcut for New idea<small>T-0142</small></span><span class="sp"></span><span class="ib" title="Shape with Paul" aria-label="Shape with Paul"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H10l-5 4v-4H4z"></path></svg></span><span class="ib" title="More actions" aria-label="More actions"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></span></div>
+</div></div></div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1480,"height":1290}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

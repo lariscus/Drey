@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shape with Paul: missing preconditions</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{cursor:default;font:inherit}
+.vt{height:26px;padding:0 12px;display:flex;align-items:center;background:transparent;border:0;border-radius:4px;color:#b3b7bc;font-size:14px}
+.vt[aria-selected="true"]{background:#2c2d31;color:#f4f5f6;font-weight:600}
+.btn{box-sizing:border-box;height:26px;padding:0 10px;border:1px solid #747980;border-radius:6px;background:transparent;color:#f4f5f6;font-size:12px;white-space:nowrap}
+.btn.l{height:28px;font-size:13px;padding:0 12px;border-radius:8px}
+.btn.pri{background:#8ecbef;border-color:#8ecbef;color:#101113;font-weight:600}
+.btn.off{opacity:.5}
+.btn.q{border-color:transparent;color:#b3b7bc}
+.ib{box-sizing:border-box;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:transparent;border:0;border-radius:4px;color:#b3b7bc;flex-shrink:0}
+.ib.hv{background:#3b3d42;color:#f4f5f6}
+.ib svg{display:block}
+.card{display:flex;flex-direction:column;gap:4px;padding:8px 10px;background:#2c2d31;border:1px solid #3b3d42;border-radius:8px;width:100%;box-sizing:border-box}
+.card.need{border-color:#747980}
+.cid{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#b3b7bc}
+.ctop{display:flex;align-items:center;gap:6px;min-width:0}
+.sp{flex-grow:1}
+.ct{font-weight:600;font-size:13px;line-height:17px}
+.chain{display:flex;gap:2px}
+.ch{font-size:10px;line-height:14px;font-weight:700;padding:0 3px;border-radius:3px;color:#b3b7bc}
+.ch.now{background:#f2cfae;color:#101113}
+.ch.miss{border:1px dashed #747980;color:#b3b7bc}
+.who{display:flex;align-items:center;gap:6px;font-size:12px;line-height:16px}
+.stl{display:flex;align-items:flex-start;gap:6px;color:#b3b7bc;font-size:12px;line-height:16px}
+.dot{width:7px;height:7px;margin-top:4px;flex-shrink:0;border-radius:50%;display:inline-block}
+.dot.run{background:#93c47f}
+.dot.need{background:#e8a25a;box-shadow:0 0 6px rgba(232,162,90,.7)}
+.dot.wait{background:transparent;border:1.5px solid #747980;box-sizing:border-box}
+.row{display:flex;gap:6px}
+.row .btn{flex:1 1 0}
+.lbl{font-size:12px;color:#b3b7bc;margin:0 0 6px}
+.cap{font-size:12px;line-height:16px;color:#b3b7bc;margin-top:6px}
+.sec{font-size:15px;font-weight:600;margin:0 0 12px}
+.menu{border:1px solid #3b3d42;border-radius:8px;background:#222326;padding:4px;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.mi{height:30px;padding:0 10px;display:flex;align-items:center;gap:8px;border-radius:4px;font-size:13px;color:#f4f5f6}
+.mi.sel{background:#3b3d42}
+.mi.dis{color:#747980}
+.mi small{margin-left:auto;color:#b3b7bc;font-size:12px}
+.msep{height:1px;background:#3b3d42;margin:4px 0}
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border:1px solid #3b3d42;border-radius:11px;font-size:12px;color:#f4f5f6;white-space:nowrap}
+.pill .dot{margin:0}
+.strip{border:1px solid #3b3d42;border-radius:8px;background:#222326;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box}
+.sg{display:grid;grid-template-columns:70px minmax(0,1fr);gap:4px 12px;font-size:13px}
+.sg span:nth-child(odd){color:#b3b7bc}
+.why{display:flex;align-items:center;gap:8px;font-size:13px;color:#f4f5f6}
+.why svg{flex-shrink:0}
+.toast{display:flex;align-items:center;gap:12px;border:1px solid #747980;border-radius:8px;background:#2c2d31;padding:8px 12px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.lr{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 12px;font-size:14px;line-height:18px;box-sizing:border-box}
+.lr small{display:block;color:#b3b7bc;font-size:13px}
+.gh{height:28px;display:flex;align-items:center;padding:8px 12px 0;font-weight:600;font-size:13px;gap:6px}
+.gh span{color:#b3b7bc;font-weight:400}
+</style>
+</helmet>
+<div style="width: 1480px; height: 930px; background: #18191b; color: #f4f5f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif; font-size: 13px; line-height: 18px; overflow: hidden; position: relative">
+<div style="position:absolute;left:30px;top:24px;right:30px"><div class="sec">Shape with Paul — when something is missing, the control explains and offers the fix</div><div style="display:grid;grid-template-columns:repeat(3,455px);gap:26px 28px"><div style="width:455px"><div class="lbl">1 · No model for the Assistant</div><div class="strip" style="width:455px"><div style="display:flex;align-items:center;gap:8px"><span class="cid">T-0141</span><b style="font-size:14px">Sync status in the title bar</b><span class="sp"></span><span class="pill"><span class="dot need"></span>Waiting for you</span></div>
+<div class="sg"><span>Flow</span><span><b>Paul (1 of 5)</b> · Ben · Ralf · Tessa · You</span></div>
+<div style="display:flex;gap:8px;align-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e0bb6e" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"></path><path d="M12 10v4"></path><path d="M12 17v.5"></path></svg><span>The Assistant has no model</span><span class="sp"></span><span class="btn l pri off" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Shape with Paul</span></div></div><div style="display:flex;justify-content:flex-end;margin-top:8px"><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Set up model</span></div><div class="cap">Disabled, never silent: the reason sits beside the control, the fix under it. The tooltip repeats the reason.</div></div><div style="width:455px"><div class="lbl">2 · Drey Service is not running</div><div class="strip" style="width:455px"><div style="display:flex;align-items:center;gap:8px"><span class="cid">T-0141</span><b style="font-size:14px">Sync status in the title bar</b><span class="sp"></span><span class="pill"><span class="dot need"></span>Waiting for you</span></div>
+<div class="sg"><span>Flow</span><span><b>Paul (1 of 5)</b> · Ben · Ralf · Tessa · You</span></div>
+<div style="display:flex;gap:8px;align-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e0bb6e" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"></path><path d="M12 10v4"></path><path d="M12 17v.5"></path></svg><span>Drey Service is not running</span><span class="sp"></span><span class="btn l pri off" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Shape with Paul</span></div></div><div style="display:flex;justify-content:flex-end;margin-top:8px"><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Start Drey Service</span></div><div class="cap">Shape runs through the service. The fix starts it; the button enables itself when it is up.</div></div><div style="width:455px"><div class="lbl">3 · The step names no persona</div><div style="width:220px"><div class="card need"><div class="ctop"><span class="cid">T-0141</span><span class="sp"></span><span style="color:#f2cfae;font-size:12px">No persona</span></div><div class="ct">Sync status in the title bar</div><span class="chain"><span class="ch miss">··</span><span class="ch">BE</span><span class="ch">RA</span><span class="ch">TE</span><span class="ch">YO</span></span><div class="stl"><span class="dot need" aria-hidden="true"></span><span>no persona for position 1</span></div><div class="row"><span class="btn pri" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Assign…</span></div></div><div class="menu" style="width:180px;margin-top:6px"><div class="mi sel">Paul</div><div class="mi">Ben</div><div class="mi">Ralf</div><div class="mi">Tessa</div><div class="mi">You</div></div></div><div class="cap">The primary becomes Assign…; the picker lists the crew as the Crew tab does.</div></div><div style="width:455px"><div class="lbl">4 · Shaping is done and the Autopilot is off</div><div style="width:220px"><div class="card"><div class="ctop"><span class="cid">T-0141</span><span class="sp"></span></div><div class="ct">Sync status in the title bar</div><span class="chain"><span class="ch now">PA</span><span class="ch">BE</span><span class="ch">RA</span><span class="ch">TE</span><span class="ch">YO</span></span><div class="who"><span>Paul · 1 of 5</span><span class="sp"></span><span style="color:#b3b7bc;font-variant-numeric:tabular-nums">$0.31</span></div><div class="stl"><span class="dot wait" aria-hidden="true"></span><span>Autopilot is off</span></div><div class="row" style="margin-top:2px"><span class="btn pri" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Turn on</span></div></div></div><div class="cap">The plan run waits for the switch; the status says so instead of a bare “waiting”. Turn on opens no dialog.</div></div><div style="width:455px"><div class="lbl">5 · A run holds the ticket</div><div style="display:flex;gap:16px;align-items:flex-start"><div style="width:200px"><div class="card"><div class="ctop"><span class="cid">T-0141</span><span class="sp"></span></div><div class="ct">Sync status in the title bar</div><span class="chain"><span class="ch" style="color:#80858c">PA</span><span class="ch" style="color:#80858c">BE</span><span class="ch now">RA</span><span class="ch">TE</span><span class="ch">YO</span></span><div class="who"><span>Ben · 3 of 5</span><span class="sp"></span><span style="color:#b3b7bc;font-variant-numeric:tabular-nums">$0.88</span></div><div class="stl"><span class="dot run" aria-hidden="true"></span><span>running · 3 min</span></div></div></div><div><div class="menu" style="width:260px;margin-top:6px">
+<div class="mi">Open ticket</div>
+<div class="mi dis">Hand to Ralf <small>a run holds it</small></div>
+<div class="mi dis">Move to Prioritized <small>a run holds it</small></div>
+<div class="msep"></div>
+<div class="mi sel">Stop run</div></div></div></div><div class="cap">Disabled rows say why; the one row that helps stays enabled.</div></div><div style="width:455px"><div class="lbl">6 · The move was refused</div><div style="width:220px"><div class="card need"><div class="ctop"><span class="cid">T-0141</span><span class="sp"></span></div><div class="ct">Sync status in the title bar</div><span class="chain"><span class="ch now">PA</span><span class="ch">BE</span><span class="ch">RA</span><span class="ch">TE</span><span class="ch">YO</span></span><div class="who"><span>Paul · 1 of 5</span><span class="sp"></span><span style="color:#b3b7bc;font-variant-numeric:tabular-nums">$0.18</span></div><div class="stl"><span class="dot need" aria-hidden="true"></span><span>shaping with you</span></div><div class="why" style="color:#f08080;align-items:flex-start;font-size:12px;line-height:16px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f08080" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6"></path><path d="M12 16.5v.5"></path></svg><span>T-0141 changed meanwhile — look again and retry</span></div><div class="row"><span class="btn" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Retry</span><span class="btn pri" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Shaping done</span></div></div></div><div class="cap">The engine’s sentence stays visible on the card until the next action; Retry sends the same move again.</div></div><div style="width:455px"><div class="lbl">7 · Read-only device</div><div class="strip" style="width:455px"><div style="display:flex;align-items:center;gap:8px"><span class="cid">T-0141</span><b style="font-size:14px">Sync status in the title bar</b><span class="sp"></span><span class="pill"><span class="dot need"></span>Waiting for you</span></div>
+<div class="sg"><span>Flow</span><span><b>Paul (1 of 5)</b> · Ben · Ralf · Tessa · You</span></div>
+<div style="display:flex;gap:8px;align-items:center"><span style="color:#b3b7bc">This device is read-only</span><span class="sp"></span></div></div><div class="cap">No control at all, and one quiet line; a phone paired read-only sees the state only.</div></div><div style="width:455px"><div class="lbl">8 · Empty board</div><div style="border:1px solid #3b3d42;border-radius:8px;padding:10px 12px;background:#18191b;display:flex;gap:12px;align-items:flex-start;width:455px;box-sizing:border-box;height:140px">
+<div style="flex:1;min-width:0"><div style="display:flex;gap:6px;height:24px;align-items:center"><b>Inbox</b><span style="color:#b3b7bc">0</span></div></div><div style="flex:1;min-width:0"><div style="display:flex;gap:6px;height:24px;align-items:center"><b>Prioritized</b><span style="color:#b3b7bc">0</span></div></div><div style="flex:1;min-width:0"><div style="display:flex;gap:6px;height:24px;align-items:center"><b>Paul</b><span style="color:#b3b7bc">0</span></div></div>
+<span class="btn pri l" style="display:inline-flex;align-items:center;height:30px">New idea</span></div><div class="cap">One primary, nothing else to learn. The first idea creates the first card.</div></div><div style="width:455px"><div class="lbl">9 · After New idea</div><div class="toast" style="width:max-content;max-width:455px"><span>T-0001 created</span><span class="btn l pri" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Shape with Paul</span></div><div class="cap">A toast with the next step, so the button need not be found. It goes by itself after a few seconds; Undo is not offered for a create.</div></div></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1480,"height":930}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
