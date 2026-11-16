@@ -1,3 +1,12 @@
+### Milestone 290 — D-77 closed: a tool chip's head is one short line, never the call's arguments
+
+**Not yet manually verified by the owner.** Owner 2026-11-16, Assistant chat with `glm-5.3-flash`, prompt "bitte arbeite das ticket weiter aus": a tool chip's head ran over several lines — `tool · vault_edit({"path":"tickets/t/0000/t-1/ticket.md","edits":[{"old_text":…,"new_text":<several paragraphs>}, …]})` — instead of a short info.
+
+- **Cause**: a model's tool-call `arguments` reach the chat as the provider's raw JSON **string** (persisted as written in the `drey-tool` fence, and `argsJson` in the streaming card). `summarizeArguments` (`plugins/assistant/renderer/tool-format.ts`) clipped only the object branch (48 characters); the string branch returned the whole payload minus its outer braces, and `runningToolLabel` fell back to that same raw string whenever `JSON.parse` failed (a streamed round's arguments are incomplete until the round ends). "Sometimes" was: short arguments (a `vault_read`) fit anyway, a long `vault_edit` / `vault_write` did not.
+- **Fix, one summary for every shape**: a string is parsed first; an object lists only its **scalar** arguments (`path: tickets/t/0000/t-1/ticket.md` — the `edits` array is payload, never in the head); an argument string that does not parse yet is the raw text; every result is collapsed to one line and cut hard at `ARGUMENT_SUMMARY_MAX` (60) characters. The chip's head carries a CSS ellipsis as a second guard (`.tool-chip-summary > span`). The full arguments stay in the expanded chip (`formatArguments`, unchanged).
+- **Specs**: `tool-format.spec.ts` — a long `vault_edit` as a JSON string and as an object gives `path: …` only, the running label for it, an unparseable half-streamed argument string cut on one line, the expanded chip still carrying the whole call.
+- **Not part of this entry**: the reported D-76 (Assistant thoughts do not stream) is still open — no code path ever streamed thoughts into the Assistant's Model chat or the desktop target chats; the question to the owner is out.
+
 ### Milestone 289 — D-75 closed: the settings' nested paths flatten, the setup is its own chapter, and the chapters follow the page
 
 **Not yet manually verified by the owner.** Owner 2026-11-16, on the merged `desktop-integration` build: the Tickets settings were broken — field labels ran into their descriptions (the pages' styles did not load), and the left chapter list did not match the page.

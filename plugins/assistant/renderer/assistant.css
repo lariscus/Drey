@@ -550,6 +550,14 @@
   cursor: pointer;
 }
 
+/* A chip head is one line, whatever its text (D-77). */
+.assistant-thread .tool-chip-summary > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .assistant-thread .tool-chip-summary:hover {
   color: var(--text-3);
 }
