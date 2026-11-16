@@ -24,5 +24,6 @@ export function slotSummaryOf(view: SlotView): SlotSummary {
     reliability: window?.reliability ?? 'unknown',
     q: view.q,
     resetsAt: window?.resetsAt ?? null,
+    ...(window?.used !== undefined && window.unit !== undefined ? { used: window.used, unit: window.unit } : {}),
   };
 }

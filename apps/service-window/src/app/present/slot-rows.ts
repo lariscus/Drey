@@ -16,9 +16,17 @@ export interface SlotRowVm {
   readonly reliabilityLabel: string;
 }
 
+/** req-317: no share to draw — what the runner counted instead, or that it counted nothing yet. */
+function countedText(i18n: I18n, slot: SlotFacts): string {
+  if (slot.used === null || slot.unit === null || slot.used <= 0) {
+    return i18n.t('service_window.slots.no_runs');
+  }
+  return i18n.t(`service_window.slots.counted_${slot.unit}`, { count: slot.used });
+}
+
 function quotaText(i18n: I18n, slot: SlotFacts, percent: number | null): string {
   if (percent === null) {
-    return i18n.t('service_window.slots.no_readout');
+    return countedText(i18n, slot);
   }
   const q = slot.q === null ? null : i18n.formatNumber(slot.q, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   return joinParts([

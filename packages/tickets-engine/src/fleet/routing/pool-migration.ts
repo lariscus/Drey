@@ -1,5 +1,6 @@
 import { WORKER_PROVIDERS, type WorkerProviderId } from '../protocol';
-import { impliedSlot, parseServiceSlots } from './slot-config';
+import { impliedAccountSlot, impliedSlot, opencodeAccountsOf, parseServiceSlots } from './slot-config';
+import { impliedEntryOf } from './slot-edit';
 import type { WriteOutcome } from './service-config-file';
 
 /** The marker `service.json` keeps once the old pool sizes moved in. */
@@ -13,10 +14,11 @@ export interface MigrationConfigFile {
 
 type Entry = Record<string, unknown>;
 
-/** A slot entry as `service.json` stores the implied slot of a provider. */
-function impliedEntry(provider: WorkerProviderId, sessions: number): Entry {
-  const slot = impliedSlot(provider);
-  return { id: slot.id, label: slot.label, provider, quota: slot.quota, sessions };
+/** The entries `service.json` stores for a provider's implied slots (req-317: opencode's one per account the file's reader found), each with the old pool size. */
+function impliedEntries(root: Entry, provider: WorkerProviderId, sessions: number): Entry[] {
+  const accounts = provider === 'opencode' ? opencodeAccountsOf(root) : [];
+  const slots = accounts.length > 0 ? accounts.map(impliedAccountSlot) : [impliedSlot(provider)];
+  return slots.map((slot) => ({ ...impliedEntryOf(slot), sessions }));
 }
 
 /** The `slots` with every provider's sessions set: a slot that names none takes its provider's old pool size. */
@@ -29,7 +31,7 @@ export function slotsWithSessions(root: Entry, sizes: Readonly<Partial<Record<Wo
     return e['sessions'] === undefined && size !== undefined ? { ...e, sessions: size } : entry;
   });
   const missing = WORKER_PROVIDERS.filter((provider) => !configured.some((slot) => slot.provider === provider) && sizes[provider] !== undefined);
-  return [...slots, ...missing.map((provider) => impliedEntry(provider, sizes[provider]!))];
+  return [...slots, ...missing.flatMap((provider) => impliedEntries(root, provider, sizes[provider]!))];
 }
 
 /**

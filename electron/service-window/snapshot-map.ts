@@ -84,11 +84,12 @@ export function componentsOf(status: Json, liveRuns: number): Omit<ServiceSnapsh
   };
 }
 
-/** One slot of `GET /slots`: the tightest window drawn, its reliability the chip. */
+/** One slot of `GET /slots`: the tightest window drawn, its reliability the chip; the longest counted window's usage where the runner counts (req-317). */
 export function slotFactsOf(view: Json): SlotFacts {
   const windows = Array.isArray(view['windows']) ? (view['windows'] as unknown[]).map(obj) : [];
   const known = windows.filter((w) => num(w['remaining']) !== null);
   const tightest = known.sort((a, b) => num(a['remaining'])! - num(b['remaining'])!)[0] ?? null;
+  const counted = windows.filter((w) => num(w['used']) !== null && (w['unit'] === 'tokens' || w['unit'] === 'runs')).sort((a, b) => (num(b['spanMs']) ?? 0) - (num(a['spanMs']) ?? 0))[0] ?? null;
   const busy = num(view['busy']) ?? 0;
   const reliability = String(tightest?.['reliability'] ?? windows[0]?.['reliability'] ?? 'unknown');
   return {
@@ -100,6 +101,8 @@ export function slotFactsOf(view: Json): SlotFacts {
     q: num(view['q']),
     resetsAt: tightest === null ? null : str(tightest['resetsAt']),
     reliability: reliability === 'measured' || reliability === 'estimated' ? reliability : 'unknown',
+    used: counted === null ? null : num(counted['used']),
+    unit: counted === null ? null : (counted['unit'] as 'tokens' | 'runs'),
   };
 }
 

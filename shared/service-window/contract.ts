@@ -98,6 +98,9 @@ export interface SlotFacts {
   /** ISO time the tightest window resets; null when unknown. */
   readonly resetsAt: string | null;
   readonly reliability: 'measured' | 'estimated' | 'unknown';
+  /** req-317: what the runner counted in the longest counted window (tokens or runs); null = nothing counted yet, or no counted window. */
+  readonly used: number | null;
+  readonly unit: 'tokens' | 'runs' | null;
 }
 
 /** Settings → Background service's Load group (the governor reads it live, req-180). */

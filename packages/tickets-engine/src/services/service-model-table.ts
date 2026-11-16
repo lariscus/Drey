@@ -1,7 +1,7 @@
 import type { FileSystem } from '../fleet/ports/file-system';
 import type { ClassConfig, ModelRow } from '../fleet/protocol-pool';
 import { parsePoolSettings } from '../fleet/routing/pool-config';
-import { ServiceConfigFile } from '../fleet/routing/service-config-file';
+import { ServiceConfigFile, type OpencodeAccounts } from '../fleet/routing/service-config-file';
 import { parseServiceSlots } from '../fleet/routing/slot-config';
 
 /** Where the engine reads the machine's model table (req-256). */
@@ -20,8 +20,8 @@ export interface ModelTablePort {
 export class ServiceModelTable implements ModelTablePort {
   private readonly file: ServiceConfigFile;
 
-  constructor(fs: FileSystem, serviceJsonPath: string) {
-    this.file = new ServiceConfigFile(fs, serviceJsonPath);
+  constructor(fs: FileSystem, serviceJsonPath: string, accounts?: OpencodeAccounts) {
+    this.file = new ServiceConfigFile(fs, serviceJsonPath, accounts);
   }
 
   async rows(): Promise<readonly ModelRow[] | null> {

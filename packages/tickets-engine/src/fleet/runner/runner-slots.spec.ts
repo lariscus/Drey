@@ -47,7 +47,7 @@ describe('the runner serves the slots (req-177)', () => {
     return { status: res.status, body: (await res.json()) as Record<string, unknown> };
   };
 
-  it('creates service.json in the service home and serves the implied slots without a network call', async () => {
+  it('creates service.json in the service home and serves the implied slots: an opencode account of its own (req-317), the z.ai one read remotely, no other network call', async () => {
     // req-287: the class migration ran on the fresh file — the shipped four, no class capped.
     expect(JSON.parse(await fsp.readFile(path.join(tmp, 'service.json'), 'utf8'))).toEqual({
       slots: [],
@@ -57,13 +57,17 @@ describe('the runner serves the slots (req-177)', () => {
     const { status, body } = await call('GET', '/slots');
     expect(status).toBe(200);
     expect((body['slots'] as SlotView[]).map((s) => [s.id, s.implied])).toEqual([
-      ['opencode', true],
+      ['zai-coding-plan', true],
       ['claude-code', true],
       ['kimi', true],
       ['copilot', true],
     ]);
     expect(body['configPath']).toBe(path.join(tmp, 'service.json'));
-    expect(http.calls).toEqual([]);
+    expect(body['slots']).toContainEqual(expect.objectContaining({ id: 'zai-coding-plan', label: 'z.ai Coding Plan', quota: 'zai', state: 'ready' }));
+    expect(http.calls.map((c) => c.headers)).toEqual([{ Authorization: 'Bearer k-1' }]);
+    expect(JSON.stringify(body)).not.toContain('k-1');
+    // the synthetic accounts key never reaches the file
+    expect(await fsp.readFile(path.join(tmp, 'service.json'), 'utf8')).not.toContain('opencodeAccounts');
   });
 
   it('writes the slots (other keys kept), reads a configured z.ai quota, and the chain status carries the summary', async () => {
@@ -92,14 +96,14 @@ describe('the runner serves the slots (req-177)', () => {
     await fsp.writeFile(path.join(tmp, 'service.json'), JSON.stringify({ slots: [kept], models: ['kept'] }), 'utf8');
     const added = await call('POST', '/slots/add', { slot: { id: 'kimi-work', provider: 'kimi', profile: 'work' } });
     expect(added.status).toBe(200);
-    expect((added.body['slots'] as SlotView[]).map((s) => s.id)).toEqual(['claude-a', 'kimi-work', 'opencode', 'copilot']);
+    expect((added.body['slots'] as SlotView[]).map((s) => s.id)).toEqual(['claude-a', 'kimi-work', 'zai-coding-plan', 'copilot']);
     expect((await call('POST', '/slots/add', { slot: { id: 'claude-a', provider: 'claude-code' } })).status).toBe(422);
     // req-290: the added entry drops the retired profile key on write.
     expect(JSON.parse(await fsp.readFile(path.join(tmp, 'service.json'), 'utf8')).slots).toEqual([kept, { id: 'kimi-work', provider: 'kimi' }]);
     // An implied slot: its provider leaves the machine's slots.
     const removed = await call('POST', '/slots/remove', { id: 'copilot' });
     expect(removed.status).toBe(200);
-    expect((removed.body['slots'] as SlotView[]).map((s) => s.id)).toEqual(['claude-a', 'kimi-work', 'opencode']);
+    expect((removed.body['slots'] as SlotView[]).map((s) => s.id)).toEqual(['claude-a', 'kimi-work', 'zai-coding-plan']);
     expect((await call('POST', '/slots/remove', { id: 'kimi-work' })).status).toBe(200);
     expect((await call('POST', '/slots/remove', { id: 'nope' })).status).toBe(422);
     expect(JSON.parse(await fsp.readFile(path.join(tmp, 'service.json'), 'utf8'))).toEqual({ slots: [kept], models: ['kept'], impliedOff: ['copilot'] });

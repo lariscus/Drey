@@ -3,10 +3,16 @@
  * slots. Every entry is checked on its own: a broken one is left out with
  * its reason, the others stand. A provider no entry names gets one implied
  * slot on its default login, so a machine without a `slots` key
- * runs as before — unless `impliedOff` names the provider (D-69: the owner
- * removed that stand-in, so the provider has no slot here). Req-290
- * retired the `profile` key a slot once carried: it is read and silently
- * ignored, whatever it says.
+ * runs as before — unless `impliedOff` names it (D-69: the owner removed
+ * that stand-in, so there is no such slot here). Req-317: a quota belongs to
+ * the account at the provider, not to the harness, so opencode gets one
+ * implied slot per account (a provider entry of its `auth.json`, handed in
+ * as the synthetic `opencodeAccounts` key by `ServiceConfigFile`) and keeps
+ * its harness-wide stand-in only while it knows no account at all. An
+ * implied slot has a key — a stand-in's is its provider id, an account's
+ * its auth entry — and `impliedOff` lists keys. Req-290 retired the
+ * `profile` key a slot once carried: it is read and silently ignored,
+ * whatever it says.
  */
 import { isWorkerProvider, WORKER_PROVIDERS, type QuotaKind, type SlotBilling, type WorkerProviderId } from '../protocol';
 import type { Slot, SlotLimit, SlotLogin } from './slot';
@@ -23,6 +29,12 @@ export const DEFAULT_REFRESH_MS = 10 * 60_000;
 const QUOTA_KINDS: readonly QuotaKind[] = ['claude-code', 'zai', 'kimi', 'counting'];
 const LOGIN_KEYS: readonly (keyof SlotLogin)[] = ['claudeConfigDir', 'opencodeAuthEntry', 'opencodeAuthFile', 'kimiCredentials', 'kimiHome', 'copilotHome'];
 const IMPLIED_LABEL: Readonly<Record<WorkerProviderId, string>> = { 'claude-code': 'Claude Code', opencode: 'OpenCode', kimi: 'Kimi', copilot: 'Copilot CLI' };
+/** What the owner knows an opencode account by (its `auth.json` entry); an entry not listed is shown as it is. */
+const ACCOUNT_LABEL: Readonly<Record<string, string>> = { 'zai-coding-plan': 'z.ai Coding Plan', 'github-copilot': 'GitHub Copilot', openai: 'OpenAI', anthropic: 'Anthropic' };
+const SLOT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$/;
+
+/** The synthetic, read-only root key `ServiceConfigFile.read()` fills with the entry names of opencode's `auth.json`; never written. */
+export const OPENCODE_ACCOUNTS_KEY = 'opencodeAccounts';
 
 type Entry = Record<string, unknown>;
 const text = (value: unknown): string | null => (typeof value === 'string' && value.trim() !== '' ? value.trim() : null);
@@ -88,7 +100,7 @@ function sessionsOf(raw: unknown): number | null {
 export function slotOf(raw: unknown, seen: ReadonlySet<string>): Slot | string {
   const entry = (raw !== null && typeof raw === 'object' ? raw : {}) as Entry;
   const id = text(entry['id']);
-  if (id === null || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$/.test(id)) {
+  if (id === null || !SLOT_ID.test(id)) {
     return `a slot needs an id of letters, digits, '.', '_' or '-' (got ${JSON.stringify(entry['id'] ?? null)})`;
   }
   if (seen.has(id)) {
@@ -108,11 +120,23 @@ export function slotOf(raw: unknown, seen: ReadonlySet<string>): Slot | string {
  * The stand-in slot of a provider no entry names: its default login. It
  * makes no network call: Claude Code's windows come from its own
  * runs and its cache, everything else is counted — a remote quota is read
- * only for a slot `service.json` names.
+ * only for a slot `service.json` names, or for an opencode account that
+ * reads one (`impliedAccountSlot`).
  */
 export function impliedSlot(provider: WorkerProviderId): Slot {
   const quota: QuotaKind = provider === 'claude-code' ? 'claude-code' : 'counting';
   return { id: provider, label: IMPLIED_LABEL[provider], provider, billing: null, sessions: null, login: {}, quota, limits: [], implied: true };
+}
+
+/** req-317: the implied slot of one opencode account — its `auth.json` entry — on the quota that account reads (z.ai remotely, the rest counted). */
+export function impliedAccountSlot(entry: string): Slot {
+  const login: SlotLogin = { opencodeAuthEntry: entry };
+  return { id: entry, label: ACCOUNT_LABEL[entry] ?? entry, provider: 'opencode', billing: null, sessions: null, login, quota: defaultQuotaKind('opencode', login), limits: [], implied: true };
+}
+
+/** The key `impliedOff` names an implied slot by: a stand-in's provider id, an account's auth entry. */
+export function impliedKeyOf(slot: Slot): string {
+  return slot.login.opencodeAuthEntry ?? slot.provider;
 }
 
 function refreshOf(root: Entry): number {
@@ -120,10 +144,34 @@ function refreshOf(root: Entry): number {
   return typeof minutes === 'number' && minutes >= 1 ? minutes * 60_000 : DEFAULT_REFRESH_MS;
 }
 
-/** The providers whose implied slot the owner removed (`impliedOff`, D-69): no stand-in slot for them on this machine. */
-export function impliedOffOf(root: Readonly<Record<string, unknown>>): readonly WorkerProviderId[] {
+/** The implied slots the owner removed (`impliedOff`, D-69), by key: no stand-in for them on this machine. */
+export function impliedOffOf(root: Readonly<Record<string, unknown>>): readonly string[] {
   const raw = root['impliedOff'];
-  return Array.isArray(raw) ? raw.filter(isWorkerProvider) : [];
+  return Array.isArray(raw) ? raw.filter((key): key is string => typeof key === 'string' && key !== '') : [];
+}
+
+/** The opencode accounts `ServiceConfigFile` found (each one a usable slot id), in the file's order, each once. */
+export function opencodeAccountsOf(root: Readonly<Record<string, unknown>>): readonly string[] {
+  const raw = root[OPENCODE_ACCOUNTS_KEY];
+  const names = Array.isArray(raw) ? raw.filter((name): name is string => typeof name === 'string' && SLOT_ID.test(name)) : [];
+  return [...new Set(names)];
+}
+
+/** The implied slots: one per provider no configured slot names — for opencode one per account instead of one for the harness. */
+function impliedSlotsOf(config: Entry, configured: readonly Slot[]): Slot[] {
+  const off = impliedOffOf(config);
+  const accounts = opencodeAccountsOf(config);
+  const named = new Set(configured.flatMap((slot) => (slot.login.opencodeAuthEntry === undefined ? [] : [slot.login.opencodeAuthEntry])));
+  const taken = new Set(configured.map((slot) => slot.id));
+  const unique = (slot: Slot): Slot => (taken.has(slot.id) ? { ...slot, id: `${slot.id}-default` } : slot);
+  return WORKER_PROVIDERS.flatMap((provider): Slot[] => {
+    if (provider === 'opencode') {
+      const open = accounts.filter((entry) => !named.has(entry) && !off.includes(entry)).map(impliedAccountSlot);
+      const standIn = accounts.length === 0 && !configured.some((slot) => slot.provider === 'opencode') && !off.includes(provider);
+      return [...open, ...(standIn ? [impliedSlot(provider)] : [])].map(unique);
+    }
+    return off.includes(provider) || configured.some((slot) => slot.provider === provider) ? [] : [unique(impliedSlot(provider))];
+  });
 }
 
 /** `service.json`'s parsed root as slots: the configured ones in their order, then the implied ones. */
@@ -140,10 +188,5 @@ export function parseServiceSlots(root: unknown): SlotConfigParse {
       slots.push(slot);
     }
   }
-  const taken = new Set(slots.map((s) => s.id));
-  const off = impliedOffOf(config);
-  const implied = WORKER_PROVIDERS.filter((provider) => !off.includes(provider) && !slots.some((s) => s.provider === provider))
-    .map(impliedSlot)
-    .map((slot) => (taken.has(slot.id) ? { ...slot, id: `${slot.id}-default` } : slot));
-  return { slots: [...slots, ...implied], errors, refreshMs: refreshOf(config) };
+  return { slots: [...slots, ...impliedSlotsOf(config, slots)], errors, refreshMs: refreshOf(config) };
 }

@@ -35,10 +35,10 @@ export function demoSnapshot(): ServiceSnapshot {
     },
     spend: { spent: 4.1, limit: 15 },
     slots: [
-      { id: 'claude-a', label: 'Claude A', busy: 1, total: 2, left: 0.62, q: 1.4, resetsAt: '2026-11-09T09:00:00', reliability: 'measured' },
-      { id: 'claude-b', label: 'Claude B', busy: 0, total: 1, left: 0.31, q: 0.8, resetsAt: '2026-11-10T14:00:00', reliability: 'measured' },
-      { id: 'zai', label: 'z.ai', busy: 1, total: 3, left: 0.7, q: 1.2, resetsAt: '2026-11-11T00:00:00', reliability: 'estimated' },
-      { id: 'kimi', label: 'Kimi', busy: 0, total: 2, left: null, q: null, resetsAt: null, reliability: 'unknown' },
+      { id: 'claude-a', label: 'Claude A', busy: 1, total: 2, left: 0.62, q: 1.4, resetsAt: '2026-11-09T09:00:00', reliability: 'measured', used: null, unit: null },
+      { id: 'claude-b', label: 'Claude B', busy: 0, total: 1, left: 0.31, q: 0.8, resetsAt: '2026-11-10T14:00:00', reliability: 'measured', used: null, unit: null },
+      { id: 'zai', label: 'z.ai', busy: 1, total: 3, left: 0.7, q: 1.2, resetsAt: '2026-11-11T00:00:00', reliability: 'estimated', used: null, unit: null },
+      { id: 'kimi', label: 'Kimi', busy: 0, total: 2, left: null, q: null, resetsAt: null, reliability: 'unknown', used: 184_000, unit: 'tokens' },
     ],
     load: { heavySeats: 2, reserve: 25, lowPriority: true, quietHours: '22:00 - 07:00' },
     governor: {

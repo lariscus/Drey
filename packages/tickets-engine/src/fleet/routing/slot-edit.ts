@@ -2,13 +2,15 @@
  * One slot added to, changed in or removed from `service.json`'s parsed
  * root (D-69, req-287, Settings → Models): every other entry stays as the
  * owner wrote it — its login folder and limits included, which the slot
- * views do not carry. Removing an implied slot names its provider in
- * `impliedOff`; adding a slot for such a provider takes it off that list
- * again. A slot a model row names stays — unless the owner confirmed the
- * removal of those rows with it (req-287: *Remove Claude B? 1 model uses
- * only this account.*). A change of an implied slot writes it out.
+ * views do not carry. Removing an implied slot names its key (req-317: the
+ * provider id of a stand-in, the auth entry of an opencode account) in
+ * `impliedOff`; adding a slot for such a provider or account takes the key
+ * off that list again. A slot a model row names stays — unless the owner
+ * confirmed the removal of those rows with it (req-287: *Remove Claude B? 1
+ * model uses only this account.*). A change of an implied slot writes it out.
  */
-import { impliedOffOf, impliedSlot, parseServiceSlots, slotOf } from './slot-config';
+import { impliedKeyOf, impliedOffOf, parseServiceSlots, slotOf } from './slot-config';
+import type { Slot } from './slot';
 
 type Root = Readonly<Record<string, unknown>>;
 export type SlotEdit = { readonly ok: true; readonly root: Record<string, unknown> } | { readonly ok: false; readonly error: string };
@@ -32,7 +34,7 @@ export function slotAdded(root: Root, entry: unknown): SlotEdit {
   if (typeof slot === 'string') {
     return { ok: false, error: slot };
   }
-  const off = impliedOffOf(root).filter((provider) => provider !== slot.provider);
+  const off = impliedOffOf(root).filter((key) => key !== slot.provider && key !== slot.login.opencodeAuthEntry);
   return { ok: true, root: { ...withOff(root, off), slots: [...entriesOf(root), withoutRetiredSlotKeys(entry)] } };
 }
 
@@ -59,7 +61,7 @@ export function slotRemoved(root: Root, id: string, withModels = false): SlotEdi
   if (implied === undefined) {
     return { ok: false, error: `unknown slot "${id}"` };
   }
-  return { ok: true, root: withOff(base, [...impliedOffOf(base), implied.provider]) };
+  return { ok: true, root: withOff(base, [...impliedOffOf(base), impliedKeyOf(implied)]) };
 }
 
 /** The keys of a slot the page edits in place (req-287): its label, its cost, its sessions. */
@@ -78,7 +80,7 @@ export function slotUpdated(root: Root, id: string, patch: Readonly<Record<strin
   if (at < 0 && implied === undefined) {
     return { ok: false, error: `unknown slot "${id}"` };
   }
-  const current = at >= 0 ? (entries[at] as Record<string, unknown>) : impliedEntryOf(implied!.provider, id);
+  const current = at >= 0 ? (entries[at] as Record<string, unknown>) : impliedEntryOf(implied!);
   const next: Record<string, unknown> = { ...current };
   for (const key of EDITABLE) {
     if (patch[key] === null) {
@@ -95,9 +97,10 @@ export function slotUpdated(root: Root, id: string, patch: Readonly<Record<strin
   return { ok: true, root: { ...root, slots } };
 }
 
-function impliedEntryOf(provider: Parameters<typeof impliedSlot>[0], id: string): Record<string, unknown> {
-  const slot = impliedSlot(provider);
-  return { id, label: slot.label, provider, quota: slot.quota };
+/** An implied slot as the entry that carries its change: an account slot keeps naming its `auth.json` entry (req-317). */
+export function impliedEntryOf(slot: Slot): Record<string, unknown> {
+  const login = slot.login.opencodeAuthEntry === undefined ? {} : { login: { opencodeAuthEntry: slot.login.opencodeAuthEntry } };
+  return { id: slot.id, label: slot.label, provider: slot.provider, quota: slot.quota, ...login };
 }
 
 function withOff(root: Root, off: readonly string[]): Record<string, unknown> {

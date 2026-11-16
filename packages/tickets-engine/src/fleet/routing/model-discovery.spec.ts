@@ -3,6 +3,7 @@ import type { ModelRow, ProbeOutcome, WorkerProviderId } from '../protocol';
 import { ModelDiscovery, type HarnessProbe, type SavedDiscovery } from './model-discovery';
 import type { ImportOutcome } from './models-dev-import';
 import { PoolSettingsRegistry } from './pool-settings';
+import { parseServiceSlots } from './slot-config';
 import { FakeClock, slot } from './routing.fake';
 import type { Slot } from './slot';
 
@@ -35,13 +36,13 @@ class Rig {
   registry: (rows: readonly ModelRow[]) => ImportOutcome = (rows) => ({ ok: true, rows: rows.map((row) => ({ ...row, context: 1_000_000, tools: true })), filled: [], unmatched: [] });
   readonly discovery: ModelDiscovery;
 
-  constructor(probes: readonly HarnessProbe[], root: Record<string, unknown> = {}) {
-    this.settings.apply(root, SLOTS, null);
+  constructor(probes: readonly HarnessProbe[], root: Record<string, unknown> = {}, slots: readonly Slot[] = SLOTS) {
+    this.settings.apply(root, slots, null);
     this.discovery = new ModelDiscovery({
       probes,
       file: { read: async () => this.saved, write: async (saved) => void (this.saved = saved) },
       settings: this.settings,
-      slots: () => SLOTS,
+      slots: () => slots,
       ignored: () => this.settings.ignored(),
       registry: { fill: async (rows) => (this.registryCalls++, this.registry(rows)) },
       clock: new FakeClock(NOW),
@@ -70,6 +71,16 @@ describe('ModelDiscovery — what the harnesses offer (req-286)', () => {
     ]);
     expect(rig.registryCalls).toBe(0);
     expect(rig.saved?.offered).toHaveLength(4);
+  });
+
+  it('req-317: an opencode model maps to the implied slot of its account, no configured slot needed', async () => {
+    const accounts = parseServiceSlots({ opencodeAccounts: ['zai-coding-plan', 'github-copilot'] }).slots;
+    const rig = new Rig([probe('opencode', 'opencode', OPENCODE)], {}, accounts);
+    await rig.discovery.check(false);
+    expect(rig.discovery.report().found.map((m) => [m.model, m.slot])).toEqual([
+      ['zai-coding-plan/glm-5.3-air', 'zai-coding-plan'],
+      ['github-copilot/gpt-5.4', 'github-copilot'],
+    ]);
   });
 
   it('a model the table holds or the owner ignored has no card', async () => {
