@@ -93,12 +93,6 @@ export function marksOf(step: FlowStepView): readonly string[] {
   return marks;
 }
 
-/** The gate the selected one runs after; null for the first of the list. */
-export function runsAfterOf(flow: FlowDraft, step: FlowStepView): FlowStepView | null {
-  const at = flow.steps.findIndex((s) => s.index === step.index);
-  return at > 0 ? flow.steps[at - 1]! : null;
-}
-
 /** Whether a gate may move one place earlier / later (the engine enforces the same rules). */
 export function moveRoomOf(flow: FlowDraft, step: FlowStepView): { readonly earlier: boolean; readonly later: boolean } {
   if (step.locked || step.state === 'current') {
@@ -115,9 +109,31 @@ export function addablePersonasOf(flow: FlowDraft): readonly FlowPersona[] {
   return flow.personas;
 }
 
-/** The personas a position can be given: the whole crew. */
-export function personasFor(flow: FlowDraft): readonly FlowPersona[] {
-  return flow.personas;
+/** One "Run as" row of a gate's menu: the persona, whether it may take the position, and why not when not. */
+export interface RunAsOption {
+  readonly persona: FlowPersona;
+  readonly enabled: boolean;
+  /** Why the row is disabled, for its tooltip; null when it is enabled. */
+  readonly reason: string | null;
+}
+
+/**
+ * The crew as a gate's "Run as" rows — the engine's rules made visible
+ * instead of refused: a position that carries a mode (`paul:shape`) can
+ * only be taken by an agent persona, and the current step's position
+ * cannot change at all (only its tell-me rule may).
+ */
+export function runAsOptionsOf(flow: FlowDraft, gate: FlowStepView): readonly RunAsOption[] {
+  const frozen = gate.locked || flow.readOnly != null ? (flow.readOnly ?? 'the current step stays as it is') : null;
+  return flow.personas.map((persona) => {
+    if (frozen !== null) {
+      return { persona, enabled: false, reason: frozen };
+    }
+    if (gate.mode !== null && persona.kind !== 'agent') {
+      return { persona, enabled: false, reason: `only an agent persona can run the ${gate.mode} step` };
+    }
+    return { persona, enabled: true, reason: null };
+  });
 }
 
 /** The flow tab's fixed key for a ticket (and optionally one plan part). */
