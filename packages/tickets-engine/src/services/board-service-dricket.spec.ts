@@ -15,6 +15,7 @@ import { openStatusItems } from '../core/pipeline/status-log';
 import { isLifecycleStore, parseStoreStages } from '../store/store-stages';
 import { NOT_LIFECYCLE_STORE } from './board-service';
 import { defaultStorePathOf } from '../store/fresh-store';
+import { readStoreRef, withStoreRef } from '../core/pipeline/pipeline-store';
 
 /**
  * E14-4b: the board's write moves against a REAL `dk` and a SCRATCH store —
@@ -186,6 +187,13 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
     return board.columns.find((c) => c.tickets.some((t) => t.id === id))?.phase.id ?? null;
   };
   const rev = (id: string): number => Number(field(id, 'rev'));
+
+  it('the machine-wide dk.store moves into the pipeline on the first read (req-316)', async () => {
+    expect(readStoreRef(await fsp.readFile(abs('tickets/_meta/pipeline.md'), 'utf8'))).toBeNull();
+    const board = await service.snapshot();
+    expect(readStoreRef(await fsp.readFile(abs('tickets/_meta/pipeline.md'), 'utf8'))).toBe(storeDir);
+    expect(board.issues.map((issue) => issue.message).join('\n')).not.toContain('dricket store');
+  });
 
   it('captures a ticket: dk allocates the number, one put fills the document', async () => {
     const reply = await service.createTicket({ title: 'Voice: capture', priority: 'high', repo: null, description: 'Capture by voice.' });
@@ -473,25 +481,30 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
     await service.snapshot(); // the chain follows the pipeline: its config now names the store, not ticket files
     expect(chainConfigs.at(-1)?.store).toMatchObject({ dkStore: storeDir, dkDataDir: path.join(root, 'data'), trailers: false });
     expect(chainConfigs.at(-1)?.ticketsVaultPath).toBe(vaultDir);
-    const kept = config['dk.store'];
-    config['dk.store'] = 'https://example.invalid/t.git#tickets'; // remote, no tickets.dk.checkout
+    // req-316: the project names its store in the pipeline — a remote one for this scenario.
+    await fsp.writeFile(abs('tickets/_meta/pipeline.md'), withStoreRef(PIPELINE, 'https://example.invalid/t.git#tickets'), 'utf8');
     expect(await service.chainRefusal()).toContain('checkout');
     config['dk.checkout'] = path.join(root, 'checkout');
     expect(await service.chainRefusal()).toBeNull();
     delete config['dk.checkout'];
-    config['dk.store'] = kept;
+    // Back to the local store: the pipeline loses the reference, the first
+    // read re-anchors the machine-wide override (req-316's migration).
+    await fsp.writeFile(abs('tickets/_meta/pipeline.md'), PIPELINE, 'utf8');
+    await service.snapshot();
+    expect(readStoreRef(await fsp.readFile(abs('tickets/_meta/pipeline.md'), 'utf8'))).toBe(config['dk.store'] ?? null);
   });
 
-  it('a fresh install: "Initialize board" creates the store beside the vault and sets dk.store (E14-9b)', async () => {
-    const freshDir = path.join(root, 'meta-fresh');
-    const freshVault: EngineVault = { id: 'fresh', name: 'fresh', path: freshDir, exists: true, active: true };
-    const storeDir2 = defaultStorePathOf(freshDir);
-    const freshConfig: Record<string, string | undefined> = {
-      'dk.path': bin === 'dk' ? '' : bin,
-      'dk.dataDir': path.join(root, 'data'),
-    };
-    const setKeys: Array<[string, unknown]> = [];
-    const fAbs = (p: string): string => path.join(freshDir, ...p.split('/'));
+  /** A fresh, boardless vault with its own config store — the D-74/req-316 harness. */
+  function freshHarness(name: string, config: Record<string, string | undefined>): {
+    fresh: EngineBoardService;
+    dir: string;
+    storeDir: string;
+    fAbs(p: string): string;
+  } {
+    const dir = path.join(root, name);
+    const freshVault: EngineVault = { id: name, name, path: dir, exists: true, active: true };
+    const storeDir = defaultStorePathOf(dir);
+    const fAbs = (p: string): string => path.join(dir, ...p.split('/'));
     const fleet: FleetPort = { runs: async () => [], start: async () => ({ ok: false, error: 'not in the spec' }), configureChain: async () => undefined };
     const storeGit = new TicketsGit(() => 'git', async (_exe, args, cwd) => {
       if (!cwd.startsWith(root)) {
@@ -504,7 +517,8 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
         maxBuffer: 16 * 1024 * 1024,
       });
       return stdout;
-    });    const fresh = new EngineBoardService(
+    });
+    const fresh = new EngineBoardService(
       {
         listVaults: async () => [freshVault],
         read: async (_v, p) => fsp.readFile(fAbs(p), 'utf8'),
@@ -520,10 +534,9 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
         resolveAssetPath: (_v, p) => fAbs(p),
         announceChanges: () => undefined,
         markManaged: () => undefined,
-        configGet: async <T>(key: string) => freshConfig[key] as T | undefined,
+        configGet: async <T>(key: string) => config[key] as T | undefined,
         configSet: async (key, value) => {
-          freshConfig[key] = value as string;
-          setKeys.push([key, value]);
+          config[key] = value as string;
         },
         emitBoardChanged: () => undefined,
         log: () => undefined,
@@ -543,23 +556,70 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
       'owner@test',
       {},
     );
+    return { fresh, dir, storeDir, fAbs };
+  }
+
+  async function disposeFresh(fresh: EngineBoardService, dirs: readonly string[]): Promise<void> {
+    await fresh.dispose();
+    await fresh.idle();
+    for (const dir of dirs) {
+      await fsp.rm(dir, { recursive: true, force: true }).catch(() => undefined);
+    }
+  }
+
+  it('a fresh install: "Initialize board" anchors its own store in the pipeline (E14-9b, req-316)', async () => {
+    const config: Record<string, string | undefined> = {
+      'dk.path': bin === 'dk' ? '' : bin,
+      'dk.dataDir': path.join(root, 'data'),
+    };
+    const { fresh, dir, storeDir: storeDir2, fAbs } = freshHarness('meta-fresh', config);
     try {
+      // D-74: the engine hosts the vault BEFORE a board exists — the setup
+      // starts the service against this honest null board, then initializes.
+      const before = await fresh.snapshot();
+      expect(before.vaultId).toBeNull();
+      expect(before.vaultPath).toBeUndefined();
       expect(await fresh.initialize('fresh')).toMatchObject({ ok: true });
-      expect(freshConfig['dk.store']).toBe(storeDir2);
-      expect(setKeys).toContainEqual(['dk.store', storeDir2]);
+      // req-316: the store is anchored in the project's pipeline — the
+      // machine-wide key is never written for it.
+      expect(readStoreRef(await fsp.readFile(fAbs('tickets/_meta/pipeline.md'), 'utf8'))).toBe(storeDir2);
+      expect(config['dk.store']).toBeUndefined();
+      // The editor's checkout follows the same source (the plugin's `checkout` asks this).
+      expect(await fresh.storeCheckout()).toEqual({ checkout: storeDir2 });
       // The toml lives on the store's main branch; the working copy is the tickets branch.
-      expect(isLifecycleStore(parseStoreStages(await storeGit.run(storeDir2, ['show', 'main:dricket.toml'])))).toBe(true);
+      const toml = (await promisify(execFile)('git', ['show', 'main:dricket.toml'], { cwd: storeDir2, windowsHide: true, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })).stdout;
+      expect(isLifecycleStore(parseStoreStages(toml))).toBe(true);
       // The board reads its new store: neither the unconfigured nor the wrong-stages error stands.
       const messages = (await fresh.snapshot()).issues.map((issue) => issue.message).join('\n');
       expect(messages).not.toContain('no dricket store configured');
       expect(messages).not.toContain(NOT_LIFECYCLE_STORE);
     } finally {
-      await fresh.dispose();
-      await fresh.idle();
-      await fsp.rm(freshDir, { recursive: true, force: true }).catch(() => undefined);
-      await fsp.rm(storeDir2, { recursive: true, force: true }).catch(() => undefined);
+      await disposeFresh(fresh, [dir, storeDir2]);
     }
   });
+
+  it('a fresh vault never adopts another project\'s store (req-316)', async () => {
+    const foreign = path.join(root, 'another-projects-store'); // not even existing
+    const { fresh, dir, storeDir: storeDir2, fAbs } = freshHarness('meta-fresh2', {
+      'dk.path': bin === 'dk' ? '' : bin,
+      'dk.dataDir': path.join(root, 'data'),
+      'dk.store': foreign,
+    });
+    try {
+      expect(await fresh.initialize('fresh2')).toMatchObject({ ok: true });
+      // the project's own store beside the vault, anchored in its pipeline;
+      // the machine-wide key names the other project's store and stays untouched
+      expect(readStoreRef(await fsp.readFile(fAbs('tickets/_meta/pipeline.md'), 'utf8'))).toBe(storeDir2);
+      // the board reads its own (empty) store, not the foreign one — a foreign
+      // store path would answer unreadable and stand in the issues
+      const board = await fresh.snapshot();
+      expect(board.issues.map((issue) => issue.message).join('\n')).not.toContain('dricket store');
+      expect(board.columns.reduce((count, column) => count + column.tickets.length, 0)).toBe(0);
+    } finally {
+      await disposeFresh(fresh, [dir, storeDir2]);
+    }
+  });
+
 
   function writeTemp(text: string): string {
     const file = path.join(root, `put-${Date.now()}.md`);

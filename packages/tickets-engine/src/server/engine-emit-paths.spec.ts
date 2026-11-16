@@ -24,7 +24,7 @@ beforeEach(async () => {
   await fsp.mkdir(path.join(vault, 'tickets/_meta'), { recursive: true });
   await fsp.mkdir(path.join(root, 'client'), { recursive: true });
   await fsp.mkdir(home, { recursive: true });
-  await fsp.writeFile(path.join(vault, 'tickets/_meta/pipeline.md'), '---\nphases:\n  - { id: inbox, title: Inbox, handover: manual }\n---\nP\n', 'utf8');
+  await fsp.writeFile(path.join(vault, 'tickets/_meta/pipeline.md'), '---\nstore: \'https://example.invalid/t.git#tickets\'\nphases:\n  - { id: inbox, title: Inbox, handover: manual }\n---\nP\n', 'utf8');
   for (const args of [['init', '-b', 'main'], ['config', 'user.name', 'spec'], ['config', 'user.email', 'spec@example.com']]) {
     await promisify(execFile)('git', args, { cwd: vault });
   }

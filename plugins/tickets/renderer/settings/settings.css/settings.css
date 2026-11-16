@@ -461,3 +461,23 @@
 .tset-advanced[open] > summary {
   margin-bottom: 8px;
 }
+
+/* The setup block while no tickets repository is configured (D-74):
+   one heading, one line, the two dialog entries, the failure line. */
+.tset-setup-line {
+  margin: 4px 0 12px;
+  max-width: 60ch;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+.tset-setup-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.tset-setup-error {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--status-deleted);
+}

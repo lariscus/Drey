@@ -20,6 +20,16 @@ at once):
 | **with Drey** | off (default) | as long as a Drey is open: 10 s after the last Drey's event stream closed it stops its live runs and leaves (2 min for a Drey that never came); a paired phone does not keep it | Drey asks first: *Stop the runs and quit* / *Keep running (enable the service)* / *Cancel* (a quit guard, SDK 1.53) |
 | **background** | on | independently of Drey, until nothing holds it (the two-level sleep below); with `service.autostart` also started at Windows sign-in | they go on; Drey asks nothing |
 
+**When it starts.** With a tickets repository detected, at Drey's start
+(adopt a running one, hand an older build over, or spawn). On a fresh
+install — no vault carries a board yet — the tickets plugin activates
+**unconfigured** (D-74, [ADR-0102](../../docs/09_architecture_decisions/0102-plugin-activates-unconfigured.md))
+and the service starts with the setup: Settings → Tickets (or the Work
+panel's Initialize) names the vault, and `ensureService` hosts it
+**before its board exists** — the board initializes in it. Without a
+tickets vault the start refuses ("set one up in Settings → Tickets");
+*Start* in Settings → Background service answers the same way.
+
 ## Components
 
 | Component | What | State |

@@ -11,8 +11,7 @@ import {
   isDirty,
   marksOf,
   moveRoomOf,
-  personasFor,
-  runsAfterOf,
+  runAsOptionsOf,
   whoOf,
   humanNameOf,
   type FlowDraft,
@@ -102,20 +101,32 @@ describe('flow model', () => {
     expect(marksOf(step(1, 'ben'))).toEqual([]);
   });
 
-  it('finds the gate before and the room to move', () => {
+  it('gives the room to move, the current step frozen', () => {
     const f = flow();
-    expect(runsAfterOf(f, f.steps[0]!)).toBeNull();
-    expect(runsAfterOf(f, f.steps[2]!)?.persona).toBe('ralf');
     expect(moveRoomOf(f, f.steps[0]!)).toEqual({ earlier: false, later: false });
     expect(moveRoomOf(f, f.steps[1]!)).toEqual({ earlier: false, later: true });
     expect(moveRoomOf(f, f.steps[2]!)).toEqual({ earlier: true, later: true });
     expect(moveRoomOf(f, f.steps[3]!)).toEqual({ earlier: true, later: false });
   });
 
-  it('offers the whole crew to add and to give', () => {
+  it('offers the whole crew to add', () => {
     const f = flow();
     expect(addablePersonasOf(f).map((p) => p.id)).toEqual(['ben', 'ralf', 'you']);
-    expect(personasFor(f).map((p) => p.id)).toEqual(['ben', 'ralf', 'you']);
+  });
+
+  it('the run-as rows: a mode position only an agent can take, the current one frozen', () => {
+    const f = flow();
+    const shape = step(0, 'paul', { mode: 'shape' });
+    const options = runAsOptionsOf(f, shape);
+    expect(options.map((o) => [o.persona.id, o.enabled, o.reason])).toEqual([
+      ['ben', true, null],
+      ['ralf', true, null],
+      ['you', false, 'only an agent persona can run the shape step'],
+    ]);
+    const current = step(1, 'ralf', { state: 'current', locked: true });
+    expect(runAsOptionsOf(f, current).every((o) => !o.enabled && o.reason === 'the current step stays as it is')).toBe(true);
+    const duringRun: FlowDraft = { ...f, readOnly: 'A run is live on this ticket. Change the flow when the run has ended.' };
+    expect(runAsOptionsOf(duringRun, step(2, 'you')).every((o) => !o.enabled && o.reason?.startsWith('A run is live'))).toBe(true);
   });
 
   it('round-trips the tab key', () => {

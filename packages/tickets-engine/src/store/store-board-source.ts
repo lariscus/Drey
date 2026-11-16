@@ -11,6 +11,7 @@ import { headFingerprint, remoteMovedProbe } from './store-git-probe';
 import { StorePathReporter, type StorePathChange } from './store-path-report';
 import { StoreConfigCache } from './store-config-cache';
 import { StoreReader } from './store-reader';
+import { idleDkWrites } from './dk-process';
 import { checkoutOf, createDricketStore, type StoreSettings } from './store-settings';
 import type { StoreStageSet } from './store-stages';
 import { stageOfPhase } from '../core/pipeline/lifecycle-stages';
@@ -145,11 +146,15 @@ export class StoreBoardSource {
   }
 
   /**
-   * Resolves when the background work is over: the watcher's HEAD reads, the ref check and a sync round (of any
-   * feed, also one replaced by new settings). Call after {@link dispose} before
+   * Resolves when the background work is over: every in-flight and queued `dk`
+   * write first (the service must not exit mid-put — a half-written put leaves
+   * the checkout dirty and every later write conflicting), then the watcher's
+   * HEAD reads, the ref check and a sync round (of any feed, also one replaced
+   * by new settings). Call after {@link dispose} before
    * the folders are let go; the processes it waits for hold their working directory.
    */
   async idle(): Promise<void> {
+    await idleDkWrites();
     await Promise.allSettled([...this.feeds].map((feed) => feed.idle()));
     await Promise.allSettled([...this.pathReporters].map((paths) => paths.idle()));
   }

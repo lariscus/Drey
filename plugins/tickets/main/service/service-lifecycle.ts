@@ -1,4 +1,4 @@
-import { promises as fsp } from 'node:fs';
+import { existsSync, promises as fsp } from 'node:fs';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
 import { NOTES_VAULT_KEY } from '../../../../packages/tickets-engine/src/contracts/notes';
@@ -16,6 +16,7 @@ import {
 import { STORE_SETTING_KEYS } from '../../../../packages/tickets-engine/src/store/store-settings';
 import { SERVICE_PREF_KEYS } from '../../../../shared/service-settings';
 import { EngineClient, type EngineEndpoints } from '../engine/engine-client';
+import { UnconfiguredTicketsError, type TicketsVaultRef } from '../engine/unconfigured-error';
 
 /**
  * Drey Service from the plugin's side (req-164, ADR-0092): Drey is a client
@@ -28,8 +29,33 @@ import { EngineClient, type EngineEndpoints } from '../engine/engine-client';
  */
 
 const SERVICE_HOME = (): string => path.join(homedir(), '.drey-engine');
-const SERVICE_ENTRY = (): string =>
-  path.join(__dirname, '..', '..', '..', 'packages', 'tickets-engine', 'src', 'service', SERVICE_ENTRY_NAME);
+
+/**
+ * The built service entry, found from this module's folder upward (the
+ * walk's seams are injectable for the spec). Since the req-300 domain
+ * folders the compiled plugin lives in
+ * `dist-electron/plugins/tickets/main/service/` — four levels up to the
+ * engine at `dist-electron/packages/tickets-engine/…`; before it lived
+ * flat in `dist-electron/plugins/tickets/main/` — three levels; and a
+ * source-loader layout resolves the same way at the repository root.
+ * Milestone 284's folder move left the fixed three-level join pointing at
+ * `dist-electron/plugins/packages/…`, which exists nowhere — the setup
+ * (D-74) was the first flow to expose it. Nothing found: the old join, so
+ * the spawn's own failure names the layout.
+ */
+export function serviceEntryOf(from: string, exists: (candidate: string) => boolean = existsSync): string {
+  const rel = path.join('packages', 'tickets-engine', 'src', 'service', SERVICE_ENTRY_NAME);
+  let dir = from;
+  for (let up = 0; up < 6; up += 1) {
+    const candidate = path.join(dir, rel);
+    if (exists(candidate)) {
+      return candidate;
+    }
+    dir = path.dirname(dir);
+  }
+  return path.join(from, '..', '..', '..', 'packages', 'tickets-engine', 'src', 'service', SERVICE_ENTRY_NAME);
+}
+const SERVICE_ENTRY = (): string => serviceEntryOf(__dirname);
 
 /** A live service's lock, or null. */
 async function liveLock(home: string): Promise<ServiceLock | null> {
@@ -95,6 +121,22 @@ async function locateTicketsVault(ctx: {
     }
   }
   return null;
+}
+
+/**
+ * The explicitly named start vault (D-74), when it is still a registered,
+ * existing vault. The engine hosts it before its board exists —
+ * "Initialize board" is the engine's fresh path (E14-9b item 6).
+ */
+async function startVaultOf(
+  ctx: Parameters<typeof locateTicketsVault>[0],
+  ref: TicketsVaultRef | null | undefined,
+): Promise<{ id: string; name: string; path: string } | null> {
+  if (ref === undefined || ref === null) {
+    return null;
+  }
+  const found = (await ctx.vault.listVaults()).find((v) => v.id === ref.id || v.path === ref.path);
+  return found !== undefined && found.exists ? { id: found.id, name: found.name, path: found.path } : null;
 }
 
 /**
@@ -263,20 +305,33 @@ function startService(vaultPath: string, home: string, log: (message: string) =>
   log(`Drey Service started (pid ${pid ?? '?'}) for ${vaultPath}`);
 }
 
+/** What a service start takes: the test seams and, when named, the vault to host before its board exists. */
+export interface EnsureServiceDeps {
+  readonly home?: string;
+  readonly spawn?: (vaultPath: string, home: string) => void | Promise<void>;
+  /** This build's stamp; the built service entry's by default. */
+  readonly ownBuild?: () => Promise<string | null>;
+  /**
+   * D-74: a vault the setup or the Work panel's "Initialize board" named.
+   * Used when the detector's probe finds no board anywhere — the engine
+   * hosts it and the fresh path initializes the board in it. Ignored when
+   * the probe found a board elsewhere or the vault left the registry.
+   */
+  readonly startVault?: TicketsVaultRef | null;
+}
+
 /**
  * Adopt a running Drey Service, hand an older build over, or start one;
  * then sync Drey's settings into its engine. Resolves with the engine's
- * invoke endpoints — what the plugin talks to.
+ * invoke endpoints — what the plugin talks to. Without any tickets vault
+ * it refuses with {@link UnconfiguredTicketsError} — the plugin's
+ * unconfigured state (D-74), not a failure: the setup names the vault and
+ * calls again.
  */
 export async function ensureService(
   ctx: Parameters<typeof locateTicketsVault>[0] & Parameters<typeof syncConfig>[1],
   log: (message: string, level?: 'info' | 'warn' | 'error') => void,
-  deps: {
-    readonly home?: string;
-    readonly spawn?: (vaultPath: string, home: string) => void | Promise<void>;
-    /** This build's stamp; the built service entry's by default. */
-    readonly ownBuild?: () => Promise<string | null>;
-  } = {},
+  deps: EnsureServiceDeps = {},
 ): Promise<EngineEndpoints> {
   const home = deps.home ?? SERVICE_HOME();
   const adopt = async (endpoints: EngineEndpoints): Promise<EngineEndpoints> => {
@@ -296,9 +351,9 @@ export async function ensureService(
     }
   }
 
-  const vault = await locateTicketsVault(ctx);
+  const vault = (await locateTicketsVault(ctx)) ?? (await startVaultOf(ctx, deps.startVault));
   if (vault === null) {
-    throw new Error('no tickets vault detected — Drey Service has nothing to host');
+    throw new UnconfiguredTicketsError();
   }
   await fsp.mkdir(home, { recursive: true });
   // A failed mirror costs what it always cost (the adoption's sync below still runs), not the start.

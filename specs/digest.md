@@ -100,6 +100,7 @@ One line per entry: its lead and the first date it names. Detail is one grep awa
 
 ### Excluded ideas
 
+- Drey Service started unconditionally, for a fallback vault (2026-11-15)
 - Tranches and checkpoint reports dropped (2026-11-15)
 - D-56 closed without a fix (2026-11-15)
 - A migration for a store that is not on the lifecycle stages, and a default store inside t… (2026-11-11)
@@ -283,6 +284,7 @@ Top-level rules, once, up front:
   - Frontmatter fields
   - Dependencies (`blocked-by`)
   - Priorities (`priorities:` in pipeline.md)
+  - The project's store (`store:` in pipeline.md, req-316)
   - Body sections
   - The scout form (E8, concept §5.6)
   - The chain (req-266; was the chain delta of E9)

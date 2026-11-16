@@ -1,8 +1,11 @@
 /**
  * The Flow tab (E13-11, design boards 5i "Shape the flow" and 7a–7c): one
  * ticket's chain (or one plan part's) as a list of gates with `+`
- * connectors, an inspector for the selected gate (who, model, tell me,
- * runs after, remove), and a foot with reset and "Save flow".
+ * connectors, every gate's actions in its own menu (click, right-click or
+ * the row's ⋯ — run as, tell me, move, remove this gate), and a foot with
+ * reset and "Save flow". The inspector column is gone: the list is the one
+ * surface, and the menu shows the engine's rules as disabled rows with
+ * their reason instead of refusals.
  *
  * Nothing is written before "Save flow": the tab keeps a draft, and every
  * edit is a round trip to the engine (`flowEdit`) that returns the next
@@ -10,7 +13,7 @@
  * (`core/flow-edit.ts`). This file is the DOM and the controller; the
  * wording and the rules about what may move are in `flow-model.ts`.
  */
-import type { FlowOp } from '../../../../packages/tickets-engine/src/contracts/flow';
+import type { FlowOp, FlowStepView } from '../../../../packages/tickets-engine/src/contracts/flow';
 import type { DeskDeps } from '../board/desk-deps';
 import { h, textButton } from '../board/desk-deps';
 import {
@@ -22,10 +25,8 @@ import {
   isStandardFlow,
   marksOf,
   moveRoomOf,
-  personasFor,
-  runsAfterOf,
+  runAsOptionsOf,
   whoOf,
-  humanNameOf,
   type FlowDraft,
   type FlowTarget,
 } from './flow-model';
@@ -37,7 +38,6 @@ interface FlowState {
   /** The flow as the file holds it; the dashed marks compare against it. */
   saved: FlowDraft | null;
   error: string;
-  selected: number | null;
   adding: number | null;
   message: string;
   notice: string;
@@ -48,18 +48,14 @@ type EditReply = { readonly ok: true; readonly [key: string]: unknown } | { read
 
 /** Mounts the Flow tab for one target; returns the dispose. */
 export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget): () => void {
-  const state: FlowState = { draft: null, saved: null, error: '', selected: null, adding: null, message: '', notice: '', busy: false };
+  const state: FlowState = { draft: null, saved: null, error: '', adding: null, message: '', notice: '', busy: false };
   let disposed = false;
   const payload = { id: target.ticketId, part: target.part };
 
   const root = h('section', 'flow-tab');
   root.setAttribute('aria-label', 'Flow editor');
   const head = h('header', 'flow-head');
-  const main = h('div', 'flow-main');
   const body = h('div', 'flow-body');
-  const inspector = h('aside', 'flow-inspector');
-  inspector.setAttribute('aria-label', 'Gate settings');
-  main.append(body, inspector);
   const foot = h('footer', 'flow-foot');
   const messageLine = h('p', 'flow-message');
   messageLine.setAttribute('role', 'alert');
@@ -69,22 +65,14 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
   const buttons = h('div', 'flow-buttons');
   buttons.append(resetButton, h('span', 'flow-grow'), saveButton);
   foot.append(messageLine, buttons);
-  root.append(head, main, foot);
+  root.append(head, body, foot);
   host.replaceChildren(root);
 
   const readOnly = (): boolean => state.draft?.readOnly != null;
 
-  const select = (index: number | null): void => {
-    state.adding = null;
-    state.message = '';
-    state.selected = state.selected === index ? null : index;
-    paint();
-  };
-
   const toggleAdding = (after: number): void => {
-    state.selected = null;
-    state.message = '';
     state.adding = state.adding === after ? null : after;
+    state.message = '';
     paint();
   };
 
@@ -101,6 +89,7 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
     if (disposed) {
       return;
     }
+    closeGateMenus();
     if (reply.ok) {
       const flow = reply as unknown as FlowDraft;
       state.draft = flow;
@@ -189,11 +178,10 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
     for (const [flag, name] of [
       [changed.has(gate.index), 'is-dashed'],
       [gate.state === 'current', 'is-current'],
-      [state.selected === gate.index, 'is-selected'],
     ] as const) {
       row.classList.toggle(name, flag);
     }
-    row.setAttribute('aria-pressed', String(state.selected === gate.index));
+    row.setAttribute('aria-haspopup', 'menu');
     row.setAttribute('aria-label', `${gate.title}, ${whoOf(gate, flow)}${gate.state === 'current' ? ', current gate' : ''}`);
     const dot = h('span', 'flow-dot');
     dot.style.background = persona?.color ?? 'var(--text-3)';
@@ -206,8 +194,34 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
     for (const mark of marksOf(gate)) {
       row.append(h('span', 'flow-mark', mark));
     }
-    row.addEventListener('click', () => select(gate.index));
+    const openAt = (x: number, y: number): void => openGateMenu(flow, gate, { x, y }, row);
+    row.addEventListener('click', () => {
+      const rect = row.getBoundingClientRect();
+      openAt(rect.left, rect.bottom + 2);
+    });
+    row.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      openAt(event.clientX, event.clientY);
+    });
+    row.addEventListener('keydown', (event) => {
+      if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+        event.preventDefault();
+        const rect = row.getBoundingClientRect();
+        openAt(rect.left, rect.bottom + 2);
+      }
+    });
     item.append(row);
+
+    const more = h('button', 'flow-more', '⋯');
+    more.type = 'button';
+    more.setAttribute('aria-haspopup', 'menu');
+    more.setAttribute('aria-label', `Options for ${gate.title}`);
+    more.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const rect = more.getBoundingClientRect();
+      openAt(rect.left, rect.bottom + 2);
+    });
+    item.append(more);
 
     const plus = h('button', `flow-plus${state.adding === gate.index ? ' is-open' : ''}`);
     plus.type = 'button';
@@ -233,7 +247,6 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
         void run({ op: 'insert', persona: persona.id, after }).then((ok) => {
           if (ok) {
             state.adding = null;
-            state.selected = after + 1;
             paint();
           }
         });
@@ -264,112 +277,6 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
     body.append(list);
   }
 
-  function section(label: string): HTMLElement {
-    const box = h('section', 'flow-sec');
-    box.setAttribute('aria-label', label);
-    box.append(h('h3', 'flow-sec-h', label));
-    return box;
-  }
-
-  function paintInspector(): void {
-    const flow = state.draft;
-    inspector.replaceChildren();
-    const gate = flow?.steps.find((s) => s.index === state.selected) ?? null;
-    inspector.hidden = flow === null || gate === null;
-    if (flow === null || gate === null) {
-      return;
-    }
-    const editable = !gate.locked && !readOnly() && !state.busy;
-    const top = h('div', 'flow-ins-head');
-    top.append(h('h3', 'flow-ins-title', gate.title), textButton('×', 'desk-btn desk-btn-link', 'Close', () => select(gate.index)));
-    top.lastElementChild?.setAttribute('aria-label', 'Close');
-    inspector.append(top);
-    if (gate.state === 'current') {
-      inspector.append(h('p', 'flow-hint', 'This is the current gate. It stays as it is; changes reach the gates after it.'));
-    } else if (gate.locked || readOnly()) {
-      inspector.append(h('p', 'flow-hint', 'This flow cannot change.'));
-    }
-
-    const who = section('Who');
-    if (gate.owner) {
-      who.append(h('p', 'flow-val', humanNameOf(flow)));
-    }
-    const chips = h('div', 'flow-chips');
-    chips.setAttribute('role', 'group');
-    const choose = (label: string, on: boolean, persona: string, color: string): void => {
-      const chip = h('button', `flow-chipbtn${on ? ' is-on' : ''}`);
-      chip.type = 'button';
-      chip.disabled = !editable;
-      chip.setAttribute('aria-pressed', String(on));
-      const dot = h('span', 'flow-dot is-small');
-      dot.style.background = color || 'var(--text-3)';
-      chip.append(dot);
-      chip.append(document.createTextNode(label));
-      chip.addEventListener('click', () => void run({ op: 'persona', step: gate.index, persona }));
-      chips.append(chip);
-    };
-    for (const persona of personasFor(flow)) {
-      choose(persona.title, gate.persona === persona.id, persona.id, persona.color);
-    }
-    who.append(chips);
-    inspector.append(who);
-
-    if (!gate.owner) {
-      const model = section('Model');
-      model.append(h('p', 'flow-val', gate.model ?? 'None'));
-      inspector.append(model);
-    }
-
-    const notify = h('section', 'flow-sec flow-row');
-    notify.append(h('span', 'flow-row-t', 'Tell me when it is done'));
-    const toggle = h('button', `flow-switch${gate.notify ? ' is-on' : ''}`);
-    toggle.type = 'button';
-    toggle.setAttribute('role', 'switch');
-    toggle.setAttribute('aria-checked', String(gate.notify));
-    toggle.setAttribute('aria-label', 'Tell me when it is done');
-    toggle.disabled = !editable;
-    toggle.append(h('span', 'flow-knob'));
-    toggle.addEventListener('click', () => void run({ op: 'notify', step: gate.index, on: !gate.notify }));
-    notify.append(toggle);
-    inspector.append(notify);
-
-    const after = section('Runs after');
-    const room = moveRoomOf(flow, gate);
-    after.append(h('p', 'flow-val', runsAfterOf(flow, gate)?.title ?? 'The start of this flow'));
-    const moves = h('div', 'flow-actions');
-    const earlier = textButton('↑ Earlier', 'desk-btn', 'Run this gate one place earlier', () => void moveGate(-1));
-    const later = textButton('↓ Later', 'desk-btn', 'Run this gate one place later', () => void moveGate(1));
-    earlier.disabled = !editable || !room.earlier;
-    later.disabled = !editable || !room.later;
-    moves.append(earlier, later);
-    after.append(moves);
-    inspector.append(after);
-
-    const actions = h('div', 'flow-actions');
-    const addAfter = textButton('Add a persona after', 'desk-btn', 'Pick a persona to run after this gate', () => toggleAdding(gate.index));
-    addAfter.disabled = readOnly() || state.busy;
-    actions.append(addAfter, h('span', 'flow-grow'));
-    const remove = textButton('Remove gate', 'desk-btn desk-btn-danger', 'Take this position out of the flow', () => {
-      void run({ op: 'remove', step: gate.index }).then((ok) => {
-        if (ok) {
-          state.selected = null;
-          paint();
-        }
-      });
-    });
-    remove.disabled = !editable;
-    actions.append(remove);
-    inspector.append(actions);
-
-    async function moveGate(dir: -1 | 1): Promise<void> {
-      if (await run({ op: 'move', step: gate!.index, dir })) {
-        // The gate sits where its neighbour was: follow it with the selection.
-        state.selected = gate!.index + dir;
-        paint();
-      }
-    }
-  }
-
   function paintFoot(): void {
     const flow = state.draft;
     foot.hidden = flow === null;
@@ -387,8 +294,130 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
     }
     paintHead();
     paintBody();
-    paintInspector();
     paintFoot();
+  }
+
+  // --- the gate's menu --------------------------------------------------------
+
+  function closeGateMenus(): void {
+    for (const menu of document.querySelectorAll('.flow-gate-menu')) {
+      menu.remove();
+    }
+  }
+
+  /** ArrowUp / ArrowDown move the focus through the menu's enabled rows. */
+  function cycleMenuFocus(menu: HTMLElement, event: KeyboardEvent): void {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
+      return;
+    }
+    event.preventDefault();
+    const items = [...menu.querySelectorAll<HTMLButtonElement>('.tickets-menu-item:not(:disabled)')];
+    const at = items.indexOf(document.activeElement as HTMLButtonElement);
+    const step = event.key === 'ArrowDown' ? 1 : items.length - 1;
+    items[(at === -1 ? (step === 1 ? 0 : step) : at + step) % items.length]?.focus();
+  }
+
+  /**
+   * The gate's actions where the gate is (the list is the one surface):
+   * run as — the crew, the position's rules shown as disabled rows with
+   * their reason —, the tell-me rule, moving, removing. Click, right-click
+   * and the row's ⋯ all land here.
+   */
+  function openGateMenu(flow: FlowDraft, gate: FlowStepView, at: { readonly x: number; readonly y: number }, focusBack: HTMLElement): void {
+    closeGateMenus();
+    if (state.busy || disposed) {
+      return;
+    }
+    const menu = h('div', 'tickets-menu flow-gate-menu');
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', `${gate.title} — gate options`);
+    const outside = (event: Event): void => {
+      if (!menu.contains(event.target as Node)) {
+        close();
+      }
+    };
+    const close = (): void => {
+      menu.remove();
+      window.removeEventListener('mousedown', outside, true);
+    };
+    const stop = flow.readOnly ?? (gate.locked ? 'the current step stays as it is' : null);
+    const row = (content: HTMLElement, action: (() => void) | null, reason: string | null, danger = false): void => {
+      const button = h('button', `tickets-menu-item${danger ? ' is-remove' : ''}`);
+      button.type = 'button';
+      button.setAttribute('role', 'menuitem');
+      button.append(content);
+      if (reason !== null) {
+        button.disabled = true;
+        button.title = reason;
+      } else if (action !== null) {
+        button.addEventListener('click', () => {
+          close();
+          action();
+        });
+      }
+      menu.append(button);
+    };
+    const checked = (label: string, on: boolean): HTMLElement => {
+      const span = h('span', 'tickets-menu-radio');
+      span.append(h('span', 'tickets-menu-check', on ? '✓' : ''), h('span', 'tickets-menu-label', label));
+      return span;
+    };
+    const dotted = (label: string, color: string | undefined, on: boolean): HTMLElement => {
+      const span = h('span', 'tickets-menu-radio');
+      const dot = h('span', 'flow-dot is-small');
+      dot.style.background = color ?? 'var(--text-3)';
+      span.append(dot, h('span', 'tickets-menu-label', label), h('span', 'tickets-menu-check', on ? '✓' : ''));
+      return span;
+    };
+
+    menu.append(h('p', 'tickets-menu-label', 'Run as'));
+    for (const option of runAsOptionsOf(flow, gate)) {
+      row(
+        dotted(option.persona.title, option.persona.color, option.persona.id === gate.persona),
+        () => void run({ op: 'persona', step: gate.index, persona: option.persona.id }),
+        option.reason,
+      );
+    }
+    menu.append(h('div', 'tickets-menu-sep'));
+    row(
+      checked('Tell me when it is done', gate.notify),
+      () => void run({ op: 'notify', step: gate.index, on: !gate.notify }),
+      flow.readOnly,
+    );
+    menu.append(h('div', 'tickets-menu-sep'));
+    const room = moveRoomOf(flow, gate);
+    row(
+      h('span', 'tickets-menu-label', 'Move earlier'),
+      () => void run({ op: 'move', step: gate.index, dir: -1 }),
+      stop ?? (room.earlier ? null : 'that is the first position'),
+    );
+    row(
+      h('span', 'tickets-menu-label', 'Move later'),
+      () => void run({ op: 'move', step: gate.index, dir: 1 }),
+      stop ?? (room.later ? null : 'that is the last position'),
+    );
+    menu.append(h('div', 'tickets-menu-sep'));
+    row(
+      h('span', 'tickets-menu-label', 'Remove this gate'),
+      () => void run({ op: 'remove', step: gate.index }),
+      stop,
+      true,
+    );
+    menu.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        close();
+        focusBack.focus();
+      } else {
+        cycleMenuFocus(menu, event);
+      }
+    });
+    document.body.append(menu);
+    const rect = menu.getBoundingClientRect();
+    menu.style.left = `${Math.max(0, Math.min(at.x, window.innerWidth - rect.width - 8))}px`;
+    menu.style.top = `${Math.max(0, Math.min(at.y, window.innerHeight - rect.height - 8))}px`;
+    window.addEventListener('mousedown', outside, true);
+    menu.querySelector<HTMLButtonElement>('.tickets-menu-item:not(:disabled)')?.focus();
   }
 
   // A board change reloads the flow while the draft has no edits of its own.
@@ -401,6 +430,7 @@ export function mountFlow(deps: FlowDeps, host: HTMLElement, target: FlowTarget)
   void load();
   return () => {
     disposed = true;
+    closeGateMenus();
     off();
   };
 }

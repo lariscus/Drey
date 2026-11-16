@@ -6728,7 +6728,33 @@ sequenceDiagram
     Note over E,S: existing tickets keep their own chains
 ```
 
-## 6.147 Pia changes persona settings; her read tools; the owner's instructions (req-315, milestone 286)
+## 6.147 The fresh install's tickets setup (D-74, milestone 287)
+
+On a fresh install no vault carries `tickets/_meta/pipeline.md`, so the plugin activates **unconfigured**: the engine client is unbound, every engine-bound call answers the typed refusal, and `board` returns the null snapshot. Settings → Tickets shows the setup block alone; the Work panel shows its empty state. The setup picks a folder, makes a repository of it, registers it as a vault, starts Drey Service for it — hosting it **before** its board exists — and runs the engine's fresh path. One `board-changed` later the whole page and the Work panel live.
+
+```mermaid
+sequenceDiagram
+    actor O as Owner
+    participant S as Settings → Tickets (setup block)
+    participant P as Plugin main (setupTicketsVault)
+    participant V as Vault registry (SDK 1.33)
+    participant E as Drey Service (ensureService)
+    participant B as Engine BoardService
+    O->>S: Create a tickets repository… / Use an existing folder…
+    S->>P: pickFolder (the OS dialog in Drey's process, req-304)
+    P->>P: empty folder → git init (the configured git);<br/>neither empty nor a repo → refused
+    P->>V: register(folder) — the folder becomes a vault
+    P->>E: ensureService(startVault: the registered vault)
+    Note over E: the detector's probe finds no board —<br/>the named vault is hosted anyway (the fresh path)
+    E-->>P: endpoints (the client binds, wireEngine runs)
+    P->>B: initialize(vaultId)
+    B->>B: pipeline.md (with `store:` anchored, req-316), repos.md,<br/>the human persona — one commit; the store beside the vault<br/>(dk init, the reference anchored in the pipeline)
+    B-->>S: board-changed → the settings page reloads
+    Note over S: the setup block hides, the full page appears
+```
+
+While the service is down, every vault-registry round retries the start; Settings → Background service reports it stopped, and a *Start* without a tickets vault answers the typed refusal with its setup hint.
+## 6.148 Pia changes persona settings; her read tools; the owner's instructions (req-315, milestone 286)
 
 ```mermaid
 sequenceDiagram

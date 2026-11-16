@@ -13,7 +13,12 @@ Plugin (`plugins/tickets/`):
   the fleet runner and the cross-layer contracts live in
   `packages/tickets-engine` since ADR-0088 — the plugin keeps the
   BoardService wiring, gateway, UI and the Drey seams, reaching the
-  engine by relative import
+  engine by relative import. `main/setup/` is the fresh install's
+  setup (D-74, ADR-0102): with no tickets vault the plugin activates
+  **unconfigured** — the engine client unbound, the engine wiring
+  deferred to the first start, the settings page the setup block alone;
+  the setup names the vault (folder → repository → registry → service
+  → board) and `ensureService` hosts it before its board exists
 
 Packages (`packages/<name>/`, npm workspaces — the tickets-engine
 extraction, ADR-0088):

@@ -880,12 +880,23 @@ is just another vault with a board: point the empty state's
 **Initialize the tickets board** at it, or initialize in the other
 vault from its own Files panel.
 
-**Setup.** Create an empty git repository for your tickets (it can live
-on GitHub, Azure DevOps or anywhere plain git works — the board never
+**Setup.** On a fresh install Settings → Tickets shows the setup on
+its own: **Create a tickets repository…** or **Use an existing
+folder…** opens the folder dialog — an empty folder becomes a git
+repository, an existing repository is taken as it is. Drey registers
+the folder as a vault, starts the background service for it and
+initializes the board in it: the configuration files under
+`tickets/_meta/` (below) and the ticket store beside the repository.
+The store belongs to the project: its reference lives in the project's
+`tickets/_meta/pipeline.md` (`store:`), and switching projects
+(req-72, the project menu) switches the store with it.
+The alternative is the Work panel's empty state: create an empty git
+repository for your tickets (it can live
+on GitHub, Azure DevOps or anywhere plain git works - the board never
 talks to a host API), clone it locally and register the folder as a
-vault (see [Vaults and files](#3-vaults-and-files)). Open the Work
-panel; the empty state offers **Initialize the tickets board**, which
-creates the configuration files under `tickets/_meta/`:
+vault (see [Vaults and files](#3-vaults-and-files)), then click
+**Initialize the tickets board**, which creates the configuration
+files under `tickets/_meta/`:
 
 - `pipeline.md` — the phases in order, each with a title, an
   optional WIP limit, a claim flag and what must happen for a ticket to

@@ -94,6 +94,70 @@ describe('Flow tab', () => {
     expect(invoke).toHaveBeenCalledWith('flowSave', { id: 'T-0130', part: null, chain: ['ben', 'ralf', 'you'] });
   });
 
+  it("opens a gate's menu from the row — run as, tell me, moves, remove — and removes from it", async () => {
+    const { host, invoke, dispose } = setup({ flow: base, flowEdit: { ...base, chain: ['ben'] }, flowSave: { ok: true } });
+    await settle();
+    (host.querySelectorAll('.flow-gate')[1] as HTMLButtonElement).click();
+    const menu = document.querySelector('.flow-gate-menu')!;
+    expect(menu.getAttribute('role')).toBe('menu');
+    const labels = [...menu.querySelectorAll('.tickets-menu-item .tickets-menu-label')].map((n) => n.textContent);
+    expect(labels).toContain('Ralf');
+    expect(labels).toContain('Tell me when it is done');
+    expect(labels).toContain('Move earlier');
+    expect(labels).toContain('Move later');
+    expect(labels).toContain('Remove this gate');
+    // The gate's own persona is ticked.
+    const ralf = [...menu.querySelectorAll('.tickets-menu-item')].find((n) => n.querySelector('.tickets-menu-label')?.textContent === 'Ralf')!;
+    expect(ralf.querySelector('.tickets-menu-check')?.textContent).toBe('✓');
+    // Remove goes through the same engine round trip as the old sidebar's button.
+    const remove = [...menu.querySelectorAll<HTMLButtonElement>('.tickets-menu-item')].find((n) => n.querySelector('.tickets-menu-label')?.textContent === 'Remove this gate')!;
+    remove.click();
+    await settle();
+    expect(invoke).toHaveBeenCalledWith('flowEdit', { id: 'T-0130', part: null, chain: ['ben', 'ralf'], edit: { op: 'remove', step: 1 } });
+    expect(document.querySelector('.flow-gate-menu')).toBeNull();
+    dispose();
+  });
+
+  it('shows the engine rules as disabled rows with their reason instead of refusals', async () => {
+    const shaped: FlowDraft = {
+      ...base,
+      steps: [step(0, 'paul', { mode: 'shape' }), step(1, 'ralf')],
+      personas: [
+        { id: 'paul', kind: 'agent', title: 'Paul', color: '#f2d3e2', model: 'sonnet' },
+        { id: 'pia', kind: 'mission', title: 'Pia', color: '#d9cff5', model: '' },
+        { id: 'you', kind: 'human', title: 'Henrik', color: '#38bdf8', model: '' },
+      ],
+    };
+    const { host, dispose } = setup({ flow: shaped });
+    await settle();
+    (host.querySelectorAll('.flow-gate')[0] as HTMLButtonElement).click();
+    const menu = document.querySelector('.flow-gate-menu')!;
+    const byLabel = (label: string): HTMLButtonElement =>
+      [...menu.querySelectorAll<HTMLButtonElement>('.tickets-menu-item')].find((n) => n.querySelector('.tickets-menu-label')?.textContent === label)!;
+    // A mode-carrying position can only be taken by an agent persona.
+    expect(byLabel('Pia').disabled).toBe(true);
+    expect(byLabel('Pia').title).toBe('only an agent persona can run the shape step');
+    expect(byLabel('Henrik').disabled).toBe(true);
+    expect(byLabel('Paul').disabled).toBe(false);
+    expect(byLabel('Paul').querySelector('.tickets-menu-check')?.textContent).toBe('✓');
+    dispose();
+  });
+
+  it("the current gate's menu keeps the tell-me rule and refuses the rest with the reason", async () => {
+    const { host, dispose } = setup({ flow: base });
+    await settle();
+    (host.querySelectorAll('.flow-gate')[0] as HTMLButtonElement).click();
+    const menu = document.querySelector('.flow-gate-menu')!;
+    const byLabel = (label: string): HTMLButtonElement =>
+      [...menu.querySelectorAll<HTMLButtonElement>('.tickets-menu-item')].find((n) => n.querySelector('.tickets-menu-label')?.textContent === label)!;
+    expect(byLabel('Remove this gate').disabled).toBe(true);
+    expect(byLabel('Remove this gate').title).toBe('the current step stays as it is');
+    expect(byLabel('Move earlier').disabled).toBe(true);
+    // The engine allows the current step's tell-me rule to change.
+    expect(byLabel('Tell me when it is done').disabled).toBe(false);
+    dispose();
+  });
+
   it('shows a refusal under the list and keeps the draft', async () => {
     const { host } = setup({ flow: base, flowEdit: { ok: false, error: 'position 1 is the current step' } });
     await settle();

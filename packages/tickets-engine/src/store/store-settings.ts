@@ -49,6 +49,11 @@ function syncSecondsOf(value: unknown): number {
   return Number.isFinite(n) && n >= 0 ? n : DEFAULT_SYNC_SECONDS;
 }
 
+/** A remote store (`<remote>#<branch>`, a URL or an scp-like location): fetched by dk, not created beside a vault. */
+export function isRemoteStore(store: string): boolean {
+  return store.includes('#') || /^[a-z][a-z0-9+.-]*:\/\//i.test(store) || /^[^\/]+@[^\/]+:/.test(store);
+}
+
 /**
  * Where the board's files are: the explicit checkout, else the store itself
  * when it is a local directory (what `dk.store` holds for a local store);
@@ -59,8 +64,7 @@ export function checkoutOf(settings: StoreSettings): string | null {
     return settings.dkCheckout;
   }
   const store = settings.dkStore;
-  const isDirectory = store !== '' && !store.includes('#') && !/^[a-z][a-z0-9+.-]*:\/\//i.test(store) && !/^[^\/]+@[^\/]+:/.test(store);
-  return isDirectory ? store : null;
+  return store !== '' && !isRemoteStore(store) ? store : null;
 }
 
 export function createDricketStore(settings: StoreSettings, env?: NodeJS.ProcessEnv): DricketTicketStore {
