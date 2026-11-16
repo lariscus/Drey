@@ -6728,7 +6728,7 @@ sequenceDiagram
     Note over E,S: existing tickets keep their own chains
 ```
 
-## 6.147 The fresh install's tickets setup (D-74, milestone 285)
+## 6.147 The fresh install's tickets setup (D-74, milestone 287)
 
 On a fresh install no vault carries `tickets/_meta/pipeline.md`, so the plugin activates **unconfigured**: the engine client is unbound, every engine-bound call answers the typed refusal, and `board` returns the null snapshot. Settings → Tickets shows the setup block alone; the Work panel shows its empty state. The setup picks a folder, makes a repository of it, registers it as a vault, starts Drey Service for it — hosting it **before** its board exists — and runs the engine's fresh path. One `board-changed` later the whole page and the Work panel live.
 
@@ -6748,7 +6748,7 @@ sequenceDiagram
     Note over E: the detector's probe finds no board —<br/>the named vault is hosted anyway (the fresh path)
     E-->>P: endpoints (the client binds, wireEngine runs)
     P->>B: initialize(vaultId)
-    B->>B: pipeline.md (with `store:` anchored, req-315), repos.md,<br/>the human persona — one commit; the store beside the vault<br/>(dk init, the reference anchored in the pipeline)
+    B->>B: pipeline.md (with `store:` anchored, req-316), repos.md,<br/>the human persona — one commit; the store beside the vault<br/>(dk init, the reference anchored in the pipeline)
     B-->>S: board-changed → the settings page reloads
     Note over S: the setup block hides, the full page appears
 ```

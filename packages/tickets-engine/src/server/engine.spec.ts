@@ -123,7 +123,7 @@ describe('createEngine', () => {
   });
 
   it('serves chainRefusal on the invoke channel (D-26: the plugin asks it before Run the chain)', async () => {
-    // req-315: every board's store is anchored beside it — the refusal that
+    // req-316: every board's store is anchored beside it — the refusal that
     // remains is a remote store without a checkout.
     await engine.invoke('configSet', { key: 'dk.store', value: 'https://example.invalid/t.git#tickets' });
     expect(await engine.invoke('chainRefusal')).toContain('checkout');

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — built (req-315, milestone 286; owner correction before the merge into `main`, 2026-11-15)
+Accepted — built (req-316, milestone 288; owner correction before the merge into `main`, 2026-11-15)
 
 ## Context
 
@@ -11,7 +11,7 @@ live in a dricket store, and a fresh project gets its own beside the
 repository — but the **reference** to it stayed a machine-wide setting:
 `dk.store` in the tickets plugin's settings, mirrored into the engine's
 service-home config. With a second project the store stopped following:
-milestone 285's fresh-install setup adopted the active project's store for
+milestone 287's fresh-install setup adopted the active project's store for
 a brand-new vault (the owner saw another project's tickets on a fresh
 board), and switching projects (req-72) never switched the store. The
 machine-wide key was the last global piece of a project-scoped world.
@@ -37,7 +37,7 @@ machine-wide key was the last global piece of a project-scoped world.
 
 ## Consequences
 
-- A fresh project cannot leak another project's tickets (milestone 285's
+- A fresh project cannot leak another project's tickets (milestone 287's
   owner report: a fresh board showed the active project's tickets).
 - The settings field reads as the override it is ("for projects that name
   none"); the pipeline is the visible, hand-editable home of the store.

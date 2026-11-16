@@ -188,7 +188,7 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
   };
   const rev = (id: string): number => Number(field(id, 'rev'));
 
-  it('the machine-wide dk.store moves into the pipeline on the first read (req-315)', async () => {
+  it('the machine-wide dk.store moves into the pipeline on the first read (req-316)', async () => {
     expect(readStoreRef(await fsp.readFile(abs('tickets/_meta/pipeline.md'), 'utf8'))).toBeNull();
     const board = await service.snapshot();
     expect(readStoreRef(await fsp.readFile(abs('tickets/_meta/pipeline.md'), 'utf8'))).toBe(storeDir);
@@ -481,20 +481,20 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
     await service.snapshot(); // the chain follows the pipeline: its config now names the store, not ticket files
     expect(chainConfigs.at(-1)?.store).toMatchObject({ dkStore: storeDir, dkDataDir: path.join(root, 'data'), trailers: false });
     expect(chainConfigs.at(-1)?.ticketsVaultPath).toBe(vaultDir);
-    // req-315: the project names its store in the pipeline — a remote one for this scenario.
+    // req-316: the project names its store in the pipeline — a remote one for this scenario.
     await fsp.writeFile(abs('tickets/_meta/pipeline.md'), withStoreRef(PIPELINE, 'https://example.invalid/t.git#tickets'), 'utf8');
     expect(await service.chainRefusal()).toContain('checkout');
     config['dk.checkout'] = path.join(root, 'checkout');
     expect(await service.chainRefusal()).toBeNull();
     delete config['dk.checkout'];
     // Back to the local store: the pipeline loses the reference, the first
-    // read re-anchors the machine-wide override (req-315's migration).
+    // read re-anchors the machine-wide override (req-316's migration).
     await fsp.writeFile(abs('tickets/_meta/pipeline.md'), PIPELINE, 'utf8');
     await service.snapshot();
     expect(readStoreRef(await fsp.readFile(abs('tickets/_meta/pipeline.md'), 'utf8'))).toBe(config['dk.store'] ?? null);
   });
 
-  /** A fresh, boardless vault with its own config store — the D-74/req-315 harness. */
+  /** A fresh, boardless vault with its own config store — the D-74/req-316 harness. */
   function freshHarness(name: string, config: Record<string, string | undefined>): {
     fresh: EngineBoardService;
     dir: string;
@@ -567,7 +567,7 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
     }
   }
 
-  it('a fresh install: "Initialize board" anchors its own store in the pipeline (E14-9b, req-315)', async () => {
+  it('a fresh install: "Initialize board" anchors its own store in the pipeline (E14-9b, req-316)', async () => {
     const config: Record<string, string | undefined> = {
       'dk.path': bin === 'dk' ? '' : bin,
       'dk.dataDir': path.join(root, 'data'),
@@ -580,7 +580,7 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
       expect(before.vaultId).toBeNull();
       expect(before.vaultPath).toBeUndefined();
       expect(await fresh.initialize('fresh')).toMatchObject({ ok: true });
-      // req-315: the store is anchored in the project's pipeline — the
+      // req-316: the store is anchored in the project's pipeline — the
       // machine-wide key is never written for it.
       expect(readStoreRef(await fsp.readFile(fAbs('tickets/_meta/pipeline.md'), 'utf8'))).toBe(storeDir2);
       expect(config['dk.store']).toBeUndefined();
@@ -598,7 +598,7 @@ describe.skipIf(!found.ok)('the board service writing through dk', { timeout: 24
     }
   });
 
-  it('a fresh vault never adopts another project\'s store (req-315)', async () => {
+  it('a fresh vault never adopts another project\'s store (req-316)', async () => {
     const foreign = path.join(root, 'another-projects-store'); // not even existing
     const { fresh, dir, storeDir: storeDir2, fAbs } = freshHarness('meta-fresh2', {
       'dk.path': bin === 'dk' ? '' : bin,

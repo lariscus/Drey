@@ -404,7 +404,7 @@ readable error instead of being written).
 On a dricket store the vocabulary is the store's: `[priorities]` of `dricket.toml` on its `main` branch, dk's
 starting set `critical | high | normal | low` without that table. `pipeline.md`'s list then does not apply (D-11).
 
-### The project's store (`store:` in pipeline.md, req-315)
+### The project's store (`store:` in pipeline.md, req-316)
 
 `_meta/pipeline.md`'s top-level `store:` names **this project's ticket
 store** — a local folder or a remote (`remote#branch`). The default is

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readStoreRef, withStoreRef } from './pipeline-store';
 
 /**
- * req-315: the project's store reference lives in pipeline.md's
+ * req-316: the project's store reference lives in pipeline.md's
  * frontmatter — read tolerantly (quoted or plain), written as one line
  * among the others.
  */

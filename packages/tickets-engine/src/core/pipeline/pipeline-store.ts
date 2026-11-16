@@ -1,5 +1,5 @@
 /**
- * The project's own store reference (req-315): `store:` in pipeline.md's
+ * The project's own store reference (req-316): `store:` in pipeline.md's
  * frontmatter — a local folder or a remote (`remote#branch`). The default
  * stays beside the repository (`store/fresh-store.ts`); the machine-wide
  * `dk.store` setting is the override for projects that name none. Pure

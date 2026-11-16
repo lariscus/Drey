@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — built (D-74, milestone 285; owner request 2026-11-15)
+Accepted — built (D-74, milestone 287; owner request 2026-11-15)
 
 ## Context
 

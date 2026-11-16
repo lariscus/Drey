@@ -1829,7 +1829,7 @@ export class EngineBoardService {
    * (`tickets/<prefix>/<shard>/<id>/ticket.md`). Null without a checkout and for a ticket
    * the store does not have.
    */
-  /** The checkout the board reads (req-315): the project's pipeline names it, the default stays beside the vault. Null: remote without a checkout. */
+  /** The checkout the board reads (req-316): the project's pipeline names it, the default stays beside the vault. Null: remote without a checkout. */
   async storeCheckout(): Promise<{ checkout: string | null }> {
     return { checkout: checkoutOf(await this.refreshStore((await this.detect()) ?? undefined)) };
   }
@@ -1914,7 +1914,7 @@ export class EngineBoardService {
   /**
    * Re-reads the store settings from the config (the settings may have
    * changed since the last snapshot). With a vault, the store belongs to
-   * the project (req-315): its pipeline.md names it (`store:`), the
+   * the project (req-316): its pipeline.md names it (`store:`), the
    * default stays beside the repository, and the machine-wide `dk.store`
    * setting is the override for projects that name none — the first read
    * moves it into the pipeline, where it belongs to this project alone.
@@ -1941,7 +1941,7 @@ export class EngineBoardService {
     return this.store;
   }
 
-  /** Anchors `store` in the project's pipeline (req-315, once — a second call is a no-op). */
+  /** Anchors `store` in the project's pipeline (req-316, once — a second call is a no-op). */
   private async writeStoreRef(vault: EngineVault, store: string): Promise<void> {
     const pipelineText = await this.readOptional(vault.id, PIPELINE_PATH);
     if (pipelineText === null || readStoreRef(pipelineText) !== null) {
@@ -4160,14 +4160,14 @@ export class EngineBoardService {
 
   /**
    * Creates the store beside `vault` and anchors it in the project's
-   * pipeline (`store:`, req-315). Whatever the resolved reference names is
+   * pipeline (`store:`, req-316). Whatever the resolved reference names is
    * adopted when it exists (the project's own store, a leftover of a half
    * first start); a remote reference is the project's own from the start;
    * a missing local store is created here — never a foreign one.
    */
   /**
    * Creates the store beside `vault` and anchors it in the project's
-   * pipeline (`store:`, req-315). Whatever the resolved reference names is
+   * pipeline (`store:`, req-316). Whatever the resolved reference names is
    * adopted when it exists (the project's own store, a leftover of a half
    * first start); a remote reference is the project's own from the start;
    * a missing local store is created here — never a foreign one.
@@ -4205,7 +4205,7 @@ export class EngineBoardService {
       }
       const humanPersonaPath = `${PERSONAS_DIR}/${HUMAN_PERSONA_ID}/persona.md`;
       try {
-        // req-315: the fresh pipeline anchors the project's own store beside
+        // req-316: the fresh pipeline anchors the project's own store beside
         // the repository — the machine-wide `dk.store` never leaks in here.
         await this.host.write(target.id, PIPELINE_PATH, withStoreRef(DEFAULT_PIPELINE_TEXT, defaultStorePathOf(target.path)));
         await this.host.write(target.id, REPOS_PATH, DEFAULT_REPOS);

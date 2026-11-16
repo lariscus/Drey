@@ -331,7 +331,7 @@ const plugin: MainPluginModule = {
     // (dk put --if-version), every other write of it is refused by the base.
     const documents = new TicketDocuments({
       vaults: () => ctx.vault.listVaults(),
-      // req-315: the checkout is the project's own — the engine resolves it
+      // req-316: the checkout is the project's own — the engine resolves it
       // (its pipeline's `store:`, else the settings override, else beside the
       // vault); the machine-wide key is not the answer any more.
       checkout: async () => {
