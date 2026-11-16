@@ -104,7 +104,20 @@ export interface TargetThreadView {
   render(): void;
 }
 
-function messageNode(api: DreyPluginApi, targets: TargetController, message: ConversationMessage): HTMLElement | null {
+/** The id of the answer a streaming target is still writing (SDK 1.63, `ConversationTarget.live`). */
+const LIVE_MESSAGE_ID = 'live';
+
+/** Whether the owner has the live answer's folded Thinking block open — the thread repaints on every delta, the choice must outlast it. */
+interface LiveThought {
+  open: boolean;
+}
+
+function messageNode(
+  api: DreyPluginApi,
+  targets: TargetController,
+  message: ConversationMessage,
+  liveThought: LiveThought,
+): HTMLElement | null {
   // An open question lives in the decision card above the composer, not twice (board 7a).
   const open = message.cards?.find((card) => card.kind === 'choices');
   if (open !== undefined && open.text === message.text && !targets.busy() && (open.choices ?? []).length > 0) {
@@ -132,7 +145,13 @@ function messageNode(api: DreyPluginApi, targets: TargetController, message: Con
     }
   }
   if (message.thought !== undefined) {
-    const thought = el('details', 'target-thought');
+    const thought = el('details', 'target-thought') as HTMLDetailsElement;
+    if (message.id === LIVE_MESSAGE_ID) {
+      thought.open = liveThought.open;
+      thought.addEventListener('toggle', () => {
+        liveThought.open = thought.open;
+      });
+    }
     thought.appendChild(el('summary', undefined, 'Thinking'));
     thought.appendChild(el('p', 'card-body', message.thought));
     article.appendChild(thought);
@@ -152,6 +171,7 @@ function messageNode(api: DreyPluginApi, targets: TargetController, message: Con
 export function createTargetThread(api: DreyPluginApi, targets: TargetController): TargetThreadView {
   const node = el('div', 'assistant-thread target-thread');
   const decision = createDecisionCard(api, targets);
+  const liveThought: LiveThought = { open: false };
   const tray = decision.node;
   return {
     node,
@@ -173,8 +193,11 @@ export function createTargetThread(api: DreyPluginApi, targets: TargetController
         if (thread.messages.length === 0) {
           node.appendChild(el('p', 'empty', thread.notice ?? 'No messages yet.'));
         }
+        if (!thread.messages.some((message) => message.id === LIVE_MESSAGE_ID)) {
+          liveThought.open = false;
+        }
         for (const message of thread.messages) {
-          const shownMessage = messageNode(api, targets, message);
+          const shownMessage = messageNode(api, targets, message, liveThought);
           if (shownMessage !== null) {
             node.appendChild(shownMessage);
           }

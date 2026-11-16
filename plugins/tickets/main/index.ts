@@ -193,6 +193,8 @@ const plugin: MainPluginModule = {
         },
         undefined,
         (event) => announcer.add(event),
+        // D-76: a Mission Control turn's thoughts and text reach the Assistant while the model writes them.
+        (live) => ctx.ipc.emit('chat-live', live),
       );
       void fleet.startPolling();
       void board.worktreeBootSweep().catch((error: unknown) => ctx.log(`engine boot sweep: ${messageOf(error)}`, 'warn'));

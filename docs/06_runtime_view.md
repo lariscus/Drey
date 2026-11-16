@@ -3895,7 +3895,7 @@ sequenceDiagram
     participant V as Board / Crew tab, Capacity band
     participant O as Owner
 
-    E-->>X: board-changed / fleet-changed (SSE signal, debounced; for the fleet, main reads runs + chain and sends them as the snapshot, D-35)
+    E-->>X: board-changed / fleet-changed (SSE signal, debounced; for the fleet, main reads runs + chain and sends them as the snapshot, D-35; a Mission Control turn's `chat` frames — thought and text deltas — are not debounced and reach the Assistant as `chat-live` for its live answer, D-76)
     X->>X: refreshBoard / applyFleetSnapshot
     X-->>V: DeskDeps.subscribe listeners (notifyViews, fleet listeners)
     X-->>T: same signal

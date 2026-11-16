@@ -138,6 +138,11 @@ leaves the app on the previous build. Verify with
   is refused, logged); the base keeps the choice per view (ADR-0089 later change). Every plugin reads it with
   `ui.workspaceScope()` and `ui.onWorkspaceScopeChange`. `FindQuery.scope` gains `'project'` (a find mode restricts itself
   to the choice's vaults).
+  1.63 (D-76) adds two optional parts to a conversation target so a streaming target fills the Assistant's thread while
+  it writes: `live()` returns the answer so far as a `ConversationMessage` (its `thought` and `text` grow; null while
+  nothing arrived) and `onLiveChange(cb)` says it changed. The Assistant draws it after the owner's pending words only
+  while a `send` of that target is on its way (repainted at most every 100 ms) and drops it when `send` resolves with
+  the thread that holds the finished answer. The tickets plugin streams Mission Control this way.
   1.61 (req-308, one active project) makes `WorkspaceScopeContrib.allLabel` optional: absent, the
   filter has no all-choice — one of the options is always in effect, and a view without a stored
   choice shows the first option. A contrib that sets `allLabel` keeps the old all/not-all choice.

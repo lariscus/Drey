@@ -154,4 +154,28 @@ describe('dispatchFrame', () => {
     dispatchFrame('{"change":"paths","vaultPath":"x","changed":[],"deleted":[]}', fire);
     expect(fire).not.toHaveBeenCalled();
   });
+
+  it('hands a chat frame to the live callback undebounced — the thought and text deltas, the turn end, nothing malformed (D-76)', () => {
+    const fire = vi.fn();
+    const onChat = vi.fn();
+    const frame = (event: unknown, file: unknown = 'tickets/_meta/chat/a.md'): string => JSON.stringify({ change: 'chat', file, event });
+    dispatchFrame(frame({ kind: 'thought', text: 'vault_read a.md … ' }), fire, undefined, onChat);
+    dispatchFrame(frame({ kind: 'text', text: '{"say": "Hi' }), fire, undefined, onChat);
+    dispatchFrame(frame({ kind: 'done' }), fire, undefined, onChat);
+    dispatchFrame(frame({ kind: 'error', message: 'refused' }), fire, undefined, onChat);
+    // Malformed, a card (the desktop reads those from the session file) and another change are not live deltas.
+    dispatchFrame(frame({ kind: 'text', text: 7 }), fire, undefined, onChat);
+    dispatchFrame(frame({ kind: 'proposal', proposal: {} }), fire, undefined, onChat);
+    dispatchFrame(frame({ kind: 'text', text: 'x' }, 3), fire, undefined, onChat);
+    dispatchFrame('{"change":"chat"}', fire, undefined, onChat);
+    expect(onChat.mock.calls.map(([live]) => live)).toEqual([
+      { file: 'tickets/_meta/chat/a.md', event: { kind: 'thought', text: 'vault_read a.md … ' } },
+      { file: 'tickets/_meta/chat/a.md', event: { kind: 'text', text: '{"say": "Hi' } },
+      { file: 'tickets/_meta/chat/a.md', event: { kind: 'done' } },
+      { file: 'tickets/_meta/chat/a.md', event: { kind: 'error', message: 'refused' } },
+    ]);
+    expect(fire).not.toHaveBeenCalled();
+    // A listener that wants no chat frames costs nothing.
+    expect(() => dispatchFrame(frame({ kind: 'text', text: 'x' }), fire)).not.toThrow();
+  });
 });

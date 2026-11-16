@@ -15,6 +15,7 @@ import type {
   ChatDecisionResult,
   ChatSession,
   ChatSessionMeta,
+  ChatStreamEvent,
   ChatTurnResult,
 } from '../../../../packages/tickets-engine/src/contracts/chat';
 import type { PersonaView } from '../../shared/remote-protocol';
@@ -32,6 +33,7 @@ import {
   historyOfSessions,
   threadOfSession,
 } from './map';
+import { LiveTurn } from './live-turn';
 import type { PersonaCardsBinding } from './persona-cards';
 import { ACCEPT, DISMISS, followsFleet, threadOfPersona, type PersonaWords } from './persona-map';
 
@@ -62,6 +64,8 @@ export interface ConversationDeps {
   subscribeChanges?(listener: (what: 'board' | 'fleet') => void): () => void;
   /** req-298: the title bar's project — Pia's new tickets go there; undefined (or absent) = all projects, she asks. */
   project?(): string | undefined;
+  /** D-76: the engine's chat stream — a turn's thought and text deltas as the model writes them; returns the unsubscribe. Absent = the answer shows when the turn ends. */
+  subscribeLive?(listener: (live: { readonly file: string; readonly event: ChatStreamEvent }) => void): () => void;
 }
 
 /** The words of a spec without a catalog: the key itself, the time as HH:MM. */
@@ -109,6 +113,12 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
   let holdDismissed: string | null = null;
   /** The persona card whose Assign… picker is open. */
   let assigning: string | null = null;
+  /** D-76: the answer the turn in flight is writing; kept until the next call so the view never blinks between the turn's end and its thread. */
+  let liveTurn: LiveTurn | null = null;
+  /** Whether a send is on its way — only then do the engine's chat events belong to this view. */
+  let sending = false;
+  /** The session file the in-flight send streams into; null until a first message's session is named by its first event. */
+  let liveFile: string | null = null;
 
   const holdCard = (): BurnRateCard | null => {
     const view = deps.hold?.view() ?? null;
@@ -268,6 +278,9 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
           fileTicket = shape.id;
         }
         let result: ChatTurnResult;
+        liveTurn = new LiveTurn();
+        liveFile = file;
+        sending = true;
         try {
           result = (await (file === null
             ? deps.invoke('mcStart', shape === null ? { text, ...reference } : { text, ticket: shape.id, ...reference })
@@ -285,6 +298,7 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
         }
         return decorated(await read());
       } finally {
+        sending = false;
         if (shape !== null) {
           deps.shape?.lock(shape, false);
           await deps.shape?.settled(shape);
@@ -293,6 +307,7 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
     },
     act: async (cardId, actionId) => {
       lastError = null;
+      liveTurn = null;
       if (cardId.startsWith(PERSONA_CARD_PREFIX)) {
         return decorated(await actOnPersonaCard(cardId, actionId));
       }
@@ -326,6 +341,7 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
       file = null;
       fileTicket = null;
       lastError = null;
+      liveTurn = null;
       return attachedTo(EMPTY_THREAD, deps.shape?.current() ?? null);
     },
     history: async () => {
@@ -337,8 +353,29 @@ export function createMissionControlTarget(deps: ConversationDeps): Conversation
     },
     open: async (id) => {
       lastError = null;
+      liveTurn = null;
       return open(id, null);
     },
+    ...(deps.subscribeLive === undefined
+      ? {}
+      : {
+          // D-76: the answer so far, while a send is on its way.
+          live: () => liveTurn?.message() ?? null,
+          onLiveChange: (listener: () => void) => {
+            const off = deps.subscribeLive?.((live) => {
+              // Only the file this send streams into: a first message adopts the session its first event names.
+              if (!sending || liveTurn === null || (liveFile !== null && live.file !== liveFile)) {
+                return;
+              }
+              liveFile = live.file;
+              if (live.event.kind === 'thought' || live.event.kind === 'text') {
+                liveTurn.push(live.event);
+                listener();
+              }
+            });
+            return () => off?.();
+          },
+        }),
     ...(deps.shape === undefined && deps.hold === undefined && deps.personaCards === undefined
       ? {}
       : {
