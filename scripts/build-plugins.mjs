@@ -67,7 +67,13 @@ function copyNestedCss(src, dest) {
       copyNestedCss(from, path.join(dest, file));
     } else if (file.endsWith('.css')) {
       mkdirSync(dest, { recursive: true });
-      cpSync(from, path.join(dest, file));
+      const to = path.join(dest, file);
+      // A previous build could copy the D-75 nested css layout as directories;
+      // a stale directory at a sheet's path comes down, so the file can land.
+      if (statSync(to, { throwIfNoEntry: false })?.isDirectory()) {
+        rmSync(to, { recursive: true, force: true });
+      }
+      cpSync(from, to);
     }
   }
 }
