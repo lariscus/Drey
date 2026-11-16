@@ -133,8 +133,8 @@ Invoke-RestMethod "http://127.0.0.1:$($d.port)/health" -Headers $h
 | `POST /slots/refresh` `{id?}` | read the quotas now (one slot, or all), the config reloaded first |
 | `POST /slots/login-done` `{id}` | the owner signed the slot's account in again: `needs-login` clears, its quota is read |
 | `POST /slots/config` `{slots: [...]}` | write the `slots` of `service.json` (every other key kept) and reload; a broken entry refuses the whole list (422), a file that does not parse refuses the write (409) |
-| `POST /slots/add` `{slot}` | D-69: append one slot entry, every other entry kept as written, and reload; takes its provider off `impliedOff`; an entry that does not parse or a taken id refuses (422), a file that does not parse refuses (409) |
-| `POST /slots/remove` `{id, withModels?}` | D-69: remove one slot — a configured entry leaves `slots`, an implied slot's provider joins `impliedOff` — and reload; refused (422) while a model row names the slot (req-287: unless `withModels: true`, the owner's confirmed *Remove Claude B? 1 model uses only this account.* — then those rows leave too), or for an unknown id |
+| `POST /slots/add` `{slot}` | D-69: append one slot entry, every other entry kept as written, and reload; takes its provider's and its account's key off `impliedOff`; an entry that does not parse or a taken id refuses (422), a file that does not parse refuses (409) |
+| `POST /slots/remove` `{id, withModels?}` | D-69: remove one slot — a configured entry leaves `slots`, an implied slot's key (its provider id, or its `auth.json` entry for an opencode account) joins `impliedOff` — and reload; refused (422) while a model row names the slot (req-287: unless `withModels: true`, the owner's confirmed *Remove Claude B? 1 model uses only this account.* — then those rows leave too), or for an unknown id |
 | `POST /slots/update` `{id, patch}` | req-287: change one account in place — `patch` takes `label`, `billing` (`{kind: subscription, pricePerMonth}` · `{kind: credits, pricePerCredit}` · `{kind: token, pricePerMillion}`, each with an optional `currency`) and `sessions`; `null` removes a key; every other key of the entry (its login folder, limits) kept; an implied slot is written out with the change; a changed entry that does not parse refuses (422) |
 | `GET /models` | the capacity pool (req-170): `{ok, classes: [{name, sessions}], models: [{model, slot, provider, category, class, cost, enabled, input?, tools?, context?, output?}], capacity: {global, perSlot}, ledgers: {ticketAllowance, personaPerDay, providerPerDay}, routing: {upgradeAboveQ, reservePerWindow, burnRate}, now: <the live load, with now.classes: [{name, busy, cap}]>, queue: [...], providerDay: [{id, spent, limit}], errors, configPath, discovery: {checkedAt, running, harnesses: [{provider, label, version, state, providers, models, error}], found: [{model, provider, slot, name, capabilities, suggested}], ignored}}` — see "The capacity pool" and "Model discovery" below |
 | `POST /models/config` `{classes?, models?, capacity?, ledgers?, routing?}` | replace the pool keys it sends in `service.json` (the others, and every other key, kept) and reload; a broken row refuses the whole write (422), a file that does not parse refuses it (409) |
@@ -616,14 +616,28 @@ then works with the implied slots and logs why.
 | `limits` | budgets the counting measures against: `{window: "5h" \| "7d" \| "month", budget, unit: "tokens" \| "runs"}` |
 | `quota.refreshMinutes` | the refresh round (default 10); a remote quota is read at most once a minute per slot, whatever asks |
 
-A provider no slot names runs on an **implied** `private` slot on its
+A provider no slot names runs on an **implied** slot on its
 default login (ids `claude-code`, `opencode`, `kimi`, `copilot`; `implied: true`) —
 a machine without slots runs as before — unless the root key `impliedOff`
-(D-69, written by Settings → Models' remove) names the provider: then it
-has no slot on this machine. An implied slot makes no network
-call: Claude Code's windows come from its runs and cache, Kimi,
-OpenCode and Copilot CLI are counted. The z.ai and Kimi endpoints are read only for a
-slot `service.json` names.
+(D-69, written by Settings → Models' remove) names its key: then it
+has no such slot on this machine. A key is the provider id of a harness
+stand-in, or the `auth.json` entry of an opencode account (req-317). **A quota
+belongs to the account, not to the harness**, so OpenCode gets one implied slot
+per account instead of one for the harness: `ServiceConfigFile` hands the top-level
+key names of opencode's `auth.json` (never a value) to `parseServiceSlots` as the
+synthetic root key `opencodeAccounts`, and every entry no configured slot's
+`login.opencodeAuthEntry` names becomes `{id: <entry>, label: <account name>,
+login: {opencodeAuthEntry}, implied: true}` — `z.ai Coding Plan` for
+`zai-coding-plan`, `GitHub Copilot`, `OpenAI`, `Anthropic`, else the entry as it
+is. The harness-wide `opencode` stand-in remains only while there is no account
+entry and no configured opencode slot. An implied Claude Code slot makes no
+network call: its windows come from its runs and cache; Kimi and Copilot CLI are
+counted; an implied opencode account reads the quota its kind names — the z.ai
+plan its endpoint, the others are counted. A configured slot may still name any
+of it. A counted slot without a budget reports what it counted (`used`, `unit` on
+its window, mirrored by the Slots row as *184,000 tokens counted* and *no runs
+yet*) and no share. One subscription used through two harnesses stays two slots
+with separate counters.
 
 ### Where the windows come from
 

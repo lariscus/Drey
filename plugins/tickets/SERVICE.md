@@ -128,7 +128,7 @@ each parsed by its owner (`fleet/routing/` — the per-key readers below):
 | Key | Owner | Holds |
 |---|---|---|
 | `slots` | req-177, `routing/slot-config.ts` | the accounts per provider: id, label, provider, login folder, sessions, cost (`billing`, req-287: subscription, credits or per token) |
-| `impliedOff` | D-69, `routing/slot-config.ts` | the providers whose implied slot the owner removed (Settings → Models) |
+| `impliedOff` | D-69, `routing/slot-config.ts` | the implied slots the owner removed (Settings → Models), by key: a harness stand-in's key is its provider id (`kimi`), an opencode account's its `auth.json` entry (`openai`; req-317) |
 | `quota` | req-177 | the quota sources (Claude Code, Kimi, z.ai) and their refresh |
 | `classes` | req-287, `routing/class-config.ts` | the owner's class list, strongest first, each with at most N sessions at once |
 | `models` | req-170, `routing/pool-config.ts` | the model table: model, provider, category, class (a name of `classes`), cost factor, capabilities, the router switch `enabled` |
@@ -138,6 +138,12 @@ each parsed by its owner (`fleet/routing/` — the per-key readers below):
 | `routing` | req-178 / req-181 | surplus and step-up thresholds, the reserve, the burn rate |
 | `governor` | req-180 | the dev-port range (`devPorts`) |
 | `migrations` | req-170, req-287 | the one-time moves done on this machine (`fleet.pool.size`, `classes.v3`) |
+
+The read of `service.json` also carries one **synthetic, read-only** root key,
+`opencodeAccounts` (req-317): the top-level key names of opencode's `auth.json`,
+filled by `ServiceConfigFile.read()` from its accounts port so that
+`parseServiceSlots` stays a pure function of the root. No value of
+`auth.json` is read into it, and every write drops it — it is never in the file.
 
 The three layers (machine `service.json` · vault `tickets/_meta/crew.md` ·
 the session record) and their precedence — session > vault > built-in

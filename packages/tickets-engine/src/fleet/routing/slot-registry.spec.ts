@@ -3,6 +3,7 @@ import type { SlotView } from '../protocol';
 import { QuotaRefreshLoop } from './quota-refresh-loop';
 import { FakeClock, FakeQuotaSource, slot, window } from './routing.fake';
 import type { Slot } from './slot';
+import { parseServiceSlots } from './slot-config';
 import { MIN_FETCH_GAP_MS, SlotRegistry } from './slot-registry';
 import { SlotReservations } from './slot-reservations';
 import { effectiveWindow, SlotStateResolver } from './slot-state-resolver';
@@ -130,6 +131,23 @@ describe('SlotRegistry — the slots and what is known of them', () => {
     await registry.refresh();
     expect(registry.summary()).toEqual([{ id: 'claude-a', label: 'Claude A', state: 'ready', busy: 0, total: 2, remaining: 0.62, reliability: 'measured', q: 1.24, resetsAt: inHours(84) }]);
     expect(slotSummaryOf({ ...registry.view('claude-a')!, windows: [] })).toMatchObject({ remaining: null, reliability: 'unknown', resetsAt: null });
+  });
+
+  it('req-317: the summary carries what the runner counted in the headline window, and nothing for a provider readout', async () => {
+    const counted = window({ name: '7d', remaining: null, reliability: 'unknown', used: 412_000, unit: 'tokens' });
+    const view = { ...rig([claudeA]).registry.view('claude-a')!, windows: [window({ name: '5h', spanMs: 5 * 3_600_000, remaining: 0.5 }), counted] };
+    expect(slotSummaryOf(view)).toMatchObject({ remaining: null, reliability: 'unknown', used: 412_000, unit: 'tokens' });
+    expect('used' in slotSummaryOf({ ...view, windows: [window({ remaining: 0.62 })] })).toBe(false);
+  });
+
+  it('req-317: an opencode account loads as its own slot, with the quota source its kind names', async () => {
+    const parsed = parseServiceSlots({ opencodeAccounts: ['zai-coding-plan', 'openai'] });
+    const { registry } = rig([...parsed.slots]);
+    await registry.load();
+    expect(registry.list().filter((s) => s.provider === 'opencode').map((s) => [s.id, s.label, s.quota, s.implied])).toEqual([
+      ['zai-coding-plan', 'z.ai Coding Plan', 'zai', true],
+      ['openai', 'OpenAI', 'counting', true],
+    ]);
   });
 });
 

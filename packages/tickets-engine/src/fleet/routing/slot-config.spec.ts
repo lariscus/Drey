@@ -76,6 +76,46 @@ describe('parseServiceSlots — the slots of service.json', () => {
   });
 });
 
+/** req-317: a quota belongs to the account at the provider, not to the harness. */
+describe('parseServiceSlots — one implied slot per opencode account', () => {
+  const ACCOUNTS = { opencodeAccounts: ['zai-coding-plan', 'github-copilot', 'my-lab'] };
+
+  it('gives every auth entry its own implied slot, z.ai on its remote reading, the rest counted; no harness stand-in', () => {
+    const parsed = parseServiceSlots(ACCOUNTS);
+    expect(parsed.slots.map((s) => [s.id, s.label, s.provider, s.quota, s.login.opencodeAuthEntry, s.implied])).toEqual([
+      ['zai-coding-plan', 'z.ai Coding Plan', 'opencode', 'zai', 'zai-coding-plan', true],
+      ['github-copilot', 'GitHub Copilot', 'opencode', 'counting', 'github-copilot', true],
+      ['my-lab', 'my-lab', 'opencode', 'counting', 'my-lab', true],
+      ['claude-code', 'Claude Code', 'claude-code', 'claude-code', undefined, true],
+      ['kimi', 'Kimi', 'kimi', 'counting', undefined, true],
+      ['copilot', 'Copilot CLI', 'copilot', 'counting', undefined, true],
+    ]);
+  });
+
+  it('a configured slot naming the entry suppresses its implied slot; the other entries stay', () => {
+    const parsed = parseServiceSlots({ ...ACCOUNTS, slots: [{ id: 'zai', provider: 'opencode', login: { opencodeAuthEntry: 'zai-coding-plan' } }] });
+    expect(parsed.slots.filter((s) => s.provider === 'opencode').map((s) => [s.id, s.implied])).toEqual([['zai', false], ['github-copilot', true], ['my-lab', true]]);
+  });
+
+  it('a missing or empty accounts list keeps the one harness stand-in; a configured opencode slot replaces it', () => {
+    expect(parseServiceSlots({ opencodeAccounts: [] }).slots[0]).toMatchObject({ id: 'opencode', label: 'OpenCode', quota: 'counting', implied: true });
+    expect(parseServiceSlots({ slots: [{ id: 'lm', provider: 'opencode' }] }).slots.filter((s) => s.provider === 'opencode').map((s) => s.id)).toEqual(['lm']);
+  });
+
+  it('impliedOff lists keys: a provider id for a stand-in, an auth entry for an account', () => {
+    const parsed = parseServiceSlots({ ...ACCOUNTS, impliedOff: ['github-copilot', 'kimi'] });
+    expect(parsed.slots.map((s) => s.id)).toEqual(['zai-coding-plan', 'my-lab', 'claude-code', 'copilot']);
+    expect(parseServiceSlots({ impliedOff: ['opencode'] }).slots.map((s) => s.id)).toEqual(['claude-code', 'kimi', 'copilot']);
+    // every account removed: the harness stand-in does not come back
+    expect(parseServiceSlots({ opencodeAccounts: ['openai'], impliedOff: ['openai'] }).slots.map((s) => s.id)).toEqual(['claude-code', 'kimi', 'copilot']);
+  });
+
+  it('an account is read by its name only: an entry that is no slot id is left out, a name listed twice counts once, an implied slot never takes a configured id', () => {
+    expect(parseServiceSlots({ opencodeAccounts: ['a b', 7, 'openai', 'openai'] }).slots.filter((s) => s.provider === 'opencode').map((s) => s.id)).toEqual(['openai']);
+    expect(parseServiceSlots({ opencodeAccounts: ['openai'], slots: [{ id: 'openai', provider: 'kimi' }] }).slots.map((s) => s.id)).toContain('openai-default');
+  });
+});
+
 describe("slotEnv — the account a worker is spawned as", () => {
   it("a Claude account is its CLAUDE_CONFIG_DIR, a second Kimi its KIMI_HOME, the default login nothing", () => {
     const [claudeA, , zai] = parseServiceSlots(SAMPLE).slots;
@@ -123,6 +163,32 @@ describe('ServiceConfigFile — service.json in the service home', () => {
     expect(JSON.parse(fs.files.get(PATH) as string).slots).toEqual([{ id: 'old', provider: 'claude-code' }]);
     expect(await file.addSlot({ id: 'added', provider: 'kimi', profile: 'private' })).toMatchObject({ ok: true });
     expect(JSON.parse(fs.files.get(PATH) as string).slots).toEqual([{ id: 'old', provider: 'claude-code' }, { id: 'added', provider: 'kimi' }]);
+  });
+
+  it('req-317: a read carries the accounts as a synthetic key; no write ever puts it into the file', async () => {
+    const fs = new MemoryFileSystem();
+    fs.files.set(PATH, JSON.stringify(SAMPLE));
+    const accounts = { names: () => Promise.resolve(['zai-coding-plan', 'openai']) };
+    const file = new ServiceConfigFile(fs, PATH, accounts);
+    expect((await file.read()).root['opencodeAccounts']).toEqual(['zai-coding-plan', 'openai']);
+    expect(await file.writeSlots([{ id: 'z', provider: 'kimi' }])).toEqual({ ok: true });
+    expect(await file.addSlot({ id: 'k2', provider: 'kimi' })).toMatchObject({ ok: true });
+    expect(await file.writePool({ capacity: {} })).toEqual({ ok: true });
+    expect(await file.removeSlot('openai')).toMatchObject({ ok: true });
+    expect(await file.updateSlot('zai-coding-plan', { label: 'z.ai work' })).toMatchObject({ ok: true });
+    expect(fs.files.get(PATH)).not.toContain('opencodeAccounts');
+    const written = JSON.parse(fs.files.get(PATH) as string) as Record<string, unknown>;
+    expect(written['impliedOff']).toEqual(['openai']);
+    expect(written['slots']).toContainEqual({ id: 'zai-coding-plan', label: 'z.ai work', provider: 'opencode', quota: 'zai', login: { opencodeAuthEntry: 'zai-coding-plan' } });
+  });
+
+  it('reads the accounts of a missing service.json, and none without the port or with a hand-written key', async () => {
+    const fs = new MemoryFileSystem();
+    const accounts = { names: () => Promise.resolve(['openai']) };
+    expect((await new ServiceConfigFile(fs, PATH, accounts).read()).root).toEqual({ opencodeAccounts: ['openai'] });
+    fs.files.set(PATH, '{"opencodeAccounts":["hand-written"]}');
+    expect((await new ServiceConfigFile(fs, PATH).read()).root).toEqual({});
+    expect((await new ServiceConfigFile(fs, PATH, { names: () => Promise.reject(new Error('gone')) }).read()).root).toEqual({ opencodeAccounts: [] });
   });
 
   it('never overwrites a file that does not parse', async () => {

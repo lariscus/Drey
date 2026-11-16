@@ -120,7 +120,17 @@ describe('slotRows and governorRows', () => {
     expect(rows[0]).toMatchObject({ label: 'Claude A', seats: [true, false], fill: 62, reliabilityLabel: 'measured' });
     expect(rows[0]?.text).toMatch(/^62 % · q 1\.4 · resets Mon \d\d:\d\d$/);
     expect(rows[2]).toMatchObject({ seats: [true, false, false], reliability: 'estimated' });
-    expect(rows[3]).toMatchObject({ fill: null, text: 'no quota readout', reliabilityLabel: 'unknown' });
+    expect(rows[3]).toMatchObject({ fill: null, text: '184,000 tokens counted', reliabilityLabel: 'counted' });
+  });
+  it('req-317: without a share the row says what was counted, or that nothing ran yet', () => {
+    const slot = { id: 'openai', label: 'OpenAI', busy: 0, total: 1, left: null, q: null, resetsAt: null, reliability: 'unknown' as const };
+    const text = (used: number | null, unit: 'tokens' | 'runs' | null): string | undefined => slotRows(i18n, [{ ...slot, used, unit }])[0]?.text;
+    expect(text(null, null)).toBe('no runs yet');
+    expect(text(0, 'tokens')).toBe('no runs yet');
+    expect(text(1, 'runs')).toBe('1 run counted');
+    expect(text(12, 'runs')).toBe('12 runs counted');
+    expect(text(2_500_000, 'tokens')).toBe('2,500,000 tokens counted');
+    expect(slotRows(i18n, [{ ...slot, left: 0.4, used: 5, unit: 'tokens' }])[0]).toMatchObject({ fill: 40, text: '40 %' });
   });
   it('draws no rows while the runner sleeps', () => {
     expect(slotRows(i18n, null)).toEqual([]);

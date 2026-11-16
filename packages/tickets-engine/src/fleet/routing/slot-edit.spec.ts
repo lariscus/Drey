@@ -45,6 +45,33 @@ describe('slot edits', () => {
 });
 
 /** req-287: an account edited in place, and removed with the model rows only it serves once the owner confirmed. */
+/** req-317: an opencode account is an implied slot of its own; `impliedOff` names it by its auth entry. */
+describe('slot edits — the implied opencode accounts', () => {
+  const root = { slots: [], opencodeAccounts: ['zai-coding-plan', 'openai'] };
+
+  it('removes an account slot through its auth entry, leaving the stand-in key and the other accounts alone', () => {
+    const edit = slotRemoved(root, 'openai');
+    expect(edit).toEqual({ ok: true, root: { ...root, impliedOff: ['openai'] } });
+    expect(parseServiceSlots(edit.ok ? edit.root : {}).slots.filter((s) => s.provider === 'opencode').map((s) => s.id)).toEqual(['zai-coding-plan']);
+    expect(slotRemoved({ ...root, impliedOff: ['kimi'] }, 'zai-coding-plan')).toMatchObject({ ok: true, root: { impliedOff: ['kimi', 'zai-coding-plan'] } });
+  });
+
+  it('a change of an account slot writes it out with its auth entry and its quota, so it stays the same account', () => {
+    const edit = slotUpdated(root, 'zai-coding-plan', { billing: { kind: 'subscription', pricePerMonth: 30 } });
+    expect(edit).toMatchObject({
+      ok: true,
+      root: { slots: [{ id: 'zai-coding-plan', label: 'z.ai Coding Plan', provider: 'opencode', quota: 'zai', login: { opencodeAuthEntry: 'zai-coding-plan' }, billing: { kind: 'subscription', pricePerMonth: 30 } }] },
+    });
+    const slots = parseServiceSlots(edit.ok ? edit.root : {}).slots.filter((s) => s.provider === 'opencode');
+    expect(slots.map((s) => [s.id, s.implied])).toEqual([['zai-coding-plan', false], ['openai', true]]);
+  });
+
+  it('adding a slot that names the account takes its key and the stand-in key off impliedOff', () => {
+    const off = { ...root, impliedOff: ['openai', 'opencode', 'kimi'] };
+    expect(slotAdded(off, { id: 'oa', provider: 'opencode', login: { opencodeAuthEntry: 'openai' } })).toMatchObject({ ok: true, root: { impliedOff: ['kimi'] } });
+  });
+});
+
 describe('slot edits — the accounts of board 7l v3', () => {
   const kept = { id: 'claude-a', label: 'Claude A', provider: 'claude-code', login: { claudeConfigDir: 'C:/a' }, sessions: 2 };
 

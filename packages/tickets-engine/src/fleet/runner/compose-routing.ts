@@ -25,7 +25,9 @@ import { FallbackQuotaSource } from '../routing/fallback-quota-source';
 import { KimiQuotaSource } from '../routing/kimi-quota-source';
 import { QuotaRefreshLoop, type Schedule } from '../routing/quota-refresh-loop';
 import type { QuotaHttp, QuotaSource } from '../routing/quota-source';
+import { OpencodeAuthAccounts } from '../routing/opencode-auth-accounts';
 import { ServiceConfigFile } from '../routing/service-config-file';
+import { opencodeAuthFileOf } from './opencode-auth-file';
 import type { Slot } from '../routing/slot';
 import { parseServiceSlots, type SlotConfigParse } from '../routing/slot-config';
 import type { BurnRateDayFile } from '../routing/burn-rate-day';
@@ -103,11 +105,6 @@ function burnRateFileOf(fs: FileSystem, file: string): BurnRateDayFile {
   };
 }
 
-function opencodeAuthFile(deps: RoutingDeps): string {
-  const data = deps.env['XDG_DATA_HOME'];
-  return path.join(data !== undefined && data !== '' ? data : path.join(deps.userHome, '.local', 'share'), 'opencode', 'auth.json');
-}
-
 function kimiHomeOf(deps: RoutingDeps): string {
   const home = deps.env['KIMI_HOME'];
   return home !== undefined && home !== '' ? home : path.join(deps.userHome, '.kimi-code');
@@ -115,7 +112,7 @@ function kimiHomeOf(deps: RoutingDeps): string {
 
 /** One source per slot: its provider's readout, with the runner's counting behind it. */
 function sourcesOf(deps: RoutingDeps, http: QuotaHttp, claude: ClaudeCodeQuotaSource, counting: CountingQuotaSource): (slot: Slot) => QuotaSource {
-  const zai = new FallbackQuotaSource(new ZaiQuotaSource({ http, fs: deps.fs, authFile: opencodeAuthFile(deps), clock: deps.clock }), counting);
+  const zai = new FallbackQuotaSource(new ZaiQuotaSource({ http, fs: deps.fs, authFile: opencodeAuthFileOf(deps.env, deps.userHome), clock: deps.clock }), counting);
   const kimi = new FallbackQuotaSource(new KimiQuotaSource({ http, fs: deps.fs, home: kimiHomeOf(deps), clock: deps.clock }), counting);
   const claudeCode = new FallbackQuotaSource(claude, counting);
   const byKind: Readonly<Record<Slot['quota'], QuotaSource>> = { zai, kimi, 'claude-code': claudeCode, counting };
@@ -146,7 +143,7 @@ function discoveryOf(deps: RoutingDeps, settings: PoolSettingsRegistry, slots: (
 }
 
 export function composeRouting(deps: RoutingDeps): Routing {
-  const config = new ServiceConfigFile(deps.fs, path.join(deps.home, 'service.json'));
+  const config = new ServiceConfigFile(deps.fs, path.join(deps.home, 'service.json'), new OpencodeAuthAccounts(deps.fs, opencodeAuthFileOf(deps.env, deps.userHome)));
   const classMigration = new ClassMigration(config, deps.log);
   const claude = new ClaudeCodeQuotaSource(deps.fs, deps.userHome);
   const counting = new CountingQuotaSource(deps.clock);

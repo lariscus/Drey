@@ -82,4 +82,7 @@ export interface SlotSummary {
   readonly q: number | null;
   /** That window's reset (ISO). */
   readonly resetsAt: string | null;
+  /** req-317: what the runner counted in that window (tokens or runs); absent when the window is a provider readout or nothing was counted. */
+  readonly used?: number;
+  readonly unit?: 'tokens' | 'runs';
 }

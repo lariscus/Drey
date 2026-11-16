@@ -62,8 +62,20 @@ describe('snapshot mapping', () => {
           { name: '7d', remaining: 0.62, resetsAt: '2026-11-10T09:00:00Z', reliability: 'measured' },
         ],
       }),
-    ).toEqual({ id: 'claude-a', label: 'Claude A', busy: 1, total: 2, left: 0.62, q: 1.4, resetsAt: '2026-11-10T09:00:00Z', reliability: 'measured' });
-    expect(slotFactsOf({ id: 'kimi', label: 'Kimi', busy: 0, total: 2, q: null, windows: [] })).toMatchObject({ left: null, reliability: 'unknown' });
+    ).toEqual({ id: 'claude-a', label: 'Claude A', busy: 1, total: 2, left: 0.62, q: 1.4, resetsAt: '2026-11-10T09:00:00Z', reliability: 'measured', used: null, unit: null });
+    expect(slotFactsOf({ id: 'kimi', label: 'Kimi', busy: 0, total: 2, q: null, windows: [] })).toMatchObject({ left: null, reliability: 'unknown', used: null, unit: null });
+  });
+
+  it('req-317: a counted slot carries the usage of its longest counted window', () => {
+    const facts = slotFactsOf({
+      id: 'openai',
+      label: 'OpenAI',
+      busy: 0,
+      total: 1,
+      q: null,
+      windows: [{ name: '7d', spanMs: 604_800_000, remaining: null, resetsAt: null, reliability: 'unknown', used: 184_000, unit: 'tokens' }],
+    });
+    expect(facts).toMatchObject({ left: null, reliability: 'unknown', used: 184_000, unit: 'tokens' });
   });
 
   it("today's spend sums the slots; the limit only when every slot has one", () => {

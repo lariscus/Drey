@@ -1,7 +1,10 @@
 import { promises as fsp } from 'node:fs';
+import { homedir } from 'node:os';
 import * as path from 'node:path';
 import type { TicketsGit } from '../core/git/tickets-git';
 import { NodeFileSystem } from '../fleet/runner/node-file-system';
+import { opencodeAuthFileOf } from '../fleet/runner/opencode-auth-file';
+import { OpencodeAuthAccounts } from '../fleet/routing/opencode-auth-accounts';
 import { CrewConfigFiles } from './crew-config-files';
 import { CrewConfigMigrator } from './crew-config-migrator';
 import { CrewConfigService } from './crew-config-service';
@@ -45,7 +48,9 @@ export function composeFreeSessions(wiring: { readonly board: FreeSessionBoard; 
 
 /** req-288: the machine's model table as the engine reads it — `<service home>/service.json`, no runner needed. */
 export function serviceModelTable(home: string): ServiceModelTable {
-  return new ServiceModelTable(new NodeFileSystem(), path.join(home, 'service.json'));
+  const fs = new NodeFileSystem();
+  // req-317: the same accounts the runner sees, so a row naming an account slot (`zai-coding-plan`) resolves without a runner awake.
+  return new ServiceModelTable(fs, path.join(home, 'service.json'), new OpencodeAuthAccounts(fs, opencodeAuthFileOf(process.env, homedir())));
 }
 
 /** req-256's default crew seeder, wired after the crew configuration whose file holds its marker. */

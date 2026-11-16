@@ -1957,6 +1957,14 @@ account.* — **Remove** takes that model out of the classes too, **Keep**
 leaves everything as it is). A login folder or a quota limit is still set
 in `service.json`.
 
+A quota belongs to the account at its provider, so Drey lists the accounts
+OpenCode is signed in to — *z.ai Coding Plan*, *GitHub Copilot*, *OpenAI* —
+each as a row of its own, and a model such as `zai-coding-plan/glm-5.3`
+counts against that row. The z.ai plan shows its real quota; the other
+accounts show what Drey counted from the runs. An account you remove stays
+removed. Claude Code, Kimi and Copilot CLI each have one row for the login
+they use.
+
 **Routing** is one folded line (*step up above q 1.3 · reserve 10 % ·
 burn rate 80 %*); open it to change *Upgrade above q* (empty: never step
 up), *Reserve per window* and *Burn rate* (both in percent; 0 switches them
@@ -2229,7 +2237,9 @@ Closing it keeps the service running. Three tabs:
   local endpoint Drey uses, answer?) — with restart, stop or start on the row you
   point at (the engine's restart restarts the whole service and hands the live
   runs over). Below: **Slots** (each account: busy sessions, how much quota is
-  left, *q*, when it resets, and whether that is measured or estimated) and
+  left, *q*, when it resets, and whether that is measured or estimated; an
+  account Drey can only count shows what it counted — *184,000 tokens
+  counted* — or *no runs yet*) and
   **Governor** (the resource governor, below: heavy and light seats, the reserve
   against the machine's load, what waits and why, the dev servers). On the right the **Log**, filtered to warnings or errors if you
   like; *Follow* keeps the newest line in view.
