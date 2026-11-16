@@ -1,5 +1,6 @@
 import type { PersonaAllowedPatch } from '../contracts/persona-allowed';
 import { settingsPatchError, type PersonaSettingsPatch } from '../contracts/persona-settings-patch';
+import type { ChatPersonaPatch } from '../contracts/chat';
 import { classNameOf } from '../contracts/capability-class';
 import { PERSONA_ROLES, PERSONA_RUN_COMMANDS, type Persona } from '../core/persona/persona';
 import { MIGRATION_FALLBACK_CLASS } from '../core/persona/persona-model-migration';
@@ -62,6 +63,30 @@ const RULES: readonly Rule[] = [
 /** The PATCH body's validation (U4): only the listed rules reject; null = the patch is writable. */
 export function personaPatchError(input: PersonaPatchFields): string | null {
   return RULES.find(([broken]) => broken(input))?.[1] ?? (input.settings !== undefined ? settingsPatchError(input.settings) : null);
+}
+
+/**
+ * What a patchPersona card may change on THIS persona (req-315): the chat's
+ * write surface per kind. The human never runs — only their title, summary,
+ * instructions and the leaving actions are theirs; Mission Control's persona
+ * never runs a ticket — she takes her profile, her instructions, her chat
+ * model and her skills. null = the patch fits the kind.
+ */
+export function chatPatchRefusalOf(persona: Pick<Persona, 'kind'>, patch: ChatPersonaPatch): string | null {
+  if (persona.kind === 'agent') {
+    return null;
+  }
+  const sent = (key: keyof ChatPersonaPatch): boolean => patch[key] !== undefined;
+  if (persona.kind === 'human') {
+    const stray = (['role', 'class', 'model', 'chatModel', 'budget', 'skills', 'allowed'] as const).filter(sent);
+    const settings = patch.settings;
+    const straySettings = settings === undefined ? [] : Object.keys(settings).filter((key) => key !== 'leaving');
+    return stray.length + straySettings.length === 0
+      ? null
+      : "the owner's persona takes only their title, summary, instructions and leaving actions";
+  }
+  const stray = (['role', 'class', 'model', 'budget', 'allowed', 'settings'] as const).filter(sent);
+  return stray.length === 0 ? null : "Mission Control's persona takes only her title, summary, instructions, chat model and skills";
 }
 
 /**

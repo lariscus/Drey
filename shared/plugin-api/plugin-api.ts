@@ -531,6 +531,13 @@ export interface ConversationCard {
   readonly meta?: string;
   /** Free small line under the text (a state, an outcome). */
   readonly note?: string;
+  /**
+   * req-315 (SDK 1.62): the before/after of a prompt patch, as the engine
+   * reads a diff — `@@ line N` groups, `- old` / `+ new` lines. Drawn as a
+   * mono block between the body and the buttons; present only on the
+   * Mission Control card that changes a persona's instructions.
+   */
+  readonly diff?: string;
   /** Buttons of a `card`; empty once it is decided. */
   readonly actions?: readonly ConversationCardAction[];
   /** Options of a `choices` card; a pick is sent as the owner's next message. */

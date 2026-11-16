@@ -95,6 +95,36 @@ describe('append and parse round-trip', () => {
     const session = parseSessionFile(text, 'f')!;
     expect(session.proposals).toEqual([]);
   });
+
+  // -- req-315: the prompt patch's diff fence ------------------------------
+
+  it('round-trips a patchPersona proposal with its diff fence', () => {
+    let text = newSessionText('x', AT);
+    const proposal = appendProposal(
+      text,
+      AT,
+      'Patch Ben — instructions: 1 edit · +1 −0',
+      { kind: 'patchPersona', persona: 'ben', patch: { prompt: '# Who Ben is\nHe builds.\n' } },
+      '@@ line 1\n- ## Who Ben is\n+ ## Who Ben is\n+ He builds.',
+    );
+    text = proposal.text;
+    const session = parseSessionFile(text, 'f')!;
+    expect(session.proposals).toHaveLength(1);
+    expect(session.proposals[0]!.command).toEqual({ kind: 'patchPersona', persona: 'ben', patch: { prompt: '# Who Ben is\nHe builds.\n' } });
+    expect(session.proposals[0]!.diff).toBe('@@ line 1\n- ## Who Ben is\n+ ## Who Ben is\n+ He builds.');
+    // The decision line follows the fences without confusing the reader.
+    const decided = decideProposal(text, AT, proposal.id, 'confirmed', 'ok')!;
+    expect(parseSessionFile(decided, 'f')!.proposals[0]!.outcome).toBe('ok');
+  });
+
+  it('carries no diff on a proposal without one and survives a diff fence on the NEXT proposal', () => {
+    let text = newSessionText('x', AT);
+    const first = appendProposal(text, AT, 'Move T-0086', { kind: 'transition', id: 'T-0086', from: 'build', to: 'review' });
+    const second = appendProposal(first.text, AT, 'Patch Ben — instructions: unchanged', { kind: 'patchPersona', persona: 'ben', patch: { prompt: 'x\n' } }, '@@ line 1\n- x\n+ x\n');
+    const session = parseSessionFile(second.text, 'f')!;
+    expect(session.proposals[0]).not.toHaveProperty('diff');
+    expect(session.proposals[1]!.diff).toBe('@@ line 1\n- x\n+ x\n');
+  });
 });
 
 describe('shape cards (E10-3)', () => {

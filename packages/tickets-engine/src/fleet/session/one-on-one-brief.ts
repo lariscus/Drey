@@ -35,8 +35,13 @@ export interface OneOnOneBriefInput {
   readonly memory: string | null;
   /** Newest first, already cut to the list's length. */
   readonly runs: readonly BriefRun[];
-  /** The earlier messages of the session file, oldest first (a fresh session after a release reads them here). */
+  /** The conversation so far, oldest first (a fresh session after a release reads them here). */
   readonly conversation: readonly BriefMessage[];
+  /**
+   * req-315: the owner's own instructions (the human persona's `prompt.md`) — Mission Control's persona honors them in
+   * how she deals with the owner; absent = none (a board whose owner wrote none). Only she carries the section.
+   */
+  readonly owner?: { readonly title: string; readonly prompt: string } | null;
   /** The MCP tools attached to this session ({@link OneOnOneToolSeam}). */
   readonly tools: readonly string[];
   readonly workingDirectory: string;
@@ -107,9 +112,14 @@ function toolsOf(tools: readonly string[]): string | null {
 
 /** The brief as one text, sections in a fixed order; empty sections are left out. */
 export function composeOneOnOneBrief(input: OneOnOneBriefInput): string {
+  const owner =
+    input.owner === undefined || input.owner === null || input.owner.prompt.trim() === ''
+      ? null
+      : section('The owner', `${input.owner.title} is the owner — their own instructions for how you deal with them. Honor it in every answer:\n\n${input.owner.prompt}`);
   const parts: (string | null)[] = [
     header(input),
     input.prompt.trim() === '' ? null : section('Your instructions', input.prompt),
+    owner,
     skillsSection(input.skills),
     section('Your memory', input.memory === null || input.memory.trim() === '' ? 'Nothing yet.' : input.memory),
     section('Your latest runs', input.runs.length === 0 ? 'No runs yet.' : input.runs.slice(0, BRIEF_RUNS).map(runLine).join('\n')),

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ChatMessage } from '../../../../shared/llm';
 import { PROVIDER_PRESETS } from '../../../../shared/config/schema';
 import {
   CHAT_PROVIDER_IDS,
@@ -70,7 +71,7 @@ describe('resolveChatModel', () => {
 });
 
 describe('chatRequest', () => {
-  const messages = [
+  const messages: ChatMessage[] = [
     { role: 'system', content: 'SYS' },
     { role: 'user', content: 'a' },
     { role: 'assistant', content: 'b' },

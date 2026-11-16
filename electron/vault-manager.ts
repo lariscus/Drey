@@ -112,6 +112,42 @@ function writeRegistryFile(registry: VaultRegistryFile): void {
 }
 
 /**
+ * True when `b` is occupied but only by `a` itself: on a case-insensitive
+ * filesystem (Windows' and macOS' defaults) a case-only rename
+ * ("Concepts" -> "concepts", D-74) resolves the new name to the very
+ * entry being renamed. dev+ino say "same file"; on a case-sensitive
+ * volume two entries that differ only in case are genuinely different
+ * files and stay a conflict.
+ */
+function isSameEntryAs(a: string, b: string): boolean {
+  try {
+    const source = fs.statSync(a);
+    const target = fs.statSync(b);
+    return source.dev === target.dev && source.ino === target.ino;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The two-step rename a case-only change needs (D-74): out of the old
+ * name into a staging name, then into the new casing. A single
+ * `fsp.rename` cannot express it on a case-insensitive filesystem -- the
+ * target name "exists" (it is the source) -- and a failure in between
+ * rolls the entry back under its old name rather than losing it.
+ */
+async function renameCaseOnly(from: string, to: string): Promise<void> {
+  const staging = `${from}.case-rename-${crypto.randomBytes(4).toString('hex')}`;
+  try {
+    await fsp.rename(from, staging);
+    await fsp.rename(staging, to);
+  } catch (error) {
+    await fsp.rename(staging, from).catch(() => undefined);
+    throw error;
+  }
+}
+
+/**
  * Vault registration (multi-vault since ADR-0051), the active vault, and
  * per-vault path resolution (see docs/05_building_block_view.md §5.0,
  * "Component reference"). A
@@ -757,8 +793,10 @@ export class VaultManager {
    * occupied target both throw. Within one vault this is an `fsp.rename`;
    * ACROSS vaults (ADR-0051) it is a copy + delete, so it also works
    * between drives -- a `.md` note's assistant sidecar comes along, and a
-   * failed copy cleans up after itself. Resolves to the new
-   * vault-relative path inside the TARGET vault.
+   * failed copy cleans up after itself. A target occupied only by the
+   * source itself -- the case-only rename on a case-insensitive
+   * filesystem (D-74) -- is no conflict: it goes through a staging name.
+   * Resolves to the new vault-relative path inside the TARGET vault.
    */
   async renameEntry(fromRel: string, toRel: string, fromVaultId?: string, toVaultId?: string): Promise<string> {
     const fromVault = this.registrationFor(fromVaultId);
@@ -776,7 +814,8 @@ export class VaultManager {
     if (!fs.existsSync(from)) {
       throw new Error(`Not found: ${fromRel}`);
     }
-    if (fs.existsSync(to)) {
+    const caseOnlySelf = fromVault.id === toVault.id && isSameEntryAs(from, to);
+    if (fs.existsSync(to) && !caseOnlySelf) {
       throw new Error(`Already exists: ${toRel}`);
     }
 
@@ -791,12 +830,16 @@ export class VaultManager {
       this.ownWrites?.recordStructural(fromVault.id, fromRel);
       this.ownWrites?.recordStructural(toVault.id, toRel);
       await fsp.mkdir(path.dirname(to), { recursive: true });
-      await fsp.rename(from, to);
+      await (caseOnlySelf ? renameCaseOnly(from, to) : fsp.rename(from, to));
       if (fromRel.toLowerCase().endsWith('.md') && toRel.toLowerCase().endsWith('.md')) {
         const sidecarFrom = this.resolveInVault(sidecarPathFor(fromRel), fromVault.id);
         const sidecarTo = this.resolveInVault(sidecarPathFor(toRel), toVault.id);
-        if (fs.existsSync(sidecarFrom) && !fs.existsSync(sidecarTo)) {
-          await fsp.rename(sidecarFrom, sidecarTo).catch(() => undefined);
+        // A case-only note rename finds its own sidecar at the new name.
+        const sidecarSelf = isSameEntryAs(sidecarFrom, sidecarTo);
+        if (fs.existsSync(sidecarFrom) && (sidecarSelf || !fs.existsSync(sidecarTo))) {
+          await (sidecarSelf ? renameCaseOnly(sidecarFrom, sidecarTo) : fsp.rename(sidecarFrom, sidecarTo)).catch(
+            () => undefined,
+          );
         }
       }
       await this.history?.rename(fromVault.id, fromRel, toVault.id, toRel);

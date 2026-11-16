@@ -12,8 +12,8 @@
  * the engine package cannot import Drey's config module, so the small
  * table is copied and `chat-model.spec.ts` pins it against the source.
  */
-import { toAnthropicMessages, type ChatMessage } from '../../../../shared/llm';
-import type { ChatFailureCode, ChatModelFailure } from '../contracts/chat';
+import { toAnthropicMessages, toAnthropicTools, toOpenAiTools, type ChatMessage, type ToolParameters } from '../../../../shared/llm';
+import type { ChatFailureCode, ChatModelFailure, ChatToolSpec } from '../contracts/chat';
 
 export const CHAT_KEYS = {
   baseUrl: 'chat.baseUrl',
@@ -142,11 +142,13 @@ export async function resolveChatModel(
   return { ok: true, spec: { provider: id, providerLabel: info.label, dialect: info.dialect, baseUrl: base, apiKey: key, model: modelId } };
 }
 
-/** One chat request in the spec's dialect. */
+/** One chat request in the spec's dialect — with the turn's tools when it carries any (req-315). */
 export function chatRequest(
   spec: ChatModelSpec,
-  messages: readonly { readonly role: string; readonly content: string }[],
+  messages: readonly ChatMessage[],
+  tools?: readonly ChatToolSpec[],
 ): { readonly url: string; readonly headers: Record<string, string>; readonly body: string } {
+  const specs = tools?.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters as unknown as ToolParameters }));
   if (spec.dialect === 'openai') {
     return {
       url: `${spec.baseUrl}/chat/completions`,
@@ -154,14 +156,10 @@ export function chatRequest(
         'content-type': 'application/json',
         ...(spec.apiKey === null ? {} : { authorization: `Bearer ${spec.apiKey}` }),
       },
-      body: JSON.stringify({ model: spec.model, stream: true, messages }),
+      body: JSON.stringify({ model: spec.model, stream: true, messages, ...(specs === undefined ? {} : { tools: toOpenAiTools(specs) }) }),
     };
   }
-  const canonical: ChatMessage[] = messages.map((m) => ({
-    role: m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user',
-    content: m.content,
-  }));
-  const adapted = toAnthropicMessages(canonical);
+  const adapted = toAnthropicMessages(messages);
   return {
     url: `${spec.baseUrl}/v1/messages`,
     headers: {
@@ -175,6 +173,7 @@ export function chatRequest(
       stream: true,
       ...(adapted.system === null ? {} : { system: adapted.system }),
       messages: adapted.messages,
+      ...(specs === undefined ? {} : { tools: toAnthropicTools(specs) }),
     }),
   };
 }

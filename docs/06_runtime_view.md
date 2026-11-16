@@ -6754,3 +6754,32 @@ sequenceDiagram
 ```
 
 While the service is down, every vault-registry round retries the start; Settings → Background service reports it stopped, and a *Start* without a tickets vault answers the typed refusal with its setup hint.
+## 6.148 Pia changes persona settings; her read tools; the owner's instructions (req-315, milestone 286)
+
+```mermaid
+sequenceDiagram
+    actor O as Owner
+    participant CS as ChatService (Pia)
+    participant T as MissionTools (read-only seam)
+    participant CT as ChatTurn (bridge)
+    participant M as chat model
+    participant B as BoardService (personaPatch)
+    participant V as the tickets repository
+    Note over CS: system message: Pia's prompt + mission.md v6 + digest + ## Crew + ## Crew settings (values, no prompt texts) + ## The owner (the you persona's prompt.md)
+    O->>CS: "Raise Ben's budget to 10, and add to his instructions that he commits small."
+    CS->>CT: runTurn {…, tools}
+    CT->>M: the request carries tools (persona_read, ticket_read, vault_list/search/read)
+    M->>CT: tool_use persona_read tickets/_meta/personas/ben/prompt.md
+    CT->>T: call → host read → the file (cap 20k)
+    T-->>CT: "# Who Ben is …"
+    CT->>M: tool result (the round repeats, at most six)
+    M-->>CT: envelope: patchPersona {persona: ben, patch: {budget: 10, prompt: …}}
+    CS->>V: read the current prompt.md → planDelta old → new
+    CS-->>O: card "Patch Ben — budget $5 → $10; instructions: 2 edits · +1 −0" (+ the diff, phone/iPad/desk)
+    O->>CS: confirm
+    CS->>B: personas() re-read → chatPatchRefusalOf (Ben is an agent: fine) → personaPatch {budget: 10, prompt}
+    B->>V: one commit "personas: ben updated"
+    Note over CS,B: the human persona takes only title/summary/prompt/leaving, Mission Control's only hers + chatModel/skills — beyond a kind's fields the confirm refuses; values validate through personaPatchError, exactly like the Persona page's Save
+```
+
+The prompt texts ride no turn by default (owner, 2026-11-15): `## Crew settings` carries the fields' current values, and Pia reads a `prompt.md` on demand through `persona_read` — as she reads one ticket through `ticket_read` and your notes through the shared vault tools' `vault_list` / `vault_search` / `vault_read` (ADR-0071, `write: 'off'`, every registered vault, the vault seam owned by the chat service — the bridge never touches the vault). The tools are additive: a model that never calls one turns exactly as before. `## The owner` rides every mission turn and Pia's 1:1 when the persona found by `kind: human` carries a `prompt.md` — whatever it is titled.

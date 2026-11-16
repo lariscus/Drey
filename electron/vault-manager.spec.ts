@@ -459,6 +459,28 @@ describe('VaultManager renaming and moving', () => {
     expect(fs.readFileSync(path.join(a, 'b.md'), 'utf8')).toBe('b');
   });
 
+  it('renames to a new casing of the same name, a folder and a note with its sidecar (D-74)', async () => {
+    const { manager, a } = twoVaults();
+    put(a, 'Concepts/one.md', '1');
+    put(a, 'note.md', 'text');
+    put(a, '.note.chat.json', '{}');
+
+    await expect(manager.renameEntry('Concepts', 'concepts')).resolves.toBe('concepts');
+    await expect(manager.renameEntry('note.md', 'Note.md')).resolves.toBe('Note.md');
+
+    // existsSync resolves case-insensitively on Windows and macOS -- only
+    // the directory listing tells the on-disk casing apart.
+    const names = fs.readdirSync(a);
+    expect(names).toContain('concepts');
+    expect(names).toContain('Note.md');
+    expect(names).toContain('.Note.chat.json');
+    expect(names).not.toContain('Concepts');
+    expect(names).not.toContain('note.md');
+    expect(fs.readFileSync(path.join(a, 'concepts/one.md'), 'utf8')).toBe('1');
+    expect(fs.readFileSync(path.join(a, 'Note.md'), 'utf8')).toBe('text');
+    expect(fs.readFileSync(path.join(a, '.Note.chat.json'), 'utf8')).toBe('{}');
+  });
+
   it('moves a folder into another vault and leaves nothing behind', async () => {
     const rename = vi.fn(async () => undefined);
     const history = { capture: vi.fn(async () => true), rename } as unknown as NoteHistoryStore;

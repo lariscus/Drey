@@ -1,11 +1,14 @@
 /**
  * One SSE body of the Mission Control bridge (D-1): blank-line frames,
- * `data:` lines, `[DONE]` ignored. Every content delta reaches `onDelta` as
- * it arrives (the UI's live text); the full accumulated reply returns for
- * the envelope parse. The walk ends when the body ends or the client's
- * signal aborts it — there is no clock in here (D-63, ADR-0014).
+ * `data:` lines, `[DONE]` ignored. Every text delta reaches `onDelta` as it
+ * arrives (the UI's live text); the accumulated reply returns for the
+ * envelope parse — with the round's tool calls when the model made any
+ * (req-315, the shared `shared/llm` sinks accumulate both dialects'
+ * fragments). The walk ends when the body ends or the client's signal
+ * aborts it — there is no clock in here (D-63, ADR-0014).
  */
-import { deltaOf, type ChatDialect } from './chat-model';
+import { createAnthropicEventSink, createOpenAiChunkSink, type ChatToolCall } from '../../../../shared/llm';
+import type { ChatDialect } from './chat-model';
 
 /** The `data:` payload of one frame, its lines joined; '' for a frame without one. */
 function dataOf(frame: string): string {
@@ -21,8 +24,8 @@ export async function readSse(
   dialect: ChatDialect,
   onDelta: (delta: string) => void,
   signal: AbortSignal,
-): Promise<{ readonly text: string }> {
-  let text = '';
+): Promise<{ readonly text: string; readonly toolCalls: readonly ChatToolCall[] }> {
+  const sink = dialect === 'anthropic' ? createAnthropicEventSink() : createOpenAiChunkSink();
   let buffer = '';
   const decoder = new TextDecoder();
   for await (const chunk of body) {
@@ -37,12 +40,17 @@ export async function readSse(
       if (data === '' || data === '[DONE]') {
         continue;
       }
-      const delta = deltaOf(dialect, data);
+      let payload: unknown;
+      try {
+        payload = JSON.parse(data) as unknown;
+      } catch {
+        continue;
+      }
+      const delta = sink.push(payload);
       if (delta !== null && delta !== '') {
-        text += delta;
         onDelta(delta);
       }
     }
   }
-  return { text };
+  return { ...sink.result() };
 }

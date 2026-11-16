@@ -115,20 +115,22 @@ export function appendMission(text: string, now: Date, say: string, thought: str
   return `${base}${think}- '${now.toISOString()}' mission — ${say}\n`;
 }
 
-/** Appends a pending proposal line with its command block; returns the minted id. */
+/** Appends a pending proposal line with its command block — and, for a prompt patch, its before/after diff; returns the minted id. */
 export function appendProposal(
   text: string,
   now: Date,
   summary: string,
   command: ChatCommand,
+  diff?: string | null,
 ): { readonly text: string; readonly id: string } {
   const id = nextProposalId(text);
   const base = text.endsWith('\n') ? text : `${text}\n`;
+  const fenced = diff === undefined || diff === null || diff.trim() === '' ? '' : `  \`\`\`diff\n${diff.split('\n').map((line) => `  ${line}`).join('\n')}\n  \`\`\`\n`;
   return {
     id,
     text:
       `${base}- '${now.toISOString()}' proposal ${id} pending — ${summary}\n` +
-      `  \`\`\`json\n  ${JSON.stringify(command)}\n  \`\`\`\n`,
+      `  \`\`\`json\n  ${JSON.stringify(command)}\n  \`\`\`\n${fenced}`,
   };
 }
 
@@ -249,14 +251,36 @@ export function parseSessionFile(
         .trim();
       const json = /^```json\s*(.+?)\s*```$/.exec(block)?.[1] ?? null;
       const command = json === null ? null : validateChatCommand(safeJson(json), priorities);
+      const diffLines = proposalDiffOf(lines, i + 4);
       if (command !== null) {
-        proposals.push({ id: id!, state: 'pending', summary: summary!, command, at: at!, decidedAt: null, outcome: null });
+        proposals.push({
+          id: id!,
+          state: 'pending',
+          summary: summary!,
+          command,
+          at: at!,
+          decidedAt: null,
+          outcome: null,
+          ...(diffLines === null ? {} : { diff: diffLines }),
+        });
       }
       continue;
     }
-    const decided = /^- '([^']+)' proposal (p-\d+) (confirmed|dismissed) — (.*?)(?: → (.*))?$/.exec(line);
+    // The outcome is the last ` → ` tail: a patchPersona card's own old → new arrows stay in the summary.
+    const decided = /^- '([^']+)' proposal (p-\d+) (confirmed|dismissed) — (.*)$/.exec(line);
+    let decidedSummary: string | undefined = decided?.[4];
+    let decidedOutcome: string | null = null;
+    if (decidedSummary !== undefined) {
+      const cut = decidedSummary.lastIndexOf(' → ');
+      if (cut !== -1) {
+        decidedOutcome = decidedSummary.slice(cut + 3);
+        decidedSummary = decidedSummary.slice(0, cut);
+      }
+    }
     if (decided !== null) {
-      const [, at, id, state, summary, outcome] = decided;
+      const [, at, id, state] = decided;
+      const summary = decidedSummary;
+      const outcome = decidedOutcome;
       const existing = proposals.find((p) => p.id === id);
       if (existing !== undefined && existing.state === 'pending') {
         proposals[proposals.indexOf(existing)] = {
@@ -276,6 +300,18 @@ export function parseSessionFile(
 
 function rec(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+/** The ```diff fence a proposal may carry behind its command block (req-315, a prompt patch's before/after); null without one. */
+function proposalDiffOf(lines: readonly string[], from: number): string | null {
+  if (lines[from]?.trim() !== '```diff') {
+    return null;
+  }
+  const collected: string[] = [];
+  for (let j = from + 1; j < lines.length && lines[j]?.trim() !== '```'; j++) {
+    collected.push(lines[j]!.replace(/^ {2}/, ''));
+  }
+  return collected.length === 0 ? null : collected.join('\n');
 }
 
 function questionOptionsOf(value: unknown): ChatQuestionOption[] {

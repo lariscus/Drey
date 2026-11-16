@@ -408,7 +408,7 @@ describe('createChatBridge', () => {
 
     const body = JSON.parse(String(calls[0]!.init.body)) as { messages: { role: string; content: string }[] };
     const system = body.messages[0]!.content;
-    expect(system).toContain('exactly eight intents');
+    expect(system).toContain('exactly nine intents');
     expect(system).toContain('- promote —');
     expect(system).toContain('scout');
     // req-280: every command is listed with its fields and an example.
@@ -523,5 +523,162 @@ describe('createChatBridge', () => {
         { kind: 'setPriority', id: 'T-0002', priority: 'p0' },
       ],
     });
+  });
+});
+
+// -- req-315: the mission turn's read tools -----------------------------------
+
+/** A fetch stand-in serving the next round's frames on every call (the last round repeats). */
+function multiFetch(calls: RecordedCall[], rounds: string[][]): typeof fetch {
+  let round = 0;
+  return (async (url: unknown, init?: unknown) => {
+    calls.push({ url: String(url), init: (init ?? {}) as RequestInit });
+    const frames = rounds[Math.min(round, rounds.length - 1)]!;
+    round += 1;
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const frameBody of frames) {
+          controller.enqueue(encoder.encode(frameBody));
+        }
+        controller.close();
+      },
+    });
+    return new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+  }) as typeof fetch;
+}
+
+/** The OpenAI-style SSE frame for one complete tool call. */
+function toolFrame(id: string, name: string, args: string): string {
+  return `data: ${JSON.stringify({ choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id, function: { name, arguments: args } }] } }] })}\n\n`;
+}
+
+const ENVELOPE_FRAMES = [frame('{"say":"Ben builds what the plan says.","thought":null,"commands":[]}'), 'data: [DONE]\n\n'];
+
+describe('the mission turn read tools', () => {
+  const seam = {
+    specs: [{ name: 'persona_read', description: 'Read one persona file.', parameters: { type: 'object', properties: { path: { type: 'string' } } } }],
+    calls: [] as { name: string; args: Record<string, unknown> }[],
+    call: async function (name: string, args: Record<string, unknown>): Promise<string> {
+      this.calls.push({ name, args });
+      return '# Who Ben is';
+    },
+  };
+
+  it('the request carries the seam\'s tools; a tool call round repeats until the envelope answers (OpenAI)', async () => {
+    const calls: RecordedCall[] = [];
+    const bridge = createChatBridge({
+      crew: CREW,
+      config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
+      fetch: multiFetch(calls, [
+        [toolFrame('call-1', 'persona_read', '{"path":"tickets/_meta/personas/ben/prompt.md"}'), 'data: [DONE]\n\n'],
+        ENVELOPE_FRAMES,
+      ]),
+    });
+    const result = await bridge.runTurn({ text: 'What does Ben do?', history: [], board: BOARD, emit: () => undefined, tools: seam });
+    seam.calls = [];
+    expect(result).toEqual({ say: 'Ben builds what the plan says.', thought: null, commands: [] });
+    expect(calls).toHaveLength(2);
+    const first = JSON.parse(String(calls[0]!.init.body)) as { tools?: { type: string; function: { name: string } }[] };
+    expect(first.tools).toEqual([{ type: 'function', function: { name: 'persona_read', description: 'Read one persona file.', parameters: { type: 'object', properties: { path: { type: 'string' } } } } }]);
+    const second = JSON.parse(String(calls[1]!.init.body)) as { messages: { role: string; tool_calls?: unknown[]; tool_call_id?: string; content: string | null }[] };
+    const assistant = second.messages.find((message) => message.role === 'assistant' && message.tool_calls !== undefined);
+    expect(assistant).toBeDefined();
+    expect(second.messages.find((message) => message.role === 'tool')).toEqual({ role: 'tool', tool_call_id: 'call-1', content: '# Who Ben is' });
+  });
+
+  it('the arguments parse into the call; a broken call reaches the seam as an empty object', async () => {
+    const calls: RecordedCall[] = [];
+    const bridge = createChatBridge({
+      crew: CREW,
+      config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
+      fetch: multiFetch(calls, [[toolFrame('call-1', 'persona_read', '{broken'), 'data: [DONE]\n\n'], ENVELOPE_FRAMES]),
+    });
+    const spy = {
+      specs: seam.specs,
+      seen: null as Record<string, unknown> | null,
+      call: async (name: string, args: Record<string, unknown>): Promise<string> => {
+        spy.seen = args;
+        return 'x';
+      },
+    };
+    await bridge.runTurn({ text: 'x', history: [], board: BOARD, emit: () => undefined, tools: spy });
+    expect(spy.seen).toEqual({});
+  });
+
+  it('the Anthropic dialect sends input_schema and answers tool results in a user message', async () => {
+    const calls: RecordedCall[] = [];
+    const bridge = createChatBridge({
+      crew: CREW,
+      config: chatConfig({ 'chat.baseUrl': 'https://api.anthropic.com', 'chat.provider': 'anthropic', 'chat.model': 'claude-sonnet' }),
+      fetch: multiFetch(calls, [
+        [
+          `data: ${JSON.stringify({ type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 't1', name: 'persona_read' } })}\n\n`,
+          `data: ${JSON.stringify({ type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"path":"x"}' } })}\n\n`,
+          `data: ${JSON.stringify({ type: 'content_block_stop', index: 0 })}\n\n`,
+          `data: ${JSON.stringify({ type: 'message_delta', delta: { stop_reason: 'tool_use' } })}\n\n`,
+          'data: [DONE]\n\n',
+        ],
+        [
+          `data: ${JSON.stringify({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } })}\n\n`,
+          `data: ${JSON.stringify({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: '{"say":"Ben builds what the plan says.","thought":null,"commands":[]}' } })}\n\n`,
+          `data: ${JSON.stringify({ type: 'content_block_stop', index: 0 })}\n\n`,
+          `data: ${JSON.stringify({ type: 'message_delta', delta: { stop_reason: 'end_turn' } })}\n\n`,
+          'data: [DONE]\n\n',
+        ],
+      ]),
+    });
+    const result = await bridge.runTurn({ text: 'x', history: [], board: BOARD, emit: () => undefined, tools: seam });
+    seam.calls = [];
+    expect(result.say).toBe('Ben builds what the plan says.');
+    const first = JSON.parse(String(calls[0]!.init.body)) as { tools?: { name: string; input_schema?: unknown }[] };
+    expect(first.tools?.[0]?.name).toBe('persona_read');
+    expect(first.tools?.[0]?.input_schema).toBeDefined();
+    const second = JSON.parse(String(calls[1]!.init.body)) as { messages: { content: { type: string; tool_use_id?: string }[] }[] };
+    const toolResult = second.messages.flatMap((message) => message.content ?? []).find((block) => block.type === 'tool_result') as { tool_use_id: string } | undefined;
+    expect(toolResult?.tool_use_id).toBe('t1');
+  });
+
+  it('a model that never calls a tool answers in one round, and the seam is never asked', async () => {
+    const calls: RecordedCall[] = [];
+    const bridge = createChatBridge({
+      crew: CREW,
+      config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
+      fetch: multiFetch(calls, [ENVELOPE_FRAMES]),
+    });
+    const seen: unknown[] = [];
+    const counting = { specs: seam.specs, call: async (name: string, args: Record<string, unknown>) => (seen.push({ name, args }), 'x') };
+    const result = await bridge.runTurn({ text: 'x', history: [], board: BOARD, emit: () => undefined, tools: counting });
+    expect(result.say).toBe('Ben builds what the plan says.');
+    expect(seen).toEqual([]);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('the round cap ends honestly instead of looping forever', async () => {
+    const calls: RecordedCall[] = [];
+    const always = [toolFrame('call-1', 'persona_read', '{"path":"x"}'), 'data: [DONE]\n\n'];
+    const bridge = createChatBridge({
+      crew: CREW,
+      config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
+      fetch: multiFetch(calls, [always]),
+    });
+    const counting = { specs: seam.specs, count: 0, call: async (): Promise<string> => ((counting.count += 1), 'x') };
+    const result = await bridge.runTurn({ text: 'x', history: [], board: BOARD, emit: () => undefined, tools: counting });
+    expect(result.say).toContain('I ran out of rounds');
+    expect(result.commands).toEqual([]);
+    // Six tool rounds, then the seventh request whose answer cannot help any more.
+    expect(calls).toHaveLength(7);
+  });
+
+  it('a turn without a seam sends no tools field (the envelope alone, as before)', async () => {
+    const calls: RecordedCall[] = [];
+    const bridge = createChatBridge({
+      crew: CREW,
+      config: chatConfig({ 'chat.baseUrl': 'http://127.0.0.1:1234/v1', 'chat.model': 'glm-5' }),
+      fetch: multiFetch(calls, [ENVELOPE_FRAMES]),
+    });
+    await bridge.runTurn({ text: 'x', history: [], board: BOARD, emit: () => undefined });
+    const body = JSON.parse(String(calls[0]!.init.body)) as { tools?: unknown };
+    expect(body.tools).toBeUndefined();
   });
 });

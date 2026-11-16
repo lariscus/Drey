@@ -1,5 +1,5 @@
 import type { PersonaMessage } from '../contracts/persona-session';
-import { loadPersonaSkills, type Persona } from '../core/persona/persona';
+import { isHumanPersona, loadPersonaSkills, PERSONAS_DIR, type Persona } from '../core/persona/persona';
 import { expandShippedFragments } from '../core/config/prompt-file';
 import { BRIEF_RUNS, composeOneOnOneBrief, type BriefRun } from '../fleet/session/one-on-one-brief';
 import { NO_TOOLS, type OneOnOneToolSeam } from '../fleet/session/one-on-one-toolset';
@@ -10,6 +10,8 @@ import type { EngineHost, EngineVault } from './host';
 export interface PersonaSessionContextDeps {
   readonly host: EngineHost;
   readonly runs: () => Promise<readonly RunInfo[]>;
+  /** The crew's records, read fresh — the mission persona's brief carries the owner's instructions from them (req-315). */
+  readonly personas?: () => Promise<readonly Persona[]>;
   /** The tools attached to a 1:1 (req-217: the service's vault MCP); absent = none. */
   readonly tools?: OneOnOneToolSeam;
 }
@@ -37,11 +39,12 @@ export class PersonaSessionContext {
   async brief(vault: EngineVault, persona: Persona, conversation: readonly PersonaMessage[], provider: WorkerProviderId | null = null): Promise<string> {
     const read = (rel: string): Promise<string | null> => this.deps.host.read(vault.id, rel).catch(() => null);
     const folder = `tickets/_meta/personas/${persona.id}`;
-    const [prompt, memory, skills, runs] = await Promise.all([
+    const [prompt, memory, skills, runs, owner] = await Promise.all([
       read(`${folder}/prompt.md`),
       read(`${folder}/memory.md`),
       loadPersonaSkills(read, persona.id, persona.skills),
       this.deps.runs().catch(() => [] as readonly RunInfo[]),
+      this.ownerOf(vault, persona),
     ]);
     return composeOneOnOneBrief({
       id: persona.id,
@@ -55,6 +58,26 @@ export class PersonaSessionContext {
       conversation: conversation.map((m) => ({ role: m.role, text: m.text })),
       tools: (this.deps.tools ?? NO_TOOLS).attached({ persona: persona.id, provider }),
       workingDirectory: vault.path,
+      ...(owner === null ? {} : { owner }),
     });
+  }
+
+  /**
+   * req-315: the owner's own instructions for Mission Control's persona's brief — the human persona's `prompt.md`,
+   * found by `kind: human` (never by name); null for every other persona's brief, or when the owner wrote none.
+   */
+  private async ownerOf(vault: EngineVault, persona: Persona): Promise<{ readonly title: string; readonly prompt: string } | null> {
+    if (this.deps.personas === undefined || persona.kind !== 'mission') {
+      return null;
+    }
+    const human = await this.deps
+      .personas()
+      .then((personas) => personas.find((candidate) => isHumanPersona(candidate)))
+      .catch(() => undefined);
+    if (human === undefined) {
+      return null;
+    }
+    const prompt = ((await this.deps.host.read(vault.id, `${PERSONAS_DIR}/${human.id}/prompt.md`).catch(() => '')) ?? '').replace(/\r\n/g, '\n').trim();
+    return prompt === '' ? null : { title: human.title, prompt };
   }
 }

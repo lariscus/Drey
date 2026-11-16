@@ -12,6 +12,9 @@
  */
 import type { PriorityConfig, TicketPriority } from './tickets';
 import type { ClassName } from './capability-class';
+import type { PersonaAllowedPatch } from './persona-allowed';
+import type { PersonaSettingsPatch } from './persona-settings-patch';
+import type { PersonaLeavingAction } from '../core/persona/persona-settings';
 
 export type ChatRole = 'owner' | 'mission';
 export type ChatProposalState = 'pending' | 'confirmed' | 'dismissed';
@@ -66,6 +69,12 @@ export interface ChatProposal {
   readonly decidedAt: string | null;
   /** The outcome line the execution reported (e.g. the moved path). */
   readonly outcome: string | null;
+  /**
+   * req-315: the before/after of a `prompt` patch (the card's diff), as the
+   * model reads it — `@@ line N` groups, `- old` / `+ new` lines. Absent on
+   * every other card.
+   */
+  readonly diff?: string | null;
 }
 
 /**
@@ -134,7 +143,66 @@ export type ChatCommand =
    * persona's and the provider's ledgers, the vault's permission mode —
    * Pia never sets one).
    */
-  | { readonly kind: 'startSession'; readonly persona: string; readonly directory: string; readonly poolClass: ClassName | null; readonly brief: string };
+  | { readonly kind: 'startSession'; readonly persona: string; readonly directory: string; readonly poolClass: ClassName | null; readonly brief: string }
+  /**
+   * req-315: Pia proposes persona settings — the Persona page's field set,
+   * executed through the same `personaPatch` the page saves with. `prompt`
+   * replaces the persona's whole instructions file; the card carries the
+   * before/after diff. What a persona takes is checked at execution (the
+   * human and the mission persona are inert for the run fields).
+   */
+  | { readonly kind: 'patchPersona'; readonly persona: string; readonly patch: ChatPersonaPatch };
+
+/**
+ * The persona fields a patchPersona card may carry (req-315) — exactly the
+ * Persona page's editable set (no `color`, no file-only run keys: `needs`,
+ * the ceilings and `gate` stay edited in the file). Only the sent keys
+ * change, like `personaPatch` itself.
+ */
+export interface ChatPersonaPatch {
+  readonly title?: string;
+  /** A role of the crew's order (planner, builder, reviewer, tester, custom); agents only. */
+  readonly role?: string;
+  readonly summary?: string;
+  /** req-288: the capability class; agents only. */
+  readonly class?: string;
+  /** req-288: the pinned model as a pool entry; null = the next free model of the class; agents only. */
+  readonly model?: string | null;
+  /** req-293: Mission Control's persona's chat model; null = the assistant's own. */
+  readonly chatModel?: string | null;
+  /** The daily budget in USD; null clears it; agents only. */
+  readonly budget?: number | null;
+  readonly skills?: readonly string[];
+  /** The persona's whole new instructions file (`prompt.md`). */
+  readonly prompt?: string;
+  /** The "Allowed to" block: only the sent keys change. */
+  readonly allowed?: PersonaAllowedPatch;
+  /** The Work block: the persona's own pool and the instructed read-only. */
+  readonly settings?: {
+    readonly parallel?: number | null;
+    readonly min?: number;
+    readonly readOnly?: boolean | null;
+    readonly leaving?: readonly PersonaLeavingAction[];
+  };
+}
+
+/** One tool a mission turn may call before it answers (req-315): a name, what it is for, its JSON schema. */
+export interface ChatToolSpec {
+  readonly name: string;
+  readonly description: string;
+  readonly parameters: Record<string, unknown>;
+}
+
+/**
+ * The read-only tools of Pia's turns (req-315): the bridge offers the specs
+ * on the request and executes the model's calls through `call` — the chat
+ * service owns the toolset, the bridge never touches the vault. A result is
+ * the tool's text (a refusal is its `Error:` line).
+ */
+export interface ChatToolSeam {
+  readonly specs: readonly ChatToolSpec[];
+  call(name: string, args: Readonly<Record<string, unknown>>): Promise<string>;
+};
 
 /** One chat session = one file under `tickets/_meta/chat/`. */
 export interface ChatSession {
@@ -305,6 +373,13 @@ export interface ChatBridge {
      * system message. Absent = an ordinary mission turn.
      */
     readonly missionTicket?: { readonly id: string; readonly text: string };
+    /**
+     * req-315: the read-only tools of an ordinary mission turn — persona
+     * files, the owner's notes and tickets, offered on the request and
+     * executed between rounds. Absent = the turn answers from the system
+     * message alone (a shape turn reads its repository through `shape`).
+     */
+    readonly tools?: ChatToolSeam;
     /** D-7a: the tickets the owner named (T-0091, t-91, #91) read on demand — the full file and thread, a block of its own after the digest; never written to the session. */
     readonly named?: string;
     /**
