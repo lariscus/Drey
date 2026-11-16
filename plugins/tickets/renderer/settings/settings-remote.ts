@@ -1,7 +1,7 @@
-import type { DreyPluginApi } from '../../../../../shared/plugin-api/renderer';
-import type { RemoteStatus } from '../../../../../packages/tickets-engine/src/server/service';
-import { deviceListOf } from '../../../shared/device-list';
-import { el, textButton } from '../dom.ts/settings-dom';
+import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
+import type { RemoteStatus } from '../../../../packages/tickets-engine/src/server/service';
+import { deviceListOf } from '../../shared/device-list';
+import { el, textButton } from './settings-dom';
 
 /**
  * Settings → Tickets → Remote access (req-66, ADR-0086): switch the

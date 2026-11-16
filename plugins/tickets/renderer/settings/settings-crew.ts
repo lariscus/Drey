@@ -1,6 +1,6 @@
-import type { DreyPluginApi } from '../../../../../shared/plugin-api/renderer';
-import type { CrewConfigReply, CrewKey, CrewOverrideMap } from '../../../shared/crew-config';
-import { el } from '../dom.ts/settings-dom';
+import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
+import type { CrewConfigReply, CrewKey, CrewOverrideMap } from '../../shared/crew-config';
+import { el } from './settings-dom';
 
 type Loaded = Extract<CrewConfigReply, { ok: true }>;
 

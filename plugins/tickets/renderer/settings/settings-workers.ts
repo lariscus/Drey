@@ -1,7 +1,7 @@
-import type { DreyPluginApi } from '../../../../../shared/plugin-api/renderer';
-import { WORKER_PROVIDERS, type WorkerProviderId } from '../../../../../packages/tickets-engine/src/fleet/protocol';
-import { el, kv, textConfig } from '../dom.ts/settings-dom';
-import type { CrewSettings } from '../crew.ts/settings-crew';
+import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
+import { WORKER_PROVIDERS, type WorkerProviderId } from '../../../../packages/tickets-engine/src/fleet/protocol';
+import { el, kv, textConfig } from './settings-dom';
+import type { CrewSettings } from './settings-crew';
 
 /** One per-runner field: the plugin-config key it writes and how. */
 export interface RunnerField {

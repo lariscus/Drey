@@ -5,7 +5,7 @@
  * window, its cost factor (edited in place), its class as a menu, and the
  * switch that lets the router use it. Every edit writes the whole table.
  */
-import { el } from './dom.ts/settings-dom';
+import { el } from './settings-dom';
 import { modelsPayload, parseCostFactor, type ClassRowView } from './models-model';
 import { glyph, onEnterEscape, textField } from './models-dom';
 import type { ModelsState } from './models-state';

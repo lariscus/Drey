@@ -1,6 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports -- the spec stands in for the host, which owns the catalog at runtime
-import { i18n } from '../../../../../shared/i18n';
-import { TICKETS_ENTRIES, TICKETS_SECTIONS, ticketsEntries, ticketsSections } from '../sections.ts/settings-sections';
+import { i18n } from '../../../../shared/i18n';
+import { TICKETS_ENTRIES, TICKETS_SECTIONS, ticketsEntries, ticketsSections } from './settings-sections';
 
 describe('Settings -> Tickets sections (E13-22)', () => {
   it('has unique section ids and every entry points at a declared section', () => {
@@ -18,8 +18,9 @@ describe('Settings -> Tickets sections (E13-22)', () => {
 });
 
 describe('Settings -> Tickets, the board 7g sections and rows', () => {
-  it('lists the six headings of the board first, in its order', () => {
-    expect(TICKETS_SECTIONS.slice(0, 6).map((s) => s.label)).toEqual([
+  it('lists the repository lead first, then the six headings of the board, in its order', () => {
+    expect(TICKETS_SECTIONS.slice(0, 7).map((s) => s.label)).toEqual([
+      'Tickets repository',
       'Crew',
       'Flow',
       'Autopilot',
@@ -36,8 +37,8 @@ describe('Settings -> Tickets, the board 7g sections and rows', () => {
 });
 
 describe('Settings -> Tickets, board 7l (req-186)', () => {
-  it('puts Models right after Autopilot, as the board 7l nav has it, and the Skills library after Models (board 7o)', () => {
-    expect(ticketsSections(i18n).map((s) => s.label).slice(0, 6)).toEqual(['Crew', 'Flow', 'Autopilot', 'Models', 'Skills library', 'Budget and runners']);
+  it('puts the repository lead first, Models right after Autopilot (board 7l), and the Skills library after Models (board 7o)', () => {
+    expect(ticketsSections(i18n).map((s) => s.label).slice(0, 7)).toEqual(['Tickets repository', 'Crew', 'Flow', 'Autopilot', 'Models', 'Skills library', 'Budget and runners']);
   });
   it('points every entry at a section of the page, the Models ones included', () => {
     const ids = ticketsSections(i18n).map((s) => s.id);

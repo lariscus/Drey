@@ -1,14 +1,17 @@
-import type { PluginSettingsEntry, PluginSettingsSection } from '../../../../../shared/plugin-api/renderer';
-import type { I18n } from '../../../../../shared/i18n/types';
+import type { PluginSettingsEntry, PluginSettingsSection } from '../../../../shared/plugin-api/renderer';
+import type { I18n } from '../../../../shared/i18n/types';
 
 /**
  * Settings -> Tickets as sections (E13-22, SDK 1.46): the entries listed
  * under the category in Settings, in page order. The page marks the first
  * element of each part `data-settings-section="<id>"`. The headings are
  * board 7g's (Crew, Flow, Autopilot, Budget and runners, Walkthrough
- * videos, Devices); the store part closes the page.
+ * videos, Devices); the store part closes the page. The repository leads
+ * the page: the setup block while unconfigured (D-74), the store part's
+ * repository line once the board exists.
  */
 export const TICKETS_SECTIONS: readonly PluginSettingsSection[] = [
+  { id: 'repository', label: 'Tickets repository' },
   { id: 'crew', label: 'Crew' },
   { id: 'flow', label: 'Flow' },
   { id: 'autopilot', label: 'Autopilot' },

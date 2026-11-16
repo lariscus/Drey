@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
-import type { DreyPluginApi } from '../../../../../shared/plugin-api/renderer';
-import type { RemoteStatus } from '../../../../../packages/tickets-engine/src/server/service';
-import { createRemoteSection } from '../remote.ts/settings-remote';
+import type { DreyPluginApi } from '../../../../shared/plugin-api/renderer';
+import type { RemoteStatus } from '../../../../packages/tickets-engine/src/server/service';
+import { createRemoteSection } from './settings-remote';
 
 const NOW = Date.now();
 const ago = (ms: number): string => new Date(NOW - ms).toISOString();

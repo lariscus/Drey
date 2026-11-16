@@ -4,7 +4,7 @@
  * beside the Models page's (`models-dom.ts`), a small menu, the in-row
  * question before a removal and a persona's circle. Plain DOM, no state.
  */
-import { el } from './dom.ts/settings-dom';
+import { el } from './settings-dom';
 import { personaPictures } from '../team/persona-pictures';
 import { textButton } from './models-dom';
 

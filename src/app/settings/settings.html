@@ -59,7 +59,7 @@
           }
         </button>
         @if (category.sections?.length && isExpanded(category.id)) {
-          @for (section of category.sections; track section.id) {
+          @for (section of sectionsOf(category); track section.id) {
             <button
               type="button"
               class="section-entry"

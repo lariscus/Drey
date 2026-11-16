@@ -6,8 +6,8 @@
  * opens a bordered row on top. Pure parts are in `models-accounts-model.ts`.
  */
 import type { SlotView, WorkerProviderId } from '../../../../packages/tickets-engine/src/fleet/protocol';
-import { RUNNER_LABEL } from './workers.ts/settings-workers';
-import { el } from './dom.ts/settings-dom';
+import { RUNNER_LABEL } from './settings-workers';
+import { el } from './settings-dom';
 import {
   BILLING_KINDS,
   amountText,
