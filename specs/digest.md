@@ -100,6 +100,7 @@ One line per entry: its lead and the first date it names. Detail is one grep awa
 
 ### Excluded ideas
 
+- The Autopilot pulling from Prioritized, a required Prioritized gate, and the chat opening… (2026-11-16)
 - Drey Service started unconditionally, for a fallback vault (2026-11-15)
 - Tranches and checkpoint reports dropped (2026-11-15)
 - D-56 closed without a fix (2026-11-15)

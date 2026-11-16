@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shape with Paul: where the documents go</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+button{cursor:default;font:inherit}
+.vt{height:26px;padding:0 12px;display:flex;align-items:center;background:transparent;border:0;border-radius:4px;color:#b3b7bc;font-size:14px}
+.vt[aria-selected="true"]{background:#2c2d31;color:#f4f5f6;font-weight:600}
+.btn{box-sizing:border-box;height:26px;padding:0 10px;border:1px solid #747980;border-radius:6px;background:transparent;color:#f4f5f6;font-size:12px;white-space:nowrap}
+.btn.l{height:28px;font-size:13px;padding:0 12px;border-radius:8px}
+.btn.pri{background:#8ecbef;border-color:#8ecbef;color:#101113;font-weight:600}
+.btn.off{opacity:.5}
+.btn.q{border-color:transparent;color:#b3b7bc}
+.ib{box-sizing:border-box;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;padding:0;background:transparent;border:0;border-radius:4px;color:#b3b7bc;flex-shrink:0}
+.ib.hv{background:#3b3d42;color:#f4f5f6}
+.ib svg{display:block}
+.card{display:flex;flex-direction:column;gap:4px;padding:8px 10px;background:#2c2d31;border:1px solid #3b3d42;border-radius:8px;width:100%;box-sizing:border-box}
+.card.need{border-color:#747980}
+.cid{font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#b3b7bc}
+.ctop{display:flex;align-items:center;gap:6px;min-width:0}
+.sp{flex-grow:1}
+.ct{font-weight:600;font-size:13px;line-height:17px}
+.chain{display:flex;gap:2px}
+.ch{font-size:10px;line-height:14px;font-weight:700;padding:0 3px;border-radius:3px;color:#b3b7bc}
+.ch.now{background:#f2cfae;color:#101113}
+.ch.miss{border:1px dashed #747980;color:#b3b7bc}
+.who{display:flex;align-items:center;gap:6px;font-size:12px;line-height:16px}
+.stl{display:flex;align-items:flex-start;gap:6px;color:#b3b7bc;font-size:12px;line-height:16px}
+.dot{width:7px;height:7px;margin-top:4px;flex-shrink:0;border-radius:50%;display:inline-block}
+.dot.run{background:#93c47f}
+.dot.need{background:#e8a25a;box-shadow:0 0 6px rgba(232,162,90,.7)}
+.dot.wait{background:transparent;border:1.5px solid #747980;box-sizing:border-box}
+.row{display:flex;gap:6px}
+.row .btn{flex:1 1 0}
+.lbl{font-size:12px;color:#b3b7bc;margin:0 0 6px}
+.cap{font-size:12px;line-height:16px;color:#b3b7bc;margin-top:6px}
+.sec{font-size:15px;font-weight:600;margin:0 0 12px}
+.menu{border:1px solid #3b3d42;border-radius:8px;background:#222326;padding:4px;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.mi{height:30px;padding:0 10px;display:flex;align-items:center;gap:8px;border-radius:4px;font-size:13px;color:#f4f5f6}
+.mi.sel{background:#3b3d42}
+.mi.dis{color:#747980}
+.mi small{margin-left:auto;color:#b3b7bc;font-size:12px}
+.msep{height:1px;background:#3b3d42;margin:4px 0}
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border:1px solid #3b3d42;border-radius:11px;font-size:12px;color:#f4f5f6;white-space:nowrap}
+.pill .dot{margin:0}
+.strip{border:1px solid #3b3d42;border-radius:8px;background:#222326;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-sizing:border-box}
+.sg{display:grid;grid-template-columns:70px minmax(0,1fr);gap:4px 12px;font-size:13px}
+.sg span:nth-child(odd){color:#b3b7bc}
+.why{display:flex;align-items:center;gap:8px;font-size:13px;color:#f4f5f6}
+.why svg{flex-shrink:0}
+.toast{display:flex;align-items:center;gap:12px;border:1px solid #747980;border-radius:8px;background:#2c2d31;padding:8px 12px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.lr{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 12px;font-size:14px;line-height:18px;box-sizing:border-box}
+.lr small{display:block;color:#b3b7bc;font-size:13px}
+.gh{height:28px;display:flex;align-items:center;padding:8px 12px 0;font-weight:600;font-size:13px;gap:6px}
+.gh span{color:#b3b7bc;font-weight:400}
+</style>
+</helmet>
+<div style="width: 1480px; height: 830px; background: #18191b; color: #f4f5f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif; font-size: 13px; line-height: 18px; overflow: hidden; position: relative">
+<div style="position:absolute;left:30px;top:24px;right:30px"><div class="sec">Where Paul’s documents go — the project’s document folder</div><div style="display:flex;gap:40px;align-items:flex-start;margin-bottom:34px"><div style="width:560px"><div class="lbl">1 · Settings → Projects · the project names where its documents go</div><div class="strip" style="width:560px;gap:2px">
+<div style="font-weight:600;font-size:15px;margin-bottom:6px">Notes</div>
+<div style="display:grid;grid-template-columns:130px minmax(0,1fr);gap:12px;align-items:center;min-height:34px"><span style="color:#b3b7bc">Repositories</span><span><span style="color:#b3b7bc">None</span></span></div>
+<div style="display:grid;grid-template-columns:130px minmax(0,1fr);gap:12px;align-items:center;min-height:34px"><span style="color:#b3b7bc">Vaults</span><span>Drey notes <b style="font-weight:600">Write</b> · Work notes Read</span></div>
+<div style="display:grid;grid-template-columns:130px minmax(0,1fr);gap:12px;align-items:center;min-height:34px"><span style="color:#b3b7bc">Documents</span><span><span style="display:inline-flex;align-items:center;justify-content:space-between;gap:12px;min-width:170px;height:28px;padding:0 10px;border:1px solid #3b3d42;border-radius:6px;color:#f4f5f6;box-sizing:border-box">Drey notes<span style="color:#b3b7bc">▾</span></span>&nbsp;&nbsp;<span style="display:inline-flex;align-items:center;min-width:170px;height:28px;padding:0 10px;border:1px solid #3b3d42;border-radius:6px;box-sizing:border-box">concepts</span></span></div></div><div class="cap">One vault from those marked Write, and a folder inside it. The folder is created with the first document.</div></div><div style="width:560px"><div class="lbl">2 · The same page, no vault marked Write</div><div class="strip" style="width:560px;gap:2px">
+<div style="font-weight:600;font-size:15px;margin-bottom:6px">Notes</div>
+<div style="display:grid;grid-template-columns:130px minmax(0,1fr);gap:12px;align-items:center;min-height:34px"><span style="color:#b3b7bc">Repositories</span><span><span style="color:#b3b7bc">None</span></span></div>
+<div style="display:grid;grid-template-columns:130px minmax(0,1fr);gap:12px;align-items:center;min-height:34px"><span style="color:#b3b7bc">Vaults</span><span>Drey notes Read · Work notes Read</span></div>
+<div style="display:grid;grid-template-columns:130px minmax(0,1fr);gap:12px;align-items:center;min-height:34px"><span style="color:#b3b7bc">Documents</span><span><span style="display:inline-flex;align-items:center;justify-content:space-between;gap:12px;min-width:170px;height:28px;padding:0 10px;border:1px solid #3b3d42;border-radius:6px;color:#747980;box-sizing:border-box">No vault marked Write<span style="color:#b3b7bc">▾</span></span></span></div><div class="why" style="margin-left:142px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e0bb6e" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"></path><path d="M12 10v4"></path><path d="M12 17v.5"></path></svg><span>Documents need a vault marked Write</span></div></div><div class="cap">The row says why it is empty; marking a vault Write above enables it.</div></div></div>
+<div style="display:flex;gap:40px;align-items:flex-start;margin-bottom:34px"><div style="width:560px"><div class="lbl">3 · Ticket pane · a ticket without a repository</div><div class="strip" style="width:560px"><div style="display:flex;align-items:center;gap:8px"><span class="cid">T-0001</span><b style="font-size:14px">Concept: how the capture reaches the vault</b><span class="sp"></span><span class="pill"><span class="dot need"></span>Shaping with you</span></div>
+<div class="sg"><span>Flow</span><span><b>Paul (1 of 2)</b> · You</span><span>Repo</span><span style="color:#b3b7bc">none</span><span>Documents</span><span style="display:flex;flex-direction:column;gap:4px"><span style="display:flex;align-items:center;gap:8px">concepts/capture-to-vault.md<span style="color:#b3b7bc">· Drey notes</span><span class="sp"></span><span class="ib" title="Open document" aria-label="Open document"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H10l-5 4v-4H4z"></path></svg></span></span><span style="display:flex;align-items:center;gap:8px">concepts/open-questions.md<span style="color:#b3b7bc">· Drey notes</span><span class="sp"></span><span class="ib" title="Open document" aria-label="Open document"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H10l-5 4v-4H4z"></path></svg></span></span></span></div>
+<div style="display:flex;gap:8px;justify-content:flex-end"><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Thread</span><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Change</span><span class="btn l pri" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Shaping done</span></div></div><div class="cap">The Documents row appears once a deliverable exists; the ticket keeps the paths (x-docs), the project keeps the files.</div></div><div style="width:380px"><div class="lbl">4 · The chat · the document is a card, not pasted text</div><div style="width:380px;border:1px solid #3b3d42;border-radius:8px;background:#222326;padding:12px 16px;display:flex;flex-direction:column;gap:10px;font-size:14px;line-height:21px">
+<div style="color:#b3b7bc;font-size:13px">Paul via Mission Control</div>
+<div>The concept is written. It has three sections: the capture path, the vault write, and the open questions.</div>
+<div class="toast" style="width:max-content;max-width:100%"><span>Paul wrote concepts/capture-to-vault.md</span><span class="btn q" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Open</span></div></div><div class="cap">Paul writes through the vault tools into the project’s folder, under the project’s Write right and his persona’s write-notes.</div></div><div style="width:300px"><div class="lbl">5 · Files panel · an ordinary folder of a vault</div><div style="width:300px;background:#222326;border:1px solid #3b3d42;border-radius:8px;padding:8px 0">
+<div style="height:28px;display:flex;align-items:center;padding:0 12px;font-weight:600">Drey notes</div>
+<div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 12px 0 12px;"><span style="color:#b3b7bc">▾</span>concepts</div>
+<div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 12px 0 28px;background:#2c2d31;"><span style="color:#b3b7bc"></span>capture-to-vault.md<span style="margin-left:auto;font-size:12px;padding:0 6px;border:1px solid #3f5a35;border-radius:4px;color:#93c47f">new</span></div>
+<div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 12px 0 28px;background:#2c2d31;"><span style="color:#b3b7bc"></span>open-questions.md<span style="margin-left:auto;font-size:12px;padding:0 6px;border:1px solid #3f5a35;border-radius:4px;color:#93c47f">new</span></div>
+<div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 12px 0 28px;"><span style="color:#b3b7bc"></span>runner-event-stream.md</div>
+<div style="display:flex;align-items:center;gap:8px;height:28px;padding:0 12px 0 12px;"><span style="color:#b3b7bc">▸</span>daily</div>
+</div><div class="cap">The owner opens, edits and live-edits it in the standard editor.</div></div></div>
+<div style="display:flex;gap:40px;align-items:flex-start"><div style="width:560px"><div class="lbl">6 · No repository and a builder in the flow</div><div class="strip" style="width:560px"><div style="display:flex;align-items:center;gap:8px"><span class="cid">T-0001</span><b style="font-size:14px">Concept: how the capture reaches the vault</b><span class="sp"></span><span class="pill"><span class="dot need"></span>Shaping with you</span></div>
+<div class="sg"><span>Flow</span><span><b>Paul (1 of 5)</b> · Ben · Ralf · Tessa · You</span></div>
+<div class="why"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e0bb6e" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l9 16H3z"></path><path d="M12 10v4"></path><path d="M12 17v.5"></path></svg><span>Ben has no repository to work in</span></div>
+<div style="display:flex;gap:8px;justify-content:flex-end"><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Add repository</span><span class="btn l" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Change flow</span><span class="btn l pri off" role="button" style="display:inline-flex;align-items:center;justify-content:center;gap:6px">Shaping done</span></div></div><div class="cap">Said before Shaping done, not after a refused run. Add repository opens Settings → Projects; Change flow opens the flow editor.</div></div></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1480,"height":830}}'>
+class Component extends DCLogic {
+renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -45,10 +45,10 @@ reviewed one after another. **Accepted by the owner on 2026-11-15** (*"Passt"*, 
 written in the standard editor with live edit). The canvas keeps its own `canvas.json`; no PNGs were exported yet — open
 the canvas to see them.
 
-The ticket-to-Shape boards (`ShapeStart`, `ShapeFirst`, `ShapeBlocked`, `MPhoneShapeStart`) were drawn on 2026-11-16 from
+The ticket-to-Shape boards (`ShapeStart`, `ShapeFirst`, `ShapeBlocked`, `MPhoneShapeStart`, `ShapeDocs`) were drawn on 2026-11-16 from
 [../concept-ticket-to-shape.md](../concept-ticket-to-shape.md): how a ticket gets to Paul and what the card, the ticket and the
-chat say at every step, and what a control does when something is missing. **Proposed — awaiting the owner's decision**
-(rows req-318 – req-325). Unlike the canvas boards above they are drawn straight as HTML (generated, inline styles, the
+chat say at every step, what a control does when something is missing, and where Paul's documents go. **Proposed; the owner decided D1 (a), D2 (a) and D6
+on 2026-11-16** (rows req-318 – req-324, req-326 – req-330). Unlike the canvas boards above they are drawn straight as HTML (generated, inline styles, the
 Anthrazit tokens of the boards they sit beside) and rendered to PNG with headless Edge at their own size; they are not on a
 canvas, so `canvas.json` and `notes.md` do not list them.
 
@@ -171,6 +171,7 @@ above.
 | 7z · The first shaping: ticket open, the Assistant on Mission Control with *T-0141.md attached*, *Paul is shaping · 40 s*, the locked document (*Paul is editing · Stop*), the Tickets row under *Running*, the toast *Started T-0141 with Paul · Undo* — **proposed 2026-11-16, req-319/320** | `ShapeFirst` | 1440×900 | desktop |
 | 7aa · When something is missing the control explains and offers the fix: no Assistant model, Drey Service not running, no persona, Autopilot off, a run holds the ticket, a refused move, read-only, the empty board, the toast after *New idea* — **proposed 2026-11-16, req-322** | `ShapeBlocked` | 1480×930 | desktop |
 | 7ab · Shape with Paul on the phone: Work with *Needs you*, the idea's ticket with the full-width button, the ticket in the chat with *Shaping done* — **proposed 2026-11-16, req-320** | `MPhoneShapeStart` | 1310×904 (three 390×844 frames) | phone |
+| 7ac · Where Paul's documents go: Settings → Projects' *Documents* row (a Write vault and a folder; and with no Write vault, disabled with its reason), the ticket pane's *Documents* row on a ticket without a repository, Paul's card *Paul wrote concepts/capture-to-vault.md · Open*, the folder in the Files panel, *Ben has no repository to work in* before *Shaping done* — **proposed 2026-11-16, req-326 – req-329, req-322** | `ShapeDocs` | 1480×830 | desktop |
 
 The older boards one folder up (`Home`, `Ticket`, `Workers`, `Ready`,
 `Shaping`, `Orchestrator`, `Phone*` of 2026-10-31) are superseded by the
